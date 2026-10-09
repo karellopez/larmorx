@@ -1,0 +1,62 @@
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "larmorx"
+description = "Neuroimaging tools in Rust (ANTs/ITK, AFNI and FreeSurfer ports; clean-room FSL- and Workbench-like tools) with Python wrappers and compatible CLIs"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+keywords = ["neuroimaging", "mri", "fmri", "registration", "preprocessing"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Typing :: Typed",
+]
+dynamic = ["version"]
+dependencies = []
+
+[project.optional-dependencies]
+# Pipeline-only dependencies (PLAN.md §2.2); library users do not need them.
+prep = ["templateflow", "matplotlib", "nilearn", "pandas", "jinja2"]
+
+[project.scripts]
+larmorx = "larmorx.cli:main"
+lx = "larmorx.cli:main"
+larmorprepx = "larmorx.pipelines.larmorprepx.cli:main"
+
+[project.urls]
+Repository = "https://github.com/karellopez/larmorx"
+Issues = "https://github.com/karellopez/larmorx/issues"
+
+[dependency-groups]
+test = ["pytest>=8", "packaging"]
+lint = ["ruff==0.16.10"]
+dev = ["maturin>=1.15,<2", { include-group = "test" }, { include-group = "lint" }]
+
+[tool.maturin]
+manifest-path = "crates/larmorx-py/Cargo.toml"
+python-source = "python"
+module-name = "larmorx._core"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+addopts = ["--import-mode=importlib"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["python", "tests/python"]
+# Python code blocks in the docs are illustrative; do not reformat them.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]

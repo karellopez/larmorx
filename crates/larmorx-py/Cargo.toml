@@ -1,0 +1,21 @@
+[package]
+name = "larmorx-py"
+description = "Python bindings of larmorx: the larmorx._core extension module"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "_core"
+# cdylib: the shared library that Python imports as larmorx._core.
+crate-type = ["cdylib"]
+# Tested from Python (tests/python); a Rust test harness would have to link libpython.
+test = false
+doctest = false
+
+[dependencies]
+larmorx-cli.workspace = true
+larmorx-core.workspace = true
+pyo3.workspace = true

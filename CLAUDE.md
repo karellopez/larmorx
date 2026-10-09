@@ -28,9 +28,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 ## Status (2026-10-09)
 - **Planning only; no code yet.** Next actions are in PLAN.md §15.
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
-- **Decided:** names (D1) and distributions (D3), see above.
+- **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
 - **Pending decisions** are in PLAN.md §16. Until the user decides, use these defaults:
-  - Apache-2.0 for our code
   - neutral names for clean-room tools
   - Python ≥ 3.12
   - FreeSurfer v8.2.0 as the port target

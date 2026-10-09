@@ -55,12 +55,17 @@ Newest entries last. Each entry records what was decided, by whom, and why.
 - **Where the rule is recorded:** CLAUDE.md (hard rule 9) and the README's contributing section.
 - **Privacy:** the repo's local git config uses the user's GitHub no-reply email, so their personal address is not exposed in public commits.
 
+## 2026-10-09: Licence decided (D2)
+- **User decision:** our code is licensed under **Apache-2.0**.
+- `LICENSE` holds the Apache-2.0 text and `NOTICE` the project notice. Ported ANTs/ITK code will add its upstream NOTICE entries there.
+- FreeSurfer-derived code stays in the separate `larmorx-freesurfer` wheel under its own licence terms (D3).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |
 |---|---|---|---|
 | D1 | Names | `larmorx` (package, repo, CLI `larmorx`/`lx`, crates `larmorx-*`); pipeline `larmorprepx` | **decided 2026-10-09** |
-| D2 | Licence of our code | Apache-2.0 | open |
+| D2 | Licence of our code | Apache-2.0 | **decided 2026-10-09** |
 | D3 | Distributions | wheel `larmorx` (library + larmorprepx via the `[prep]` extra), wheel `larmorx-freesurfer`, standalone CLI | **decided 2026-10-09** |
 | D4 | Names of clean-room tools | neutral names with documented compatibility | open |
 | D5 | FreeSurfer version to port | v8.2.0, also validated against 7.4.x | open |

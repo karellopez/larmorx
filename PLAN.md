@@ -611,7 +611,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | # | Decision | Recommendation |
 |---|---|---|
 | D1 | Names | **Decided 2026-10-09:** project/package `larmorx` (repo `github.com/karellopez/larmorx`, `import larmorx as lx`, CLI `larmorx`/`lx`, crates `larmorx-*`); pipeline `larmorprepx`, inside the package. All were free on PyPI, crates.io and GitHub that day |
-| D2 | Licence of our code | **Apache-2.0** |
+| D2 | Licence of our code | **Decided 2026-10-09:** Apache-2.0 |
 | D3 | Distributions | **Decided with D1:** wheel `larmorx` (library + larmorprepx pipeline via the `[prep]` extra) and wheel `larmorx-freesurfer` (licence isolation); plus standalone CLI binaries |
 | D4 | Names for clean-room tools | **Neutral names** (`mri.hmc`, `mri.brain_mask`, `mri.pepolar`, …) with documented compatibility ("accepts mcflirt-style options"), not the FSL/Workbench program names |
 | D5 | FreeSurfer version to port | **v8.2.0**, also validated against 7.4.x |

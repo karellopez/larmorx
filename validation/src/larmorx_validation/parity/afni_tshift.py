@@ -795,7 +795,11 @@ def _highlights(results: list[CaseResult]) -> list[str]:
         lines.append(
             "- Not bit-identical outside Fourier: "
             + ", ".join(f"`{c}`" for c in rest)
-            + " (`-no_detrend`, whose last float32 bit is not reproduced yet; see the API page)."
+            + ". Known causes, in the last float32 bit only: `-no_detrend` (its rounding is "
+            "not reproduced yet); quintic and heptic weights for some fractions (unresolved); "
+            "weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not "
+            "correctly rounded, and larmorx uses correctly rounded functions "
+            "(`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`."
         )
     rows = []
     for category in sorted({r.category for r in compared}):

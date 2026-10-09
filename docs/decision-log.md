@@ -180,6 +180,28 @@ ported.
 - **MSM's optimiser is patent-encumbered.** Patents cover the method, however it is coded,
   so it is still not implemented.
 
+## 2026-10-09: Replica and original for every restricted upstream (`docs/licensing.md`)
+- **User direction:** "I need the most accurate output possible … only those functions can be
+  under that licence … we should do that in all the software we are trying to replicate …
+  maybe we should have a clean-room version too … would be interesting to have both."
+- **Decision: two tracks.**
+  - **Replica:** a bit-exact port under the upstream's licence, in a package per licence
+    family: `larmorx-gpl` (GPL-3.0-or-later, for AFNI's MCW files and Workbench, both
+    GPL-2.0-or-later), `larmorx-nc` (FSL Licence, non-commercial), `larmorx-freesurfer`.
+  - **Original:** a strict clean-room implementation, Apache-2.0, in the main package.
+  - `implementation="auto"` uses the replica when it is installed.
+- **Licence facts behind it:**
+  - AFNI's MCW code and Workbench allow "any later version", so GPL-3 works. GPL-3 may
+    include Apache-2.0 code.
+  - The FSL Licence allows modified copies without financial return, with its conditions
+    passed on and the source included. It is incompatible with the GPL, so `larmorx-nc`
+    and `larmorx-gpl` stay apart.
+  - MSM_HOCR's ELC library forbids public distribution of derivatives, and FastPD is
+    patented, so MSM gets no published replica.
+- **Options weighed** (all-GPL, originals only, replicas only, private replicas, one wheel per
+  upstream) are listed in `docs/licensing.md`. Earlier the same day, the decisions went from
+  strict clean-room to "read, never translate"; this entry supersedes both.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

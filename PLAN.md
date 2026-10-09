@@ -542,20 +542,22 @@ def bold_pipeline(run, anat, fmap, s):
 | Source | Licence | Treatment |
 |---|---|---|
 | ANTs, ITK | Apache-2.0 | **port**; keep LICENSE and NOTICE, mark modifications, record files in PROVENANCE |
-| AFNI | public domain (NIH) + **GPL-2 for code copyrighted by the Medical College of Wisconsin** (most of the older core, e.g. 3dTshift, csfft, mrilib) + other third-party exceptions | NIH files: **port** after a per-routine check; MCW GPL-2 files: **read, then implement originally** (no translation; decided 2026-10-09) |
+| AFNI | public domain (NIH) + **GPL-2.0-or-later for code copyrighted by the Medical College of Wisconsin** (most of the older core, e.g. 3dTshift, csfft, mrilib) + other third-party exceptions | NIH files: **port** (main package); MCW files: **replica** in `larmorx-gpl` (GPL-3.0-or-later) + **clean-room original** in the main package |
 | FreeSurfer | FreeSurfer Software License v1.0 | **port** into `larmorx-freesurfer` only; carry the licence and preface; audit third-party files; atlases per D6 |
 | sdcflows / fMRIPrep / nitransforms code | Apache-2.0 / MIT | may port with attribution |
-| FSL | non-commercial | **read, never translate**: source may be read; original implementation only (decided 2026-10-09) |
-| Connectome Workbench | GPL-2.0-or-later | **read, never translate**: source may be read; original implementation only (decided 2026-10-09) |
-| MSM_HOCR | non-commercial; patent-encumbered optimiser | may be read and run as an oracle; do not implement the patented optimiser; fsaverage-based fsLR registration for now |
+| FSL | FSL Licence (non-commercial; transmission without financial return, with conditions passed on and source included) | **replica** in `larmorx-nc` + **clean-room original** in the main package |
+| Connectome Workbench | GPL-2.0-or-later | **replica** in `larmorx-gpl` (GPL-3.0-or-later) + **clean-room original** in the main package |
+| MSM_HOCR | non-commercial; ELC: no public distribution of derivatives; FastPD: patented | no published replica; may be read and run as an oracle; original without the ELC/FastPD methods; fsaverage-based fsLR registration for now |
 | tedana | LGPL-2.1 | implement from the published equations; tedana is a test oracle only |
 | Our own code | **Apache-2.0** (D2) | – |
 
-**Licence-restricted sources** (FSL, Workbench, MSM_HOCR, AFNI's MCW GPL-2 files):
-- The clones stay outside the working tree (`reference_src/`).
-- They may be read to understand behaviour. The implementation is original, never a
-  translation. Decision of 2026-10-09; it replaced the earlier strict clean-room rule.
-- `specs/<tool>.md` records the behaviour, and validation compares with the upstream binary.
+**Licence-restricted upstreams: replica + original.** See `docs/licensing.md` (decided
+2026-10-09):
+- Restricted upstreams get both a bit-exact replica, under the upstream's licence in a
+  separate package (`larmorx-gpl`, `larmorx-nc`, `larmorx-freesurfer`), and a clean-room
+  original in the Apache-2.0 main package.
+- `implementation="auto"` picks the replica when it is installed.
+- MSM_HOCR gets no published replica (ELC licence, FastPD patents).
 
 **Naming:**
 - larmorprepx and larmorx must not present themselves as fMRIPrep, ANTs, FreeSurfer, AFNI or FSL.
@@ -598,7 +600,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | ANTs parity (MI sampling, optimiser scales, SyN regularisation) | ANTsPy in-process oracle on every PR; deterministic configurations first; variability bands for stochastic ones |
 | FreeSurfer port subtleties | Step-level oracle; mixed mode; profiling before optimising |
 | "Same results" disputes | Published variability-band methodology and metrics per tool; status labels (`experimental` / `validated` / `stable`) |
-| Licence contamination | Read-never-translate rule for restricted sources; PROVENANCE; `cargo deny`; separate FreeSurfer wheel |
+| Licence contamination | Replica/original tracks in separate packages (`docs/licensing.md`); SPDX headers; PROVENANCE; `cargo deny` per directory |
 | API sprawl (three interfaces per tool) | CLI parsing written once in Rust; Python wrappers and stubs partly generated; CI enforces the per-tool contract |
 | Windows/ARM-specific bugs | All six targets in CI from day one; deep-path and spaces-in-path tests |
 

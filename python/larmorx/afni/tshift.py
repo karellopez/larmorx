@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 25.2.09)."""
 
 from __future__ import annotations

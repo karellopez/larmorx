@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Benchmarks of antsApplyTransforms: larmorx against ANTs on real fMRIPrep resampling jobs.
 
 Both tools run the same command line on the same files, in-process: ANTs through ANTsPy's

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! NIfTI-1 and NIfTI-2 images: `.nii`, `.nii.gz`, and `.hdr`/`.img` pairs (optionally gzipped),
 //! in either byte order.
 //!

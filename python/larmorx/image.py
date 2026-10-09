@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``Image``: the in-memory image type shared by every larmorx tool."""
 
 from __future__ import annotations

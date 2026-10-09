@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """NIfTI parity with nibabel on the test-data catalog (see validation/).
 
 Runs the `nifti-io` parity suite case by case. Needs larmorx-testdata, larmorx-validation and

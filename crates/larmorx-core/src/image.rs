@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Images: voxel arrays placed in world space by an affine.
 
 use ndarray::{Array, Dimension, Ix3, Ix4, IxDyn};

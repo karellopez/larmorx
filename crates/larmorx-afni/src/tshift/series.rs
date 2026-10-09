@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! What happens to one voxel's time series (`specs/3dTshift.md` §4–§5).
 //!
 //! Arithmetic is float32 except where the spec (or a black-box observation) says otherwise;

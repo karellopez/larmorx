@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Smoke tests of the installed package: import, version and command lines."""
 
 import importlib.metadata

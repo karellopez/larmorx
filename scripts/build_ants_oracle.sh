@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Build the ANTs command-line programs from the pinned release tags, as parity oracles.
 #
 # ANTsPy runs most ANTs programs in-process, but not all of them (ImageMath, for one), and

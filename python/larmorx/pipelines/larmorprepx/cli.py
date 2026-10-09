@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The ``larmorprepx`` command (stub: only ``--version`` and ``--help`` work)."""
 
 import argparse

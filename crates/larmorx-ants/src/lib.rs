@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! ANTs tools for larmorx (PLAN.md §5), ported from ANTs v2.6.5 and the ITK v5.4.5 filters
 //! they run on. See `PROVENANCE.md`.
 //!

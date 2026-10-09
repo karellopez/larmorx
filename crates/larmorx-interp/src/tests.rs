@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Properties every interpolator must have; parity with ITK is checked by the validation suite.
 
 use super::*;

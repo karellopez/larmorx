@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! 4×4 affine transforms between voxel indices and world coordinates.
 
 use std::fmt;

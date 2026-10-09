@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Complex FFTs in double precision for lengths `2^a · 3^b · 5^c`.
 //!
 //! A self-sorting (Stockham) mixed-radix transform with radix-4, -2, -3 and -5 stages, written

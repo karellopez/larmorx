@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Parity checks: larmorx against the reference implementations it re-implements."""
 
 from larmorx_validation.parity.harness import (

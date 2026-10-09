@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The ``larmorx`` command line and its alias ``lx``.
 
 Arguments are parsed once, in Rust (crate ``larmorx-cli``), so the console scripts behave

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! ITK transform files: text (`.txt`, `.tfm`), MATLAB v4 (`.mat`), and displacement fields
 //! stored as NIfTI vector images (`.nii`, `.nii.gz`).
 //!

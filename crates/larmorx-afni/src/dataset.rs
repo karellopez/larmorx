@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Datasets held as AFNI holds them, and AFNI's rules for reading and writing NIfTI
 //! (`specs/3dTshift.md` §6).
 //!

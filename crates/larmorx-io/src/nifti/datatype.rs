@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! NIfTI `datatype` codes.
 
 use larmorx_core::element::DataType;

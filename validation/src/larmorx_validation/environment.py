@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A record of the environment a parity run or benchmark ran in."""
 
 from __future__ import annotations

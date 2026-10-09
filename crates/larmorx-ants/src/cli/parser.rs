@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! ANTs' command-line parser (`Utilities/antsCommandLineParser.cxx` and
 //! `antsCommandLineOption.cxx`, ANTs v2.6.5), so arguments are read exactly as ANTs reads them.
 //!

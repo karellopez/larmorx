@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``lx.afni.tshift`` and ``larmorx afni 3dTshift``: behaviour that does not need AFNI (parity
 with AFNI itself is in ``tests/parity`` and ``validation/``)."""
 

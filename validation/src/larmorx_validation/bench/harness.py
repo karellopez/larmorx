@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Timing harness: warm-up, repeated runs, robust statistics."""
 
 from __future__ import annotations

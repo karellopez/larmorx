@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Small fixed-size linear algebra (3×3 and 4×4), in f64.
 //!
 //! Everything here is written out explicitly, without fused multiply-add, so results are the

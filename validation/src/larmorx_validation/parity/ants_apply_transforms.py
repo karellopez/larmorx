@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Parity of ``larmorx ants antsApplyTransforms`` with antsApplyTransforms (ANTs 2.6.5).
 
 Both programs get the same arguments and files. ANTs runs in-process through ANTsPy's

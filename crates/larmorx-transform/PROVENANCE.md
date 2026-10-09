@@ -16,5 +16,5 @@ order, because that order decides bit-identity with ANTs
 | `TransformChain` (the `-t` list as ANTs builds it: options last first, composites expanded, inverses by `GetInverseTransform`) | ANTs v2.6.5 (`fdce4d2f84b6`): `Examples/itkantsRegistrationHelper.h`, `GetCompositeTransformFromParserOption` | Apache-2.0 |
 
 `larmorx_core::linalg::inverse3_itk` reproduces `itk::Matrix::GetInverse`
-(`Modules/Core/Common/include/itkMatrix.h`, an SVD inverse through vnl) exactly for signed
-permutations of diagonal matrices. Other matrices use a cofactor inverse.
+(`Modules/Core/Common/include/itkMatrix.h`, an SVD inverse through vnl) exactly: it is an
+operation-for-operation port of vnl's SVD inverse (`larmorx-core`, `vnl_svd.rs`).

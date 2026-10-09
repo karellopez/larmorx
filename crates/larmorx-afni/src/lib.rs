@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! AFNI-compatible tools for larmorx (PLAN.md §5).
 //!
 //! AFNI's programs are GPL-2, so these are **clean-room** re-implementations: they were

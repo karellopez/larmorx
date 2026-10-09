@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 //! Correctly rounded sine for binary64 (`sin`).
 //!
 //! Port of CORE-MATH `src/binary64/sin/sin.c` at commit 040ee482a8ca

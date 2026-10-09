@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! The volume type every filter takes and returns.
 
 /// A 3D image: voxels in Fortran order (`x` fastest), its size and its spacing (mm).

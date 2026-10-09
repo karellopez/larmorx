@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Build AFNI command-line programs from the pinned release tag, as parity oracles.
 #
 # AFNI publishes binaries only for its latest version, so the oracle for the version we port

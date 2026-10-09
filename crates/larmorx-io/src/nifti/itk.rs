@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! How ITK 5.4.5 (and so ANTs) places a NIfTI-1 image in physical space.
 //!
 //! ITK reads NIfTI through nifti_clib (`nifti_convert_nhdr2nim`) and then chooses between the

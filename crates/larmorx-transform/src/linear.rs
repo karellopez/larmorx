@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! ITK's linear transforms (the `MatrixOffsetTransformBase` family).
 //!
 //! Every type maps a point as `y = M·x + offset`, with `offset = t + c − M·c` for the

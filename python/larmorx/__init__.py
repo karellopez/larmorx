@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """larmorx: neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool.
 
 Use it as ``import larmorx as lx``::

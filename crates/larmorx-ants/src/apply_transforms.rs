@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! `antsApplyTransforms`: resampling an image through a chain of transforms.
 //!
 //! Ported from ANTs v2.6.5 (`Examples/antsApplyTransforms.cxx`) and ITK v5.4.5

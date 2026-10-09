@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Benchmarks of 3dTshift: larmorx against AFNI 25.2.09 on real BOLD runs.
 
 Both tools run fMRIPrep's command line (``-ignore 0 -tzero -TR -tpattern @file``, the default

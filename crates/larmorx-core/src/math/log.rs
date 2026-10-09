@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 //! Correctly rounded natural logarithm of binary64 values: [`log`].
 //!
 //! `log(x)` is the binary64 value nearest to the exact ln x (round-to-nearest, ties-to-even),

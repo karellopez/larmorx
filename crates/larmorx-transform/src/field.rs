@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Displacement fields (ITK's `DisplacementFieldTransform`).
 //!
 //! A point `x` (LPS) maps to `x + d(x)`, where `d` is the field linearly interpolated at `x`.

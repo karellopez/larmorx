@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Parity of NIfTI reading and writing with nibabel.
 
 For every NIfTI file of the test-data catalog, larmorx and nibabel read the file and must

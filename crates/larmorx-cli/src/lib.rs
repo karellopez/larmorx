@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! The `larmorx` multicall command line (alias `lx`), PLAN.md §4 item 3.
 //!
 //! Usage is `larmorx <family> <tool> [original arguments]`, where each tool accepts the

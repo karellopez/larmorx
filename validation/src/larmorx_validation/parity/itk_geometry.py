@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Parity of larmorx's reading of NIfTI geometry *as ITK does it* with ANTsPy.
 
 ANTs works in ITK physical space, and ITK chooses between a header's qform and sform with

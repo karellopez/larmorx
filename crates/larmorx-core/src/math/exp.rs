@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 //! Correctly rounded exponential `exp(x)` for binary64 (CORE-MATH's `cr_exp`), in pure Rust.
 //!
 //! The result is `e^x` rounded to the nearest `f64` (ties to even) for every input, so it is

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Command line: ``python -m larmorx_validation parity <suite> [--tier smoke] [--out DIR]``."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Array comparisons for parity checks.
 
 ``identical`` is the strictest test: same shape, same dtype, and the same value in every

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``antsApplyTransforms`` and ``antsApplyTransformsToPoints``."""
 
 from __future__ import annotations

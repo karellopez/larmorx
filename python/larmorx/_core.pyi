@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Type stubs for the compiled extension module (crate ``larmorx-py``)."""
 
 from typing import Any

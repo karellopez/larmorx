@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Runs the standalone `larmorx` and `lx` binaries as separate processes.
 
 use std::process::{Command, Output};

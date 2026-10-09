@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ANTs tools ported to Rust: ``lx.ants``.
 
 Each function reproduces the ANTs program it is named after (ANTs v2.6.5 on ITK v5.4.5); the

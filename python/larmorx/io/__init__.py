@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Reading and writing images (NIfTI-1/2 for now)."""
 
 from larmorx.io.nifti import (

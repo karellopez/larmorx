@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Arrays whose element type is known only at run time (e.g. after reading a file).
 
 use ndarray::ArrayD;

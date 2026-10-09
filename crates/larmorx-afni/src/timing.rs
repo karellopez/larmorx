@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Slice acquisition times: AFNI's named patterns, the NIfTI header's slice-timing fields,
 //! and the default time origin (`specs/3dTshift.md` §3).
 //!

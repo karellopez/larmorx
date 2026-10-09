@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """NIfTI-1/2 reading and writing (``.nii``, ``.nii.gz``, ``.hdr``/``.img`` pairs).
 
 The format is implemented in Rust (crate ``larmorx-io``) with nibabel's semantics: the same

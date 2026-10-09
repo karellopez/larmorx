@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! The NIfTI-1 and NIfTI-2 header.
 //!
 //! [`NiftiHeader`] holds every on-disk field of either version (NIfTI-1 values are widened

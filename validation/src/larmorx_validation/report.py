@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Small helpers for writing Markdown and JSON reports."""
 
 from __future__ import annotations

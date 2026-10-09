@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Recreate the larmorx workspace on a new machine.
 #
 # The workspace root is the directory that contains this repo (larmorx/). Upstream

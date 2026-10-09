@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """3dTshift against AFNI itself, through the AFNI 25.2.09 binary (see validation/)."""
 
 import os

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! The original ANTs command lines (`larmorx ants <tool> ...`).
 
 pub mod apply_transforms;

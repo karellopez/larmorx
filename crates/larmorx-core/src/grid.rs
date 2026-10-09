@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Sampling grids in ITK's physical space (LPS mm).
 //!
 //! A grid is what ITK calls an image's geometry: size, spacing, origin and direction cosines.

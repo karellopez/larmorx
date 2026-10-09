@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Spatial transforms for larmorx (PLAN.md §5), in ITK's conventions.
 //!
 //! Transforms map **LPS** physical points, as ITK and ANTs do. [`LinearTransform`] covers

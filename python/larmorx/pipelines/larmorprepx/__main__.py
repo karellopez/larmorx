@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``python -m larmorx.pipelines.larmorprepx``: same as the ``larmorprepx`` command."""
 
 import sys

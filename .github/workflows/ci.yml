@@ -41,6 +41,8 @@ jobs:
         run: |
           ruff check
           ruff format --check
+      - name: SPDX licence headers (docs/licensing.md)
+        run: python scripts/check_spdx.py
 
   # Build the wheel and run the Rust and Python tests on each of the six target platforms.
   test:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Round trips through files: every type, version, byte order and file layout.
 
 use std::path::{Path, PathBuf};

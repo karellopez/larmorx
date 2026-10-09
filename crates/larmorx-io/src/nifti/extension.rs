@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Header extensions (NIfTI-1 §"extensions"): `esize`, `ecode`, then `esize - 8` bytes.
 
 use std::io::{self, Read, Write};

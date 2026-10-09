@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``lx.transforms`` and ``lx.ants``: behaviour that does not need ANTs (parity with ANTs is in
 ``tests/parity`` and ``validation/``)."""
 

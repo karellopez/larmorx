@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Unit quaternions ⇄ 3×3 rotation matrices.
 //!
 //! The quaternion is `[w, x, y, z]` (w is the scalar part), as in NIfTI's qform and nibabel.

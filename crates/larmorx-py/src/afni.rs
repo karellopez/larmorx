@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Bindings for `larmorx_afni` (`lx.afni`).
 //!
 //! Images cross as numpy arrays in AFNI's storage types (`uint8`, `int16`, `float32`) and

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """NIfTI geometry as ITK reads it, against ANTsPy (see validation/)."""
 
 import os

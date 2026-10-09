@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Mathematical morphology with ball structuring elements (ITK's
 //! `BinaryBallStructuringElement`, `Binary{Erode,Dilate}ImageFilter`,
 //! `BinaryMorphological{Opening,Closing}ImageFilter`, `Grayscale{Erode,Dilate}ImageFilter`,

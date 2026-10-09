@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Install Docker Engine on Ubuntu from Docker's official apt repository, so that the
 # fMRIPrep and FreeSurfer oracles (PLAN.md §11.1) can run on this machine.
 #

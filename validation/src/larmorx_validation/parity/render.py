@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Markdown report of a parity run (the validation record of the per-tool contract)."""
 
 from __future__ import annotations

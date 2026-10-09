@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Parity of ``larmorx afni 3dTshift`` with AFNI 25.2.09's ``3dTshift``.
 
 Both programs get the same arguments and files. AFNI runs as its own binary (built by

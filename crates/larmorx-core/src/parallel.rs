@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Running work on an explicit number of threads.
 //!
 //! Every larmorx entry point takes `n_threads` (CLAUDE.md rule 5): there is no global thread

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """larmorx.Image and NIfTI reading/writing (no external test data needed)."""
 
 import gzip

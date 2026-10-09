@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! `antsApplyTransforms` with its original arguments (ANTs v2.6.5).
 //!
 //! Supported: 3D scalar images (`-e 0`) and time series (`-e 3`, also with `--time-index`),

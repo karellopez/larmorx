@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Correctly rounded transcendental functions (CLAUDE.md rule 5, decided 2026-10-09).
 //!
 //! Each function returns the exact result rounded to the nearest `f64` (ties to even). So

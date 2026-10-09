@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """antsApplyTransforms against ANTs itself, through ANTsPy (see validation/)."""
 
 import os

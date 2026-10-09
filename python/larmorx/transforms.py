@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ITK transform files: ``lx.transforms``.
 
 Transforms are kept in ITK's stored form: a class name, parameters and fixed parameters

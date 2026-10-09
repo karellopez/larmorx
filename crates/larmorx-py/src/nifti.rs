@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Bindings for `larmorx_io::nifti`.
 //!
 //! Headers cross the boundary as dicts whose keys are the fields of the Python

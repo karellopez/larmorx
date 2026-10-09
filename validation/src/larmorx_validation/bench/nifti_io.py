@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Benchmarks of NIfTI reading and writing: larmorx vs nibabel and SimpleITK.
 
 Reads include materialising the voxel array: nibabel loads lazily and memory-maps uncompressed

@@ -17,6 +17,9 @@ handling and operation order
 | `windowed_sinc`, `window` (cosine, Hamming, Welch, Lanczos, Blackman; radius 3, constant boundary) | ITK v5.4.5: `itkWindowedSincInterpolateImageFunction.h/.hxx`, `Modules/Core/Common/include/itkConstantBoundaryCondition.hxx` | Apache-2.0 |
 | `vnl::erf` (`vnl_erf`, `vnl_gamma_p`, series and continued fraction, `vnl_log_gamma`) | VXL as bundled with ITK v5.4.5: `Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_erf.h`, `vnl_gamma.cxx` | BSD (VXL) |
 
-**Deliberate difference:** `exp`, `log`, `sin` and `cos` come from the `libm` crate (CLAUDE.md
-rule 5), not the platform's math library. Where ITK uses them, results can differ from ANTs
-by an ulp. See [docs/findings/platform-math.md](../../docs/findings/platform-math.md).
+**Deliberate difference:** `exp`, `log`, `sin` and `cos` come from `larmorx_core::math`
+(correctly rounded CORE-MATH ports, CLAUDE.md rule 5), not the platform's math library. They
+agree with glibc, and so with ANTs on Linux, except where glibc is not correctly rounded
+(about 0.003 % of `exp`/`log` calls and 0.15 % of `sin`/`cos` calls); there a result can
+differ by an ulp. `pow` (the B-spline prefilter's pole powers) still comes from the `libm`
+crate. See [docs/findings/platform-math.md](../../docs/findings/platform-math.md).

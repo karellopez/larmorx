@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Shared foundation of larmorx (PLAN.md §5): format-independent in-memory types.
 //!
 //! - [`Affine`]: 4×4 voxel-to-world transforms (RAS+ mm), with LPS conversion for ITK/ANTs.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 //! 128-bit floating-point ("dint") arithmetic for the accurate paths of the correctly rounded
 //! functions in [`super`].
 //!

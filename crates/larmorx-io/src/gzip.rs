@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! gzip compression in parallel, with output independent of the number of threads.
 //!
 //! The input is cut into fixed-size blocks. Each block is deflated independently, primed with

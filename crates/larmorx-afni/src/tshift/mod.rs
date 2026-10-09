@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Slice-timing correction: AFNI's `3dTshift` (`specs/3dTshift.md`).
 //!
 //! Every voxel's series is detrended, shifted in time so that its slice refers to the common

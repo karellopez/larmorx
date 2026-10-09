@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! The `larmorx._core` extension module: Python bindings of the larmorx crates.
 //!
 //! Built by maturin into the `larmorx` wheel (abi3, CPython >= 3.12). The idiomatic Python

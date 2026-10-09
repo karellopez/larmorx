@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! AFNI's "1D" text format, as far as `3dTshift -tpattern @file` uses it.
 //!
 //! The rules were established by running AFNI 25.2.09 on test files (`specs/3dTshift.md`

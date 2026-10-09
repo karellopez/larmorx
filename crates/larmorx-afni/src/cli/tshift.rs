@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! `3dTshift` with its original arguments (the behaviour of AFNI 25.2.09,
 //! `specs/3dTshift.md` §3 and §7).
 //!

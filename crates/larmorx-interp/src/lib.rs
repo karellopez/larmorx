@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Image interpolators for larmorx (PLAN.md §5), ported from ITK v5.4.5.
 //!
 //! An interpolator evaluates a 3D image at a **continuous index** (voxel coordinates). Each one

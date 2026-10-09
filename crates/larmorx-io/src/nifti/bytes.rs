@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Reading and writing header fields in a given byte order.
 
 use super::header::ByteOrder;

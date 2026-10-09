@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! File names: single `.nii` / `.nii.gz` files and `.hdr` + `.img` pairs.
 
 use std::path::{Path, PathBuf};

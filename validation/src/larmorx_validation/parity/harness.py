@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The parity harness: run a suite of cases, each comparing larmorx with a reference tool.
 
 A case ends in one of five states:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 //! Correctly rounded cosine for binary64 (`cos`).
 //!
 //! Port of CORE-MATH `src/binary64/cos/cos.c` at commit 040ee482a8ca

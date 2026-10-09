@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AFNI-compatible tools: ``lx.afni``.
 
 AFNI is GPL-2, so these are clean-room re-implementations: written from behaviour specs,

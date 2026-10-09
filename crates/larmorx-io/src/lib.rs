@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! File formats for larmorx (PLAN.md §5), in pure Rust.
 //!
 //! - [`nifti`]: NIfTI-1 and NIfTI-2 (`.nii`, `.nii.gz`, `.hdr`/`.img` pairs), read and written

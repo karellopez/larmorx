@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! Bindings for `larmorx_ants`, `larmorx_transform` and the ITK readers of `larmorx_io`.
 //!
 //! Transforms cross the boundary in ITK's stored form, as lists of

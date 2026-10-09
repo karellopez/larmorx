@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-interp"
+description = "Image interpolators for larmorx, ported from ITK (linear, nearest, B-spline, Gaussian, label, windowed sinc)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+libm.workspace = true
+rayon.workspace = true
+thiserror.workspace = true

@@ -1,6 +1,9 @@
 # larmorx
 
-**Status: early development.** Available now: `lx.Image` and NIfTI-1/2 reading and writing, [validated against nibabel](docs/validation/nifti-io.md) (252 files, bit-identical data) and [faster than nibabel and SimpleITK](docs/benchmarks/nifti-io.md) (compressed writes 4–8× faster with threads). No neuroimaging tools yet.
+**Status: early development.** Available now:
+- `lx.Image` and NIfTI-1/2 reading and writing, [validated against nibabel](docs/validation/nifti-io.md) (252 files, bit-identical data) and [faster than nibabel and SimpleITK](docs/benchmarks/nifti-io.md) (compressed writes 4–8× faster with threads);
+- `lx.ants.apply_transforms` / `larmorx ants antsApplyTransforms`, [validated against ANTs](docs/validation/ants-apply-transforms.md) (63 of 79 cases bit-identical, all agree);
+- `lx.afni.tshift` / `larmorx afni 3dTshift`, a clean-room implementation [validated against AFNI](docs/validation/afni-tshift.md) (217 of 217 compared cases agree, 158 bit-identical) and [2–6× faster](docs/benchmarks/afni-tshift.md).
 
 **larmorx** is a library of neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool:
 - tools from ANTs/ITK, AFNI and FreeSurfer, ported to Rust
@@ -19,6 +22,8 @@ uv tool install "larmorx[prep]"      # plus the larmorprepx pipeline command   (
 |---|---|
 | [PLAN.md](PLAN.md) | the plan |
 | [CLAUDE.md](CLAUDE.md) | project context and rules for contributors |
+| [docs/overview.md](docs/overview.md) | the project in plain terms: replicas and clean-room originals, packages, installation, what is published |
+| [docs/licensing.md](docs/licensing.md) | how each upstream's licence is handled |
 | [docs/decision-log.md](docs/decision-log.md) | decisions so far |
 | [docs/analysis/](docs/analysis/) | what fMRIPrep computes, in detail |
 

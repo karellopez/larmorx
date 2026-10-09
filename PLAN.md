@@ -1,12 +1,13 @@
 # larmorx: plan
 
-**Status:** draft v0.3.1, 2026-10-09.
+**Status:** draft v0.3.2, 2026-10-10.
 
 **History:**
 - v0.1 proposed forking fMRIPrep.
 - v0.2 proposed a new Python pipeline that uses ANTsPy.
 - v0.3: **port ANTs as well.** The project becomes a Rust library of the best functions from existing neuroimaging tools. Each tool has its own Python wrapper and CLI. The preprocessing pipeline is written in Python on top of that library.
-- v0.3.1 (this version): the project is named **larmorx** (repo `github.com/karellopez/larmorx`). The pipeline, **larmorprepx**, lives *inside* the larmorx package.
+- v0.3.1: the project is named **larmorx** (repo `github.com/karellopez/larmorx`). The pipeline, **larmorprepx**, lives *inside* the larmorx package.
+- v0.3.2 (this version): a replica and a clean-room original for every licence-restricted upstream ([docs/licensing.md](docs/licensing.md)); better algorithms are the default once validated (D11). Plain-language summary: [docs/overview.md](docs/overview.md).
 
 **Background material** in [docs/analysis/](docs/analysis/) describes what fMRIPrep computes, in detail (stages, tools, parameters, file:line). It is the specification for the ports and the pipeline:
 
@@ -62,6 +63,7 @@
   - Results can be resumed through a stage cache; no graph engine.
 - **G3 Native on all six targets**, installed with `pip`/`uv`. No Docker, no external neuroimaging installs, no admin rights.
 - **G4 Equivalent results.** Differences from the original tool are no larger than that tool's own variability across versions, platforms, thread counts and seeds (§11).
+  - **Better algorithms by default (D11, decided 2026-10-10).** larmorx should be an evolution of the upstreams, not only a copy. An improved algorithm (faster, more accurate or more robust) becomes the default once its results meet G4. Improvements that move results beyond that band stay opt-in. Replicas always stay exact.
 - **G5 Fast.** Targets, to be confirmed by benchmarks:
   - the fMRI pipeline at least 2× faster than fMRIPrep
   - larmorx ports of ANTs tools at least as fast as ANTs on equal threads
@@ -167,14 +169,15 @@ larmorx/                          this repo (github.com/karellopez/larmorx)
 | `motion_correction` (antsMotionCorr) | 2 | CLI compatibility only; implemented with `lx.mri.hmc` |
 | TimeVaryingVelocity / Exponential / Demons transforms, point-set metrics | 3 | – |
 
-### 3.2 `lx.afni`: AFNI tools (NIH code ported; MCW GPL-2 code clean-room)
+### 3.2 `lx.afni`: AFNI tools (NIH code ported; MCW GPL-2 code: replica in `larmorx-gpl` + clean-room original)
 
 AFNI is public domain except for "major portions copyrighted by the Medical College of
 Wisconsin", which are GPL-2. Translating such code to Rust would make a GPL-2 derivative,
-because the GPL counts translations as modifications. Decision (2026-10-09, user): the source
-may be read to understand behaviour, but the implementation must be original. That means our
-own design and structure, no line-by-line translation, a spec in `specs/<tool>.md`, and
-validation against an AFNI oracle built from the pinned tag (`scripts/build_afni_oracle.sh`). Every tool needs a per-routine
+because the GPL counts translations as modifications. Decision (2026-10-09, user; see
+[docs/licensing.md](docs/licensing.md)): each MCW tool gets a bit-exact replica in
+`larmorx-gpl` (GPL-3.0-or-later) and a clean-room original in the main package, written from
+a spec in `specs/<tool>.md` and validated against an AFNI oracle built from the pinned tag
+(`scripts/build_afni_oracle.sh`). The `tshift` original is done (2026-10-10). Every tool needs a per-routine
 licence check: newer NIH programs, such as 3dAutomask, 3dUnifize, 3dQwarp, 3dDespike and
 3dTproject, still call MCW library routines.
 
@@ -203,7 +206,8 @@ These are named by function, not by the original tool (D4). Each tool's docs sta
 | `multiecho` | tedana t2smap (LGPL; implemented from the equations, not the code) | 1 | Posse 1999; Kundu 2012 |
 | `maths`, `stats` | fslmaths, fslstats syntax | 1 (the subset used), 2 (broader) | definitions |
 | `surfmap` | wb_command volume-to-surface-mapping, metric-resample (ADAP_BARY_AREA), metric-dilate, surface-resample, create-signed-distance-volume, sphere project-unproject, fill-holes, remove-islands, CIFTI helpers | 1 (for surfaces) | Workbench documentation; Glasser et al. 2013 |
-| `fnirt`-like, `melodic`-like, MSM-like | – | 3 | research |
+| MSM-like spherical registration | MSM (MSMSulc) | 2, with the surfaces track | Robinson et al. 2014, 2018; an optimiser free of the FastPD and ELC methods, after a patent check (decision log 2026-10-10) |
+| `fnirt`-like, `melodic`-like | – | 3 | research |
 
 ### 3.4 `lx.freesurfer`: FreeSurfer port (FreeSurfer licence, separate wheel)
 
@@ -360,7 +364,7 @@ How a port gets faster:
 | Better data structures (BVH/spatial hash for intersection tests, cache-friendly meshes) | no |
 | SIMD | no (with `libm` and a fixed operation order) |
 | Better optimisers for the *same* objective (L-BFGS, multigrid, proper convergence tests) | slightly; validate per step |
-| Algorithm substitutions (learned segmentation, other spherical registration) | yes; opt-in "fast" profiles only |
+| Algorithm substitutions (learned segmentation, other spherical registration) | yes; the default once results meet G4 (D11), opt-in otherwise |
 
 **"Same results"** means differences no larger than FreeSurfer's own cross-version and cross-platform variability (Gronenschild et al. 2012). FreeSurfer is not bit-reproducible across versions or operating systems.
 
@@ -479,7 +483,7 @@ def bold_pipeline(run, anat, fmap, s):
   - `larmorprepx templates fetch` and `--offline-bundle` for air-gapped HPC.
   - `larmorprepx doctor` checks the environment: disk, RAM, cgroups, Windows long paths, synced folders.
 - **Docker/Apptainer** images built from the same wheels (optional, for HPC).
-- **Supply chain:** PyPI trusted publishing, SBOM, `cargo deny`. The licence policy is enforced: no GPL or non-commercial crates; FreeSurfer-licensed code only in `larmorx-freesurfer`.
+- **Supply chain:** PyPI trusted publishing, SBOM, `cargo deny`. The licence policy is enforced per package: no GPL, non-commercial or FreeSurfer-licensed crates in the main package; each replica package only with its own family (docs/licensing.md).
 - **Cross-platform checklist** (from [04-engine-portability.md](docs/analysis/04-engine-portability.md)):
   - `spawn` only, never `fork`
   - ≤ 61 worker processes on Windows
@@ -547,7 +551,7 @@ def bold_pipeline(run, anat, fmap, s):
 | sdcflows / fMRIPrep / nitransforms code | Apache-2.0 / MIT | may port with attribution |
 | FSL | FSL Licence (non-commercial; transmission without financial return, with conditions passed on and source included) | **replica** in `larmorx-nc` + **clean-room original** in the main package |
 | Connectome Workbench | GPL-2.0-or-later | **replica** in `larmorx-gpl` (GPL-3.0-or-later) + **clean-room original** in the main package |
-| MSM_HOCR | non-commercial; ELC: no public distribution of derivatives; FastPD: patented | no published replica; may be read and run as an oracle; original without the ELC/FastPD methods; fsaverage-based fsLR registration for now |
+| MSM_HOCR | non-commercial; ELC: no public distribution of derivatives; FastPD: patented | no published replica; may be read and run as an oracle; clean-room original in the surfaces track, without the ELC/FastPD methods, after a patent check; fsaverage-based fsLR registration until then |
 | tedana | LGPL-2.1 | implement from the published equations; tedana is a test oracle only |
 | Our own code | **Apache-2.0** (D2) | – |
 
@@ -639,6 +643,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | D8 | Output compatibility | **fMRIPrep-compatible derivative names and confound columns** |
 | D9 | Minimum Python | **3.12** |
 | D10 | First milestone | **M1 Preview** (pipeline usable early on x64 with interim ANTsPy), while the ANTs port proceeds |
+| D11 | Default when an improved algorithm exists | **Decided 2026-10-10:** the improvement, once its results meet G4; opt-in otherwise. Replicas stay exact |
 
 ---
 

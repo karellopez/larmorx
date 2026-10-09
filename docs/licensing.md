@@ -23,8 +23,8 @@ and lives in the main package.
 | AFNI, files copyrighted by the Medical College of Wisconsin | GPL "Version 2 (or any later edition)" (`doc/README/README.copyright`) | ✓ `larmorx-gpl`, as GPL-3.0-or-later | ✓ main package |
 | Connectome Workbench | GPL-2.0-or-later (file headers: "version 2 … or (at your option) any later version") | ✓ `larmorx-gpl`, as GPL-3.0-or-later | ✓ main package |
 | FSL | FSL Licence: non-commercial. Modification and transmission allowed "without financial return", if the licence conditions are imposed on the receiver and all original and amended source is included (`~/fsl/LICENCE.FSL`) | ✓ `larmorx-nc`, under the FSL Licence's terms | ✓ main package |
-| FreeSurfer | FreeSurfer Software License v1.0 | ✓ `larmorx-freesurfer` (planned, D3) | optional, for parts worth it |
-| MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded) |
+| FreeSurfer | FreeSurfer Software License v1.0: derived works and redistribution allowed, also commercially, if the licence text with its required preface ships with them, notices are kept and modifications marked. Every user inherits "research use only" and an indemnity in MGH's favour | ✓ `larmorx-freesurfer` (planned, D3) | not planned (not required; revisit for single parts if needed) |
+| MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, in the surfaces track, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded). First step: a patent check of FastPD and HOCR |
 | tedana | LGPL-2.1 | possible in an LGPL package; not planned | ✓ main package (from the published equations) |
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
 
@@ -43,14 +43,40 @@ command-line binary. Code from different families is never linked into one binar
 - **`larmorx-gpl` and `larmorx-nc` are separate,** and neither may link the other. The FSL
   Licence's non-commercial and "impose these conditions" clauses are incompatible with the
   GPL, which forbids added restrictions.
-- **In the repository:**
+- **In the repository** (all in this one repository; for FSL decided 2026-10-10):
   - `crates/` holds the Apache crates;
   - `crates-gpl/`, `crates-nc/` and `crates-freesurfer/` hold the others, each directory
     with its own `LICENSE`;
+  - `crates-nc/` also holds FSL's original source files for every replicated part: the FSL
+    Licence requires "all original and amended source code" in any transmitted product;
   - every source file carries an SPDX header;
   - `cargo deny` enforces the allowed licences per directory.
 - **Names:** no package may present itself as AFNI, FSL, Workbench or FreeSurfer (PLAN.md
   §12); "nc" stands for non-commercial.
+
+## Publishing
+
+**Published in this repository:**
+- our own code, specs and docs, and the clean-room originals;
+- replicas of permissive upstreams, with their notices (`NOTICE`, `PROVENANCE.md`);
+- the replica directories (`crates-gpl/`, `crates-nc/`, `crates-freesurfer/`), each under
+  its upstream's terms:
+  - GPL: the GPL text, the upstream copyright notices, changes marked. Once wheels ship,
+    the GPL requires the source to be public anyway.
+  - FSL: free of charge only, the FSL Licence passed on, FSL's original source included.
+  - FreeSurfer: the licence with its required preface, notices kept, marked as modified, no
+    MGH or FreeSurfer names used for promotion.
+- the scripts that build the oracles (they fetch and compile upstreams; they contain none
+  of their code).
+
+**Never published:**
+- the upstream clones, `tags/` and `reference_src/` (outside the repository), except the
+  FSL source that `crates-nc/` must include;
+- oracle builds and oracle outputs, and test images (they stay in `larmorx-testdata`);
+- anything translated from MSM_HOCR;
+- licence keys and personal data;
+- long verbatim excerpts of restricted code in our docs (descriptions and file:line
+  references are fine).
 
 ## Choosing at run time
 

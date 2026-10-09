@@ -202,6 +202,41 @@ ported.
   upstream) are listed in `docs/licensing.md`. Earlier the same day, the decisions went from
   strict clean-room to "read, never translate"; this entry supersedes both.
 
+## 2026-10-10: Better algorithms by default once validated; FSL replicas in this repository; a clean-room MSM
+Plain-language summary of these and the earlier decisions: [overview.md](overview.md).
+- **D11, user decision: improvements become the default once validated** ("let do b").
+  - The user wants versions that are an evolution of the upstreams: faster and better, not
+    only replicas.
+  - An improved algorithm becomes the default when its results stay within the upstream
+    tool's own variability across versions, platforms, thread counts and seeds (PLAN.md G4,
+    §11). Changes that move results further stay opt-in. Replicas always stay exact.
+  - Alternative rejected: faithful by default, every improvement opt-in.
+- **User decision: FSL replicas stay in this repository** (`crates-nc/`), not in a separate
+  one. The FSL Licence requires "all original and amended source code" in any transmitted
+  product (`LICENCE.FSL`, lines 29-32), so FSL's own source files for the replicated parts
+  are published in `crates-nc/` too.
+- **MSM: a clean-room original, in the surfaces track** (the user proposed a clean-room MSM;
+  scheduling it with the surfaces track was recommended).
+  - fMRIPrep runs MSMSulc whenever it builds FreeSurfer surfaces
+    (`fmriprep/workflows/base.py:371`), with the HOCR optimiser (`--dopt=HOCR`).
+  - Clean-room code avoids MSM_HOCR's copyright but not patents. The first step is a patent
+    check of FastPD and HOCR; the optimiser must avoid any patented method.
+  - Until it exists, larmorprepx uses fsaverage-based fsLR registration (fMRIPrep's
+    `--no-msm`).
+- **FreeSurfer: unchanged.** A replica in `larmorx-freesurfer`; no clean-room version is
+  planned. The licence allows derived code, also commercially. The separate wheel keeps its
+  extra terms (required preface, research use only, an indemnity in MGH's favour) away from
+  plain `larmorx` installs.
+- **Platforms (user reminder):** everything must work on Linux, macOS (Intel and Apple
+  silicon) and Windows from the start. CI builds and tests the six targets on every push.
+- **The clean-room 3dTshift original is merged** (`crates/larmorx-afni`): 236 parity cases,
+  217 agree with AFNI (158 bit-identical), 17 rejected by both, 2 expected divergences,
+  0 failures. It is 2.0-3.1× faster than AFNI on one thread and 5.6-6.2× on 12.
+- **Process:** on 2026-10-09 a verified replica of AFNI's FFT and draft 3dTshift replica
+  code were deleted while the rule was still "clean-room only". The user objected. Both
+  were recovered from the session transcripts and re-verified bit-exact. From now on, work
+  that must leave the build is archived, never deleted.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |
@@ -216,3 +251,4 @@ ported.
 | D8 | Output compatibility | fMRIPrep-compatible derivative names and confound columns | open |
 | D9 | Minimum Python | 3.12 | open |
 | D10 | First milestone | M1 Preview (pipeline on x64 with interim ANTsPy) | open |
+| D11 | Default when an improved algorithm exists | the improvement, once its results stay within the upstream's own variability; opt-in otherwise | **decided 2026-10-10** |

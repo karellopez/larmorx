@@ -22,7 +22,7 @@ pyo3::create_exception!(
     "A NIfTI file is malformed or unsupported."
 );
 
-fn to_py_err(err: nifti::Error) -> PyErr {
+pub(crate) fn to_py_err(err: nifti::Error) -> PyErr {
     match &err {
         nifti::Error::Io { source, .. } if source.kind() == std::io::ErrorKind::NotFound => {
             PyFileNotFoundError::new_err(err.to_string())
@@ -70,7 +70,10 @@ fn array_field<const N: usize, T: Copy + Default + for<'py> FromPyObjectOwned<'p
     })
 }
 
-fn header_to_dict<'py>(py: Python<'py>, h: &NiftiHeader) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn header_to_dict<'py>(
+    py: Python<'py>,
+    h: &NiftiHeader,
+) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new(py);
     d.set_item(
         "version",
@@ -138,7 +141,7 @@ fn header_to_dict<'py>(py: Python<'py>, h: &NiftiHeader) -> PyResult<Bound<'py, 
     Ok(d)
 }
 
-fn header_from_dict(d: &Bound<'_, PyDict>) -> PyResult<NiftiHeader> {
+pub(crate) fn header_from_dict(d: &Bound<'_, PyDict>) -> PyResult<NiftiHeader> {
     let version = match get::<i64>(d, "version")? {
         1 => NiftiVersion::V1,
         2 => NiftiVersion::V2,

@@ -86,3 +86,37 @@ def ants_apply_transforms(
 
 def ants_transform_points(points: np.ndarray, transforms: list[tuple[Parts, bool]]) -> np.ndarray:
     """Map ``(n, 3)`` LPS points through ``transforms``."""
+
+# --- AFNI 3dTshift (larmorx/afni) ------------------------------------------------------------
+
+def afni_tshift_file(
+    path: str,
+    slice_times: str | list[float],
+    tr: float | None = None,
+    tzero: float | None = None,
+    slice: int | None = None,
+    ignore: int = 0,
+    method: str = "fourier",
+    restore: str = "trend",
+    detrend: bool = True,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, dict[str, Any], list[str]]:
+    """Read a NIfTI file with AFNI's rules and shift it (``3dTshift``): the voxels in AFNI's
+    storage type (before the brick factor, the header's ``scl_slope``), the output header
+    fields and warnings."""
+
+def afni_tshift_array(
+    data: np.ndarray,
+    header: dict[str, Any],
+    slice_times: str | list[float],
+    tr: float | None = None,
+    tzero: float | None = None,
+    slice: int | None = None,
+    ignore: int = 0,
+    method: str = "fourier",
+    restore: str = "trend",
+    detrend: bool = True,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, dict[str, Any], list[str]]:
+    """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
+    the shifted voxels, the output header fields and warnings."""

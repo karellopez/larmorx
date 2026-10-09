@@ -294,11 +294,8 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
         ));
     }
     let has_time_axis = header.dim[0] >= 4;
+    let tr = header_tr(&header);
     let per_second = timing::time_units_per_second(&header);
-    let mut tr = timing::to_seconds(header.pixdim[4], per_second);
-    if tr.is_nan() || tr <= 0.0 {
-        tr = 1.0;
-    }
     let toffset = timing::to_seconds(finite_or_zero(header.toffset), per_second);
     let slice_timing = timing::header_timing(&header, shape4[2]);
     let bricks = Bricks::new(shape4, data, vec![factor; shape4[3]]).map_err(unsupported)?;
@@ -311,6 +308,13 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
         slice_timing,
         warnings,
     })
+}
+
+/// The TR AFNI reads from a header, in seconds: `pixdim[4]` converted from milliseconds or
+/// microseconds, or 1 if it is not positive.
+pub fn header_tr(header: &NiftiHeader) -> f32 {
+    let tr = timing::to_seconds(header.pixdim[4], timing::time_units_per_second(header));
+    if tr.is_nan() || tr <= 0.0 { 1.0 } else { tr }
 }
 
 // ------------------------------------------------------------------------------------------------

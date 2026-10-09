@@ -16,6 +16,7 @@ test = false
 doctest = false
 
 [dependencies]
+larmorx-afni.workspace = true
 larmorx-ants.workspace = true
 larmorx-cli.workspace = true
 larmorx-core.workspace = true

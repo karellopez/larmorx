@@ -216,6 +216,7 @@ dependencies = [
 name = "larmorx-py"
 version = "0.0.1"
 dependencies = [
+ "larmorx-afni",
  "larmorx-ants",
  "larmorx-cli",
  "larmorx-core",

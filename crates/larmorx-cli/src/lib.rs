@@ -2,13 +2,14 @@
 //!
 //! Usage is `larmorx <family> <tool> [original arguments]`, where each tool accepts the
 //! argument syntax of the program it replaces. Parsing lives here, once, and is shared by the
-//! standalone binaries and the Python console scripts (through `larmorx._core`). In phase L0
-//! no tool family exists yet; only `--version` and `--help` are handled.
+//! standalone binaries and the Python console scripts (through `larmorx._core`).
 #![forbid(unsafe_code)]
 
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
+
+pub use larmorx_ants::cli::{FileLoader, TransformLoader};
 
 /// Exit code for invalid usage (unknown command or option).
 pub const EXIT_USAGE: u8 = 2;
@@ -16,13 +17,28 @@ pub const EXIT_USAGE: u8 = 2;
 /// Exit code when the output streams cannot be written.
 const EXIT_IO_ERROR: u8 = 1;
 
-/// Tool families planned for the CLI (PLAN.md §3); none is available yet.
-const PLANNED_FAMILIES: &str = "ants, afni, mri";
+/// Tool families planned for the CLI (PLAN.md §3) that have no tool yet.
+const PLANNED_FAMILIES: &str = "afni, mri";
 
-/// Runs the CLI with `args` (program name first), writing to `out` and `err`.
+/// Runs the CLI with `args` (program name first), writing to `out` and `err`, reading
+/// transform files with [`FileLoader`].
 ///
 /// Returns the process exit code.
 pub fn run<I, S>(args: I, out: &mut dyn Write, err: &mut dyn Write) -> u8
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    run_with(args, &FileLoader, out, err)
+}
+
+/// [`run`] with another reader for transform files (the Python entry point adds `.h5`).
+pub fn run_with<I, S>(
+    args: I,
+    loader: &dyn TransformLoader,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
@@ -35,6 +51,31 @@ where
         Some("-V" | "--version") => (0, writeln!(out, "larmorx {}", larmorx_core::VERSION)),
         Some("-h" | "--help") => (0, out.write_all(usage(&prog).as_bytes())),
         None => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
+        Some("ants") => {
+            let tool = args.next().map(|a| a.as_ref().to_owned());
+            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            match tool.as_deref() {
+                Some(tool) => match larmorx_ants::cli::run(tool, &rest, loader, out, err) {
+                    Some(code) => (code, Ok(())),
+                    None => (
+                        EXIT_USAGE,
+                        writeln!(
+                            err,
+                            "error: unknown ants tool '{tool}' (available: {})\n\nRun '{prog} --help' for usage.",
+                            larmorx_ants::cli::TOOLS.join(", ")
+                        ),
+                    ),
+                },
+                None => (
+                    EXIT_USAGE,
+                    writeln!(
+                        err,
+                        "error: missing ants tool (available: {})",
+                        larmorx_ants::cli::TOOLS.join(", ")
+                    ),
+                ),
+            }
+        }
         Some(arg) => {
             let kind = if arg.starts_with('-') {
                 "option"
@@ -78,13 +119,16 @@ fn usage(prog: &str) -> String {
 Usage: {prog} <family> <tool> [original arguments]
        {prog} --version | --help
 
-Tool families (planned, none available yet): {PLANNED_FAMILIES}
+Tools:
+  ants   {ants}
+Planned tool families: {PLANNED_FAMILIES}
 
 Options:
   -h, --help     Print this help
   -V, --version  Print the version
 ",
         version = larmorx_core::VERSION,
+        ants = larmorx_ants::cli::TOOLS.join(", "),
     )
 }
 
@@ -137,11 +181,18 @@ mod tests {
 
     #[test]
     fn unknown_commands_and_options_are_usage_errors() {
-        let (code, out, err) = run_capture(&["lx", "ants", "antsRegistration"]);
+        let (code, out, err) = run_capture(&["lx", "afni", "3dTshift"]);
         assert_eq!(code, EXIT_USAGE);
         assert_eq!(out, "");
-        assert!(err.starts_with("error: unknown command 'ants'"), "{err}");
+        assert!(err.starts_with("error: unknown command 'afni'"), "{err}");
         assert!(err.contains("Run 'lx --help'"), "{err}");
+
+        let (code, _, err) = run_capture(&["lx", "ants", "antsRegistration"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(
+            err.starts_with("error: unknown ants tool 'antsRegistration'"),
+            "{err}"
+        );
 
         let (code, _, err) = run_capture(&["larmorx", "--frobnicate"]);
         assert_eq!(code, EXIT_USAGE);

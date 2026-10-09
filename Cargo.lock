@@ -143,9 +143,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "larmorx-ants"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-interp",
+ "larmorx-io",
+ "larmorx-transform",
+ "rayon",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-cli"
 version = "0.0.1"
 dependencies = [
+ "larmorx-ants",
  "larmorx-core",
 ]
 
@@ -162,6 +176,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-interp"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "libm",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-io"
 version = "0.0.1"
 dependencies = [
@@ -169,6 +193,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "larmorx-core",
+ "larmorx-transform",
  "proptest",
  "rayon",
  "tempfile",
@@ -179,11 +204,24 @@ dependencies = [
 name = "larmorx-py"
 version = "0.0.1"
 dependencies = [
+ "larmorx-ants",
  "larmorx-cli",
  "larmorx-core",
+ "larmorx-interp",
  "larmorx-io",
+ "larmorx-transform",
  "numpy",
  "pyo3",
+]
+
+[[package]]
+name = "larmorx-transform"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "libm",
+ "rayon",
+ "thiserror",
 ]
 
 [[package]]

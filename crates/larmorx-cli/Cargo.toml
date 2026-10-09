@@ -16,4 +16,5 @@ name = "lx"
 path = "src/bin/lx.rs"
 
 [dependencies]
+larmorx-ants.workspace = true
 larmorx-core.workspace = true

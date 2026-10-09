@@ -27,3 +27,4 @@ workbench	https://github.com/Washington-University/workbench.git	990632890c3facf
 MSM_HOCR	https://github.com/ecr05/MSM_HOCR.git	c9d899676c3fc15b55ff2863765951533e35ad8d	non-commercial	reference_src
 ANTs-v2.6.5	https://github.com/ANTsX/ANTs.git	fdce4d2f84b60ac75d7e45aafe18488b1f9f5303	Apache-2.0	tags
 ITK-v5.4.5	https://github.com/InsightSoftwareConsortium/ITK.git	f51594ad88194a72cdc06a314dafff709fcdc2e9	Apache-2.0	tags
+AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags

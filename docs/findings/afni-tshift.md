@@ -59,6 +59,30 @@ is a hard error here, while a header pattern outside it only causes a warning an
 - **The output time origin** (`ttorg`, the NIfTI `toffset`) is set to `tzero` (AFNI
   issue 297, 2021). *Read.*
 
+## Reading and writing NIfTI (`thd_niftiread.c`, `thd_niftiwrite.c`)
+
+- **Kept as stored:** uint8 and int16 stay byte and short, unless both `scl_slope` and
+  `scl_inter` are non-zero.
+- **Converted to float32:** float32 stays float32. int8, uint16, int32, uint32 and float64
+  become float32, and so do uint8 and int16 with both slope and intercept. The scaling is
+  then applied in float.
+- **Brick factors:** otherwise a finite non-zero slope becomes the brick factor, even on
+  float data.
+- **Non-finite floats** are read as 0.
+- **On writing,** the datum is kept, `scl_slope` = the brick factor (0 = none),
+  `scl_inter` = 0, and an AFNI history extension (code 4) is added.
+
+*Verified* on every `synthetic/tshift/dtypes` file with the 25.2.09 oracle:
+- int16, uint8, int16 with a slope, and float32 with slope 2 keep their type and factor;
+- int16 with slope and intercept, float64 and int32 come out as float32;
+- NaN and ±inf come out finite.
+
+**A negative `scl_slope` corrupts the data.** Extraction applies the brick factor only when
+it is positive (`thd_dsetto1D.c`: `if( DSET_BRICK_FACTOR > 0.0 )`). Insertion always divides
+by it (`thd_1Dtodset.c`). So int16 data with slope −0.5 come out sign-flipped and doubled.
+*Verified:* the scaled mean went from 942 in to −1884 out. A port that matches AFNI must
+reproduce this. larmorx's `lx.afni.tshift` warns about it.
+
 ## AFNI's FFT (`src/csfft.c`)
 
 `csfft_cox` routes every length 3dTshift uses (`csfft_nextup_one35`: 2ᵃ·3ᵇ·5ᶜ with b, c ≤ 1,

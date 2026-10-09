@@ -32,13 +32,24 @@ stores `M⁻¹` and `−M⁻¹·offset` without going back through the transform
 (Euler angles, versor), so the inverse is exactly the inverted matrix. *Read.*
 
 **`itk::Matrix::GetInverse` is an SVD inverse** (`vnl_matrix_inverse`, `itkMatrix.h:277`).
-For a signed permutation of a diagonal matrix, which is the index-to-point matrix of every
-axis-aligned image, the SVD is exact and each entry `m` becomes exactly `1/m`. A cofactor
-inverse can be one ulp off. That ulp decides nearest-neighbour ties when a resampling grid
-lands exactly half way between voxels, which is common when downsampling by 2. *Read.*
-*larmorx:* `linalg::inverse3_itk` is exact for those matrices and uses the cofactor inverse
-otherwise. Oblique matrices can still differ from vnl by a few ulps; the parity reports
-measure the effect.
+It runs LINPACK's `dsvdc` (f2c translation in VXL's `v3p/netlib`, with the reference BLAS
+kernels), then `V · diag(1/w) · Uᵀ` through vnl's plain row-sum matrix product. Every point →
+index conversion of an image uses it (`m_PhysicalPointToIndex`), and so does every inverted
+affine. *Read.*
+
+- **A cofactor inverse is not good enough.** On 200 random oblique direction × spacing
+  matrices, 78 % of the entries of a cofactor inverse differed from ITK's in the last bits.
+  On axis-aligned matrices the SVD is exact, so there the difference is only an ulp. That
+  ulp still decides nearest-neighbour ties on half-voxel grids. *Verified* against
+  SimpleITK's `TransformPhysicalPointToContinuousIndex`. Mapping the unit vectors returns
+  the columns of ITK's inverse exactly.
+- **larmorx ports vnl's SVD inverse operation for operation**
+  (`larmorx_core::vnl_svd`). It uses only `sqrt`, which IEEE rounds exactly, so it is the
+  same on every platform. 0 of 18,000 entries differ from ITK's, over 2,000 matrices:
+  oblique, arbitrary rotations, LPS flips and signed permutations. *Verified.*
+- In the antsApplyTransforms parity suite, bit-identical cases rose from 46 to 61 of 79.
+  The cases that changed are oblique inputs, displacement fields on oblique grids, and
+  inverted transforms. *Validated.*
 
 **Displacement fields** (`DisplacementFieldTransform::TransformPoint`) map `x` to `x + d(x)`,
 with `d` read by `VectorLinearInterpolateImageFunction`. That is a weighted sum over the 8

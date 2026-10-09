@@ -37,3 +37,24 @@ The numerical algorithms for the polar decomposition (scaled Newton iteration, H
 | dim/pixdim fixes, `qto_xyz`/`sto_xyz` construction, `quatern_to_mat44` | `Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c`: `nifti_convert_nhdr2nim`, `nifti_quatern_to_mat44`, `NIFTI_VERSION` | public domain |
 
 Single-precision steps are kept where ITK computes in `float`. The SVD comparisons use larmorx's own symmetric eigen-solver instead of vnl's LINPACK SVD; they only decide whether two matrices are within 1e-4, so the choice of algorithm does not change the outcome in practice. The parity suite `itk-geometry` checks the result against ITK 5.4.5 itself (through ANTsPy) on every catalog file.
+
+## ITK's reading of NIfTI voxel values (`src/nifti/itk.rs`, `read_itk_image`)
+
+**Ported** (logic re-expressed in Rust) from ITK v5.4.5 `Modules/IO/NIFTI/src/itkNiftiImageIO.cxx`
+(Apache-2.0):
+- `MustRescale`;
+- `RescaleFunction`;
+- `CastCopy`, which promotes scaled integers to float32;
+- the slope and intercept rules, and nifti_clib's `FIXED_FLOAT`;
+- `ConvertRASToFromLPS_CXYZT` for `NIFTI_INTENT_DISPVECT` vectors (`m_ConvertRASDisplacementVectors`).
+
+## ITK transform files (`src/itk_transform.rs`)
+
+**Ported** (logic re-expressed in Rust) from ITK v5.4.5 (Apache-2.0):
+- `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (text format);
+- `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` (MATLAB v4 format);
+- the displacement-field reading path of ANTs v2.6.5's `itk::ants::ReadTransform`
+  (`Utilities/itkantsReadWriteTransform.h`).
+
+HDF5 (`.h5`) files follow ITK's `itkHDF5TransformIO` layout and are read and written by the
+Python layer with h5py (`python/larmorx/transforms.py`).

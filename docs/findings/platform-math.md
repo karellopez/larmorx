@@ -28,14 +28,23 @@ exactly. Those using them can differ by an ulp: on the boldref → T1w case (5.9
 Gaussian interpolation differs by at most 5.7e-13 (8e-16 relative) in 13 % of voxels.
 *Validated.*
 
-**These functions are the only remaining source of difference.** In a scratch build with
+**These functions are the only remaining source of difference** (apart from `--float`, where
+ANTs computes in single precision). Every other difference was traced and ported away. The
+last one was ITK's SVD matrix inverse ([itk-transforms.md](itk-transforms.md)). In a scratch build with
 the platform's `exp`, `log`, `sin` and `cos` (glibc, as ITK uses) instead of the `libm`
 crate, Lanczos windowed-sinc and Gaussian interpolation on the same case became
 bit-identical to antsApplyTransforms (0 of 5.9 M voxels differ). *Verified.* Every
 interpolator that does not use these functions already matches ANTs bit for bit: linear,
 nearest neighbour, B-spline orders 3 and 5, MultiLabel and GenericLabel, through text affines
 and through fMRIPrep's `.h5` affine + warp composite. (MultiLabel does use `vnl_erf`. Its
-result is a label chosen by comparing weights, and an ulp rarely changes the choice.)
+result is a label chosen by comparing weights, and an ulp rarely changes the choice.) Across
+the 79 passing parity cases, the 18 that are not bit-identical are exactly these:
+- Gaussian and windowed-sinc interpolation (`exp`, `log`, `sin`, `cos` in the weights);
+- the Euler transform with `ComputeZYX` (`sin`/`cos` in its matrix; the other Euler file
+  matched by chance);
+- the two `--float` cases.
+
+All 18 are within about 1e-15 relative.
 
 **Option under consideration** (needs a decision, since CLAUDE.md fixes the `libm` crate):
 correctly rounded pure-Rust `exp`, `log`, `sin`, `cos`, for example ported from CORE-MATH

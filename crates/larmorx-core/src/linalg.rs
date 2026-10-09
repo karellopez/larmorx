@@ -63,29 +63,15 @@ pub fn inverse3(m: &Mat3) -> Option<Mat3> {
     Some(adj.map(|row| row.map(|v| v / det)))
 }
 
-/// Inverse of a 3×3 matrix as ITK computes it (`itk::Matrix::GetInverse`, an SVD inverse), to
-/// the last bit where that decides results: for a signed permutation of a diagonal matrix (the
-/// voxel-to-world matrix of an axis-aligned grid) the SVD is exact, so each non-zero entry `m`
-/// becomes `1/m` at the transposed position. Other matrices use [`inverse3`], which agrees with
-/// ITK to within a few ulps. `None` if singular.
+/// Inverse of a 3×3 matrix as ITK computes it (`itk::Matrix::GetInverse`): vnl's SVD
+/// pseudo-inverse, ported operation for operation ([`crate::vnl_svd::vnl_inverse3`]), so
+/// point ↔ index conversions of oblique images and inverted affines match ITK to the bit.
+/// `None` if singular (ITK throws).
 pub fn inverse3_itk(m: &Mat3) -> Option<Mat3> {
-    let nonzero = |row: &[f64; 3]| row.iter().filter(|v| **v != 0.0).count();
-    let columns = transpose3(m);
-    if m.iter().all(|r| nonzero(r) == 1) && columns.iter().all(|c| nonzero(c) == 1) {
-        let mut inv = [[0.0; 3]; 3];
-        for (i, row) in m.iter().enumerate() {
-            for (j, &v) in row.iter().enumerate() {
-                if v != 0.0 {
-                    if !v.is_finite() {
-                        return None;
-                    }
-                    inv[j][i] = 1.0 / v;
-                }
-            }
-        }
-        return Some(inv);
+    if det3(m) == 0.0 || m.iter().flatten().any(|v| !v.is_finite()) {
+        return None;
     }
-    inverse3(m)
+    crate::vnl_svd::vnl_inverse3(m)
 }
 
 /// Inverse of a 4×4 matrix by Gauss-Jordan elimination with partial pivoting, or `None` if it
@@ -255,8 +241,6 @@ mod tests {
                 [0.0, 1.0 / 3.3, 0.0]
             ]
         );
-        let oblique = [[1.0, 0.2, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 2.0]];
-        assert_eq!(inverse3_itk(&oblique), inverse3(&oblique));
         assert!(inverse3_itk(&[[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]).is_none());
     }
 

@@ -17,6 +17,7 @@ pub mod image;
 pub mod linalg;
 pub mod parallel;
 pub mod rotation;
+pub mod vnl_svd;
 
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;

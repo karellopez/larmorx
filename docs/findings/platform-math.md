@@ -60,3 +60,17 @@ the same bits on every platform.
 The residue is where glibc's own `exp`/`log` are not correctly rounded: about 0.003 % of
 calls, with dozens of calls per voxel through vnl's `erf`. Matching those cases would mean
 porting glibc's algorithms instead of rounding correctly, which was not chosen. *Validated.*
+
+**After the switch: `sin` and `cos`** (CORE-MATH ports, 0 mismatches over about 21 M
+evaluations, bit-identical to the C). glibc agrees with them on 99.85 % (`sin`) and 99.87 %
+(`cos`) of inputs in [−10, 10]. On the parity suite (standard tier):
+- **63 of 79 compared cases are now bit-identical**, up from 61 with `exp`/`log` only and
+  from 46 at the start. Both Euler `ComputeZYX` cases became exact.
+- **Windowed sinc** still differs in a fraction of voxels: 65 of 10,560 for the synthetic
+  Lanczos case, and 0.43 % of fMRIPrep's boldref → T1w (about 7 % before). Each voxel
+  evaluates 36 sines and cosines, and glibc's are not correctly rounded about 0.15 % of the
+  time.
+- **Gaussian:** 16 to 44 voxels.
+
+All are within about 1e-15 relative. The only `libm` call left in the ITK ports is `pow`
+(the B-spline prefilter for axes shorter than about 20 voxels). *Validated.*

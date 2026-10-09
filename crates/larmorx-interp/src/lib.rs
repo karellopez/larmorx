@@ -23,6 +23,7 @@ mod vnl;
 use std::collections::BTreeMap;
 
 use larmorx_core::RealElement;
+use larmorx_core::math;
 use rayon::prelude::*;
 
 /// A 3D scalar image in Fortran order (`x` fastest), read as f64.
@@ -414,26 +415,26 @@ fn window(w: Window, a: f64) -> f64 {
     let r = SINC_RADIUS as f64;
     let pi = std::f64::consts::PI;
     match w {
-        Window::Cosine => libm::cos(a * (pi / (2.0 * r))),
-        Window::Hamming => 0.54 + 0.46 * libm::cos(a * (pi / r)),
+        Window::Cosine => math::cos(a * (pi / (2.0 * r))),
+        Window::Hamming => 0.54 + 0.46 * math::cos(a * (pi / r)),
         Window::Welch => 1.0 - a * (1.0 / (r * r)) * a,
         Window::Lanczos => {
             if a == 0.0 {
                 1.0
             } else {
                 let z = (pi / r) * a;
-                libm::sin(z) / z
+                math::sin(z) / z
             }
         }
         Window::Blackman => {
-            0.42 + 0.5 * libm::cos(a * (pi / r)) + 0.08 * libm::cos(a * (2.0 * pi / r))
+            0.42 + 0.5 * math::cos(a * (pi / r)) + 0.08 * math::cos(a * (2.0 * pi / r))
         }
     }
 }
 
 fn sinc(x: f64) -> f64 {
     let px = std::f64::consts::PI * x;
-    if x == 0.0 { 1.0 } else { libm::sin(px) / px }
+    if x == 0.0 { 1.0 } else { math::sin(px) / px }
 }
 
 /// ITK's windowed sinc with radius 3: 6 taps per axis (offsets −2..=3 around `floor(index)`),
@@ -531,7 +532,7 @@ mod bspline {
         }
         for &z in poles {
             // Initial causal coefficient.
-            let horizon = (libm::log(TOLERANCE) / libm::log(z.abs())).ceil() as usize;
+            let horizon = (math::log(TOLERANCE) / math::log(z.abs())).ceil() as usize;
             let mut zn = z;
             if horizon < n {
                 let mut sum = c[0];

@@ -5,6 +5,7 @@
 //! differs. Ported from ITK v5.4.5 (`Modules/Core/Transform`, `Modules/Core/Common/itkVersor`).
 
 use larmorx_core::linalg::{self, Mat3};
+use larmorx_core::math;
 
 use crate::TransformError;
 
@@ -134,9 +135,9 @@ impl LinearTransform {
                 [p[9], p[10], p[11]],
             ),
             LinearKind::Euler3D => {
-                let (cx, sx) = (libm::cos(p[0]), libm::sin(p[0]));
-                let (cy, sy) = (libm::cos(p[1]), libm::sin(p[1]));
-                let (cz, sz) = (libm::cos(p[2]), libm::sin(p[2]));
+                let (cx, sx) = (math::cos(p[0]), math::sin(p[0]));
+                let (cy, sy) = (math::cos(p[1]), math::sin(p[1]));
+                let (cz, sz) = (math::cos(p[2]), math::sin(p[2]));
                 let rx = [[1.0, 0.0, 0.0], [0.0, cx, -sx], [0.0, sx, cx]];
                 let ry = [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]];
                 let rz = [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]];

@@ -7,9 +7,13 @@
 //! `UPSTREAM.md`), verified against mpmath on CORE-MATH's worst-case inputs and millions of
 //! random inputs. Background: `docs/findings/platform-math.md`.
 
+mod cos;
 pub(crate) mod dint;
 mod exp;
 mod log;
+mod sin;
 
+pub use cos::cos;
 pub use exp::exp;
 pub use log::log;
+pub use sin::sin;

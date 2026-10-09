@@ -26,3 +26,6 @@ work/
 # OS / editors
 .DS_Store
 .idea/
+
+# Local Claude Code tooling (agent worktrees)
+.claude/

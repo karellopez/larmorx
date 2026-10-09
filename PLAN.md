@@ -594,8 +594,8 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 ## 15. Next steps (first 2–4 weeks)
 
 1. ~~Create the repo~~ (done 2026-10-09: `github.com/karellopez/larmorx`, public). Optionally reserve a `larmorx` GitHub org later and transfer the repo there; GitHub redirects old URLs. Settle the remaining decisions in §16.
-2. Install Rust (`rustup`, stable). It is not installed on this machine yet.
-3. `git init`; scaffold the Cargo workspace, `larmorx-core`, `larmorx-io`, `larmorx-py`, `larmorx-cli`, `python/larmorx` (with `pipelines/larmorprepx/`); set up a CI matrix that builds, imports and runs `larmorx --version` on all six targets. Publish a real minimal 0.0.1 to PyPI and crates.io soon after, to claim the names.
+2. ~~Install Rust~~ (done 2026-10-09: rustup, stable 1.99.0).
+3. ~~Scaffold the Cargo workspace, `larmorx-core`, `larmorx-io`, `larmorx-py`, `larmorx-cli`, `python/larmorx` (with `pipelines/larmorprepx/`); set up a CI matrix that builds, imports and runs `larmorx --version` on all six targets~~ (done 2026-10-09, phase L0; CI green on all six). Still open: publish a real minimal 0.0.1 to PyPI and crates.io, to claim the names.
 4. Pin the upstream versions to port (ANTs 2.6.x and ITK v5.4.7 tags, AFNI 25.2.09, FreeSurfer per D5) and record them in `UPSTREAM.md`. Move `workbench/` and `MSM_HOCR/` to `reference_src/`.
 5. Implement `Image`/`Affine`/`Transform` (Rust + Python) and NIfTI I/O, with round-trip tests against nibabel.
 6. First tools, with the full per-tool contract:

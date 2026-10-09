@@ -26,7 +26,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
 ## Status (2026-10-09)
-- **Planning only; no code yet.** Next actions are in PLAN.md §15.
+- **Phase L0 done:** a buildable, tested skeleton (Cargo workspace, maturin package, `larmorx`/`lx`/`larmorprepx` commands, CI green on all six targets). No tools yet. Next actions are in PLAN.md §15 (step 5: `Image`/`Affine`/`Transform` + NIfTI I/O).
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
 - **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
 - **Pending decisions** are in PLAN.md §16. Until the user decides, use these defaults:
@@ -121,3 +121,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `docs/analysis/01–04` | what fMRIPrep computes (stages, tools, parameters, file:line) |
 | `upstream.tsv` | pinned upstream commits |
 | `scripts/bootstrap_workspace.sh` | recreates the workspace |
+| `Cargo.toml`, `crates/` | Rust workspace: `larmorx-core`, `-io`, `-cli` (standalone `larmorx`/`lx`), `-py` (`larmorx._core`) |
+| `pyproject.toml`, `python/larmorx/` | maturin package (abi3, CPython >= 3.12), including `pipelines/larmorprepx/` |
+| `tests/python/` | Python tests of the installed package |
+| `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |

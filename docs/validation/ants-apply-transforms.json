@@ -1,0 +1,860 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "5d716fad582e-dirty",
+  "larmorx_testdata_commit": "535104904d50",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "antspyx": "0.6.3",
+   "h5py": "3.16.0",
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "antsApplyTransforms from ANTs 2.6.5 on ITK 5.4.5, run in-process through ANTsPy 0.6.3",
+ "results": [
+  {
+   "case": "interpolation/Linear",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/NearestNeighbor",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline[0]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline[1]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline[2]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline[4]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BSpline[5]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/Gaussian",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/Gaussian[1.5,2]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/Gaussian[1x2x3]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/CosineWindowedSinc",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/HammingWindowedSinc",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/LanczosWindowedSinc",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/WelchWindowedSinc",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/BlackmanWindowedSinc",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/labels-NearestNeighbor",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/labels-MultiLabel",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/labels-MultiLabel[0.8]",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/labels-GenericLabel",
+   "category": "interpolation",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "transform/affine-centered.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/affine-centered.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/affine-float.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/euler-centered.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/euler-zyx.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/similarity.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/versor-rigid.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/translation.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/warp-lps-vector.nii.gz",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "transform/warp-ras-dispvect.nii.gz",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "transform/composite-affine-warp.h5",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-affine-centered.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-affine-centered.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-affine-float.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-euler-centered.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-euler-zyx.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-similarity.mat",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-versor-rigid.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform/inverse-translation.txt",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-warp-then-affine",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-three-linear",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-composite-then-inverse-affine",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-identity-keyword",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-none",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "transform/chain-larmorx-written-h5",
+   "category": "transform",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/oblique-to-axial",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/oblique-to-axial-lanczos",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/scaled-int16-las",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/scaled-int16-las-bspline",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/qform-only-int8",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/single-slice",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/single-slice-nearest",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/ties-nearest",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/ties-linear",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/ties-genericlabel",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/ties-multilabel",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/outside-default",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "geometry/outside-negative-default",
+   "category": "geometry",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-char",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.012,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-uchar",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-short",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-int",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-float",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-double",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "output/-u-default",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "output/float-Linear",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "output/float-LanczosWindowedSinc",
+   "category": "output",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "time-series/Linear",
+   "category": "time-series",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "time-series/LanczosWindowedSinc",
+   "category": "time-series",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.149,
+   "status": "pass"
+  },
+  {
+   "case": "time-series/BSpline",
+   "category": "time-series",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "time-series/time-index",
+   "category": "time-series",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "time-series/named-type",
+   "category": "time-series",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "errors/4d-as-scalar",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4\nSee -e option for available input types.",
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/invert-field",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/missing-transform",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-ynul31hz/missing.mat: /tmp/lx-aat-ynul31hz/missing.mat: No such file or directory (os error 2)",
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/unknown-interpolator",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Error:  Unrecognized interpolation option. cubic",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "fmriprep/boldref-to-T1w-lanczos",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.72,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/T1w-to-MNI-linear",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.795,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/T1w-to-MNI-lanczos",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.032,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/GM-probseg-to-MNI",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.011,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/aseg-to-boldref",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.235,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/mask-to-MNI-multilabel",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.477,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/bold-series-to-T1w",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 34.2,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-apply-transforms",
+ "summary": {
+  "both-error": 4,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 79,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

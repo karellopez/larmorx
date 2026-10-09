@@ -5,10 +5,12 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | Record | larmorx | Reference | Status |
 |---|---|---|---|
 | [nifti-io](nifti-io.md) | `larmorx.io.load` / `save` | nibabel | `validated` |
+| [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTs 2.6.5, ITK 5.4.5) | `validated` |
 
 Reproduce a record:
 
 ```bash
 pip install -e ../larmorx-testdata -e "validation[oracles]"
 python -m larmorx_validation parity nifti-io --tier standard --out docs/validation
+python -m larmorx_validation parity ants-apply-transforms --tier standard --out docs/validation
 ```

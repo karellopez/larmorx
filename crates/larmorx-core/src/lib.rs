@@ -1,9 +1,27 @@
-//! Shared foundation of larmorx (PLAN.md §5).
+//! Shared foundation of larmorx (PLAN.md §5): format-independent in-memory types.
 //!
-//! This crate will hold the in-memory `Image` and `Affine` types, physical-space helpers,
-//! error types, the thread pool, deterministic parallel reductions, the seeded RNG and
-//! progress/cancellation. In phase L0 it only defines the version.
+//! - [`Affine`]: 4×4 voxel-to-world transforms (RAS+ mm), with LPS conversion for ITK/ANTs.
+//! - [`Image`]: an n-dimensional voxel array plus its affine; [`DynImage`] and [`DynArray`]
+//!   when the element type is known only at run time.
+//! - [`Element`] / [`DataType`]: the supported voxel types.
+//! - [`parallel`]: running work on an explicit number of threads.
+//! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions.
 #![forbid(unsafe_code)]
+
+pub mod affine;
+pub mod array;
+pub mod element;
+pub mod image;
+pub mod linalg;
+pub mod parallel;
+pub mod rotation;
+
+pub use affine::{Affine, SingularAffine};
+pub use array::DynArray;
+pub use element::{DataType, Element, RealElement};
+pub use image::{DynImage, Image, Image3, Image4};
+pub use ndarray;
+pub use num_complex::Complex;
 
 /// Version shared by every larmorx crate, the CLI and the Python package.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

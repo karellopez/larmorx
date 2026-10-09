@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --group lint
+      - name: ruff
+        run: |
+          ruff check
+          ruff format --check
+
+  # Build the wheel and run the Rust and Python tests on each of the six target platforms.
+  test:
+    name: test (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64, runner: ubuntu-24.04, target: x86_64, manylinux: "2_28" }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64, manylinux: "2_28" }
+          - { platform: macos-arm64, runner: macos-15, target: aarch64 }
+          - { platform: macos-x64, runner: macos-15-intel, target: x86_64 }
+          - { platform: windows-x64, runner: windows-2025, target: x64 }
+          - { platform: windows-arm64, runner: windows-11-arm, target: aarch64 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test
+        run: cargo test --workspace --locked
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: v1.15.0
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+      - name: Test wheel (Python 3.12)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          python -m pip install --group test
+          python -m pytest
+      # The abi3 wheel must also work on the newest CPython; checking one platform is enough.
+      - name: Set up the newest Python
+        if: matrix.platform == 'linux-x64'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Test wheel (Python 3.14)
+        if: matrix.platform == 'linux-x64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          python -m pip install --group test
+          python -m pytest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: dist/*.whl
+          if-no-files-found: error

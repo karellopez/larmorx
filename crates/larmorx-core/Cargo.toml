@@ -1,0 +1,7 @@
+[package]
+name = "larmorx-core"
+description = "Shared foundation of larmorx: image and affine types, errors, threading, deterministic reductions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true

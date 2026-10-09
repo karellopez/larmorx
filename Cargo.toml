@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/karellopez/larmorx"
+
+# Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
+[workspace.dependencies]
+larmorx-core = { path = "crates/larmorx-core", version = "0.0.1" }
+larmorx-io = { path = "crates/larmorx-io", version = "0.0.1" }
+larmorx-cli = { path = "crates/larmorx-cli", version = "0.0.1" }
+pyo3 = { version = "0.29.3", features = ["abi3-py312"] }

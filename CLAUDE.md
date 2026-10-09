@@ -47,6 +47,10 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 - **Not a fork of fMRIPrep.** No nipype, traits, niworkflows/smriprep/sdcflows runtime dependencies, or graph engines. Ops are plain typed functions; per-subject orchestration is readable Python.
 - **Port to Rust** where existing Python packages are limited, **including ANTs**: ANTsPy has no Linux-aarch64, Windows-arm64 or Python-3.14 wheels. Also **FreeSurfer recon-all**: the goal is the same results, several times faster.
 - Rust implementations may **reimagine** algorithms for speed, provided validation shows equivalent results.
+- **How to port (user, 2026-10-09):**
+  - Make a faithful **replica** when the licence allows it: ANTs/ITK (Apache-2.0), AFNI's NIH public-domain code, CORE-MATH (MIT), nibabel (MIT). Bit-identical results are the target.
+  - When the licence does not allow it (AFNI's MCW GPL-2 code), write **our own implementation** with the same behaviour.
+  - In both cases the upstream source is read to understand the behaviour (CLAUDE.md rule 1 sets the limits).
 - **Each tool gets its own Python wrapper**, so other developers can build on the library.
 
 ## Workspace layout

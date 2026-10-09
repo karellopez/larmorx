@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-image"
+description = "Image filters for larmorx, ported from ITK (Gaussian smoothing, morphology, connected components, distance maps, thresholds, statistics)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+rayon.workspace = true
+thiserror.workspace = true

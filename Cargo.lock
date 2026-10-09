@@ -176,6 +176,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-image"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-interp"
 version = "0.0.1"
 dependencies = [

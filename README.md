@@ -1,6 +1,6 @@
 # larmorx
 
-**Status: planning; no code yet.**
+**Status: phase L0, a buildable project skeleton; no tools yet.**
 
 **larmorx** is a library of neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool:
 - tools from ANTs/ITK, AFNI and FreeSurfer, ported to Rust
@@ -28,7 +28,7 @@ The repo expects to live inside a workspace directory, next to read-only clones 
 ```bash
 mkdir -p ~/work/super_fmriprep && cd ~/work/super_fmriprep
 git clone https://github.com/karellopez/larmorx.git
-python3 -m venv .venv
+python3.12 -m venv .venv           # Python >= 3.12
 larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 ```
 
@@ -36,6 +36,28 @@ The script:
 - shallow-clones every upstream listed in [upstream.tsv](upstream.tsv) at its pinned commit (about 2 GB; `--skip freesurfer,afni` saves about 1.1 GB)
 - installs Rust with rustup (user-level)
 - installs the evaluation packages into the venv
+
+## Building and testing
+You need Rust (stable, via rustup) and Python ≥ 3.12. From the repo, with the workspace venv active:
+
+```bash
+source ../.venv/bin/activate
+pip install --group dev          # maturin, pytest, packaging, ruff (pip >= 25.1)
+maturin develop                  # build the larmorx._core extension into the venv
+cargo test --workspace           # Rust tests
+pytest                           # Python tests of the installed package
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
+ruff check && ruff format --check
+```
+
+| Path | Contents |
+|---|---|
+| `crates/larmorx-core`, `crates/larmorx-io` | shared Rust foundation (stubs for now) |
+| `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
+| `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
+| `python/larmorx` | the Python package, including `pipelines/larmorprepx` |
+| `tests/python` | Python tests |
+| `.github/workflows/ci.yml` | lint, plus wheel build and tests on the six target platforms |
 
 ## Contributing
 - Commit messages, PR descriptions and release notes must not contain AI co-author trailers (`Co-Authored-By: Claude …`) or "Generated with …" lines.

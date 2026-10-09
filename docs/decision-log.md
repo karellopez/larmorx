@@ -60,6 +60,21 @@ Newest entries last. Each entry records what was decided, by whom, and why.
 - `LICENSE` holds the Apache-2.0 text and `NOTICE` the project notice. Ported ANTs/ITK code will add its upstream NOTICE entries there.
 - FreeSurfer-derived code stays in the separate `larmorx-freesurfer` wheel under its own licence terms (D3).
 
+## 2026-10-09: Phase L1 foundations: images, NIfTI I/O, test data, validation
+- **User direction:** start the implementation with a high-quality architecture; keep test data in a separate, comprehensive and well-organised repository; prove parity with the replicated software with reports; measure performance.
+- **Test data:** a separate repository, `larmorx-testdata` (next to `larmorx/` in the workspace; to be published as `github.com/karellopez/larmorx-testdata`). It holds a TOML catalog (source, licence, SHA-256, size, tier, tags), generated edge cases committed in the repo, and a standard-library downloader into a content-addressed cache. Tiers: `smoke` (≤ 50 MB, every CI run), `standard` (≤ 2 GB), `full` (benchmarks).
+- **Validation framework:** `validation/` (package `larmorx-validation`, development only) runs parity suites (statuses `pass`, `both-error`, `expected-divergence`, `fail`) and benchmarks. Reports are committed in `docs/validation/` (the per-tool validation record) and `docs/benchmarks/`; `tests/parity/` runs the suites in CI.
+- **Image model:** one `lx.Image` (data, affine, optional header) for every dimensionality, instead of separate `Image`/`Image4D` classes; 4D specifics (`tr`, slice timing) come from the header. A frozen dataclass over numpy; headers cross the Rust boundary as dicts, so no Rust object reaches Python.
+- **NIfTI I/O semantics = nibabel 5.x**, validated case by case. Deliberate differences, each documented in `docs/api/io.md`:
+  - arrays are returned in native byte order (values identical);
+  - `save` stores the array's own type; nibabel rescales into the header's type;
+  - gzip is detected from the content, not the name;
+  - a single file with `vox_offset` 0 is an error (nibabel reads garbage);
+  - `get_fdata`-style reads of complex data raise (nibabel drops the imaginary part);
+  - the default gzip level is 2: zlib-rs's level 2 matches the file size of zlib's level 1 (nibabel's default) and is faster; zlib-rs's level 1 compresses about 15% less;
+  - RGB24/RGBA32 data are not supported yet.
+- **Finding (needs a decision):** no ANTs 2.6.x release pins ITK 5.4.7, contrary to CLAUDE.md; fMRIPrep's image runs ANTs 2.6.2 with ITK 5.4.4. See `UPSTREAM.md`.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

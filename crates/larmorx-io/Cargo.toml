@@ -11,6 +11,7 @@ bytemuck.workspace = true
 crc32fast.workspace = true
 flate2.workspace = true
 larmorx-core.workspace = true
+larmorx-transform.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 

@@ -8,9 +8,16 @@
 //! nifti_clib (public domain); see `PROVENANCE.md`. Where ITK computes in single precision,
 //! this port does too, so borderline choices come out the same.
 
-use larmorx_core::linalg;
+use std::path::Path;
+
+use larmorx_core::array::DynArray;
+use larmorx_core::element::DataType;
+use larmorx_core::element::RealElement;
+use larmorx_core::{dispatch_real_dyn_array, linalg};
+use rayon::prelude::*;
 
 use super::header::{NiftiHeader, NiftiVersion, xform};
+use super::{Error, ReadOptions, Scaling};
 
 /// The geometry ITK gives an image read from a NIfTI file.
 #[derive(Clone, Debug, PartialEq)]
@@ -391,6 +398,29 @@ impl ItkGeometry {
         self
     }
 
+    /// The 3D grid ITK reads into a 3D image: the first three dimensions, with the top-left
+    /// 3×3 of the direction (a 2D image gets a third axis of one voxel, spacing 1). `None` if
+    /// the grid is singular.
+    pub fn grid3(&self) -> Option<larmorx_core::Grid3> {
+        let n = self.ndim;
+        let pick = |v: &[f64], i: usize, default: f64| if i < n { v[i] } else { default };
+        let size = std::array::from_fn(|i| if i < n { self.size[i] } else { 1 });
+        let spacing = std::array::from_fn(|i| pick(&self.spacing, i, 1.0));
+        let origin = std::array::from_fn(|i| pick(&self.origin, i, 0.0));
+        let direction = std::array::from_fn(|i| {
+            std::array::from_fn(|j| {
+                if i < n && j < n {
+                    self.direction[i][j]
+                } else if i == j {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+        });
+        larmorx_core::Grid3::new(size, spacing, origin, direction)
+    }
+
     /// The voxel-to-world affine of the first three dimensions in **RAS+** (as nibabel would
     /// read a file ITK wrote with this geometry): `diag(-1,-1,1)·[D·diag(spacing) | origin]`.
     pub fn ras_affine(&self) -> larmorx_core::Affine {
@@ -413,6 +443,151 @@ impl ItkGeometry {
             std::array::from_fn(|i| lps[i] * self.origin.get(i).copied().unwrap_or(0.0));
         larmorx_core::Affine::from_linear(linear, translation)
     }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Voxel values
+
+/// Voxel values as ITK's NIfTI reader produces them, in the narrowest float type that holds
+/// them exactly (ANTs then converts them to its pixel type, usually double, without loss).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ItkVoxels {
+    F32(Vec<f32>),
+    F64(Vec<f64>),
+}
+
+impl ItkVoxels {
+    pub fn len(&self) -> usize {
+        match self {
+            ItkVoxels::F32(v) => v.len(),
+            ItkVoxels::F64(v) => v.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// An image as ITK 5.4.5 reads it from a NIfTI file: its geometry and its voxel values
+/// (Fortran order, `x` fastest; for vector images the components are the slowest axis, as
+/// stored).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ItkImage {
+    pub geometry: ItkGeometry,
+    pub voxels: ItkVoxels,
+    /// The header's `intent_code`.
+    pub intent_code: i32,
+}
+
+/// Reads a NIfTI image's geometry and voxel values the way ITK 5.4.5's `NiftiImageIO` does.
+///
+/// Values differ from nibabel's when the header has scaling: ITK ignores `scl_slope`/`scl_inter`
+/// for Analyze files and when the slope is 0 (or not finite); integer data are converted to
+/// float32 **before** scaling and the scaled value is rounded to float32 again
+/// (`f32(f64(f32(x))·slope + inter)`), float32 data are scaled in double and rounded to
+/// float32. Displacement vectors with intent `NIFTI_INTENT_DISPVECT` are converted from RAS to
+/// LPS (x and y negated); other vector intents are taken as LPS already (ANTs writes
+/// `NIFTI_INTENT_VECTOR`). Complex and RGB data are not supported.
+pub fn read_itk_image(path: impl AsRef<Path>, n_threads: usize) -> Result<ItkImage, Error> {
+    let path = path.as_ref();
+    let stored = super::read_header(path)?;
+    let geometry = itk_geometry(&stored).map_err(|e| super::format_err(path, e.to_string()))?;
+    let image = super::read(
+        path,
+        &ReadOptions {
+            scaling: Scaling::Raw,
+            n_threads,
+        },
+    )?;
+    let (slope, inter) = itk_rescale(&stored);
+    let rescale = must_rescale(slope, inter);
+    let is_float = matches!(image.data, DynArray::F32(_) | DynArray::F64(_));
+    if stored.intent_code == INTENT_DISPVECT && !is_float && !rescale {
+        return Err(super::format_err(
+            path,
+            "ITK converts NIFTI_INTENT_DISPVECT vectors only for float data",
+        ));
+    }
+    let voxels = larmorx_core::parallel::with_threads(n_threads, || {
+        dispatch_real_dyn_array!(&image.data, a => {
+            Ok(itk_values(a.as_slice_memory_order().expect("contiguous"), slope, inter, rescale))
+        }, complex => Err(super::format_err(
+            path,
+            "complex images are not supported by the ITK reader port",
+        )))
+    })??;
+    let voxels = if stored.intent_code == INTENT_DISPVECT {
+        ras_to_lps_vectors(voxels, path)?
+    } else {
+        voxels
+    };
+    Ok(ItkImage {
+        geometry,
+        voxels,
+        intent_code: stored.intent_code,
+    })
+}
+
+/// ITK's `m_RescaleSlope`/`m_RescaleIntercept`: nifti_clib zeroes non-finite values, ITK
+/// replaces a zero slope by 1 and ignores scaling in Analyze files.
+fn itk_rescale(h: &NiftiHeader) -> (f64, f64) {
+    if !is_nifti(&h.magic) {
+        return (1.0, 0.0);
+    }
+    let finite = |v: f64| if v.is_finite() { v } else { 0.0 };
+    let (mut slope, inter) = (finite(h.scl_slope), finite(h.scl_inter));
+    if slope.abs() < f64::EPSILON {
+        slope = 1.0;
+    }
+    (slope, inter)
+}
+
+/// ITK's `NiftiImageIO::MustRescale`.
+fn must_rescale(slope: f64, inter: f64) -> bool {
+    slope.abs() > f64::EPSILON && ((slope - 1.0).abs() > f64::EPSILON || inter.abs() > f64::EPSILON)
+}
+
+/// ITK's values for stored values of type `T` (see [`read_itk_image`]).
+fn itk_values<T: RealElement>(v: &[T], slope: f64, inter: f64, rescale: bool) -> ItkVoxels {
+    fn map<T: Copy + Send + Sync, U: Send>(v: &[T], f: impl Fn(T) -> U + Send + Sync) -> Vec<U> {
+        v.par_iter().with_min_len(1 << 16).map(|&x| f(x)).collect()
+    }
+    match T::DATA_TYPE {
+        DataType::F64 if rescale => ItkVoxels::F64(map(v, |x| x.to_f64() * slope + inter)),
+        DataType::F64 => ItkVoxels::F64(map(v, |x| x.to_f64())),
+        // Float data are scaled in double and stored back as float; integer data are first
+        // converted to float (`CastCopy<float>`).
+        DataType::F32 if rescale => ItkVoxels::F32(map(v, |x| (x.to_f64() * slope + inter) as f32)),
+        _ if rescale => ItkVoxels::F32(map(v, |x| (f64::from(x.to_f32()) * slope + inter) as f32)),
+        // Unscaled: the stored values, in float32 when that is exact.
+        DataType::F32 | DataType::U8 | DataType::I8 | DataType::U16 | DataType::I16 => {
+            ItkVoxels::F32(map(v, |x| x.to_f32()))
+        }
+        _ => ItkVoxels::F64(map(v, |x| x.to_f64())),
+    }
+}
+
+/// ITK's RAS→LPS conversion of displacement vectors (components are the slowest axis).
+fn ras_to_lps_vectors(voxels: ItkVoxels, path: &Path) -> Result<ItkVoxels, Error> {
+    let n = voxels.len();
+    if !n.is_multiple_of(3) {
+        return Err(super::format_err(
+            path,
+            "NIFTI_INTENT_DISPVECT needs 3-component vectors",
+        ));
+    }
+    let flip = 2 * n / 3;
+    Ok(match voxels {
+        ItkVoxels::F32(mut v) => {
+            v[..flip].iter_mut().for_each(|x| *x = -*x);
+            ItkVoxels::F32(v)
+        }
+        ItkVoxels::F64(mut v) => {
+            v[..flip].iter_mut().for_each(|x| *x = -*x);
+            ItkVoxels::F64(v)
+        }
+    })
 }
 
 #[cfg(test)]

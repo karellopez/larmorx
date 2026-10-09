@@ -206,7 +206,7 @@ fn read_header_from(
     if got < 4 {
         return Err(header_err(path)(HeaderError::NotNifti));
     }
-    let size = match NiftiHeader::sniff(&block[..4]).map_err(header_err(path))?.0 {
+    let size = match NiftiHeader::sniff_version(&block[..4]).map_err(header_err(path))? {
         NiftiVersion::V1 => header::NIFTI1_HEADER_SIZE,
         NiftiVersion::V2 => header::NIFTI2_HEADER_SIZE,
     };

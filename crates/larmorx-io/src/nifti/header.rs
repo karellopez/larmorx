@@ -265,40 +265,42 @@ impl NiftiHeader {
     // ----------------------------------------------------------------------------------------
     // Binary layout
 
-    /// Detects the version and byte order from the first bytes of a file (at least 4), as
-    /// nibabel does: `sizeof_hdr` selects the version, `dim[0]` confirms the byte order.
+    /// Detects the version and byte order from the first bytes of a file, as nibabel does.
+    ///
+    /// `sizeof_hdr` (348 or 540, in either byte order) gives the version. The byte order follows
+    /// nibabel's `guessed_endian`, with little-endian as the reference order: `dim[0]` read
+    /// little-endian in 1..=7 means little-endian; 0 means big-endian if `sizeof_hdr` reads
+    /// correctly big-endian, else little-endian; any other value means big-endian.
     pub fn sniff(block: &[u8]) -> Result<(NiftiVersion, ByteOrder), HeaderError> {
-        let head: [u8; 4] = block
+        let version = Self::sniff_version(block)?;
+        let be = i32::from_be_bytes(block[..4].try_into().unwrap());
+        let little = FieldReader::new(block, ByteOrder::Little);
+        let dim0 = match version {
+            NiftiVersion::V1 if block.len() >= 42 => i64::from(little.i16(40)),
+            NiftiVersion::V2 if block.len() >= 24 => little.i64(16),
+            _ => return Err(HeaderError::NotNifti),
+        };
+        let size = i32::try_from(version.header_size()).expect("small");
+        let order = match dim0 {
+            0 if be == size => ByteOrder::Big,
+            0..=7 => ByteOrder::Little,
+            _ => ByteOrder::Big,
+        };
+        Ok((version, order))
+    }
+
+    /// The version from the first four bytes (`sizeof_hdr`, 348 or 540, in either byte order).
+    pub fn sniff_version(head: &[u8]) -> Result<NiftiVersion, HeaderError> {
+        let head: [u8; 4] = head
             .get(..4)
             .ok_or(HeaderError::NotNifti)?
             .try_into()
             .unwrap();
-        let (le, be) = (i32::from_le_bytes(head), i32::from_be_bytes(head));
-        let (version, order) = match (le, be) {
-            (348, _) => (NiftiVersion::V1, ByteOrder::Little),
-            (_, 348) => (NiftiVersion::V1, ByteOrder::Big),
-            (540, _) => (NiftiVersion::V2, ByteOrder::Little),
-            (_, 540) => (NiftiVersion::V2, ByteOrder::Big),
-            _ => return Err(HeaderError::NotNifti),
-        };
-        // nibabel trusts dim[0] over sizeof_hdr when it is a plausible 1..=7.
-        let dim0 = |o: ByteOrder| -> Option<i64> {
-            let r = FieldReader::new(block, o);
-            match version {
-                NiftiVersion::V1 if block.len() >= 42 => Some(i64::from(r.i16(40))),
-                NiftiVersion::V2 if block.len() >= 24 => Some(r.i64(16)),
-                _ => None,
-            }
-        };
-        let swapped = match order {
-            ByteOrder::Little => ByteOrder::Big,
-            ByteOrder::Big => ByteOrder::Little,
-        };
-        let plausible = |d: Option<i64>| d.is_some_and(|d| (1..=7).contains(&d));
-        if !plausible(dim0(order)) && plausible(dim0(swapped)) {
-            return Ok((version, swapped));
+        match (i32::from_le_bytes(head), i32::from_be_bytes(head)) {
+            (348, _) | (_, 348) => Ok(NiftiVersion::V1),
+            (540, _) | (_, 540) => Ok(NiftiVersion::V2),
+            _ => Err(HeaderError::NotNifti),
         }
-        Ok((version, order))
     }
 
     /// Parses a header block (348 bytes for NIfTI-1, 540 for NIfTI-2). Extensions are read
@@ -989,10 +991,25 @@ mod tests {
         let mut bytes = h.to_bytes();
         assert_eq!(
             NiftiHeader::sniff(&bytes).unwrap(),
-            (NiftiVersion::V1, ByteOrder::NATIVE)
+            (NiftiVersion::V1, ByteOrder::Little)
         );
-        bytes[..4].copy_from_slice(&348i32.to_be_bytes()); // sizeof_hdr in the "wrong" order
-        assert_eq!(NiftiHeader::sniff(&bytes).unwrap().1, ByteOrder::NATIVE);
+        // A big-endian sizeof_hdr does not matter while dim[0] reads 1..=7 little-endian.
+        bytes[..4].copy_from_slice(&348i32.to_be_bytes());
+        assert_eq!(NiftiHeader::sniff(&bytes).unwrap().1, ByteOrder::Little);
+        // dim[0] outside 0..=7 little-endian: nibabel assumes big-endian.
+        bytes[40..42].copy_from_slice(&8i16.to_le_bytes());
+        assert_eq!(NiftiHeader::sniff(&bytes).unwrap().1, ByteOrder::Big);
+        // dim[0] = 0: sizeof_hdr decides.
+        bytes[40..42].copy_from_slice(&0i16.to_le_bytes());
+        assert_eq!(NiftiHeader::sniff(&bytes).unwrap().1, ByteOrder::Big);
+        bytes[..4].copy_from_slice(&348i32.to_le_bytes());
+        assert_eq!(NiftiHeader::sniff(&bytes).unwrap().1, ByteOrder::Little);
+        let mut be = h.clone();
+        be.byte_order = ByteOrder::Big;
+        assert_eq!(
+            NiftiHeader::sniff(&be.to_bytes()).unwrap().1,
+            ByteOrder::Big
+        );
         assert_eq!(NiftiHeader::sniff(b"\0\0\0\0"), Err(HeaderError::NotNifti));
     }
 }

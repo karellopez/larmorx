@@ -7,6 +7,9 @@
 //! `UPSTREAM.md`), verified against mpmath on CORE-MATH's worst-case inputs and millions of
 //! random inputs. Background: `docs/findings/platform-math.md`.
 
+pub(crate) mod dint;
 mod exp;
+mod log;
 
 pub use exp::exp;
+pub use log::log;

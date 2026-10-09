@@ -46,7 +46,17 @@ the 79 passing parity cases, the 18 that are not bit-identical are exactly these
 
 All 18 are within about 1e-15 relative.
 
-**Option under consideration** (needs a decision, since CLAUDE.md fixes the `libm` crate):
+**Decided (2026-10-09):** the functions are correctly rounded, ported from CORE-MATH. The option, as first written:
 correctly rounded pure-Rust `exp`, `log`, `sin`, `cos`, for example ported from CORE-MATH
 (MIT). These would match glibc in more than 99.8 % of calls, be more accurate, and still give
 the same bits on every platform.
+
+**After the switch: `exp` and `log`** (CORE-MATH ports, 2026-10-09). On the parity suite:
+- the Gaussian interpolation cases went from about 13 % of voxels differing to 16, 56 and 44
+  voxels;
+- fMRIPrep's GM probability map → MNI went to 749 of 1.08 M voxels;
+- MultiLabel stays identical.
+
+The residue is where glibc's own `exp`/`log` are not correctly rounded: about 0.003 % of
+calls, with dozens of calls per voxel through vnl's `erf`. Matching those cases would mean
+porting glibc's algorithms instead of rounding correctly, which was not chosen. *Validated.*

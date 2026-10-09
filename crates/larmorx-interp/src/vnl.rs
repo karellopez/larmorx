@@ -6,6 +6,8 @@
 //! licence) as bundled with ITK v5.4.5, in the same operation order, so interpolated values
 //! match ITK's rather than an exact erf.
 
+use larmorx_core::math;
+
 // The constants are written exactly as in vnl, so they parse to the same doubles.
 #[allow(clippy::excessive_precision)]
 fn log_gamma(x: f64) -> f64 {
@@ -16,7 +18,7 @@ fn log_gamma(x: f64) -> f64 {
     zp -= 5.00757863970517583837 / (x + 3.0);
     zp += 0.0114684895434781459556 / (x + 4.0);
     let x1 = x + 4.65;
-    libm::log(zp) + (x - 0.5) * libm::log(x1) - x1
+    math::log(zp) + (x - 0.5) * math::log(x1) - x1
 }
 
 const MAX_ITS: usize = 100;
@@ -38,7 +40,7 @@ fn gamma_series(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    sum * libm::exp(-x + a * libm::log(x) - log_gamma(a))
+    sum * math::exp(-x + a * math::log(x) - log_gamma(a))
 }
 
 fn gamma_cont_frac(a: f64, x: f64) -> f64 {
@@ -65,7 +67,7 @@ fn gamma_cont_frac(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    libm::exp(-x + a * libm::log(x) - log_gamma(a)) * cf
+    math::exp(-x + a * math::log(x) - log_gamma(a)) * cf
 }
 
 fn gamma_p(a: f64, x: f64) -> f64 {

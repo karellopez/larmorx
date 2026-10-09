@@ -44,6 +44,7 @@ from larmorx_validation.parity.harness import (
     Outcome,
     Suite,
 )
+from larmorx_validation.report import table
 
 #: specs/3dTshift.md §9 (PLAN.md §11.3, slice timing as deterministic arithmetic).
 RTOL = 1e-5
@@ -755,6 +756,15 @@ def run_case(case: Case, checks: CheckList) -> None:
             _compare(checks, outputs["afni"], outputs["larmorx"])
 
 
+def _differing_fraction(r: CaseResult) -> float:
+    for c in r.checks:
+        if c.name in ("values", "values (integer output)"):
+            match = re.match(r"(\d+) of (\d+) values differ", c.detail)
+            if match:
+                return int(match.group(1)) / max(int(match.group(2)), 1)
+    return 0.0
+
+
 def _highlights(results: list[CaseResult]) -> list[str]:
     compared = [r for r in results if r.status == PASS]
 
@@ -763,6 +773,10 @@ def _highlights(results: list[CaseResult]) -> list[str]:
 
     def method(r: CaseResult) -> str:
         return next((str(c.value) for c in r.checks if c.name == "method"), "")
+
+    def worst(rs: list[CaseResult], name: str) -> float | None:
+        values = [float(c.value) for r in rs for c in r.checks if c.name == name]
+        return max(values) if values else None
 
     fourier = [r for r in compared if method(r) == "Fourier"]
     other = [r for r in compared if method(r) != "Fourier"]
@@ -776,23 +790,41 @@ def _highlights(results: list[CaseResult]) -> list[str]:
         "precision with its own FFT, so float32 outputs differ in the last bits and integer "
         "outputs occasionally round the other way (by 1).",
     ]
-    worst = {}
-    for r in compared:
-        for c in r.checks:
-            if c.name in ("values", "values (integer output)") and c.value is not None:
-                key = "float" if c.name == "values" else "integer"
-                value = float(c.value)
-                if value > worst.get(key, (0.0, ""))[0]:
-                    worst[key] = (value, r.case)
-    if "float" in worst:
+    rest = [r.case for r in other if not identical(r)]
+    if rest:
         lines.append(
-            f"- Largest float difference: {worst['float'][0]:.1e} × max |AFNI| "
-            f"(`{worst['float'][1]}`)."
+            "- Not bit-identical outside Fourier: "
+            + ", ".join(f"`{c}`" for c in rest)
+            + " (`-no_detrend`, whose last float32 bit is not reproduced yet; see the API page)."
         )
-    if "integer" in worst:
-        lines.append(
-            f"- Largest integer difference: {worst['integer'][0]:g} (`{worst['integer'][1]}`)."
+    rows = []
+    for category in sorted({r.category for r in compared}):
+        rs = [r for r in compared if r.category == category]
+        f, i = worst(rs, "values"), worst(rs, "values (integer output)")
+        rows.append(
+            (
+                category,
+                len(rs),
+                sum(map(identical, rs)),
+                "–" if f is None else f"{f:.1e}",
+                "–" if i is None else f"{i:g}",
+                f"{max(map(_differing_fraction, rs)):.1e}",
+            )
         )
+    lines += [
+        "",
+        table(
+            (
+                "Category",
+                "Compared",
+                "Bit-identical",
+                "Worst float diff (× max AFNI)",
+                "Worst integer diff",
+                "Most values differing (fraction)",
+            ),
+            rows,
+        ),
+    ]
     return lines
 
 

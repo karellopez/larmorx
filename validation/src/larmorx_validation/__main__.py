@@ -22,6 +22,30 @@ def _parity_suite(name: str):
     raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
 
 
+def _redacted(result):
+    """The result with machine-specific paths removed from its messages."""
+    from dataclasses import replace
+
+    from larmorx_validation.report import redact
+
+    checks = [replace(c, detail=redact(c.detail)) for c in result.checks]
+    return replace(result, reason=redact(result.reason), checks=checks)
+
+
+def _summary(result) -> dict:
+    """What the JSON record keeps of a case: its status and anything that did not pass."""
+    return {
+        "case": result.case,
+        "category": result.category,
+        "status": result.status,
+        "reason": result.reason,
+        "checks_passed": sum(c.passed for c in result.checks),
+        "checks_total": len(result.checks),
+        "failed_checks": [c.__dict__ for c in result.failed_checks],
+        "seconds": round(result.seconds, 3),
+    }
+
+
 def cmd_parity(args: argparse.Namespace) -> int:
     from larmorx_validation.parity import FAIL, run, summarise
     from larmorx_validation.parity.render import render
@@ -59,9 +83,11 @@ def cmd_parity(args: argparse.Namespace) -> int:
             if r.reason:
                 print("    " + r.reason.strip().replace("\n", "\n    "), file=sys.stderr)
     if args.out:
+        results = [_redacted(r) for r in results]
         env = environment.describe(suite.packages)
         command = f"python -m larmorx_validation parity {args.suite} --tier {args.tier}"
         out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(
             render(suite, results, env, args.tier, command), encoding="utf-8"
         )
@@ -73,7 +99,7 @@ def cmd_parity(args: argparse.Namespace) -> int:
                 "reference": suite.reference,
                 "environment": env,
                 "summary": counts,
-                "results": [r.to_dict() for r in results],
+                "results": [_summary(r) for r in results],
             },
         )
         print(f"report: {out / (suite.name + '.md')}", file=sys.stderr)

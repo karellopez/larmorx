@@ -4,8 +4,33 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Sequence
+from functools import cache
 from pathlib import Path
 from typing import Any
+
+
+@cache
+def _local_roots() -> list[tuple[str, str]]:
+    """Machine-specific path prefixes and the placeholders that replace them in reports."""
+    from larmorx_testdata.catalog import REPO_ROOT as testdata_root
+    from larmorx_testdata.fetch import cache_dir
+
+    larmorx_root = Path(__file__).resolve().parents[3]
+    roots = [
+        (str(cache_dir() / "data"), "<testdata-cache>"),
+        (str(cache_dir()), "<testdata-cache>"),
+        (str(testdata_root), "<larmorx-testdata>"),
+        (str(larmorx_root), "<larmorx>"),
+        (str(Path.home()), "~"),
+    ]
+    return sorted(roots, key=lambda r: -len(r[0]))
+
+
+def redact(text: str) -> str:
+    """``text`` without machine-specific paths (reports are committed and published)."""
+    for root, placeholder in _local_roots():
+        text = text.replace(root, placeholder)
+    return text
 
 
 def table(header: Sequence[str], rows: Iterable[Sequence[Any]]) -> str:

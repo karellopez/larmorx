@@ -7,7 +7,7 @@ One package, **`larmorx`** (repo `github.com/karellopez/larmorx`), with two laye
 
 1. **The tool library**: `pip install larmorx`, then `import larmorx as lx`.
    - ANTs/ITK, AFNI and FreeSurfer functions are **ported** to Rust.
-   - FSL-like and Connectome-Workbench-like functions are **original re-implementations**: their licences don't allow a port, so we write our own code with the same behaviour.
+   - FSL-like and Connectome-Workbench-like functions have **both** a replica (licence-segregated package) and a clean-room original (Apache-2.0); see `docs/licensing.md`.
    - Every tool has three interfaces, plus documentation and a validation record (PLAN.md §4):
      - a Rust API (crates `larmorx-*`)
      - an idiomatic **Python wrapper** (`lx.ants.registration(...)`)
@@ -30,7 +30,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 - **Phase L1 in progress:**
   - `Image`/`Affine` and NIfTI-1/2 I/O: validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`).
   - **antsApplyTransforms (A1) done:** `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms`, `lx.transforms`, crates `larmorx-transform`, `-interp`, `-ants`. It is validated against ANTs itself: 83 cases, 63 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`), and benchmarked (`docs/benchmarks/ants-apply-transforms.md`).
-  - Next: `lx.afni.tshift`, an original implementation (spec `specs/3dTshift.md`, AFNI oracle built by `scripts/build_afni_oracle.sh`); then A2, the ANTs image filters (`larmorx-image`).
+  - Next: `lx.afni.tshift`. The clean-room original is under way (spec `specs/3dTshift.md`, AFNI oracle built by `scripts/build_afni_oracle.sh`); the bit-exact replica follows in `larmorx-gpl`. Then A2, the ANTs image filters (`larmorx-image`).
 - Conventions every tool follows are in `docs/architecture.md`.
 - **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
 - **Decided 2026-10-09:** transcendental functions are correctly rounded (CORE-MATH ports in `larmorx_core::math`; rule 5). See `docs/findings/platform-math.md`.
@@ -62,7 +62,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   fmriprep/ smriprep/ niworkflows/ sdcflows/ nireports/ nitransforms/ nipype/ nibabel/
   nitime/ pybids/ python-client/ tedana/ acres/ migas-py/
   ANTs/ ITK/ afni/ freesurfer/   read-only upstream references, pinned in upstream.tsv
-  reference_src/workbench/  reference_src/MSM_HOCR/     licence-restricted: read, never translate
+  reference_src/workbench/  reference_src/MSM_HOCR/     licence-restricted sources (docs/licensing.md)
 ```
 
 Recreate it with:
@@ -71,20 +71,16 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 ```
 
 ## Hard rules
-1. **Licence-restricted upstreams: read, never translate** (user decisions, 2026-10-09).
-   - **Which upstreams:**
-     - FSL (non-commercial licence);
-     - Connectome Workbench (GPL-2.0-or-later, in `reference_src/`);
-     - MSM_HOCR (non-commercial, in `reference_src/`);
-     - AFNI code copyrighted by the Medical College of Wisconsin (GPL-2). That is every AFNI file whose header says so, including 3dTshift, csfft and most of `mrilib`.
-   - **The rule:**
-     - The source may be read to understand behaviour.
-     - The implementation must be original: our own design and structure, our own helpers (FFT, solvers, ...).
-     - Never translate functions, macros or kernels line by line, even with renaming. A translation is a derivative under these licences.
-   - **Why it holds even though larmorx is not commercial:** larmorx is Apache-2.0, so others may use it commercially. Code derived from these sources therefore cannot be in it.
-   - **Process:** write the behaviour down in `specs/<tool>.md`, and validate against the upstream binary as an oracle.
-   - **MSM's optimiser is patented.** Patents cover the method however it is coded, so do not implement it.
-   - **Ported directly instead:** AFNI files without the MCW header (NIH work, public domain), after a per-file check of every routine they call.
+1. **Licences: two tracks, kept apart** (user decision, 2026-10-09). See `docs/licensing.md`.
+   - **Replica:** a bit-for-bit port of the upstream source, for the most accurate output. It carries the upstream's licence and lives in a package per licence family:
+     - permissive upstreams (ANTs/ITK, AFNI's NIH files, CORE-MATH, nibabel): the main `larmorx` package (Apache-2.0);
+     - AFNI's MCW files and Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`);
+     - FSL: `larmorx-nc` (the FSL Licence's non-commercial terms, `crates-nc/`);
+     - FreeSurfer: `larmorx-freesurfer`.
+   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary.
+   - **Never** move replica code into the main package, even renamed. Never link code from different licence families into one binary: `larmorx-gpl` and `larmorx-nc` are incompatible with each other.
+   - **MSM_HOCR:** no replica can be published (its ELC library forbids public distribution of derivatives, and its FastPD optimiser is patented). Its original must avoid those optimisation methods.
+   - **Every file records its origin** with an SPDX header and in its crate's `PROVENANCE.md`.
 2. **Ported code records its provenance.** Each crate's `PROVENANCE.md` lists the upstream files and versions it was ported from. Port from the pinned **release tags**, not the local master/dev clones:
    - ANTs v2.6.5
    - ITK v5.4.5 (the version ANTs 2.6.5 pins; decided 2026-10-09)

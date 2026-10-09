@@ -33,7 +33,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   - Next: `lx.afni.tshift`.
 - Conventions every tool follows are in `docs/architecture.md`.
 - **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
-- **Open question for the user:** CLAUDE.md fixes the `libm` crate for transcendental functions. A correctly rounded `exp`/`log`/`sin`/`cos` (e.g. a port of CORE-MATH) would match glibc, and so ANTs, in more than 99.8 % of calls instead of about 90 %. That would close the last bit-identity gap. See `docs/findings/platform-math.md`. Do not change it without the user's decision.
+- **Decided 2026-10-09:** transcendental functions are correctly rounded (CORE-MATH ports in `larmorx_core::math`; rule 5). See `docs/findings/platform-math.md`.
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
 - **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
 - **Pending decisions** are in PLAN.md §16. Until the user decides, use these defaults:
@@ -80,7 +80,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 5. **Rust rules:**
    - Pure-Rust dependencies only: no C, C++, Fortran or HDF5 libraries.
    - Deterministic reductions, independent of thread count.
-   - The `libm` crate for transcendental functions.
+   - Correctly rounded transcendental functions from `larmorx_core::math` (pure-Rust ports of CORE-MATH, decided 2026-10-09). They give the same bits on every platform and match glibc, and so ANTs/AFNI on Linux, in more than 99.8 % of calls. Use the `libm` crate only for functions not yet ported, and say so in the code.
    - Seeded RNG; no fast-math; no `target-cpu=native` in release builds.
    - Explicit `n_threads` on every call; release the GIL.
    - `#![forbid(unsafe_code)]` outside audited hot loops.

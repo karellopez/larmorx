@@ -100,9 +100,9 @@ Newest entries last. Each entry records what was decided, by whom, and why.
   pure-Rust HDF5 reader for the ITK layout comes later. Then the standalone binary will read
   `.h5` too, and the large gzip-compressed fMRIPrep warps can be decompressed in parallel
   (reading them dominates the T1w → MNI time today).
-- **Open, for the user:** see below, *transcendental functions*.
+- **Transcendental functions:** correctly rounded, by user decision (below).
 
-### Pending: transcendental functions (`libm` crate vs correctly rounded)
+### Decided: transcendental functions are correctly rounded (user decision, 2026-10-09)
 CLAUDE.md rule 5 prescribes the `libm` crate. ITK calls the platform's math library, which on
 Linux is glibc. The `libm` crate and glibc disagree in the last bit for about 10 % of `exp`,
 5 % of `log` and 3 % of `sin`/`cos` results. glibc is correctly rounded in more than 99.8 % of
@@ -112,7 +112,13 @@ cases. The 18 parity cases that are not bit-identical all go through these funct
 Option: correctly rounded pure-Rust `exp`, `log`, `sin` and `cos`, for example ported from
 CORE-MATH (MIT). This would be more accurate, still identical on every platform, and would
 match ANTs-on-Linux in more than 99.8 % of calls. Details:
-`docs/findings/platform-math.md`. **Not changed without the user's decision.**
+`docs/findings/platform-math.md`.
+
+**User decision:** port CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` to pure
+Rust in `larmorx_core::math`. They are pinned at CORE-MATH commit `040ee482a8ca`
+(`UPSTREAM.md`) and verified against mpmath on CORE-MATH's worst-case inputs and on random
+inputs. CLAUDE.md rule 5 now says so. The `libm` crate stays only for functions not yet
+ported.
 
 ## Open decisions (PLAN.md §16)
 

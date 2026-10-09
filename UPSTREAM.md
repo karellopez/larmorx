@@ -12,6 +12,7 @@ Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmripre
 | ITK | Apache-2.0 | `v5.4.5` → `f51594ad8819` | libitk 5.4.4 (conda-forge) | the version ANTs 2.6.5's build pins (2.6.0–2.6.3 pin `v5.4.3`) |
 | AFNI | public domain (+ per-file exceptions) | `AFNI_25.2.09` → `b1e12b26dae2` | AFNI_25.2.09 | matches fMRIPrep |
 | FreeSurfer | FreeSurfer Software License v1.0 | `v8.2.0` → `d932c45b7941` (pending D5) | 7.3.2 | fMRIPrep runs 7.3.2; D5 proposes porting 8.2.0 and validating against 7.4.x |
+| CORE-MATH | MIT | `master` → `040ee482a8ca` (no releases; 2026-10-09) | – (fMRIPrep's tools use glibc's libm) | correctly rounded `exp`, `log`, `sin`, `cos` in `larmorx_core::math` (user decision 2026-10-09) |
 
 **ANTs/ITK patch level (decided 2026-10-09: ANTs v2.6.5 + ITK v5.4.5).** CLAUDE.md first said "ITK v5.4.7 (pinned by ANTs 2.6)", but no ANTs 2.6.x release pins 5.4.7, and fMRIPrep's image runs ANTs 2.6.2 linked against ITK 5.4.4. The candidates were:
 

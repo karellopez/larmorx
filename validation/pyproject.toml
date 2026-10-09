@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "larmorx-validation"
+version = "0.1.0"
+description = "Parity checks and benchmarks of larmorx against the tools it re-implements (development only)"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = ["numpy>=1.26", "larmorx-testdata"]
+
+[project.optional-dependencies]
+# Reference implementations used as oracles.
+oracles = ["nibabel>=5.3", "SimpleITK>=2.4"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/larmorx_validation"]

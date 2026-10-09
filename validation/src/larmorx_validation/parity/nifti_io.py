@@ -140,9 +140,11 @@ def _theirs(hdr, name: str) -> Any:
     return value.rstrip(b"\x00") if isinstance(value, bytes) else value
 
 
-def _header_fields_check(checks: CheckList, ours, theirs) -> None:
+def _header_fields_check(checks: CheckList, ours, theirs, *, label: str = "header fields") -> None:
     mismatches = []
     names = [f for f in FIELDS if f in theirs]
+    if label == "header as stored":
+        names.append("vox_offset")
     for name in names:
         a = getattr(ours, name)
         if name == "regular":
@@ -150,16 +152,42 @@ def _header_fields_check(checks: CheckList, ours, theirs) -> None:
         a, b = _ours(a), _theirs(theirs, name)
         if compare.equal(name, a, b).passed is False:
             mismatches.append(f"{name}: {a!r} != {b!r}")
-    checks(f"header fields ({len(names)})", not mismatches, detail="; ".join(mismatches[:6]))
+    checks(f"{label} ({len(names)})", not mismatches, detail="; ".join(mismatches[:6]))
 
 
 def _extensions(hdr) -> list[tuple[int, bytes]]:
     return [(int(e.get_code()), bytes(e.content).rstrip(b"\x00")) for e in hdr.extensions]
 
 
+def _head(path: Path, n: int) -> bytes:
+    """The first ``n`` bytes of the content, decompressing gzip (works on truncated streams)."""
+    with path.open("rb") as f:
+        gz = f.read(2) == b"\x1f\x8b"
+    with gzip.open(path, "rb") if gz else path.open("rb") as f:
+        return f.read(n)
+
+
 def _decompressed(path: Path) -> bytes:
     raw = path.read_bytes()
     return gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+
+
+def _compare_stored_headers(path: Path, checks: CheckList) -> bool:
+    """Compare the header as stored (no fixes) with nibabel's parse of the same bytes. Returns
+    whether they agree; adds no check if larmorx cannot parse a header at all."""
+    nib = _nib()
+    stored, err = _try(lx.io.read_header, path)
+    if err is not None:
+        return True
+    size = 348 if stored.version == 1 else 540
+    klass = nib.Nifti2Header if stored.version == 2 else nib.Nifti1Header
+    theirs, err = _try(klass, _head(path, size), check=False)
+    if err is not None:
+        checks("header as stored", False, detail=f"larmorx parses it, nibabel does not: {err!r}")
+        return False
+    before = len(checks.checks)
+    _header_fields_check(checks, stored, theirs, label="header as stored")
+    return all(c.passed for c in checks.checks[before:])
 
 
 def _compare_reads(
@@ -205,7 +233,7 @@ def _compare_reads(
     # the header as stored is the header class applied to the raw block (with the same fixes).
     h = img.header
     size = 348 if h.version == 1 else 540
-    rh = _quiet(type(ref.header), _decompressed(path)[:size])
+    rh = _quiet(type(ref.header), _head(path, size))
     rh.extensions = ref.header.extensions
     _header_fields_check(checks, h, rh)
     checks.add(
@@ -238,7 +266,7 @@ def _compare_reads(
     checks.add(compare.close("sform matrix", h.sform, rh.get_sform(), AFFINE_ATOL))
 
     stored = lx.io.read_header(path)
-    checks("header bytes re-serialised exactly", stored.to_bytes() == _decompressed(path)[:size])
+    checks("header bytes re-serialised exactly", stored.to_bytes() == _head(path, size))
 
 
 def _compare_writes(path: Path, checks: CheckList, img: lx.Image, ref) -> None:
@@ -346,7 +374,11 @@ def _run_case(case: Case, checks: CheckList) -> None:
         sides = f"larmorx: {'reads it' if lx_err is None else repr(lx_err)}; nibabel: {'reads it' if ref_err is None else repr(ref_err)}"
         raise Outcome(EXPECTED, f"{EXPECTED_DIVERGENCES[case.id]} ({sides})")
     if ref_err is not None and lx_err is not None:
-        raise Outcome(BOTH_ERROR, f"nibabel: {ref_err!r}; larmorx: {lx_err!r}")
+        # Agreeing to reject is not enough: where the header can be parsed, both must parse it
+        # the same way (e.g. header-only files, or files whose data are truncated).
+        if _compare_stored_headers(path, checks):
+            raise Outcome(BOTH_ERROR, f"nibabel: {ref_err!r}; larmorx: {lx_err!r}")
+        return
     if ref_err is not None:
         checks("larmorx rejects what nibabel rejects", False, detail=f"nibabel: {ref_err!r}")
         return
@@ -367,7 +399,7 @@ def suite() -> Suite:
         reference=f"nibabel {nib.__version__}",
         thresholds=[
             (
-                "Voxel data (all four read modes)",
+                "Voxel data (all five read modes, including memory-mapped)",
                 "bit-identical: same dtype, same values, NaN = NaN, -0.0 ≠ +0.0",
             ),
             ("Header fields, extensions, shape, zooms, scale factors", "identical"),

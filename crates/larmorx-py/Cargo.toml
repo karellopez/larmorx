@@ -18,4 +18,6 @@ doctest = false
 [dependencies]
 larmorx-cli.workspace = true
 larmorx-core.workspace = true
+larmorx-io.workspace = true
+numpy.workspace = true
 pyo3.workspace = true

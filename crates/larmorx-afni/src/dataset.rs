@@ -260,6 +260,7 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
             factor,
         ),
         other => {
+            let stored = other.data_type();
             let (s, i) = if slope != 0.0 {
                 (slope, inter)
             } else {
@@ -271,17 +272,15 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
                 DynArray::I32(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
                 DynArray::U32(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
                 DynArray::F64(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
-                o => {
+                _ => {
                     return Err(unsupported(format!(
-                        "{:?} data are not supported",
-                        o.data_type()
+                        "{stored} data are not supported by 3dTshift"
                     )));
                 }
             };
             warnings.push(format!(
-                "{}: {:?} data are converted to float32",
-                path.display(),
-                image.header.data_type().ok()
+                "{}: {stored} data are converted to float32, as AFNI does",
+                path.display()
             ));
             (BrickData::Float(v), 0.0)
         }

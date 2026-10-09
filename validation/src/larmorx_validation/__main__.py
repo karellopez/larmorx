@@ -11,7 +11,7 @@ from larmorx_validation import environment
 from larmorx_validation.report import write_json
 
 PARITY_SUITES = ("nifti-io", "itk-geometry", "ants-apply-transforms", "afni-tshift")
-BENCH_SUITES = ("nifti-io", "ants-apply-transforms")
+BENCH_SUITES = ("nifti-io", "ants-apply-transforms", "afni-tshift")
 
 
 def _parity_suite(name: str):
@@ -123,6 +123,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
         from larmorx_validation.bench import nifti_io as bench
     elif args.suite == "ants-apply-transforms":
         from larmorx_validation.bench import ants_apply_transforms as bench
+    elif args.suite == "afni-tshift":
+        from larmorx_validation.bench import afni_tshift as bench
     else:
         raise SystemExit(f"unknown benchmark suite {args.suite!r}; choose from {BENCH_SUITES}")
     return bench.main(args)

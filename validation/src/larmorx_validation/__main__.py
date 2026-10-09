@@ -10,7 +10,7 @@ from pathlib import Path
 from larmorx_validation import environment
 from larmorx_validation.report import write_json
 
-PARITY_SUITES = ("nifti-io", "itk-geometry")
+PARITY_SUITES = ("nifti-io", "itk-geometry", "ants-apply-transforms")
 BENCH_SUITES = ("nifti-io",)
 
 
@@ -23,6 +23,10 @@ def _parity_suite(name: str):
         from larmorx_validation.parity import itk_geometry
 
         return itk_geometry.suite()
+    if name == "ants-apply-transforms":
+        from larmorx_validation.parity import ants_apply_transforms
+
+        return ants_apply_transforms.suite()
     raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
 
 

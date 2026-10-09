@@ -104,6 +104,8 @@ class Suite:
     run_case: Callable[[Case, CheckList], None]
     notes: str = ""
     packages: tuple[str, ...] = ()
+    #: Extra summary lines for the report, computed from the results (optional).
+    highlights: Callable[[list[CaseResult]], list[str]] | None = None
 
 
 def run(

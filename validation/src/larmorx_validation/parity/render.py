@@ -41,6 +41,10 @@ def render(
         f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, tier `{tier}`",
         f"- **Generated:** {dt.date.today().isoformat()} on {env['platform']}, with `{command}`",
         "",
+    ]
+    if suite.highlights is not None:
+        lines += [*suite.highlights(results), ""]
+    lines += [
         "## Thresholds",
         "",
         table(("Quantity", "Requirement"), suite.thresholds),

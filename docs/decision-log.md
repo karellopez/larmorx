@@ -62,7 +62,7 @@ Newest entries last. Each entry records what was decided, by whom, and why.
 
 ## 2026-10-09: Phase L1 foundations: images, NIfTI I/O, test data, validation
 - **User direction:** start the implementation with a high-quality architecture; keep test data in a separate, comprehensive and well-organised repository; prove parity with the replicated software with reports; measure performance.
-- **Test data:** a separate repository, `larmorx-testdata` (next to `larmorx/` in the workspace; to be published as `github.com/karellopez/larmorx-testdata`). It holds a TOML catalog (source, licence, SHA-256, size, tier, tags), generated edge cases committed in the repo, and a standard-library downloader into a content-addressed cache. Tiers: `smoke` (≤ 50 MB, every CI run), `standard` (≤ 2 GB), `full` (benchmarks).
+- **Test data:** a separate repository, `larmorx-testdata` (next to `larmorx/` in the workspace; local for now). It holds a TOML catalog (source, licence, SHA-256, size, tier, tags), generated edge cases committed in the repo, and a standard-library downloader into a content-addressed cache. Tiers: `smoke` (≤ 50 MB, meant for every CI run), `standard` (≤ 2 GB), `full` (benchmarks). Downloads go to a path-addressed cache, so BIDS layouts and header/image pairs stay intact.
 - **Validation framework:** `validation/` (package `larmorx-validation`, development only) runs parity suites (statuses `pass`, `both-error`, `expected-divergence`, `fail`) and benchmarks. Reports are committed in `docs/validation/` (the per-tool validation record) and `docs/benchmarks/`; `tests/parity/` runs the suites in CI.
 - **Image model:** one `lx.Image` (data, affine, optional header) for every dimensionality, instead of separate `Image`/`Image4D` classes; 4D specifics (`tr`, slice timing) come from the header. A frozen dataclass over numpy; headers cross the Rust boundary as dicts, so no Rust object reaches Python.
 - **NIfTI I/O semantics = nibabel 5.x**, validated case by case. Deliberate differences, each documented in `docs/api/io.md`:
@@ -73,7 +73,12 @@ Newest entries last. Each entry records what was decided, by whom, and why.
   - `get_fdata`-style reads of complex data raise (nibabel drops the imaginary part);
   - the default gzip level is 2: zlib-rs's level 2 matches the file size of zlib's level 1 (nibabel's default) and is faster; zlib-rs's level 1 compresses about 15% less;
   - RGB24/RGBA32 data are not supported yet.
-- **Finding (needs a decision):** no ANTs 2.6.x release pins ITK 5.4.7, contrary to CLAUDE.md; fMRIPrep's image runs ANTs 2.6.2 with ITK 5.4.4. See `UPSTREAM.md`.
+- **Finding:** no ANTs 2.6.x release pins ITK 5.4.7, contrary to CLAUDE.md; fMRIPrep's image runs ANTs 2.6.2 with ITK 5.4.4. See `UPSTREAM.md`.
+
+## 2026-10-09: Port targets for ANTs/ITK; copyright holder; test data stays local
+- **User decision:** port ANTs from **v2.6.5** and ITK from **v5.4.5** (the ITK version ANTs 2.6.5 pins), rather than ITK 5.4.7 (pinned by no ANTs release) or fMRIPrep's exact ANTs 2.6.2 + ITK 5.4.4. Validation against fMRIPrep outputs must allow for the patch-level difference.
+- **User decision:** the NOTICE names the copyright holder as Karel Lopez Vilaret.
+- **User decision:** `larmorx-testdata` stays a local repository for now; CI skips the parity tests until it is published.
 
 ## Open decisions (PLAN.md §16)
 

@@ -45,10 +45,10 @@ How the code is organised and the conventions every tool follows. The plan behin
 |---|---|---|
 | Rust unit and property tests (round trips, fuzzed inputs, thread-count invariance) | `crates/*/src/**` | `cargo test`, all six platforms |
 | Python API tests (no external data) | `tests/python/` | pytest, all six platforms |
-| Parity with reference tools, case by case on the test-data catalog | `validation/` suites, `tests/parity/` | pytest (smoke tier) on all platforms; standard tier locally/nightly |
+| Parity with reference tools, case by case on the test-data catalog | `validation/` suites, `tests/parity/` | locally (smoke or standard tier); in CI on all platforms once the test data are published |
 | Benchmarks against reference tools | `validation/` (`bench`) | on demand; reports in `docs/benchmarks/` |
 
-Test data live in a separate repository, [larmorx-testdata](https://github.com/karellopez/larmorx-testdata): a catalog of every file (source, licence, SHA-256, properties), small generated edge cases committed in the repo, and a downloader that verifies hashes into a content-addressed cache. larmorx never commits image data.
+Test data live in a separate repository, `larmorx-testdata` (next to this one in the workspace; not published yet): a catalog of every file (source, licence, SHA-256, properties), small generated edge cases committed in the repo, and a downloader that verifies hashes into a content-addressed cache. larmorx never commits image data.
 
 ## Adding a tool (the per-tool contract, PLAN.md §4)
 

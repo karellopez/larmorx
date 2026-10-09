@@ -42,7 +42,7 @@
 | Fact | Consequence |
 |---|---|
 | ANTsPy (`antspyx` 0.6.3) has no wheels for Linux aarch64, Windows arm64 or Python 3.14. Its `motion_correction` is a Python loop of full registrations | Port ANTs. ANTsPy stays useful as an **in-process test oracle** and as an interim backend on x64 |
-| ANTs: about 160k lines (Examples 93k, Utilities 37k, ImageRegistration 23k, ImageSegmentation 10k). The ITK modules it relies on (registration v4, metrics, optimisers, transforms, interpolators, filters, statistics, N4, denoising) are about 200k lines. ANTs 2.6 pins ITK v5.4.7 | Large, but much of ITK's size is generic N-dimensional template and pipeline machinery. A 3D/4D-only Rust port of the subset we need is far smaller. Licence: Apache-2.0, so we can port it |
+| ANTs: about 160k lines (Examples 93k, Utilities 37k, ImageRegistration 23k, ImageSegmentation 10k). The ITK modules it relies on (registration v4, metrics, optimisers, transforms, interpolators, filters, statistics, N4, denoising) are about 200k lines. ANTs 2.6.5 pins ITK v5.4.5 | Large, but much of ITK's size is generic N-dimensional template and pipeline machinery. A 3D/4D-only Rust port of the subset we need is far smaller. Licence: Apache-2.0, so we can port it |
 | FreeSurfer's recon-all path is about 200–250k lines of C/C++ (surface library 82k, volume core 36k, GCA + GCA morph 44k, I/O 13k, programs about 60k). Latest release v8.2.0 | Separate long track, ported step by step against FreeSurfer's own intermediates. Its licence allows derivative works with conditions, so it ships as a separate wheel |
 | numpy, scipy, matplotlib, scikit-learn, pandas, pillow and h5py have wheels for **Windows arm64 and Linux aarch64**; nibabel, nilearn, templateflow and jinja2 are pure Python | With ANTs ported, **all six targets are first-class**: win-x64, win-arm64, linux-x64, linux-aarch64, macOS-x64, macOS-arm64 |
 | fMRIPrep's biggest compute cost (4D BOLD resampling) is Python/scipy; FSL tools have no Python equivalents and a non-commercial licence; Workbench is GPL | Rust kernels for resampling; clean-room re-implementations of FSL and Workbench functions |
@@ -121,7 +121,10 @@ larmorx/                          this repo (github.com/karellopez/larmorx)
     larmorx_freesurfer/           wheel "larmorx-freesurfer" (exposed as lx.freesurfer)
   specs/                          clean-room specifications (FSL-like, Workbench-like tools)
   oracles/                        scripts that generate reference outputs (ANTsPy, AFNI, FreeSurfer, fMRIPrep)
-  tests/  benchmarks/  docs/
+  validation/                     parity suites and benchmarks against the reference tools (dev-only package)
+  tests/                          Rust-independent Python tests; tests/parity runs the parity suites
+  docs/                           architecture, api/ (one page per tool), validation/ and benchmarks/ reports
+  (separate repo) larmorx-testdata  test-data catalog, generated edge cases, hash-verified downloader
   UPSTREAM.md                     exact upstream versions and SHAs ported from
 ```
 
@@ -287,7 +290,7 @@ Every catalog entry ships the same six things. CI checks that all of them exist.
 ## 6. ANTs port (`larmorx-ants`)
 
 ### 6.1 Scope and source
-- **Port from** ANTs 2.6.x (the line fMRIPrep uses) and ITK v5.4.7 (pinned by ANTs). Check out those tags; the local clones are `master`.
+- **Port from** ANTs v2.6.5 (the newest of the 2.6 line fMRIPrep uses) and ITK v5.4.5 (pinned by ANTs 2.6.5); decided 2026-10-09, see `UPSTREAM.md`. Check out those tags; the local clones are `master`.
 - **What comes from where:**
   - from ITK: registration framework v4, metrics v4, optimisers v4 + scales estimators, transforms, interpolators, N4, the patch-based denoising base classes, statistics/histograms, morphology, smoothing, distance maps
   - from ANTs: `itkantsRegistrationHelper` (stage logic, about 5.8k lines), the antsRegistration/antsApplyTransforms/antsAI/Atropos/DenoiseImage/ImageMath front-ends, Atropos and adaptive-NLM filters
@@ -596,8 +599,8 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 1. ~~Create the repo~~ (done 2026-10-09: `github.com/karellopez/larmorx`, public). Optionally reserve a `larmorx` GitHub org later and transfer the repo there; GitHub redirects old URLs. Settle the remaining decisions in §16.
 2. ~~Install Rust~~ (done 2026-10-09: rustup, stable 1.99.0).
 3. ~~Scaffold the Cargo workspace, `larmorx-core`, `larmorx-io`, `larmorx-py`, `larmorx-cli`, `python/larmorx` (with `pipelines/larmorprepx/`); set up a CI matrix that builds, imports and runs `larmorx --version` on all six targets~~ (done 2026-10-09, phase L0; CI green on all six). Still open: publish a real minimal 0.0.1 to PyPI and crates.io, to claim the names.
-4. Pin the upstream versions to port (ANTs 2.6.x and ITK v5.4.7 tags, AFNI 25.2.09, FreeSurfer per D5) and record them in `UPSTREAM.md`. Move `workbench/` and `MSM_HOCR/` to `reference_src/`.
-5. Implement `Image`/`Affine`/`Transform` (Rust + Python) and NIfTI I/O, with round-trip tests against nibabel.
+4. ~~Pin the upstream versions to port and record them in `UPSTREAM.md`; keep `workbench/` and `MSM_HOCR/` in `reference_src/`~~ (done 2026-10-09). ANTs v2.6.5 + ITK v5.4.5 chosen 2026-10-09.
+5. ~~Implement `Image`/`Affine` (Rust + Python) and NIfTI I/O, validated against nibabel~~ (done 2026-10-09: `docs/validation/nifti-io.md`, `docs/benchmarks/nifti-io.md`; test data in the separate `larmorx-testdata` repo). The `Transform` chain (affines, displacement fields, ITK `.mat`/`.txt`/`.h5` I/O) moves to step 6, where `apply_transforms` needs it together with interpolation.
 6. First tools, with the full per-tool contract:
    - `lx.ants.apply_transforms` (A1), validated against ANTsPy in CI
    - `lx.afni.tshift`
@@ -640,8 +643,8 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | templateflow/python-client | 06ccc7f | 2026-10-07 | Apache-2.0 |
 | ME-ICA/tedana | 45dd96d | 2026-10-07 | LGPL-2.1 |
 | nipreps/acres, migas-py | 46fa586, 4c721fe | – | Apache-2.0 |
-| ANTsX/ANTs | 0f65b0e (master; port from the 2.6.x tag) | 2026-09-22 | Apache-2.0 |
-| InsightSoftwareConsortium/ITK | dfef0816 (master; port from v5.4.7) | 2026-10-08 | Apache-2.0 |
+| ANTsX/ANTs | 0f65b0e (master; port from v2.6.5) | 2026-09-22 | Apache-2.0 |
+| InsightSoftwareConsortium/ITK | dfef0816 (master; port from v5.4.5) | 2026-10-08 | Apache-2.0 |
 | afni/afni | 0eb4d34 | 2026-10-07 | public domain (+ exceptions) |
 | freesurfer/freesurfer | 766ac05 (dev after v8.2.0) | 2026-10-07 | FreeSurfer Software License v1.0 |
 | Washington-University/workbench | 9906328 | 2026-10-06 | GPL-2.0-or-later (clean-room: do not read) |

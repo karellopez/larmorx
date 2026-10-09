@@ -11,7 +11,7 @@ pytest tests/parity                                             # the parity sui
 
 ## Parity
 
-A **suite** compares larmorx with a reference implementation (an *oracle*) on every relevant file of the [test-data catalog](https://github.com/karellopez/larmorx-testdata). Each case ends as:
+A **suite** compares larmorx with a reference implementation (an *oracle*) on every relevant file of the test-data catalog (`larmorx-testdata`, a separate repository next to this one). Each case ends as:
 
 | Status | Meaning |
 |---|---|

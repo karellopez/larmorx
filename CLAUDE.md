@@ -26,7 +26,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
 ## Status (2026-10-09)
-- **Phase L0 done:** a buildable, tested skeleton (Cargo workspace, maturin package, `larmorx`/`lx`/`larmorprepx` commands, CI green on all six targets). No tools yet. Next actions are in PLAN.md §15 (step 5: `Image`/`Affine`/`Transform` + NIfTI I/O).
+- **Phase L0 done:** a buildable, tested skeleton, CI green on all six targets.
+- **Phase L1 started:** `Image`/`Affine` (Rust + Python) and NIfTI-1/2 I/O, validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`). Conventions every tool follows are in `docs/architecture.md`. Next: PLAN.md §15 step 6 (`Transform` + `lx.ants.apply_transforms`).
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
 - **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
 - **Pending decisions** are in PLAN.md §16. Until the user decides, use these defaults:
@@ -64,8 +65,8 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
    - Never open FSL source (it is deliberately not cloned) or anything under `reference_src/`.
    - Work only from `specs/<tool>.md`, published papers, official documentation and black-box runs.
 2. **Ported code records its provenance.** Each crate's `PROVENANCE.md` lists the upstream files and versions it was ported from. Port from the pinned **release tags**, not the local master/dev clones:
-   - ANTs 2.6.x
-   - ITK v5.4.7 (pinned by ANTs 2.6)
+   - ANTs v2.6.5
+   - ITK v5.4.5 (the version ANTs 2.6.5 pins; decided 2026-10-09)
    - AFNI 25.2.09
    - FreeSurfer v8.2.0 (pending D5)
 3. **FreeSurfer-derived code lives only in `crates/larmorx-freesurfer`** (separate wheel, carries the FreeSurfer licence text and preface). Audit each ported file for third-party code first.
@@ -125,3 +126,6 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `pyproject.toml`, `python/larmorx/` | maturin package (abi3, CPython >= 3.12), including `pipelines/larmorprepx/` |
 | `tests/python/` | Python tests of the installed package |
 | `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
+| `validation/` | parity suites and benchmarks (dev-only package `larmorx-validation`) |
+| `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/` | conventions, user docs per tool, validation records, benchmark reports |
+| `../larmorx-testdata/` (separate repo) | test-data catalog, generated edge cases, hash-verified downloader (`pip install -e`) |

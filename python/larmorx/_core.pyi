@@ -43,3 +43,6 @@ def nifti_header_for_image(
 
 def nifti_header_info(header: dict[str, Any]) -> dict[str, Any]:
     """Shape, dtype, zooms, affines, scaling and serialised bytes of header fields."""
+
+def nifti_itk_geometry(header: dict[str, Any]) -> dict[str, Any]:
+    """The geometry ITK 5.4.5 reads from header fields (LPS origin, spacing, direction)."""

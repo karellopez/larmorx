@@ -21,7 +21,7 @@ from larmorx import _core
 if TYPE_CHECKING:
     from larmorx.image import Image
 
-__all__ = ["Extension", "NiftiError", "NiftiHeader", "load", "read_header", "save"]
+__all__ = ["Extension", "ItkGeometry", "NiftiError", "NiftiHeader", "load", "read_header", "save"]
 
 logger = logging.getLogger("larmorx.io")
 
@@ -45,6 +45,23 @@ class Extension:
     def trimmed_content(self) -> bytes:
         """The content without trailing NUL padding (what nibabel reports)."""
         return self.content.rstrip(b"\x00")
+
+
+@dataclass(frozen=True, eq=False)
+class ItkGeometry:
+    """Where ITK 5.4.5, and so ANTs, places an image read from a NIfTI file.
+
+    ITK chooses between the qform and the sform with rules that differ from nibabel's, so the
+    same file can sit differently in space for ANTs than for nibabel. Coordinates are LPS mm.
+    """
+
+    ndim: int
+    size: tuple[int, ...]
+    spacing: tuple[float, ...]
+    origin: tuple[float, ...]
+    direction: np.ndarray  # ndim x ndim, columns = index axes in LPS
+    source: Literal["qform", "sform", "default"]
+    ras_affine: np.ndarray  # the spatial geometry as a RAS+ affine
 
 
 @dataclass(frozen=True, eq=False)
@@ -197,6 +214,13 @@ class NiftiHeader:
     def to_bytes(self) -> bytes:
         """The header block as it would be stored (without extensions)."""
         return self._info["header_bytes"]
+
+    @cached_property
+    def itk_geometry(self) -> ItkGeometry:
+        """The geometry ITK 5.4.5 (and so ANTs) reads from this header. Use it on a header as
+        stored (:func:`read_header`): nibabel's load-time fixes do not apply to ITK. Raises
+        :class:`NiftiError` for headers ITK cannot read (e.g. NIfTI-2)."""
+        return ItkGeometry(**_core.nifti_itk_geometry(self.to_dict()))
 
 
 def read_header(path: PathLike) -> NiftiHeader:

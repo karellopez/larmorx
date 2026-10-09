@@ -25,3 +25,15 @@ The numerical algorithms for the polar decomposition (scaled Newton iteration, H
 ## Parallel gzip (`src/gzip.rs`)
 
 **Original implementation** of the parallel-deflate method popularised by pigz (Mark Adler): fixed-size blocks, each compressed independently with the preceding 32 KiB as a dictionary and ended with a sync flush. No pigz code was used. Deflate itself is [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) (Zlib licence), through [flate2](https://github.com/rust-lang/flate2-rs) (MIT/Apache-2.0).
+
+## ITK's reading of NIfTI geometry (`src/nifti/itk.rs`)
+
+**Ported** (logic re-expressed in Rust, no code copied verbatim) from the release tags in [UPSTREAM.md](../../UPSTREAM.md):
+
+| larmorx | Upstream (ITK v5.4.5, `f51594ad`) | Licence |
+|---|---|---|
+| `itk_geometry`: qform/sform choice, origin and direction (LPS), units, number of dimensions | `Modules/IO/NIFTI/src/itkNiftiImageIO.cxx`: `ReadImageInformation`, `SetImageIOOrientationFromNIfTI`, `IsAffine` | Apache-2.0 |
+| `ItkGeometry::with_positive_spacing` | `Modules/IO/ImageBase/include/itkImageFileReader.hxx`: `GenerateOutputInformation` (negative spacing) | Apache-2.0 |
+| dim/pixdim fixes, `qto_xyz`/`sto_xyz` construction, `quatern_to_mat44` | `Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c`: `nifti_convert_nhdr2nim`, `nifti_quatern_to_mat44`, `NIFTI_VERSION` | public domain |
+
+Single-precision steps are kept where ITK computes in `float`. The SVD comparisons use larmorx's own symmetric eigen-solver instead of vnl's LINPACK SVD; they only decide whether two matrices are within 1e-4, so the choice of algorithm does not change the outcome in practice. The parity suite `itk-geometry` checks the result against ITK 5.4.5 itself (through ANTsPy) on every catalog file.

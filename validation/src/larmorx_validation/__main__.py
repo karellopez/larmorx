@@ -10,7 +10,7 @@ from pathlib import Path
 from larmorx_validation import environment
 from larmorx_validation.report import write_json
 
-PARITY_SUITES = ("nifti-io",)
+PARITY_SUITES = ("nifti-io", "itk-geometry")
 BENCH_SUITES = ("nifti-io",)
 
 
@@ -19,6 +19,10 @@ def _parity_suite(name: str):
         from larmorx_validation.parity import nifti_io
 
         return nifti_io.suite()
+    if name == "itk-geometry":
+        from larmorx_validation.parity import itk_geometry
+
+        return itk_geometry.suite()
     raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
 
 

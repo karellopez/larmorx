@@ -413,6 +413,36 @@ pub fn nifti_header_info<'py>(
     Ok(out)
 }
 
+/// The geometry ITK 5.4.5 (and so ANTs) reads from a header as stored: `ndim`, `size`,
+/// `spacing`, `origin` and `direction` (LPS) and `source` ("qform", "sform" or "default").
+#[pyfunction]
+pub fn nifti_itk_geometry<'py>(
+    py: Python<'py>,
+    header: &Bound<'_, PyDict>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let h = header_from_dict(header)?;
+    let g = nifti::itk::itk_geometry(&h)
+        .map_err(|e| NiftiError::new_err(format!("ITK cannot read this header: {e}")))?;
+    let out = PyDict::new(py);
+    out.set_item("ndim", g.ndim)?;
+    out.set_item("size", PyTuple::new(py, &g.size)?)?;
+    out.set_item("spacing", PyTuple::new(py, &g.spacing)?)?;
+    out.set_item("origin", PyTuple::new(py, &g.origin)?)?;
+    let direction =
+        numpy::ndarray::Array2::from_shape_fn((g.ndim, g.ndim), |(i, j)| g.direction[i][j]);
+    out.set_item("direction", PyArray::from_owned_array(py, direction))?;
+    out.set_item(
+        "source",
+        match g.source {
+            nifti::itk::GeometrySource::Qform => "qform",
+            nifti::itk::GeometrySource::Sform => "sform",
+            nifti::itk::GeometrySource::Default => "default",
+        },
+    )?;
+    out.set_item("ras_affine", affine_to_py(py, &g.ras_affine()))?;
+    Ok(out)
+}
+
 /// Registers the NIfTI functions and exception on the extension module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("NiftiError", m.py().get_type::<NiftiError>())?;
@@ -422,5 +452,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(nifti_write, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_for_image, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_info, m)?)?;
+    m.add_function(wrap_pyfunction!(nifti_itk_geometry, m)?)?;
     Ok(())
 }

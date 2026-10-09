@@ -2,6 +2,7 @@
 # Used by scripts/bootstrap_workspace.sh. Columns are TAB-separated:
 #   name  url  commit  licence  location
 # location: "ws"            = clone into the workspace root (read-only reference)
+#           "tags"          = clone into <workspace>/tags/: the release tags code is ported from (UPSTREAM.md)
 #           "reference_src" = clone into <workspace>/reference_src/ (licence review only; DO NOT READ for implementation)
 # Porting must use the release tags listed in CLAUDE.md, not these master/dev snapshots.
 fmriprep	https://github.com/nipreps/fmriprep.git	21a490fb89acee54baca06dd0ca04a2297659e97	Apache-2.0	ws
@@ -24,3 +25,5 @@ afni	https://github.com/afni/afni.git	0eb4d3472eccf1eb3b1bc746977ef41b2bb9a5d4	p
 freesurfer	https://github.com/freesurfer/freesurfer.git	766ac058320a4b0417b9328ad85221db7cfbf700	FreeSurfer-1.0	ws
 workbench	https://github.com/Washington-University/workbench.git	990632890c3facfb2549945d41f0c6c8caa0de4a	GPL-2.0-or-later	reference_src
 MSM_HOCR	https://github.com/ecr05/MSM_HOCR.git	c9d899676c3fc15b55ff2863765951533e35ad8d	non-commercial	reference_src
+ANTs-v2.6.5	https://github.com/ANTsX/ANTs.git	fdce4d2f84b60ac75d7e45aafe18488b1f9f5303	Apache-2.0	tags
+ITK-v5.4.5	https://github.com/InsightSoftwareConsortium/ITK.git	f51594ad88194a72cdc06a314dafff709fcdc2e9	Apache-2.0	tags

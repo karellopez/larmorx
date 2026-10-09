@@ -76,6 +76,7 @@ while IFS=$'\t' read -r name url sha licence location; do
   [[ -n "$SKIP" && "$SKIP" == *",$name,"* ]] && continue
   case "$location" in
     ws) dest="$WS_DIR/$name" ;;
+    tags) dest="$WS_DIR/tags/$name" ;;
     reference_src) dest="$WS_DIR/reference_src/$name" ;;
     *) echo "  ! $name: unknown location '$location'" >&2; fail=1; continue ;;
   esac

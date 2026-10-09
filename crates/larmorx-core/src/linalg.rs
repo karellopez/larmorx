@@ -137,6 +137,83 @@ pub fn polar_orthogonal(m: &Mat3) -> Option<Mat3> {
     Some(q)
 }
 
+/// Eigen-decomposition of a symmetric matrix by the cyclic Jacobi method.
+///
+/// Returns the eigenvalues in descending order and the matching unit eigenvectors as the
+/// columns of the second matrix. Each eigenvector's largest-magnitude component is made
+/// positive, so the result is a deterministic function of the input.
+#[allow(clippy::needless_range_loop)] // index form mirrors the Jacobi rotation formulas
+pub fn symmetric_eigen<const N: usize>(m: &[[f64; N]; N]) -> ([f64; N], [[f64; N]; N]) {
+    let mut a = *m;
+    let mut v = [[0.0; N]; N];
+    for (i, row) in v.iter_mut().enumerate() {
+        row[i] = 1.0;
+    }
+    for _sweep in 0..64 {
+        let off: f64 = (0..N)
+            .flat_map(|i| (0..N).filter(move |&j| j != i).map(move |j| (i, j)))
+            .map(|(i, j)| a[i][j] * a[i][j])
+            .sum();
+        if off <= f64::MIN_POSITIVE {
+            break;
+        }
+        for p in 0..N {
+            for q in p + 1..N {
+                if a[p][q] == 0.0 {
+                    continue;
+                }
+                let theta = (a[q][q] - a[p][p]) / (2.0 * a[p][q]);
+                let t = theta.signum() / (theta.abs() + (theta * theta + 1.0).sqrt());
+                let t = if theta == 0.0 { 1.0 } else { t };
+                let c = 1.0 / (t * t + 1.0).sqrt();
+                let s = t * c;
+                for k in 0..N {
+                    let (akp, akq) = (a[k][p], a[k][q]);
+                    a[k][p] = c * akp - s * akq;
+                    a[k][q] = s * akp + c * akq;
+                }
+                for k in 0..N {
+                    let (apk, aqk) = (a[p][k], a[q][k]);
+                    a[p][k] = c * apk - s * aqk;
+                    a[q][k] = s * apk + c * aqk;
+                }
+                for row in v.iter_mut() {
+                    let (vkp, vkq) = (row[p], row[q]);
+                    row[p] = c * vkp - s * vkq;
+                    row[q] = s * vkp + c * vkq;
+                }
+            }
+        }
+    }
+    let mut order: [usize; N] = std::array::from_fn(|i| i);
+    order.sort_by(|&i, &j| a[j][j].total_cmp(&a[i][i]));
+    let values = order.map(|i| a[i][i]);
+    let mut vectors = [[0.0; N]; N];
+    for (col, &src) in order.iter().enumerate() {
+        let largest = (0..N)
+            .max_by(|&i, &j| v[i][src].abs().total_cmp(&v[j][src].abs()))
+            .unwrap_or(0);
+        let sign = if v[largest][src] < 0.0 { -1.0 } else { 1.0 };
+        for row in 0..N {
+            vectors[row][col] = sign * v[row][src];
+        }
+    }
+    (values, vectors)
+}
+
+/// Singular values (descending) and left singular vectors (columns) of a square matrix,
+/// from the eigen-decomposition of `m·mᵀ`.
+pub fn svd_u<const N: usize>(m: &[[f64; N]; N]) -> ([f64; N], [[f64; N]; N]) {
+    let mut mmt = [[0.0; N]; N];
+    for i in 0..N {
+        for j in 0..N {
+            mmt[i][j] = (0..N).map(|k| m[i][k] * m[j][k]).sum();
+        }
+    }
+    let (eig, u) = symmetric_eigen(&mmt);
+    (eig.map(|e| e.max(0.0).sqrt()), u)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,6 +244,27 @@ mod tests {
         }
         assert!(inverse3(&[[1.0, 2.0, 3.0], [2.0, 4.0, 6.0], [0.0, 0.0, 1.0]]).is_none());
         assert!(inverse4(&[[0.0; 4]; 4]).is_none());
+    }
+
+    #[test]
+    fn symmetric_eigen_and_singular_values() {
+        let m = [[4.0, 1.0, 0.5], [1.0, 3.0, 0.2], [0.5, 0.2, 1.0]];
+        let (values, vectors) = symmetric_eigen(&m);
+        assert!(values[0] >= values[1] && values[1] >= values[2]);
+        for k in 0..3 {
+            for i in 0..3 {
+                let mv: f64 = (0..3).map(|j| m[i][j] * vectors[j][k]).sum();
+                assert!((mv - values[k] * vectors[i][k]).abs() < 1e-12);
+            }
+        }
+        let (sv, _) = svd_u(&[[2.0, 0.0, 0.0], [0.0, -3.0, 0.0], [0.0, 0.0, 0.5]]);
+        assert!(
+            (sv[0] - 3.0).abs() < 1e-12
+                && (sv[1] - 2.0).abs() < 1e-12
+                && (sv[2] - 0.5).abs() < 1e-12
+        );
+        let (sv, _) = svd_u(&[[1.0, 2.0], [2.0, 4.0]]);
+        assert!(sv[1].abs() < 1e-7, "{sv:?}");
     }
 
     #[test]

@@ -6,6 +6,7 @@
 
 use pyo3::prelude::*;
 
+mod afni;
 mod ants;
 mod nifti;
 
@@ -30,5 +31,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cli_main, m)?)?;
     nifti::register(m)?;
     ants::register(m)?;
+    afni::register(m)?;
     Ok(())
 }

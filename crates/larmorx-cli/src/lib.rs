@@ -18,7 +18,7 @@ pub const EXIT_USAGE: u8 = 2;
 const EXIT_IO_ERROR: u8 = 1;
 
 /// Tool families planned for the CLI (PLAN.md §3) that have no tool yet.
-const PLANNED_FAMILIES: &str = "afni, mri";
+const PLANNED_FAMILIES: &str = "mri";
 
 /// Runs the CLI with `args` (program name first), writing to `out` and `err`, reading
 /// transform files with [`FileLoader`].
@@ -76,6 +76,31 @@ where
                 ),
             }
         }
+        Some("afni") => {
+            let tool = args.next().map(|a| a.as_ref().to_owned());
+            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            match tool.as_deref() {
+                Some(tool) => match larmorx_afni::cli::run(tool, &rest, out, err) {
+                    Some(code) => (code, Ok(())),
+                    None => (
+                        EXIT_USAGE,
+                        writeln!(
+                            err,
+                            "error: unknown afni tool '{tool}' (available: {})\n\nRun '{prog} --help' for usage.",
+                            larmorx_afni::cli::TOOLS.join(", ")
+                        ),
+                    ),
+                },
+                None => (
+                    EXIT_USAGE,
+                    writeln!(
+                        err,
+                        "error: missing afni tool (available: {})",
+                        larmorx_afni::cli::TOOLS.join(", ")
+                    ),
+                ),
+            }
+        }
         Some(arg) => {
             let kind = if arg.starts_with('-') {
                 "option"
@@ -120,6 +145,7 @@ Usage: {prog} <family> <tool> [original arguments]
        {prog} --version | --help
 
 Tools:
+  afni   {afni}
   ants   {ants}
 Planned tool families: {PLANNED_FAMILIES}
 
@@ -128,6 +154,7 @@ Options:
   -V, --version  Print the version
 ",
         version = larmorx_core::VERSION,
+        afni = larmorx_afni::cli::TOOLS.join(", "),
         ants = larmorx_ants::cli::TOOLS.join(", "),
     )
 }
@@ -180,12 +207,32 @@ mod tests {
     }
 
     #[test]
+    fn afni_tools_run() {
+        let (code, out, _) = run_capture(&["lx", "afni", "3dTshift"]);
+        assert_eq!(code, 0);
+        assert!(out.starts_with("Usage: 3dTshift"), "{out}");
+        let (code, _, err) = run_capture(&["lx", "afni", "3dTshift", "-bogus", "in.nii"]);
+        assert_eq!(code, 1);
+        assert!(err.contains("Unknown option: -bogus"), "{err}");
+        let (code, out, _) = run_capture(&["lx", "--help"]);
+        assert_eq!(code, 0);
+        assert!(out.contains("afni   3dTshift"), "{out}");
+    }
+
+    #[test]
     fn unknown_commands_and_options_are_usage_errors() {
-        let (code, out, err) = run_capture(&["lx", "afni", "3dTshift"]);
+        let (code, out, err) = run_capture(&["lx", "fsl", "bet"]);
         assert_eq!(code, EXIT_USAGE);
         assert_eq!(out, "");
-        assert!(err.starts_with("error: unknown command 'afni'"), "{err}");
+        assert!(err.starts_with("error: unknown command 'fsl'"), "{err}");
         assert!(err.contains("Run 'lx --help'"), "{err}");
+
+        let (code, _, err) = run_capture(&["lx", "afni", "3dvolreg"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(
+            err.starts_with("error: unknown afni tool '3dvolreg'"),
+            "{err}"
+        );
 
         let (code, _, err) = run_capture(&["lx", "ants", "antsRegistration"]);
         assert_eq!(code, EXIT_USAGE);

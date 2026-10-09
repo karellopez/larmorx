@@ -1,0 +1,16 @@
+[package]
+name = "larmorx-afni"
+description = "AFNI-compatible tools for larmorx (3dTshift), re-implemented clean-room from behaviour specs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

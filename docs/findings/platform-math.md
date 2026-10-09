@@ -74,3 +74,23 @@ evaluations, bit-identical to the C). glibc agrees with them on 99.85 % (`sin`) 
 
 All are within about 1e-15 relative. The only `libm` call left in the ITK ports is `pow`
 (the B-spline prefilter for axes shorter than about 20 voxels). *Validated.*
+
+**Cost.** On baseline x86-64 builds, which have no hardware FMA in the generated code,
+every `mul_add` in the CORE-MATH kernels is a call into the platform's `fma`. Per call:
+
+| Function | glibc | larmorx |
+|---|---|---|
+| `cos` | 22 ns | 78 ns (about 20 `mul_add` on the fast path) |
+| `sin` | 18 ns | 22 ns |
+| `exp` | 12 ns | 21 ns |
+| `log` | 9 ns | 30 ns |
+
+Lanczos resampling of fMRIPrep's boldref → 1 mm T1w went from 1.62 s to 2.76 s on one thread,
+still about 4× faster than ANTs (11.6 s).
+
+Wrapping the functions in `#[target_feature(enable = "fma")]` changes nothing, because the
+kernels' internal helpers are not inlined into the wrapper. The results are identical either
+way, since `mul_add` is correctly rounded. Forcing the fast-path helpers inline and
+dispatching on `is_x86_feature_detected!("fma")` should recover most of it: the CORE-MATH
+authors measure about 2.5× for `cos` with FMA. The dispatch needs a small audited `unsafe`
+block. *Verified (no gain without inlining); follow-up open.*

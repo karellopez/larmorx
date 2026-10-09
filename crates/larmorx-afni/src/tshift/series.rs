@@ -369,37 +369,65 @@ fn wsinc_weight(x: f32, radius: i64) -> f32 {
     sinc * window
 }
 
-/// Weighted-sinc interpolation of `v` in place, shifted by `s` samples with `radius` 5 or 9.
-pub fn wsinc(v: &mut [f32], s: f32, radius: i64, scratch: &mut Vec<f32>) {
-    if s.abs() < 0.0001 {
-        return;
+/// Weighted-sinc weights for one slice.
+#[derive(Clone, Debug)]
+pub struct Wsinc {
+    radius: i64,
+    /// The integer part of the source offset (floored).
+    i0: i64,
+    /// Weights of the samples at offsets −(R−1) … R from `i0 + n`.
+    weights: Vec<f32>,
+    /// The shift is below 0.0001 samples: the series is left unchanged.
+    unchanged: bool,
+}
+
+impl Wsinc {
+    /// The weights that shift by `s` samples with `radius` 5 or 9. The fraction is taken once
+    /// from the slice's offset `d = −s` (observed: computing it per output sample from
+    /// `n + d` in float32 does not match AFNI).
+    pub fn new(s: f32, radius: i64) -> Wsinc {
+        let d = -s;
+        let i0 = d.floor() as i64;
+        let f = d - i0 as f32;
+        Wsinc {
+            radius,
+            i0,
+            weights: (-(radius - 1)..=radius)
+                .map(|j| wsinc_weight(j as f32 - f, radius))
+                .collect(),
+            unchanged: s.abs() < 0.0001,
+        }
     }
-    let m = v.len() as i64;
-    let d = -s;
-    scratch.clear();
-    scratch.extend_from_slice(v);
-    let src = &scratch[..];
-    for (n, out) in v.iter_mut().enumerate() {
-        let t = n as f32 + d;
-        let it = t.floor() as i64;
-        let f = t - it as f32;
-        // AFNI sums in float32 only when the whole window ±radius is inside (observed).
-        if it - radius >= 0 && it + radius < m {
-            let mut acc = 0f32;
-            for j in -(radius - 1)..=radius {
-                acc += wsinc_weight(j as f32 - f, radius) * src[(it + j) as usize];
-            }
-            *out = acc;
-        } else {
-            let mut acc = 0f64;
-            for j in -(radius - 1)..=radius {
-                let q = it + j;
-                if (0..m).contains(&q) {
-                    acc +=
-                        f64::from(wsinc_weight(j as f32 - f, radius)) * f64::from(src[q as usize]);
+
+    /// Interpolates `v` in place (`scratch` holds a copy of the input).
+    pub fn apply(&self, v: &mut [f32], scratch: &mut Vec<f32>) {
+        if self.unchanged {
+            return;
+        }
+        let (m, r) = (v.len() as i64, self.radius);
+        scratch.clear();
+        scratch.extend_from_slice(v);
+        let src = &scratch[..];
+        let offsets = -(r - 1)..=r;
+        for (n, out) in v.iter_mut().enumerate() {
+            let it = self.i0 + n as i64;
+            // AFNI sums in float32 only when the whole window ±radius is inside (observed).
+            if it - r >= 0 && it + r < m {
+                let mut acc = 0f32;
+                for (j, &w) in offsets.clone().zip(&self.weights) {
+                    acc += w * src[(it + j) as usize];
                 }
+                *out = acc;
+            } else {
+                let mut acc = 0f64;
+                for (j, &w) in offsets.clone().zip(&self.weights) {
+                    let q = it + j;
+                    if (0..m).contains(&q) {
+                        acc += f64::from(w) * f64::from(src[q as usize]);
+                    }
+                }
+                *out = acc as f32;
             }
-            *out = acc as f32;
         }
     }
 }
@@ -504,7 +532,7 @@ mod tests {
         let exact = sine(m, -0.4);
         for radius in [5, 9] {
             let mut v = sine(m, 0.0);
-            wsinc(&mut v, -0.4, radius, &mut Vec::new());
+            Wsinc::new(-0.4, radius).apply(&mut v, &mut Vec::new());
             for n in 12..m - 12 {
                 assert!((v[n] - exact[n]).abs() < 2e-2, "radius {radius} at {n}");
             }

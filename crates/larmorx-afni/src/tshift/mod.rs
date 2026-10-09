@@ -12,7 +12,7 @@ use rayon::prelude::*;
 
 use crate::dataset::{BrickData, Bricks, Datum, extract, store};
 use crate::fft::Fft;
-use series::{FourierWork, Lagrange, Removal};
+use series::{FourierWork, Lagrange, Removal, Wsinc};
 
 /// How the series are resampled in time.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -158,10 +158,7 @@ enum Kernel {
         zero: bool,
     },
     Lagrange(Lagrange),
-    Wsinc {
-        s: f32,
-        radius: i64,
-    },
+    Wsinc(Wsinc),
 }
 
 impl Kernel {
@@ -180,8 +177,8 @@ impl Kernel {
                     zero: s.abs() > m as f32,
                 }
             }
-            Method::Wsinc5 => Kernel::Wsinc { s, radius: 5 },
-            Method::Wsinc9 => Kernel::Wsinc { s, radius: 9 },
+            Method::Wsinc5 => Kernel::Wsinc(Wsinc::new(s, 5)),
+            Method::Wsinc9 => Kernel::Wsinc(Wsinc::new(s, 9)),
             method => Kernel::Lagrange(Lagrange::new(method, s)),
         })
     }
@@ -294,11 +291,11 @@ fn process_block<T: Datum>(
                 series::retrend(x, &d, params.restore);
             }
         }
-        Kernel::Wsinc { s, radius } => {
+        Kernel::Wsinc(wsinc) => {
             for (voxel, v) in buf.chunks_mut(nt).enumerate() {
                 let x = &mut v[skip..];
                 let d = series::detrend(x, removal(voxel));
-                series::wsinc(x, *s, *radius, &mut scratch);
+                wsinc.apply(x, &mut scratch);
                 series::retrend(x, &d, params.restore);
             }
         }

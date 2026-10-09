@@ -74,8 +74,12 @@ def bench_file(
         out.append(Measurement(label, op, tool, measure(fn, repeats=repeats), data_bytes, extra))
 
     # The same image, compressed (as distributed) and uncompressed.
-    gz_path = workdir / "input.nii.gz"
-    raw_path = workdir / "input.nii"
+    # Separate directories: nifti_clib-based readers (ITK, so SimpleITK) strip the extension and
+    # prefer x.nii over x.nii.gz when both exist, which would time the wrong file.
+    (workdir / "gz").mkdir(exist_ok=True)
+    (workdir / "raw").mkdir(exist_ok=True)
+    gz_path = workdir / "gz" / "input.nii.gz"
+    raw_path = workdir / "raw" / "input.nii"
     if src.name.endswith(".gz"):
         shutil.copyfile(src, gz_path)
     else:
@@ -120,7 +124,7 @@ def bench_file(
             )
 
         suffix = ".nii.gz" if compressed else ".nii"
-        target = workdir / f"out{suffix}"
+        target = path.parent / f"out{suffix}"
         for n in threads:
             add(
                 label,
@@ -190,6 +194,9 @@ def render(
         "have yet). "
         "*Speed-up* is the nibabel median divided by the tool's median for the same operation.",
         f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, tier `{tier}`",
+        "- **Pitfall avoided:** ITK (and so SimpleITK and ANTs) reads NIfTI through nifti_clib, which "
+        "prefers `x.nii` over `x.nii.gz` when both exist; compressed and uncompressed inputs are kept "
+        "in separate directories.",
         "- **Defaults differ:** nibabel writes gzip level 1, larmorx level 2 (zlib-rs; the same file "
         "size as zlib's level 1), SimpleITK zlib's default (6). The *level 6* rows compare larmorx and "
         "nibabel at the same level.",

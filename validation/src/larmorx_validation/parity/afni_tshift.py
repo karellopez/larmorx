@@ -1,0 +1,832 @@
+"""Parity of ``larmorx afni 3dTshift`` with AFNI 25.2.09's ``3dTshift``.
+
+Both programs get the same arguments and files. AFNI runs as its own binary (built by
+``scripts/build_afni_oracle.sh``; set ``LARMORX_AFNI_BIN`` to use another); larmorx runs
+in-process through its Python console entry point. The outputs are read with nibabel, a
+reader independent of both, and compared value by value and field by field.
+
+Cases cover (``specs/3dTshift.md`` §9):
+- every file of ``larmorx-testdata`` ``synthetic/tshift/`` (every FFT length class and every
+  data type AFNI reads);
+- every interpolation method;
+- ``-ignore``, ``-tzero``, ``-slice``, ``-rlt``, ``-rlt+``, ``-no_detrend``, ``-TR`` units and
+  every ``-tpattern`` form;
+- slice timing from NIfTI headers, and the "copy of input" cases;
+- the errors both programs must raise;
+- real BOLD runs, called as fMRIPrep calls 3dTshift (``SliceTiming`` from the BIDS sidecar).
+"""
+
+from __future__ import annotations
+
+import contextlib
+import functools
+import io
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+import larmorx_testdata as td
+import numpy as np
+
+from larmorx_validation.parity.harness import (
+    BOTH_ERROR,
+    EXPECTED,
+    PASS,
+    Case,
+    CaseResult,
+    Check,
+    CheckList,
+    Outcome,
+    Suite,
+)
+
+#: specs/3dTshift.md §9 (PLAN.md §11.3, slice timing as deterministic arithmetic).
+RTOL = 1e-5
+INT_ATOL = 1
+#: Geometry is written from the same float32 header values: compare affines to 1e-6 mm.
+AFFINE_ATOL = 1e-6
+
+ORACLE = "oracles/afni-25.2.09/bin/3dTshift"
+S = "synthetic/tshift"
+F32 = f"{S}/dtypes/float32.nii.gz"
+I16 = f"{S}/dtypes/int16.nii.gz"
+METHODS = ("-Fourier", "-linear", "-cubic", "-quintic", "-heptic", "-wsinc5", "-wsinc9")
+PATTERNS = (
+    "alt+z",
+    "altplus",
+    "alt+z2",
+    "alt-z",
+    "altminus",
+    "alt-z2",
+    "seq+z",
+    "seqplus",
+    "seq-z",
+    "seqminus",
+    "zero",
+    "simult",
+)
+
+
+@functools.cache
+def afni_binary() -> str | None:
+    """The AFNI ``3dTshift`` oracle: ``LARMORX_AFNI_BIN``, else the workspace's
+    ``oracles/afni-25.2.09`` build, else ``3dTshift`` on the PATH."""
+    if env := os.environ.get("LARMORX_AFNI_BIN"):
+        path = Path(env)
+        return str(path / "3dTshift" if path.is_dir() else path)
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ORACLE
+        if candidate.is_file():
+            return str(candidate)
+    return shutil.which("3dTshift")
+
+
+@functools.cache
+def afni_version() -> str:
+    binary = afni_binary()
+    if binary is None:
+        return "not found"
+    out = subprocess.run([binary, "-help"], capture_output=True, text=True, encoding="utf-8")
+    match = re.search(r"AFNI_[0-9.]+", out.stdout + out.stderr)
+    return match.group(0) if match else "unknown version"
+
+
+# ------------------------------------------------------------------------------------------------
+# Scenarios
+
+
+@dataclass(frozen=True)
+class Scenario:
+    """One 3dTshift invocation.
+
+    ``image`` is a catalog path, or ``gen:<name>`` for an input generated from a catalog file
+    (see :func:`_generated`). In ``args``, ``{tmp}`` is the case's temporary directory.
+    ``sidecar`` names a BIDS JSON whose ``SliceTiming`` is passed as fMRIPrep passes it.
+    """
+
+    image: str
+    args: tuple[str, ...] = ()
+    tier: str = "smoke"
+    expect: str = "pass"  # "pass", "error" (both reject) or "divergence"
+    reason: str = ""
+    sidecar: str | None = None
+    suffix: str = ".nii"
+    files: tuple[tuple[str, str], ...] = ()  # (name, text) written to {tmp} first
+
+
+def _scenarios() -> list[tuple[str, str, str, Scenario]]:
+    out: list[tuple[str, str, str, Scenario]] = []
+
+    def add(cid: str, category: str, desc: str, s: Scenario) -> None:
+        out.append((cid, category, desc, s))
+
+    synthetic = sorted(e.path for e in td.select(tags={"tshift"}) if e.path.startswith(f"{S}/"))
+    for path in synthetic:
+        name = path.removeprefix(f"{S}/").removesuffix(".nii.gz")
+        add(
+            f"synthetic/{name}",
+            "synthetic",
+            f"default Fourier, -tpattern alt+z: {td.catalog()[path].description}",
+            Scenario(path, ("-tpattern", "alt+z")),
+        )
+    for path in synthetic:
+        if "/lengths/" in path:
+            continue
+        name = path.removeprefix(f"{S}/").removesuffix(".nii.gz")
+        for method in METHODS[1:]:
+            add(
+                f"methods/{name}{method}",
+                "methods",
+                f"{method}, -tpattern alt-z, on {name}",
+                Scenario(path, ("-tpattern", "alt-z", method)),
+            )
+
+    # Options, on float32 and int16 data.
+    options = [
+        ("ignore", ("-ignore", "3"), "-ignore 3: three leading points kept out of fit and shift"),
+        ("tzero-0", ("-tzero", "0"), "-tzero 0: every slice moved to the start of the TR"),
+        ("tzero-0.5", ("-tzero", "0.5"), "-tzero 0.5"),
+        ("tzero-beyond-tr", ("-tzero", "5"), "-tzero 5: beyond the TR (allowed)"),
+        ("slice-2", ("-slice", "2"), "-slice 2: align to slice 2's time"),
+        ("slice-wins", ("-tzero", "0.5", "-slice", "1"), "-tzero and -slice: -slice wins"),
+        ("rlt", ("-rlt",), "-rlt: no trend added back"),
+        ("rlt+", ("-rlt+",), "-rlt+: only the intercept added back"),
+        ("rlt-last-wins", ("-rlt", "-rlt+"), "-rlt then -rlt+: the last wins"),
+        ("no-detrend", ("-heptic", "-no_detrend"), "-heptic -no_detrend: mean removed only"),
+        (
+            "no-detrend-fourier",
+            ("-quintic", "-no_detrend", "-Fourier"),
+            "-no_detrend then -Fourier (allowed, with a warning)",
+        ),
+        ("TR-seconds", ("-TR", "2.5s"), "-TR 2.5s"),
+        ("TR-plain", ("-TR", "1.7"), "-TR 1.7 (no unit)"),
+        ("TR-ms", ("-TR", "2000ms"), "-TR 2000ms: every time in milliseconds"),
+        ("TR-msec", ("-TR", "2000msec", "-tzero", "500"), "-TR 2000msec -tzero 500"),
+        ("verbose", ("-verbose",), "-verbose"),
+        ("abbreviations", ("-cub", "-verb"), "-cub and -verb: AFNI's abbreviations"),
+        ("wsinc-case", ("-WSINC5",), "-WSINC5: case-insensitive"),
+        ("ignore-heptic", ("-ignore", "5", "-heptic"), "-ignore 5 with -heptic"),
+        ("rlt-wsinc9", ("-rlt", "-wsinc9"), "-rlt with -wsinc9"),
+        ("rlt+-linear", ("-rlt+", "-linear"), "-rlt+ with -linear"),
+    ]
+    for image, tag in [(F32, "float32"), (I16, "int16")]:
+        for cid, args, desc in options:
+            add(
+                f"options/{tag}-{cid}",
+                "options",
+                f"{desc} ({tag})",
+                Scenario(image, ("-tpattern", "alt+z", *args)),
+            )
+
+    # Every -tpattern form.
+    for pattern in PATTERNS:
+        add(
+            f"tpattern/{pattern}",
+            "tpattern",
+            f"-tpattern {pattern}",
+            Scenario(F32, ("-tpattern", pattern)),
+        )
+    files = {
+        "file-tabs": ("0.0\t1.0\t0.5\t1.5\n", "one line, tab-separated (as fMRIPrep writes it)"),
+        "file-lines": ("0\n1.5\n0.5\n1\n", "one value per line"),
+        "file-matrix": ("0 9\n1.5 9\n0.5 9\n1 9\n", "two columns: read column by column"),
+        "file-comments": ("# slice times\n0, 1.5, 0.25, 1.75 # end\n", "comments and commas"),
+        "file-extra": ("0 1 0.5 1.5 0.25 1.25\n", "more values than slices"),
+        "file-repeat": ("2@0 2@1\n", "N@value repetition"),
+        "file-tr": ("0 2 1 0.5\n", "a value equal to the TR"),
+    }
+    for cid, (text, desc) in files.items():
+        add(
+            f"tpattern/{cid}",
+            "tpattern",
+            f"-tpattern @file: {desc}",
+            Scenario(F32, ("-tpattern", "@{tmp}/st.1D"), files=(("st.1D", text),)),
+        )
+    add(
+        "tpattern/inline-1D",
+        "tpattern",
+        "-tpattern '@1D: 0 1 0.5 1.5'",
+        Scenario(F32, ("-tpattern", "@1D: 0 1 0.5 1.5")),
+    )
+
+    # Slice timing from the NIfTI header (inputs generated from the float32 file).
+    header = [
+        ("code1-seq-inc", "slice_code 1 (sequential increasing)"),
+        ("code2-seq-dec", "slice_code 2: AFNI gives every slice time 0"),
+        ("code3-alt-inc", "slice_code 3 (alternating increasing)"),
+        ("code4-alt-dec", "slice_code 4 (alternating decreasing)"),
+        ("code5-alt-inc2", "slice_code 5 (alternating increasing, from slice 1)"),
+        ("code6-alt-dec2", "slice_code 6 (alternating decreasing, from nz-2)"),
+        ("code3-partial", "slice_code 3 over slices 1..2 only"),
+        ("code3-ms", "slice_code 3 with the TR and duration in milliseconds"),
+        ("code3-beyond-tr", "times beyond the TR: a copy of the input, timing kept"),
+        ("code3-no-slice-dim", "no slice axis in dim_info: no timing, a copy"),
+        ("code3-zero-duration", "slice_duration 0: no timing, a copy"),
+    ]
+    for name, desc in header:
+        add(
+            f"header-timing/{name}",
+            "header-timing",
+            f"no -tpattern, {desc}",
+            Scenario(f"gen:{name}", ("-cubic",)),
+        )
+    add(
+        "header-timing/tpattern-overrides",
+        "header-timing",
+        "-tpattern overrides the header's timing",
+        Scenario("gen:code3-alt-inc", ("-tpattern", "seq-z")),
+    )
+
+    # Copies of the input.
+    for path, desc in [
+        (I16, "int16"),
+        (f"{S}/dtypes/int16-slope.nii.gz", "int16 with a brick factor"),
+        (f"{S}/dtypes/int16-slope-inter.nii.gz", "int16 scaled to float32"),
+        (f"{S}/dtypes/float64.nii.gz", "float64 converted to float32"),
+        (f"{S}/dtypes/float32-nonfinite.nii.gz", "non-finite floats zeroed"),
+    ]:
+        name = path.split("/")[-1].removesuffix(".nii.gz")
+        add(
+            f"copy/no-timing-{name}",
+            "copy",
+            f"no slice timing anywhere: the output is a copy of the input ({desc})",
+            Scenario(path, ()),
+        )
+    add(
+        "copy/3d-input",
+        "copy",
+        "a 3D image: one value per voxel, written back as 3D",
+        Scenario("synthetic/resampling/images/axial-1mm.nii.gz", ("-tpattern", "alt+z")),
+    )
+
+    # Errors both must raise.
+    errors = [
+        ("unknown-option", ("-bogus",), "an unknown option"),
+        ("no-detrend-fourier", ("-no_detrend",), "-no_detrend while the method is Fourier"),
+        ("rlt-no-detrend", ("-linear", "-rlt", "-no_detrend"), "-rlt with -no_detrend"),
+        ("unknown-pattern", ("-tpattern", "ALT+Z"), "pattern names are case-sensitive"),
+        ("slice-too-large", ("-tpattern", "alt+z", "-slice", "4"), "-slice beyond the last"),
+        ("ignore-too-large", ("-tpattern", "alt+z", "-ignore", "96"), "-ignore > nt - 5"),
+        ("negative-tzero", ("-tpattern", "alt+z", "-tzero", "-1"), "-tzero < 0"),
+        ("negative-ignore", ("-tpattern", "alt+z", "-ignore", "-1"), "-ignore < 0"),
+        ("zero-TR", ("-tpattern", "alt+z", "-TR", "0"), "-TR 0"),
+        ("bad-TR", ("-tpattern", "alt+z", "-TR", "abc"), "-TR abc"),
+        ("missing-file", ("-tpattern", "@{tmp}/none.1D"), "a missing -tpattern file"),
+    ]
+    for cid, args, desc in errors:
+        add(f"errors/{cid}", "errors", desc, Scenario(F32, args, expect="error"))
+    for cid, text, desc in [
+        ("file-too-short", "0 1 0.5\n", "a -tpattern file with fewer values than slices"),
+        ("file-beyond-tr", "0 1 0.5 2.5\n", "a -tpattern value beyond the TR"),
+        ("file-negative", "0 1 -0.5 1.5\n", "a negative -tpattern value"),
+        ("file-text", "0 1 abc 1.5\n", "a -tpattern file with text"),
+    ]:
+        add(
+            f"errors/{cid}",
+            "errors",
+            desc,
+            Scenario(F32, ("-tpattern", "@{tmp}/st.1D"), expect="error", files=(("st.1D", text),)),
+        )
+    add(
+        "errors/missing-dataset",
+        "errors",
+        "an input file that does not exist",
+        Scenario("missing", ("-tpattern", "alt+z"), expect="error"),
+    )
+    add(
+        "errors/existing-output",
+        "errors",
+        "an output that exists already (AFNI exits 0 without writing; larmorx exits 1)",
+        Scenario(F32, ("-tpattern", "alt+z"), expect="error", files=(("out.nii", "taken"),)),
+    )
+
+    # Deliberate differences.
+    add(
+        "divergence/afni-format-output",
+        "divergence",
+        "-prefix without .nii: AFNI writes its own BRIK/HEAD format",
+        Scenario(
+            F32,
+            ("-tpattern", "alt+z"),
+            expect="divergence",
+            suffix="",
+            reason="larmorx writes NIfTI only; it rejects a -prefix that does not end in "
+            ".nii or .nii.gz, where AFNI writes its own format.",
+        ),
+    )
+    add(
+        "divergence/voxshift",
+        "divergence",
+        "-voxshift: per-voxel shifts from a dataset",
+        Scenario(
+            F32,
+            ("-voxshift", "gen:voxshift"),
+            expect="divergence",
+            reason="-voxshift is not supported by larmorx (fMRIPrep does not use it).",
+        ),
+    )
+
+    # Real BOLD runs, as fMRIPrep calls 3dTshift.
+    o = "openneuro"
+    real = [
+        ("ds001600-acq-v4", f"{o}/ds001600/sub-1/func/sub-1_task-rest_acq-v4_bold", None, "smoke"),
+        (
+            "ds001600-acq-v1",
+            f"{o}/ds001600/sub-1/func/sub-1_task-rest_acq-v1_bold",
+            None,
+            "standard",
+        ),
+        (
+            "ds001600-acq-v2",
+            f"{o}/ds001600/sub-1/func/sub-1_task-rest_acq-v2_bold",
+            None,
+            "standard",
+        ),
+        (
+            "ds001600-acq-PA",
+            f"{o}/ds001600/sub-1/func/sub-1_task-rest_acq-PA_bold",
+            None,
+            "standard",
+        ),
+        *(
+            (
+                f"ds000210-echo-{e}",
+                f"{o}/ds000210/sub-02/func/sub-02_task-cuedSGT_run-01_echo-{e}_bold",
+                f"{o}/ds000210/task-cuedSGT_echo-{e}_bold.json",
+                "standard",
+            )
+            for e in (1, 2, 3)
+        ),
+        ("ds006736", f"{o}/ds006736/sub-004/func/sub-004_task-freeRecall_bold", None, "standard"),
+        (
+            "ds006010-uint16",
+            f"{o}/ds006010/sub-206/func/sub-206_task-category_run-01_bold",
+            None,
+            "standard",
+        ),
+        (
+            "ds003345-ms-header",
+            f"{o}/ds003345/sub-22973/func/sub-22973_task-PenaltyKik_run-02_bold",
+            None,
+            "standard",
+        ),
+        (
+            "ds005454-mb4-96-slices",
+            f"{o}/ds005454/sub-16/func/sub-16_task-rest_bold",
+            None,
+            "standard",
+        ),
+    ]
+    for cid, stem, sidecar, tier in real:
+        add(
+            f"real/{cid}",
+            "real",
+            f"fMRIPrep's call (-ignore 0 -tzero -TR -tpattern @file) on {stem.split('/')[-1]}",
+            Scenario(
+                f"{stem}.nii.gz",
+                ("-ignore", "0"),
+                tier=tier,
+                sidecar=sidecar or f"{stem}.json",
+                suffix=".nii.gz",
+            ),
+        )
+    d3345 = f"{o}/ds003345/sub-22973/func/sub-22973_task-PenaltyKik_run-02_bold"
+    for method in METHODS[1:]:
+        add(
+            f"real/ds003345{method}",
+            "real",
+            f"fMRIPrep's call with {method}",
+            Scenario(
+                f"{d3345}.nii.gz",
+                ("-ignore", "0", method),
+                tier="standard",
+                sidecar=f"{d3345}.json",
+                suffix=".nii.gz",
+            ),
+        )
+    add(
+        "real/ds003345-ignore-4",
+        "real",
+        "fMRIPrep's call with -ignore 4 (non-steady-state volumes)",
+        Scenario(
+            f"{d3345}.nii.gz",
+            ("-ignore", "4"),
+            tier="standard",
+            sidecar=f"{d3345}.json",
+            suffix=".nii.gz",
+        ),
+    )
+    d210 = f"{o}/ds000210/sub-02/func/sub-02_task-cuedSGT_run-01_echo-1_bold.nii.gz"
+    add(
+        "real/ds000210-header-timing",
+        "real",
+        "no -tpattern: the slice timing in the header (slice_code 3, ALT_INC)",
+        Scenario(d210, (), tier="standard", suffix=".nii.gz"),
+    )
+    add(
+        "real/ds001600-header-zero-duration",
+        "real",
+        "no -tpattern: slice_code 5 with slice_duration 0, so a copy of the input",
+        Scenario(f"{o}/ds001600/sub-1/func/sub-1_task-rest_acq-v4_bold.nii.gz", ()),
+    )
+    return out
+
+
+_TIERS = ("smoke", "standard", "full")
+
+
+def cases(tier: str) -> list[Case]:
+    rank = _TIERS.index(tier)
+    return [
+        Case(cid, category, desc, scenario)
+        for cid, category, desc, scenario in _scenarios()
+        if _TIERS.index(scenario.tier) <= rank
+    ]
+
+
+# ------------------------------------------------------------------------------------------------
+# Generated inputs
+
+
+@functools.cache
+def _generated_dir() -> Path:
+    return Path(tempfile.mkdtemp(prefix="lx-tshift-gen-"))
+
+
+def _generated(name: str) -> Path:
+    """A copy of the float32 file (nz = 4, TR = 2 s) with slice timing in its header, or
+    (``voxshift``) a 3D map of 0.25-TR shifts on its grid."""
+    import nibabel as nib
+
+    path = _generated_dir() / f"{name}.nii"
+    if path.exists():
+        return path
+    src = nib.load(td.get(F32))
+    data = np.asanyarray(src.dataobj)
+    if name == "voxshift":
+        nib.Nifti1Image(np.full(data.shape[:3], 0.25, np.float32), src.affine).to_filename(path)
+        return path
+    img = nib.Nifti1Image(data, src.affine, src.header)
+    h = img.header
+    code = int(name[4])
+    h["slice_code"] = code
+    h["slice_start"], h["slice_end"] = 0, 3
+    h["slice_duration"] = 0.5
+    h.set_dim_info(slice=2)
+    if name.endswith("partial"):
+        h["slice_start"], h["slice_end"] = 1, 2
+    elif name.endswith("ms"):
+        h.set_xyzt_units("mm", "msec")
+        h["pixdim"][4] = 2000.0
+        h["slice_duration"] = 500.0
+    elif name.endswith("beyond-tr"):
+        h["slice_duration"] = 0.7
+    elif name.endswith("no-slice-dim"):
+        h["dim_info"] = 0
+    elif name.endswith("zero-duration"):
+        h["slice_duration"] = 0.0
+    img.to_filename(path)
+    return path
+
+
+def _image_path(image: str) -> Path:
+    if image.startswith("gen:"):
+        return _generated(image.removeprefix("gen:"))
+    if image == "missing":
+        return _generated_dir() / "does-not-exist.nii"
+    return td.get(image)
+
+
+# ------------------------------------------------------------------------------------------------
+# Running
+
+
+def _fmriprep_args(sidecar: str, tmp: Path) -> list[str]:
+    """``-tzero``, ``-TR`` and ``-tpattern`` as fMRIPrep (nipype's TShift) builds them."""
+    meta = json.loads(td.get(sidecar).read_text(encoding="utf-8"))
+    times = list(meta["SliceTiming"])
+    if str(meta.get("SliceEncodingDirection", "")).endswith("-"):
+        times = times[::-1]
+    t0 = round(min(times) + 0.5 * (max(times) - min(times)), 3)
+    pattern = tmp / "slice_timing.1D"
+    pattern.write_text("\t".join(str(float(t)) for t in times) + "\n", encoding="utf-8")
+    return ["-tzero", str(t0), "-TR", f"{meta['RepetitionTime']}s", "-tpattern", f"@{pattern}"]
+
+
+def _args(s: Scenario, tmp: Path) -> list[str]:
+    args = [
+        str(_generated(a.removeprefix("gen:")))
+        if a.startswith("gen:")
+        else a.replace("{tmp}", str(tmp))
+        for a in s.args
+    ]
+    if s.sidecar:
+        args += _fmriprep_args(s.sidecar, tmp)
+    return args
+
+
+def _run_afni(args: list[str]) -> tuple[int, str]:
+    env = {**os.environ, "AFNI_DONT_LOGFILE": "YES", "AFNI_NIFTI_TYPE_WARN": "NO"}
+    p = subprocess.run(
+        [afni_binary(), *args], capture_output=True, text=True, encoding="utf-8", env=env
+    )
+    return p.returncode, (p.stdout + p.stderr).strip()
+
+
+def _run_larmorx(args: list[str]) -> tuple[int, str]:
+    from larmorx.cli import run
+
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+        code = run(["larmorx", "afni", "3dTshift", *args])
+    return code, err.getvalue().strip()
+
+
+def _last_error(log: str, tmp: Path) -> str:
+    """The last error line of a log, without colour codes or temporary paths."""
+    lines = [ln for ln in log.splitlines() if "ERROR" in ln]
+    line = lines[-1] if lines else (log.splitlines()[-1] if log else "")
+    line = line.replace(str(tmp), "<tmp>").replace(str(_generated_dir()), "<generated>")
+    return re.sub(r"\x1b\[[0-9;]*m", "", line)
+
+
+def _ulps(a: np.ndarray, b: np.ndarray) -> int:
+    if a.dtype != np.float32:
+        return 0
+    ia = a.view(np.int32).astype(np.int64)
+    ib = b.view(np.int32).astype(np.int64)
+    ia = np.where(ia < 0, np.iinfo(np.int32).min - ia, ia)
+    ib = np.where(ib < 0, np.iinfo(np.int32).min - ib, ib)
+    return int(np.abs(ia - ib).max()) if a.size else 0
+
+
+HEADER_FIELDS = (
+    "dim",
+    "scl_slope",
+    "scl_inter",
+    "toffset",
+    "xyzt_units",
+    "dim_info",
+    "slice_code",
+    "slice_start",
+    "slice_end",
+    "slice_duration",
+    "qform_code",
+    "sform_code",
+)
+
+
+def _compare(checks: CheckList, a_path: Path, l_path: Path) -> None:
+    import nibabel as nib
+
+    a_img, l_img = nib.load(a_path), nib.load(l_path)
+    a = np.asanyarray(a_img.dataobj.get_unscaled())
+    b = np.asanyarray(l_img.dataobj.get_unscaled())
+    checks(
+        "data type",
+        a.dtype == b.dtype,
+        metric="dtype",
+        value=str(b.dtype),
+        threshold=str(a.dtype),
+        detail=f"AFNI {a.dtype}, larmorx {b.dtype}",
+    )
+    checks("shape", a.shape == b.shape, detail=f"AFNI {a.shape}, larmorx {b.shape}")
+    ha, hb = a_img.header, l_img.header
+    differing = [
+        f"{k}: AFNI {np.asarray(ha[k]).tolist()}, larmorx {np.asarray(hb[k]).tolist()}"
+        for k in HEADER_FIELDS
+        if not np.array_equal(np.asarray(ha[k]), np.asarray(hb[k]), equal_nan=True)
+    ]
+    checks(
+        "header fields (scaling, timing, slice fields, units, xform codes)",
+        not differing,
+        detail="; ".join(differing),
+    )
+    tr_a, tr_b = float(ha["pixdim"][4]), float(hb["pixdim"][4])
+    checks("TR (pixdim[4])", tr_a == tr_b, detail=f"AFNI {tr_a}, larmorx {tr_b}")
+    for name, fa, fb in [
+        ("sform", ha.get_sform(), hb.get_sform()),
+        ("qform", ha.get_qform(), hb.get_qform()),
+    ]:
+        diff = float(np.abs(fa - fb).max())
+        checks(
+            f"geometry ({name})",
+            diff <= AFFINE_ATOL,
+            metric="max |diff| (mm)",
+            value=f"{diff:.1e}",
+            threshold=f"{AFFINE_ATOL:g}",
+        )
+    voxel_sizes = float(np.abs(ha["pixdim"][1:4] - hb["pixdim"][1:4]).max())
+    checks(
+        "voxel sizes (pixdim[1:4])",
+        voxel_sizes <= 1e-5 * float(np.abs(ha["pixdim"][1:4]).max()),
+        metric="max |diff|",
+        value=f"{voxel_sizes:.1e}",
+        threshold="1e-5 relative",
+    )
+    if a.shape != b.shape:
+        return
+    differing_voxels = int(np.count_nonzero(a != b))
+    if a.dtype.kind in "iu":
+        d = int(np.abs(a.astype(np.int64) - b.astype(np.int64)).max()) if a.size else 0
+        checks(
+            "values (integer output)",
+            d <= INT_ATOL,
+            metric="max |diff|",
+            value=d,
+            threshold=INT_ATOL,
+            detail=f"{differing_voxels} of {a.size} values differ "
+            f"({differing_voxels / max(a.size, 1):.2e})",
+        )
+    else:
+        scale = float(np.abs(a).max()) or 1.0
+        rel = float(np.abs(a.astype(np.float64) - b).max()) / scale
+        checks(
+            "values",
+            rel <= RTOL,
+            metric="max |diff| / max |AFNI|",
+            value=f"{rel:.1e}",
+            threshold=f"{RTOL:g}",
+            detail=f"{differing_voxels} of {a.size} values differ; at most {_ulps(a, b)} ulp",
+        )
+    checks.add(
+        Check(
+            "bit-identical",
+            True,
+            metric="differing values",
+            value=differing_voxels,
+            threshold="reported",
+            detail="identical" if differing_voxels == 0 else f"{differing_voxels} values differ",
+        )
+    )
+
+
+#: The method options, as 3dTshift matches them (4 characters; wsinc 7, any case).
+_METHOD_NAMES = {
+    "-Fou": "Fourier",
+    "-fou": "Fourier",
+    "-lin": "linear",
+    "-Lin": "linear",
+    "-cub": "cubic",
+    "-Cub": "cubic",
+    "-qui": "quintic",
+    "-Qui": "quintic",
+    "-hep": "heptic",
+    "-Hep": "heptic",
+}
+
+
+def _method_of(args: list[str]) -> str:
+    """The interpolation method a command line selects (the last method option wins)."""
+    method = "Fourier"
+    for a in args:
+        if a[:4] in _METHOD_NAMES:
+            method = _METHOD_NAMES[a[:4]]
+        elif a[:7].lower() in ("-wsinc5", "-wsinc9"):
+            method = a[1:7].lower()
+    return method
+
+
+def _produced(code: int, target: Path, occupied: bool) -> bool:
+    """Whether a run wrote its output (NIfTI, or AFNI's own format for a bare prefix)."""
+    if code != 0:
+        return False
+    if occupied:  # the output existed before: written only if it was replaced
+        return target.read_bytes() != b"taken"
+    return target.exists() or Path(f"{target}+orig.HEAD").exists()
+
+
+def run_case(case: Case, checks: CheckList) -> None:
+    s: Scenario = case.payload
+    if afni_binary() is None:
+        raise Outcome("skipped", "the AFNI 3dTshift oracle was not found (LARMORX_AFNI_BIN)")
+    with tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name:
+        tmp = Path(tmp_name)
+        for name, text in s.files:
+            (tmp / name).write_text(text, encoding="utf-8")
+        occupied = any(name == "out.nii" for name, _ in s.files)
+        image = _image_path(s.image)
+        args = _args(s, tmp)
+        outputs, logs, codes, produced = {}, {}, {}, {}
+        for tool, runner in [("afni", _run_afni), ("larmorx", _run_larmorx)]:
+            target = tmp / ("out.nii" if occupied else f"{tool}{s.suffix}")
+            codes[tool], logs[tool] = runner([*args, "-prefix", str(target), str(image)])
+            outputs[tool] = target
+            produced[tool] = _produced(codes[tool], target, occupied)
+        if s.expect == "divergence":
+            ok = produced["afni"] and not produced["larmorx"]
+            checks(
+                "AFNI succeeds and larmorx refuses",
+                ok,
+                detail=f"AFNI exit {codes['afni']}; larmorx: {_last_error(logs['larmorx'], tmp)}",
+            )
+            if ok:
+                raise Outcome(EXPECTED, s.reason)
+            return
+        if not produced["afni"] and not produced["larmorx"]:
+            raise Outcome(
+                BOTH_ERROR,
+                f"AFNI: {_last_error(logs['afni'], tmp)}; larmorx: {_last_error(logs['larmorx'], tmp)}",
+            )
+        checks(
+            "both succeed",
+            produced["afni"] and produced["larmorx"],
+            detail=f"AFNI exit {codes['afni']}: {_last_error(logs['afni'], tmp)}; "
+            f"larmorx exit {codes['larmorx']}: {_last_error(logs['larmorx'], tmp)}",
+        )
+        if s.expect == "error":
+            checks("both reject the arguments", False, detail="expected an error from both")
+        if produced["afni"] and produced["larmorx"]:
+            copy = "just a copy of input" in logs["larmorx"]
+            checks.add(
+                Check(
+                    "method",
+                    True,
+                    metric="interpolation",
+                    value="copy" if copy else _method_of(args),
+                    threshold="reported",
+                )
+            )
+            _compare(checks, outputs["afni"], outputs["larmorx"])
+
+
+def _highlights(results: list[CaseResult]) -> list[str]:
+    compared = [r for r in results if r.status == PASS]
+
+    def identical(r: CaseResult) -> bool:
+        return any(c.name == "bit-identical" and c.value == 0 for c in r.checks)
+
+    def method(r: CaseResult) -> str:
+        return next((str(c.value) for c in r.checks if c.name == "method"), "")
+
+    fourier = [r for r in compared if method(r) == "Fourier"]
+    other = [r for r in compared if method(r) != "Fourier"]
+    lines = [
+        f"**Bit-identical: {sum(map(identical, compared))} of {len(compared)} passing cases** "
+        "produce exactly the bytes of AFNI's output data.",
+        f"- Lagrange and weighted-sinc methods and copies: {sum(map(identical, other))} of "
+        f"{len(other)} bit-identical.",
+        f"- Fourier: {sum(map(identical, fourier))} of {len(fourier)} bit-identical. AFNI "
+        "computes the FFT in float32 with its own kernels; larmorx computes it in double "
+        "precision with its own FFT, so float32 outputs differ in the last bits and integer "
+        "outputs occasionally round the other way (by 1).",
+    ]
+    worst = {}
+    for r in compared:
+        for c in r.checks:
+            if c.name in ("values", "values (integer output)") and c.value is not None:
+                key = "float" if c.name == "values" else "integer"
+                value = float(c.value)
+                if value > worst.get(key, (0.0, ""))[0]:
+                    worst[key] = (value, r.case)
+    if "float" in worst:
+        lines.append(
+            f"- Largest float difference: {worst['float'][0]:.1e} × max |AFNI| "
+            f"(`{worst['float'][1]}`)."
+        )
+    if "integer" in worst:
+        lines.append(
+            f"- Largest integer difference: {worst['integer'][0]:g} (`{worst['integer'][1]}`)."
+        )
+    return lines
+
+
+def suite() -> Suite:
+    return Suite(
+        name="afni-tshift",
+        title="3dTshift",
+        tool="`larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`)",
+        reference=f"3dTshift from AFNI ({afni_version()}), the binary built by `scripts/build_afni_oracle.sh`",
+        thresholds=[
+            ("Exit status", "both succeed, or both reject the arguments"),
+            (
+                "Output data type, shape, scaling (`scl_slope`), TR, `toffset`, units, slice fields, xform codes",
+                "identical",
+            ),
+            ("Geometry: sform and qform (read by nibabel)", f"max |diff| ≤ {AFFINE_ATOL:g} mm"),
+            (
+                "float32 outputs",
+                f"max |diff| ≤ {RTOL:g} × max |AFNI output| (specs/3dTshift.md §9); bit-identity reported",
+            ),
+            ("Integer outputs", f"max |diff| ≤ {INT_ATOL}, with the fraction of differing values"),
+        ],
+        cases=cases,
+        run_case=run_case,
+        packages=("nibabel",),
+        highlights=_highlights,
+        notes=(
+            "Both programs read the same files with the same arguments; outputs are read with "
+            "nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS "
+            "`SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` "
+            "values (reversed when `SliceEncodingDirection` ends in `-`) and "
+            "`-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from "
+            "the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, "
+            "`slice_duration`, `dim_info` and the time unit. larmorx uses all logical CPUs "
+            "(`OMP_NUM_THREADS` unset); its results do not depend on the thread count."
+        ),
+    )

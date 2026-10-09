@@ -15,6 +15,7 @@ pub mod element;
 pub mod grid;
 pub mod image;
 pub mod linalg;
+pub mod math;
 pub mod parallel;
 pub mod rotation;
 pub mod vnl_svd;

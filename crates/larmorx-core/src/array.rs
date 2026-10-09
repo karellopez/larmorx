@@ -43,6 +43,27 @@ macro_rules! dispatch_dyn_array {
     };
 }
 
+/// Like [`dispatch_dyn_array!`] for the real (integer and float) variants; complex arrays
+/// evaluate `$complex` instead.
+#[macro_export]
+macro_rules! dispatch_real_dyn_array {
+    ($value:expr, $a:ident => $body:expr, complex => $complex:expr) => {
+        match $value {
+            $crate::DynArray::U8($a) => $body,
+            $crate::DynArray::I8($a) => $body,
+            $crate::DynArray::U16($a) => $body,
+            $crate::DynArray::I16($a) => $body,
+            $crate::DynArray::U32($a) => $body,
+            $crate::DynArray::I32($a) => $body,
+            $crate::DynArray::U64($a) => $body,
+            $crate::DynArray::I64($a) => $body,
+            $crate::DynArray::F32($a) => $body,
+            $crate::DynArray::F64($a) => $body,
+            $crate::DynArray::C64(_) | $crate::DynArray::C128(_) => $complex,
+        }
+    };
+}
+
 impl DynArray {
     pub fn data_type(&self) -> DataType {
         fn of<T: Element>(_: &ArrayD<T>) -> DataType {

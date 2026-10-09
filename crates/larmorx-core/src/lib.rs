@@ -4,6 +4,7 @@
 //! - [`Image`]: an n-dimensional voxel array plus its affine; [`DynImage`] and [`DynArray`]
 //!   when the element type is known only at run time.
 //! - [`Element`] / [`DataType`]: the supported voxel types.
+//! - [`Grid3`]: sampling grids in ITK's physical space (LPS), for tools ported from ITK.
 //! - [`parallel`]: running work on an explicit number of threads.
 //! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions.
 #![forbid(unsafe_code)]
@@ -11,6 +12,7 @@
 pub mod affine;
 pub mod array;
 pub mod element;
+pub mod grid;
 pub mod image;
 pub mod linalg;
 pub mod parallel;
@@ -19,6 +21,7 @@ pub mod rotation;
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;
 pub use element::{DataType, Element, RealElement};
+pub use grid::Grid3;
 pub use image::{DynImage, Image, Image3, Image4};
 pub use ndarray;
 pub use num_complex::Complex;

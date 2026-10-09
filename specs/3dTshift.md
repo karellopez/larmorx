@@ -1,16 +1,11 @@
 # Spec: `lx.afni.tshift` (behaviour of AFNI 3dTshift 25.2.09)
 
-This is the **only** input for implementing larmorx's slice-timing correction. AFNI's
-3dTshift is GPL-2 (copyrighted by the Medical College of Wisconsin), so it is
-re-implemented clean-room (CLAUDE.md rule 1).
-
-**The implementer must not open** any of these:
-- AFNI source: `tags/AFNI-25.2.09/`, the `afni/` clone, `oracles/afni-25.2.09/build/`;
-- `docs/findings/afni-tshift.md`.
-
-They may run the AFNI binary (`oracles/afni-25.2.09/bin/3dTshift`, built by
-`scripts/build_afni_oracle.sh`) as a black box, read AFNI's published documentation, and
-read this file.
+The input for implementing larmorx's slice-timing correction. AFNI's 3dTshift is GPL-2
+(copyrighted by the Medical College of Wisconsin). larmorx's implementation must therefore be
+original: AFNI's source may be read to understand behaviour, but nothing may be translated
+from it (CLAUDE.md rule 1). The first implementation was written clean-room, from this file
+and black-box runs of the AFNI binary only (`oracles/afni-25.2.09/bin/3dTshift`, built by
+`scripts/build_afni_oracle.sh`).
 
 This spec describes behaviour: what goes in, what comes out, and the maths. Statements
 marked **(observed)** were confirmed by running the AFNI binary. The rest come from AFNI's

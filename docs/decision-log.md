@@ -147,6 +147,26 @@ ported.
   CORE-MATH `exp`, `log`, `sin` and `cos` were ported (MIT) and integrated, and 63 of 79
   antsApplyTransforms parity cases are now bit-identical.
 
+## 2026-10-09: AFNI's GPL-2 code: read, then implement originally (refines the clean-room decision)
+- **User decision.** Reading AFNI's MCW (GPL-2) source to understand behaviour is allowed.
+  The implementation must be original, written our own way.
+- **Why this is defensible.** Copyright protects code's expression, not algorithms or
+  behaviour. Strict clean-room (implementers who never see the source) is the safest
+  practice, not the only lawful one. The firm line stays: **no line-by-line translation**,
+  even renamed, because the GPL counts translations as modifications.
+- **Not a reason for it.** That nobody could prove the source was read. Our history records
+  that it was read (`docs/findings/afni-tshift.md`), so the approach rests on the code being
+  original.
+- **In practice:**
+  - our own design and FFT;
+  - a spec in `specs/<tool>.md`;
+  - validation against the AFNI oracle;
+  - results equal to AFNI's up to floating-point rounding, but not AFNI's exact last bits
+    where those come from its hand-written FFT.
+
+  The `tshift` implementation already under way follows the stricter clean-room process,
+  which satisfies this.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -70,10 +70,12 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 1. **Clean-room.** When designing or implementing `lx.mri` tools (the FSL-like and Workbench-like ones):
    - Never open FSL source (it is deliberately not cloned) or anything under `reference_src/`.
    - Work only from `specs/<tool>.md`, published papers, official documentation and black-box runs.
-   - **AFNI code copyrighted by the Medical College of Wisconsin (GPL-2) is clean-room too** (user decision, 2026-10-09). That covers every AFNI file whose header says "copyrighted by the Medical College of Wisconsin", including 3dTshift, csfft and most of `mrilib`.
-     - Behaviour specs (`specs/<tool>.md`) may be written by someone who has read the source.
-     - The implementation must be written by an agent that never opens AFNI source, from the spec alone.
-     - Only AFNI files without that header (NIH work, public domain) may be ported directly, after a per-file check of every routine they call.
+   - **AFNI code copyrighted by the Medical College of Wisconsin (GPL-2): read, don't translate** (user decision, 2026-10-09). That covers every AFNI file whose header says "copyrighted by the Medical College of Wisconsin", including 3dTshift, csfft and most of `mrilib`.
+     - The source may be read to understand behaviour.
+     - The implementation must be original: our own design and structure, our own FFT and helpers.
+     - Never translate functions, macros or kernels line by line, even with renaming. A translation is a GPL-2 derivative.
+     - Write the behaviour down in `specs/<tool>.md` and validate against the AFNI oracle.
+     - AFNI files without that header (NIH work, public domain) may be ported directly, after a per-file check of every routine they call.
 2. **Ported code records its provenance.** Each crate's `PROVENANCE.md` lists the upstream files and versions it was ported from. Port from the pinned **release tags**, not the local master/dev clones:
    - ANTs v2.6.5
    - ITK v5.4.5 (the version ANTs 2.6.5 pins; decided 2026-10-09)

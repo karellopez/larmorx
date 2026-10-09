@@ -22,7 +22,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["numpy>=1.26"]
+# h5py reads and writes ITK .h5 transforms (PLAN.md §5) until a pure-Rust reader exists.
+dependencies = ["numpy>=1.26", "h5py>=3.10"]
 
 [project.optional-dependencies]
 # Pipeline-only dependencies (PLAN.md §2.2); library users do not need them.

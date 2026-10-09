@@ -6,9 +6,9 @@ Use it as ``import larmorx as lx``::
     lx.save(img.with_data(img.data * 2), "out.nii.gz", n_threads=4)
 """
 
-from larmorx import io
+from larmorx import ants, io, transforms
 from larmorx._core import __version__
 from larmorx.image import Image, as_image
 from larmorx.io import load, save
 
-__all__ = ["Image", "__version__", "as_image", "io", "load", "save"]
+__all__ = ["Image", "__version__", "ants", "as_image", "io", "load", "save", "transforms"]

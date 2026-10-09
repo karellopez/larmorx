@@ -216,13 +216,16 @@ fn header_from_dict(d: &Bound<'_, PyDict>) -> PyResult<NiftiHeader> {
     })
 }
 
-fn affine_to_py<'py>(py: Python<'py>, a: &Affine) -> Bound<'py, PyArray<f64, numpy::Ix2>> {
+pub(crate) fn affine_to_py<'py>(
+    py: Python<'py>,
+    a: &Affine,
+) -> Bound<'py, PyArray<f64, numpy::Ix2>> {
     let rows = a.rows();
     let arr = numpy::ndarray::Array2::from_shape_fn((4, 4), |(i, j)| rows[i][j]);
     PyArray::from_owned_array(py, arr)
 }
 
-fn affine_from_py(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Affine> {
+pub(crate) fn affine_from_py(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Affine> {
     let view = a.as_array();
     if view.shape() != [4, 4] {
         return Err(PyValueError::new_err(format!(

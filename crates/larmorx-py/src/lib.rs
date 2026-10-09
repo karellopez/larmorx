@@ -6,6 +6,7 @@
 
 use pyo3::prelude::*;
 
+mod ants;
 mod nifti;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
@@ -15,7 +16,7 @@ mod nifti;
 #[pyfunction]
 fn cli_main(py: Python<'_>, argv: Vec<String>) -> (u8, String, String) {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = py.detach(|| larmorx_cli::run(&argv, &mut out, &mut err));
+    let code = py.detach(|| larmorx_cli::run_with(&argv, &ants::PyLoader, &mut out, &mut err));
     (
         code,
         String::from_utf8_lossy(&out).into_owned(),
@@ -28,5 +29,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", larmorx_core::VERSION)?;
     m.add_function(wrap_pyfunction!(cli_main, m)?)?;
     nifti::register(m)?;
+    ants::register(m)?;
     Ok(())
 }

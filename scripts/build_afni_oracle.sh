@@ -65,6 +65,10 @@ for prog in "${PROGRAMS[@]}"; do
   env PATH="$CLEANPATH" make "$prog" > "build-$prog.log" 2>&1
   cp "$prog" "$OUT/bin/"
 done
+# The programs find AFNI's own shared libraries next to themselves (rpath $ORIGIN).
+for lib in lib*.so; do
+  [[ -f "$lib" ]] && cp "$lib" "$OUT/bin/"
+done
 
 {
   echo "AFNI version: $VERSION"

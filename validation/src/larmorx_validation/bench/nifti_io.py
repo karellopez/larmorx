@@ -1,7 +1,7 @@
 """Benchmarks of NIfTI reading and writing: larmorx vs nibabel and SimpleITK.
 
-Reads include materialising the voxel array (nibabel loads lazily, so its read is
-``np.asanyarray(img.dataobj)``). Files are read from the OS page cache after a warm-up, so the
+Reads include materialising the voxel array: nibabel loads lazily and memory-maps uncompressed
+files, so its read is ``np.asanyarray(nib.load(path, mmap=False).dataobj)``. Files are read from the OS page cache after a warm-up, so the
 numbers measure parsing, decompression and conversion rather than disk speed. Writes use each
 tool's default gzip level unless stated; output sizes are reported because the levels differ.
 """
@@ -92,7 +92,12 @@ def bench_file(
                 lambda p=path, n=n: lx.load(p, n_threads=n),
             )
         if nib is not None:
-            add(label, "read", "nibabel", lambda p=path: np.asanyarray(nib.load(p).dataobj))
+            add(
+                label,
+                "read",
+                "nibabel",
+                lambda p=path: np.asanyarray(nib.load(p, mmap=False).dataobj),
+            )
         add(
             label,
             "read float32",
@@ -104,7 +109,7 @@ def bench_file(
                 label,
                 "read float32",
                 "nibabel",
-                lambda p=path: nib.load(p).get_fdata(dtype=np.float32),
+                lambda p=path: nib.load(p, mmap=False).get_fdata(dtype=np.float32),
             )
         if sitk is not None:
             add(
@@ -180,7 +185,9 @@ def render(
         "",
         f"- **Generated:** {dt.date.today().isoformat()} on {env['platform']} ({env['cpu']}, {env['logical_cpus']} logical CPUs), with `{command}`",
         f"- **Method:** median of {repeats} runs after one warm-up, files in the OS page cache (parsing, "
-        "decompression and conversion, not disk speed). Reads materialise the voxel array. "
+        "decompression and conversion, not disk speed). Reads materialise the voxel array (nibabel "
+        "with `mmap=False`; memory-mapping uncompressed files is a nibabel feature larmorx does not "
+        "have yet). "
         "*Speed-up* is the nibabel median divided by the tool's median for the same operation.",
         f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, tier `{tier}`",
         "- **Defaults differ:** nibabel writes gzip level 1, larmorx level 2 (zlib-rs; the same file "

@@ -16,8 +16,9 @@ def nifti_read(
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], list[str], bool]:
     """Read a NIfTI file: ``(data, affine, header fields, fixes applied, scaled)``."""
 
-def nifti_read_header(path: str) -> dict[str, Any]:
-    """Read a NIfTI header as stored (no fixes)."""
+def nifti_read_header(path: str, fix: bool = False) -> Any:
+    """Read a NIfTI header: the fields as stored, or ``(fields, fixes)`` with nibabel's
+    load-time fixes applied when ``fix`` is set."""
 
 def nifti_parse_header(block: bytes) -> dict[str, Any]:
     """Parse a 348/540-byte header block (no extensions, no fixes)."""

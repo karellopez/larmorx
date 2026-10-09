@@ -285,11 +285,33 @@ pub fn nifti_parse_header<'py>(py: Python<'py>, block: &[u8]) -> PyResult<Bound<
     header_to_dict(py, &NiftiHeader::parse(block).map_err(header_err)?)
 }
 
-/// Reads a header exactly as stored (no fixes applied).
+/// Reads a header: exactly as stored, or with nibabel's load-time fixes applied (`fix`).
+/// Returns the header dict, and the list of fixes when `fix` is set.
 #[pyfunction]
-pub fn nifti_read_header(py: Python<'_>, path: std::path::PathBuf) -> PyResult<Bound<'_, PyDict>> {
-    let header = py.detach(|| nifti::read_header(&path)).map_err(to_py_err)?;
-    header_to_dict(py, &header)
+#[pyo3(signature = (path, fix = false))]
+pub fn nifti_read_header(
+    py: Python<'_>,
+    path: std::path::PathBuf,
+    fix: bool,
+) -> PyResult<Bound<'_, PyAny>> {
+    let mut header = py.detach(|| nifti::read_header(&path)).map_err(to_py_err)?;
+    if !fix {
+        return Ok(header_to_dict(py, &header)?.into_any());
+    }
+    let fixes: Vec<&str> = header
+        .apply_load_fixes()
+        .map_err(header_err)?
+        .iter()
+        .map(|f| f.0)
+        .collect();
+    Ok(PyTuple::new(
+        py,
+        [
+            header_to_dict(py, &header)?.into_any(),
+            fixes.into_pyobject(py)?.into_any(),
+        ],
+    )?
+    .into_any())
 }
 
 macro_rules! write_typed {

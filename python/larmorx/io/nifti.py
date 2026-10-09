@@ -201,7 +201,7 @@ class NiftiHeader:
 
 def read_header(path: PathLike) -> NiftiHeader:
     """The header of a NIfTI file exactly as stored (no fixes applied)."""
-    return NiftiHeader.from_dict(_core.nifti_read_header(os.fspath(path)))
+    return NiftiHeader.from_dict(_core.nifti_read_header(os.fspath(path), False))
 
 
 def _scaling(dtype: Any, scaled: bool) -> str:
@@ -215,7 +215,51 @@ def _scaling(dtype: Any, scaled: bool) -> str:
     return dt.name
 
 
-def load(path: PathLike, *, dtype: Any = None, scaled: bool = True, n_threads: int = 1) -> Image:
+def _memory_map(path: PathLike, scaled: bool) -> Image | None:
+    """The image with its data memory-mapped, or ``None`` if the file is not eligible
+    (compressed, scaled, non-native byte order, or an unsupported type)."""
+    from larmorx.image import Image
+
+    name = os.fspath(path)
+    lower = name.lower()
+    if lower.endswith((".hdr", ".img")):
+        image_path = name[:-4] + (".IMG" if name[-4:].isupper() else ".img")
+    elif lower.endswith(".nii"):
+        image_path = name
+    else:
+        return None
+    for candidate in {name, image_path}:
+        with open(candidate, "rb") as f:
+            if f.read(2) == b"\x1f\x8b":
+                return None
+    fields, fixes = _core.nifti_read_header(name, True)
+    header = NiftiHeader.from_dict(fields)
+    dtype = header.data_dtype
+    if (
+        dtype is None
+        or not dtype.isnative
+        or (scaled and header.slope_inter not in (None, (1.0, 0.0)))
+    ):
+        return None
+    offset = int(header.vox_offset)
+    if header.is_single_file and offset == 0:
+        return None
+    for fix in fixes:
+        logger.warning("%s: %s", name, fix)
+    data = np.memmap(
+        image_path, dtype=dtype, mode="c", offset=offset, shape=header.shape, order="F"
+    )
+    return Image(data, header.affine, header)
+
+
+def load(
+    path: PathLike,
+    *,
+    dtype: Any = None,
+    scaled: bool = True,
+    mmap: bool = False,
+    n_threads: int = 1,
+) -> Image:
     """Read a NIfTI image.
 
     Parameters
@@ -228,6 +272,10 @@ def load(path: PathLike, *, dtype: Any = None, scaled: bool = True, n_threads: i
         ``img.get_fdata(dtype=...)`` gives.
     scaled
         ``False`` returns the stored values, ignoring ``scl_slope``/``scl_inter``.
+    mmap
+        Memory-map the voxel data instead of reading it (copy-on-write, like nibabel's default
+        ``mmap='c'``) when the file allows it: uncompressed, native byte order, no scaling (or
+        ``scaled=False``), and ``dtype=None``. Other files are read normally.
     n_threads
         Threads for byte swapping and scaling (0 = all logical CPUs).
 
@@ -236,6 +284,8 @@ def load(path: PathLike, *, dtype: Any = None, scaled: bool = True, n_threads: i
     """
     from larmorx.image import Image
 
+    if mmap and dtype is None and (mapped := _memory_map(path, scaled)) is not None:
+        return mapped
     data, affine, fields, fixes, _ = _core.nifti_read(
         os.fspath(path), _scaling(dtype, scaled), n_threads
     )

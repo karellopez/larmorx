@@ -188,6 +188,10 @@ def _compare_reads(
         else:
             checks.add(compare.identical(f"data as {label}", ours.data, theirs))
 
+    mapped = lx.load(path, mmap=True)
+    checks.add(compare.identical("data, memory-mapped (mmap=True)", mapped.data, ref_data))
+    del mapped
+
     unscaled, err = _try(lambda: ref.dataobj.get_unscaled())
     if err is None:
         checks.add(

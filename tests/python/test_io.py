@@ -290,3 +290,31 @@ def test_nibabel_reads_what_larmorx_writes_and_back(tmp_path):
     converted = lx.load(path).to_nibabel()
     np.testing.assert_array_equal(np.asanyarray(converted.dataobj), data)
     assert int(converted.header["sform_code"]) == 2
+
+
+# --- memory mapping -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("suffix", [".nii", ".hdr"])
+def test_mmap_maps_eligible_files(tmp_path, suffix):
+    data = sample("float32", (5, 6, 7, 2))
+    path = tmp_path / f"m{suffix}"
+    lx.save(lx.Image(data, oblique_affine()), path)
+    img = lx.load(path, mmap=True)
+    assert isinstance(img.data.base, np.memmap) or isinstance(img.data, np.memmap)
+    np.testing.assert_array_equal(img.data, data)
+    np.testing.assert_array_equal(img.affine, lx.load(path).affine)
+    img.data[0, 0, 0, 0] = 42  # copy-on-write: the file is unchanged
+    np.testing.assert_array_equal(lx.load(path).data, data)
+
+
+def test_mmap_falls_back_for_compressed_and_scaled_files(tmp_path):
+    data = sample("int16")
+    gz = tmp_path / "c.nii.gz"
+    lx.save(lx.Image(data, np.eye(4)), gz)
+    assert not isinstance(lx.load(gz, mmap=True).data.base, np.memmap)
+    path, stored = scaled_file(tmp_path)
+    scaled = lx.load(path, mmap=True)
+    assert scaled.dtype == np.float64  # scaled: read normally
+    raw = lx.load(path, mmap=True, scaled=False)
+    np.testing.assert_array_equal(raw.data, stored)

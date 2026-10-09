@@ -2,7 +2,7 @@
 
 `lx.Image`, `lx.load` and `lx.save` (module `larmorx.io`; Rust crates `larmorx-core` and `larmorx-io`).
 
-**Status: `validated`** against nibabel 5.4.2 (see the [validation record](../validation/nifti-io.md)): bit-identical data in every read mode, identical header fields and extensions, affines within 1e-9 mm, and the same header on write, on every file of the test-data catalog.
+**Status: `validated`** against nibabel 5.4.2 (see the [validation record](../validation/nifti-io.md)): bit-identical data in every read mode (including memory-mapped), identical header fields and extensions, affines within 1e-9 mm, and the same header on write, on every file of the test-data catalog.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ A frozen dataclass:
 
 Properties: `shape`, `ndim`, `dtype`, `voxel_sizes`, `tr`. Methods: `with_data(data)`, `replace(**fields)`, `save(path, **options)`, `from_nibabel(img)`, `to_nibabel()`. `lx.as_image(x)` accepts an `Image`, a path, a nibabel image or an `(array, affine)` pair.
 
-## `lx.load(path, *, dtype=None, scaled=True, n_threads=1)`
+## `lx.load(path, *, dtype=None, scaled=True, mmap=False, n_threads=1)`
 
 Reads `.nii`, `.nii.gz`, `.hdr`/`.img` pairs (either name), `.hdr.gz`/`.img.gz`; NIfTI-1 and NIfTI-2; either byte order.
 
@@ -37,6 +37,8 @@ Reads `.nii`, `.nii.gz`, `.hdr`/`.img` pairs (either name), `.hdr.gz`/`.img.gz`;
 | `np.float64` | float64, scaled | `img.get_fdata()` |
 | `np.float32` | float32, scaled | `img.get_fdata(dtype=np.float32)` |
 | `None`, `False` | stored values, `scl_slope`/`scl_inter` ignored | `img.dataobj.get_unscaled()` |
+
+`mmap=True` memory-maps the voxel data instead of reading it (copy-on-write, like nibabel's default `mmap='c'`) when the file allows it: uncompressed, native byte order, and no scaling (or `scaled=False`). Other files are read normally. Useful for large uncompressed images of which only part is needed.
 
 Header fields that nibabel fixes when it reads a file (zero or negative voxel sizes, a `qfac` other than ±1, unknown xform codes, a wrong `bitpix`) are fixed the same way and logged on the `larmorx.io` logger. `lx.io.read_header(path)` returns the header exactly as stored, without fixes.
 

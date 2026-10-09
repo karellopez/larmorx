@@ -1,0 +1,1326 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "7466702e9d4c-dirty",
+  "larmorx_testdata_commit": "535104904d50",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "antspyx": "0.6.3",
+   "h5py": "3.16.0",
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "best": 0.2792086247354746,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.28919430263340473,
+   "operation": "1 thread",
+   "seconds": [
+    0.2934679836034775,
+    0.28919430263340473,
+    0.2792086247354746
+   ],
+   "throughput_mb_s": 163.16338036512056,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.17918794974684715,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.1801409311592579,
+   "operation": "1 thread",
+   "seconds": [
+    0.17918794974684715,
+    0.18655718676745892,
+    0.1801409311592579
+   ],
+   "throughput_mb_s": 261.93891469498493,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.14191952161490917,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.14420415088534355,
+   "operation": "1 thread",
+   "seconds": [
+    0.14191952161490917,
+    0.14420415088534355,
+    0.1457043271511793
+   ],
+   "throughput_mb_s": 327.21610099502226,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 11.571403538808227,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 11.620005529373884,
+   "operation": "1 thread",
+   "seconds": [
+    11.620005529373884,
+    11.673899265006185,
+    11.571403538808227
+   ],
+   "throughput_mb_s": 4.060748497986515,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.7285853121429682,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 1.7547130100429058,
+   "operation": "1 thread",
+   "seconds": [
+    1.768248725682497,
+    1.7547130100429058,
+    1.7285853121429682
+   ],
+   "throughput_mb_s": 26.890961501930292,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 1.6092880982905626,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 1
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 1.622710870578885,
+   "operation": "1 thread",
+   "seconds": [
+    1.653342666104436,
+    1.6092880982905626,
+    1.622710870578885
+   ],
+   "throughput_mb_s": 29.07845190139567,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.8485942017287016,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.8502695467323065,
+   "operation": "1 thread",
+   "seconds": [
+    0.8525051195174456,
+    0.8502695467323065,
+    0.8485942017287016
+   ],
+   "throughput_mb_s": 10.180630405107628,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.7109494712203741,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.7434065267443657,
+   "operation": "1 thread",
+   "seconds": [
+    0.7109494712203741,
+    0.7434065267443657,
+    0.7489907220005989
+   ],
+   "throughput_mb_s": 11.644073180133143,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.6946420427411795,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.7323522754013538,
+   "operation": "1 thread",
+   "seconds": [
+    0.6946420427411795,
+    0.7587547246366739,
+    0.7323522754013538
+   ],
+   "throughput_mb_s": 11.819830825617448,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 4.213588008657098,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 4.245396304875612,
+   "operation": "1 thread",
+   "seconds": [
+    4.245396304875612,
+    4.365681365132332,
+    4.213588008657098
+   ],
+   "throughput_mb_s": 2.038980433948822,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.349622955545783,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 1.358421305194497,
+   "operation": "1 thread",
+   "seconds": [
+    1.3594403117895126,
+    1.349622955545783,
+    1.358421305194497
+   ],
+   "throughput_mb_s": 6.372308772616464,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 1.3570738397538662,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 1
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 1.375244727358222,
+   "operation": "1 thread",
+   "seconds": [
+    1.3570738397538662,
+    1.4040209129452705,
+    1.375244727358222
+   ],
+   "throughput_mb_s": 6.294356071903138,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.2850925624370575,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 1
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.28810046426951885,
+   "operation": "1 thread",
+   "seconds": [
+    0.2850925624370575,
+    0.28810046426951885,
+    0.3035872206091881
+   ],
+   "throughput_mb_s": 0.9667738672556814,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.023379240185022354,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 1
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.02402614802122116,
+   "operation": "1 thread",
+   "seconds": [
+    0.02402614802122116,
+    0.028084492310881615,
+    0.023379240185022354
+   ],
+   "throughput_mb_s": 11.592703073084765,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.019761767238378525,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 1
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.025818852707743645,
+   "operation": "1 thread",
+   "seconds": [
+    0.025818852707743645,
+    0.036307986825704575,
+    0.019761767238378525
+   ],
+   "throughput_mb_s": 10.787776015952224,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 79.95401662401855,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 1
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 80.23014247044921,
+   "operation": "1 thread",
+   "seconds": [
+    80.39111482352018,
+    79.95401662401855,
+    80.23014247044921
+   ],
+   "throughput_mb_s": 2.2561335980011568,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 13.432763550430536,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 1
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 14.795178774744272,
+   "operation": "1 thread",
+   "seconds": [
+    15.0981280002743,
+    14.795178774744272,
+    13.432763550430536
+   ],
+   "throughput_mb_s": 12.234385454604192,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 12.415234124287963,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 1
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 12.42212376743555,
+   "operation": "1 thread",
+   "seconds": [
+    12.42212376743555,
+    12.495469002053142,
+    12.415234124287963
+   ],
+   "throughput_mb_s": 14.57157595503237,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.18643443658947945,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.18874364160001278,
+   "operation": "4 threads",
+   "seconds": [
+    0.18874364160001278,
+    0.18876465782523155,
+    0.18643443658947945
+   ],
+   "throughput_mb_s": 250.00005086262365,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.07393015548586845,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.07864860072731972,
+   "operation": "4 threads",
+   "seconds": [
+    0.07864860072731972,
+    0.07393015548586845,
+    0.09165026620030403
+   ],
+   "throughput_mb_s": 599.9587985499824,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.04084368795156479,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.041822075843811035,
+   "operation": "4 threads",
+   "seconds": [
+    0.041822075843811035,
+    0.04084368795156479,
+    0.043236877769231796
+   ],
+   "throughput_mb_s": 1128.2538957707602,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 3.104631971567869,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 3.1762752030044794,
+   "operation": "4 threads",
+   "seconds": [
+    3.1762752030044794,
+    3.2353595476597548,
+    3.104631971567869
+   ],
+   "throughput_mb_s": 14.85574044571649,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.5381038039922714,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 0.5668489225208759,
+   "operation": "4 threads",
+   "seconds": [
+    0.5808600466698408,
+    0.5668489225208759,
+    0.5381038039922714
+   ],
+   "throughput_mb_s": 83.24249747208832,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.5231383219361305,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 4
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 0.5279046185314655,
+   "operation": "4 threads",
+   "seconds": [
+    0.5231383219361305,
+    0.5279046185314655,
+    0.5302953347563744
+   ],
+   "throughput_mb_s": 89.38341954890002,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.7481375206261873,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.7598596066236496,
+   "operation": "4 threads",
+   "seconds": [
+    0.7598596066236496,
+    0.7481375206261873,
+    0.7665912341326475
+   ],
+   "throughput_mb_s": 11.391946518203808,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.6461080927401781,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.6464968286454678,
+   "operation": "4 threads",
+   "seconds": [
+    0.6569571681320667,
+    0.6461080927401781,
+    0.6464968286454678
+   ],
+   "throughput_mb_s": 13.389516570617264,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.6182916592806578,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.6197595559060574,
+   "operation": "4 threads",
+   "seconds": [
+    0.6287059746682644,
+    0.6197595559060574,
+    0.6182916592806578
+   ],
+   "throughput_mb_s": 13.967158581919652,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 1.7101304829120636,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 1.751618143171072,
+   "operation": "4 threads",
+   "seconds": [
+    1.7101304829120636,
+    1.751618143171072,
+    1.7830161098390818
+   ],
+   "throughput_mb_s": 4.94187619244966,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.803198354318738,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 0.8237795736640692,
+   "operation": "4 threads",
+   "seconds": [
+    0.8303743805736303,
+    0.8237795736640692,
+    0.803198354318738
+   ],
+   "throughput_mb_s": 10.508005146932623,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.7549545429646969,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 4
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 0.7575745973736048,
+   "operation": "4 threads",
+   "seconds": [
+    0.7600905317813158,
+    0.7549545429646969,
+    0.7575745973736048
+   ],
+   "throughput_mb_s": 11.426307099010446,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.2003464251756668,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 4
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.2029270138591528,
+   "operation": "4 threads",
+   "seconds": [
+    0.20603827200829983,
+    0.2029270138591528,
+    0.2003464251756668
+   ],
+   "throughput_mb_s": 1.3725525976217252,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.009542526677250862,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 4
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.010288700461387634,
+   "operation": "4 threads",
+   "seconds": [
+    0.010288700461387634,
+    0.009542526677250862,
+    0.011283352971076965
+   ],
+   "throughput_mb_s": 27.071251713983226,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.0096780676394701,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 4
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.010752774775028229,
+   "operation": "4 threads",
+   "seconds": [
+    0.010972592979669571,
+    0.0096780676394701,
+    0.010752774775028229
+   ],
+   "throughput_mb_s": 25.90289537606992,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 21.318788373842835,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 4
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 21.87966075539589,
+   "operation": "4 threads",
+   "seconds": [
+    21.318788373842835,
+    21.87966075539589,
+    21.94141693972051
+   ],
+   "throughput_mb_s": 8.272976533941913,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 4.313449461013079,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 4
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 4.491305157542229,
+   "operation": "4 threads",
+   "seconds": [
+    4.313449461013079,
+    4.491305157542229,
+    4.576777812093496
+   ],
+   "throughput_mb_s": 40.30229825199716,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 3.8434626068919897,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 4
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 3.938087059184909,
+   "operation": "4 threads",
+   "seconds": [
+    3.8434626068919897,
+    3.938087059184909,
+    3.9557917434722185
+   ],
+   "throughput_mb_s": 45.96392037038023,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.17978172935545444,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.182727487757802,
+   "operation": "12 threads",
+   "seconds": [
+    0.17978172935545444,
+    0.20496842078864574,
+    0.182727487757802
+   ],
+   "throughput_mb_s": 258.2310991028512,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.06290425732731819,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.06572649627923965,
+   "operation": "12 threads",
+   "seconds": [
+    0.06676899641752243,
+    0.06290425732731819,
+    0.06572649627923965
+   ],
+   "throughput_mb_s": 717.9132111276732,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.026066599413752556,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Linear",
+   "median": 0.02705364115536213,
+   "operation": "12 threads",
+   "seconds": [
+    0.026066599413752556,
+    0.02774886228144169,
+    0.02705364115536213
+   ],
+   "throughput_mb_s": 1744.1615244699726,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 1.8836365565657616,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 1.9237303491681814,
+   "operation": "12 threads",
+   "seconds": [
+    1.9237303491681814,
+    1.8836365565657616,
+    1.9284199588000774
+   ],
+   "throughput_mb_s": 24.52834412078758,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.4191075321286917,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 0.42307891510427,
+   "operation": "12 threads",
+   "seconds": [
+    0.4191075321286917,
+    0.4591298531740904,
+    0.42307891510427
+   ],
+   "throughput_mb_s": 111.52983123342554,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.36387566290795803,
+   "data_bytes": 47185920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 4.479686569632706e-16,
+    "shape": [
+     160,
+     192,
+     192
+    ],
+    "threads": 12
+   },
+   "input": "boldref \u2192 T1w 1 mm, Lanczos",
+   "median": 0.39780048467218876,
+   "operation": "12 threads",
+   "seconds": [
+    0.39780048467218876,
+    0.36387566290795803,
+    0.4006665088236332
+   ],
+   "throughput_mb_s": 118.61705004930802,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.7388077042996883,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.7400851882994175,
+   "operation": "12 threads",
+   "seconds": [
+    0.7388077042996883,
+    0.7580152992159128,
+    0.7400851882994175
+   ],
+   "throughput_mb_s": 11.696329202170055,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.6096736397594213,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.6193138808012009,
+   "operation": "12 threads",
+   "seconds": [
+    0.6096736397594213,
+    0.6281362883746624,
+    0.6193138808012009
+   ],
+   "throughput_mb_s": 13.977209728936558,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.5987600013613701,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Linear",
+   "median": 0.6005129721015692,
+   "operation": "12 threads",
+   "seconds": [
+    0.6236962880939245,
+    0.6005129721015692,
+    0.5987600013613701
+   ],
+   "throughput_mb_s": 14.414809341597204,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 1.2264640554785728,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 1.2644811775535345,
+   "operation": "12 threads",
+   "seconds": [
+    1.2881388757377863,
+    1.2644811775535345,
+    1.2264640554785728
+   ],
+   "throughput_mb_s": 6.845716768001095,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.7751974426209927,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 0.7834907881915569,
+   "operation": "12 threads",
+   "seconds": [
+    0.7834907881915569,
+    0.7751974426209927,
+    0.7960426136851311
+   ],
+   "throughput_mb_s": 11.048349426009604,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.7367434557527304,
+   "data_bytes": 8656280,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 2.963524668204148e-16,
+    "shape": [
+     97,
+     115,
+     97
+    ],
+    "threads": 12
+   },
+   "input": "T1w \u2192 MNI 2 mm (.h5 affine + warp), Lanczos",
+   "median": 0.7467938084155321,
+   "operation": "12 threads",
+   "seconds": [
+    0.762450996786356,
+    0.7367434557527304,
+    0.7467938084155321
+   ],
+   "throughput_mb_s": 11.591258393486118,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 0.1945333108305931,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 12
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.19911503605544567,
+   "operation": "12 threads",
+   "seconds": [
+    0.19911503605544567,
+    0.1945333108305931,
+    0.21200094930827618
+   ],
+   "throughput_mb_s": 1.3988295686642216,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.009216977283358574,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 12
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.009285252541303635,
+   "operation": "12 threads",
+   "seconds": [
+    0.009285252541303635,
+    0.009584737941622734,
+    0.009216977283358574
+   ],
+   "throughput_mb_s": 29.996814708164642,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 0.008628861978650093,
+   "data_bytes": 278528,
+   "extra": {
+    "bit_identical": true,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     34
+    ],
+    "threads": 12
+   },
+   "input": "aseg \u2192 boldref, GenericLabel",
+   "median": 0.00872080959379673,
+   "operation": "12 threads",
+   "seconds": [
+    0.00872080959379673,
+    0.008957365527749062,
+    0.008628861978650093
+   ],
+   "throughput_mb_s": 31.938319143915493,
+   "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 13.648921497166157,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 12
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 13.651602651923895,
+   "operation": "12 threads",
+   "seconds": [
+    13.651602651923895,
+    13.714435916393995,
+    13.648921497166157
+   ],
+   "throughput_mb_s": 13.259243226984093,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 3.4301018211990595,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 12
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 3.4905846677720547,
+   "operation": "12 threads",
+   "seconds": [
+    3.707640426233411,
+    3.4905846677720547,
+    3.4301018211990595
+   ],
+   "throughput_mb_s": 51.85661922807153,
+   "tool": "larmorx (CLI)"
+  },
+  {
+   "best": 3.1111467629671097,
+   "data_bytes": 181009920,
+   "extra": {
+    "bit_identical": false,
+    "max_rel_diff": 6.077160723472648e-16,
+    "shape": [
+     49,
+     52,
+     37,
+     240
+    ],
+    "threads": 12
+   },
+   "input": "BOLD 240 volumes \u2192 T1w grid, Lanczos (-e 3)",
+   "median": 3.1544141490012407,
+   "operation": "12 threads",
+   "seconds": [
+    3.1111467629671097,
+    3.178835514932871,
+    3.1544141490012407
+   ],
+   "throughput_mb_s": 57.383054808231776,
+   "tool": "larmorx (Python, no file output)"
+  }
+ ]
+}

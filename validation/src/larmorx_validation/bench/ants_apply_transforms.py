@@ -173,6 +173,9 @@ def worker(threads: int, repeats: int, quick: bool) -> None:
                 print(json.dumps(m.to_dict()), flush=True)
 
 
+NOTES = "## Notes\n\n- **Where the time goes.**\n  - Linear interpolation onto a 1 mm grid is dominated by reading the gzipped input and\n    writing the 47 MB output. ANTs hardly speeds up with more threads there.\n  - The `.h5` jobs are dominated by reading fMRIPrep's 90 MB gzip-compressed warp: h5py\n    for larmorx, ITK's HDF5 reader for ANTs, both decompressing in one thread.\n  - A pure-Rust reader for ITK's `.h5` layout with parallel decompression is planned\n    (decision log, 2026-10-09).\n- **Single-thread speed** comes from computing each output row's indices once (ITK's\n  scan-line method) and reusing them for every volume of a series. It also comes from\n  evaluating GenericLabel only for the labels around each point; ITK evaluates every label\n  of the image.\n- **Equal results.** Where outputs are not bit-identical, the windowed-sinc weights go through\n  the platform's `sin`/`cos`. See `docs/findings/platform-math.md`.\n"
+
+
 def _fmt(s: float) -> str:
     return f"{s * 1000:.0f} ms" if s < 1 else f"{s:.2f} s"
 
@@ -230,7 +233,7 @@ def render(
             ),
             "",
         ]
-    lines += ["## Environment", "", environment_section(env), ""]
+    lines += [NOTES, "## Environment", "", environment_section(env), ""]
     return "\n".join(lines)
 
 

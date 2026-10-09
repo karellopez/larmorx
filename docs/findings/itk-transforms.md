@@ -78,3 +78,19 @@ into a double transform exactly.
 (`Parameters::F32`), so a field is not doubled in memory. Values parsed from text are
 double, as ANTs reads them in double mode; an earlier draft wrongly narrowed text
 `_float_` fields to float32.
+
+**`antsApplyTransforms -o CompositeTransform[out.h5] -t warp -t affine` stores the queue
+`[affine, warp]`**: group 1 the affine, group 2 the field. This is the command-line order
+reversed, and it is consistent with the mapping `affine(warp(x))`. *Verified*
+(larmorx-testdata `transforms/composite-affine-warp.h5`).
+
+**ITK's HDF5 writer stores object modification times**, so writing the same transform twice
+gives different bytes and only the datasets are reproducible. The test-data generator
+therefore compares `.h5` files by their datasets. *Verified.*
+
+**ANTs reads `.h5` composites written by larmorx.** `lx.transforms.write` uses ITK's layout:
+- variable-length ASCII `TransformType` strings;
+- float64 fixed parameters;
+- parameters in their stored precision, chunked and gzip-compressed when large.
+
+*Validated* (parity case `transform/chain-larmorx-written-h5`, bit-identical).

@@ -51,7 +51,7 @@ fn roundeven_finite(x: f64) -> f64 {
 
 /// Round `(-1)^s * r / 2^128` to `f64`, assuming `r` is non-zero and not in the
 /// subnormal range (`u128_tod` in sin.c).
-#[inline]
+#[inline(always)]
 fn u128_tod(r: u128, s: usize) -> f64 {
     let sh = u64::from(((r >> 64) as u64).leading_zeros());
     // since the smallest distance from a binary64 number to a multiple of pi/2
@@ -137,7 +137,7 @@ fn mh_uu(a: u128, b: u128) -> u128 {
 /// Return Sr such that Sr/2^128 approximates sin2pi(r), for 0 <= r < 2^-14,
 /// where u/2^128 approximates r, u2/2^128 approximates r^2,
 /// u4/2^128 approximates r^4, and u2h = floor(u2/2^64) (`evalPS`).
-#[inline]
+#[inline(always)]
 fn eval_ps(u: u128, u2: u128, u2h: u128, u4: u128) -> u128 {
     // fixed point: each variable a is interpreted as a/2^128.
     // Estrin's scheme: degree-{1,3} part and degree-{5,7} part times r^4.
@@ -152,7 +152,7 @@ fn eval_ps(u: u128, u2: u128, u2h: u128, u4: u128) -> u128 {
 /// Return Cr such that Cr/2^128 approximates cos2pi(r), for 0 <= r < 2^-14,
 /// where u2/2^128 approximates r^2, u4/2^128 approximates r^4, and
 /// u2h = floor(u2/2^64) (`evalPC`).
-#[inline]
+#[inline(always)]
 fn eval_pc(u2: u128, u2h: u128, u4: u128) -> u128 {
     // Estrin's scheme
     let mut sh = PC[3].wrapping_sub(u2h.wrapping_mul(PC[4]));
@@ -165,7 +165,7 @@ fn eval_pc(u2: u128, u2h: u128, u4: u128) -> u128 {
 /// Argument reduction for |x| >= 2^31 (`reduce_large`).
 /// Return (k, r) such that x/(2pi) mod 1 = k/2^15 + r + s with 0 <= r < 2^-15
 /// and 0 <= s < 2^-67.988.
-#[inline]
+#[inline(always)]
 fn reduce_large(x: f64) -> (u64, f64) {
     let tu = x.to_bits();
     let e = ((tu >> 52) & 0x7ff) as i32; // 1054 <= e <= 2046
@@ -496,7 +496,7 @@ const PIL: f64 = fb(0xbbc1a62633145c07);
 /// Return (k, r, neg) such that x/(2pi) mod 1 = k/2^13 + r/2^128 + eps with
 /// |r/2^128| <= 2^-14 and 0 <= eps < 2^-128 + 2^-139 < 2^-127.999;
 /// neg = 0 if r >= 0, neg = 1 if r < 0 (r holds |r|).
-#[inline]
+#[inline(always)]
 fn reduce_large_acc(x: f64) -> (u64, u128, i32) {
     let tu = x.to_bits();
     let e = ((tu >> 52) & 0x7ff) as i32;
@@ -792,7 +792,7 @@ fn sin_large_accurate(x: f64) -> f64 {
 }
 
 /// Accurate path for |x| < 2^-16 (`sin_small_accurate`).
-#[inline]
+#[inline(always)]
 fn sin_small_accurate(x: f64) -> f64 {
     // x + (c3h+c3l)*x^3 + c5*x^5 approximates sin(x) on [0,2^-16] with relative
     // error < 2^-112.743, cf sinsmall_acc.sollya, where c3h = c[0], c3l = c[1]
@@ -819,7 +819,7 @@ fn sin_small_accurate(x: f64) -> f64 {
 
 /// Fast path for 2^-26 <= |x| < 2^31 (`cr_sin_moderate`); the proof of correctness
 /// is in sin.pdf.
-#[inline]
+#[inline(always)]
 fn cr_sin_moderate(x: f64, mut sbit: usize) -> f64 {
     let ax = x.abs();
     // 0x1.45f306dc9c883p+12
@@ -910,7 +910,7 @@ fn cr_sin_large(x: f64) -> f64 {
 ///
 /// `sin(±0) = ±0`; `sin(±inf)` and `sin(NaN)` return the default quiet NaN
 /// (`0x7ff8000000000000`), as in CORE-MATH.
-#[inline]
+#[inline(always)]
 pub fn sin(x: f64) -> f64 {
     let tu = x.to_bits();
     let e = ((tu >> 52) & 0x7ff) as i32;

@@ -18,6 +18,7 @@ Differences from the C code, all without effect on the result in round-to-neares
 - `__builtin_fma` is `f64::mul_add`, which is correctly rounded on every target;
 - exception flags and `errno` are not modelled;
 - the NaN returned for negative `log` arguments is the canonical quiet NaN on every platform.
+- inline hints are `#[inline(always)]` so that the kernels compile into the FMA-enabled copy that `math` selects at run time on x86-64. That changes code generation only; the results are bit-identical, which a unit test checks.
 
 ## vnl's SVD (`src/vnl_svd.rs`)
 

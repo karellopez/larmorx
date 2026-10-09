@@ -7,7 +7,8 @@
 //! - [`Grid3`]: sampling grids in ITK's physical space (LPS), for tools ported from ITK.
 //! - [`parallel`]: running work on an explicit number of threads.
 //! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions.
-#![forbid(unsafe_code)]
+// No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
+#![deny(unsafe_code)]
 
 pub mod affine;
 pub mod array;

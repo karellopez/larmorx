@@ -72,7 +72,7 @@ impl Dint {
 }
 
 /// Extract both the mantissa and exponent of a double (`fast_extract`).
-#[inline]
+#[inline(always)]
 fn fast_extract(x: f64) -> (i64, u64) {
     let xu = x.to_bits();
     let e = ((xu >> 52) & 0x7ff) as i64;
@@ -81,17 +81,17 @@ fn fast_extract(x: f64) -> (i64, u64) {
 }
 
 /// Return true if a = 0 (`dint_zero_p`).
-#[inline]
+#[inline(always)]
 fn dint_zero_p(a: &Dint) -> bool {
     a.hi == 0
 }
 
-#[inline]
+#[inline(always)]
 fn cmp(a: i64, b: i64) -> i32 {
     i32::from(a > b) - i32::from(a < b)
 }
 
-#[inline]
+#[inline(always)]
 fn cmpu128(a: u128, b: u128) -> i32 {
     i32::from(a > b) - i32::from(a < b)
 }
@@ -103,7 +103,7 @@ const MAGIC: Dint = Dint::new(0x8000_0000_0000_0000, 0x0, -10, 0x0);
 
 /// Compare the absolute values of a and b: -1 if |a| < |b|, 0 if |a| = |b|,
 /// +1 if |a| > |b| (`cmp_dint_abs`).
-#[inline]
+#[inline(always)]
 fn cmp_dint_abs(a: &Dint, b: &Dint) -> i32 {
     if dint_zero_p(a) {
         return if dint_zero_p(b) { 0 } else { -1 };
@@ -122,7 +122,7 @@ fn cmp_dint_abs(a: &Dint, b: &Dint) -> i32 {
 /// The C version writes through a pointer that may alias an input; it reads every
 /// input field it needs before writing the corresponding output field, so returning
 /// the result by value is equivalent.
-#[inline]
+#[inline(always)]
 fn add_dint(a: &Dint, b: &Dint) -> Dint {
     if (a.hi | a.lo) == 0 {
         return *b;
@@ -206,7 +206,7 @@ fn add_dint(a: &Dint, b: &Dint) -> Dint {
 /// floating-point numbers (`mul_dint`). The C version allows the output to alias an
 /// input; it reads the inputs before overwriting them, so returning by value is
 /// equivalent.
-#[inline]
+#[inline(always)]
 fn mul_dint(a: &Dint, b: &Dint) -> Dint {
     let bh = u128::from(b.hi);
     let bl = u128::from(b.lo);
@@ -244,7 +244,7 @@ fn mul_dint(a: &Dint, b: &Dint) -> Dint {
 
 /// Multiply two dint64_t numbers, assuming the low part of b is zero,
 /// with error bounded by 2 ulps (`mul_dint_21`).
-#[inline]
+#[inline(always)]
 fn mul_dint_21(a: &Dint, b: &Dint) -> Dint {
     let bh = u128::from(b.hi);
     let hi = u128::from(a.hi) * bh;
@@ -271,7 +271,7 @@ fn mul_dint_21(a: &Dint, b: &Dint) -> Dint {
 }
 
 /// Convert a non-zero double to the corresponding dint64_t value (`dint_fromd`).
-#[inline]
+#[inline(always)]
 fn dint_fromd(b: f64) -> Dint {
     let (ex, hi) = fast_extract(b);
     // |b| = 2^(ex-52)*hi
@@ -286,7 +286,7 @@ fn dint_fromd(b: f64) -> Dint {
 }
 
 /// `subnormalize_dint`, round-to-nearest branch only.
-#[inline]
+#[inline(always)]
 fn subnormalize_dint(a: &mut Dint) {
     if a.ex > -1023 {
         return;
@@ -311,7 +311,7 @@ fn subnormalize_dint(a: &mut Dint) {
 }
 
 /// Convert a dint64_t value to a double (`dint_tod`).
-#[inline]
+#[inline(always)]
 fn dint_tod(a: &mut Dint) -> f64 {
     subnormalize_dint(a);
 
@@ -1303,7 +1303,7 @@ fn eval_pc_fast(uh: f64, ul: f64) -> (f64, f64) {
 /// Put in Y an approximation of sin2pi(X), for 0 <= X < 2^-11, where X2 approximates
 /// X^2. Absolute error bounded by 2^-132.999 with 0 <= Y < 0.003068 (see evalPS() in
 /// sin.sage), and relative error bounded by 2^-124.648 (`evalPS`).
-#[inline]
+#[inline(always)]
 fn eval_ps(x: &Dint, x2: &Dint) -> Dint {
     let mut y = mul_dint_21(x2, &PS[5]); // degree 11
     y = add_dint(&y, &PS[4]); // degree 9
@@ -1321,7 +1321,7 @@ fn eval_ps(x: &Dint, x2: &Dint) -> Dint {
 /// Put in Y an approximation of cos2pi(X), for 0 <= X < 2^-11, where X2 approximates
 /// X^2. Absolute/relative error bounded by 2^-125.999 with 0.999995 < Y <= 1
 /// (see evalPC() in sin.sage) (`evalPC`).
-#[inline]
+#[inline(always)]
 fn eval_pc(x2: &Dint) -> Dint {
     let mut y = mul_dint_21(x2, &PC[5]); // degree 10
     y = add_dint(&y, &PC[4]); // degree 8
@@ -1337,7 +1337,7 @@ fn eval_pc(x2: &Dint) -> Dint {
 
 /// Normalize X such that X->hi has its most significant bit set (if X <> 0)
 /// (`normalize`).
-#[inline]
+#[inline(always)]
 fn normalize(x: &mut Dint) {
     if x.hi != 0 {
         let cnt = x.hi.leading_zeros();
@@ -1357,7 +1357,7 @@ fn normalize(x: &mut Dint) {
 /// Approximate X/(2pi) mod 1. If Xin is the input value, and Xout the output value,
 /// we have |Xout - (Xin/(2pi) mod 1)| < 2^-126.67*|Xout|.
 /// Assert X is normalized at input, and normalize X at output (`reduce`).
-#[inline]
+#[inline(always)]
 fn reduce(x: &mut Dint) {
     let mut e = x.ex as i32;
     let mut u: u128;
@@ -1459,7 +1459,7 @@ fn reduce(x: &mut Dint) {
 
 /// Given Xin:=X with 0 <= Xin < 1, return i and modify X such that
 /// Xin = i/2^11 + Xout, with 0 <= Xout < 2^-11. This operation is exact (`reduce2`).
-#[inline]
+#[inline(always)]
 fn reduce2(x: &mut Dint) -> i32 {
     if x.ex <= -11 {
         return 0;
@@ -1472,7 +1472,7 @@ fn reduce2(x: &mut Dint) -> i32 {
 }
 
 /// h+l <- c1/2^64 + c0/2^128 (`set_dd`).
-#[inline]
+#[inline(always)]
 fn set_dd(mut c1: u64, mut c0: u64) -> (f64, f64) {
     let (h, l);
     if c1 != 0 {
@@ -1525,7 +1525,7 @@ fn set_dd(mut c1: u64, mut c0: u64) -> (f64, f64) {
 /// Otherwise only the absolute error is bounded:
 /// | i/2^11 + h + l - frac(x/(2pi)) | < 2^-75.998 with 0 <= h < 2^-11 and |l| < 2^-53.
 /// In both cases we have |l| < 2^-51.64*|i/2^11 + h|.
-#[inline]
+#[inline(always)]
 fn reduce_fast(x: f64) -> (i32, f64, f64, f64) {
     let (mut h, l, err1);
     // 0x1.921fb54442d17p+2
@@ -1602,7 +1602,7 @@ fn reduce_fast(x: f64) -> (i32, f64, f64, f64) {
 
 /// Assume x is a regular number and x > 0x1.6a09e667f3bccp-27; return (h, l, err)
 /// with a bound err on the maximal absolute error | h + l - cos(x) | (`cos_fast`).
-#[inline]
+#[inline(always)]
 fn cos_fast(x: f64) -> (f64, f64, f64) {
     let mut neg: i32 = 0;
     let mut is_cos: i32 = 1;
@@ -1793,7 +1793,7 @@ fn cos_accurate(x: f64) -> f64 {
 ///
 /// `cos(±0) = 1`; `cos(±inf)` returns the default quiet NaN and `cos(NaN)` returns a
 /// quiet NaN (`x + x`), as in CORE-MATH.
-#[inline]
+#[inline(always)]
 pub fn cos(x: f64) -> f64 {
     let mut tu = x.to_bits();
     let e = ((tu >> 52) & 0x7ff) as i32;

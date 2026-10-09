@@ -115,7 +115,7 @@ const TWO_POW_52: f64 = f64::from_bits(0x4330000000000000);
 
 /// `fast_two_sum`: `(hi, lo)` with `hi + lo = a + b` exactly (round-to-nearest).
 /// Assumes |a| >= |b|.
-#[inline]
+#[inline(always)]
 fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
     let hi = a + b;
     let e = hi - a; // exact
@@ -130,7 +130,7 @@ fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 /// `log1_template.g`): for each interval `i`, 362 <= i <= 724, and -1074 <= e <= 1024,
 /// z is exact and -2.4696201316824195e-21 <= h + l - log(2^e*y) <= 2.89253666698316e-21.
 /// The C file details the bound of every operation below.
-#[inline]
+#[inline(always)]
 fn cr_log_fast(e: i32, v: u64) -> (f64, f64) {
     const CY: [f64; 2] = [1.0, 0.5];
     const CM: [u64; 2] = [43, 44];
@@ -225,7 +225,7 @@ fn log_2(mut x: Dint64) -> Dint64 {
 
 /// `fast_extract`: the unbiased exponent and the integer significand (with the implicit bit
 /// for normal numbers) of a double.
-#[inline]
+#[inline(always)]
 fn fast_extract(x: f64) -> (i64, u64) {
     let u = x.to_bits();
     let e = ((u >> 52) & 0x7ff) as i64;
@@ -234,7 +234,7 @@ fn fast_extract(x: f64) -> (i64, u64) {
 }
 
 /// `dint_fromd`: the double `b` (non-zero, finite) as a normalized dint.
-#[inline]
+#[inline(always)]
 fn dint_fromd(b: f64) -> Dint64 {
     let (ex, hi) = fast_extract(b);
 
@@ -250,7 +250,7 @@ fn dint_fromd(b: f64) -> Dint64 {
 
 /// `dint_tod`: a dint as a double, rounded to nearest, assuming the input is not in the
 /// subnormal range.
-#[inline]
+#[inline(always)]
 fn dint_tod(a: &Dint64) -> f64 {
     const TWO_POW_M54: f64 = f64::from_bits(0x3c90000000000000); // 0x1p-54
     const TWO_POW_M53: f64 = f64::from_bits(0x3ca0000000000000); // 0x1p-53

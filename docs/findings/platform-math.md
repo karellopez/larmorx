@@ -93,4 +93,18 @@ kernels' internal helpers are not inlined into the wrapper. The results are iden
 way, since `mul_add` is correctly rounded. Forcing the fast-path helpers inline and
 dispatching on `is_x86_feature_detected!("fma")` should recover most of it: the CORE-MATH
 authors measure about 2.5× for `cos` with FMA. The dispatch needs a small audited `unsafe`
-block. *Verified (no gain without inlining); follow-up open.*
+block. *Verified (no gain without inlining).*
+
+**Done (2026-10-09).** The kernels' helpers are now `#[inline(always)]`, and on x86-64 an
+FMA-compiled copy is selected at run time. It has one audited `unsafe` call per function;
+the crate otherwise denies `unsafe`.
+
+| Function | before | after |
+|---|---|---|
+| `cos` | 82 ns | 34 ns |
+| `sin` | 22 ns | 17 ns |
+| `exp` | 19 ns | 13 ns |
+| `log` | 38 ns | 32 ns |
+
+A unit test checks that both copies give the same bits on 200,000 random inputs. Lanczos
+boldref → T1w: 2.13 s on one thread, against 2.76 s before and 1.62 s with the `libm` crate.

@@ -74,25 +74,25 @@ pub(crate) const LOG2: Dint64 = Dint64::new(0xb17217f7d1cf79ab, 0xc9e3b39803f2f6
 pub(crate) const ZERO: Dint64 = Dint64::new(0x0, 0x0, 0, 0x0);
 
 /// High 64 bits of a 128-bit integer (`uint128_t.h`).
-#[inline]
+#[inline(always)]
 pub(crate) const fn hi64(x: u128) -> u64 {
     (x >> 64) as u64
 }
 
 /// Low 64 bits of a 128-bit integer (`uint128_t.l`).
-#[inline]
+#[inline(always)]
 pub(crate) const fn lo64(x: u128) -> u64 {
     x as u64
 }
 
 /// `h:l` as a 128-bit integer.
-#[inline]
+#[inline(always)]
 pub(crate) const fn join128(h: u64, l: u64) -> u128 {
     ((h as u128) << 64) | l as u128
 }
 
 /// `addu_128`: `a + b` modulo 2^128, and whether the addition overflowed (the carry out).
-#[inline]
+#[inline(always)]
 pub(crate) fn addu_128(a: u128, b: u128) -> (u128, bool) {
     let (ah, al) = (hi64(a), lo64(a));
     let (bh, bl) = (hi64(b), lo64(b));
@@ -104,7 +104,7 @@ pub(crate) fn addu_128(a: u128, b: u128) -> (u128, bool) {
 }
 
 /// `subu_128`: `a - b` modulo 2^128, and whether the subtraction underflowed (the borrow).
-#[inline]
+#[inline(always)]
 pub(crate) fn subu_128(a: u128, b: u128) -> (u128, bool) {
     let c = b.wrapping_neg();
     let (ah, al) = (hi64(a), lo64(a));
@@ -118,7 +118,7 @@ pub(crate) fn subu_128(a: u128, b: u128) -> (u128, bool) {
 
 /// `cmp_dint`: compares `(ex, hi, lo)` lexicographically, i.e. the magnitudes of two normalized
 /// non-zero values; the signs are ignored.
-#[inline]
+#[inline(always)]
 pub(crate) fn cmp_dint(a: &Dint64, b: &Dint64) -> Ordering {
     a.ex.cmp(&b.ex)
         .then_with(|| a.hi.cmp(&b.hi))

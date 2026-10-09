@@ -73,7 +73,7 @@ const L2L: f64 = fb(0x3d0718432a1b0e26);
 /// `0x1.9ff0342542fc3p-102` (`l2ll`): third part, accurate path only.
 const L2LL: f64 = fb(0x3999ff0342542fc3);
 
-#[inline]
+#[inline(always)]
 fn fasttwosum(x: f64, y: f64) -> (f64, f64) {
     let s = x + y;
     let z = s - x;
@@ -81,14 +81,14 @@ fn fasttwosum(x: f64, y: f64) -> (f64, f64) {
     (s, e)
 }
 
-#[inline]
+#[inline(always)]
 fn fastsum(xh: f64, xl: f64, yh: f64, yl: f64) -> (f64, f64) {
     let (sh, sl) = fasttwosum(xh, yh);
     let e = (xl + yl) + sl;
     (sh, e)
 }
 
-#[inline]
+#[inline(always)]
 fn muldd(xh: f64, xl: f64, ch: f64, cl: f64) -> (f64, f64) {
     let ahhh = ch * xh;
     let l = (ch * xl + cl * xh) + ch.mul_add(xh, -ahhh);
@@ -99,7 +99,7 @@ fn muldd(xh: f64, xl: f64, ch: f64, cl: f64) -> (f64, f64) {
 /// Parameterized Double-Word Overlap: Tight Error Bounds and Examples", Arith 2026
 /// (<https://inria.hal.science/hal-05517451>), with CORE-MATH's change: `g` and `l` use a
 /// multiply and an add instead of an FMA. Returns `(dh, dl)`.
-#[inline]
+#[inline(always)]
 fn fast_fma_dw(ah: f64, al: f64, bh: f64, bl: f64, ch: f64, cl: f64) -> (f64, f64) {
     let dh = ah.mul_add(bh, ch);
     let t = ch - dh;
@@ -113,7 +113,7 @@ fn fast_fma_dw(ah: f64, al: f64, bh: f64, bl: f64, ch: f64, cl: f64) -> (f64, f6
     (dh, l)
 }
 
-#[inline]
+#[inline(always)]
 fn opolydd(xh: f64, xl: f64, c: &[[f64; 2]]) -> (f64, f64) {
     let n = c.len();
     let (mut ch, mut cl) = (c[n - 1][0], c[n - 1][1]);
@@ -123,13 +123,13 @@ fn opolydd(xh: f64, xl: f64, c: &[[f64; 2]]) -> (f64, f64) {
     (ch, cl)
 }
 
-#[inline]
+#[inline(always)]
 fn as_ldexp(x: f64, i: i64) -> f64 {
     f64::from_bits(x.to_bits().wrapping_add((i as u64) << 52))
 }
 
 /// Sets the exponent of a binary64 number to 0 (subnormal range).
-#[inline]
+#[inline(always)]
 fn as_todenormal(x: f64) -> f64 {
     f64::from_bits(x.to_bits() & (u64::MAX >> 12))
 }
@@ -449,7 +449,7 @@ fn as_exp_accurate(x: f64) -> f64 {
 ///
 /// Port of CORE-MATH's `cr_exp` (see the module documentation).
 #[must_use]
-#[inline]
+#[inline(always)]
 pub fn exp(x: f64) -> f64 {
     let mut ix = x.to_bits();
     let aix = ix & (u64::MAX >> 1);

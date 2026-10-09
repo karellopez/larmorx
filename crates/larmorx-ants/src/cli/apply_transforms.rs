@@ -399,22 +399,63 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
 }
 
 /// ANTs' output cast (`CastImageFilter`, a `static_cast`): floats round to nearest, integers
-/// truncate toward zero. Values outside an integer type's range are undefined behaviour in
-/// ANTs; here they saturate.
+/// truncate toward zero. Out of range, the C++ cast is undefined; x86-64 builds (where ANTs
+/// and fMRIPrep usually run) convert through a 32-bit integer (`cvttsd2si`, which gives
+/// `i32::MIN` for NaN and values beyond its range) and keep the low bits, so `-u uchar` wraps
+/// 400.7 to 144. This reproduces that, on every platform.
 pub fn cast_output(values: Vec<f64>, shape: &[usize], ty: OutputType) -> DynArray {
     fn array<T>(v: Vec<T>, shape: &[usize]) -> ArrayD<T> {
         ArrayD::from_shape_vec(IxDyn(shape).f(), v).expect("shape matches the data")
+    }
+    /// x86-64's `cvttsd2si` to a 32-bit integer.
+    fn to_i32(v: f64) -> i32 {
+        if v.is_nan() || v >= 2_147_483_648.0 || v <= -2_147_483_649.0 {
+            i32::MIN
+        } else {
+            v as i32
+        }
     }
     match ty {
         OutputType::Double => DynArray::F64(array(values, shape)),
         OutputType::Float => {
             DynArray::F32(array(values.iter().map(|&v| v as f32).collect(), shape))
         }
-        OutputType::Int => DynArray::I32(array(values.iter().map(|&v| v as i32).collect(), shape)),
-        OutputType::Short => {
-            DynArray::I16(array(values.iter().map(|&v| v as i16).collect(), shape))
-        }
-        OutputType::UChar => DynArray::U8(array(values.iter().map(|&v| v as u8).collect(), shape)),
-        OutputType::Char => DynArray::I8(array(values.iter().map(|&v| v as i8).collect(), shape)),
+        OutputType::Int => DynArray::I32(array(values.iter().map(|&v| to_i32(v)).collect(), shape)),
+        OutputType::Short => DynArray::I16(array(
+            values.iter().map(|&v| to_i32(v) as i16).collect(),
+            shape,
+        )),
+        OutputType::UChar => DynArray::U8(array(
+            values.iter().map(|&v| to_i32(v) as u8).collect(),
+            shape,
+        )),
+        OutputType::Char => DynArray::I8(array(
+            values.iter().map(|&v| to_i32(v) as i8).collect(),
+            shape,
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integer_casts_follow_x86_64() {
+        let values = vec![400.7, -3.7, 255.9, 1e12, f64::NAN, -128.5];
+        let DynArray::U8(u) = cast_output(values.clone(), &[6], OutputType::UChar) else {
+            panic!()
+        };
+        assert_eq!(
+            u.as_slice_memory_order().unwrap(),
+            [144, 253, 255, 0, 0, 128]
+        );
+        let DynArray::I32(i) = cast_output(values, &[6], OutputType::Int) else {
+            panic!()
+        };
+        assert_eq!(
+            i.as_slice_memory_order().unwrap(),
+            [400, -3, 255, i32::MIN, i32::MIN, -128]
+        );
     }
 }

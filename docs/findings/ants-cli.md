@@ -67,10 +67,17 @@ type is the computation type unless `-u` says otherwise. *Read.*
 the arithmetic stays double, so float results can differ in the last float bits.
 
 **`-u` casts with `CastImageFilter`, a plain `static_cast`.** Integers truncate toward zero.
-Out-of-range values are undefined behaviour in C++. An unknown `-u` name silently falls back
-to the default type (`antsApplyTransforms.cxx:1453-1600`). Plain `char` is signed on x86 and
-unsigned on ARM. *Read.*
-*larmorx:* truncates the same way and saturates out-of-range values. `char` is always int8.
+An unknown `-u` name silently falls back to the default type
+(`antsApplyTransforms.cxx:1453-1600`). *Read.*
+
+**Out-of-range values wrap on x86-64.** C++ leaves the cast of an out-of-range double to a
+small integer undefined. x86-64 builds convert through a 32-bit integer (`cvttsd2si`: NaN and
+values beyond ±2³¹ give `INT_MIN`) and keep the low bits. So `-u uchar` turns 400.7 into 144
+and −3.7 into 253, and `-u char` wraps too. ARM builds (`fcvtzs`) saturate instead, so ANTs
+gives different results on different hardware. *Verified* on x86-64: an `-u uchar` and an
+`-u char` output both match the int32 wrap exactly, and neither matches saturation.
+*larmorx:* the CLI reproduces x86-64 on every platform. `lx.ants.apply_transforms(dtype=...)`
+saturates instead, which is safer, and says so.
 
 **`-e 0` with a 4D file fails.** v2.6.5 (`antsApplyTransforms.cxx:355-375`) checks the file's number of dimensions against
 `-d` and exits ("Input image dimension does not match"). It also rejects non-scalar pixel

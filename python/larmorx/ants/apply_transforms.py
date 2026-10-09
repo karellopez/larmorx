@@ -134,7 +134,8 @@ def apply_transforms(
         The value of output voxels outside the input (``-f``).
     dtype
         Output type (``-u``). The default is float64, as ANTs computes. Integer types truncate
-        toward zero.
+        toward zero and saturate outside their range. (The command line reproduces ANTs on
+        x86-64 instead, which wraps out-of-range values.)
     n_threads
         Worker threads (0 = all). The result does not depend on it.
     """

@@ -78,4 +78,15 @@ The header is the image's header, updated as nibabel updates it: the qform/sform
 
 ## Performance
 
-See the [benchmark report](../benchmarks/nifti-io.md). In short: compressed files are read several times faster than with nibabel (zlib-rs inflate, no Python buffering) and written several times faster with threads; uncompressed files run at memory/disk speed for both.
+From the [benchmark report](../benchmarks/nifti-io.md) (real data from 2 MB templates to a 1.4 GB 7 T BOLD run; median times, warm OS cache):
+
+| Operation | vs nibabel | vs SimpleITK |
+|---|---|---|
+| Read `.nii.gz` | 1.1–2.4× faster | 1.1–1.6× faster |
+| Read `.nii` | 1.1–1.5× faster | 2–3.8× faster |
+| Write `.nii.gz`, 1 thread | 1.3–1.9× faster | – |
+| Write `.nii.gz`, all threads | 4.4–7.6× faster | 4–9× faster |
+| Write `.nii.gz` at gzip level 6 | 5.8–12.4× faster | – |
+| Write `.nii` | about the same (disk-bound) | about the same |
+
+Reading a gzip stream is inherently sequential; the gains come from zlib-rs's inflate and from decompressing straight into the final array. Writing compresses in parallel, with output bytes that do not depend on the thread count.

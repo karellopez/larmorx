@@ -1,6 +1,6 @@
 # larmorx
 
-**Status: phase L0, a buildable project skeleton; no tools yet.**
+**Status: early development.** Available now: `lx.Image` and NIfTI-1/2 reading and writing, [validated against nibabel](docs/validation/nifti-io.md) (252 files, bit-identical data) and [faster than nibabel and SimpleITK](docs/benchmarks/nifti-io.md) (compressed writes 4–8× faster with threads). No neuroimaging tools yet.
 
 **larmorx** is a library of neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool:
 - tools from ANTs/ITK, AFNI and FreeSurfer, ported to Rust
@@ -42,12 +42,21 @@ You need Rust (stable, via rustup) and Python ≥ 3.12. From the repo, with the 
 
 ```bash
 source ../.venv/bin/activate
-pip install --group dev          # maturin, pytest, packaging, ruff (pip >= 25.1)
-maturin develop                  # build the larmorx._core extension into the venv
+pip install --group dev          # maturin, pytest, packaging, nibabel, ruff (pip >= 25.1)
+maturin develop --release        # build the larmorx._core extension into the venv
 cargo test --workspace           # Rust tests
-pytest                           # Python tests of the installed package
+pytest tests/python              # Python tests of the installed package
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 ruff check && ruff format --check
+```
+
+Parity checks and benchmarks need the test data (`larmorx-testdata`, a separate repository kept next to this one; not published yet) and the validation package:
+
+```bash
+pip install -e ../larmorx-testdata -e "validation[oracles]"
+pytest tests/parity                                             # parity with the reference tools (smoke tier)
+python -m larmorx_validation parity nifti-io --tier standard --out docs/validation
+python -m larmorx_validation bench nifti-io --out docs/benchmarks
 ```
 
 | Path | Contents |
@@ -56,7 +65,9 @@ ruff check && ruff format --check
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
 | `python/larmorx` | the Python package, including `pipelines/larmorprepx` |
-| `tests/python` | Python tests |
+| `tests/python`, `tests/parity` | Python tests; parity suites under pytest |
+| `validation/` | parity suites and benchmarks against the reference tools |
+| `docs/` | [architecture](docs/architecture.md), [API pages](docs/api/), validation records, benchmark reports |
 | `.github/workflows/ci.yml` | lint, plus wheel build and tests on the six target platforms |
 
 ## Contributing

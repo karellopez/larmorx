@@ -141,8 +141,14 @@ fi
 echo
 echo "environment:"
 echo "  os:     $(uname -sm)"
-echo "  python: $(command -v python3 >/dev/null && python3 --version 2>&1 || echo missing)"
-echo "  rustc:  $(command -v rustc >/dev/null && rustc --version || echo 'missing (use --install-rust)')"
+if [[ -n "$VENV" ]]; then
+  echo "  python: $("$VENV/bin/python" --version 2>&1) ($VENV)"
+else
+  echo "  python: $(command -v python3 >/dev/null && python3 --version 2>&1 || echo missing)"
+fi
+# rustup installs into ~/.cargo/bin, which may not be on PATH in this shell yet.
+RUSTC="$(command -v rustc || echo "$HOME/.cargo/bin/rustc")"
+echo "  rustc:  $([[ -x "$RUSTC" ]] && "$RUSTC" --version || echo 'missing (use --install-rust)')"
 echo "  docker: $(command -v docker >/dev/null && docker --version || echo 'missing (needed for fMRIPrep/FreeSurfer oracles)')"
 echo "  cores:  $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo ?)"
 [[ "$fail" == 0 ]] || { echo "some clones failed (see above)" >&2; exit 1; }

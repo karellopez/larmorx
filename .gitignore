@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+# Rust
+target/
+# Compiled extensions
+*.so
+*.pyd
+*.dylib
+# Data and outputs: never commit (use content-addressed fixture storage, PLAN.md §11.1)
+oracles/data/
+oracles/logs/
+fixtures/
+work/
+*.nii
+*.nii.gz
+*.mgz
+# OS / editors
+.DS_Store
+.idea/

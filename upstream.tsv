@@ -1,0 +1,26 @@
+# Upstream repositories analysed for larmorx, pinned to the exact commits read on 2026-10-08/09.
+# Used by scripts/bootstrap_workspace.sh. Columns are TAB-separated:
+#   name  url  commit  licence  location
+# location: "ws"            = clone into the workspace root (read-only reference)
+#           "reference_src" = clone into <workspace>/reference_src/ (licence review only; DO NOT READ for implementation)
+# Porting must use the release tags listed in CLAUDE.md, not these master/dev snapshots.
+fmriprep	https://github.com/nipreps/fmriprep.git	21a490fb89acee54baca06dd0ca04a2297659e97	Apache-2.0	ws
+smriprep	https://github.com/nipreps/smriprep.git	10d70eed1cb18a7fba13b9c6e566cead464b45e1	Apache-2.0	ws
+niworkflows	https://github.com/nipreps/niworkflows.git	dacf491b50055f12cc93d8a1a60b2a4c4a36f797	Apache-2.0	ws
+sdcflows	https://github.com/nipreps/sdcflows.git	d0dd398a87edca4ff1411a9f7ea1d92286f82933	Apache-2.0	ws
+nireports	https://github.com/nipreps/nireports.git	e4ef786c5f0b1fa3635f8080f9c7d9a22a37dc99	Apache-2.0	ws
+nitransforms	https://github.com/nipy/nitransforms.git	06537caee1e5908e7faada275187a0568982b549	MIT	ws
+nipype	https://github.com/nipy/nipype.git	599a762085006a54634f8abf8cb6f4719d654d62	Apache-2.0	ws
+nibabel	https://github.com/nipy/nibabel.git	4be8b5c78a2d2facaf07c2ac7f088216b56ff08e	MIT	ws
+nitime	https://github.com/nipy/nitime.git	a014ce0a298715e231f8ed56e87ed9bda444a12c	BSD	ws
+pybids	https://github.com/bids-standard/pybids.git	47eb9fbae90221bf61c0512886a73b3acded1045	MIT	ws
+python-client	https://github.com/templateflow/python-client.git	06ccc7f9e504d61e0ad167ec87f27467b5325859	Apache-2.0	ws
+tedana	https://github.com/ME-ICA/tedana.git	45dd96d6390f56168edb15b3e57fd91cf1cdaf47	LGPL-2.1	ws
+acres	https://github.com/nipreps/acres.git	46fa5864f5482c754ce6f77d0ba3d5db457c4936	Apache-2.0	ws
+migas-py	https://github.com/nipreps/migas-py.git	4c721feb0edf91fcfa449c4583294bbb1441a982	Apache-2.0	ws
+ANTs	https://github.com/ANTsX/ANTs.git	0f65b0e66bea11f32fbe9a008ca94572541fd4fa	Apache-2.0	ws
+ITK	https://github.com/InsightSoftwareConsortium/ITK.git	dfef081654167268e754645b95f70d87c73b66fc	Apache-2.0	ws
+afni	https://github.com/afni/afni.git	0eb4d3472eccf1eb3b1bc746977ef41b2bb9a5d4	public-domain+exceptions	ws
+freesurfer	https://github.com/freesurfer/freesurfer.git	766ac058320a4b0417b9328ad85221db7cfbf700	FreeSurfer-1.0	ws
+workbench	https://github.com/Washington-University/workbench.git	990632890c3facfb2549945d41f0c6c8caa0de4a	GPL-2.0-or-later	reference_src
+MSM_HOCR	https://github.com/ecr05/MSM_HOCR.git	c9d899676c3fc15b55ff2863765951533e35ad8d	non-commercial	reference_src

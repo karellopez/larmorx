@@ -1,0 +1,2548 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "4fe591cf4057",
+  "larmorx_testdata_commit": "db846de5f34a",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "nibabel 5.4.2",
+ "results": [
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/ChickenEgg-zeros.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.32,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SlopeInterceptUCHAR.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.012,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SmallVoxels.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SmallVoxelsNonOrthoSform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SmallVoxels_AffinePrecision.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SmallVoxels_noqform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/SmallVoxels_nosform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/xyzt_units_test_scl.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Modules/IO/NIFTI/test/Input/xyzt_units_test_scl_mm_s.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.011,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/LPSLabels.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.049,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/LPSLabels_noqform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.951,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/LPSLabels_nosform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.948,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/NonOrthoSform.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.96,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/itkNiftisform2DirectionDef.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.402,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/r16slice.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "itk/Testing/Data/Input/r64slice.nii.gz",
+   "category": "itk-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/doc/source/downloads/someones_anatomy.nii.gz",
+   "category": "nibabel-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/doc/source/downloads/someones_epi.nii.gz",
+   "category": "nibabel-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/anatomical.nii",
+   "category": "nibabel-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/example4d.nii.gz",
+   "category": "nibabel-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/example_nifti2.nii.gz",
+   "category": "nibabel-testdata",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/functional.nii",
+   "category": "nibabel-testdata",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/nifti1.hdr",
+   "category": "nibabel-testdata",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: FileNotFoundError(2, 'No such file or directory'); larmorx: FileNotFoundError('<testdata-cache>/nibabel/tests/data/nifti1.img: No such file or directory (os error 2)')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "nibabel/tests/data/nifti2.hdr",
+   "category": "nibabel-testdata",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: FileNotFoundError(2, 'No such file or directory'); larmorx: FileNotFoundError('<testdata-cache>/nibabel/tests/data/nifti2.img: No such file or directory (os error 2)')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "nibabel/tests/data/reoriented_anat_moved.nii",
+   "category": "nibabel-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/resampled_anat_moved.nii",
+   "category": "nibabel-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "nibabel/tests/data/standard.nii.gz",
+   "category": "nibabel-testdata",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_desc-aparcaseg_dseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.485,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_desc-aseg_dseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.489,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_desc-brain_mask.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.377,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.051,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_dseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.477,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_label-CSF_probseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.013,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_label-GM_probseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.05,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_label-WM_probseg.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.071,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/anat/sub-01_space-MNI152NLin2009cAsym_res-2_desc-preproc_T1w.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.274,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_boldref.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_desc-brain_mask.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_desc-preproc_bold.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 12.405,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_space-MNI152NLin2009cAsym_res-2_boldref.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.296,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_space-T1w_boldref.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_space-T1w_desc-brain_mask.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro-derivatives/ds000005-fmriprep/sub-01/func/sub-01_task-mixedgamblestask_run-1_space-T1w_desc-preproc_bold.nii.gz",
+   "category": "openneuro-derivatives-ds000005-fmriprep",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.871,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000002/sub-01/anat/sub-01_inplaneT2.nii.gz",
+   "category": "openneuro-ds000002",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.131,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000005/sub-01/anat/sub-01_T1w.nii.gz",
+   "category": "openneuro-ds000005",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.122,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000005/sub-01/anat/sub-01_inplaneT2.nii.gz",
+   "category": "openneuro-ds000005",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.154,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz",
+   "category": "openneuro-ds000005",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.596,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-02_bold.nii.gz",
+   "category": "openneuro-ds000005",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.001,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000117/sub-01/ses-mri/func/sub-01_ses-mri_task-facerecognition_run-01_bold.nii.gz",
+   "category": "openneuro-ds000117",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.032,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000122/sub-17/func/sub-17_task-visualattentiontask_run-01_bold.nii.gz",
+   "category": "openneuro-ds000122",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.773,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000210/sub-02/anat/sub-02_T1w.nii.gz",
+   "category": "openneuro-ds000210",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.5,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000210/sub-02/func/sub-02_task-cuedSGT_run-01_echo-1_bold.nii.gz",
+   "category": "openneuro-ds000210",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.919,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000210/sub-02/func/sub-02_task-cuedSGT_run-01_echo-2_bold.nii.gz",
+   "category": "openneuro-ds000210",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.653,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000210/sub-02/func/sub-02_task-cuedSGT_run-01_echo-3_bold.nii.gz",
+   "category": "openneuro-ds000210",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.757,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000217/sub-Exp1s08/anat/sub-Exp1s08_T1w.nii.gz",
+   "category": "openneuro-ds000217",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.535,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000217/sub-Exp2s01/anat/sub-Exp2s01_inplaneT1.nii.gz",
+   "category": "openneuro-ds000217",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.161,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000218/sub-22/anat/sub-22_T1w.nii.gz",
+   "category": "openneuro-ds000218",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.081,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000221/sub-010139/ses-02/anat/sub-010139_ses-02_acq-mp2rage_defacemask.nii.gz",
+   "category": "openneuro-ds000221",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.764,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000222/sub-3107/anat/sub-3107_T1w.nii.gz",
+   "category": "openneuro-ds000222",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.187,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000222/sub-4143/anat/sub-4143_T1w.nii.gz",
+   "category": "openneuro-ds000222",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.037,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000228/sub-pixar008/anat/sub-pixar008_T1w.nii.gz",
+   "category": "openneuro-ds000228",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.625,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000240/sub-01/perf/sub-01_asl.nii.gz",
+   "category": "openneuro-ds000240",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.313,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000241/sub-08/anat/sub-08_T1w.nii.gz",
+   "category": "openneuro-ds000241",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.193,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000248/sub-01/anat/sub-01_T1w.nii.gz",
+   "category": "openneuro-ds000248",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.218,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000258/sub-21262/anat/sub-21262_T1w.nii.gz",
+   "category": "openneuro-ds000258",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.893,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds000258/sub-21262/func/sub-21262_task-rest_echo-4_bold.nii.gz",
+   "category": "openneuro-ds000258",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.722,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001547/sub-181004LEEV1LGN/stat/BOLDzstat2.nii",
+   "category": "openneuro-ds001547",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/anat/sub-1_T1w.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.062,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v1_magnitude1.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v1_magnitude2.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v1_phase1.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.06,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v1_phase2.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v2_magnitude1.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v2_magnitude2.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v2_phase1.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.067,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v2_phase2.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v4_magnitude1.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v4_magnitude2.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_acq-v4_phasediff.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_dir-AP_epi.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.426,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/fmap/sub-1_dir-PA_epi.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.191,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/func/sub-1_task-rest_acq-PA_bold.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.42,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/func/sub-1_task-rest_acq-v1_bold.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.209,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/func/sub-1_task-rest_acq-v2_bold.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.193,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001600/sub-1/func/sub-1_task-rest_acq-v4_bold.nii.gz",
+   "category": "openneuro-ds001600",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.193,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds001972/sub-0018/ses-01/anat/sub-0018_ses-01_run-01_inplaneT1.nii.gz",
+   "category": "openneuro-ds001972",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.457,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002155/sub-30/anat/sub-30_T1w.nii.gz",
+   "category": "openneuro-ds002155",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.024,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002169/sub-01/anat/sub-01_T1w.nii.gz",
+   "category": "openneuro-ds002169",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.481,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002207/sub-01/anat/sub-01_T1w.nii.gz",
+   "category": "openneuro-ds002207",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.53,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002543/sub-001/anat/sub-001_T1w.nii.gz",
+   "category": "openneuro-ds002543",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.007,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002711/sub-14/anat/sub-14_T2w.nii",
+   "category": "openneuro-ds002711",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.635,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002738/sub-269/func/sub-269_task-reward_run-1_sbref.nii.gz",
+   "category": "openneuro-ds002738",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.489,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds002738/sub-384/fmap/sub-384_magnitude.nii.gz",
+   "category": "openneuro-ds002738",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.753,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds003012/sub-01/fmap/sub-01_magnitude1.nii.gz",
+   "category": "openneuro-ds003012",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds003020/sub-UTS10/ses-5/func/sub-UTS10_ses-5_task-wheretheressmoke_run-4_bold.nii",
+   "category": "openneuro-ds003020",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: OSError('Expected 236996928 bytes, got 9554 bytes from <testdata-cache>/openneuro/ds003020/sub-UTS10/ses-5/func/sub-UTS10_ses-5_task-wheretheressmoke_run-4_bold.nii\\n - could the file be damaged?'); larmorx: NiftiError('<testdata-cache>/openneuro/ds003020/sub-UTS10/ses-5/func/sub-UTS10_ses-5_task-wheretheressmoke_run-4_bold.nii: expected 236996928 bytes of voxel data, found 9554')",
+   "seconds": 0.115,
+   "status": "both-error"
+  },
+  {
+   "case": "openneuro/ds003345/sub-22973/func/sub-22973_task-PenaltyKik_run-02_bold.nii.gz",
+   "category": "openneuro-ds003345",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.735,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds003592/sub-280/ses-1/anat/sub-280_ses-1_T1w.nii.gz",
+   "category": "openneuro-ds003592",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.201,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz",
+   "category": "openneuro-ds003763",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: OSError('Expected 152764416 bytes, got 164400 bytes from object\\n - could the file be damaged?'); larmorx: OSError('<testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream')",
+   "seconds": 0.078,
+   "status": "both-error"
+  },
+  {
+   "case": "openneuro/ds003990/sub-05/ses-02/anat/sub-05_ses-02_part-phase_T2starw.nii.gz",
+   "category": "openneuro-ds003990",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.62,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds004199/sub-00053/anat/sub-00053_acq-traacpcVNS_FLAIR_roi.nii.gz",
+   "category": "openneuro-ds004199",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.235,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds004856/sub-2220/ses-wave1/anat/sub-2220_ses-wave1_acq-MPRAGE_run-1_T1w.nii.gz",
+   "category": "openneuro-ds004856",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.995,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005040/sub-002/anat/sub-002_T1w.nii.gz",
+   "category": "openneuro-ds005040",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.952,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005040/sub-002/fmap/sub-002_dir-A_epi.nii.gz",
+   "category": "openneuro-ds005040",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.257,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005040/sub-002/fmap/sub-002_dir-P_epi.nii.gz",
+   "category": "openneuro-ds005040",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.259,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005040/sub-002/func/sub-002_task-clip_run-1_bold.nii.gz",
+   "category": "openneuro-ds005040",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.598,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005143/sub-unfMSL03/func/sub-unfMSL03_task-rest_rec-MoCoMean_bold.nii.gz",
+   "category": "openneuro-ds005143",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005371/sub-07/ses-02/mrs/sub-07_ses-02_acq-megaslaser_mrsref.nii.gz",
+   "category": "openneuro-ds005371",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.648,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005454/sub-16/anat/sub-16_acq-denoised_T1w.nii.gz",
+   "category": "openneuro-ds005454",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.7,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005454/sub-16/fmap/sub-16_magnitude1.nii.gz",
+   "category": "openneuro-ds005454",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.2,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005454/sub-16/fmap/sub-16_magnitude2.nii.gz",
+   "category": "openneuro-ds005454",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.204,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005454/sub-16/fmap/sub-16_phasediff.nii.gz",
+   "category": "openneuro-ds005454",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.254,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005752/sub-ON01016/ses-01/anat/sub-ON01016_ses-01_acq-FSPGR_rec-SCIC_T1w.nii.gz",
+   "category": "openneuro-ds005752",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.664,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005752/sub-ON01016/ses-01/fmap/sub-ON01016_ses-01_acq-bold_fieldmap.nii.gz",
+   "category": "openneuro-ds005752",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005752/sub-ON01016/ses-01/fmap/sub-ON01016_ses-01_acq-bold_magnitude.nii.gz",
+   "category": "openneuro-ds005752",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.058,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005752/sub-ON01016/ses-01/func/sub-ON01016_ses-01_task-rest_dir-forward_bold.nii.gz",
+   "category": "openneuro-ds005752",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.691,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds005752/sub-ON01016/ses-01/func/sub-ON01016_ses-01_task-rest_dir-reverse_bold.nii.gz",
+   "category": "openneuro-ds005752",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.527,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006010/sub-206/anat/sub-206_T1w.nii.gz",
+   "category": "openneuro-ds006010",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.817,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006010/sub-206/func/sub-206_task-category_run-01_bold.nii.gz",
+   "category": "openneuro-ds006010",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 18.291,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006010/sub-206/func/sub-206_task-category_run-01_sbref.nii.gz",
+   "category": "openneuro-ds006010",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.181,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006248/sub-003/anat/sub-003_acq-CECor_T1w.nii",
+   "category": "openneuro-ds006248",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.214,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006736/sub-004/anat/sub-004_T1w.nii.gz",
+   "category": "openneuro-ds006736",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.966,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006736/sub-004/fmap/sub-004_dir-AP_epi.nii.gz",
+   "category": "openneuro-ds006736",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.069,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006736/sub-004/fmap/sub-004_dir-PA_epi.nii.gz",
+   "category": "openneuro-ds006736",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds006736/sub-004/func/sub-004_task-freeRecall_bold.nii.gz",
+   "category": "openneuro-ds006736",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.188,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds007694/sub-GRACE101/mrs/sub-GRACE101_mrsref.nii.gz",
+   "category": "openneuro-ds007694",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "openneuro/ds008719/sub-001/anat/sub-001_T1w.nii.gz",
+   "category": "openneuro-ds008719",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.264,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/complex128-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/complex128-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/complex64-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/complex64-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/float32-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/float32-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/float64-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/float64-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int16-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int16-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int32-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int32-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int64-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int64-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int8-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/int8-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/rgb24.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "RGB24 data are not supported by larmorx yet (larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/dtypes/rgb24.nii: data type code 128 is not supported'); nibabel: reads it)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/rgba32.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "RGBA32 data are not supported by larmorx yet (larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/dtypes/rgba32.nii: data type code 2304 is not supported'); nibabel: reads it)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint16-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint16-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint32-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint32-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint64-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint64-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint8-be.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/dtypes/uint8-le.nii",
+   "category": "synthetic/dtypes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/extensions-pair.hdr.gz",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/extensions.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/fix-bitpix.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/fix-negative-pixdim.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/fix-qfac-zero.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/fix-zero-pixdim.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/slice-timing.nii.gz",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/text-and-units.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/header/vox-offset-gap.nii",
+   "category": "synthetic/header",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/big-endian-nifti2.nii.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/gzip-content-named-nii.nii",
+   "category": "synthetic/layouts",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "larmorx detects gzip from the file content; nibabel from the file name (and fails) (larmorx: reads it; nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/layouts/gzip-content-named-nii.nii\"'))",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti1-pair-gz.hdr.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti1-pair.hdr",
+   "category": "synthetic/layouts",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti1-single-gz.nii.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti1-single.nii",
+   "category": "synthetic/layouts",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti2-pair-gz.hdr.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti2-pair.hdr",
+   "category": "synthetic/layouts",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti2-single-gz.nii.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/nifti2-single.nii",
+   "category": "synthetic/layouts",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/layouts/plain-content-named-gz.nii.gz",
+   "category": "synthetic/layouts",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "larmorx detects gzip from the file content; nibabel from the file name (and fails) (larmorx: reads it; nibabel: ImageFileError('File <larmorx-testdata>/data/synthetic/nifti/layouts/plain-content-named-gz.nii.gz is not a gzip file'))",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "synthetic/nifti/layouts/uppercase.HDR",
+   "category": "synthetic/layouts",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/malformed/bad-magic.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/bad-magic.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/bad-magic.nii: invalid magic string \"xyz\\\\0\"')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/extension-bad-size.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "nibabel: ValueError('read length must be non-negative or -1'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/extension-bad-size.nii: bad header extension: extension size 4 is smaller than its 8-byte header')",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/float128-datatype.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: HeaderDataError('data code 1536 not supported'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/float128-datatype.nii: data type code 1536 is not supported')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/ndim-8.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: HeaderDataError('vox offset 0 too low for single file nifti1'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/ndim-8.nii: vox_offset 0.00000000000000000000000000000000000000006323079060572872 is below the minimum 352 for a single-file image')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/negative-dim.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: OverflowError('memory mapped length must be positive'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/negative-dim.nii: dim[2] = -6 is negative')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/not-nifti.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/not-nifti.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/not-nifti.nii: not a NIfTI-1 or NIfTI-2 header (sizeof_hdr is neither 348 nor 540)')",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/truncated-data.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: OSError('Expected 420 bytes, got 410 bytes from <larmorx-testdata>/data/synthetic/nifti/malformed/truncated-data.nii\\n - could the file be damaged?'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-data.nii: expected 420 bytes of voxel data, found 410')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/truncated-gzip.nii.gz",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: OSError('Expected 32000 bytes, got 15945 bytes from object\\n - could the file be damaged?'); larmorx: OSError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-gzip.nii.gz: incomplete deflate stream')",
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/truncated-header.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-header.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-header.nii: file ends inside the header')",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/unknown-datatype.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: HeaderDataError('data code 999 not recognized'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/unknown-datatype.nii: data type code 999 is not supported')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/vox-offset-too-small.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: HeaderDataError('vox offset 300 too low for single file nifti1'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/vox-offset-too-small.nii: vox_offset 300 is below the minimum 352 for a single-file image')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/malformed/vox-offset-zero.nii",
+   "category": "synthetic/malformed",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "larmorx rejects a single file with vox_offset 0; nibabel reads the header bytes as voxel data (larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/vox-offset-zero.nii: vox_offset is 0 in a single-file image'); nibabel: reads it)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-ASR.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-LAS.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-LPI.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-LPS.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-PSL.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-RAS.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/axes-SLP.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/both-different.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/half-turn-qform.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/invalid-xform-codes.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/left-handed-qform.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/neither.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/qform-only.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/quaternion-not-unit.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: ValueError('w2 should be positive, but is -1.400000e-01'); larmorx: NiftiError('qform quaternion is not unit: 1 - (b\u00b2 + c\u00b2 + d\u00b2) = -1.4000000268220925e-1')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/orientation/quaternion-w2-above-threshold.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/quaternion-w2-below-threshold.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/sform-only.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/sheared-sform.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/xform-code-1.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/xform-code-2.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/xform-code-3.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/xform-code-4.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/orientation/xform-code-5.nii",
+   "category": "synthetic/orientation",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/complex64-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/float32-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/float64-inter-zero.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/int16-inter5.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/int16-slope-big-endian.nii.gz",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/int16-slope-inter.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/int16-slope2.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/int32-small-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/nifti2-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.004,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/slope-inf.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/slope-nan.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/slope-one-inter-nan.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "nibabel: HeaderDataError('Valid slope but invalid intercept nan'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/scaling/slope-one-inter-nan.nii: scl_slope is valid but scl_inter = NaN is not finite')",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "synthetic/nifti/scaling/slope-zero.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/uint64-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/scaling/uint8-negative-slope.nii",
+   "category": "synthetic/scaling",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/1d.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/2d.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/3d-singleton.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/4d-bold-like.nii.gz",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/4d-one-volume.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/4d-tr-msec.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/5d-vector.nii.gz",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/6d.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/7d.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/empty.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/freesurfer-ico7.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/freesurfer-large-vector.nii",
+   "category": "synthetic/shapes",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/nifti/shapes/nifti2-large-dim.nii.gz",
+   "category": "synthetic/shapes",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152Lin/tpl-MNI152Lin_res-02_T1w.nii.gz",
+   "category": "templateflow-MNI152Lin",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.263,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152Lin/tpl-MNI152Lin_res-02_desc-brain_mask.nii.gz",
+   "category": "templateflow-MNI152Lin",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.052,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_desc-brain_mask.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.42,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.54,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.312,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-brain_mask.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.141,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.36,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_label-CSF_probseg.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.26,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_label-GM_probseg.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.267,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_label-WM_probseg.nii.gz",
+   "category": "templateflow-MNI152NLin2009cAsym",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.253,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz",
+   "category": "templateflow-OASIS30ANTs",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.601,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_desc-BrainCerebellumExtraction_mask.nii.gz",
+   "category": "templateflow-OASIS30ANTs",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.846,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_desc-brain_mask.nii.gz",
+   "category": "templateflow-OASIS30ANTs",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.824,
+   "status": "pass"
+  },
+  {
+   "case": "templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_label-brain_probseg.nii.gz",
+   "category": "templateflow-OASIS30ANTs",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.701,
+   "status": "pass"
+  }
+ ],
+ "suite": "nifti-io",
+ "summary": {
+  "both-error": 17,
+  "expected-divergence": 5,
+  "fail": 0,
+  "pass": 230,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

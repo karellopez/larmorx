@@ -1,0 +1,3747 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "4fe591cf4057",
+  "larmorx_testdata_commit": "db846de5f34a",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "SimpleITK": "2.5.6",
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "best": 0.003745647147297859,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.0038616303354501724,
+   "operation": "read",
+   "seconds": [
+    0.003745647147297859,
+    0.003950629383325577,
+    0.0038616303354501724
+   ],
+   "throughput_mb_s": 251.7071587813411,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.003801017999649048,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.003879562020301819,
+   "operation": "read",
+   "seconds": [
+    0.00425838865339756,
+    0.003879562020301819,
+    0.003801017999649048
+   ],
+   "throughput_mb_s": 250.5437456376535,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.00395151786506176,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.004482511430978775,
+   "operation": "read",
+   "seconds": [
+    0.004482511430978775,
+    0.00395151786506176,
+    0.006088504567742348
+   ],
+   "throughput_mb_s": 216.84272644180624,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.02272692881524563,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.023304706439375877,
+   "operation": "read",
+   "seconds": [
+    0.02272692881524563,
+    0.023304706439375877,
+    0.023421037942171097
+   ],
+   "throughput_mb_s": 41.70831340564319,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.00416509248316288,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.004181267693638802,
+   "operation": "read float32",
+   "seconds": [
+    0.004181267693638802,
+    0.00416509248316288,
+    0.006175467744469643
+   ],
+   "throughput_mb_s": 232.46538399795793,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.02112944982945919,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.021524081006646156,
+   "operation": "read float32",
+   "seconds": [
+    0.02153872884809971,
+    0.021524081006646156,
+    0.02112944982945919
+   ],
+   "throughput_mb_s": 45.15872244208094,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.013197001069784164,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.013544829562306404,
+   "operation": "read",
+   "seconds": [
+    0.013840215280652046,
+    0.013197001069784164,
+    0.013544829562306404
+   ],
+   "throughput_mb_s": 71.76170032474654,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.020357539877295494,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 752427
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.020641760900616646,
+   "operation": "write",
+   "seconds": [
+    0.021056709811091423,
+    0.020641760900616646,
+    0.020357539877295494
+   ],
+   "throughput_mb_s": 47.089005859522516,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.010215243324637413,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 752427
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.015350740402936935,
+   "operation": "write",
+   "seconds": [
+    0.010215243324637413,
+    0.015350740402936935,
+    0.016584737226366997
+   ],
+   "throughput_mb_s": 63.319421375534105,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.011099107563495636,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 752427
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.01127881184220314,
+   "operation": "write",
+   "seconds": [
+    0.011099107563495636,
+    0.011290935799479485,
+    0.01127881184220314
+   ],
+   "throughput_mb_s": 86.17929030103714,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.027207234874367714,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 769290
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.027332192286849022,
+   "operation": "write",
+   "seconds": [
+    0.027332192286849022,
+    0.027207234874367714,
+    0.027799323201179504
+   ],
+   "throughput_mb_s": 35.562460186103735,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.024699846282601357,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 749066
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.025692354887723923,
+   "operation": "write",
+   "seconds": [
+    0.024699846282601357,
+    0.026586484163999557,
+    0.025692354887723923
+   ],
+   "throughput_mb_s": 37.83226583346129,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.012200675904750824,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 749351
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.013214126229286194,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.013214126229286194,
+    0.012200675904750824,
+    0.013727067038416862
+   ],
+   "throughput_mb_s": 73.55764453390618,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.06547508202493191,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 759490
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii.gz)",
+   "median": 0.06746233627200127,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.0680196788161993,
+    0.06547508202493191,
+    0.06746233627200127
+   ],
+   "throughput_mb_s": 14.408039414481511,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.000517653301358223,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0005263276398181915,
+   "operation": "read",
+   "seconds": [
+    0.000517653301358223,
+    0.0005271509289741516,
+    0.0005263276398181915
+   ],
+   "throughput_mb_s": 1846.7584190253742,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.0004362538456916809,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0004753880202770233,
+   "operation": "read",
+   "seconds": [
+    0.0004753880202770233,
+    0.0004362538456916809,
+    0.0005306936800479889
+   ],
+   "throughput_mb_s": 2044.6455496156286,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.0006331633776426315,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0006360486149787903,
+   "operation": "read",
+   "seconds": [
+    0.0006331633776426315,
+    0.0006360486149787903,
+    0.0006593950092792511
+   ],
+   "throughput_mb_s": 1528.1850743946866,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.0007646661251783371,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0008068885654211044,
+   "operation": "read",
+   "seconds": [
+    0.0009302645921707153,
+    0.0008068885654211044,
+    0.0007646661251783371
+   ],
+   "throughput_mb_s": 1204.6273074804649,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0008248016238212585,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0008725188672542572,
+   "operation": "read float32",
+   "seconds": [
+    0.0008880924433469772,
+    0.0008725188672542572,
+    0.0008248016238212585
+   ],
+   "throughput_mb_s": 1114.0160247294152,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.0008930694311857224,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0009318273514509201,
+   "operation": "read float32",
+   "seconds": [
+    0.0008930694311857224,
+    0.0011483225971460342,
+    0.0009318273514509201
+   ],
+   "throughput_mb_s": 1043.1116863939744,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.001377629116177559,
+   "data_bytes": 972000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0013897866010665894,
+   "operation": "read",
+   "seconds": [
+    0.0013897866010665894,
+    0.001377629116177559,
+    0.0014425013214349747
+   ],
+   "throughput_mb_s": 699.3879486635144,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.0011001266539096832,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 972352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.001342475414276123,
+   "operation": "write",
+   "seconds": [
+    0.001342475414276123,
+    0.00220642052590847,
+    0.0011001266539096832
+   ],
+   "throughput_mb_s": 724.0356059139546,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.0010650437325239182,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 972352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0010847151279449463,
+   "operation": "write",
+   "seconds": [
+    0.0010974481701850891,
+    0.0010650437325239182,
+    0.0010847151279449463
+   ],
+   "throughput_mb_s": 896.0878067972635,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.0011170394718647003,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 972352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0011258721351623535,
+   "operation": "write",
+   "seconds": [
+    0.0011170394718647003,
+    0.0011312179267406464,
+    0.0011258721351623535
+   ],
+   "throughput_mb_s": 863.3307190428292,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.0013301335275173187,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 972352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0013457536697387695,
+   "operation": "write",
+   "seconds": [
+    0.0013301335275173187,
+    0.0013457536697387695,
+    0.0013859514147043228
+   ],
+   "throughput_mb_s": 722.2718554344938,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0014223325997591019,
+   "data_bytes": 972000,
+   "extra": {
+    "output_bytes": 972352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_sbref (90\u00d790\u00d760 uint16, .nii)",
+   "median": 0.0014362726360559464,
+   "operation": "write",
+   "seconds": [
+    0.0017686542123556137,
+    0.0014362726360559464,
+    0.0014223325997591019
+   ],
+   "throughput_mb_s": 676.7517361252145,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.06413814425468445,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.06444599479436874,
+   "operation": "read",
+   "seconds": [
+    0.07050481252372265,
+    0.06413814425468445,
+    0.06444599479436874
+   ],
+   "throughput_mb_s": 264.71842128334555,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.06280742213129997,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.06408343650400639,
+   "operation": "read",
+   "seconds": [
+    0.06280742213129997,
+    0.06408343650400639,
+    0.06456205435097218
+   ],
+   "throughput_mb_s": 266.2160915626526,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.06278226897120476,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.06353414431214333,
+   "operation": "read",
+   "seconds": [
+    0.07136167772114277,
+    0.06278226897120476,
+    0.06353414431214333
+   ],
+   "throughput_mb_s": 268.51769524405637,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.1564368363469839,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.15736667066812515,
+   "operation": "read",
+   "seconds": [
+    0.15736667066812515,
+    0.16169390454888344,
+    0.1564368363469839
+   ],
+   "throughput_mb_s": 108.4094994675104,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.07218380086123943,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.08200128376483917,
+   "operation": "read float32",
+   "seconds": [
+    0.07218380086123943,
+    0.10640235617756844,
+    0.08200128376483917
+   ],
+   "throughput_mb_s": 208.04603558310473,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.1600373201072216,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.16093022003769875,
+   "operation": "read float32",
+   "seconds": [
+    0.16093022003769875,
+    0.16702799685299397,
+    0.1600373201072216
+   ],
+   "throughput_mb_s": 106.00893975043094,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0861878115683794,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.08662376552820206,
+   "operation": "read",
+   "seconds": [
+    0.09699433855712414,
+    0.08662376552820206,
+    0.0861878115683794
+   ],
+   "throughput_mb_s": 196.94412839217628,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.41305447556078434,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13872972
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.42352690547704697,
+   "operation": "write",
+   "seconds": [
+    0.43167610093951225,
+    0.41305447556078434,
+    0.42352690547704697
+   ],
+   "throughput_mb_s": 40.28089308938737,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.12171289697289467,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13872972
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.12387086264789104,
+   "operation": "write",
+   "seconds": [
+    0.12714410573244095,
+    0.12171289697289467,
+    0.12387086264789104
+   ],
+   "throughput_mb_s": 137.724414243356,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.08322574943304062,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13872972
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.08688246458768845,
+   "operation": "write",
+   "seconds": [
+    0.0976811870932579,
+    0.08322574943304062,
+    0.08688246458768845
+   ],
+   "throughput_mb_s": 196.3577124677638,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.49577477388083935,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13684901
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.49796635657548904,
+   "operation": "write",
+   "seconds": [
+    0.49577477388083935,
+    0.49796635657548904,
+    0.5498962216079235
+   ],
+   "throughput_mb_s": 34.25942691655272,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.4502857383340597,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13838925
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.4606361333280802,
+   "operation": "write",
+   "seconds": [
+    0.4502857383340597,
+    0.4606361333280802,
+    0.473315067589283
+   ],
+   "throughput_mb_s": 37.035831029454386,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.10037394426763058,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13840913
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.10077556408941746,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.10077556408941746,
+    0.10037394426763058,
+    0.10769008845090866
+   ],
+   "throughput_mb_s": 169.2874870426202,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.7864693570882082,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 13714132
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii.gz)",
+   "median": 0.8104594200849533,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.7864693570882082,
+    0.8104594200849533,
+    0.8421403206884861
+   ],
+   "throughput_mb_s": 21.049841086690986,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0033149737864732742,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.0034035835415124893,
+   "operation": "read",
+   "seconds": [
+    0.003489455208182335,
+    0.0033149737864732742,
+    0.0034035835415124893
+   ],
+   "throughput_mb_s": 5012.376453206973,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.0033546648919582367,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.003645576536655426,
+   "operation": "read",
+   "seconds": [
+    0.003645576536655426,
+    0.0036500263959169388,
+    0.0033546648919582367
+   ],
+   "throughput_mb_s": 4679.655420333447,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.0034182239323854446,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.003589341416954994,
+   "operation": "read",
+   "seconds": [
+    0.0037256404757499695,
+    0.0034182239323854446,
+    0.003589341416954994
+   ],
+   "throughput_mb_s": 4752.972765258099,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.003710659220814705,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.0038310457020998,
+   "operation": "read",
+   "seconds": [
+    0.003888562321662903,
+    0.003710659220814705,
+    0.0038310457020998
+   ],
+   "throughput_mb_s": 4453.103232532406,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.010810988023877144,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.01152779906988144,
+   "operation": "read float32",
+   "seconds": [
+    0.011903049424290657,
+    0.010810988023877144,
+    0.01152779906988144
+   ],
+   "throughput_mb_s": 1479.9045244093986,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.009297220036387444,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.009528947994112968,
+   "operation": "read float32",
+   "seconds": [
+    0.009528947994112968,
+    0.009562544524669647,
+    0.009297220036387444
+   ],
+   "throughput_mb_s": 1790.3384518983394,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.013245759531855583,
+   "data_bytes": 17060042,
+   "extra": {},
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.015160763636231422,
+   "operation": "read",
+   "seconds": [
+    0.013245759531855583,
+    0.021534042432904243,
+    0.015160763636231422
+   ],
+   "throughput_mb_s": 1125.2759035982629,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.012830095365643501,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 17060394
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.012949245050549507,
+   "operation": "write",
+   "seconds": [
+    0.013969430699944496,
+    0.012949245050549507,
+    0.012830095365643501
+   ],
+   "throughput_mb_s": 1317.4545646022852,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.013422729447484016,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 17060394
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.013624155893921852,
+   "operation": "write",
+   "seconds": [
+    0.01879989169538021,
+    0.013422729447484016,
+    0.013624155893921852
+   ],
+   "throughput_mb_s": 1252.1907509595512,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.013232655823230743,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 17060394
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.013503428548574448,
+   "operation": "write",
+   "seconds": [
+    0.013503428548574448,
+    0.013826752081513405,
+    0.013232655823230743
+   ],
+   "throughput_mb_s": 1263.385957028004,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.01416340284049511,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 17060394
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.01464327983558178,
+   "operation": "write",
+   "seconds": [
+    0.01464327983558178,
+    0.01416340284049511,
+    0.01511646993458271
+   ],
+   "throughput_mb_s": 1165.0424079546522,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.013728680089116096,
+   "data_bytes": 17060042,
+   "extra": {
+    "output_bytes": 17060394
+   },
+   "input": "tpl-MNI152NLin2009cAsym_res-01_T1w (193\u00d7229\u00d7193 int16, .nii)",
+   "median": 0.014064116403460503,
+   "operation": "write",
+   "seconds": [
+    0.01504085585474968,
+    0.013728680089116096,
+    0.014064116403460503
+   ],
+   "throughput_mb_s": 1213.0191126548373,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.2699860129505396,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.27236922457814217,
+   "operation": "read",
+   "seconds": [
+    0.2699860129505396,
+    0.28445132821798325,
+    0.27236922457814217
+   ],
+   "throughput_mb_s": 586.4979798926211,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.19783896952867508,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.1980349626392126,
+   "operation": "read",
+   "seconds": [
+    0.20278998464345932,
+    0.1980349626392126,
+    0.19783896952867508
+   ],
+   "throughput_mb_s": 806.6454421537045,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.18325552716851234,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.1840968243777752,
+   "operation": "read",
+   "seconds": [
+    0.18325552716851234,
+    0.1840968243777752,
+    0.18914516642689705
+   ],
+   "throughput_mb_s": 867.7173033261993,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.28079916909337044,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.2896925564855337,
+   "operation": "read",
+   "seconds": [
+    0.29190365225076675,
+    0.28079916909337044,
+    0.2896925564855337
+   ],
+   "throughput_mb_s": 551.4259735837468,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.17369761131703854,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.17633548937737942,
+   "operation": "read float32",
+   "seconds": [
+    0.17633548937737942,
+    0.17369761131703854,
+    0.17797281965613365
+   ],
+   "throughput_mb_s": 905.9095282749827,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.3024565577507019,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.30954307690262794,
+   "operation": "read float32",
+   "seconds": [
+    0.3126196153461933,
+    0.3024565577507019,
+    0.30954307690262794
+   ],
+   "throughput_mb_s": 516.0638758212325,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.2554066590964794,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.2554956264793873,
+   "operation": "read",
+   "seconds": [
+    0.2554066590964794,
+    0.26765110343694687,
+    0.2554956264793873
+   ],
+   "throughput_mb_s": 625.231837433772,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.9194058123975992,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 35020136
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.9214189555495977,
+   "operation": "write",
+   "seconds": [
+    0.9214189555495977,
+    0.9194058123975992,
+    0.9389316197484732
+   ],
+   "throughput_mb_s": 173.36739062929053,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.36027978733181953,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 35020136
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.37259052880108356,
+   "operation": "write",
+   "seconds": [
+    0.37259052880108356,
+    0.36027978733181953,
+    0.40748205222189426
+   ],
+   "throughput_mb_s": 428.738756495024,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.27162439562380314,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 35020136
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.27683928795158863,
+   "operation": "write",
+   "seconds": [
+    0.2965551018714905,
+    0.27683928795158863,
+    0.27162439562380314
+   ],
+   "throughput_mb_s": 577.0279254147435,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 1.3832732066512108,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 36658658
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 1.394878227263689,
+   "operation": "write",
+   "seconds": [
+    1.3832732066512108,
+    1.394878227263689,
+    1.3976697474718094
+   ],
+   "throughput_mb_s": 114.52182482865715,
+   "tool": "nibabel"
+  },
+  {
+   "best": 2.779166154563427,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 31756187
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 2.8062886521220207,
+   "operation": "write",
+   "seconds": [
+    2.779166154563427,
+    2.8062886521220207,
+    2.926577664911747
+   ],
+   "throughput_mb_s": 56.92358121435832,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.6126316599547863,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 31739110
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 0.6156239528208971,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.6126316599547863,
+    0.6156239528208971,
+    0.6359262336045504
+   ],
+   "throughput_mb_s": 259.48308097504156,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 4.913079507648945,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 32544882
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii.gz)",
+   "median": 4.932963889092207,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    4.936764081940055,
+    4.932963889092207,
+    4.913079507648945
+   ],
+   "throughput_mb_s": 32.38296561489669,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.08337379060685635,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.09541148319840431,
+   "operation": "read",
+   "seconds": [
+    0.11103332228958607,
+    0.08337379060685635,
+    0.09541148319840431
+   ],
+   "throughput_mb_s": 1674.2638794097647,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.0821481216698885,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.08506592363119125,
+   "operation": "read",
+   "seconds": [
+    0.0821481216698885,
+    0.08596557006239891,
+    0.08506592363119125
+   ],
+   "throughput_mb_s": 1877.8847413986864,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.0843617282807827,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.084853770211339,
+   "operation": "read",
+   "seconds": [
+    0.08607279136776924,
+    0.084853770211339,
+    0.0843617282807827
+   ],
+   "throughput_mb_s": 1882.5798736124211,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.10669000074267387,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.10845651663839817,
+   "operation": "read",
+   "seconds": [
+    0.11431501246988773,
+    0.10669000074267387,
+    0.10845651663839817
+   ],
+   "throughput_mb_s": 1472.8852165942042,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.09478318318724632,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.09637023322284222,
+   "operation": "read float32",
+   "seconds": [
+    0.09679222665727139,
+    0.09637023322284222,
+    0.09478318318724632
+   ],
+   "throughput_mb_s": 1657.6072782828605,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.12156013958156109,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.12401714734733105,
+   "operation": "read float32",
+   "seconds": [
+    0.12156013958156109,
+    0.1292861495167017,
+    0.12401714734733105
+   ],
+   "throughput_mb_s": 1288.0799423051544,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.2059925515204668,
+   "data_bytes": 159744000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.21334270760416985,
+   "operation": "read",
+   "seconds": [
+    0.2059925515204668,
+    0.21334270760416985,
+    0.22194970585405827
+   ],
+   "throughput_mb_s": 748.7670977551508,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.14640406891703606,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 159744352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.14922193996608257,
+   "operation": "write",
+   "seconds": [
+    0.14940223470330238,
+    0.14922193996608257,
+    0.14640406891703606
+   ],
+   "throughput_mb_s": 1070.5128216153003,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.148517943918705,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 159744352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.14860309287905693,
+   "operation": "write",
+   "seconds": [
+    0.1762237325310707,
+    0.148517943918705,
+    0.14860309287905693
+   ],
+   "throughput_mb_s": 1074.9708966690907,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.14564589224755764,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 159744352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.14995589666068554,
+   "operation": "write",
+   "seconds": [
+    0.14995589666068554,
+    0.14564589224755764,
+    0.15608110465109348
+   ],
+   "throughput_mb_s": 1065.2732140401429,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.14636673592031002,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 159744352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.1500538270920515,
+   "operation": "write",
+   "seconds": [
+    0.1500538270920515,
+    0.15349337458610535,
+    0.14636673592031002
+   ],
+   "throughput_mb_s": 1064.577979087491,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.14322691783308983,
+   "data_bytes": 159744000,
+   "extra": {
+    "output_bytes": 159744352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_T1w (208\u00d7300\u00d7320 float64, .nii)",
+   "median": 0.1441774033010006,
+   "operation": "write",
+   "seconds": [
+    0.14528971910476685,
+    0.14322691783308983,
+    0.1441774033010006
+   ],
+   "throughput_mb_s": 1107.9683524782372,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.1797617133706808,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.19076169468462467,
+   "operation": "read",
+   "seconds": [
+    0.20237419940531254,
+    0.1797617133706808,
+    0.19076169468462467
+   ],
+   "throughput_mb_s": 735.8820764938109,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.1298722680658102,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.13550020940601826,
+   "operation": "read",
+   "seconds": [
+    0.1298722680658102,
+    0.13550020940601826,
+    0.14476868510246277
+   ],
+   "throughput_mb_s": 1035.999225502046,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.12209478206932545,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.12221763469278812,
+   "operation": "read",
+   "seconds": [
+    0.12209478206932545,
+    0.12221763469278812,
+    0.12640632316470146
+   ],
+   "throughput_mb_s": 1148.5913006978155,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.19377069920301437,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.19827977195382118,
+   "operation": "read",
+   "seconds": [
+    0.19827977195382118,
+    0.20126372762024403,
+    0.19377069920301437
+   ],
+   "throughput_mb_s": 707.979995219551,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.11711563169956207,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.11763419769704342,
+   "operation": "read float32",
+   "seconds": [
+    0.11809721402823925,
+    0.11711563169956207,
+    0.11763419769704342
+   ],
+   "throughput_mb_s": 1193.3444079036567,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.21150768175721169,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.21166083216667175,
+   "operation": "read float32",
+   "seconds": [
+    0.21335067972540855,
+    0.21166083216667175,
+    0.21150768175721169
+   ],
+   "throughput_mb_s": 663.2219601662514,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.18891281075775623,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.18966575153172016,
+   "operation": "read",
+   "seconds": [
+    0.20204979181289673,
+    0.18891281075775623,
+    0.18966575153172016
+   ],
+   "throughput_mb_s": 740.1342143551036,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 1.0880931615829468,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 44604942
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 1.10749470628798,
+   "operation": "write",
+   "seconds": [
+    1.2098325323313475,
+    1.0880931615829468,
+    1.10749470628798
+   ],
+   "throughput_mb_s": 126.75285146103235,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.38703409396111965,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 44604942
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.39487479627132416,
+   "operation": "write",
+   "seconds": [
+    0.38703409396111965,
+    0.394879512488842,
+    0.39487479627132416
+   ],
+   "throughput_mb_s": 355.50030877013523,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.2975910995155573,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 44604942
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.3064210172742605,
+   "operation": "write",
+   "seconds": [
+    0.2975910995155573,
+    0.3064210172742605,
+    0.3089138772338629
+   ],
+   "throughput_mb_s": 458.1216825422758,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 1.9056441411376,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 46905256
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 1.9382078293710947,
+   "operation": "write",
+   "seconds": [
+    1.9056441411376,
+    1.9382078293710947,
+    1.9395895842462778
+   ],
+   "throughput_mb_s": 72.42675933547827,
+   "tool": "nibabel"
+  },
+  {
+   "best": 2.4795276280492544,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 40678540
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 2.503262560814619,
+   "operation": "write",
+   "seconds": [
+    2.4795276280492544,
+    2.503262560814619,
+    2.5294239837676287
+   ],
+   "throughput_mb_s": 56.07806156551062,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.5684662386775017,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 40689018
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 0.6163115911185741,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.5684662386775017,
+    0.622591145336628,
+    0.6163115911185741
+   ],
+   "throughput_mb_s": 227.77133194139813,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 5.013592844828963,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 42673163
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii.gz)",
+   "median": 5.093673238530755,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    5.013592844828963,
+    5.165431210771203,
+    5.093673238530755
+   ],
+   "throughput_mb_s": 27.559308464885227,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.07052497938275337,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.07101756520569324,
+   "operation": "read",
+   "seconds": [
+    0.07158032990992069,
+    0.07101756520569324,
+    0.07052497938275337
+   ],
+   "throughput_mb_s": 1976.6674849160604,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.07250587455928326,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.07424830831587315,
+   "operation": "read",
+   "seconds": [
+    0.07424830831587315,
+    0.0768428836017847,
+    0.07250587455928326
+   ],
+   "throughput_mb_s": 1890.6573790582822,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.07135655172169209,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.07205746881663799,
+   "operation": "read",
+   "seconds": [
+    0.07217400521039963,
+    0.07135655172169209,
+    0.07205746881663799
+   ],
+   "throughput_mb_s": 1948.141036666373,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.0911396685987711,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.09136529080569744,
+   "operation": "read",
+   "seconds": [
+    0.09188236482441425,
+    0.0911396685987711,
+    0.09136529080569744
+   ],
+   "throughput_mb_s": 1536.4490252489422,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.08598680980503559,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.09174879640340805,
+   "operation": "read float32",
+   "seconds": [
+    0.10884769447147846,
+    0.09174879640340805,
+    0.08598680980503559
+   ],
+   "throughput_mb_s": 1530.0267415255769,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.10792669840157032,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.10843932442367077,
+   "operation": "read float32",
+   "seconds": [
+    0.11822064407169819,
+    0.10792669840157032,
+    0.10843932442367077
+   ],
+   "throughput_mb_s": 1294.5314141901592,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.18034232407808304,
+   "data_bytes": 140378112,
+   "extra": {},
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.18459386378526688,
+   "operation": "read",
+   "seconds": [
+    0.18929061107337475,
+    0.18459386378526688,
+    0.18034232407808304
+   ],
+   "throughput_mb_s": 760.4700888827924,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.12405022792518139,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 140378464
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.13777727633714676,
+   "operation": "write",
+   "seconds": [
+    0.13777727633714676,
+    0.14796819724142551,
+    0.12405022792518139
+   ],
+   "throughput_mb_s": 1018.8771017398317,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.13243733905255795,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 140378464
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.13381317257881165,
+   "operation": "write",
+   "seconds": [
+    0.14363670907914639,
+    0.13381317257881165,
+    0.13243733905255795
+   ],
+   "throughput_mb_s": 1049.0604870557254,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.13345848582684994,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 140378464
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.13679533638060093,
+   "operation": "write",
+   "seconds": [
+    0.14328965172171593,
+    0.13345848582684994,
+    0.13679533638060093
+   ],
+   "throughput_mb_s": 1026.1907731227827,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.12992121651768684,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 140378464
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.14193848706781864,
+   "operation": "write",
+   "seconds": [
+    0.14193848706781864,
+    0.12992121651768684,
+    0.14841560646891594
+   ],
+   "throughput_mb_s": 989.0066809922167,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.11766565404832363,
+   "data_bytes": 140378112,
+   "extra": {
+    "output_bytes": 140378464
+   },
+   "input": "sub-16_acq-mp2rage_T1w (224\u00d7272\u00d7288 float64, .nii)",
+   "median": 0.1296592578291893,
+   "operation": "write",
+   "seconds": [
+    0.1296592578291893,
+    0.11766565404832363,
+    0.16944262199103832
+   ],
+   "throughput_mb_s": 1082.6694086505686,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.1496624108403921,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.1514387745410204,
+   "operation": "read",
+   "seconds": [
+    0.16609071008861065,
+    0.1514387745410204,
+    0.1496624108403921
+   ],
+   "throughput_mb_s": 425.02023801417846,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.14812232926487923,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.14936835505068302,
+   "operation": "read",
+   "seconds": [
+    0.14936835505068302,
+    0.14812232926487923,
+    0.16236571967601776
+   ],
+   "throughput_mb_s": 430.9115138756137,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.14944320544600487,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.16654073260724545,
+   "operation": "read",
+   "seconds": [
+    0.16654073260724545,
+    0.1672415044158697,
+    0.14944320544600487
+   ],
+   "throughput_mb_s": 386.4792894348045,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.21207267604768276,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.21221941336989403,
+   "operation": "read",
+   "seconds": [
+    0.22450310178101063,
+    0.21221941336989403,
+    0.21207267604768276
+   ],
+   "throughput_mb_s": 303.292441430954,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.15122283808887005,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.15204934030771255,
+   "operation": "read float32",
+   "seconds": [
+    0.15204934030771255,
+    0.15271421149373055,
+    0.15122283808887005
+   ],
+   "throughput_mb_s": 423.31353670947277,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.21255583502352238,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.21580402739346027,
+   "operation": "read float32",
+   "seconds": [
+    0.21255583502352238,
+    0.21580402739346027,
+    0.22888671420514584
+   ],
+   "throughput_mb_s": 298.2546006087674,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.22913248278200626,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.22986159846186638,
+   "operation": "read",
+   "seconds": [
+    0.22986159846186638,
+    0.22913248278200626,
+    0.2420420367270708
+   ],
+   "throughput_mb_s": 280.01434093689187,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.7993037030100822,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32210091
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.8057166840881109,
+   "operation": "write",
+   "seconds": [
+    0.8057166840881109,
+    0.7993037030100822,
+    0.809587275609374
+   ],
+   "throughput_mb_s": 79.88483454683094,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.25656699761748314,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32210091
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.2570847701281309,
+   "operation": "write",
+   "seconds": [
+    0.2570847701281309,
+    0.27408756129443645,
+    0.25656699761748314
+   ],
+   "throughput_mb_s": 250.36311551213532,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.1910520177334547,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32210091
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.19352575950324535,
+   "operation": "write",
+   "seconds": [
+    0.19352575950324535,
+    0.21583722718060017,
+    0.1910520177334547
+   ],
+   "throughput_mb_s": 332.58902672809626,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 1.3641985971480608,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32363090
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 1.372344009578228,
+   "operation": "write",
+   "seconds": [
+    1.3641985971480608,
+    1.4056101310998201,
+    1.372344009578228
+   ],
+   "throughput_mb_s": 46.90117313936583,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.9759380035102367,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32038137
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.9771241173148155,
+   "operation": "write",
+   "seconds": [
+    1.06903862580657,
+    0.9759380035102367,
+    0.9771241173148155
+   ],
+   "throughput_mb_s": 65.87141066262583,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.24423738196492195,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32044175
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 0.24722815677523613,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.24423738196492195,
+    0.24722815677523613,
+    0.25250503420829773
+   ],
+   "throughput_mb_s": 260.34471493680263,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 1.6006890088319778,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 32051275
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii.gz)",
+   "median": 1.606870125979185,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    1.6131326854228973,
+    1.6006890088319778,
+    1.606870125979185
+   ],
+   "throughput_mb_s": 40.05584705284001,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.03275790996849537,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.03305597975850105,
+   "operation": "read",
+   "seconds": [
+    0.03305597975850105,
+    0.03321625478565693,
+    0.03275790996849537
+   ],
+   "throughput_mb_s": 1947.1376879533354,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.03292081691324711,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.033056532964110374,
+   "operation": "read",
+   "seconds": [
+    0.033599451184272766,
+    0.03292081691324711,
+    0.033056532964110374
+   ],
+   "throughput_mb_s": 1947.1051023372859,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.03304561600089073,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.033445555716753006,
+   "operation": "read",
+   "seconds": [
+    0.033445555716753006,
+    0.03304561600089073,
+    0.03567594289779663
+   ],
+   "throughput_mb_s": 1924.4573044352064,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.042066579684615135,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.04362199828028679,
+   "operation": "read",
+   "seconds": [
+    0.04463404044508934,
+    0.042066579684615135,
+    0.04362199828028679
+   ],
+   "throughput_mb_s": 1475.506545721152,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.03419676795601845,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.03452011197805405,
+   "operation": "read float32",
+   "seconds": [
+    0.034997427836060524,
+    0.03452011197805405,
+    0.03419676795601845
+   ],
+   "throughput_mb_s": 1864.5520049563966,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.04234679974615574,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.04276784136891365,
+   "operation": "read float32",
+   "seconds": [
+    0.04234679974615574,
+    0.04276784136891365,
+    0.04311549663543701
+   ],
+   "throughput_mb_s": 1504.975279083975,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.09690273739397526,
+   "data_bytes": 64364544,
+   "extra": {},
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.10145791061222553,
+   "operation": "read",
+   "seconds": [
+    0.09690273739397526,
+    0.10145791061222553,
+    0.1076249722391367
+   ],
+   "throughput_mb_s": 634.3965060152161,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.0513484813272953,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 64364896
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.052456773817539215,
+   "operation": "write",
+   "seconds": [
+    0.052456773817539215,
+    0.0513484813272953,
+    0.06723249703645706
+   ],
+   "throughput_mb_s": 1227.0015732168292,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.05157937668263912,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 64364896
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.05412633344531059,
+   "operation": "write",
+   "seconds": [
+    0.05412633344531059,
+    0.06273332424461842,
+    0.05157937668263912
+   ],
+   "throughput_mb_s": 1189.1539644937177,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.049472345039248466,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 64364896
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.055589787662029266,
+   "operation": "write",
+   "seconds": [
+    0.059659168124198914,
+    0.049472345039248466,
+    0.055589787662029266
+   ],
+   "throughput_mb_s": 1157.848351415171,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.06775372475385666,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 64364896
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.06906574033200741,
+   "operation": "write",
+   "seconds": [
+    0.06906574033200741,
+    0.06775372475385666,
+    0.0713364128023386
+   ],
+   "throughput_mb_s": 931.93157259434,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.054998718202114105,
+   "data_bytes": 64364544,
+   "extra": {
+    "output_bytes": 64364896
+   },
+   "input": "tpl-OASIS30ANTs_res-01_T1w (216\u00d7291\u00d7256 float32, .nii)",
+   "median": 0.05661574937403202,
+   "operation": "write",
+   "seconds": [
+    0.059973280876874924,
+    0.05661574937403202,
+    0.054998718202114105
+   ],
+   "throughput_mb_s": 1136.8664145867886,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.25723690912127495,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.26019671000540257,
+   "operation": "read",
+   "seconds": [
+    0.26019671000540257,
+    0.2610515858978033,
+    0.25723690912127495
+   ],
+   "throughput_mb_s": 256.9083982599628,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.24404229037463665,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.2462338600307703,
+   "operation": "read",
+   "seconds": [
+    0.24656795524060726,
+    0.2462338600307703,
+    0.24404229037463665
+   ],
+   "throughput_mb_s": 271.47655481519314,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.25219883769750595,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.25266920402646065,
+   "operation": "read",
+   "seconds": [
+    0.25219883769750595,
+    0.25266920402646065,
+    0.2577944006770849
+   ],
+   "throughput_mb_s": 264.5621980627268,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.39651042968034744,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.4010130763053894,
+   "operation": "read",
+   "seconds": [
+    0.4010130763053894,
+    0.41546702943742275,
+    0.39651042968034744
+   ],
+   "throughput_mb_s": 166.69461409057203,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.27618984319269657,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.3052936755120754,
+   "operation": "read float32",
+   "seconds": [
+    0.34805488772690296,
+    0.3052936755120754,
+    0.27618984319269657
+   ],
+   "throughput_mb_s": 218.95874484748697,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.42444036342203617,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.4368794597685337,
+   "operation": "read float32",
+   "seconds": [
+    0.42444036342203617,
+    0.4376533590257168,
+    0.4368794597685337
+   ],
+   "throughput_mb_s": 153.00952815547006,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.293762581422925,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.2947738040238619,
+   "operation": "read",
+   "seconds": [
+    0.3097953125834465,
+    0.2947738040238619,
+    0.293762581422925
+   ],
+   "throughput_mb_s": 226.77293262663454,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 1.0543137714266777,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 39249075
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 1.085162265226245,
+   "operation": "write",
+   "seconds": [
+    1.0866729095578194,
+    1.085162265226245,
+    1.0543137714266777
+   ],
+   "throughput_mb_s": 61.60066760712802,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.37178751081228256,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 39249075
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.3803578391671181,
+   "operation": "write",
+   "seconds": [
+    0.37178751081228256,
+    0.4068685732781887,
+    0.3803578391671181
+   ],
+   "throughput_mb_s": 175.74692333507952,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.26421066746115685,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 39249075
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.26488954946398735,
+   "operation": "write",
+   "seconds": [
+    0.2914336808025837,
+    0.26421066746115685,
+    0.26488954946398735
+   ],
+   "throughput_mb_s": 252.35695456942912,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 1.2966614626348019,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 39380679
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 1.3100020717829466,
+   "operation": "write",
+   "seconds": [
+    1.3100020717829466,
+    1.2966614626348019,
+    1.343251932412386
+   ],
+   "throughput_mb_s": 51.027949832949425,
+   "tool": "nibabel"
+  },
+  {
+   "best": 1.650137884542346,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 38335447
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 1.6802806612104177,
+   "operation": "write",
+   "seconds": [
+    1.6802806612104177,
+    1.650137884542346,
+    1.6962385587394238
+   ],
+   "throughput_mb_s": 39.78306811663587,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.3801008928567171,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 38340131
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 0.38277532905340195,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.3801008928567171,
+    0.39099338836967945,
+    0.38277532905340195
+   ],
+   "throughput_mb_s": 174.63696044703562,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 5.128567092120647,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 38858879
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii.gz)",
+   "median": 5.193020356819034,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    5.21553024277091,
+    5.128567092120647,
+    5.193020356819034
+   ],
+   "throughput_mb_s": 12.872416321692743,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.03477737680077553,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.03496392443776131,
+   "operation": "read",
+   "seconds": [
+    0.03477737680077553,
+    0.03496392443776131,
+    0.0352532546967268
+   ],
+   "throughput_mb_s": 1911.8769152757072,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.034433918073773384,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.03453261777758598,
+   "operation": "read",
+   "seconds": [
+    0.034433918073773384,
+    0.03453261777758598,
+    0.035835642367601395
+   ],
+   "throughput_mb_s": 1935.7559403848054,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.034221919253468513,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.03424854390323162,
+   "operation": "read",
+   "seconds": [
+    0.03708809241652489,
+    0.034221919253468513,
+    0.03424854390323162
+   ],
+   "throughput_mb_s": 1951.8120299909301,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.043513016775250435,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.04481968842446804,
+   "operation": "read",
+   "seconds": [
+    0.043513016775250435,
+    0.04481968842446804,
+    0.04609997570514679
+   ],
+   "throughput_mb_s": 1491.4588286942871,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.06414048932492733,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.07067246362566948,
+   "operation": "read float32",
+   "seconds": [
+    0.06414048932492733,
+    0.07067246362566948,
+    0.07493705302476883
+   ],
+   "throughput_mb_s": 945.866559202842,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.06264269538223743,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.06276521272957325,
+   "operation": "read float32",
+   "seconds": [
+    0.06370623596012592,
+    0.06276521272957325,
+    0.06264269538223743
+   ],
+   "throughput_mb_s": 1065.0281755279332,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0698711946606636,
+   "data_bytes": 66846720,
+   "extra": {},
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.07007354125380516,
+   "operation": "read",
+   "seconds": [
+    0.0698711946606636,
+    0.07007354125380516,
+    0.0701245553791523
+   ],
+   "throughput_mb_s": 953.9509321768445,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.05679898522794247,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 66847072
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.057468924671411514,
+   "operation": "write",
+   "seconds": [
+    0.06346886046230793,
+    0.057468924671411514,
+    0.05679898522794247
+   ],
+   "throughput_mb_s": 1163.180281903788,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.052595946937799454,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 66847072
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.053770989179611206,
+   "operation": "write",
+   "seconds": [
+    0.061916470527648926,
+    0.052595946937799454,
+    0.053770989179611206
+   ],
+   "throughput_mb_s": 1243.1744518724017,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.054824791848659515,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 66847072
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.05829692259430885,
+   "operation": "write",
+   "seconds": [
+    0.054824791848659515,
+    0.05903460644185543,
+    0.05829692259430885
+   ],
+   "throughput_mb_s": 1146.659498052575,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.05466238409280777,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 66847072
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.05566937290132046,
+   "operation": "write",
+   "seconds": [
+    0.05566937290132046,
+    0.05466238409280777,
+    0.06798302568495274
+   ],
+   "throughput_mb_s": 1200.780905480874,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.0513702817261219,
+   "data_bytes": 66846720,
+   "extra": {
+    "output_bytes": 66847072
+   },
+   "input": "sub-01_task-mixedgamblestask_run-03_bold (64\u00d764\u00d734\u00d7240 int16, .nii)",
+   "median": 0.05951584316790104,
+   "operation": "write",
+   "seconds": [
+    0.0513702817261219,
+    0.05951584316790104,
+    0.06034502945840359
+   ],
+   "throughput_mb_s": 1123.175215907094,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.49309870041906834,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.513721227645874,
+   "operation": "read",
+   "seconds": [
+    0.49309870041906834,
+    0.56023920327425,
+    0.513721227645874
+   ],
+   "throughput_mb_s": 279.75153890091394,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.4942088611423969,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.5074646007269621,
+   "operation": "read",
+   "seconds": [
+    0.4942088611423969,
+    0.5162778086960316,
+    0.5074646007269621
+   ],
+   "throughput_mb_s": 283.20064846715195,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.5005342718213797,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.5030567236244678,
+   "operation": "read",
+   "seconds": [
+    0.5030567236244678,
+    0.5069333370774984,
+    0.5005342718213797
+   ],
+   "throughput_mb_s": 285.68210551795113,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.7237883899360895,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.7272343803197145,
+   "operation": "read",
+   "seconds": [
+    0.7272343803197145,
+    0.7307463195174932,
+    0.7237883899360895
+   ],
+   "throughput_mb_s": 197.61758779448627,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.5564955975860357,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.5705043748021126,
+   "operation": "read float32",
+   "seconds": [
+    0.5705043748021126,
+    0.5564955975860357,
+    0.5784962084144354
+   ],
+   "throughput_mb_s": 251.907453031976,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.7758408393710852,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.7822129968553782,
+   "operation": "read float32",
+   "seconds": [
+    0.7758408393710852,
+    0.78984035551548,
+    0.7822129968553782
+   ],
+   "throughput_mb_s": 183.7278395753517,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.5974918063730001,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.6404664423316717,
+   "operation": "read",
+   "seconds": [
+    0.6425569113343954,
+    0.6404664423316717,
+    0.5974918063730001
+   ],
+   "throughput_mb_s": 224.39006090123323,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 3.148775164037943,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 112384672
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 3.1756100356578827,
+   "operation": "write",
+   "seconds": [
+    3.185273488983512,
+    3.148775164037943,
+    3.1756100356578827
+   ],
+   "throughput_mb_s": 45.25565242151248,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 1.0998249612748623,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 112384672
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 1.1099228113889694,
+   "operation": "write",
+   "seconds": [
+    1.0998249612748623,
+    1.1099228113889694,
+    1.1403185781091452
+   ],
+   "throughput_mb_s": 129.48134998699086,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.7207480631768703,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 112384672
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.7262672334909439,
+   "operation": "write",
+   "seconds": [
+    0.7207480631768703,
+    0.7262672334909439,
+    0.7282758913934231
+   ],
+   "throughput_mb_s": 197.88074881088798,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 4.141675693914294,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 115466529
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 4.142802627757192,
+   "operation": "write",
+   "seconds": [
+    4.142802627757192,
+    4.2008435148745775,
+    4.141675693914294
+   ],
+   "throughput_mb_s": 34.690116067103894,
+   "tool": "nibabel"
+  },
+  {
+   "best": 3.604178361594677,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 112100701
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 3.655603591352701,
+   "operation": "write",
+   "seconds": [
+    3.713465491309762,
+    3.655603591352701,
+    3.604178361594677
+   ],
+   "throughput_mb_s": 39.31342674571032,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.9106183759868145,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 112112635
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 0.9492937512695789,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    0.9106183759868145,
+    0.9492937512695789,
+    0.9560674205422401
+   ],
+   "throughput_mb_s": 151.39076161388135,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 8.437169536948204,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 113823285
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii.gz)",
+   "median": 8.625347526744008,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    8.625347526744008,
+    8.704568622633815,
+    8.437169536948204
+   ],
+   "throughput_mb_s": 16.661856644546226,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.07342133112251759,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.07418657653033733,
+   "operation": "read",
+   "seconds": [
+    0.07342133112251759,
+    0.07478165440261364,
+    0.07418657653033733
+   ],
+   "throughput_mb_s": 1937.2009158723006,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.07434283755719662,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.07452738843858242,
+   "operation": "read",
+   "seconds": [
+    0.07434283755719662,
+    0.08506896160542965,
+    0.07452738843858242
+   ],
+   "throughput_mb_s": 1928.3421438876005,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.0731697827577591,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.07352214679121971,
+   "operation": "read",
+   "seconds": [
+    0.07356148399412632,
+    0.07352214679121971,
+    0.0731697827577591
+   ],
+   "throughput_mb_s": 1954.7076666314495,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.09421424008905888,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.09421904943883419,
+   "operation": "read",
+   "seconds": [
+    0.09421424008905888,
+    0.1048539113253355,
+    0.09421904943883419
+   ],
+   "throughput_mb_s": 1525.3210986096553,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.12479383684694767,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.1385069638490677,
+   "operation": "read float32",
+   "seconds": [
+    0.14900745078921318,
+    0.12479383684694767,
+    0.1385069638490677
+   ],
+   "throughput_mb_s": 1037.5962334760784,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.13352412730455399,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.1365219447761774,
+   "operation": "read float32",
+   "seconds": [
+    0.13352412730455399,
+    0.1365219447761774,
+    0.13710950687527657
+   ],
+   "throughput_mb_s": 1052.6828066770818,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.14509112760424614,
+   "data_bytes": 143714304,
+   "extra": {},
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.14581003412604332,
+   "operation": "read",
+   "seconds": [
+    0.14766820147633553,
+    0.14509112760424614,
+    0.14581003412604332
+   ],
+   "throughput_mb_s": 985.6269828163424,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.13487316854298115,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 143714656
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.1371713951230049,
+   "operation": "write",
+   "seconds": [
+    0.13487316854298115,
+    0.1371713951230049,
+    0.13785887323319912
+   ],
+   "throughput_mb_s": 1047.6987849480417,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.12182622030377388,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 143714656
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.1372087337076664,
+   "operation": "write",
+   "seconds": [
+    0.12182622030377388,
+    0.1372087337076664,
+    0.14075778797268867
+   ],
+   "throughput_mb_s": 1047.41367489182,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.13441486842930317,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 143714656
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.13570976629853249,
+   "operation": "write",
+   "seconds": [
+    0.13570976629853249,
+    0.13952342048287392,
+    0.13441486842930317
+   ],
+   "throughput_mb_s": 1058.982768298777,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.1389020811766386,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 143714656
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.14457040093839169,
+   "operation": "write",
+   "seconds": [
+    0.1389020811766386,
+    0.14817332103848457,
+    0.14457040093839169
+   ],
+   "throughput_mb_s": 994.0783387689676,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.13212645798921585,
+   "data_bytes": 143714304,
+   "extra": {
+    "output_bytes": 143714656
+   },
+   "input": "sub-206_task-category_run-01_bold (96\u00d796\u00d769\u00d7113 uint16, .nii)",
+   "median": 0.13714495487511158,
+   "operation": "write",
+   "seconds": [
+    0.13714495487511158,
+    0.13212645798921585,
+    0.1389391776174307
+   ],
+   "throughput_mb_s": 1047.9007713471535,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 2.62326424010098,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 2.6300307400524616,
+   "operation": "read",
+   "seconds": [
+    2.62326424010098,
+    2.6414295379072428,
+    2.6300307400524616
+   ],
+   "throughput_mb_s": 240.22532907254055,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 2.6352700237184763,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 2.6428230609744787,
+   "operation": "read",
+   "seconds": [
+    2.6352700237184763,
+    2.6428230609744787,
+    2.770824084058404
+   ],
+   "throughput_mb_s": 239.06254237354756,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 2.5941144060343504,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 2.615463411435485,
+   "operation": "read",
+   "seconds": [
+    2.615463411435485,
+    2.6420351155102253,
+    2.5941144060343504
+   ],
+   "throughput_mb_s": 241.56331043959796,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 3.1945373248308897,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 3.2491668984293938,
+   "operation": "read",
+   "seconds": [
+    3.1945373248308897,
+    3.2491668984293938,
+    3.4847720451653004
+   ],
+   "throughput_mb_s": 194.44984506810164,
+   "tool": "nibabel"
+  },
+  {
+   "best": 2.9389082863926888,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 2.95247295871377,
+   "operation": "read float32",
+   "seconds": [
+    2.9389082863926888,
+    3.0387061834335327,
+    2.95247295871377
+   ],
+   "throughput_mb_s": 213.99010552673798,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.391149889677763,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 3.426321651786566,
+   "operation": "read float32",
+   "seconds": [
+    3.4952102210372686,
+    3.391149889677763,
+    3.426321651786566
+   ],
+   "throughput_mb_s": 184.39599786860768,
+   "tool": "nibabel"
+  },
+  {
+   "best": 3.0071774162352085,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 3.036780573427677,
+   "operation": "read",
+   "seconds": [
+    3.0071774162352085,
+    3.036780573427677,
+    3.0436527766287327
+   ],
+   "throughput_mb_s": 208.04927610784674,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 13.136569267138839,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 465396914
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 14.06906128488481,
+   "operation": "write",
+   "seconds": [
+    13.136569267138839,
+    18.88996689207852,
+    14.06906128488481
+   ],
+   "throughput_mb_s": 44.90704725828286,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 5.024923400953412,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 465396914
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 5.1888147965073586,
+   "operation": "write",
+   "seconds": [
+    5.1888147965073586,
+    5.024923400953412,
+    5.215998264029622
+   ],
+   "throughput_mb_s": 121.76190995008545,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 3.65657664462924,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 465396914
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 3.6724448557943106,
+   "operation": "write",
+   "seconds": [
+    3.65657664462924,
+    3.6724448557943106,
+    3.7246035747230053
+   ],
+   "throughput_mb_s": 172.037981456184,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 17.195684852078557,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 472029622
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 17.56492736376822,
+   "operation": "write",
+   "seconds": [
+    17.56492736376822,
+    17.195684852078557,
+    19.3302243296057
+   ],
+   "throughput_mb_s": 35.969405788903835,
+   "tool": "nibabel"
+  },
+  {
+   "best": 15.366447230800986,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 462539708
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 15.413398291915655,
+   "operation": "write",
+   "seconds": [
+    15.366447230800986,
+    15.413398291915655,
+    17.36264994367957
+   ],
+   "throughput_mb_s": 40.990311677819925,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 3.8130749985575676,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 462595132
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 3.861040296033025,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    3.8659367598593235,
+    3.861040296033025,
+    3.8130749985575676
+   ],
+   "throughput_mb_s": 163.6346558333345,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 41.4985479041934,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 465716007
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii.gz)",
+   "median": 41.55137595720589,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    41.4985479041934,
+    41.55137595720589,
+    41.68671308644116
+   ],
+   "throughput_mb_s": 15.205272640085278,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.29679261334240437,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.2979834023863077,
+   "operation": "read",
+   "seconds": [
+    0.2979834023863077,
+    0.29679261334240437,
+    0.30797499418258667
+   ],
+   "throughput_mb_s": 2120.2523192245794,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.2938569113612175,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.29555150493979454,
+   "operation": "read",
+   "seconds": [
+    0.29555150493979454,
+    0.2986430935561657,
+    0.2938569113612175
+   ],
+   "throughput_mb_s": 2137.698470284227,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.2942743096500635,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.29600113816559315,
+   "operation": "read",
+   "seconds": [
+    0.32064586877822876,
+    0.2942743096500635,
+    0.29600113816559315
+   ],
+   "throughput_mb_s": 2134.4512521656234,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.3999111447483301,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.40713514760136604,
+   "operation": "read",
+   "seconds": [
+    0.3999111447483301,
+    0.40713514760136604,
+    0.40885976143181324
+   ],
+   "throughput_mb_s": 1551.8188584853099,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.582482073456049,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.6002555135637522,
+   "operation": "read float32",
+   "seconds": [
+    0.6002555135637522,
+    0.6154288053512573,
+    0.582482073456049
+   ],
+   "throughput_mb_s": 1052.5517645793311,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.5697399340569973,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.5785520952194929,
+   "operation": "read float32",
+   "seconds": [
+    0.5697399340569973,
+    0.5785520952194929,
+    0.5842767301946878
+   ],
+   "throughput_mb_s": 1092.036491131029,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.6422942094504833,
+   "data_bytes": 631800000,
+   "extra": {},
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.655818834900856,
+   "operation": "read",
+   "seconds": [
+    0.655818834900856,
+    0.6591690238565207,
+    0.6422942094504833
+   ],
+   "throughput_mb_s": 963.3758080392931,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 0.5755166504532099,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 631800352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.5853369068354368,
+   "operation": "write",
+   "seconds": [
+    0.5755166504532099,
+    0.5853369068354368,
+    0.6201620120555162
+   ],
+   "throughput_mb_s": 1079.378376148808,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.5666140466928482,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 631800352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.583567202091217,
+   "operation": "write",
+   "seconds": [
+    0.609953910112381,
+    0.5666140466928482,
+    0.583567202091217
+   ],
+   "throughput_mb_s": 1082.651659887568,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.57187195494771,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 631800352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.5812173690646887,
+   "operation": "write",
+   "seconds": [
+    0.57187195494771,
+    0.6186602208763361,
+    0.5812173690646887
+   ],
+   "throughput_mb_s": 1087.028766908171,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.6199829522520304,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 631800352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.6295539475977421,
+   "operation": "write",
+   "seconds": [
+    0.6295539475977421,
+    0.6199829522520304,
+    0.6417814083397388
+   ],
+   "throughput_mb_s": 1003.5676885369846,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.5743492692708969,
+   "data_bytes": 631800000,
+   "extra": {
+    "output_bytes": 631800352
+   },
+   "input": "sub-f1031ax_ses-wave1bas_task-Cuedts_acq-mb4AP_run-1_bold (90\u00d790\u00d760\u00d7650 int16, .nii)",
+   "median": 0.5879459530115128,
+   "operation": "write",
+   "seconds": [
+    0.5923199336975813,
+    0.5743492692708969,
+    0.5879459530115128
+   ],
+   "throughput_mb_s": 1074.5885684965817,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 3.8811678905040026,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 3.912922853603959,
+   "operation": "read",
+   "seconds": [
+    3.931380659341812,
+    3.912922853603959,
+    3.8811678905040026
+   ],
+   "throughput_mb_s": 351.72070891518166,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 3.854350794106722,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 3.9129689671099186,
+   "operation": "read",
+   "seconds": [
+    3.854350794106722,
+    3.9129689671099186,
+    3.9625049587339163
+   ],
+   "throughput_mb_s": 351.7165639615306,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 3.9106069207191467,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 3.956101670861244,
+   "operation": "read",
+   "seconds": [
+    3.956101670861244,
+    3.9106069207191467,
+    4.080804949626327
+   ],
+   "throughput_mb_s": 347.8818580768145,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 5.716530600562692,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 5.7379456870257854,
+   "operation": "read",
+   "seconds": [
+    5.7717489246279,
+    5.716530600562692,
+    5.7379456870257854
+   ],
+   "throughput_mb_s": 239.85169520023297,
+   "tool": "nibabel"
+  },
+  {
+   "best": 4.561668269336224,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 4.5733571369200945,
+   "operation": "read float32",
+   "seconds": [
+    4.624978361651301,
+    4.5733571369200945,
+    4.561668269336224
+   ],
+   "throughput_mb_s": 300.9290459495654,
+   "tool": "larmorx"
+  },
+  {
+   "best": 6.071872016415,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 6.0973593685775995,
+   "operation": "read float32",
+   "seconds": [
+    6.0973593685775995,
+    6.071872016415,
+    6.188943279907107
+   ],
+   "throughput_mb_s": 225.7134468885758,
+   "tool": "nibabel"
+  },
+  {
+   "best": 4.637533728033304,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 4.714008716866374,
+   "operation": "read",
+   "seconds": [
+    4.714008716866374,
+    4.637533728033304,
+    4.72275678627193
+   ],
+   "throughput_mb_s": 291.95024503791393,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 18.591657642275095,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 645158955
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 18.66775320097804,
+   "operation": "write",
+   "seconds": [
+    18.786673353984952,
+    18.591657642275095,
+    18.66775320097804
+   ],
+   "throughput_mb_s": 73.72370874969009,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 6.069871397688985,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 645158955
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 6.993887858465314,
+   "operation": "write",
+   "seconds": [
+    6.993887858465314,
+    7.074343854561448,
+    6.069871397688985
+   ],
+   "throughput_mb_s": 196.77982087376438,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 4.668620828539133,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 645158955
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 4.671652702614665,
+   "operation": "write",
+   "seconds": [
+    4.671652702614665,
+    4.668620828539133,
+    4.8616102412343025
+   ],
+   "throughput_mb_s": 294.5972416206639,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 23.497321642935276,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 645889225
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 24.398497000336647,
+   "operation": "write",
+   "seconds": [
+    23.497321642935276,
+    24.907713120803237,
+    24.398497000336647
+   ],
+   "throughput_mb_s": 56.4074090293763,
+   "tool": "nibabel"
+  },
+  {
+   "best": 41.53020179271698,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 598021091
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 42.10261574015021,
+   "operation": "write",
+   "seconds": [
+    41.53020179271698,
+    42.18841855786741,
+    42.10261574015021
+   ],
+   "throughput_mb_s": 32.68813530479923,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 8.71461977250874,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 597910140
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 8.722836589440703,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    8.722836589440703,
+    8.71461977250874,
+    8.897061709314585
+   ],
+   "throughput_mb_s": 157.77619881885735,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 100.92490374483168,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 605630707
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii.gz)",
+   "median": 102.38447019830346,
+   "operation": "write (gzip level 6)",
+   "seconds": [
+    100.92490374483168,
+    102.38447019830346,
+    102.57273646816611
+   ],
+   "throughput_mb_s": 13.442038595642458,
+   "tool": "nibabel"
+  },
+  {
+   "best": 0.6234937943518162,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 0.627971388399601,
+   "operation": "read",
+   "seconds": [
+    0.627971388399601,
+    0.6234937943518162,
+    0.6288947891443968
+   ],
+   "throughput_mb_s": 2191.5902944358963,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 0.6402115263044834,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 0.6851999796926975,
+   "operation": "read",
+   "seconds": [
+    0.6851999796926975,
+    0.6402115263044834,
+    0.7147857248783112
+   ],
+   "throughput_mb_s": 2008.5464693347355,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 0.6079640537500381,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 0.6130025386810303,
+   "operation": "read",
+   "seconds": [
+    0.6189669091254473,
+    0.6130025386810303,
+    0.6079640537500381
+   ],
+   "throughput_mb_s": 2245.10652592276,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 0.8795618321746588,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 0.8815757557749748,
+   "operation": "read",
+   "seconds": [
+    0.8826538063585758,
+    0.8795618321746588,
+    0.8815757557749748
+   ],
+   "throughput_mb_s": 1561.1318607442445,
+   "tool": "nibabel"
+  },
+  {
+   "best": 1.2948512714356184,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 1.3380208630114794,
+   "operation": "read float32",
+   "seconds": [
+    1.3380208630114794,
+    1.3423391189426184,
+    1.2948512714356184
+   ],
+   "throughput_mb_s": 1028.5758899920775,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.2585663553327322,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 1.2649148479104042,
+   "operation": "read float32",
+   "seconds": [
+    1.2709570918232203,
+    1.2585663553327322,
+    1.2649148479104042
+   ],
+   "throughput_mb_s": 1088.0226461674695,
+   "tool": "nibabel"
+  },
+  {
+   "best": 1.3755887914448977,
+   "data_bytes": 1376256000,
+   "extra": {},
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 1.3842876628041267,
+   "operation": "read",
+   "seconds": [
+    1.3755887914448977,
+    1.3900486659258604,
+    1.3842876628041267
+   ],
+   "throughput_mb_s": 994.1979813734256,
+   "tool": "SimpleITK"
+  },
+  {
+   "best": 3.345624728128314,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 1376256352
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 3.421800961717963,
+   "operation": "write",
+   "seconds": [
+    3.4639859944581985,
+    3.421800961717963,
+    3.345624728128314
+   ],
+   "throughput_mb_s": 402.20223659912455,
+   "tool": "larmorx (threads=1)"
+  },
+  {
+   "best": 3.192960187792778,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 1376256352
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 3.274873849004507,
+   "operation": "write",
+   "seconds": [
+    3.192960187792778,
+    3.274873849004507,
+    3.2841472681611776
+   ],
+   "throughput_mb_s": 420.2470273529324,
+   "tool": "larmorx (threads=4)"
+  },
+  {
+   "best": 2.955527486279607,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 1376256352
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 3.2779906038194895,
+   "operation": "write",
+   "seconds": [
+    2.955527486279607,
+    3.489074271172285,
+    3.2779906038194895
+   ],
+   "throughput_mb_s": 419.8474511782911,
+   "tool": "larmorx (threads=all)"
+  },
+  {
+   "best": 3.3384170904755592,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 1376256352
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 3.3936588522046804,
+   "operation": "write",
+   "seconds": [
+    3.3936588522046804,
+    3.3384170904755592,
+    3.4893581736832857
+   ],
+   "throughput_mb_s": 405.5375215767252,
+   "tool": "nibabel"
+  },
+  {
+   "best": 1.2681562583893538,
+   "data_bytes": 1376256000,
+   "extra": {
+    "output_bytes": 1376256352
+   },
+   "input": "sub-16_task-rest_bold (160\u00d7160\u00d796\u00d7280 int16, .nii)",
+   "median": 1.2736377120018005,
+   "operation": "write",
+   "seconds": [
+    1.3178120721131563,
+    1.2681562583893538,
+    1.2736377120018005
+   ],
+   "throughput_mb_s": 1080.571018768683,
+   "tool": "SimpleITK"
+  }
+ ],
+ "tier": "full"
+}

@@ -167,6 +167,19 @@ ported.
   The `tshift` implementation already under way follows the stricter clean-room process,
   which satisfies this.
 
+## 2026-10-09: D7 decided (not commercial); read-never-translate for every restricted upstream
+- **User decision: larmorx is not commercial (D7).** FSL and MSM binaries may now be run as
+  validation oracles under their non-commercial licences.
+- **The AFNI rule now covers FSL, Workbench and MSM** (user direction: "a port with our own
+  code when the licence does not allow it, but we need to see the source code"). Their source
+  may be read. The implementation is original, never a translation. This replaces the
+  earlier strict clean-room rule for FSL and Workbench.
+- **Why the line against translating stays.** larmorx is Apache-2.0, so others may use it
+  commercially. Code derived from non-commercial (FSL, MSM) or GPL (Workbench, AFNI MCW)
+  sources cannot be part of it, whatever larmorx's own use.
+- **MSM's optimiser is patent-encumbered.** Patents cover the method, however it is coded,
+  so it is still not implemented.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |
@@ -177,7 +190,7 @@ ported.
 | D4 | Names of clean-room tools | neutral names with documented compatibility | open |
 | D5 | FreeSurfer version to port | v8.2.0, also validated against 7.4.x | open |
 | D6 | FreeSurfer atlas data | download at first use after licence acceptance | open |
-| D7 | Commercial project or users? | unknown. Until answered, do not run FSL/MSM binaries | open |
+| D7 | Commercial project or users? | **not commercial**; FSL/MSM binaries may be run as oracles | **decided 2026-10-09** |
 | D8 | Output compatibility | fMRIPrep-compatible derivative names and confound columns | open |
 | D9 | Minimum Python | 3.12 | open |
 | D10 | First milestone | M1 Preview (pipeline on x64 with interim ANTsPy) | open |

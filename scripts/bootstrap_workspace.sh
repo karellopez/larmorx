@@ -3,7 +3,7 @@
 #
 # The workspace root is the directory that contains this repo (larmorx/). Upstream
 # repositories from upstream.tsv are shallow-cloned at their pinned commits next to it
-# (or under reference_src/ for clean-room-restricted sources).
+# (or under reference_src/ for licence-restricted sources).
 #
 # Usage:
 #   larmorx/scripts/bootstrap_workspace.sh [options]
@@ -88,16 +88,17 @@ for pid in "${pids[@]}"; do wait "$pid" || fail=1; done
 
 if [[ -d "$WS_DIR/reference_src" ]]; then
   cat > "$WS_DIR/reference_src/DO_NOT_READ.md" <<'EOF'
-# Clean-room restricted sources
+# Licence-restricted sources
 
-These repositories are kept only for licence review. Do NOT read them while designing or
-implementing larmorx tools (including when using AI assistants):
+These repositories are licence-restricted:
 
-- workbench/  (GPL-2.0-or-later): lx.mri.surfmap is a clean-room re-implementation.
-- MSM_HOCR/   (non-commercial; patent-encumbered optimiser).
+- workbench/  (GPL-2.0-or-later)
+- MSM_HOCR/   (non-commercial; the optimiser is patented: do not implement it)
 
-Implement only from specs/<tool>.md, published papers, official documentation and
-black-box runs. See larmorx/CLAUDE.md and PLAN.md §12.
+They may be read to understand behaviour (CLAUDE.md rule 1, decided 2026-10-09). larmorx's
+code must be an original implementation, never a translation of theirs, even renamed.
+Record the behaviour in specs/<tool>.md and validate against the upstream binaries. See
+larmorx/CLAUDE.md and PLAN.md §12.
 EOF
 fi
 

@@ -503,7 +503,7 @@ def bold_pipeline(run, anat, fmap, s):
 | SciPy / scikit-image / nitransforms / sdcflows code | references for interpolation, morphology, transforms, B-spline fit | CI: all targets |
 | AFNI binaries | `afni.*` references (fixtures; the binaries themselves run only on Linux/macOS) | fixture generation on Linux |
 | FreeSurfer (pinned, Docker) | step-level intermediates for the port; variability band | fixture generation on Linux |
-| FSL binaries | black-box behaviour for clean-room specs and comparisons (only under licence terms that allow it, D7) | fixture generation on Linux |
+| FSL binaries | black-box behaviour for specs and comparisons (non-commercial use, D7 decided) | fixture generation on Linux |
 | fMRIPrep (pinned, Docker) | end-to-end derivatives and intermediates | fixture generation on Linux x64 |
 
 - Fixtures are content-addressed in object storage or GitHub Releases, never in git.
@@ -545,16 +545,17 @@ def bold_pipeline(run, anat, fmap, s):
 | AFNI | public domain (NIH) + **GPL-2 for code copyrighted by the Medical College of Wisconsin** (most of the older core, e.g. 3dTshift, csfft, mrilib) + other third-party exceptions | NIH files: **port** after a per-routine check; MCW GPL-2 files: **read, then implement originally** (no translation; decided 2026-10-09) |
 | FreeSurfer | FreeSurfer Software License v1.0 | **port** into `larmorx-freesurfer` only; carry the licence and preface; audit third-party files; atlases per D6 |
 | sdcflows / fMRIPrep / nitransforms code | Apache-2.0 / MIT | may port with attribution |
-| FSL | non-commercial | **clean-room only**: never read the source (not cloned) |
-| Connectome Workbench | GPL-2.0-or-later | **clean-room only**: implement from the documentation; never read the source |
-| MSM_HOCR | non-commercial; patent-encumbered optimiser | avoid; fsaverage-based fsLR registration for now |
+| FSL | non-commercial | **read, never translate**: source may be read; original implementation only (decided 2026-10-09) |
+| Connectome Workbench | GPL-2.0-or-later | **read, never translate**: source may be read; original implementation only (decided 2026-10-09) |
+| MSM_HOCR | non-commercial; patent-encumbered optimiser | may be read and run as an oracle; do not implement the patented optimiser; fsaverage-based fsLR registration for now |
 | tedana | LGPL-2.1 | implement from the published equations; tedana is a test oracle only |
 | Our own code | **Apache-2.0** (D2) | – |
 
-**Clean-room practice:**
-- Move the `workbench/` and `MSM_HOCR/` clones to `reference_src/`, outside the working tree.
-- Implementers of clean-room tools, including AI assistants, must not consult them.
-- `specs/<tool>.md` is the only input besides published papers and documentation.
+**Licence-restricted sources** (FSL, Workbench, MSM_HOCR, AFNI's MCW GPL-2 files):
+- The clones stay outside the working tree (`reference_src/`).
+- They may be read to understand behaviour. The implementation is original, never a
+  translation. Decision of 2026-10-09; it replaced the earlier strict clean-room rule.
+- `specs/<tool>.md` records the behaviour, and validation compares with the upstream binary.
 
 **Naming:**
 - larmorprepx and larmorx must not present themselves as fMRIPrep, ANTs, FreeSurfer, AFNI or FSL.
@@ -597,7 +598,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | ANTs parity (MI sampling, optimiser scales, SyN regularisation) | ANTsPy in-process oracle on every PR; deterministic configurations first; variability bands for stochastic ones |
 | FreeSurfer port subtleties | Step-level oracle; mixed mode; profiling before optimising |
 | "Same results" disputes | Published variability-band methodology and metrics per tool; status labels (`experimental` / `validated` / `stable`) |
-| Licence contamination | Clean-room practice; PROVENANCE; `cargo deny`; separate FreeSurfer wheel |
+| Licence contamination | Read-never-translate rule for restricted sources; PROVENANCE; `cargo deny`; separate FreeSurfer wheel |
 | API sprawl (three interfaces per tool) | CLI parsing written once in Rust; Python wrappers and stubs partly generated; CI enforces the per-tool contract |
 | Windows/ARM-specific bugs | All six targets in CI from day one; deep-path and spaces-in-path tests |
 
@@ -632,7 +633,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | D4 | Names for clean-room tools | **Neutral names** (`mri.hmc`, `mri.brain_mask`, `mri.pepolar`, …) with documented compatibility ("accepts mcflirt-style options"), not the FSL/Workbench program names |
 | D5 | FreeSurfer version to port | **v8.2.0**, also validated against 7.4.x |
 | D6 | FreeSurfer atlas data | **Download at first use after licence acceptance**, until MGH confirms whether bundling is allowed |
-| D7 | Is the project (or its main users) commercial? | Determines whether FSL and MSM binaries may be run, even for validation, and frames the FreeSurfer licence questions |
+| D7 | Is the project (or its main users) commercial? | **Decided 2026-10-09: not commercial.** FSL and MSM binaries may be run as validation oracles. larmorx itself stays Apache-2.0, so others may use it commercially |
 | D8 | Output compatibility | **fMRIPrep-compatible derivative names and confound columns** |
 | D9 | Minimum Python | **3.12** |
 | D10 | First milestone | **M1 Preview** (pipeline usable early on x64 with interim ANTsPy), while the ANTs port proceeds |

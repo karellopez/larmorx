@@ -27,7 +27,13 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 ## Status (2026-10-09)
 - **Phase L0 done:** a buildable, tested skeleton, CI green on all six targets.
-- **Phase L1 started:** `Image`/`Affine` (Rust + Python) and NIfTI-1/2 I/O, validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`). Conventions every tool follows are in `docs/architecture.md`. Next: PLAN.md §15 step 6 (`Transform` + `lx.ants.apply_transforms`).
+- **Phase L1 in progress:**
+  - `Image`/`Affine` and NIfTI-1/2 I/O: validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`).
+  - **antsApplyTransforms (A1) done:** `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms`, `lx.transforms`, crates `larmorx-transform`, `-interp`, `-ants`. It is validated against ANTs itself: 83 cases, 61 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`), and benchmarked (`docs/benchmarks/ants-apply-transforms.md`).
+  - Next: `lx.afni.tshift`.
+- Conventions every tool follows are in `docs/architecture.md`.
+- **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
+- **Open question for the user:** CLAUDE.md fixes the `libm` crate for transcendental functions. A correctly rounded `exp`/`log`/`sin`/`cos` (e.g. a port of CORE-MATH) would match glibc, and so ANTs, in more than 99.8 % of calls instead of about 90 %. That would close the last bit-identity gap. See `docs/findings/platform-math.md`. Do not change it without the user's decision.
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
 - **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
 - **Pending decisions** are in PLAN.md §16. Until the user decides, use these defaults:
@@ -122,10 +128,10 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `docs/analysis/01–04` | what fMRIPrep computes (stages, tools, parameters, file:line) |
 | `upstream.tsv` | pinned upstream commits |
 | `scripts/bootstrap_workspace.sh` | recreates the workspace |
-| `Cargo.toml`, `crates/` | Rust workspace: `larmorx-core`, `-io`, `-cli` (standalone `larmorx`/`lx`), `-py` (`larmorx._core`) |
+| `Cargo.toml`, `crates/` | Rust workspace: `larmorx-core`, `-io`, `-transform`, `-interp`, `-ants`, `-cli` (standalone `larmorx`/`lx`), `-py` (`larmorx._core`) |
 | `pyproject.toml`, `python/larmorx/` | maturin package (abi3, CPython >= 3.12), including `pipelines/larmorprepx/` |
 | `tests/python/` | Python tests of the installed package |
 | `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
 | `validation/` | parity suites and benchmarks (dev-only package `larmorx-validation`) |
-| `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/` | conventions, user docs per tool, validation records, benchmark reports |
+| `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/`, `docs/findings/` | conventions, user docs per tool, validation records, benchmark reports, findings about the upstream tools |
 | `../larmorx-testdata/` (separate repo) | test-data catalog, generated edge cases, hash-verified downloader (`pip install -e`) |

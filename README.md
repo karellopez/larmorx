@@ -61,13 +61,14 @@ python -m larmorx_validation bench nifti-io --out docs/benchmarks
 
 | Path | Contents |
 |---|---|
-| `crates/larmorx-core`, `crates/larmorx-io` | shared Rust foundation (stubs for now) |
+| `crates/larmorx-core`, `crates/larmorx-io` | shared Rust foundation: images, grids, linear algebra, NIfTI and transform files |
+| `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-ants` | ITK transforms and interpolators; ANTs tools (antsApplyTransforms) |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
 | `python/larmorx` | the Python package, including `pipelines/larmorprepx` |
 | `tests/python`, `tests/parity` | Python tests; parity suites under pytest |
 | `validation/` | parity suites and benchmarks against the reference tools |
-| `docs/` | [architecture](docs/architecture.md), [API pages](docs/api/), validation records, benchmark reports |
+| `docs/` | [architecture](docs/architecture.md), [API pages](docs/api/), validation records, benchmark reports, [findings](docs/findings/) about the tools we replicate |
 | `.github/workflows/ci.yml` | lint, plus wheel build and tests on the six target platforms |
 
 ## Contributing

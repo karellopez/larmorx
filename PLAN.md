@@ -602,7 +602,11 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 4. ~~Pin the upstream versions to port and record them in `UPSTREAM.md`; keep `workbench/` and `MSM_HOCR/` in `reference_src/`~~ (done 2026-10-09). ANTs v2.6.5 + ITK v5.4.5 chosen 2026-10-09.
 5. ~~Implement `Image`/`Affine` (Rust + Python) and NIfTI I/O, validated against nibabel~~ (done 2026-10-09: `docs/validation/nifti-io.md`, `docs/benchmarks/nifti-io.md`; test data in the separate `larmorx-testdata` repo). The `Transform` chain (affines, displacement fields, ITK `.mat`/`.txt`/`.h5` I/O) moves to step 6, where `apply_transforms` needs it together with interpolation.
 6. First tools, with the full per-tool contract:
-   - `lx.ants.apply_transforms` (A1), validated against ANTsPy in CI
+   - ~~`lx.ants.apply_transforms` (A1)~~. Done 2026-10-09:
+     - Transforms (affine family, displacement fields, `.mat`/`.txt`/`.h5`/NIfTI), all ITK interpolators, the resampler, ANTs' CLI.
+     - Validated against antsApplyTransforms on 83 cases, 61 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`). The rest differ only through the platform's `exp`/`log`/`sin`/`cos`.
+     - What porting revealed is in `docs/findings/`.
+     - CI runs the parity suite once the test data are published.
    - `lx.afni.tshift`
 7. Pipeline skeleton: BIDS indexer, `@stage` cache, executor, derivatives writer. Then a first end-to-end path on ds000005 using the interim backends.
 8. Oracles: on a Linux x64 machine, run fMRIPrep (ds000005, `--fs-no-reconall`, fixed seeds) and FreeSurfer (D5 version) on 3–5 T1w scans, keeping intermediates and timings.

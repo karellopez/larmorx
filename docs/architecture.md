@@ -11,10 +11,14 @@ How the code is organised and the conventions every tool follows. The plan behin
  larmorx._core (PyO3, abi3)   numpy arrays in and out, no copies, GIL released    crates/larmorx-py
         ▼
  Rust crates                                                                       crates/larmorx-*
-   larmorx-core   Affine, Image<T, D>, DynArray/DynImage, element types, thread pools
-   larmorx-io     file formats (NIfTI now; MGH, GIFTI, CIFTI, transforms next)
-   larmorx-cli    the multicall `larmorx`/`lx` command line (original tool syntax)
-   (next)         larmorx-interp, -transform, -image, -optim, -mesh; families: -ants, -afni, -mri
+   larmorx-core      Affine, Grid3, Image<T, D>, DynArray/DynImage, element types, thread pools,
+                     small linear algebra (incl. vnl's SVD inverse, bit-exact with ITK)
+   larmorx-io        file formats: NIfTI (nibabel and ITK semantics), ITK transform files
+   larmorx-transform ITK transforms: matrix-offset family, displacement fields, composites, -t chains
+   larmorx-interp    the ITK interpolators (linear, nearest, B-spline, Gaussian, label, windowed sinc)
+   larmorx-ants      ANTs tools (antsApplyTransforms) and their original command lines
+   larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)
+   (next)            larmorx-afni, -image, -optim, -mesh, -mri
 ```
 
 - **The Rust crates know nothing about Python.** Bindings live only in `larmorx-py`, so the same code serves the standalone CLI and Rust users.

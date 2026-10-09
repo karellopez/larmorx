@@ -80,6 +80,40 @@ Newest entries last. Each entry records what was decided, by whom, and why.
 - **User decision:** the NOTICE names the copyright holder as Karel Lopez Vilaret.
 - **User decision:** `larmorx-testdata` stays a local repository for now; CI skips the parity tests until it is published.
 
+## 2026-10-09: antsApplyTransforms (A1): what was decided while porting
+- **Bit-identity is the target, not only the PLAN.md §11.3 tolerance.** Every difference
+  from antsApplyTransforms was traced to its cause (`docs/findings/`). Three causes were
+  removed:
+  - the order of the `-t` options (verified with an oracle run);
+  - the order of the terms in ITK's `ComputeOffset`;
+  - ITK's matrix inverse. vnl's SVD (LINPACK `dsvdc` and BLAS) is ported operation for
+    operation in `larmorx_core::vnl_svd`. It is bit-exact with ITK on 2,000 random matrices
+    and uses only `sqrt`, so it is the same on every platform.
+
+  Result: 61 of 79 compared parity cases are bit-identical, and all 83 agree within tolerance.
+- **The command line reproduces ANTs on x86-64 where C++ is undefined.** An out-of-range
+  `-u` cast wraps through int32, as ANTs' x86-64 builds do and fMRIPrep users see.
+  `lx.ants.apply_transforms(dtype=...)` saturates instead and documents the difference.
+- **No guessing in the Python API.** Unlike ANTsPy, `lx.ants.apply_transforms` never inverts
+  a transform unless asked.
+- **h5py is a runtime dependency**, as PLAN.md §5 specifies, for ITK `.h5` transforms. A
+  pure-Rust HDF5 reader for the ITK layout comes later. Then the standalone binary will read
+  `.h5` too, and the large gzip-compressed fMRIPrep warps can be decompressed in parallel
+  (reading them dominates the T1w → MNI time today).
+- **Open, for the user:** see below, *transcendental functions*.
+
+### Pending: transcendental functions (`libm` crate vs correctly rounded)
+CLAUDE.md rule 5 prescribes the `libm` crate. ITK calls the platform's math library, which on
+Linux is glibc. The `libm` crate and glibc disagree in the last bit for about 10 % of `exp`,
+5 % of `log` and 3 % of `sin`/`cos` results. glibc is correctly rounded in more than 99.8 % of
+cases. The 18 parity cases that are not bit-identical all go through these functions
+(Gaussian and windowed-sinc weights, Euler matrices), apart from the two `--float` cases.
+
+Option: correctly rounded pure-Rust `exp`, `log`, `sin` and `cos`, for example ported from
+CORE-MATH (MIT). This would be more accurate, still identical on every platform, and would
+match ANTs-on-Linux in more than 99.8 % of calls. Details:
+`docs/findings/platform-math.md`. **Not changed without the user's decision.**
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -12,7 +12,7 @@ use rayon::prelude::*;
 
 use crate::dataset::{BrickData, Bricks, Datum, extract, store};
 use crate::fft::Fft;
-use series::{FourierWork, Lagrange};
+use series::{FourierWork, Lagrange, Removal};
 
 /// How the series are resampled in time.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -71,8 +71,10 @@ pub struct TshiftParams {
     pub ignore: usize,
     pub method: Method,
     pub restore: Restore,
-    /// Remove the linear trend before shifting (true, AFNI's default) or only the mean
-    /// (`-no_detrend`, which restores the mean afterwards and needs `restore = Trend`).
+    /// Remove the linear trend before shifting (true, AFNI's default). `false` is
+    /// `-no_detrend`, reproduced as AFNI 25.2.09 behaves (observed): within each slice, voxels
+    /// are taken in pairs in index order; the first of each pair has its mean removed and
+    /// restored, the second is shifted as raw values. Needs `restore = Trend`.
     pub detrend: bool,
     /// Worker threads (0 = all logical CPUs). The result does not depend on it.
     pub n_threads: usize,
@@ -238,6 +240,18 @@ fn process_block<T: Datum>(
         }
     }
     let skip = params.ignore;
+    // Without detrending, AFNI removes the mean from the first voxel of each pair (in index
+    // order within the slice) and nothing from the second (observed). Blocks start at an even
+    // index within their slice, so the parity within the block is the parity in the slice.
+    let removal = |voxel: usize| {
+        if params.detrend {
+            Removal::Trend
+        } else if voxel.is_multiple_of(2) {
+            Removal::Mean
+        } else {
+            Removal::Nothing
+        }
+    };
     let mut scratch = Vec::new();
     match kernel {
         Kernel::Fourier {
@@ -250,42 +264,42 @@ fn process_block<T: Datum>(
             for pair in buf.chunks_mut(2 * nt) {
                 let (first, second) = pair.split_at_mut(nt);
                 let x = &mut first[skip..];
-                let dx = series::detrend(x, params.detrend);
+                let dx = series::detrend(x, removal(0));
                 if second.is_empty() {
                     if *zero {
                         x.fill(0.0);
                     } else {
                         series::fourier_shift(x, None, fft, response, &mut work);
                     }
-                    series::retrend(x, &dx, params.restore, params.detrend);
+                    series::retrend(x, &dx, params.restore);
                     continue;
                 }
                 let y = &mut second[skip..];
-                let dy = series::detrend(y, params.detrend);
+                let dy = series::detrend(y, removal(1));
                 if *zero {
                     x.fill(0.0);
                     y.fill(0.0);
                 } else {
                     series::fourier_shift(x, Some(y), fft, response, &mut work);
                 }
-                series::retrend(x, &dx, params.restore, params.detrend);
-                series::retrend(y, &dy, params.restore, params.detrend);
+                series::retrend(x, &dx, params.restore);
+                series::retrend(y, &dy, params.restore);
             }
         }
         Kernel::Lagrange(lagrange) => {
-            for s in buf.chunks_mut(nt) {
+            for (voxel, s) in buf.chunks_mut(nt).enumerate() {
                 let x = &mut s[skip..];
-                let d = series::detrend(x, params.detrend);
+                let d = series::detrend(x, removal(voxel));
                 lagrange.apply(x, &mut scratch);
-                series::retrend(x, &d, params.restore, params.detrend);
+                series::retrend(x, &d, params.restore);
             }
         }
         Kernel::Wsinc { s, radius } => {
-            for v in buf.chunks_mut(nt) {
+            for (voxel, v) in buf.chunks_mut(nt).enumerate() {
                 let x = &mut v[skip..];
-                let d = series::detrend(x, params.detrend);
+                let d = series::detrend(x, removal(voxel));
                 series::wsinc(x, *s, *radius, &mut scratch);
-                series::retrend(x, &d, params.restore, params.detrend);
+                series::retrend(x, &d, params.restore);
             }
         }
     }
@@ -398,6 +412,54 @@ mod tests {
         let mut p = params(3, Method::Linear, 1);
         p.tr = 0.0;
         assert!(matches!(tshift(&mut d, &p), Err(TshiftError::Tr(_))));
+    }
+
+    #[test]
+    fn no_detrend_reproduces_afni_pairs() {
+        // Two voxels per slice at levels 1000 and 5000 with one impulse each, -linear
+        // -no_detrend, slices at 0 and 1 s of a 2 s TR. The expected values are AFNI
+        // 25.2.09's output: the first voxel of the pair has its mean removed (its last point
+        // moves toward the mean), the second is shifted raw (zero beyond the end, then clipped
+        // to its range).
+        let nt = 16;
+        let mut data = vec![0f32; 2 * 2 * nt];
+        for z in 0..2 {
+            for t in 0..nt {
+                let base = 2 * (z + 2 * t);
+                data[base] = 1000.0 + if t == 8 { 10.0 } else { 0.0 };
+                data[base + 1] = 5000.0 + if t == 4 { 10.0 } else { 0.0 };
+            }
+        }
+        let mut b = Bricks::new([2, 1, 2, nt], BrickData::Float(data), vec![0.0; nt]).unwrap();
+        let params = TshiftParams {
+            tr: 2.0,
+            slice_times: vec![0.0, 1.0],
+            tzero: 0.5,
+            ignore: 0,
+            method: Method::Linear,
+            restore: Restore::Trend,
+            detrend: false,
+            n_threads: 1,
+        };
+        tshift(&mut b, &params).unwrap();
+        let BrickData::Float(out) = &b.data else {
+            unreachable!()
+        };
+        let series = |x: usize, z: usize| -> Vec<f32> {
+            (0..nt).map(|t| out[x + 2 * (z + 2 * t)]).collect()
+        };
+        let mut a0 = vec![1000.0; nt];
+        (a0[7], a0[8], a0[15]) = (1002.5, 1007.5, 1000.15625);
+        let mut b0 = vec![5000.0; nt];
+        (b0[3], b0[4]) = (5002.5, 5007.5);
+        let mut a1 = vec![1000.0; nt];
+        (a1[0], a1[8], a1[9]) = (1000.15625, 1007.5, 1002.5);
+        let mut b1 = vec![5000.0; nt];
+        (b1[4], b1[5]) = (5007.5, 5002.5);
+        assert_eq!(series(0, 0), a0);
+        assert_eq!(series(1, 0), b0);
+        assert_eq!(series(0, 1), a1);
+        assert_eq!(series(1, 1), b1);
     }
 
     #[test]

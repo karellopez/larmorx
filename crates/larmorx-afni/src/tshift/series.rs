@@ -61,8 +61,21 @@ fn range(v: &[f32]) -> (f32, f32) {
         })
 }
 
+/// What is removed from a series before it is shifted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Removal {
+    /// The least-squares line (AFNI's default).
+    Trend,
+    /// The mean (`-no_detrend`).
+    Mean,
+    /// Nothing: the raw values are shifted (what AFNI does to every other voxel with
+    /// `-no_detrend`, observed).
+    Nothing,
+}
+
 /// The detrended series and what is needed to put the trend back.
 pub struct Detrended {
+    removal: Removal,
     a: f32,
     b: f32,
     /// The input's range (for the default restore).
@@ -73,19 +86,22 @@ pub struct Detrended {
     hi1: f32,
 }
 
-/// Removes the linear trend (or the mean, without detrending) from `v` in place.
-pub fn detrend(v: &mut [f32], detrend: bool) -> Detrended {
+/// Removes the linear trend, the mean or nothing from `v` in place.
+pub fn detrend(v: &mut [f32], removal: Removal) -> Detrended {
     let (lo0, hi0) = range(v);
-    let (a, b) = if detrend {
-        linear_fit(v)
-    } else {
-        (mean(v), 0.0)
+    let (a, b) = match removal {
+        Removal::Trend => linear_fit(v),
+        Removal::Mean => (mean(v), 0.0),
+        Removal::Nothing => (0.0, 0.0),
     };
-    for (i, x) in v.iter_mut().enumerate() {
-        *x -= trend(a, b, i);
+    if removal != Removal::Nothing {
+        for (i, x) in v.iter_mut().enumerate() {
+            *x -= trend(a, b, i);
+        }
     }
     let (lo1, hi1) = range(v);
     Detrended {
+        removal,
         a,
         b,
         lo0,
@@ -96,19 +112,19 @@ pub fn detrend(v: &mut [f32], detrend: bool) -> Detrended {
 }
 
 /// Clips the shifted residual to its original range, then puts back what `restore` says.
-pub fn retrend(v: &mut [f32], d: &Detrended, restore: Restore, detrended: bool) {
+pub fn retrend(v: &mut [f32], d: &Detrended, restore: Restore) {
     for x in v.iter_mut() {
         *x = clip(*x, d.lo1, d.hi1);
     }
-    match (restore, detrended) {
-        (Restore::Trend, true) => {
+    match (d.removal, restore) {
+        (Removal::Trend, Restore::Trend) => {
             for (i, x) in v.iter_mut().enumerate() {
                 *x = clip(*x + trend(d.a, d.b, i), d.lo0, d.hi0);
             }
         }
-        (Restore::None, true) => {}
+        (Removal::Trend, Restore::None) | (Removal::Nothing, _) => {}
         // -rlt+ restores the intercept; without detrending, the mean (no clip either way).
-        (Restore::Intercept, true) | (_, false) => {
+        (Removal::Trend, Restore::Intercept) | (Removal::Mean, _) => {
             for x in v.iter_mut() {
                 *x += d.a;
             }
@@ -499,14 +515,20 @@ mod tests {
     fn retrend_restores_and_clips() {
         let original: Vec<f32> = (0..20).map(|i| 10.0 + i as f32 + (i % 3) as f32).collect();
         let mut v = original.clone();
-        let d = detrend(&mut v, true);
+        let d = detrend(&mut v, Removal::Trend);
         let residual = v.clone();
-        retrend(&mut v, &d, Restore::Trend, true);
+        retrend(&mut v, &d, Restore::Trend);
         for (a, b) in v.iter().zip(&original) {
             assert!((a - b).abs() < 1e-4);
         }
         let mut w = residual.clone();
-        retrend(&mut w, &d, Restore::None, true);
+        retrend(&mut w, &d, Restore::None);
         assert_eq!(w, residual);
+        // Without removal the series is untouched both ways.
+        let mut raw = original.clone();
+        let d = detrend(&mut raw, Removal::Nothing);
+        assert_eq!(raw, original);
+        retrend(&mut raw, &d, Restore::Trend);
+        assert_eq!(raw, original);
     }
 }

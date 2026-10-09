@@ -93,8 +93,10 @@ def tshift(
         its input range), ``none`` (``-rlt``) or ``intercept`` (``-rlt+``, the fitted
         trend's value at the first time point used).
     detrend
-        ``False`` removes and restores only the mean (``-no_detrend``); it needs
-        ``restore="trend"``.
+        ``False`` is ``-no_detrend``: the mean instead of the trend is removed and restored,
+        with AFNI 25.2.09's behaviour reproduced (a warning says so): within each slice, voxels
+        are taken in pairs in index order, and only the first of each pair has its mean
+        removed; the second is shifted as raw values. Needs ``restore="trend"``.
     n_threads
         Worker threads (0 = all). The result does not depend on it.
 
@@ -108,9 +110,16 @@ def tshift(
     """
     if method not in METHODS:
         raise ValueError(f"unknown method {method!r}; use one of {', '.join(METHODS)}")
-    if not detrend and method == "fourier":
+    if not detrend:
         warnings.warn(
-            "detrend=False with Fourier interpolation: AFNI calls this dangerous",
+            "detrend=False reproduces AFNI 25.2.09's -no_detrend: only the first voxel of each "
+            "pair (in index order within a slice) has its mean removed and restored; the second "
+            "is shifted as raw values"
+            + (
+                "; AFNI also calls it dangerous with Fourier interpolation"
+                if method == "fourier"
+                else ""
+            ),
             stacklevel=2,
         )
     times: str | list[float] = (

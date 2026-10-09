@@ -121,7 +121,8 @@ def test_ignored_points_and_restore_modes(tmp_path):
     np.testing.assert_array_equal(shifted.data[..., :3], original[..., :3])
     residual = lx.afni.tshift(src, slice_times="alt+z", restore="none", method="cubic")
     assert abs(float(residual.data[..., 1:3, :].mean())) < 5  # detrended: about zero
-    mean_kept = lx.afni.tshift(src, slice_times="alt+z", detrend=False, method="cubic")
+    with pytest.warns(UserWarning, match="first voxel of each pair"):
+        mean_kept = lx.afni.tshift(src, slice_times="alt+z", detrend=False, method="cubic")
     assert abs(float(mean_kept.data.mean() - original.mean())) < 1
 
 
@@ -160,6 +161,7 @@ def test_fmriprep_slice_timing():
         ({"slice_times": "alt+z", "tzero": -1.0}, "non-negative"),
     ],
 )
+@pytest.mark.filterwarnings("ignore:detrend=False")
 def test_invalid_arguments(tmp_path, kwargs, match):
     src = save(tmp_path / "bold.nii", bold())
     with pytest.raises(ValueError, match=match):

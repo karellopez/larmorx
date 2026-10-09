@@ -39,6 +39,10 @@ Options (they must come before the dataset):
                   (default: the slice timing in the NIfTI header)
 ";
 
+/// The warning for `-no_detrend`, whose AFNI behaviour larmorx reproduces.
+const NO_DETREND_PAIRS: &str = "-no_detrend: as AFNI 25.2.09 does, only the first voxel of each pair \
+(in index order within a slice) has its mean removed and restored; the second is shifted as raw values";
+
 /// Runs `3dTshift` with `args`; returns the exit code.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     if args.is_empty() || matches!(args[0].as_str(), "-help" | "-h") {
@@ -196,6 +200,7 @@ fn parse(args: &[String], log: &mut Log<'_>) -> Result<Options, String> {
                     );
                 }
                 o.no_detrend = true;
+                log.warn(NO_DETREND_PAIRS);
                 i += 1;
                 continue;
             }

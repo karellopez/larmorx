@@ -1,6 +1,11 @@
-//! File formats for larmorx (PLAN.md §5).
+//! File formats for larmorx (PLAN.md §5), in pure Rust.
 //!
-//! This crate will read and write NIfTI-1/2, MGH/MGZ, GIFTI, CIFTI-2, FreeSurfer
-//! surf/curv/label/annot/LTA files and ITK transforms, in pure Rust. In phase L0 it is empty;
-//! NIfTI I/O is the next step (PLAN.md §15, step 5).
+//! - [`nifti`]: NIfTI-1 and NIfTI-2 (`.nii`, `.nii.gz`, `.hdr`/`.img` pairs), read and written
+//!   with nibabel's semantics.
+//! - [`gzip`]: parallel gzip compression whose output does not depend on the thread count.
+//!
+//! MGH/MGZ, GIFTI, CIFTI-2, FreeSurfer surfaces and ITK transforms follow.
 #![forbid(unsafe_code)]
+
+pub mod gzip;
+pub mod nifti;

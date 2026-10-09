@@ -6,6 +6,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 |---|---|---|---|
 | [nifti-io](nifti-io.md) | `larmorx.io.load` / `save` | nibabel | `validated` |
 | [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTs 2.6.5, ITK 5.4.5) | `validated` |
+| [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 
 Reproduce a record:
 
@@ -13,4 +14,5 @@ Reproduce a record:
 pip install -e ../larmorx-testdata -e "validation[oracles]"
 python -m larmorx_validation parity nifti-io --tier standard --out docs/validation
 python -m larmorx_validation parity ants-apply-transforms --tier standard --out docs/validation
+python -m larmorx_validation parity afni-tshift --tier standard --out docs/validation   # needs the AFNI oracle (scripts/build_afni_oracle.sh)
 ```

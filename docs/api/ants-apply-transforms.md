@@ -11,7 +11,7 @@
 - awkward geometries, output types and time series;
 - real fMRIPrep derivatives.
 
-All 83 agree. Every interpolator gives **the same bytes** as ANTs except where ITK calls the
+All 83 agree, and 63 of the 79 compared are byte-identical. Every interpolator gives **the same bytes** as ANTs except where ITK calls the
 platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc). There the last bit can
 differ, at most about 1e-15 relative
 ([why](../findings/platform-math.md)).

@@ -1,5 +1,11 @@
 # AFNI 3dTshift (AFNI 25.2.09)
 
+> **Not an input for the implementation.** These notes were written while reading AFNI's
+> source, which is GPL-2 (copyrighted by the Medical College of Wisconsin). By decision of
+> 2026-10-09, larmorx re-implements 3dTshift clean-room: the implementer works only from the
+> behaviour spec `specs/3dTshift.md` and black-box runs of the AFNI oracle, never from this
+> file or AFNI's source. The notes stay as a record of upstream behaviour.
+
 Slice-timing correction in fMRIPrep (`fmriprep/workflows/bold/stc.py`), run as
 `3dTshift -ignore <dummies> -tzero <t0> -TR <TR>s -tpattern @<slice times> -prefix out in`
 with AFNI's default interpolation. fMRIPrep sets `tzero` to

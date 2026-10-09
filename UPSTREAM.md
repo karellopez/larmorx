@@ -10,7 +10,7 @@ Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmripre
 |---|---|---|---|---|
 | ANTs | Apache-2.0 | `v2.6.5` → `fdce4d2f84b6` | 2.6.2 (conda-forge) | newest 2.6.x |
 | ITK | Apache-2.0 | `v5.4.5` → `f51594ad8819` | libitk 5.4.4 (conda-forge) | the version ANTs 2.6.5's build pins (2.6.0–2.6.3 pin `v5.4.3`) |
-| AFNI | public domain (+ per-file exceptions) | `AFNI_25.2.09` → `b1e12b26dae2` | AFNI_25.2.09 | matches fMRIPrep |
+| AFNI | public domain (NIH) + GPL-2 (code copyrighted by the Medical College of Wisconsin) | `AFNI_25.2.09` → `b1e12b26dae2` | AFNI_25.2.09 | matches fMRIPrep. MCW-copyrighted (GPL-2) files are clean-room, not ported (CLAUDE.md rule 1); the tag is also the source of the AFNI oracle (`scripts/build_afni_oracle.sh`) |
 | FreeSurfer | FreeSurfer Software License v1.0 | `v8.2.0` → `d932c45b7941` (pending D5) | 7.3.2 | fMRIPrep runs 7.3.2; D5 proposes porting 8.2.0 and validating against 7.4.x |
 | CORE-MATH | MIT | `master` → `040ee482a8ca` (no releases; 2026-10-09) | – (fMRIPrep's tools use glibc's libm) | correctly rounded `exp`, `log`, `sin`, `cos` in `larmorx_core::math` (user decision 2026-10-09) |
 

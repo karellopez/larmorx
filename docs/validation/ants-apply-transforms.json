@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "5d716fad582e-dirty",
-  "larmorx_testdata_commit": "535104904d50",
+  "larmorx_commit": "a50f8f922e52",
+  "larmorx_testdata_commit": "18c8309c46b6",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -24,7 +24,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.099,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -44,7 +44,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -54,7 +54,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -64,7 +64,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -74,7 +74,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -84,7 +84,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -94,7 +94,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -114,7 +114,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -124,7 +124,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -134,7 +134,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -144,7 +144,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -154,7 +154,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -164,7 +164,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -174,7 +174,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -194,7 +194,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -204,7 +204,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -274,7 +274,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -294,7 +294,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -314,7 +314,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -324,7 +324,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -334,7 +334,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -344,7 +344,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -354,7 +354,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -364,7 +364,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -374,7 +374,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -404,7 +404,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -414,7 +414,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -424,7 +424,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -434,7 +434,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -444,7 +444,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -454,7 +454,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -484,7 +484,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -504,7 +504,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -514,7 +514,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.01,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -524,7 +524,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -534,7 +534,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -544,7 +544,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.013,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -554,7 +554,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.013,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -574,7 +574,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -584,7 +584,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.013,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -594,7 +594,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -604,7 +604,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.012,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -684,7 +684,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -694,7 +694,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -704,7 +704,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.149,
+   "seconds": 0.158,
    "status": "pass"
   },
   {
@@ -734,7 +734,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -763,8 +763,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-ynul31hz/missing.mat: /tmp/lx-aat-ynul31hz/missing.mat: No such file or directory (os error 2)",
-   "seconds": 0.007,
+   "reason": "ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-xa4g6xsa/missing.mat: /tmp/lx-aat-xa4g6xsa/missing.mat: No such file or directory (os error 2)",
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -774,7 +774,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1; larmorx: Error:  Unrecognized interpolation option. cubic",
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -784,7 +784,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.72,
+   "seconds": 5.184,
    "status": "pass"
   },
   {
@@ -794,7 +794,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.795,
+   "seconds": 1.823,
    "status": "pass"
   },
   {
@@ -804,7 +804,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.032,
+   "seconds": 3.114,
    "status": "pass"
   },
   {
@@ -814,7 +814,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.011,
+   "seconds": 2.264,
    "status": "pass"
   },
   {
@@ -824,7 +824,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.235,
+   "seconds": 0.26,
    "status": "pass"
   },
   {
@@ -834,7 +834,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.477,
+   "seconds": 5.07,
    "status": "pass"
   },
   {
@@ -844,7 +844,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 34.2,
+   "seconds": 36.031,
    "status": "pass"
   }
  ],

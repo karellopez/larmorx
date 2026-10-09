@@ -29,8 +29,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 - **Phase L0 done:** a buildable, tested skeleton, CI green on all six targets.
 - **Phase L1 in progress:**
   - `Image`/`Affine` and NIfTI-1/2 I/O: validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`).
-  - **antsApplyTransforms (A1) done:** `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms`, `lx.transforms`, crates `larmorx-transform`, `-interp`, `-ants`. It is validated against ANTs itself: 83 cases, 61 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`), and benchmarked (`docs/benchmarks/ants-apply-transforms.md`).
-  - Next: `lx.afni.tshift`.
+  - **antsApplyTransforms (A1) done:** `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms`, `lx.transforms`, crates `larmorx-transform`, `-interp`, `-ants`. It is validated against ANTs itself: 83 cases, 63 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`), and benchmarked (`docs/benchmarks/ants-apply-transforms.md`).
+  - Next: `lx.afni.tshift`, clean-room (spec `specs/3dTshift.md`, AFNI oracle built by `scripts/build_afni_oracle.sh`).
 - Conventions every tool follows are in `docs/architecture.md`.
 - **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
 - **Decided 2026-10-09:** transcendental functions are correctly rounded (CORE-MATH ports in `larmorx_core::math`; rule 5). See `docs/findings/platform-math.md`.
@@ -70,6 +70,10 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 1. **Clean-room.** When designing or implementing `lx.mri` tools (the FSL-like and Workbench-like ones):
    - Never open FSL source (it is deliberately not cloned) or anything under `reference_src/`.
    - Work only from `specs/<tool>.md`, published papers, official documentation and black-box runs.
+   - **AFNI code copyrighted by the Medical College of Wisconsin (GPL-2) is clean-room too** (user decision, 2026-10-09). That covers every AFNI file whose header says "copyrighted by the Medical College of Wisconsin", including 3dTshift, csfft and most of `mrilib`.
+     - Behaviour specs (`specs/<tool>.md`) may be written by someone who has read the source.
+     - The implementation must be written by an agent that never opens AFNI source, from the spec alone.
+     - Only AFNI files without that header (NIH work, public domain) may be ported directly, after a per-file check of every routine they call.
 2. **Ported code records its provenance.** Each crate's `PROVENANCE.md` lists the upstream files and versions it was ported from. Port from the pinned **release tags**, not the local master/dev clones:
    - ANTs v2.6.5
    - ITK v5.4.5 (the version ANTs 2.6.5 pins; decided 2026-10-09)

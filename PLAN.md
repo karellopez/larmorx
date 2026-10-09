@@ -93,7 +93,7 @@
                                           │ PyO3 (abi3), zero-copy numpy, GIL released
 ┌─────────────────────────────────────────▼─────────── larmorx (Rust workspace) ──────────────┐
 │ foundation:  larmorx-{core, io, interp, transform, optim, image, mesh, cli}                 │
-│ ports:       larmorx-ants (ANTs/ITK, Apache-2.0)    larmorx-afni (public domain)            │
+│ ports:       larmorx-ants (ANTs/ITK, Apache-2.0)    larmorx-afni (Apache-2.0: NIH public-domain code ported, MCW GPL-2 code clean-room)            │
 │              larmorx-freesurfer (FreeSurfer licence; own wheel)                             │
 │ clean-room:  larmorx-mri (hmc, brain_mask, tissue, pepolar, unwrap, linreg/bbr, maths,      │
 │              surfmap, multiecho, bspline-fieldmap)                                          │
@@ -167,7 +167,16 @@ larmorx/                          this repo (github.com/karellopez/larmorx)
 | `motion_correction` (antsMotionCorr) | 2 | CLI compatibility only; implemented with `lx.mri.hmc` |
 | TimeVaryingVelocity / Exponential / Demons transforms, point-set metrics | 3 | – |
 
-### 3.2 `lx.afni`: AFNI port (public domain; check each file for third-party exceptions)
+### 3.2 `lx.afni`: AFNI tools (NIH code ported; MCW GPL-2 code clean-room)
+
+AFNI is public domain except for "major portions copyrighted by the Medical College of
+Wisconsin", which are GPL-2. Translating such code to Rust would make a GPL-2 derivative,
+because the GPL counts translations as modifications. Decision (2026-10-09, user): these parts
+are re-implemented clean-room. Behaviour specs come from AFNI's documentation and black-box
+runs of an AFNI oracle built from the pinned tag (`scripts/build_afni_oracle.sh`), and an
+implementer who never sees AFNI source writes the code. Every tool needs a per-routine
+licence check: newer NIH programs, such as 3dAutomask, 3dUnifize, 3dQwarp, 3dDespike and
+3dTproject, still call MCW library routines.
 
 | Tool | Tier |
 |---|---|
@@ -533,7 +542,7 @@ def bold_pipeline(run, anat, fmap, s):
 | Source | Licence | Treatment |
 |---|---|---|
 | ANTs, ITK | Apache-2.0 | **port**; keep LICENSE and NOTICE, mark modifications, record files in PROVENANCE |
-| AFNI | public domain (+ per-file third-party exceptions) | **port** after a per-file check |
+| AFNI | public domain (NIH) + **GPL-2 for code copyrighted by the Medical College of Wisconsin** (most of the older core, e.g. 3dTshift, csfft, mrilib) + other third-party exceptions | NIH files: **port** after a per-routine check; MCW GPL-2 files: **clean-room** (decided 2026-10-09) |
 | FreeSurfer | FreeSurfer Software License v1.0 | **port** into `larmorx-freesurfer` only; carry the licence and preface; audit third-party files; atlases per D6 |
 | sdcflows / fMRIPrep / nitransforms code | Apache-2.0 / MIT | may port with attribution |
 | FSL | non-commercial | **clean-room only**: never read the source (not cloned) |
@@ -604,7 +613,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 6. First tools, with the full per-tool contract:
    - ~~`lx.ants.apply_transforms` (A1)~~. Done 2026-10-09:
      - Transforms (affine family, displacement fields, `.mat`/`.txt`/`.h5`/NIfTI), all ITK interpolators, the resampler, ANTs' CLI.
-     - Validated against antsApplyTransforms on 83 cases, 61 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`). The rest differ only through the platform's `exp`/`log`/`sin`/`cos`.
+     - Validated against antsApplyTransforms on 83 cases, 63 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`). The rest are windowed-sinc and Gaussian voxels where glibc is not correctly rounded, and the `--float` cases.
      - What porting revealed is in `docs/findings/`.
      - CI runs the parity suite once the test data are published.
    - `lx.afni.tshift`
@@ -649,7 +658,7 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | nipreps/acres, migas-py | 46fa586, 4c721fe | – | Apache-2.0 |
 | ANTsX/ANTs | 0f65b0e (master; port from v2.6.5) | 2026-09-22 | Apache-2.0 |
 | InsightSoftwareConsortium/ITK | dfef0816 (master; port from v5.4.5) | 2026-10-08 | Apache-2.0 |
-| afni/afni | 0eb4d34 | 2026-10-07 | public domain (+ exceptions) |
+| afni/afni | 0eb4d34 | 2026-10-07 | public domain (NIH) + GPL-2 (MCW-copyrighted files; clean-room only) |
 | freesurfer/freesurfer | 766ac05 (dev after v8.2.0) | 2026-10-07 | FreeSurfer Software License v1.0 |
 | Washington-University/workbench | 9906328 | 2026-10-06 | GPL-2.0-or-later (clean-room: do not read) |
 | ecr05/MSM_HOCR | c9d8996 | 2022-07-21 | non-commercial (do not read) |

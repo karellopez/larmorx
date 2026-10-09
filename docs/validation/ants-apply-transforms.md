@@ -4,11 +4,11 @@
 
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
 - **Reference:** antsApplyTransforms from ANTs 2.6.5 on ITK 5.4.5, run in-process through ANTsPy 0.6.3
-- **Test data:** larmorx-testdata `535104904d50`, tier `standard`
+- **Test data:** larmorx-testdata `18c8309c46b6`, tier `standard`
 - **Generated:** 2026-10-09 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
 
-**Bit-identical: 61 of 79 passing cases** produce exactly the bytes of antsApplyTransforms' output data.
-The others differ in the last bits only, where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed-sinc weights, Euler and versor matrices) or where `--float` makes ANTs compute in single precision: `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `output/float-LanczosWindowedSinc`, `output/float-Linear`, `time-series/LanczosWindowedSinc`, `transform/euler-zyx.txt`, `transform/inverse-euler-zyx.txt`. See `docs/findings/platform-math.md`.
+**Bit-identical: 63 of 79 passing cases** produce exactly the bytes of antsApplyTransforms' output data.
+The others differ in the last bits only, where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed-sinc weights, Euler and versor matrices) or where `--float` makes ANTs compute in single precision: `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `output/float-LanczosWindowedSinc`, `output/float-Linear`, `time-series/LanczosWindowedSinc`. See `docs/findings/platform-math.md`.
 
 ## Thresholds
 
@@ -39,15 +39,15 @@ The others differ in the last bits only, where ITK calls the platform's `exp`, `
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-ynul31hz/missing.mat: /tmp/lx-aat-ynul31hz/missing.mat: No such file or directory (os error 2) |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-xa4g6xsa/missing.mat: /tmp/lx-aat-xa4g6xsa/missing.mat: No such file or directory (os error 2) |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5d716fad582e-dirty) |
-| larmorx-testdata | 535104904d50 |
+| larmorx | 0.0.1 (a50f8f922e52) |
+| larmorx-testdata | 18c8309c46b6 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

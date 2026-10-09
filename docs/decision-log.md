@@ -120,6 +120,33 @@ Rust in `larmorx_core::math`. They are pinned at CORE-MATH commit `040ee482a8ca`
 inputs. CLAUDE.md rule 5 now says so. The `libm` crate stays only for functions not yet
 ported.
 
+## 2026-10-09: AFNI's GPL-2 (MCW) code is clean-room; correctly rounded maths decided
+- **Finding.** AFNI's `LICENSE.txt` lists an exception: "major portions of this software are
+  copyrighted by the Medical College of Wisconsin", under GPL-2. PLAN.md had treated AFNI as
+  public domain. Every file on 3dTshift's code path carries that header, as do 3dvolreg,
+  3dTstat, 3dcalc, 3dmerge and 3dTcat:
+  - `3dTshift.c`, `csfft.c`, `thd_shift2.c`, `thd_detrend.c`, `thd_timeof.c`,
+    `thd_dsetto1D.c`, `thd_1Dtodset.c`, `mrilib.h`.
+
+  Newer NIH programs (3dAutomask, 3dUnifize, 3dQwarp, 3dDespike, 3dTproject) are public
+  domain but call MCW library routines. The finding came from the agent porting AFNI's FFT.
+  A faithful port had already been written and verified, but it was never committed.
+- **Why it matters.** GPL-2's definition of a covered work includes code "translated into
+  another language", so a Rust port is a GPL-2 derivative. It could not sit in the Apache-2.0
+  package, and renaming does not change that.
+- **User decision: clean-room**, as for Workbench (CLAUDE.md rule 1):
+  - a behaviour spec, `specs/<tool>.md`, from documentation and black-box runs of the AFNI
+    oracle;
+  - an implementer who never opens AFNI source;
+  - validation against the AFNI binary.
+
+  Results stay very close to AFNI's but are not guaranteed bit-identical: an independently
+  written FFT rounds differently. NIH public-domain files may still be ported after a
+  per-routine check. All GPL-derived drafts were deleted.
+- **User decision (earlier the same day): correctly rounded transcendental functions.**
+  CORE-MATH `exp`, `log`, `sin` and `cos` were ported (MIT) and integrated, and 63 of 79
+  antsApplyTransforms parity cases are now bit-identical.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

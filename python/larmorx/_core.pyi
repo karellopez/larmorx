@@ -185,7 +185,11 @@ def resample_series(
 
 # --- ANTs image programs: ImageMath, ThresholdImage, MultiplyImages (larmorx/ants) -------------
 
-ImageTuple = tuple[np.ndarray, np.ndarray, bytes | None]  # data, RAS+ affine, descrip
+# data, RAS+ affine, descrip[, spacing of the axes after the third (the time step in seconds)]
+ImageTuple = (
+    tuple[np.ndarray, np.ndarray, bytes | None]
+    | tuple[np.ndarray, np.ndarray, bytes | None, list[float] | None]
+)
 
 def ants_program(
     program: str,
@@ -194,8 +198,9 @@ def ants_program(
     outputs: list[str],
     n_threads: int = 1,
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
-    """Run ``ImageMath``, ``ThresholdImage`` or ``MultiplyImages`` with ``args`` on in-memory
-    ``inputs`` (by placeholder name); writes to ``outputs`` names are returned:
+    """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage`` or
+    ``ResampleImageBySpacing`` with ``args`` on in-memory ``inputs`` (by placeholder name);
+    writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``."""
 
 def ants_image_math_operations() -> list[tuple[str, str]]:
@@ -251,6 +256,67 @@ def ants_otsu_threshold(
     a: np.ndarray, n_thresholds: int, mask: np.ndarray | None = None, n_threads: int = 1
 ) -> tuple[np.ndarray, np.ndarray]:
     """``ThresholdImage ... Otsu n [mask]``: ``(labels, thresholds)``."""
+
+# The Gaussian group: ``a`` is float32 in 2 to 4 dimensions, ``spacing`` ITK's spacing of every
+# axis (mm; seconds for a fourth axis).
+
+def ants_smooth_image(
+    a: np.ndarray,
+    spacing: list[float],
+    sigma: list[float],
+    physical: bool = False,
+    median: bool = False,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``SmoothImage``: recursive Gaussian (sigma in voxels unless ``physical``) or median
+    (radius ``sigma`` voxels)."""
+
+def ants_discrete_gaussian(
+    a: np.ndarray, spacing: list[float], sigma: list[float], n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``G``: ``DiscreteGaussianImageFilter`` (sigma in physical units)."""
+
+def ants_laplacian(
+    a: np.ndarray,
+    spacing: list[float],
+    sigma: float = 1.0,
+    normalize: bool = False,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """ImageMath ``Laplacian``: ``LaplacianRecursiveGaussianImageFilter``, ``[0, 1]`` if
+    ``normalize``."""
+
+def ants_gradient_magnitude(
+    a: np.ndarray,
+    spacing: list[float],
+    sigma: float = 1.0,
+    normalize: bool = False,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """ImageMath ``Grad``: ``GradientMagnitudeRecursiveGaussianImageFilter``, ``[0, 1]`` if
+    ``normalize``."""
+
+def ants_unsharp_mask(
+    a: np.ndarray,
+    spacing: list[float],
+    amount: float = 0.5,
+    radius: float = 1.0,
+    threshold: float = 0.0,
+    radius_in_spacing_units: bool = False,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """ImageMath ``UnsharpMask``: ``UnsharpMaskImageFilter`` in float."""
+
+def ants_resample_image_by_spacing(
+    image: str | ImageTuple,
+    spacing: list[float],
+    smooth: bool = True,
+    add_voxels: int = 0,
+    nearest: bool = False,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
+    """``ResampleImageBySpacing`` on a path (read in ``len(spacing)`` dimensions) or an
+    in-memory image: ``(data, ras_affine, descrip, spacing)``."""
 
 # --- Head-motion correction, mcflirt-compatible (larmorx/mri) ---------------------------------
 

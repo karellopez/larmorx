@@ -27,6 +27,8 @@ pub use apply_transforms::{
     ApplyTransformsError, ApplyTransformsOptions, OutputType, apply_transforms, transform_points,
 };
 pub use image::{AntsImage, FileStore, ImageStore};
+/// The image view the spatial filters take (re-exported for the bindings).
+pub use larmorx_image::VolumeRef;
 pub use multiply_images::multiply_images;
 pub use resample_image_by_spacing::{
     ResampleBySpacingError, ResampleBySpacingOptions, ResampleBySpacingPlan,

@@ -122,6 +122,81 @@ def test_operations_and_errors():
         lx.ants.image_math("Canny", ramp(), 1, 0, 1)
 
 
+# --- Gaussian group -----------------------------------------------------------------------------
+
+
+def textured(shape=(9, 8, 7), affine=AFFINE, seed=0):
+    rng = np.random.default_rng(seed)
+    return image(rng.uniform(0, 100, shape), affine)
+
+
+def test_typed_gaussian_functions_equal_image_math():
+    img = textured()
+    pairs = [
+        # ANTs reads Laplacian's normalize flag from the sigma argument: stoi("1.5") is 1.
+        (lx.ants.laplacian(img, 1.5, normalize=True), ("Laplacian", 1.5, 0)),
+        (lx.ants.laplacian(img, 0.8), ("Laplacian", 0.8)),
+        (lx.ants.gradient_magnitude(img, 1.2), ("Grad", 1.2)),
+        (lx.ants.gradient_magnitude(img, 2.0, normalize=True), ("Grad", 2.0, 1)),
+        (lx.ants.discrete_gaussian(img, 1.5), ("G", 1.5)),
+        (lx.ants.discrete_gaussian(img, [1.0, 2.0, 0.5]), ("G", "1x2x0.5")),
+        (lx.ants.unsharp_mask(img, 0.7, 1.5, 2.0), ("UnsharpMask", 0.7, 1.5, 2.0)),
+    ]
+    for typed, (op, *operands) in pairs:
+        generic = lx.ants.image_math(op, img, *operands)
+        np.testing.assert_array_equal(typed.data, generic.data, err_msg=op)
+        assert typed.data.dtype == np.float32
+    lap = lx.ants.laplacian(img, 1.5, normalize=True).data
+    assert (lap.min(), lap.max()) == (0.0, 1.0)
+
+
+def test_smooth_image_modes_threads_and_dimensions():
+    img = textured()
+    a = lx.ants.smooth_image(img, 1.0, n_threads=1)
+    b = lx.ants.smooth_image(img, [1.0, 1.0, 1.0], n_threads=4)
+    np.testing.assert_array_equal(a.data, b.data)
+    assert np.abs(a.data - img.data).max() > 1  # it smooths
+    # One voxel is 2 × 2 × 3 mm.
+    physical = lx.ants.smooth_image(img, [2.0, 2.0, 3.0], sigma_in_physical_units=True)
+    np.testing.assert_allclose(physical.data, a.data, atol=1e-4)
+    med = lx.ants.smooth_image(img, 1, median=True)
+    assert set(np.unique(med.data)) <= set(np.unique(img.data))
+    # 2D and 4D are filtered in their own dimensions; a 4D image along time too.
+    two = lx.ants.smooth_image(image(img.data[:, :, 0]), 1.0)
+    assert two.shape == (9, 8)
+    series = image(np.random.default_rng(1).uniform(0, 1, (6, 5, 4, 8)))
+    four = lx.ants.smooth_image(series, 1.0)
+    assert four.shape == series.shape
+    assert not np.allclose(
+        four.data[..., 0], lx.ants.smooth_image(image(series.data[..., 0]), 1).data
+    )
+    with pytest.raises(ValueError, match="sigmas"):
+        lx.ants.smooth_image(img, [1.0, 2.0])
+    with pytest.raises(ValueError, match="less than 4"):
+        lx.ants.smooth_image(image(np.ones((9, 8, 3))), 1.0)
+
+
+def test_resample_image_by_spacing_grid_and_command_line(tmp_path):
+    img = textured((10, 9, 8))
+    out = lx.ants.resample_image_by_spacing(img, [4.0, 4.0, 3.0])
+    assert out.shape == (5, 4, 8)
+    np.testing.assert_allclose(out.affine[:3, :3], np.diag([4.0, 4.0, 3.0]), atol=1e-12)
+    np.testing.assert_allclose(out.affine[:3, 3], img.affine[:3, 3], atol=1e-12)
+    src, dst = tmp_path / "in.nii.gz", tmp_path / "out.nii.gz"
+    lx.save(img, src)
+    code, stdout, _ = run(["ResampleImageBySpacing", "3", str(src), str(dst), "4", "4", "3"])
+    assert code == 0 and " output size [5, 4, 8]" in stdout
+    np.testing.assert_array_equal(lx.load(dst).data, out.data)
+    from_path = lx.ants.resample_image_by_spacing(src, [4.0, 4.0, 3.0], n_threads=3)
+    np.testing.assert_array_equal(from_path.data, out.data)
+    nn = lx.ants.resample_image_by_spacing(img, [1.0, 1.0, 3.0], smooth=False, nearest=True)
+    assert nn.shape == (20, 18, 8)
+    assert set(np.unique(nn.data)) <= set(np.unique(img.data))
+    code, _, _ = run(["SmoothImage", "3", str(src), "1.5", str(dst)])
+    assert code == 0
+    np.testing.assert_array_equal(lx.load(dst).data, lx.ants.smooth_image(src, 1.5).data)
+
+
 # --- command lines ------------------------------------------------------------------------------
 
 

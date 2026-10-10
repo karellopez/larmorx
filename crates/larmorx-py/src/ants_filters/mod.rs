@@ -18,6 +18,7 @@
 
 mod gaussian;
 mod image_math;
+mod resample;
 mod threshold;
 
 use std::collections::HashMap;
@@ -313,5 +314,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     image_math::register(m)?;
     threshold::register(m)?;
     gaussian::register(m)?;
+    resample::register(m)?;
     Ok(())
 }

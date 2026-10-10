@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Gaussian filtering as ANTs does it: ``SmoothImage``, ``ResampleImageBySpacing`` and
-ImageMath's ``G``, ``Laplacian``, ``Grad`` and ``UnsharpMask``.
+"""Gaussian filtering as ANTs does it: ``SmoothImage`` and ImageMath's ``G``, ``Laplacian``,
+``Grad`` and ``UnsharpMask`` (``ResampleImageBySpacing`` is in
+:mod:`larmorx.ants.resample`).
 
 Every function takes an image (path, :class:`~larmorx.Image`, nibabel image or
 ``(array, affine)``) in 2, 3 or 4 dimensions and filters it in all of them, as ITK does (a 4D
@@ -10,21 +11,19 @@ and do not depend on ``n_threads``.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
 
 from larmorx import _core
-from larmorx.ants._filters import float_input, memory_image, result
+from larmorx.ants._filters import float_input, result
 from larmorx.image import Image
 
 __all__ = [
     "discrete_gaussian",
     "gradient_magnitude",
     "laplacian",
-    "resample_image_by_spacing",
     "smooth_image",
     "unsharp_mask",
 ]
@@ -129,45 +128,3 @@ def unsharp_mask(
         n_threads,
     )
     return result(data, a)
-
-
-def resample_image_by_spacing(
-    image: Any,
-    spacing: Sequence[float],
-    *,
-    smooth: bool = True,
-    add_voxels: int = 0,
-    nearest: bool = False,
-    n_threads: int = 1,
-) -> Image:
-    """``ResampleImageBySpacing d in out sx sy [sz [st]] smooth addvox nn``: the image resampled
-    onto a grid with the same origin and direction and the new ``spacing`` (one value per
-    axis; for a 4D image the last is the time step in seconds).
-
-    The output has ``int(size · old spacing / new spacing + add_voxels)`` voxels on each axis.
-    With ``smooth`` (as in ANTs, the default), each axis is first smoothed with a recursive
-    Gaussian of sigma ``new/old - 1`` where that is positive (ITK reads it in millimetres:
-    ``(new/old - 1) / old`` voxels). Interpolation is linear, or nearest-neighbour with
-    ``nearest``. Output voxels beyond the input take the input's value at index ``(1, 1, …)``.
-
-    Unlike the command line, ``nearest`` works in 2D too (there ANTs reads it from the
-    ``addvox`` argument).
-    """
-    spacing = [float(s) for s in spacing]
-    if isinstance(image, (str, os.PathLike)):
-        from larmorx.io import read_header
-
-        source: Any = os.fspath(image)
-        header = read_header(image)
-    else:
-        source = memory_image(image)
-        header = getattr(image, "header", None)
-    data, affine, _descrip, out_spacing = _core.ants_resample_image_by_spacing(
-        source, spacing, bool(smooth), int(add_voxels), bool(nearest), n_threads
-    )
-    if header is not None and len(out_spacing) >= 4:
-        scale = {"msec": 1e-3, "usec": 1e-6}.get(header.time_unit, 1.0)
-        pixdim = list(header.pixdim)
-        pixdim[4] = float(out_spacing[3]) / scale
-        header = header.replace(pixdim=tuple(pixdim))
-    return Image(np.asfortranarray(data), affine, header)

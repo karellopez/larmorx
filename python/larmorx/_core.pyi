@@ -198,8 +198,9 @@ def ants_program(
     outputs: list[str],
     n_threads: int = 1,
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
-    """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage`` or
-    ``ResampleImageBySpacing`` with ``args`` on in-memory ``inputs`` (by placeholder name);
+    """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``,
+    ``ResampleImageBySpacing`` or ``ResampleImage`` with ``args`` on in-memory ``inputs`` (by
+    placeholder name);
     writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``."""
 
@@ -317,6 +318,23 @@ def ants_resample_image_by_spacing(
 ) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
     """``ResampleImageBySpacing`` on a path (read in ``len(spacing)`` dimensions) or an
     in-memory image: ``(data, ras_affine, descrip, spacing)``."""
+
+def ants_resample_image(
+    image: str | ImageTuple,
+    dim: int,
+    spacing: list[float] | None = None,
+    size: list[int] | None = None,
+    interpolation: str = "linear",
+    sigma: list[float] | None = None,
+    alpha: float = 1.0,
+    window: str = "hamming",
+    order: int = 3,
+    pixel_type: str = "float",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
+    """``ResampleImage`` by ``spacing`` or ``size`` (``interpolation``: ``linear``, ``nearest``,
+    ``gaussian``, ``sinc``, ``bspline``; ``pixel_type``: ``char`` ... ``double``):
+    ``(data, ras_affine, descrip, spacing)``."""
 
 # --- Head-motion correction, mcflirt-compatible (larmorx/mri) ---------------------------------
 

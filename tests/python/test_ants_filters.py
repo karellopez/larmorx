@@ -197,6 +197,41 @@ def test_resample_image_by_spacing_grid_and_command_line(tmp_path):
     np.testing.assert_array_equal(lx.load(dst).data, lx.ants.smooth_image(src, 1.5).data)
 
 
+def test_resample_image_types_interpolators_and_command_line(tmp_path):
+    img = textured((10, 9, 8))
+    src, dst = tmp_path / "in.nii.gz", tmp_path / "out.nii.gz"
+    lx.save(img, src)
+    out = lx.ants.resample_image(img, 1.5)
+    assert out.shape == (13, 12, 16) and out.data.dtype == np.float32
+    np.testing.assert_allclose(np.diag(out.affine)[:3], [1.5, 1.5, 1.5], atol=1e-12)
+    for args, kw in [
+        (["1.5"], {}),
+        (["1.5", "0", "1"], {"interpolation": "nearest"}),
+        (["0.8", "0", "4", "5"], {"interpolation": "bspline", "order": 5, "pixel_type": "uint"}),
+        (["1.2", "0", "3"], {"interpolation": "sinc"}),
+        (["2", "0", "2"], {"interpolation": "gaussian"}),
+        (["20x18x16", "1"], {"size": [20, 18, 16]}),
+        (["1", "0", "0", "2"], {"pixel_type": "short"}),
+    ]:
+        code, _, err = run(["ResampleImage", "3", str(src), str(dst), *args])
+        assert code == 0, err
+        spacing = None if "size" in kw else float(args[0])
+        typed = lx.ants.resample_image(src, spacing, **kw)
+        written = lx.load(dst)
+        assert written.data.dtype == typed.data.dtype, args
+        np.testing.assert_array_equal(written.data, typed.data, err_msg=str(args))
+    by_size = lx.ants.resample_image(img, size=[19, 17, 15])
+    np.testing.assert_allclose(np.diag(by_size.affine)[:3], [1.0, 1.0, 1.5], atol=1e-12)
+    two = lx.ants.resample_image(image(img.data[:, :, 0]), 0.5, interpolation="nearest")
+    assert two.shape == (40, 36)
+    with pytest.raises(ValueError, match="3D"):
+        lx.ants.resample_image(image(img.data[:, :, 0]), 0.5, interpolation="bspline")
+    with pytest.raises(ValueError, match="either"):
+        lx.ants.resample_image(img)
+    code, stdout, _ = run(["ResampleImage", "3", str(src), str(dst), "1", "0", "0", "9"])
+    assert (code, stdout) == (1, "Unsupported pixel type\n")
+
+
 # --- command lines ------------------------------------------------------------------------------
 
 

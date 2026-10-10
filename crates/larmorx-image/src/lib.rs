@@ -15,14 +15,23 @@
 //! - Filters that can run in parallel take an explicit `n_threads` (0 = all CPUs). Their
 //!   results never depend on it.
 //! - Transcendental functions come from `larmorx_core::math`, which is correctly rounded.
+//! - Filters return [`FilterError`]; where ITK throws for the same arguments, the message is
+//!   ITK's. Float comparisons that ITK makes with `itk::Math::FloatAlmostEqual` use
+//!   [`itk_math`].
+//! - Voxel-wise and histogram filters take flat slices in Fortran order (they do not depend on
+//!   the image shape); spatial filters take a [`Volume`].
 #![forbid(unsafe_code)]
 
 pub mod components;
 pub mod distance;
+mod error;
 pub mod gaussian;
+pub mod intensity;
+pub mod itk_math;
 pub mod morphology;
 pub mod statistics;
 pub mod threshold;
 mod volume;
 
+pub use error::FilterError;
 pub use volume::Volume;

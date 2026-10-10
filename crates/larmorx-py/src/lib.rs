@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 
 mod afni;
 mod ants;
+mod ants_filters;
 mod nifti;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
@@ -32,6 +33,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cli_main, m)?)?;
     nifti::register(m)?;
     ants::register(m)?;
+    ants_filters::register(m)?;
     afni::register(m)?;
     Ok(())
 }

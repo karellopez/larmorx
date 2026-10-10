@@ -7,5 +7,33 @@ arguments.
 """
 
 from larmorx.ants.apply_transforms import apply_transforms, apply_transforms_to_points
+from larmorx.ants.image_math import (
+    ImageMathError,
+    add_to_zero,
+    image_arithmetic,
+    image_math,
+    image_math_operations,
+    negative_image,
+    normalize_image,
+    rescale_image,
+    truncate_image_intensity,
+)
+from larmorx.ants.threshold import OtsuResult, multiply_images, otsu_threshold, threshold_image
 
-__all__ = ["apply_transforms", "apply_transforms_to_points"]
+__all__ = [
+    "ImageMathError",
+    "OtsuResult",
+    "add_to_zero",
+    "apply_transforms",
+    "apply_transforms_to_points",
+    "image_arithmetic",
+    "image_math",
+    "image_math_operations",
+    "multiply_images",
+    "negative_image",
+    "normalize_image",
+    "otsu_threshold",
+    "rescale_image",
+    "threshold_image",
+    "truncate_image_intensity",
+]

@@ -121,3 +121,72 @@ def afni_tshift_array(
 ) -> tuple[np.ndarray, dict[str, Any], list[str]]:
     """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
     the shifted voxels, the output header fields and warnings."""
+
+# --- ANTs image programs: ImageMath, ThresholdImage, MultiplyImages (larmorx/ants) -------------
+
+ImageTuple = tuple[np.ndarray, np.ndarray, bytes | None]  # data, RAS+ affine, descrip
+
+def ants_program(
+    program: str,
+    args: list[str],
+    inputs: dict[str, ImageTuple],
+    outputs: list[str],
+    n_threads: int = 1,
+) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
+    """Run ``ImageMath``, ``ThresholdImage`` or ``MultiplyImages`` with ``args`` on in-memory
+    ``inputs`` (by placeholder name); writes to ``outputs`` names are returned:
+    ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``."""
+
+def ants_image_math_operations() -> list[tuple[str, str]]:
+    """The ImageMath operations larmorx implements: ``(name, usage)``."""
+
+def ants_read_float(
+    path: str, dim: int = 3, n_threads: int = 1
+) -> tuple[np.ndarray, np.ndarray, bytes]:
+    """Read a NIfTI image as ANTs reads it into ``itk::Image<float, dim>``."""
+
+def ants_arithmetic(
+    op: str, a: np.ndarray, b: np.ndarray | float, n_threads: int = 1
+) -> tuple[np.ndarray, float, int]:
+    """ImageMath's voxel-wise arithmetic on float32 arrays: ``(data, result, count)``."""
+
+def ants_negative_image(a: np.ndarray, n_threads: int = 1) -> np.ndarray:
+    """ImageMath ``Neg``."""
+
+def ants_truncate_image_intensity(
+    a: np.ndarray,
+    lower_quantile: float = 0.025,
+    upper_quantile: float | None = None,
+    bins: int = 64,
+    mask: np.ndarray | None = None,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, float, float]:
+    """ImageMath ``TruncateImageIntensity``: ``(data, lower, upper)``."""
+
+def ants_normalize_image(
+    a: np.ndarray, mode: str = "range", mask: np.ndarray | None = None, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``Normalize`` (``mode``: ``range``, ``mean`` or ``mask``)."""
+
+def ants_rescale_image(
+    a: np.ndarray, minimum: float, maximum: float, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``RescaleImage``."""
+
+def ants_to_float(a: np.ndarray) -> np.ndarray:
+    """float64 values converted to float32 as a C++ ``static_cast`` converts them."""
+
+def ants_threshold_image(
+    a: np.ndarray,
+    lower: float,
+    upper: float,
+    inside: float = 1.0,
+    outside: float = 0.0,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``ThresholdImage`` with a range."""
+
+def ants_otsu_threshold(
+    a: np.ndarray, n_thresholds: int, mask: np.ndarray | None = None, n_threads: int = 1
+) -> tuple[np.ndarray, np.ndarray]:
+    """``ThresholdImage ... Otsu n [mask]``: ``(labels, thresholds)``."""

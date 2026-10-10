@@ -18,8 +18,8 @@ use larmorx_core::Grid3;
 use larmorx_core::array::DynArray;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use larmorx_interp::{Interpolation, Window};
-use larmorx_io::nifti::itk::{ItkGeometry, ItkVoxels};
-use larmorx_io::nifti::{self, NiftiVersion};
+use larmorx_io::nifti;
+use larmorx_io::nifti::itk::{ItkGeometry, ItkMeta, ItkVoxels, write_itk_image};
 use larmorx_transform::{LinearTransform, Transform, TransformChain};
 
 use super::parser::{self, OptionSpec, OptionValue, Parsed, atof};
@@ -361,7 +361,7 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     }
     .map_err(|e| e.to_string())?;
 
-    // Write it as ITK would: both qform and sform (scanner), mm and seconds.
+    // Write it as ITK's NIfTI writer does (larmorx_io::nifti::itk::itk_header).
     let [nx, ny, nz] = reference_grid.size;
     let shape: Vec<usize> = if image_type == ImageType::TimeSeries {
         vec![nx, ny, nz, volumes]
@@ -369,31 +369,42 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
         vec![nx, ny, nz]
     };
     let data = cast_output(result, &shape, output_type);
-    let affine = reference_grid.ras_affine();
-    let mut header = nifti::header_for_image(
-        None,
-        Some(NiftiVersion::V1),
-        &shape,
-        data.data_type(),
-        &affine,
-    )
-    .map_err(|e| e.to_string())?;
-    header.set_qform(&affine, 1).map_err(|e| e.to_string())?;
-    header.set_sform(&affine, 1);
-    header.xyzt_units = 2 | 8;
-    if shape.len() == 4 && g.ndim >= 4 {
-        header.pixdim[4] = g.spacing[3];
-        header.toffset = g.origin[3];
+    let mut geometry = ItkGeometry::from_grid3(&reference_grid);
+    if shape.len() == 4 {
+        // The fourth axis comes from the input (read as a 4D image: size 1, spacing 1,
+        // origin 0 for a 3D file).
+        let (spacing, origin) = if g.ndim >= 4 {
+            (g.spacing[3], g.origin[3])
+        } else {
+            (1.0, 0.0)
+        };
+        geometry = geometry.with_axis(volumes, spacing, origin);
     }
-    nifti::write_dyn(
-        &output,
-        &header,
-        &data,
-        &nifti::WriteOptions {
-            n_threads,
-            ..Default::default()
-        },
-    )
+    let options = nifti::WriteOptions {
+        n_threads,
+        ..Default::default()
+    };
+    let meta = ItkMeta::default();
+    macro_rules! write {
+        ($a:expr) => {
+            write_itk_image(
+                &output,
+                &geometry,
+                &meta,
+                $a.as_slice_memory_order().expect("contiguous"),
+                &options,
+            )
+        };
+    }
+    match &data {
+        DynArray::F64(a) => write!(a),
+        DynArray::F32(a) => write!(a),
+        DynArray::I32(a) => write!(a),
+        DynArray::I16(a) => write!(a),
+        DynArray::U8(a) => write!(a),
+        DynArray::I8(a) => write!(a),
+        _ => unreachable!("cast_output makes only these types"),
+    }
     .map_err(|e| e.to_string())?;
     log(format!("Output warped image: {output}"));
     Ok(())

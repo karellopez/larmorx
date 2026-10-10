@@ -577,9 +577,76 @@ pub fn vnl_inverse3(m: &Mat3) -> Option<Mat3> {
     }))
 }
 
+/// [`vnl_inverse3`] for an `n × n` matrix (row-major): `vnl_matrix_inverse<double>`, as
+/// `itk::Matrix<double, n, n>::GetInverse` computes it for 2D and 4D images. Returns the
+/// inverse row-major, or `None` if the SVD fails.
+pub fn vnl_inverse(m: &[f64], n: usize) -> Option<Vec<f64>> {
+    assert_eq!(m.len(), n * n, "not an n × n matrix");
+    let (u, w, v) = vnl_svd(m, n, n)?;
+    let winv: Vec<f64> = w
+        .iter()
+        .map(|&wk| if wk.abs() <= 0.0 { 0.0 } else { 1.0 / wk })
+        .collect();
+    let mut vw = vec![0.0f64; n * n];
+    for i in 0..n {
+        for k in 0..n {
+            let mut sum = 0.0;
+            for (j, &wj) in winv.iter().enumerate() {
+                let d = if j == k { wj } else { 0.0 };
+                sum += v[i + n * j] * d;
+            }
+            vw[i * n + k] = sum;
+        }
+    }
+    let mut out = vec![0.0f64; n * n];
+    for i in 0..n {
+        for k in 0..n {
+            let mut sum = 0.0;
+            for j in 0..n {
+                sum += vw[i * n + j] * u[k + n * j];
+            }
+            out[i * n + k] = sum;
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_general_inverse_matches_the_3x3_one() {
+        let m = [[1.4, 0.3, -0.12], [-0.25, 1.1, 0.4], [0.05, -0.2, 2.1]];
+        let flat: Vec<f64> = m.iter().flatten().copied().collect();
+        let general = vnl_inverse(&flat, 3).unwrap();
+        let three: Vec<f64> = vnl_inverse3(&m)
+            .unwrap()
+            .iter()
+            .flatten()
+            .copied()
+            .collect();
+        assert_eq!(general, three);
+        // 2×2 and 4×4.
+        let m2 = [0.9, -0.3, 0.2, 1.7];
+        let i2 = vnl_inverse(&m2, 2).unwrap();
+        for r in 0..2 {
+            for c in 0..2 {
+                let x: f64 = (0..2).map(|k| m2[r * 2 + k] * i2[k * 2 + c]).sum();
+                assert!((x - if r == c { 1.0 } else { 0.0 }).abs() < 1e-15);
+            }
+        }
+        let m4 = [
+            1.0, 0.1, 0.0, 0.0, -0.2, 1.3, 0.05, 0.0, 0.0, 0.3, 0.8, 0.0, 0.0, 0.0, 0.0, 2.0,
+        ];
+        let i4 = vnl_inverse(&m4, 4).unwrap();
+        for r in 0..4 {
+            for c in 0..4 {
+                let x: f64 = (0..4).map(|k| m4[r * 4 + k] * i4[k * 4 + c]).sum();
+                assert!((x - if r == c { 1.0 } else { 0.0 }).abs() < 1e-14);
+            }
+        }
+    }
 
     fn matmul(a: &Mat3, b: &Mat3) -> Mat3 {
         std::array::from_fn(|i| std::array::from_fn(|j| (0..3).map(|k| a[i][k] * b[k][j]).sum()))

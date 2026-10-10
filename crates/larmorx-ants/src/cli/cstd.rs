@@ -11,6 +11,8 @@
 //!   number or an image file.
 //! - [`format_g`]: `std::cout << value` for `float` and `double` (`%g` with 6 significant
 //!   digits).
+//! - [`convert_vector_f32`]: ANTs' `ConvertVector<float>` (`1.5x1x2`).
+//! - [`stof`]: `std::stof`, which throws when there is no number.
 
 pub use super::parser::atof;
 
@@ -97,6 +99,92 @@ pub fn from_string_f32(s: &str) -> StreamFloat {
         is_number: i == bytes.len(),
         value: Some(strtof_whole(&text)),
     }
+}
+
+/// ANTs' `ConvertVector<float>` (`Examples/antsUtilities.h`): the text split at every `x`,
+/// each piece read with `istringstream >> float` into one variable that is reused from piece
+/// to piece. A piece with nothing but whitespace leaves the variable as it was, so `1.5x`
+/// gives `[1.5, 1.5]`; where the variable was never set (an empty first piece), C++ reads an
+/// uninitialised value, and this returns `None`. A piece that is not a number reads as 0.
+pub fn convert_vector_f32(s: &str) -> Option<Vec<f32>> {
+    let mut value: Option<f32> = None;
+    let mut out = Vec::new();
+    for piece in s.split('x') {
+        if let Some(v) = from_string_f32(piece).value {
+            value = Some(v);
+        }
+        out.push(value?);
+    }
+    Some(out)
+}
+
+/// `std::stof(s)`: glibc's `strtof` on the longest number at the start of `s` (after
+/// whitespace): decimals, `inf`, `infinity`, `nan` (any case) and hexadecimal floats. `None`
+/// where `std::stof` throws: no number, or a result out of range (overflow to infinity).
+pub fn stof(s: &str) -> Option<f32> {
+    let t = s.trim_start_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']);
+    let b = t.as_bytes();
+    let mut i = usize::from(matches!(b.first(), Some(b'+' | b'-')));
+    let negative = b.first() == Some(&b'-');
+    let rest = t[i..].to_ascii_lowercase();
+    if rest.starts_with("inf") {
+        return Some(if negative {
+            f32::NEG_INFINITY
+        } else {
+            f32::INFINITY
+        });
+    }
+    if rest.starts_with("nan") {
+        return Some(if negative { -f32::NAN } else { f32::NAN });
+    }
+    if rest.starts_with("0x") {
+        // Hexadecimal: exact in double for the floats a command line holds.
+        let v = super::parser::atof(t) as f32;
+        return v.is_finite().then_some(v);
+    }
+    let from = i;
+    let mut digits = 0;
+    while b.get(i).is_some_and(u8::is_ascii_digit) {
+        i += 1;
+        digits += 1;
+    }
+    if b.get(i) == Some(&b'.') {
+        i += 1;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+            digits += 1;
+        }
+    }
+    if digits == 0 {
+        return None;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        let mut j = i + 1;
+        if matches!(b.get(j), Some(b'+' | b'-')) {
+            j += 1;
+        }
+        let e = j;
+        while b.get(j).is_some_and(u8::is_ascii_digit) {
+            j += 1;
+        }
+        if j > e {
+            i = j;
+        }
+    }
+    let mut text = String::from(&t[..from]);
+    let body = &t[from..i];
+    if body.starts_with('.') {
+        text.push('0');
+    }
+    text.push_str(body);
+    let text = text.replace(".e", ".0e").replace(".E", ".0E");
+    let text = if text.ends_with('.') {
+        format!("{text}0")
+    } else {
+        text
+    };
+    let v: f32 = text.parse().ok()?;
+    v.is_finite().then_some(v)
 }
 
 /// libstdc++'s `__convert_to_v` for float: `strtof` must consume the whole text (else 0);
@@ -310,6 +398,25 @@ mod tests {
             }
         );
         assert_eq!(f("-1e40").value, Some(-f32::MAX));
+    }
+
+    #[test]
+    fn vectors_and_stof() {
+        assert_eq!(convert_vector_f32("1.5"), Some(vec![1.5]));
+        assert_eq!(convert_vector_f32("1x2.5x3"), Some(vec![1.0, 2.5, 3.0]));
+        assert_eq!(convert_vector_f32("1.5x"), Some(vec![1.5, 1.5]));
+        assert_eq!(convert_vector_f32("2xabc"), Some(vec![2.0, 0.0]));
+        assert_eq!(convert_vector_f32(""), None);
+        assert_eq!(convert_vector_f32("x1"), None);
+        assert_eq!(stof("0.5"), Some(0.5));
+        assert_eq!(stof("  -2e1xyz"), Some(-20.0));
+        assert_eq!(stof(".5"), Some(0.5));
+        assert_eq!(stof("5."), Some(5.0));
+        assert_eq!(stof("1e"), Some(1.0));
+        assert_eq!(stof("0x10"), Some(16.0));
+        assert_eq!(stof("abc"), None);
+        assert_eq!(stof("1e60"), None);
+        assert_eq!(stof("0.1"), Some(0.1f32));
     }
 
     #[test]

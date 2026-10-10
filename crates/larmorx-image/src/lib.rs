@@ -7,8 +7,11 @@
 //! possible. The provenance of each module is in `PROVENANCE.md`.
 //!
 //! **Conventions** shared by every module:
-//! - Volumes are [`Volume`]: voxels in Fortran order (`x` fastest), the size, and the spacing
-//!   in mm. Spacing matters for filters whose parameters are physical, such as Gaussian sigmas.
+//! - Spatial filters take a [`VolumeRef`] (a borrowed [`Volume`]): voxels in Fortran order
+//!   (first axis fastest), the size and the spacing, in **as many dimensions as the ITK image**
+//!   (2, 3 or 4 for ANTs). ITK's filters are `D`-dimensional: a 4D image is filtered along
+//!   time too, and a 2D image is not a 3D image with one slice. Spacing matters for filters
+//!   whose parameters are physical, such as Gaussian sigmas.
 //! - The pixel precision is the one ITK uses for the same instantiation. ANTs reads images as
 //!   `float`, and ITK's `NumericTraits<float>::RealType` is `double`, so many filters
 //!   accumulate in `f64` and store `f32`.
@@ -19,19 +22,22 @@
 //!   ITK's. Float comparisons that ITK makes with `itk::Math::FloatAlmostEqual` use
 //!   [`itk_math`].
 //! - Voxel-wise and histogram filters take flat slices in Fortran order (they do not depend on
-//!   the image shape); spatial filters take a [`Volume`].
+//!   the image shape).
 #![forbid(unsafe_code)]
 
 pub mod components;
+pub mod discrete_gaussian;
 pub mod distance;
 mod error;
 pub mod gaussian;
 pub mod intensity;
 pub mod itk_math;
+mod lines;
+pub mod median;
 pub mod morphology;
 pub mod statistics;
 pub mod threshold;
 mod volume;
 
 pub use error::FilterError;
-pub use volume::Volume;
+pub use volume::{Volume, VolumeRef, strides};

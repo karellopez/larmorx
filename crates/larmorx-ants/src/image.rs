@@ -84,22 +84,12 @@ impl<T> AntsImage<T> {
     }
 }
 
-impl<T: Clone> AntsImage<T> {
-    /// The voxels as a [`larmorx_image::Volume`] for the spatial filters: size and spacing of
-    /// a 3D image, or of a 2D image with a third axis of one voxel (spacing 1). `None` for 4D
-    /// images: ITK's spatial filters work in all four dimensions there (a `D`-dimensional
-    /// neighbourhood), which a 3D volume cannot represent.
-    pub fn to_volume(&self) -> Option<larmorx_image::Volume<T>> {
-        let g = &self.geometry;
-        let (size, spacing) = match g.ndim {
-            3 => (
-                [g.size[0], g.size[1], g.size[2]],
-                [g.spacing[0], g.spacing[1], g.spacing[2]],
-            ),
-            2 => ([g.size[0], g.size[1], 1], [g.spacing[0], g.spacing[1], 1.0]),
-            _ => return None,
-        };
-        Some(larmorx_image::Volume::new(self.data.clone(), size, spacing))
+impl<T> AntsImage<T> {
+    /// The voxels as a [`larmorx_image::VolumeRef`] for the spatial filters: the image's own
+    /// `D` dimensions, size and spacing (ITK's spatial filters work in all `D` dimensions: a
+    /// 4D image is filtered along time too).
+    pub fn view(&self) -> larmorx_image::VolumeRef<'_, T> {
+        larmorx_image::VolumeRef::new(&self.data, &self.geometry.size, &self.geometry.spacing)
     }
 }
 
@@ -461,8 +451,11 @@ mod tests {
         let mut store = FileStore;
         let img: AntsImage<f32> = store.read(p3.to_str().unwrap(), 3, 1).unwrap();
         assert_eq!(img.size(), [4, 3, 2]);
-        let vol = img.to_volume().unwrap();
-        assert_eq!((vol.size, vol.spacing), ([4, 3, 2], [2.0, 3.0, 4.0]));
+        let vol = img.view();
+        assert_eq!(
+            (vol.size, vol.spacing),
+            (&[4, 3, 2][..], &[2.0, 3.0, 4.0][..])
+        );
         assert_eq!(img.meta.descrip, b"test");
         assert_eq!(img.data[5], 2.5);
         let ints: AntsImage<i32> = store.read(p3.to_str().unwrap(), 3, 1).unwrap();

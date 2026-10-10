@@ -211,6 +211,8 @@ fn ants_program<'py>(
         "ImageMath" => larmorx_ants::cli::image_math::run,
         "ThresholdImage" => larmorx_ants::cli::threshold_image::run,
         "MultiplyImages" => larmorx_ants::cli::multiply_images::run,
+        "SmoothImage" => larmorx_ants::cli::smooth_image::run,
+        "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         other => {
             return Err(PyValueError::new_err(format!(
                 "unknown ANTs image program {other:?}"

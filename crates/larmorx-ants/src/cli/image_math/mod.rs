@@ -42,6 +42,7 @@
 //! An operation listed in [`KNOWN`] but in no group answers "not supported yet".
 
 mod arithmetic;
+mod gaussian;
 mod intensity;
 
 use std::io::Write;
@@ -63,7 +64,11 @@ pub struct Operation {
 }
 
 /// The operation groups larmorx implements. Add new groups here.
-pub const GROUPS: &[&[Operation]] = &[arithmetic::OPERATIONS, intensity::OPERATIONS];
+pub const GROUPS: &[&[Operation]] = &[
+    arithmetic::OPERATIONS,
+    intensity::OPERATIONS,
+    gaussian::OPERATIONS,
+];
 
 /// Every operation name in ANTs v2.6.5's dispatch tables, with the dimensions each table
 /// serves (`ImageMathHelperAll`: 2, 3, 4; `2DOnly`; `2DOr3D`; `3DOr4D`; `3DOnly`; `4DOnly`).
@@ -533,6 +538,9 @@ mod tests {
         );
         // Known to ANTs, not to larmorx yet.
         let (code, _, err) = run_capture(&["3", "o.nii", "Canny", "a.nii"]);
+        assert_eq!(code, 1);
+        assert!(err.contains("not supported yet"), "{err}");
+        let (code, _, err) = run_capture(&["3", "o.nii", "PeronaMalik", "a.nii"]);
         assert_eq!(code, 1);
         assert!(err.contains("not supported yet"), "{err}");
         // A 2D-only operation in 3D is unknown to ANTs.

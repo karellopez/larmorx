@@ -222,7 +222,7 @@ These are named by function, not by the original tool (D4). Each tool's docs sta
 
 ## 4. The per-tool contract ("each binary has its own Python wrapper")
 
-Every catalog entry ships the same six things. CI checks that all of them exist.
+Every catalog entry ships the same seven things. CI checks that all of them exist.
 
 1. **Rust API**: typed and builder-style; works on in-memory types.
    ```rust
@@ -255,10 +255,11 @@ Every catalog entry ships the same six things. CI checks that all of them exist.
    This lets existing scripts and settings files work unchanged, for example fMRIPrep's registration JSONs, which map 1:1 onto antsRegistration flags.
 4. **Type stubs and docs**: `.pyi` stubs generated from the Rust signatures (e.g. with `pyo3-stub-gen`). A docs page per tool with the **option-mapping table** (original flag → Rust/Python parameter → status).
 5. **Validation record**: the oracle used, datasets, metrics and thresholds (§11). It sets the tool's **status**:
-   - `experimental`: runs, but has no oracle comparison yet
+   - `experimental`: runs, but has no oracle comparison yet, or not every case is within its thresholds
    - `validated`: within thresholds on the oracle set
    - `stable`: validated, plus API frozen under SemVer
 6. **PROVENANCE.md**: for ports, the upstream files and versions; for clean-room tools, the papers and specs.
+7. **Golden cases** (§11.4): at least one light, self-generated input per function, with the SHA-256 of larmorx's Linux x64 output, which every CI platform must reproduce.
 
 ### 4.1 Shared conventions
 - **Coordinates:** world space is RAS mm. Images carry a float64 affine. Converting to and from ITK's LPS conventions happens at the API boundary of `lx.ants`, exactly as ANTs does.
@@ -515,7 +516,7 @@ def bold_pipeline(run, anat, fmap, s):
 
 ### 11.2 Levels
 1. **Unit/property tests:** every kernel against its oracle; thread-count invariance; parser fuzzing; all targets, on every PR.
-2. **Tool level:** every catalog tool against its oracle on real data; on every PR (subset) and nightly (full).
+2. **Tool level:** every catalog tool against its oracle on real data. This runs on the Linux x64 development machine, where the oracles are, never in CI (§11.4).
 3. **CLI compatibility:** the same argument lists to larmorx and to the original tool, compare outputs. This includes all fMRIPrep settings files.
 4. **Pipeline level:** larmorprepx vs fMRIPrep on ds000005, ds000054, ds000210, ds001600/HCP (PEPOLAR), ds001771/ds000206 (phasediff), plus an OpenNeuro diversity set (oblique, anisotropic, 7T, multiband + sbref, long/short runs, lesions, pediatric/elderly); weekly and at release.
 5. **FreeSurfer step level:** each ported step against FreeSurfer intermediates.
@@ -538,6 +539,31 @@ def bold_pipeline(run, anat, fmap, s):
 | Preprocessed BOLD | temporal-mean NCC; tSNR r; per-voxel time-series r (median) | > 0.99; > 0.98; > 0.98 |
 | FreeSurfer surfaces | vertex distance, median / 95th percentile | ≤ 0.1 / 0.5 mm, or within band |
 | FreeSurfer thickness / aseg | ICC, mean abs difference / Dice | > 0.95, ≤ 0.05 mm / ≥ 0.95 |
+
+### 11.4 Cross-platform golden tests and the CI budget (decided 2026-10-10, D12)
+- **Parity** (§11.2) compares larmorx with the original tools on Linux x64 only. Most originals
+  do not exist on Windows or macOS, so they are not compared there.
+- **Golden tests** check that every other platform reproduces larmorx's own Linux x64 output,
+  bit for bit. Replicas and clean-room originals alike.
+  - **Every function has at least one case:** every CLI tool, ImageMath op and public Python
+    function. Each case has an input recipe the test generates itself (seeded, plain
+    arithmetic, no transcendental functions), the arguments, and the SHA-256 of the output
+    data.
+  - **The checksums are recorded on Linux x64** by a script, from a commit whose parity passed.
+    No image data is committed.
+  - **A coverage test** fails when a registered tool has no case.
+  - **A mismatch fails CI.** The failing job uploads its outputs, so the size of the
+    difference can be measured.
+  - **Tolerances** need a documented reason (`docs/findings/`); a fix is preferred.
+- **The CI budget is small** (the user: "do not make the test huge, otherwise we will be out of
+  GitHub actions rates"):
+  - inputs at most 32³ voxels (4 volumes for 4D);
+  - one case per distinct code path;
+  - the whole suite under a minute per platform, on the release wheel the test job already
+    builds, once per platform, inside the existing jobs;
+  - no parity, benchmarks or real data in CI;
+  - docs-only changes skip CI;
+  - before adding CI work, estimate minutes × jobs (13 jobs today).
 
 ---
 

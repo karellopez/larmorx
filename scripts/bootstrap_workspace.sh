@@ -68,6 +68,39 @@ clone_one() {
   fi
 }
 
+# Download a release tarball, check its SHA-256 and unpack it, for upstreams pinned by a
+# tarball (the commit column is "sha256:<hex>"). Idempotent: a marker file records the hash.
+fetch_tarball() {
+  local name="$1" url="$2" sha="$3" dest="$4"
+  local want="${sha#sha256:}" got tmp
+  if [[ -f "$dest/.upstream-sha256" && "$(cat "$dest/.upstream-sha256")" == "$want" ]]; then
+    echo "  = $name (already at sha256 ${want:0:9})"
+    return 0
+  fi
+  command -v curl >/dev/null || { echo "  ! $name: curl is required" >&2; return 1; }
+  tmp="$(mktemp -d)"
+  if ! curl -sSfL -o "$tmp/src.tar" "$url"; then
+    echo "  ! $name: failed to download $url" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  if command -v sha256sum >/dev/null; then
+    got="$(sha256sum "$tmp/src.tar" | cut -d' ' -f1)"
+  else
+    got="$(shasum -a 256 "$tmp/src.tar" | cut -d' ' -f1)"
+  fi
+  if [[ "$got" != "$want" ]]; then
+    echo "  ! $name: sha256 $got, expected $want" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  mkdir -p "$dest"
+  tar -xf "$tmp/src.tar" -C "$dest" --strip-components=1
+  echo "$want" > "$dest/.upstream-sha256"
+  rm -rf "$tmp"
+  echo "  + $name @ sha256 ${want:0:9}"
+}
+
 echo "cloning upstream references (jobs=$JOBS)..."
 fail=0
 pids=()
@@ -81,7 +114,11 @@ while IFS=$'\t' read -r name url sha licence location; do
     reference_src) dest="$WS_DIR/reference_src/$name" ;;
     *) echo "  ! $name: unknown location '$location'" >&2; fail=1; continue ;;
   esac
-  clone_one "$name" "$url" "$sha" "$dest" &
+  if [[ "$sha" == sha256:* ]]; then
+    fetch_tarball "$name" "$url" "$sha" "$dest" &
+  else
+    clone_one "$name" "$url" "$sha" "$dest" &
+  fi
   pids+=("$!")
   while [[ "$(jobs -rp | wc -l)" -ge "$JOBS" ]]; do sleep 0.5; done
 done < "$LOCK"

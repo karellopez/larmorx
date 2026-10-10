@@ -1,6 +1,7 @@
 # Upstream repositories analysed for larmorx, pinned to the exact commits read on 2026-10-08/09.
 # Used by scripts/bootstrap_workspace.sh. Columns are TAB-separated:
 #   name  url  commit  licence  location
+# commit: a git commit, or "sha256:<hex>" for a release tarball (downloaded, checked, unpacked)
 # location: "ws"            = clone into the workspace root (read-only reference)
 #           "tags"          = clone into <workspace>/tags/: the release tags code is ported from (UPSTREAM.md)
 #           "reference_src" = clone into <workspace>/reference_src/ (licence review only; DO NOT READ for implementation)
@@ -29,3 +30,4 @@ ANTs-v2.6.5	https://github.com/ANTsX/ANTs.git	fdce4d2f84b60ac75d7e45aafe18488b1f
 ITK-v5.4.5	https://github.com/InsightSoftwareConsortium/ITK.git	f51594ad88194a72cdc06a314dafff709fcdc2e9	Apache-2.0	tags
 AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags
 core-math	https://gitlab.inria.fr/core-math/core-math.git	040ee482a8caefe2afe71a3a59d43923d2f0c7e6	MIT	tags
+glibc-2.35	https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz	sha256:5123732f6b67ccd319305efd399971d58592122bcc2a6518a1bd2510dd0cf52e	LGPL-2.1-or-later	tags

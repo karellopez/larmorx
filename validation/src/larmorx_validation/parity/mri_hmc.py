@@ -311,7 +311,11 @@ def _thresholds(case: str) -> tuple[float, float, float, float, str]:
     mcflirt's own variability for this case where that is larger."""
     from larmorx_validation.parity.mri_hmc_band import band_for
 
-    band = band_for(case)
+    # Runs that repeat an estimation with more output files share its band.
+    base = case.removesuffix("-reports")
+    for suffix in ("-repeat2", "-repeat3"):
+        base = base.removesuffix(suffix)
+    band = band_for(base)
     if band is None:
         return P95_RMS_MM, MEDIAN_MM, MEDIAN_DEG, FD_R, "spec"
     p95 = max(P95_RMS_MM, band["rms_p95"])
@@ -635,34 +639,47 @@ def _run_case_recording(case: Case, checks: CheckList) -> None:
 # Report
 
 
-def _band_lines() -> list[str]:
+def _band_rows() -> list[dict[str, Any]]:
     root = oracle_dir()
     path = None if root is None else root / "band" / "band.json"
     if path is None or not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))["runs"]
+
+
+def _band_lines() -> list[str]:
+    runs = _band_rows()
+    if not runs:
         return ["- The variability band (perturbation runs of mcflirt) has not been measured here."]
-    band = json.loads(path.read_text(encoding="utf-8"))
     rows = [
         (
-            b["dataset"],
+            f"`{b['case']}`",
             b["perturbation"],
             f"{b['rms_median']:.4f}",
             f"{b['rms_p95']:.4f}",
             f"{b['param_mm_median']:.4f} / {b['param_deg_median']:.4f}",
+            f"{b.get('fd_r', float('nan')):.4f}",
         )
-        for b in band["runs"]
+        for b in sorted(runs, key=lambda b: (b["case"], b["perturbation"]))
     ]
     return [
-        "**mcflirt's own variability band**: the same matrices compared between mcflirt runs on "
-        "slightly perturbed inputs (`larmorx_validation.parity.mri_hmc_band`, fMRIPrep's "
-        "command):",
+        "## mcflirt's own variability band",
+        "",
+        "mcflirt is deterministic, so its variability is measured by perturbing its input slightly "
+        "and comparing its matrices with its own unperturbed ones "
+        "(`python -m larmorx_validation.parity.mri_hmc_band`): uniform noise of ±0.5 intensity "
+        "units, the volumes in reverse order (runs with a separate reference), the top slice "
+        "cropped. Noise and reverse order set the widened thresholds; cropping changes the "
+        "problem more (it breaks thin images) and is only reported.",
         "",
         table(
             (
-                "Data",
+                "Run",
                 "Perturbation",
                 "RMS dev. median (mm)",
                 "95th pct (mm)",
-                "Median param. diff (mm / °)",
+                "Median Δparam (mm / °)",
+                "FD r",
             ),
             rows,
         ),
@@ -670,64 +687,105 @@ def _band_lines() -> list[str]:
 
 
 def _highlights(results: list[CaseResult]) -> list[str]:
+    from larmorx_validation.parity.mri_hmc_band import band_for
+
     compared = [r for r in results if r.status == PASS and _METRICS.get(r.case, {}).get("mats")]
-    lines = []
-    if compared:
-        allm = [_METRICS[r.case] for r in compared]
-        ident = sum(m["identical"] for m in allm)
-        total = sum(m["mats"] for m in allm)
-        lines += [
-            f"**Matrices:** over {len(compared)} runs with `-mats`, the worst 95th-percentile RMS "
-            f"deviation from mcflirt's matrices is {max(m['rms_p95'] for m in allm):.4f} mm "
-            f"(threshold {P95_RMS_MM} mm) and the worst median parameter difference "
-            f"{max(m['param_mm_median'] for m in allm):.4f} mm / "
-            f"{max(m['param_deg_median'] for m in allm):.4f}° (threshold {MEDIAN_MM} mm / "
-            f"{MEDIAN_DEG}°). {ident} of {total} matrix files are identical to mcflirt's as text "
-            "(6 decimals).",
-            "",
-        ]
+    lines: list[str] = []
+    if not compared:
+        return [*lines, "", *_band_lines()]
+    allm = [_METRICS[r.case] for r in compared]
+    ident = sum(m["identical"] for m in allm)
+    total = sum(m["mats"] for m in allm)
+    fmriprep = [r for r in compared if r.case.startswith("real/") and r.case.endswith("/fmriprep")]
+    if fmriprep:
         rows = []
-        for cat in sorted({r.category for r in compared}):
-            ms = [_METRICS[r.case] for r in compared if r.category == cat]
-            fdr = [m["fd_r"] for m in ms if "fd_r" in m and m.get("fd_max", 0) >= FD_MIN_MM]
+        for r in fmriprep:
+            m = _METRICS[r.case]
+            band = band_for(r.case) or {}
             rows.append(
                 (
-                    cat,
-                    len(ms),
-                    f"{np.median([m['rms_median'] for m in ms]):.4f}",
-                    f"{max(m['rms_p95'] for m in ms):.4f}",
-                    f"{max(m['param_mm_median'] for m in ms):.4f} / {max(m['param_deg_median'] for m in ms):.4f}",
-                    f"{max(m['param_mm_max'] for m in ms):.3f} / {max(m['param_deg_max'] for m in ms):.3f}",
-                    f"{min(fdr):.4f}" if fdr else "–",
-                    f"{sum(m['identical'] for m in ms)}/{sum(m['mats'] for m in ms)}",
+                    r.case.split("/")[1],
+                    m["volumes"],
+                    f"{m['rms_median']:.4f}",
+                    f"**{m['rms_p95']:.4f}**",
+                    f"{band.get('rms_p95', float('nan')):.4f}",
+                    f"{m['param_mm_median']:.4f} / {m['param_deg_median']:.4f}",
+                    f"{m.get('fd_r', float('nan')):.4f}",
+                    f"{band.get('fd_r', float('nan')):.4f}",
                 )
             )
         lines += [
+            "**fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): "
+            "larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its "
+            "input is perturbed slightly (the band, worst of noise and reverse order):",
+            "",
             table(
                 (
-                    "Category",
-                    "Runs",
+                    "Run",
+                    "Volumes",
                     "RMS dev. median (mm)",
-                    "Worst 95th pct (mm)",
-                    "Worst median Δparam (mm / °)",
-                    "Max Δparam (mm / °)",
-                    "Lowest FD r",
-                    "Identical .mat",
+                    "95th pct (mm)",
+                    "mcflirt band 95th pct (mm)",
+                    "Median Δparam (mm / °)",
+                    "FD r",
+                    "mcflirt band FD r",
                 ),
                 rows,
             ),
             "",
         ]
-        truth = [_METRICS[r.case] for r in compared if "truth_larmorx" in _METRICS[r.case]]
-        if truth:
-            lines += [
-                "**Against the synthetic ground truth** (mean RMS deviation from the true motion, "
-                f"{len(truth)} runs): larmorx {np.mean([m['truth_larmorx'] for m in truth]):.4f} mm, "
-                f"mcflirt {np.mean([m['truth_mcflirt'] for m in truth]):.4f} mm.",
-                "",
-            ]
-    lines += _band_lines()
-    return lines
+    lines += [
+        f"**All runs with `-mats`** ({len(compared)}): the worst 95th-percentile RMS deviation "
+        f"is {max(m['rms_p95'] for m in allm):.4f} mm and the worst median parameter difference "
+        f"{max(m['param_mm_median'] for m in allm):.4f} mm / "
+        f"{max(m['param_deg_median'] for m in allm):.4f}° (thresholds per run: "
+        f"{P95_RMS_MM} mm and {MEDIAN_MM} mm / {MEDIAN_DEG}°, or mcflirt's band where wider; "
+        f"{sum(m.get('threshold_source') == 'band' for m in allm)} runs use the band). "
+        f"{ident} of {total} matrix files are identical to mcflirt's as text (6 decimals).",
+        "",
+    ]
+    rows = []
+    for cat in sorted({r.category for r in compared}):
+        ms = [_METRICS[r.case] for r in compared if r.category == cat]
+        fdr = [m["fd_r"] for m in ms if "fd_r" in m and m.get("fd_max", 0) >= FD_MIN_MM]
+        rows.append(
+            (
+                cat,
+                len(ms),
+                f"{np.median([m['rms_median'] for m in ms]):.4f}",
+                f"{max(m['rms_p95'] for m in ms):.4f}",
+                f"{max(m['param_mm_median'] for m in ms):.4f} / "
+                f"{max(m['param_deg_median'] for m in ms):.4f}",
+                f"{max(m['param_mm_max'] for m in ms):.3f} / {max(m['param_deg_max'] for m in ms):.3f}",
+                f"{min(fdr):.4f}" if fdr else "–",
+                f"{sum(m['identical'] for m in ms)}/{sum(m['mats'] for m in ms)}",
+            )
+        )
+    lines += [
+        table(
+            (
+                "Category",
+                "Runs",
+                "RMS dev. median (mm)",
+                "Worst 95th pct (mm)",
+                "Worst median Δparam (mm / °)",
+                "Max Δparam (mm / °)",
+                "Lowest FD r",
+                "Identical .mat",
+            ),
+            rows,
+        ),
+        "",
+    ]
+    truth = [_METRICS[r.case] for r in compared if "truth_larmorx" in _METRICS[r.case]]
+    if truth:
+        lines += [
+            "**Against the synthetic ground truth** (mean RMS deviation from the true motion, "
+            f"{len(truth)} runs): larmorx {np.mean([m['truth_larmorx'] for m in truth]):.4f} mm, "
+            f"mcflirt {np.mean([m['truth_mcflirt'] for m in truth]):.4f} mm.",
+            "",
+        ]
+    return [*lines, *_band_lines()]
 
 
 def suite() -> Suite:

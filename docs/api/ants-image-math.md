@@ -3,19 +3,25 @@
 `lx.ants.image_math` (the command line on in-memory images) and typed wrappers of its
 operations: `lx.ants.image_arithmetic`, `add_to_zero`, `negative_image`,
 `truncate_image_intensity`, `normalize_image`, `rescale_image`, `discrete_gaussian`,
-`laplacian`, `gradient_magnitude`, `unsharp_mask`. Command line
+`laplacian`, `gradient_magnitude`, `unsharp_mask`, `morphology`, `morphological_dilate`,
+`morphological_erode`, `morphological_open`, `morphological_close`, `grayscale_dilate`,
+`grayscale_erode`, `grayscale_open`, `grayscale_close`, `fill_holes`, `pad_image`. Command line
 `larmorx ants ImageMath`. Rust: `larmorx_ants::image_math` (operations),
 `larmorx_ants::cli::image_math` (the dispatcher), `larmorx_image` (ITK filters).
 A replica of ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
 
 **Status: `validated`** for the operations below, against ImageMath itself (see the
-[validation record](../validation/ants-image-math.md)): 162 cases, 145 outputs compared,
-142 bit-identical; every output has ANTs' exact header bytes. The 3 others are `^`, where
-ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35 of
-35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)). Every Gaussian
-case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4 dimensions,
-fMRIPrep's `Laplacian 1.5 1` on real T1w, boldref and template images included) is
-bit-identical.
+[validation record](../validation/ants-image-math.md)): 264 cases, 242 outputs compared,
+237 bit-identical; every output has ANTs' exact header bytes. Of the 5 others, 3 are `^`,
+where ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35
+of 35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)); 2 are
+grayscale morphology on an image made to hold `-0.0` next to `+0.0`, where only the sign of
+a zero result differs ([why](../findings/ants-morphology.md#grayscale-morphology)). Every
+Gaussian case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4
+dimensions, fMRIPrep's `Laplacian 1.5 1` on real T1w, boldref and template images included)
+is bit-identical, and so is every other morphology case (95 compared: `MD`, `ME`, `MO`,
+`MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage` in 2, 3 and 4 dimensions, sMRIPrep's
+`MD 2/5`, `ME 2/10`, `FillHoles 2` and `PadImage ±10` on real masks included).
 
 **Speed** ([benchmark](../benchmarks/ants-programs.md)): fMRIPrep's
 `TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on
@@ -24,7 +30,11 @@ bit-identical.
 gzipped input is most of the time. The Gaussian operations
 ([benchmark](../benchmarks/ants-gaussian.md)): fMRIPrep's `Laplacian 1.5 1` on a raw T1w takes
 351 ms on one thread and 128 ms on 12, against 1.23 s and 277 ms for ANTs (7 ms against 52 ms
-on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms.
+on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms. The morphology
+operations ([benchmark](../benchmarks/ants-morphology.md)) on a 1 mm brain mask: `ME 10`
+306 ms on one thread and 81 ms on 12, against 900 ms for ANTs (which does not gain from
+threads here); `MD 2` 137 ms against 249 ms; `FillHoles 2` 70 ms against 2.89 s;
+`GD 2` on a raw T1w 171 ms against 1.75 s.
 
 **Implemented operations** (the others answer "not supported yet"):
 
@@ -33,9 +43,10 @@ on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms.
 | arithmetic | `m`, `+`, `-`, `/`, `^`, `exp`, `max`, `abs`, `addtozero`, `overadd`, `Decision`, `total`, `mean`, `vtotal`, `Neg` |
 | intensity | `TruncateImageIntensity`, `Normalize`, `RescaleImage` |
 | gaussian | `G`, `Laplacian`, `Grad`, `UnsharpMask` |
+| morphology | `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage` |
 
-All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian operations filter in all
-of the image's dimensions (a 4D image along time too).
+All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian and morphology operations
+work in all of the image's dimensions (a 4D image along time too).
 
 ## Quick start
 
@@ -51,6 +62,12 @@ both = lx.ants.add_to_zero(wm_mask, gm_mask)
 
 # The Laplacian feature channel of fMRIPrep's brain extraction (ImageMath 3 out Laplacian in 1.5 1)
 lap = lx.ants.laplacian(t1, 1.5, normalize=True)
+
+# sMRIPrep's mask clean-up steps (ImageMath MD 2, ME 10, FillHoles 2, PadImage 10)
+mask = lx.ants.morphological_dilate("brain_mask.nii.gz", 2)
+csf = lx.ants.morphological_erode(csf_mask, 10)
+filled = lx.ants.fill_holes(gm_mask, 2)
+padded = lx.ants.pad_image(mask, 10)
 ```
 
 ```bash
@@ -89,6 +106,13 @@ converted to float32 as a C++ `static_cast` converts them.
 | `Laplacian a sigma` | `laplacian(a, sigma=1.0, normalize=False)` | `LaplacianRecursiveGaussianImageFilter`, sigma in mm; ANTs reads `normalize` from the sigma argument itself (`stoi("1.5")` is 1), so fMRIPrep's `Laplacian a 1.5 1` is `laplacian(a, 1.5, normalize=True)` |
 | `Grad a sigma normalize` | `gradient_magnitude(a, sigma=1.0, normalize=False)` | `GradientMagnitudeRecursiveGaussianImageFilter`, sigma in mm |
 | `UnsharpMask a amount radius threshold physical` | `unsharp_mask(a, amount=0.5, radius=1.0, threshold=0.0, radius_in_physical_units=False)` | `UnsharpMaskImageFilter` in float; `radius` is the Gaussian's sigma |
+| `MD a r value` | `morphological_dilate(a, radius=1, value=1.0)` | ITK's `BinaryDilateImageFilter` with its ball (offsets with `Σ o² ≤ r(r+1)`, in voxels); `value` is the foreground |
+| `ME a r value` | `morphological_erode(a, radius=1, value=1.0)` | `BinaryErodeImageFilter` (the border does not erode), then 1 where the eroded value and the input exceed 0.5, else 0 |
+| `MO a r value`, `MC a r value` | `morphological_open(...)`, `morphological_close(...)` | the binary opening (eroded voxels set to 0) and closing (padded by `r` first; voxels that do not end as `value` keep their input) |
+| `GD a r`, `GE a r`, `GO a r`, `GC a r` | `grayscale_dilate(a, radius=1)`, `grayscale_erode`, `grayscale_open`, `grayscale_close` | maximum / minimum over the ball; opening and closing pad by `r` |
+| any of the eight | `morphology(a, operation, radius=1, value=1.0)` | `operation` is ImageMath's name |
+| `FillHoles a p` | `fill_holes(a, hole_param=2.0)` | the background regions other than the largest set to 1 (all of them for 2; by their share of object neighbours for `p ≤ 1`) |
+| `PadImage a p value` | `pad_image(a, pad, value=0.0)` | `p` voxels of `value` added on each side of every axis (removed if negative); the origin moves so voxels keep their positions; a fractional `p` grows by `int(2p)` and shifts by `int(p)` |
 
 ## Command-line behaviour (as in ANTs)
 
@@ -126,6 +150,14 @@ All reproduced from ANTs; details and sources in
   `Grad`; `G` without a valid sigma prints "Incorrect sigma vector size" and returns the
   image unchanged, and `G` with a variance above about 709 voxels² writes NaN, as ANTs
   does.
+- **Morphology** ([findings](../findings/ants-morphology.md)): radii are in voxels and
+  truncated (`2.9` is 2; `-1` makes ANTs abort); `ME`'s output is 0/1 and keeps voxels that
+  are above 0.5 but not the foreground (a label 2 stays 1); `MO r 0` is a dilation of the
+  zeros (the opening's eroded voxels become 0, the foreground); the binary erosion does not
+  erode at the image border; the eight morphology operations write only output names longer
+  than 3 characters. Their outputs and `PadImage`'s have no `descrip`; `FillHoles` writes
+  the image it read (keeping it). `PadImage` needs its pad argument (ANTs crashes without
+  it) and crashes ANTs when an axis would end with 0 or fewer voxels.
 
 ## Deliberate differences
 
@@ -135,4 +167,10 @@ All reproduced from ANTs; details and sources in
 - The coefficients of the recursive Gaussians use correctly rounded `sin`, `cos` and `exp`;
   ANTs uses glibc's, which differ in the last bit for about 0.6 % of sigmas. That has not
   changed a single output value: each pass rounds to float.
+- Grayscale morphology: where a neighbourhood holds both `-0.0` and `+0.0` and its extreme
+  is zero, larmorx returns `+0.0` for a maximum and `-0.0` for a minimum; ITK's moving
+  histogram returns either, depending on the order it was filled in.
+- `FillHoles` with `p ≤ 1` and a hole on the first or last slice: ANTs reads outside the
+  image's memory (undefined); larmorx refuses with a message. Radii above 65535 voxels are
+  refused.
 - Images are NIfTI only (ANTs reads every format ITK knows).

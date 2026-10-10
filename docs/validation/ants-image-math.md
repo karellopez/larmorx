@@ -1,23 +1,27 @@
 # Parity: ImageMath
 
-**All cases agree.** 162 cases on the `standard` tier: 146 pass, 16 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 264 cases on the `standard` tier: 243 pass, 20 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ImageMath` / `lx.ants.image_math` and the typed `lx.ants` wrappers (crates larmorx-ants, larmorx-image)
 - **Reference:** ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
+- **Test data:** larmorx-testdata `f32b1d60627c`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-image-math --tier standard`
 
-**Bit-identical: 142 of 145 passing cases** produce exactly the values ANTs writes; 145 of 145 also write exactly its header bytes.
-Not bit-identical (each within its declared tolerance; the cause is in the case's reason): `arithmetic/^-image`, `arithmetic/^-scalar-2`, `arithmetic/^-scalar-0.37`.
+**Bit-identical: 237 of 242 passing cases** produce exactly the values ANTs writes; 242 of 242 also write exactly its header bytes.
+Not bit-identical (each within its declared tolerance; the cause is in the case's reason): `arithmetic/^-image`, `arithmetic/^-scalar-2`, `arithmetic/^-scalar-0.37`, `grayscale-morphology/GD-signed-zeros`, `grayscale-morphology/GC-signed-zeros`.
 
 | Category | Cases | Pass | Both error | Expected divergence | Bit-identical | Most values differing |
 |---|---|---|---|---|---|---|
 | G | 15 | 15 | 0 | 0 | 15 | 0 |
 | arithmetic | 58 | 58 | 0 | 0 | 55 | 35 |
+| binary-morphology | 38 | 37 | 1 | 0 | 37 | 0 |
 | dispatch | 10 | 2 | 8 | 0 | 1 | 0 |
+| fill-holes | 17 | 16 | 0 | 1 | 16 | 0 |
 | grad | 9 | 8 | 1 | 0 | 8 | 0 |
+| grayscale-morphology | 30 | 30 | 0 | 0 | 28 | 832 |
 | laplacian | 20 | 18 | 2 | 0 | 18 | 0 |
 | normalize | 11 | 11 | 0 | 0 | 11 | 0 |
+| pad-image | 17 | 14 | 3 | 0 | 14 | 0 |
 | rescale | 10 | 8 | 2 | 0 | 8 | 0 |
 | truncate | 21 | 20 | 1 | 0 | 20 | 0 |
 | unsharp | 8 | 6 | 2 | 0 | 6 | 0 |
@@ -39,13 +43,23 @@ Not bit-identical (each within its declared tolerance; the cause is in the case'
 |---|---|---|---|---|---|
 | G | 15 | 15 | 0 | 0 | 0 |
 | arithmetic | 58 | 58 | 0 | 0 | 0 |
+| binary-morphology | 38 | 37 | 1 | 0 | 0 |
 | dispatch | 10 | 2 | 8 | 0 | 0 |
+| fill-holes | 17 | 16 | 0 | 1 | 0 |
 | grad | 9 | 8 | 1 | 0 | 0 |
+| grayscale-morphology | 30 | 30 | 0 | 0 | 0 |
 | laplacian | 20 | 18 | 2 | 0 | 0 |
 | normalize | 11 | 11 | 0 | 0 | 0 |
+| pad-image | 17 | 14 | 3 | 0 | 0 |
 | rescale | 10 | 8 | 2 | 0 | 0 |
 | truncate | 21 | 20 | 1 | 0 | 0 |
 | unsharp | 8 | 6 | 2 | 0 | 0 |
+
+## Expected divergences
+
+| Case | Reason |
+|---|---|
+| `fill-holes/hole-first-slice-0.5` | For a hole on the first or last slice, ANTs reads the binary image at neighbour indices outside the image (NeighborhoodIterator::GetIndex is not clamped), which land before or after its buffer: the result depends on whatever memory lies there. larmorx reproduces reads that land inside the buffer an… |
 
 ## Rejected by both
 
@@ -60,20 +74,24 @@ Not bit-identical (each within its declared tolerance; the cause is in the case'
 | `dispatch/missing-input` | a missing input file: ANTs prints 'does not exist' and crashes; larmorx exits 1 | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses t… |
 | `dispatch/missing-operand-image` | an operand that is neither a number nor a readable image (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs … |
 | `truncate/bins-not-a-number` | bins 'many': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throw… |
-| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x59090644c410): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
+| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x608e4c5e6410): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
 | `rescale/too-few-arguments` | no maximum: ANTs throws std::exception | ANTs killed by signal 6: what(): std::exception; larmorx exit 1: larmorx: RescaleImage needs an input image, a minimum and a maximum (ANTs aborts: it throws st… |
 | `laplacian/leading-point` | sigma '.5': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Laplacian: '.5' is not a number (ANTs aborts: std::stoi throws) |
-| `laplacian/thin` | an axis of 3 voxels: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5970d127e330): The number of pixels along direction 2 is less than 4. This filter requires a… |
+| `laplacian/thin` | an axis of 3 voxels: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5671f0178330): The number of pixels along direction 2 is less than 4. This filter requires a… |
 | `grad/bad-flag` | a normalize flag that is not a number: std::stoi throws | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Grad: 'yes' is not a number (ANTs aborts: std::stoi throws) |
-| `unsharp/negative-threshold` | a negative threshold: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x58997d0ea3a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold mu… |
+| `unsharp/negative-threshold` | a negative threshold: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x5c47867aa3a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold mu… |
 | `unsharp/bad-amount` | an amount that is not a number: std::stof throws | ANTs killed by signal 6: what(): stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws) |
+| `binary-morphology/MD-radius-negative` | MD -1: a radius near 2^64; ANTs aborts (std::bad_alloc), larmorx refuses | ANTs killed by signal 6: what(): std::bad_alloc; larmorx exit 1: larmorx: MD: a radius of -1 is not supported (ANTs converts it to a radius near 2^64 and canno… |
+| `pad-image/depad-to-zero` | PadImage -14: an axis of 0 voxels; ANTs crashes (munmap_chunk), larmorx refuses | ANTs killed by signal 6: munmap_chunk(): invalid pointer; larmorx exit 1: larmorx: PadImage: padding by -14 gives an axis of 0 voxels (ANTs cannot allocate or … |
+| `pad-image/depad-negative` | PadImage -20: a negative size wraps to 2^32 - 8; ANTs crashes, larmorx refuses | ANTs killed by signal 11: ; larmorx exit 1: larmorx: PadImage: padding by -20 gives an axis of 4294967288 voxels (ANTs cannot allocate or write such an image) |
+| `pad-image/no-pad` | no pad argument: ANTs reads argv[5] (null) and crashes | ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath PadImage needs at least 2 operand(s) (ANTs reads past the arguments here) |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (54d3282e3bf5-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (8252e615467a) |
+| larmorx-testdata | f32b1d60627c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -250,3 +268,105 @@ Both programs get the same arguments and files; ANTs runs as its own binary and 
 | `unsharp/dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
 | `unsharp/dim4` | pass | 8/8 | ImageMath 4 on a 4D series |
 | `unsharp/real-T1w` | pass | 8/8 | defaults on the raw T1w |
+| `binary-morphology/MD-components` | pass | 8/8 | MD 2 on components of 1 to 343 voxels |
+| `binary-morphology/MD-default-radius` | pass | 8/8 | MD without a radius: 1 |
+| `binary-morphology/MD-radius-0` | pass | 8/8 | MD 0: the ball is the centre voxel only |
+| `binary-morphology/MD-radius-fraction` | pass | 8/8 | MD 2.9: static_cast<unsigned long> truncates to 2 |
+| `binary-morphology/MD-radius-minus-half` | pass | 8/8 | MD -0.5: truncates to 0 |
+| `binary-morphology/MD-radius-negative` | both-error | – | MD -1: a radius near 2^64; ANTs aborts (std::bad_alloc), larmorx refuses |
+| `binary-morphology/MD-labels-value-2` | pass | 8/8 | MD 2 2: label 2 of a 3-tissue map dilates |
+| `binary-morphology/MD-value-0` | pass | 8/8 | MD 1 0: the background (0) is the foreground and grows |
+| `binary-morphology/MD-fractional-value` | pass | 8/8 | MD 1 0.6 on a mask with values 0.3, 0.6, 0.999, 1, 1.7, 2 |
+| `binary-morphology/MD-real-T1w-mask-2` | pass | 8/8 | MD 2 on fMRIPrep's T1w brain mask (sMRIPrep) |
+| `binary-morphology/MD-real-T1w-mask-5` | pass | 8/8 | MD 5 on fMRIPrep's T1w brain mask (sMRIPrep's superstep 7) |
+| `binary-morphology/MD-real-bold-mask` | pass | 8/8 | MD 4 on a BOLD brain mask |
+| `binary-morphology/MD-dim2` | pass | 8/8 | ImageMath 2: a 2D ball (radius 1 is the full 3 x 3) |
+| `binary-morphology/MD-dim4` | pass | 8/8 | ImageMath 4: a 4D ball, across time too |
+| `binary-morphology/ME-components` | pass | 8/8 | ME 1 on components (the border one stays) |
+| `binary-morphology/ME-holes` | pass | 8/8 | ME 2 around holes |
+| `binary-morphology/ME-labels` | pass | 8/8 | ME 1 on a 3-tissue map: labels 2 and 3 are not the foreground but above 0.5, so they stay 1 |
+| `binary-morphology/ME-value-2` | pass | 8/8 | ME 2 2: label 2 erodes, the output is 0/1 |
+| `binary-morphology/ME-fractional` | pass | 8/8 | ME 1 on a fractional mask |
+| `binary-morphology/ME-brain-mask` | pass | 8/8 | ME 3 on a brain mask |
+| `binary-morphology/ME-real-T1w-mask-10` | pass | 8/8 | ME 10 on fMRIPrep's T1w brain mask (sMRIPrep's CSF step) |
+| `binary-morphology/ME-real-T1w-mask-2` | pass | 8/8 | ME 2 on fMRIPrep's T1w brain mask (sMRIPrep's superstep 7) |
+| `binary-morphology/ME-real-mni-mask` | pass | 8/8 | ME 5 on the MNI 2 mm brain mask |
+| `binary-morphology/ME-dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
+| `binary-morphology/ME-dim4` | pass | 8/8 | ImageMath 4: eroded across time too |
+| `binary-morphology/MO-components` | pass | 8/8 | MO 1: objects smaller than the ball vanish |
+| `binary-morphology/MO-holes` | pass | 8/8 | MO 2 around holes |
+| `binary-morphology/MO-value-0` | pass | 8/8 | MO 1 0: the opening's eroded voxels become 0, the foreground itself, so it dilates only |
+| `binary-morphology/MO-labels-value-3` | pass | 8/8 | MO 1 3 on a 3-tissue map |
+| `binary-morphology/MO-dim4` | pass | 8/8 | ImageMath 4 opening |
+| `binary-morphology/MC-holes-1` | pass | 8/8 | MC 1 closes the one-voxel hole |
+| `binary-morphology/MC-holes-2` | pass | 8/8 | MC 2 (SafeBorder: padded by the radius first) |
+| `binary-morphology/MC-value-0` | pass | 8/8 | MC 1 0: the foreground is 0, so the pad value is FLT_MAX |
+| `binary-morphology/MC-labels-value-3` | pass | 8/8 | MC 2 3: closing label 3 of a 3-tissue map |
+| `binary-morphology/MC-components-border` | pass | 8/8 | MC 3 with an object on the border |
+| `binary-morphology/MC-real-T1w-mask` | pass | 8/8 | MC 4 on fMRIPrep's T1w brain mask |
+| `binary-morphology/MC-dim2` | pass | 8/8 | ImageMath 2 closing |
+| `binary-morphology/MC-dim4` | pass | 8/8 | ImageMath 4: holes closed across time |
+| `grayscale-morphology/GD-phantom-1` | pass | 8/8 | GD 1: grayscale dilation of the phantom |
+| `grayscale-morphology/GD-phantom-2` | pass | 8/8 | GD 2 |
+| `grayscale-morphology/GD-outliers` | pass | 8/8 | GD 1 with hot and negative voxels |
+| `grayscale-morphology/GD-dim2` | pass | 8/8 | ImageMath 2 GD 2 |
+| `grayscale-morphology/GD-dim4` | pass | 8/8 | ImageMath 4 GD 1 (across time too) |
+| `grayscale-morphology/GD-real-T1w` | pass | 8/8 | GD 2 on the raw T1w |
+| `grayscale-morphology/GE-phantom-1` | pass | 8/8 | GE 1: grayscale erosion of the phantom |
+| `grayscale-morphology/GE-phantom-2` | pass | 8/8 | GE 2 |
+| `grayscale-morphology/GE-outliers` | pass | 8/8 | GE 1 with hot and negative voxels |
+| `grayscale-morphology/GE-dim2` | pass | 8/8 | ImageMath 2 GE 2 |
+| `grayscale-morphology/GE-dim4` | pass | 8/8 | ImageMath 4 GE 1 (across time too) |
+| `grayscale-morphology/GE-real-T1w` | pass | 8/8 | GE 2 on the raw T1w |
+| `grayscale-morphology/GO-phantom-1` | pass | 8/8 | GO 1: grayscale opening of the phantom |
+| `grayscale-morphology/GO-phantom-2` | pass | 8/8 | GO 2 |
+| `grayscale-morphology/GO-outliers` | pass | 8/8 | GO 1 with hot and negative voxels |
+| `grayscale-morphology/GO-dim2` | pass | 8/8 | ImageMath 2 GO 2 |
+| `grayscale-morphology/GO-dim4` | pass | 8/8 | ImageMath 4 GO 1 (across time too) |
+| `grayscale-morphology/GO-real-T1w` | pass | 8/8 | GO 2 on the raw T1w |
+| `grayscale-morphology/GC-phantom-1` | pass | 8/8 | GC 1: grayscale closing of the phantom |
+| `grayscale-morphology/GC-phantom-2` | pass | 8/8 | GC 2 |
+| `grayscale-morphology/GC-outliers` | pass | 8/8 | GC 1 with hot and negative voxels |
+| `grayscale-morphology/GC-dim2` | pass | 8/8 | ImageMath 2 GC 2 |
+| `grayscale-morphology/GC-dim4` | pass | 8/8 | ImageMath 4 GC 1 (across time too) |
+| `grayscale-morphology/GC-real-T1w` | pass | 8/8 | GC 2 on the raw T1w |
+| `grayscale-morphology/GD-radius-0` | pass | 8/8 | GD 0: the image unchanged |
+| `grayscale-morphology/GE-int16-scaled` | pass | 8/8 | GE 1 on scaled int16 input |
+| `grayscale-morphology/GO-radius-4` | pass | 8/8 | GO 4 (a 9-voxel ball) |
+| `grayscale-morphology/GE-signed-zeros` | pass | 8/8 | GE 1 with -0.0 and +0.0 side by side |
+| `grayscale-morphology/GD-signed-zeros` | pass | 8/8 | GD 1 with -0.0 and +0.0 side by side: the sign of a zero maximum |
+| `grayscale-morphology/GC-signed-zeros` | pass | 8/8 | GC 1 with -0.0 and +0.0 side by side |
+| `fill-holes/default` | pass | 8/8 | no parameter: 2, every hole filled |
+| `fill-holes/param-2` | pass | 8/8 | FillHoles 2, as sMRIPrep calls it |
+| `fill-holes/param-almost-2` | pass | 8/8 | 2.0000001 is within FloatAlmostEqual of 2: every hole |
+| `fill-holes/param-1.5` | pass | 8/8 | between 1 and 2: every hole (the ratio is not computed) |
+| `fill-holes/param-3` | pass | 8/8 | above 2: no hole |
+| `fill-holes/param-1` | pass | 8/8 | 1: holes whose object-edge ratio exceeds 1 (none can) |
+| `fill-holes/param-0.99` | pass | 8/8 | 0.99: holes bounded by the object only (the border hole's out-of-image neighbours wrap to other rows) |
+| `fill-holes/param-0.5` | pass | 8/8 | 0.5 |
+| `fill-holes/components-0.3` | pass | 8/8 | 0.3 on separate components |
+| `fill-holes/labels` | pass | 8/8 | a 3-tissue map: every label ≥ 0.5 is object |
+| `fill-holes/fractional` | pass | 8/8 | values 0.3 (background) and 0.6 (object) |
+| `fill-holes/real-T1w-mask` | pass | 8/8 | fMRIPrep's T1w brain mask |
+| `fill-holes/real-mni-mask` | pass | 8/8 | the MNI 2 mm brain mask |
+| `fill-holes/dim2` | pass | 8/8 | ImageMath 2: 2D components |
+| `fill-holes/dim4` | pass | 8/8 | ImageMath 4: 4D components, holes closed across time |
+| `fill-holes/hole-first-slice-2` | pass | 8/8 | a pocket touching the first slice is a hole |
+| `fill-holes/hole-first-slice-0.5` | expected-divergence | 1/1 | 0.5 with a hole on the first slice: ANTs reads neighbours outside the image's memory |
+| `pad-image/pad-10` | pass | 8/8 | PadImage 10, as sMRIPrep pads before Atropos |
+| `pad-image/depad-5` | pass | 8/8 | PadImage -5 crops |
+| `pad-image/pad-value` | pass | 8/8 | PadImage 3 7: the new voxels are 7 |
+| `pad-image/pad-fraction` | pass | 8/8 | PadImage 2.5: the size grows by 5 but the image shifts by 2 |
+| `pad-image/depad-fraction` | pass | 8/8 | PadImage -2.5 |
+| `pad-image/pad-0` | pass | 8/8 | PadImage 0: a copy (a new image without descrip) |
+| `pad-image/depad-to-one` | pass | 8/8 | PadImage -13.5: one voxel on the shortest axis |
+| `pad-image/depad-to-zero` | both-error | – | PadImage -14: an axis of 0 voxels; ANTs crashes (munmap_chunk), larmorx refuses |
+| `pad-image/depad-negative` | both-error | – | PadImage -20: a negative size wraps to 2^32 - 8; ANTs crashes, larmorx refuses |
+| `pad-image/no-pad` | both-error | – | no pad argument: ANTs reads argv[5] (null) and crashes |
+| `pad-image/int16-scaled` | pass | 8/8 | scaled int16 input |
+| `pad-image/las-sform-only` | pass | 8/8 | an sform-only LAS image: the origin moves along -x |
+| `pad-image/negative-pixdim` | pass | 8/8 | a qform image with a negative pixdim |
+| `pad-image/real-T1w-mask-pad` | pass | 8/8 | fMRIPrep's T1w brain mask padded by 10 |
+| `pad-image/real-T1w-depad` | pass | 8/8 | the raw T1w cropped by 10 (sMRIPrep's de-padding) |
+| `pad-image/dim2` | pass | 8/8 | ImageMath 2 PadImage -3 1 |
+| `pad-image/dim4` | pass | 8/8 | ImageMath 4: time is padded too |

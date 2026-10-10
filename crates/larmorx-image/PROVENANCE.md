@@ -22,7 +22,13 @@ upstream files below as it is ported.
 | `gaussian::gradient_magnitude_recursive_gaussian` | `Modules/Filtering/ImageGradient/include/itkGradientMagnitudeRecursiveGaussianImageFilter.h/.hxx`, `Modules/Filtering/ImageIntensity/include/itkSqrtImageFilter.h` |
 | `discrete_gaussian` (`gaussian_kernel`, the Bessel functions, the separable convolution with nearest-edge boundaries) | `Modules/Filtering/Smoothing/include/itkDiscreteGaussianImageFilter.h/.hxx`, `Modules/Core/Common/include/itkGaussianOperator.h/.hxx`, `itkNeighborhoodOperator.hxx` (`CreateDirectional`, `FillCenteredDirectional`), `itkNeighborhoodInnerProduct.hxx`, `itkZeroFluxNeumannBoundaryCondition.hxx`, `Modules/Filtering/ImageFilterBase/include/itkNeighborhoodOperatorImageFilter.hxx` |
 | `median` | `Modules/Filtering/Smoothing/include/itkMedianImageFilter.h/.hxx` (box neighbourhood, `ZeroFluxNeumannImageNeighborhoodPixelAccessPolicy`) |
-| `lines` (running a line filter along an axis, `float → float` with double arithmetic) | the line iteration of `itkRecursiveSeparableImageFilter.hxx` (`DynamicThreadedGenerateData`); the grouping of lines is larmorx's |
+| `morphology::ball_contains`, `ball_squared_radius` | `Modules/Filtering/MathematicalMorphology/include/itkBinaryBallStructuringElement.h/.hxx`, `itkFlatStructuringElement.h/.hxx` (`Ball`), `Modules/Core/Common/include/itkEllipsoidInteriorExteriorSpatialFunction.h/.hxx`, `itkFloodFilledSpatialFunctionConditionalConstIterator.hxx` (the centre inclusion strategy) |
+| `morphology::binary_dilate`, `binary_erode` (the values, `BoundaryToForeground`, the defaults) | `Modules/Filtering/BinaryMathematicalMorphology/include/itkBinaryMorphologyImageFilter.h/.hxx`, `itkBinaryDilateImageFilter.h/.hxx`, `itkBinaryErodeImageFilter.h/.hxx`. The voxel sets come from an exact integer distance transform, larmorx's own code after Felzenszwalb and Huttenlocher, *Distance Transforms of Sampled Functions*, Theory of Computing 8 (2012) |
+| `morphology::binary_opening`, `binary_closing` (`SafeBorder`, the pad value, the final restore) | `itkBinaryMorphologicalOpeningImageFilter.h/.hxx`, `itkBinaryMorphologicalClosingImageFilter.h/.hxx`; `Modules/Filtering/ImageGrid/include/itkConstantPadImageFilter.h`, `itkCropImageFilter.h` (`morphology::pad`, `crop`) |
+| `morphology::grayscale_dilate`, `grayscale_erode`, `grayscale_opening`, `grayscale_closing` (boundary values, `SafeBorder`) | `Modules/Filtering/MathematicalMorphology/include/itkGrayscaleDilateImageFilter.h/.hxx`, `itkGrayscaleErodeImageFilter.h/.hxx`, `itkBasicDilateImageFilter.hxx`, `itkBasicErodeImageFilter.hxx`, `itkMovingHistogramDilateImageFilter.h`, `itkMovingHistogramErodeImageFilter.h`, `itkMorphologyHistogram.h`, `itkGrayscaleMorphologicalOpeningImageFilter.h/.hxx`, `itkGrayscaleMorphologicalClosingImageFilter.h/.hxx`. The run decomposition of the ball is larmorx's |
+| `components::connected_components` (run-length rows, labels in the order of the first run, face or full connectivity) | `Modules/Segmentation/ConnectedComponents/include/itkConnectedComponentImageFilter.h/.hxx`, `Modules/Filtering/ImageLabel/include/itkScanlineFilterCommon.h` |
+| `components::relabel_components`, `label_sizes` | `Modules/Segmentation/ConnectedComponents/include/itkRelabelComponentImageFilter.h/.hxx` |
+| `lines` (running a line filter along an axis, `float → float` with double arithmetic) | the line iteration of `itkRecursiveSeparableImageFilter.hxx` (`DynamicThreadedGenerateData`); the grouping of lines and `for_each_line` are larmorx's |
 | `volume` (`Volume`, `VolumeRef`) | original larmorx code |
 
 Parity records: [ants-image-math](../../docs/validation/ants-image-math.md),
@@ -30,4 +36,5 @@ Parity records: [ants-image-math](../../docs/validation/ants-image-math.md),
 [ants-smooth-image](../../docs/validation/ants-smooth-image.md),
 [ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md).
 Behaviour found while porting: [ants-image-programs.md](../../docs/findings/ants-image-programs.md),
-[ants-gaussian-filters.md](../../docs/findings/ants-gaussian-filters.md).
+[ants-gaussian-filters.md](../../docs/findings/ants-gaussian-filters.md),
+[ants-morphology.md](../../docs/findings/ants-morphology.md).

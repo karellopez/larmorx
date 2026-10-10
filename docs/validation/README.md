@@ -9,7 +9,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [resample-series](resample-series.md) | `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process) | `validated` |
-| [ants-image-math](ants-image-math.md) | `lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`) | ImageMath (ANTs 2.6.5 binary) | `validated` |
+| [ants-image-math](ants-image-math.md) | `lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`, `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage`) | ImageMath (ANTs 2.6.5 binary) | `validated` |
 | [ants-threshold-image](ants-threshold-image.md) | `lx.ants.threshold_image`, `lx.ants.otsu_threshold`, `larmorx ants ThresholdImage` (no `Kmeans` yet) | ThresholdImage (ANTs 2.6.5 binary) | `validated` |
 | [ants-multiply-images](ants-multiply-images.md) | `lx.ants.multiply_images`, `larmorx ants MultiplyImages` | MultiplyImages (ANTs 2.6.5 binary) | `validated` |
 | [ants-smooth-image](ants-smooth-image.md) | `lx.ants.smooth_image`, `larmorx ants SmoothImage` (recursive Gaussian and median) | SmoothImage (ANTs 2.6.5 binary) | `validated` |

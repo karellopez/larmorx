@@ -12,6 +12,9 @@ class NiftiError(ValueError): ...
 def cli_main(argv: list[str]) -> tuple[int, str, str]:
     """Run the ``larmorx`` command line; return ``(exit_code, stdout, stderr)``."""
 
+def cli_tools() -> list[tuple[str, list[str]]]:
+    """The command line's tool families and their tools: ``[(family, [tool, ...]), ...]``."""
+
 def nifti_read(
     path: str, scaling: str = "auto", n_threads: int = 1
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], list[str], bool]:

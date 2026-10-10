@@ -30,10 +30,21 @@ fn cli_main(py: Python<'_>, argv: Vec<String>) -> (u8, String, String) {
     )
 }
 
+/// The command line's tool families and their tools: `[(family, [tool, ...]), ...]`
+/// (`larmorx_cli::FAMILIES`). The golden coverage test enumerates them.
+#[pyfunction]
+fn cli_tools() -> Vec<(&'static str, Vec<&'static str>)> {
+    larmorx_cli::FAMILIES
+        .iter()
+        .map(|(family, tools)| (*family, tools.to_vec()))
+        .collect()
+}
+
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", larmorx_core::VERSION)?;
     m.add_function(wrap_pyfunction!(cli_main, m)?)?;
+    m.add_function(wrap_pyfunction!(cli_tools, m)?)?;
     nifti::register(m)?;
     ants::register(m)?;
     ants_filters::register(m)?;

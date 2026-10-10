@@ -155,15 +155,11 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
             if skipped(p, fshift) {
                 continue;
             }
-            for v in 0..nxy {
-                extract(
-                    data,
-                    &factors,
-                    need,
-                    v + kk * nxy,
-                    nvox,
-                    &mut slice[v * ntt..(v + 1) * ntt],
-                );
+            let base = kk * nxy;
+            match &*data {
+                BrickData::Byte(a) => extract(a, &factors, need, base, nvox, &mut slice),
+                BrickData::Short(a) => extract(a, &factors, need, base, nvox, &mut slice),
+                BrickData::Float(a) => extract(a, &factors, need, base, nvox, &mut slice),
             }
             slice.par_chunks_mut(2 * ntt).with_min_len(8).for_each_init(
                 ShiftWork::default,
@@ -173,73 +169,95 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
                     shift_pair(far, gar, fshift, nup, p, work);
                 },
             );
-            for v in 0..nxy {
-                insert(
-                    data,
-                    &factors,
-                    need,
-                    v + kk * nxy,
-                    nvox,
-                    &slice[v * ntt..(v + 1) * ntt],
-                );
+            match data {
+                BrickData::Byte(a) => insert(a, &factors, need, base, nvox, &slice, byteize),
+                BrickData::Short(a) => insert(a, &factors, need, base, nvox, &slice, shortize),
+                BrickData::Float(a) => insert(a, &factors, need, base, nvox, &slice, |v| v),
             }
         }
     })?;
     Ok(())
 }
 
-/// `THD_extract_series(ind, dset, 0)`: the series as float, non-finite values set to 0
-/// (`thd_floatscan`), multiplied by each positive brick factor when the dataset needs brick
-/// factors, and scanned again (`MRI_floatscan`).
-fn extract(
-    data: &BrickData,
+/// A stored value as float (byte and short convert exactly).
+trait Stored: Copy {
+    fn to_f32(self) -> f32;
+}
+
+impl Stored for u8 {
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+}
+
+impl Stored for i16 {
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+}
+
+impl Stored for f32 {
+    fn to_f32(self) -> f32 {
+        self
+    }
+}
+
+/// `THD_extract_series(ind, dset, 0)` for every voxel of one slice (`base` is its first voxel;
+/// the series go one after another into `slice`): each value as float, set to 0 if not finite
+/// (`thd_floatscan`), multiplied by its sub-brick's factor when the dataset needs brick factors
+/// and the factor is positive, and set to 0 if that is not finite (`MRI_floatscan`). The loops
+/// run over the sub-bricks outside, so the dataset is read a row at a time; each value is
+/// computed exactly as AFNI computes it.
+fn extract<T: Stored>(
+    data: &[T],
     factors: &[f32],
     need: bool,
-    ind: usize,
+    base: usize,
     nvox: usize,
-    far: &mut [f32],
+    slice: &mut [f32],
 ) {
-    for (t, v) in far.iter_mut().enumerate() {
-        let x = match data {
-            BrickData::Byte(a) => f32::from(a[ind + t * nvox]),
-            BrickData::Short(a) => f32::from(a[ind + t * nvox]),
-            BrickData::Float(a) => a[ind + t * nvox],
-        };
-        *v = if x.is_finite() { x } else { 0.0 };
-    }
-    if need {
-        for (v, &fac) in far.iter_mut().zip(factors) {
-            if f64::from(fac) > 0.0 {
-                *v *= fac;
+    let ntt = factors.len();
+    let nxy = slice.len() / ntt;
+    for (t, &fac) in factors.iter().enumerate() {
+        let scale = need && f64::from(fac) > 0.0;
+        let row = &data[base + t * nvox..base + t * nvox + nxy];
+        for (v, &x) in row.iter().enumerate() {
+            let x = x.to_f32();
+            let mut y = if x.is_finite() { x } else { 0.0 };
+            if scale {
+                y *= fac;
             }
-        }
-    }
-    for v in far.iter_mut() {
-        if !v.is_finite() {
-            *v = 0.0;
+            slice[v * ntt + t] = if y.is_finite() { y } else { 0.0 };
         }
     }
 }
 
-/// `THD_insert_series(ind, dset, ntt, MRI_float, far, 0)`: each value times `1.0/factor` (in
-/// double, when the dataset needs brick factors and the factor is not 0), then stored in the
-/// dataset's type.
-fn insert(data: &mut BrickData, factors: &[f32], need: bool, ind: usize, nvox: usize, far: &[f32]) {
-    for (t, &v) in far.iter().enumerate() {
-        let v = if need {
-            let fac = if f64::from(factors[t]) != 0.0 {
-                1.0 / f64::from(factors[t])
-            } else {
-                1.0
-            };
-            (f64::from(v) * fac) as f32
+/// `THD_insert_series(ind, dset, ntt, MRI_float, far, 0)` for every voxel of one slice: each
+/// value times `1.0/factor` (in double, when the dataset needs brick factors and the factor is
+/// not 0), then stored with `store` (`SHORTIZE`, `BYTEIZE`, or as is for float). Row by row,
+/// as [`extract`].
+fn insert<T>(
+    data: &mut [T],
+    factors: &[f32],
+    need: bool,
+    base: usize,
+    nvox: usize,
+    slice: &[f32],
+    store: impl Fn(f32) -> T,
+) {
+    let ntt = factors.len();
+    let nxy = slice.len() / ntt;
+    for (t, &fac) in factors.iter().enumerate() {
+        let inv = if f64::from(fac) != 0.0 {
+            1.0 / f64::from(fac)
         } else {
-            v
+            1.0
         };
-        match data {
-            BrickData::Float(a) => a[ind + t * nvox] = v,
-            BrickData::Short(a) => a[ind + t * nvox] = shortize(v),
-            BrickData::Byte(a) => a[ind + t * nvox] = byteize(v),
+        let row = &mut data[base + t * nvox..base + t * nvox + nxy];
+        for (v, out) in row.iter_mut().enumerate() {
+            let x = slice[v * ntt + t];
+            let x = if need { (f64::from(x) * inv) as f32 } else { x };
+            *out = store(x);
         }
     }
 }

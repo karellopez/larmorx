@@ -18,7 +18,7 @@ from larmorx_validation.parity.ants_image_math.common import (
 #: The benchmark jobs; add new ones here.
 JOBS: list[Job] = [
     Job(
-        "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (176×256×256 int16)",
+        "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160×192×192 int16)",
         "ImageMath",
         ("3", "{out}", "Laplacian", T1_RAW, "1.5", "1"),
     ),
@@ -78,17 +78,19 @@ TITLE = "ANTs Gaussian filters (ImageMath Laplacian, G, Grad; SmoothImage; Resam
 
 NOTES = [
     "- **Where the time goes.** Reading the gzipped input is sequential in both programs "
-    "(zlib-rs in larmorx, zlib in ITK) and takes about 150 ms for the raw T1w, which bounds "
-    "the speed-up of the faster filters. The recursive filters cost a few multiply-adds "
-    "per voxel and pass; the Laplacian makes nine passes over the image in 3D, the gradient "
-    "magnitude nine, `SmoothImage` three.",
-    "- **How larmorx runs the passes.** A pass along the first axis filters each contiguous "
-    "line; along the other axes it filters 32 neighbouring lines together, so the recursion "
-    "runs on contiguous values. Lines are shared among threads; each line's arithmetic is "
-    "exactly ITK's, so the result does not depend on the thread count.",
-    "- **ANTs' threads.** ITK splits every pass into regions per thread too, so ANTs gains "
-    "from threads as well; `ResampleImageBySpacing` gains less because its smoothing filters "
-    "and resampler run one after the other and its output is small.",
+    "(zlib-rs in larmorx, zlib in ITK): about 50 ms of larmorx's time for the raw T1w, which "
+    "is why 4 and 12 threads differ little for the faster filters. The recursive filters cost "
+    "a few multiply-adds per voxel and pass; the Laplacian and the gradient magnitude make "
+    "nine passes over a 3D image, `SmoothImage` three.",
+    "- **How larmorx runs the passes.** Every pass filters 32 neighbouring lines together, "
+    "laid out so that the 32 recursions advance side by side on contiguous values (lines "
+    "along the first axis are transposed into that layout). Each line's arithmetic is "
+    "exactly ITK's, so the result does not depend on the thread count or on the grouping. "
+    "The resampler computes the part of the linear interpolation that is constant along an "
+    "output row once per row when the row runs along an input axis (axis-aligned images).",
+    "- **Threads.** ITK splits every pass into regions per thread, so ANTs gains 3–5× from 12 "
+    "threads. larmorx gains less from many threads on these images: reading the input stays "
+    "sequential, and a pass over a 6-million-voxel image is short.",
 ]
 
 

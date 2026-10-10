@@ -55,7 +55,7 @@ class Job:
 #: The benchmark jobs; add new ones here.
 JOBS: list[Job] = [
     Job(
-        "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176×256×256 int16)",
+        "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (160×192×192 int16)",
         "ImageMath",
         ("3", "{out}", "TruncateImageIntensity", T1_RAW, "0.01", "0.999", "256"),
     ),

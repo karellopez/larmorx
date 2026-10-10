@@ -1,22 +1,26 @@
 # Parity: ImageMath
 
-**All cases agree.** 110 cases on the `standard` tier: 99 pass, 11 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 162 cases on the `standard` tier: 146 pass, 16 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ImageMath` / `lx.ants.image_math` and the typed `lx.ants` wrappers (crates larmorx-ants, larmorx-image)
 - **Reference:** ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `ea0c2b73b3bb`, tier `standard`
+- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-image-math --tier standard`
 
-**Bit-identical: 95 of 98 passing cases** produce exactly the values ANTs writes; 98 of 98 also write exactly its header bytes.
+**Bit-identical: 142 of 145 passing cases** produce exactly the values ANTs writes; 145 of 145 also write exactly its header bytes.
 Not bit-identical (each within its declared tolerance; the cause is in the case's reason): `arithmetic/^-image`, `arithmetic/^-scalar-2`, `arithmetic/^-scalar-0.37`.
 
 | Category | Cases | Pass | Both error | Expected divergence | Bit-identical | Most values differing |
 |---|---|---|---|---|---|---|
+| G | 15 | 15 | 0 | 0 | 15 | 0 |
 | arithmetic | 58 | 58 | 0 | 0 | 55 | 35 |
 | dispatch | 10 | 2 | 8 | 0 | 1 | 0 |
+| grad | 9 | 8 | 1 | 0 | 8 | 0 |
+| laplacian | 20 | 18 | 2 | 0 | 18 | 0 |
 | normalize | 11 | 11 | 0 | 0 | 11 | 0 |
 | rescale | 10 | 8 | 2 | 0 | 8 | 0 |
 | truncate | 21 | 20 | 1 | 0 | 20 | 0 |
+| unsharp | 8 | 6 | 2 | 0 | 6 | 0 |
 
 ## Thresholds
 
@@ -33,11 +37,15 @@ Not bit-identical (each within its declared tolerance; the cause is in the case'
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
+| G | 15 | 15 | 0 | 0 | 0 |
 | arithmetic | 58 | 58 | 0 | 0 | 0 |
 | dispatch | 10 | 2 | 8 | 0 | 0 |
+| grad | 9 | 8 | 1 | 0 | 0 |
+| laplacian | 20 | 18 | 2 | 0 | 0 |
 | normalize | 11 | 11 | 0 | 0 | 0 |
 | rescale | 10 | 8 | 2 | 0 | 0 |
 | truncate | 21 | 20 | 1 | 0 | 0 |
+| unsharp | 8 | 6 | 2 | 0 | 0 |
 
 ## Rejected by both
 
@@ -52,15 +60,20 @@ Not bit-identical (each within its declared tolerance; the cause is in the case'
 | `dispatch/missing-input` | a missing input file: ANTs prints 'does not exist' and crashes; larmorx exits 1 | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses t… |
 | `dispatch/missing-operand-image` | an operand that is neither a number nor a readable image (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs … |
 | `truncate/bins-not-a-number` | bins 'many': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throw… |
-| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x5958823db410): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
+| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x59090644c410): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
 | `rescale/too-few-arguments` | no maximum: ANTs throws std::exception | ANTs killed by signal 6: what(): std::exception; larmorx exit 1: larmorx: RescaleImage needs an input image, a minimum and a maximum (ANTs aborts: it throws st… |
+| `laplacian/leading-point` | sigma '.5': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Laplacian: '.5' is not a number (ANTs aborts: std::stoi throws) |
+| `laplacian/thin` | an axis of 3 voxels: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5970d127e330): The number of pixels along direction 2 is less than 4. This filter requires a… |
+| `grad/bad-flag` | a normalize flag that is not a number: std::stoi throws | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Grad: 'yes' is not a number (ANTs aborts: std::stoi throws) |
+| `unsharp/negative-threshold` | a negative threshold: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x58997d0ea3a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold mu… |
+| `unsharp/bad-amount` | an amount that is not a number: std::stof throws | ANTs killed by signal 6: what(): stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws) |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (2960b32a61f4-dirty) |
-| larmorx-testdata | ea0c2b73b3bb |
+| larmorx | 0.0.1 (54d3282e3bf5-dirty) |
+| larmorx-testdata | 28167dea9be5 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -185,3 +198,55 @@ Both programs get the same arguments and files; ANTs runs as its own binary and 
 | `rescale/too-few-arguments` | both-error | – | no maximum: ANTs throws std::exception |
 | `rescale/real-MNI-2mm` | pass | 8/8 | the MNI 2 mm template onto [0, 1] |
 | `rescale/real-MNI-2mm-mask` | pass | 8/8 | the MNI 2 mm brain mask onto [0, 255] |
+| `G/sigma-1.5` | pass | 8/8 | sigma 1.5 mm on the oblique anisotropic phantom |
+| `G/sigma-vector` | pass | 8/8 | one sigma per axis (1x2x0.5) |
+| `G/sigma-0` | pass | 8/8 | sigma 0: kernels [0, 1, 0], the image unchanged |
+| `G/no-sigma` | pass | 8/8 | no sigma: 'Incorrect sigma vector size', variance 0 (unchanged) |
+| `G/wrong-length` | pass | 8/8 | two sigmas in 3D: 'Incorrect sigma vector size', variance 0 |
+| `G/trailing-x` | pass | 8/8 | '1.5x': ConvertVector reuses the last value for the empty piece (1.5, 1.5) |
+| `G/kernel-width-cap` | pass | 8/8 | sigma 20 mm: the kernel reaches the 32-voxel cap on x and y |
+| `G/huge-variance` | pass | 8/8 | sigma 41 mm: a variance over 709 voxels² overflows e^t in I0; ITK's kernel is NaN |
+| `G/int16-scaled` | pass | 8/8 | scaled int16 input |
+| `G/outliers` | pass | 8/8 | hot and negative voxels (NaN and -inf read as 0) |
+| `G/thin` | pass | 8/8 | an axis of 3 voxels (fine for the discrete filter) |
+| `G/las-sform-only` | pass | 8/8 | an sform-only LAS image |
+| `G/dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
+| `G/dim4` | pass | 8/8 | ImageMath 4: smoothed along time too (TR 2 s) |
+| `G/real-T1w` | pass | 8/8 | the raw T1w of ds000005, sigma 2 mm |
+| `laplacian/fmriprep-T1w` | pass | 8/8 | Laplacian 1.5 1 on the raw T1w, as fMRIPrep and sMRIPrep call it (normalised: stoi('1.5')) |
+| `laplacian/fmriprep-boldref` | pass | 8/8 | Laplacian 1.5 1 on the boldref, as fMRIPrep's coregistration calls it |
+| `laplacian/fmriprep-T1w-preproc` | pass | 8/8 | Laplacian 1.5 1 on fMRIPrep's preprocessed T1w |
+| `laplacian/fmriprep-mni` | pass | 8/8 | Laplacian 1.5 1 on the 2 mm MNI template |
+| `laplacian/phantom` | pass | 8/8 | sigma 1.5 (normalised: stoi('1.5') is 1) |
+| `laplacian/not-normalized` | pass | 8/8 | sigma 0.8: stoi('0.8') is 0, so not normalised |
+| `laplacian/flag-ignored` | pass | 8/8 | '1.5 0' normalises anyway: the flag is read from the sigma argument |
+| `laplacian/no-sigma` | pass | 8/8 | no sigma: 1, not normalised |
+| `laplacian/sigma-0` | pass | 8/8 | sigma 0 becomes 0.5 (stoi('0') is 0) |
+| `laplacian/negative-sigma` | pass | 8/8 | sigma -1 becomes 0.5; stoi('-1') is -1, so normalised |
+| `laplacian/leading-point` | both-error | – | sigma '.5': std::stoi throws (ANTs aborts) |
+| `laplacian/tiny` | pass | 8/8 | a 4 x 4 x 4 image, the smallest ITK accepts |
+| `laplacian/thin` | both-error | – | an axis of 3 voxels: ITK throws (ANTs aborts) |
+| `laplacian/constant` | pass | 8/8 | a constant image, normalised |
+| `laplacian/outliers` | pass | 8/8 | hot and negative voxels |
+| `laplacian/negative-pixdim` | pass | 8/8 | a qform-only image with a negative pixdim |
+| `laplacian/int16-scaled` | pass | 8/8 | scaled int16 input |
+| `laplacian/dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
+| `laplacian/dim4` | pass | 8/8 | ImageMath 4: the second derivative along time too |
+| `laplacian/real-bold-4d` | pass | 8/8 | ImageMath 4 on fMRIPrep's preprocessed BOLD series |
+| `grad/default` | pass | 8/8 | no options: sigma 1, not normalised |
+| `grad/sigma-1.5` | pass | 8/8 | sigma 1.5 |
+| `grad/normalized` | pass | 8/8 | sigma 2, normalised to [0, 1] |
+| `grad/sigma-0` | pass | 8/8 | sigma 0 becomes 0.5 |
+| `grad/bad-flag` | both-error | – | a normalize flag that is not a number: std::stoi throws |
+| `grad/real-boldref` | pass | 8/8 | sigma 1 on the boldref |
+| `grad/real-T1w` | pass | 8/8 | sigma 1, normalised, on the raw T1w |
+| `grad/dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
+| `grad/dim4` | pass | 8/8 | ImageMath 4 on a 4D series |
+| `unsharp/defaults` | pass | 8/8 | amount 0.5, radius 1 voxel, threshold 0 |
+| `unsharp/threshold` | pass | 8/8 | amount 1, radius 2 voxels, threshold 5 |
+| `unsharp/physical-radius` | pass | 8/8 | radius 1.5 mm (spacing units) |
+| `unsharp/negative-threshold` | both-error | – | a negative threshold: ITK throws (ANTs aborts) |
+| `unsharp/bad-amount` | both-error | – | an amount that is not a number: std::stof throws |
+| `unsharp/dim2` | pass | 8/8 | ImageMath 2 on a 2D image |
+| `unsharp/dim4` | pass | 8/8 | ImageMath 4 on a 4D series |
+| `unsharp/real-T1w` | pass | 8/8 | defaults on the raw T1w |

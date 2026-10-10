@@ -127,9 +127,12 @@ validated in 2D and 4D. Spatial operations need more:
 - ITK's neighbourhoods and structuring elements are `D`-dimensional, so `ImageMath 4 MD`
   dilates across time too, and a 2D image is not a 3D image with one slice (a 3D ball
   reaches outside a one-slice image);
-- `larmorx_image::Volume` is 3D: spatial filters need a `D`-generic size and spacing (or
+- `larmorx_image::Volume` was 3D: spatial filters need a `D`-generic size and spacing (or
   separate 2D and 4D paths), and the boundary conditions of ITK's iterators in each
-  dimension.
+  dimension. *Since the Gaussian group (2026-10-10):* `Volume` and `VolumeRef` have the
+  image's own number of dimensions, `AntsImage::view()` gives one, and the Gaussian and median
+  filters work in 2, 3 and 4 dimensions as ITK does
+  ([ants-gaussian-filters.md](ants-gaussian-filters.md)).
 
 ## ThresholdImage (`Examples/ThresholdImage.cxx`)
 

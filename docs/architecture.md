@@ -18,11 +18,13 @@ How the code is organised and the conventions every tool follows. The plan behin
                      nitransforms chains (RAS) and fMRIPrep's one-shot BOLD resampler
    larmorx-interp    the ITK interpolators (linear, nearest, B-spline, Gaussian, label, windowed sinc);
                      SciPy's map_coordinates and spline prefilter (ndimage)
-   larmorx-image     ITK image filters: thresholds, Otsu, histograms and quantiles, intensity
-                     rescaling, ITK's float comparisons (smoothing, morphology, components and
-                     distance maps next)
-   larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages),
-                     images as ANTs programs read and write them, the original command lines
+   larmorx-image     ITK image filters on D-dimensional volumes: thresholds, Otsu, histograms
+                     and quantiles, intensity rescaling, recursive and discrete Gaussians
+                     (smoothing, Laplacian, gradient magnitude), median, ITK's float
+                     comparisons (morphology, components and distance maps next)
+   larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages,
+                     SmoothImage, ResampleImageBySpacing), images as ANTs programs read and
+                     write them, ITK's identity resampling in 2-4D, the original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)
    larmorx-mri       clean-room MRI tools named by function: head-motion correction

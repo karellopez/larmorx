@@ -21,6 +21,8 @@ the suites build them here.
 - ``components-uint8`` (components of 1 to 343 voxels, edge and corner contacts, one on the
   border) and ``holes-uint8`` (enclosed holes of 1, 8 and 64 voxels, a cavity, a hole on the
   border), for the morphology and component filters.
+- ``thin-3-slices`` (an axis of 3 voxels, too short for ITK's recursive Gaussian filters) and
+  ``tiny-4`` (4 x 4 x 4, the smallest they accept), for the Gaussian filters.
 
 Other parity modules add inputs by decorating a builder with :func:`builder`.
 """
@@ -297,6 +299,20 @@ def _(t):
     p[u < 0.05] = 0.5
     p[(u >= 0.05) & (u < 0.08)] = 1.0
     save(p.astype(np.float32), t)
+
+
+@builder("thin-3-slices")
+def _(t):
+    """Three slices of the phantom (32 x 40 x 3): too thin for ITK's recursive Gaussian filters
+    along z (they need four voxels)."""
+    save(np.ascontiguousarray(head(15)[:, :, 12:15]), t)
+
+
+@builder("tiny-4")
+def _(t):
+    """A 4 x 4 x 4 corner of the phantom, the smallest image the recursive filters accept,
+    with 1 mm voxels."""
+    save(np.ascontiguousarray(head(16)[10:14, 12:16, 8:12]), t, affine=np.eye(4))
 
 
 @builder("components-uint8")

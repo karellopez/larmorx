@@ -44,6 +44,8 @@ TISSUES = "{gen:tissues-int16}"
 PROBSEG = "{gen:gm-probseg}"
 COMPONENTS = "{gen:components-uint8}"
 HOLES = "{gen:holes-uint8}"
+THIN = "{gen:thin-3-slices}"
+TINY = "{gen:tiny-4}"
 
 
 def image_math(

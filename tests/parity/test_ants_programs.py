@@ -16,7 +16,13 @@ if ants_programs.ants_bin() is None:
     pytest.skip("the ANTs 2.6.5 oracle is not available", allow_module_level=True)
 
 #: The suites of ANTs image programs; add new ones here.
-SUITES = ("ants_image_math", "ants_threshold_image", "ants_multiply_images")
+SUITES = (
+    "ants_image_math",
+    "ants_threshold_image",
+    "ants_multiply_images",
+    "ants_smooth_image",
+    "ants_resample_image_by_spacing",
+)
 TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
 
 PARAMS = []

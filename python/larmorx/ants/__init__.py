@@ -7,6 +7,14 @@ arguments.
 """
 
 from larmorx.ants.apply_transforms import apply_transforms, apply_transforms_to_points
+from larmorx.ants.components import (
+    distance_map,
+    extract_contours,
+    largest_component,
+    maurer_distance,
+    replace_voxel_value,
+    threshold_at_mean,
+)
 from larmorx.ants.image_math import (
     ImageMathError,
     add_to_zero,
@@ -17,6 +25,19 @@ from larmorx.ants.image_math import (
     normalize_image,
     rescale_image,
     truncate_image_intensity,
+)
+from larmorx.ants.morphology import (
+    fill_holes,
+    grayscale_close,
+    grayscale_dilate,
+    grayscale_erode,
+    grayscale_open,
+    morphological_close,
+    morphological_dilate,
+    morphological_erode,
+    morphological_open,
+    morphology,
+    pad_image,
 )
 from larmorx.ants.resample import PIXEL_TYPES, resample_image, resample_image_by_spacing
 from larmorx.ants.smoothing import (
@@ -36,19 +57,36 @@ __all__ = [
     "apply_transforms",
     "apply_transforms_to_points",
     "discrete_gaussian",
+    "distance_map",
+    "extract_contours",
+    "fill_holes",
     "gradient_magnitude",
+    "grayscale_close",
+    "grayscale_dilate",
+    "grayscale_erode",
+    "grayscale_open",
     "image_arithmetic",
     "image_math",
     "image_math_operations",
     "laplacian",
+    "largest_component",
+    "maurer_distance",
+    "morphological_close",
+    "morphological_dilate",
+    "morphological_erode",
+    "morphological_open",
+    "morphology",
     "multiply_images",
     "negative_image",
     "normalize_image",
     "otsu_threshold",
+    "pad_image",
+    "replace_voxel_value",
     "resample_image",
     "resample_image_by_spacing",
     "rescale_image",
     "smooth_image",
+    "threshold_at_mean",
     "threshold_image",
     "truncate_image_intensity",
     "unsharp_mask",

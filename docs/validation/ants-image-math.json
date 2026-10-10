@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "54d3282e3bf5-dirty",
-  "larmorx_testdata_commit": "28167dea9be5",
+  "larmorx_commit": "57245bee1dee-dirty",
+  "larmorx_testdata_commit": "f32b1d60627c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -22,7 +22,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -31,8 +31,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: UnsharpMask ImageIn [amount=0.5] [radius=1] [threshold=0] [radius in spacing unit (0)/1] : Apply an Unsharp Mask filter",
-   "seconds": 0.018,
+   "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: ExtractContours inputImage {fullyConnected=1} : the voxels of each label (the value truncated to an integer) that touch another label",
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation Bogus not found or not supported for dimension 3; larmorx exit 1: Operation Bogus not found or not supported for dimension 3",
-   "seconds": 0.08,
+   "seconds": 0.086,
    "status": "both-error"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation neg not found or not supported for dimension 3; larmorx exit 1: Operation neg not found or not supported for dimension 3",
-   "seconds": 0.016,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -62,7 +62,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Dimension 5 is not supported; larmorx exit 1: Dimension 5 is not supported",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -72,7 +72,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ImageMath: the dimension 'three' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.014,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -82,7 +82,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation TileImages not found or not supported for dimension 3; larmorx exit 1: Operation TileImages not found or not supported for dimension 3",
-   "seconds": 0.015,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -92,7 +92,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses the null image)",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -102,7 +102,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs crashes here: it uses the null image)",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -182,7 +182,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -232,7 +232,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -252,7 +252,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -262,7 +262,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.055,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -272,7 +272,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -292,7 +292,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -302,7 +302,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -322,7 +322,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -332,7 +332,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -342,7 +342,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -362,7 +362,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -372,7 +372,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -382,7 +382,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -392,7 +392,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -422,7 +422,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -452,7 +452,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -462,7 +462,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -472,7 +472,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -482,7 +482,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -502,7 +502,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -512,7 +512,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -522,7 +522,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -532,7 +532,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -542,7 +542,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -552,7 +552,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.055,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -562,7 +562,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -572,7 +572,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -582,7 +582,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -592,7 +592,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -602,7 +602,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -612,7 +612,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -632,7 +632,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -642,7 +642,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.61,
+   "seconds": 0.606,
    "status": "pass"
   },
   {
@@ -652,7 +652,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.498,
+   "seconds": 0.516,
    "status": "pass"
   },
   {
@@ -662,7 +662,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.06,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -672,7 +672,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -682,7 +682,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.061,
+   "seconds": 4.191,
    "status": "pass"
   },
   {
@@ -692,7 +692,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.501,
+   "seconds": 0.593,
    "status": "pass"
   },
   {
@@ -702,7 +702,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -712,7 +712,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -722,7 +722,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -742,7 +742,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -762,7 +762,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -782,7 +782,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -792,7 +792,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -802,7 +802,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -812,7 +812,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -842,7 +842,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -862,7 +862,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -872,7 +872,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.422,
+   "seconds": 1.428,
    "status": "pass"
   },
   {
@@ -882,7 +882,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.742,
+   "seconds": 0.761,
    "status": "pass"
   },
   {
@@ -892,7 +892,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.867,
+   "seconds": 1.893,
    "status": "pass"
   },
   {
@@ -902,7 +902,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -912,7 +912,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -922,7 +922,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -942,7 +942,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -952,7 +952,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1002,7 +1002,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1012,7 +1012,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.139,
+   "seconds": 1.122,
    "status": "pass"
   },
   {
@@ -1022,7 +1022,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -1032,7 +1032,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1052,7 +1052,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1062,7 +1062,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1072,7 +1072,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1081,8 +1081,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x59090644c410): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
-   "seconds": 0.021,
+   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x627dc84a7410): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -1102,7 +1102,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.325,
+   "seconds": 0.309,
    "status": "pass"
   },
   {
@@ -1112,7 +1112,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.099,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1122,7 +1122,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1132,7 +1132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1162,7 +1162,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1172,7 +1172,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1182,7 +1182,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.086,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1192,7 +1192,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -1222,7 +1222,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1232,7 +1232,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1242,7 +1242,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1252,7 +1252,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1262,7 +1262,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.505,
+   "seconds": 1.525,
    "status": "pass"
   },
   {
@@ -1272,7 +1272,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.704,
+   "seconds": 1.764,
    "status": "pass"
   },
   {
@@ -1282,7 +1282,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.123,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -1292,7 +1292,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.692,
+   "seconds": 1.696,
    "status": "pass"
   },
   {
@@ -1302,7 +1302,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.481,
+   "seconds": 0.458,
    "status": "pass"
   },
   {
@@ -1312,7 +1312,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1322,7 +1322,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1332,7 +1332,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1352,7 +1352,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1362,7 +1362,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1382,7 +1382,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1391,8 +1391,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5970d127e330): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
-   "seconds": 0.016,
+   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x6088a551e330): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -1402,7 +1402,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1412,7 +1412,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1422,7 +1422,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1432,7 +1432,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1462,7 +1462,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.982,
+   "seconds": 6.963,
    "status": "pass"
   },
   {
@@ -1472,7 +1472,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1482,7 +1482,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1492,7 +1492,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1502,7 +1502,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1512,7 +1512,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: Grad: 'yes' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.015,
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -1522,7 +1522,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.097,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1532,7 +1532,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.736,
+   "seconds": 1.81,
    "status": "pass"
   },
   {
@@ -1542,7 +1542,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1552,7 +1552,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1582,7 +1582,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1591,8 +1591,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x58997d0ea3a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
-   "seconds": 0.02,
+   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x587859e533a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -1602,7 +1602,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws)",
-   "seconds": 0.027,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -1632,16 +1632,1666 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.386,
+   "seconds": 1.451,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-components",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-default-radius",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-radius-0",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-radius-fraction",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-radius-minus-half",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-radius-negative",
+   "category": "binary-morphology",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  std::bad_alloc; larmorx exit 1: larmorx: MD: a radius of -1 is not supported (ANTs converts it to a radius near 2^64 and cannot allocate its structuring element)",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "binary-morphology/MD-labels-value-2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-value-0",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-fractional-value",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-real-T1w-mask-2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.479,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-real-T1w-mask-5",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.527,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-real-bold-mask",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-dim2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MD-dim4",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-components",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-holes",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-labels",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-value-2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-fractional",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-brain-mask",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-real-T1w-mask-10",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.218,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-real-T1w-mask-2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.843,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-real-mni-mask",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.252,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-dim2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-dim4",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-components",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-holes",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-value-0",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-labels-value-3",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-dim4",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-holes-1",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-holes-2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-value-0",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-labels-value-3",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-components-border",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-real-T1w-mask",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.398,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-dim2",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MC-dim4",
+   "category": "binary-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-phantom-1",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-phantom-2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-outliers",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.059,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-dim2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-dim4",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-real-T1w",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.405,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-phantom-1",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-phantom-2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-outliers",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-dim2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-dim4",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-real-T1w",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.194,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-phantom-1",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-phantom-2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-outliers",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-dim2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-dim4",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-real-T1w",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.531,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-phantom-1",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-phantom-2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-outliers",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-dim2",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-dim4",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-real-T1w",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.657,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-radius-0",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-int16-scaled",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GO-radius-4",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.154,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GE-signed-zeros",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GD-signed-zeros",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "grayscale-morphology/GC-signed-zeros",
+   "category": "grayscale-morphology",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/default",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-2",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-almost-2",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-1.5",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-3",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-1",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-0.99",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/param-0.5",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/components-0.3",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/labels",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/fractional",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/real-T1w-mask",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.145,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/real-mni-mask",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.59,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/dim2",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/dim4",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/hole-first-slice-2",
+   "category": "fill-holes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "fill-holes/hole-first-slice-0.5",
+   "category": "fill-holes",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "For a hole on the first or last slice, ANTs reads the binary image at neighbour indices outside the image (NeighborhoodIterator::GetIndex is not clamped), which land before or after its buffer: the result depends on whatever memory lies there. larmorx reproduces reads that land inside the buffer and refuses the others.",
+   "seconds": 0.021,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "pad-image/pad-10",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/depad-5",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.036,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/pad-value",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/pad-fraction",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/depad-fraction",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/pad-0",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/depad-to-one",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/depad-to-zero",
+   "category": "pad-image",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: munmap_chunk(): invalid pointer; larmorx exit 1: larmorx: PadImage: padding by -14 gives an axis of 0 voxels (ANTs cannot allocate or write such an image)",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "pad-image/depad-negative",
+   "category": "pad-image",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: PadImage: padding by -20 gives an axis of 4294967288 voxels (ANTs cannot allocate or write such an image)",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "pad-image/no-pad",
+   "category": "pad-image",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath PadImage needs at least 2 operand(s) (ANTs reads past the arguments here)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "pad-image/int16-scaled",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/las-sform-only",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/negative-pixdim",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/real-T1w-mask-pad",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.433,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/real-T1w-depad",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.97,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/dim2",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/dim4",
+   "category": "pad-image",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/components",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-0",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-above-all",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/empty",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/ties",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-negative",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-not-a-number",
+   "category": "largest-component",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: GetLargestComponent: the minimum size 'big' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "largest-component/labels",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/fractional",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/holes",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/brain-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-T1w-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.38,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-WM-probseg",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.453,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-bold-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/dim2",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/dim4",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/components",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/brain-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/sparse-points",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/labels",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/zeros-and-signed-zeros",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/empty",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/all-object",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/negative-pixdim",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/int16-scaled",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/real-bold-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.109,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/real-T1w-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.154,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/dim2",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/dim4",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/components",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/brain-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-2",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-0.6",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/sparse-points",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/empty",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/all-object",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-0",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/negative-pixdim",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/real-T1w-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.044,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/real-mni-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.237,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/dim2",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/dim4",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/labels",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/labels-faces",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/fractional",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/negative-values",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/int32-large",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/components",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/flag-not-a-number",
+   "category": "extract-contours",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ExtractContours: 'yes' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "extract-contours/real-T1w-mask",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.268,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/dim2",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/dim4",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/default",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/fraction-1.5",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/fraction-0",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/above-maximum",
+   "category": "threshold-at-mean",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x59a65b4b5600): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "threshold-at-mean/real-T1w",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.351,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/dim4",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/labels",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/range",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/empty-range",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/missing-value",
+   "category": "replace-voxel-value",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath ReplaceVoxelValue needs at least 4 operand(s) (ANTs reads past the arguments here)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "replace-voxel-value/dim2",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
    "status": "pass"
   }
  ],
  "suite": "ants-image-math",
  "summary": {
-  "both-error": 16,
-  "expected-divergence": 0,
+  "both-error": 24,
+  "expected-divergence": 1,
   "fail": 0,
-  "pass": 146,
+  "pass": 302,
   "skipped": 0
  },
  "tier": "standard"

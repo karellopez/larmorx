@@ -161,6 +161,10 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
     `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`): 1.6–7× faster on one thread,
     up to 21× with threads, bit-identical; fMRIPrep's `Laplacian 1.5 1` on a T1w 351 ms
     instead of 1.23 s;
+  - ANTs' morphology, components and distance maps (`ImageMath MD`, `ME`, `MC`, `GD`, `GO`,
+    `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`): 1.3–43× faster
+    on one thread, up to 78× with threads, bit-identical; sMRIPrep's `ME 10` on a brain mask
+    278 ms instead of 956 ms, `FillHoles 2` 68 ms instead of 2.9 s;
   - head-motion correction (`lx.mri.hmc`, clean-room, mcflirt-compatible): 1.2–2.3× faster
     than mcflirt on one thread and 4.9–9.4× on 12, within mcflirt's own variability; the
     matrices alone, all fMRIPrep needs, 5.7–16×.

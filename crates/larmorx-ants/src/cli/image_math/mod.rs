@@ -42,8 +42,10 @@
 //! An operation listed in [`KNOWN`] but in no group answers "not supported yet".
 
 mod arithmetic;
+mod components;
 mod gaussian;
 mod intensity;
+mod morphology;
 
 use std::io::Write;
 
@@ -68,6 +70,8 @@ pub const GROUPS: &[&[Operation]] = &[
     arithmetic::OPERATIONS,
     intensity::OPERATIONS,
     gaussian::OPERATIONS,
+    morphology::OPERATIONS,
+    components::OPERATIONS,
 ];
 
 /// Every operation name in ANTs v2.6.5's dispatch tables, with the dimensions each table

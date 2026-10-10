@@ -128,9 +128,132 @@ pub(crate) fn filter_lines<F: LineFilter>(
     Ok(())
 }
 
+/// Where a line lies in the image: its first voxel's index and the distance in memory between
+/// its voxels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Line {
+    pub start: usize,
+    pub stride: usize,
+}
+
+/// Calls `f(state, line, where)` on every line of `data` (an image of `size`, Fortran order)
+/// along `axis`, with the line's values in a contiguous slice that `f` may change in place.
+/// Lines along the first axis are passed as they lie in memory; lines along another axis are
+/// gathered in groups of up to [`LANES`] neighbouring lines and scattered back afterwards.
+/// Each line is seen once, so the result never depends on the thread count (`init` makes
+/// each worker's scratch state).
+pub(crate) fn for_each_line<T, S, I, F>(
+    data: &mut [T],
+    size: &[usize],
+    axis: usize,
+    n_threads: usize,
+    init: I,
+    f: F,
+) -> Result<(), FilterError>
+where
+    T: Copy + Send + Sync + Default,
+    I: Fn() -> S + Sync + Send,
+    F: Fn(&mut S, &mut [T], Line) + Sync + Send,
+{
+    let n = size[axis];
+    if n == 0 || data.is_empty() {
+        return Ok(());
+    }
+    let inner: usize = size[..axis].iter().product();
+    parallel::with_threads(n_threads, || {
+        if inner == 1 {
+            // Contiguous lines, a few per task.
+            let per_task = (4096 / n).max(1);
+            data.par_chunks_mut(n * per_task).enumerate().for_each_init(
+                &init,
+                |state, (c, lines)| {
+                    for (l, line) in lines.chunks_exact_mut(n).enumerate() {
+                        let start = (c * per_task + l) * n;
+                        f(state, line, Line { start, stride: 1 });
+                    }
+                },
+            );
+        } else {
+            // Strided lines: each task owns the pieces of `w ≤ LANES` neighbouring lines, one
+            // piece per position along the axis (as in `filter_lines`).
+            let mut tasks: Vec<(usize, Vec<&mut [T]>)> = Vec::new();
+            for (b, block) in data.chunks_mut(inner * n).enumerate() {
+                let first = tasks.len();
+                tasks.extend(
+                    (0..inner.div_ceil(LANES))
+                        .map(|c| (b * inner * n + c * LANES, Vec::with_capacity(n))),
+                );
+                for row in block.chunks_mut(inner) {
+                    for (c, piece) in row.chunks_mut(LANES).enumerate() {
+                        tasks[first + c].1.push(piece);
+                    }
+                }
+            }
+            tasks.into_par_iter().for_each_init(
+                || (init(), vec![T::default(); n * LANES]),
+                |(state, buf), (start, mut rows)| {
+                    let w = rows[0].len();
+                    for (i, row) in rows.iter().enumerate() {
+                        for (l, &v) in row.iter().enumerate() {
+                            buf[l * n + i] = v;
+                        }
+                    }
+                    for l in 0..w {
+                        let line = Line {
+                            start: start + l,
+                            stride: inner,
+                        };
+                        f(state, &mut buf[l * n..(l + 1) * n], line);
+                    }
+                    for (i, row) in rows.iter_mut().enumerate() {
+                        for (l, v) in row.iter_mut().enumerate() {
+                            *v = buf[l * n + i];
+                        }
+                    }
+                },
+            );
+        }
+    })?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn for_each_line_sees_every_line_once_with_its_position() {
+        for size in [
+            vec![7usize, 5, 3],
+            vec![70, 3, 2, 4],
+            vec![1, 9, 40],
+            vec![6],
+        ] {
+            let len: usize = size.iter().product();
+            let data: Vec<u32> = (0..len as u32).collect();
+            for axis in 0..size.len() {
+                for threads in [1, 3] {
+                    let mut d = data.clone();
+                    for_each_line(
+                        &mut d,
+                        &size,
+                        axis,
+                        threads,
+                        || (),
+                        |_, line, at| {
+                            for (i, v) in line.iter_mut().enumerate() {
+                                // Each value is its own index: check it, then mark it.
+                                assert_eq!(*v as usize, at.start + i * at.stride);
+                                *v += 1_000_000;
+                            }
+                        },
+                    )
+                    .unwrap();
+                    assert!(d.iter().zip(&data).all(|(a, b)| *a == b + 1_000_000));
+                }
+            }
+        }
+    }
 
     /// A filter whose output at `i` is a sum of the line's values weighted by position, so
     /// that every value's line and position matter.

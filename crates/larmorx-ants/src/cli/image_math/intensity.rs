@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //! ImageMath's intensity operations on the command line: `TruncateImageIntensity`,
-//! `Normalize` and `RescaleImage` (`ImageMath_Templates.hxx`, ANTs v2.6.5).
+//! `Normalize`, `RescaleImage`, `ThresholdAtMean` and `ReplaceVoxelValue`
+//! (`ImageMath_Templates.hxx`, ANTs v2.6.5).
 
 use super::{Context, OpError, Operation};
 use crate::cli::cstd::{atof, stoi};
 use crate::image::AntsImage;
 use crate::image_math::{
-    Normalization, TruncateOptions, normalize, rescale, truncate_image_intensity,
+    Normalization, TruncateOptions, normalize, replace_voxel_value, rescale, threshold_at_mean,
+    truncate_image_intensity,
 };
 
 const ALL: &[usize] = &[2, 3, 4];
@@ -30,6 +32,18 @@ pub const OPERATIONS: &[Operation] = &[
         dims: ALL,
         usage: "RescaleImage InputImage min max",
         run: run_rescale,
+    },
+    Operation {
+        name: "ThresholdAtMean",
+        dims: ALL,
+        usage: "ThresholdAtMean Image %ofMean : 1 where the value is at least mean x fraction (and at most the maximum)",
+        run: run_threshold_at_mean,
+    },
+    Operation {
+        name: "ReplaceVoxelValue",
+        dims: ALL,
+        usage: "ReplaceVoxelValue inputImage low high replaceVal : Replace voxels with intensities in [low, high] with replaceVal",
+        run: run_replace_voxel_value,
     },
 ];
 
@@ -140,6 +154,35 @@ fn run_rescale(ctx: &mut Context<'_>) -> Result<(), OpError> {
             "larmorx: RescaleImage: {e} (ANTs aborts: ITK throws)"
         ))
     })?;
+    ctx.write(&output, image.derived(data))?;
+    Ok(())
+}
+
+/// `ThresholdAtMean`: `ImageMath d out ThresholdAtMean image [fraction=1]`.
+fn run_threshold_at_mean(ctx: &mut Context<'_>) -> Result<(), OpError> {
+    let output = ctx.output().to_owned();
+    let fn1 = ctx.required(4)?.to_owned();
+    let fraction = ctx.arg(5).map_or(1.0f32, |s| atof(s) as f32);
+    let image: AntsImage<f32> = ctx.read(&fn1)?;
+    let data = threshold_at_mean(&image.data, fraction, ctx.n_threads).map_err(|e| {
+        OpError::crash(format!(
+            "larmorx: ThresholdAtMean: {e} (ANTs aborts: ITK throws)"
+        ))
+    })?;
+    ctx.write(&output, image.derived(data))?;
+    Ok(())
+}
+
+/// `ReplaceVoxelValue`: `ImageMath d out ReplaceVoxelValue image low high value`; ANTs reads
+/// all three numbers whatever the argument count (a missing one crashes it: `atof(NULL)`).
+fn run_replace_voxel_value(ctx: &mut Context<'_>) -> Result<(), OpError> {
+    let output = ctx.output().to_owned();
+    let fn1 = ctx.required(4)?.to_owned();
+    let low = atof(ctx.required(5)?) as f32;
+    let high = atof(ctx.required(6)?) as f32;
+    let value = atof(ctx.required(7)?) as f32;
+    let image: AntsImage<f32> = ctx.read(&fn1)?;
+    let data = replace_voxel_value(&image.data, low, high, value, ctx.n_threads)?;
     ctx.write(&output, image.derived(data))?;
     Ok(())
 }

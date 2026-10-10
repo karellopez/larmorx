@@ -3,19 +3,30 @@
 `lx.ants.image_math` (the command line on in-memory images) and typed wrappers of its
 operations: `lx.ants.image_arithmetic`, `add_to_zero`, `negative_image`,
 `truncate_image_intensity`, `normalize_image`, `rescale_image`, `discrete_gaussian`,
-`laplacian`, `gradient_magnitude`, `unsharp_mask`. Command line
+`laplacian`, `gradient_magnitude`, `unsharp_mask`, `morphology`, `morphological_dilate`,
+`morphological_erode`, `morphological_open`, `morphological_close`, `grayscale_dilate`,
+`grayscale_erode`, `grayscale_open`, `grayscale_close`, `fill_holes`, `pad_image`,
+`largest_component`, `distance_map`, `maurer_distance`, `extract_contours`,
+`threshold_at_mean`, `replace_voxel_value`. Command line
 `larmorx ants ImageMath`. Rust: `larmorx_ants::image_math` (operations),
 `larmorx_ants::cli::image_math` (the dispatcher), `larmorx_image` (ITK filters).
 A replica of ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
 
 **Status: `validated`** for the operations below, against ImageMath itself (see the
-[validation record](../validation/ants-image-math.md)): 162 cases, 145 outputs compared,
-142 bit-identical; every output has ANTs' exact header bytes. The 3 others are `^`, where
-ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35 of
-35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)). Every Gaussian
-case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4 dimensions,
-fMRIPrep's `Laplacian 1.5 1` on real T1w, boldref and template images included) is
-bit-identical.
+[validation record](../validation/ants-image-math.md)): 327 cases, 301 outputs compared,
+296 bit-identical; every output has ANTs' exact header bytes. Of the 5 others, 3 are `^`,
+where ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35
+of 35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)); 2 are
+grayscale morphology on an image made to hold `-0.0` next to `+0.0`, where only the sign of
+a zero result differs ([why](../findings/ants-morphology.md#grayscale-morphology)). Every
+Gaussian case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4
+dimensions, fMRIPrep's `Laplacian 1.5 1` on real T1w, boldref and template images included)
+is bit-identical, and so is every other morphology case (95 compared: `MD`, `ME`, `MO`,
+`MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage` in 2, 3 and 4 dimensions, sMRIPrep's
+`MD 2/5`, `ME 2/10`, `FillHoles 2` and `PadImage ±10` on real masks included), and
+every component and distance-map case (59 compared: `GetLargestComponent`, `D`,
+`MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`, in 2, 3 and
+4 dimensions, on real masks and probability maps too).
 
 **Speed** ([benchmark](../benchmarks/ants-programs.md)): fMRIPrep's
 `TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on
@@ -24,18 +35,26 @@ bit-identical.
 gzipped input is most of the time. The Gaussian operations
 ([benchmark](../benchmarks/ants-gaussian.md)): fMRIPrep's `Laplacian 1.5 1` on a raw T1w takes
 351 ms on one thread and 128 ms on 12, against 1.23 s and 277 ms for ANTs (7 ms against 52 ms
-on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms.
+on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms. The morphology
+operations ([benchmark](../benchmarks/ants-morphology.md)) on a 1 mm brain mask: `ME 10`
+278 ms on one thread and 72 ms on 12, against 956 ms for ANTs (which does not gain from
+threads here); `MD 2` 130 ms against 248 ms; `FillHoles 2` 68 ms against 2.91 s;
+`GetLargestComponent` 55 ms against 240 ms; `D` 547 ms against 2.90 s (both sequential);
+`MaurerDistance` 213 ms against 518 ms (58 ms against 115 ms on 12 threads); `GD 2` on a
+raw T1w 170 ms against 1.84 s.
 
 **Implemented operations** (the others answer "not supported yet"):
 
 | Group | Operations |
 |---|---|
 | arithmetic | `m`, `+`, `-`, `/`, `^`, `exp`, `max`, `abs`, `addtozero`, `overadd`, `Decision`, `total`, `mean`, `vtotal`, `Neg` |
-| intensity | `TruncateImageIntensity`, `Normalize`, `RescaleImage` |
+| intensity | `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `ThresholdAtMean`, `ReplaceVoxelValue` |
 | gaussian | `G`, `Laplacian`, `Grad`, `UnsharpMask` |
+| morphology | `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage` |
+| components | `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours` |
 
-All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian operations filter in all
-of the image's dimensions (a 4D image along time too).
+All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian and morphology operations
+work in all of the image's dimensions (a 4D image along time too).
 
 ## Quick start
 
@@ -51,6 +70,14 @@ both = lx.ants.add_to_zero(wm_mask, gm_mask)
 
 # The Laplacian feature channel of fMRIPrep's brain extraction (ImageMath 3 out Laplacian in 1.5 1)
 lap = lx.ants.laplacian(t1, 1.5, normalize=True)
+
+# sMRIPrep's mask clean-up steps (ImageMath MD 2, ME 10, FillHoles 2, PadImage 10)
+mask = lx.ants.morphological_dilate("brain_mask.nii.gz", 2)
+csf = lx.ants.morphological_erode(csf_mask, 10)
+filled = lx.ants.fill_holes(gm_mask, 2)
+padded = lx.ants.pad_image(mask, 10)
+largest = lx.ants.largest_component(mask)
+dist = lx.ants.maurer_distance(mask)  # signed, mm, negative inside
 ```
 
 ```bash
@@ -89,6 +116,19 @@ converted to float32 as a C++ `static_cast` converts them.
 | `Laplacian a sigma` | `laplacian(a, sigma=1.0, normalize=False)` | `LaplacianRecursiveGaussianImageFilter`, sigma in mm; ANTs reads `normalize` from the sigma argument itself (`stoi("1.5")` is 1), so fMRIPrep's `Laplacian a 1.5 1` is `laplacian(a, 1.5, normalize=True)` |
 | `Grad a sigma normalize` | `gradient_magnitude(a, sigma=1.0, normalize=False)` | `GradientMagnitudeRecursiveGaussianImageFilter`, sigma in mm |
 | `UnsharpMask a amount radius threshold physical` | `unsharp_mask(a, amount=0.5, radius=1.0, threshold=0.0, radius_in_physical_units=False)` | `UnsharpMaskImageFilter` in float; `radius` is the Gaussian's sigma |
+| `MD a r value` | `morphological_dilate(a, radius=1, value=1.0)` | ITK's `BinaryDilateImageFilter` with its ball (offsets with `Σ o² ≤ r(r+1)`, in voxels); `value` is the foreground |
+| `ME a r value` | `morphological_erode(a, radius=1, value=1.0)` | `BinaryErodeImageFilter` (the border does not erode), then 1 where the eroded value and the input exceed 0.5, else 0 |
+| `MO a r value`, `MC a r value` | `morphological_open(...)`, `morphological_close(...)` | the binary opening (eroded voxels set to 0) and closing (padded by `r` first; voxels that do not end as `value` keep their input) |
+| `GD a r`, `GE a r`, `GO a r`, `GC a r` | `grayscale_dilate(a, radius=1)`, `grayscale_erode`, `grayscale_open`, `grayscale_close` | maximum / minimum over the ball; opening and closing pad by `r` |
+| any of the eight | `morphology(a, operation, radius=1, value=1.0)` | `operation` is ImageMath's name |
+| `FillHoles a p` | `fill_holes(a, hole_param=2.0)` | the background regions other than the largest set to 1 (all of them for 2; by their share of object neighbours for `p ≤ 1`) |
+| `GetLargestComponent a n` | `largest_component(a, min_size=50)` | 1 in the largest face-connected component(s) of the voxels in `[0.25, 1e9]` (ties keep all of them), 0 elsewhere; components under `n` voxels are dropped first, and if none is left every voxel becomes 1 |
+| `D a` | `distance_map(a)` | ITK's Danielsson map: the distance (mm) to the nearest non-zero voxel; sequential, as ITK's |
+| `MaurerDistance a f` | `maurer_distance(a, foreground=1.0)` | ITK's signed Maurer map of the voxels equal to `f`: the distance (mm) to the object's inner contour, negative inside, `-0.0` on the contour |
+| `ExtractContours a full` | `extract_contours(a, fully_connected=True)` | ITK's `LabelContourImageFilter` on the values truncated to integer labels |
+| `ThresholdAtMean a f` | `threshold_at_mean(a, fraction=1.0)` | 1 where `mean·f ≤ v ≤ max` (float mean in image order) |
+| `ReplaceVoxelValue a lo hi v` | `replace_voxel_value(a, low, high, value)` | voxels in `[lo, hi]` become `v` |
+| `PadImage a p value` | `pad_image(a, pad, value=0.0)` | `p` voxels of `value` added on each side of every axis (removed if negative); the origin moves so voxels keep their positions; a fractional `p` grows by `int(2p)` and shifts by `int(p)` |
 
 ## Command-line behaviour (as in ANTs)
 
@@ -126,6 +166,24 @@ All reproduced from ANTs; details and sources in
   `Grad`; `G` without a valid sigma prints "Incorrect sigma vector size" and returns the
   image unchanged, and `G` with a variance above about 709 voxels² writes NaN, as ANTs
   does.
+- **Morphology** ([findings](../findings/ants-morphology.md)): radii are in voxels and
+  truncated (`2.9` is 2; `-1` makes ANTs abort); `ME`'s output is 0/1 and keeps voxels that
+  are above 0.5 but not the foreground (a label 2 stays 1); `MO r 0` is a dilation of the
+  zeros (the opening's eroded voxels become 0, the foreground); the binary erosion does not
+  erode at the image border; the eight morphology operations write only output names longer
+  than 3 characters. Their outputs and `PadImage`'s have no `descrip`; `FillHoles` writes
+  the image it read (keeping it). `PadImage` needs its pad argument (ANTs crashes without
+  it) and crashes ANTs when an axis would end with 0 or fewer voxels.
+- **Components and distance maps** ([findings](../findings/ants-morphology.md)):
+  `GetLargestComponent` keeps every component of the largest size and turns the whole
+  image to 1 when no component reaches the minimum size (50 by default) or the mask is
+  empty; it writes the image it read (keeping its `descrip`). `D` is Danielsson's
+  propagation, not an exact Euclidean transform, and an image without non-zero voxels gets
+  distances near `2·max(size)` mm; `MaurerDistance` gives `∓1.8446743e19` when there is
+  nothing to measure from. `ExtractContours` truncates values to integer labels (1.7 is 1,
+  0.6 is 0, negative values wrap to near 2^64). `ThresholdAtMean` with a fraction above
+  `max/mean` and `ReplaceVoxelValue` with fewer than three numbers make ANTs abort or
+  crash; larmorx exits 1.
 
 ## Deliberate differences
 
@@ -135,4 +193,12 @@ All reproduced from ANTs; details and sources in
 - The coefficients of the recursive Gaussians use correctly rounded `sin`, `cos` and `exp`;
   ANTs uses glibc's, which differ in the last bit for about 0.6 % of sigmas. That has not
   changed a single output value: each pass rounds to float.
+- Grayscale morphology: where a neighbourhood holds both `-0.0` and `+0.0` and its extreme
+  is zero, larmorx returns `+0.0` for a maximum and `-0.0` for a minimum; ITK's moving
+  histogram returns either, depending on the order it was filled in.
+- `FillHoles` with `p ≤ 1` and a hole on the first or last slice: ANTs reads outside the
+  image's memory (undefined); larmorx refuses with a message. Radii above 65535 voxels are
+  refused.
+- `ClusterThresholdVariate` is not ported: ANTs decides with a value read outside the image
+  (its result is undefined).
 - Images are NIfTI only (ANTs reads every format ITK knows).

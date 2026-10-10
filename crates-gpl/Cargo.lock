@@ -144,6 +144,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-interp"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "libm",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-io"
 version = "0.0.1"
 dependencies = [
@@ -161,6 +171,7 @@ name = "larmorx-transform"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-interp",
  "libm",
  "rayon",
  "thiserror",

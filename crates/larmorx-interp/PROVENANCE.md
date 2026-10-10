@@ -23,3 +23,25 @@ agree with glibc, and so with ANTs on Linux, except where glibc is not correctly
 (about 0.003 % of `exp`/`log` calls and 0.15 % of `sin`/`cos` calls); there a result can
 differ by an ulp. `pow` (the B-spline prefilter's pole powers) still comes from the `libm`
 crate. See [docs/findings/platform-math.md](../../docs/findings/platform-math.md).
+
+## SciPy's spline interpolation (`src/ndimage/`)
+
+**Ported** from SciPy 1.15.2 (tag `v1.15.2` → `0f1fd4a7268b`, BSD-3-Clause, `UPSTREAM.md`;
+SciPy 1.15.3, in the development venv, has the same `ndimage` interpolation code). The
+operation order is kept, so results are bit-identical to SciPy on x86-64 Linux
+(`docs/validation/resample-series.md`). Each file reproduces SciPy's notice.
+
+| larmorx | SciPy 1.15.2 | Licence |
+|---|---|---|
+| `ndimage::splines`: `filter_poles`, `interpolation_weights`, `LineFilter` (gain, causal/anticausal initialisations for mirror, wrap and reflect, the recursions), `apply_rows` (the same per line, many lines at once) | `scipy/ndimage/src/ni_splines.c` (`get_filter_poles`, `get_spline_interpolation_weights`, `_init_*`, `_apply_filter`, `apply_filter`) | BSD-3-Clause |
+| `ndimage::map_coordinate`, `Spline::sample` (the coordinate-array path), `filter_axis` (lines of an axis) | `scipy/ndimage/src/ni_interpolation.c` (`map_coordinate`, `NI_GeometricTransform`, `_get_spline_boundary_mode`, `NI_SplineFilter1D`), `ni_support.c` (line buffers) | BSD-3-Clause (Peter J. Verveer) |
+| `Mode`, `Mode::extend`, `Mode::prepad`, `pad`, `map_coordinates`, `spline_filter`, `spline_filter1d`, `Output` (`CASE_INTERP_OUT*`) | `scipy/ndimage/_interpolation.py` (`map_coordinates`, `spline_filter`, `spline_filter1d`, `_prepad_for_spline_filter`), `_ni_support.py` (`_extend_mode_to_code`, `_get_output`) | BSD-3-Clause |
+
+**Deliberate differences** (`docs/findings/scipy-ndimage.md`):
+- `pow(z, n)` in the prefilter is `larmorx_core::math::powi`, correctly rounded; glibc's
+  differs only for powers below 1e-100.
+- `floor` is computed without the C library (same result for every input).
+- C's casts of NaN and out-of-range doubles to integers follow x86-64 (`i64::MIN`); where SciPy
+  would then read outside its buffer (index arithmetic that overflows), larmorx returns NaN.
+- `Spline::sample_batch` evaluates interior points four at a time; each point keeps SciPy's
+  own order of operations, so the values are the same.

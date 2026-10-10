@@ -9,7 +9,9 @@ use pyo3::prelude::*;
 
 mod afni;
 mod ants;
+mod ndimage;
 mod nifti;
+mod resample;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
@@ -33,5 +35,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     nifti::register(m)?;
     ants::register(m)?;
     afni::register(m)?;
+    ndimage::register(m)?;
+    resample::register(m)?;
     Ok(())
 }

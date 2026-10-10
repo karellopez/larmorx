@@ -241,6 +241,7 @@ name = "larmorx-transform"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-interp",
  "libm",
  "rayon",
  "thiserror",

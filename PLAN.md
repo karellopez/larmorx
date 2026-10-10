@@ -438,7 +438,7 @@ def bold_pipeline(run, anat, fmap, s):
     stc = afni.tshift(bold, run.slice_timing, tzero=s.slice_time_ref) if run.slice_timing else bold
     sdc = fmaps.align(fmap, ref) if fmap else None            # ants.registration rigid
     coreg = mri.bbr(ref, anat, init=ants.registration(..., stages=[ants.Rigid(...)]))
-    outs = {sp: xfm.resample_series(stc, hmc >> sdc >> coreg >> anat.to(sp), sp) for sp in s.spaces}
+    outs = {sp: transforms.resample_series(stc, sp, [hmc, coreg, anat.to(sp)], fieldmap=sdc) for sp in s.spaces}
     return BoldResult(outs, confounds.compute(outs["boldref"], hmc, anat, s), hmc, coreg)
 ```
 
@@ -456,7 +456,7 @@ def bold_pipeline(run, anat, fmap, s):
 | Coregistration reference + mask | ANTs premask, N4, BET, 3dUnifize, 3dAutomask | `ants.*`, `mri.brain_mask`, `afni.unifize`, `afni.automask`, or a simplified reimagined mask (validated by Dice) |
 | BOLD → T1w | mri_coreg + bbregister / FLIRT-BBR | `ants.registration` (MI) init + `mri.bbr` |
 | Multi-echo | t2smap | `mri.multiecho` |
-| One-shot resampling | Python (nitransforms + scipy) | Rust `xfm.resample_series` (fused, streamed) |
+| One-shot resampling | Python (nitransforms + scipy) | `transforms.resample_series` (Rust, fused, streamed; bit-identical to fMRIPrep) |
 | Confounds | Python | numpy (fMRIPrep's formulas) |
 | Surfaces / CIFTI | recon-all, mri_vol2surf, wb_command | `freesurfer.recon_lite` (or an imported FreeSurfer/FastSurfer subject dir), `freesurfer.vol2surf`, `mri.surfmap` |
 | Reports | nireports | matplotlib/nilearn, Jinja2; self-contained HTML |

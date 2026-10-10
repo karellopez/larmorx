@@ -33,6 +33,8 @@ ANTs-v2.6.5	https://github.com/ANTsX/ANTs.git	fdce4d2f84b60ac75d7e45aafe18488b1f
 ITK-v5.4.5	https://github.com/InsightSoftwareConsortium/ITK.git	f51594ad88194a72cdc06a314dafff709fcdc2e9	Apache-2.0	tags
 AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags
 core-math	https://gitlab.inria.fr/core-math/core-math.git	040ee482a8caefe2afe71a3a59d43923d2f0c7e6	MIT	tags
+scipy-v1.15.2	https://github.com/scipy/scipy.git	0f1fd4a7268b813fa2b844ca6038e4dfdf90084a	BSD-3-Clause	tags
+nitransforms-25.1.0	https://github.com/nipy/nitransforms.git	c10f63d1a1f77f8e0040d7f8be3b8b6e12176664	MIT	tags
 fsl-mcflirt	https://git.fmrib.ox.ac.uk/fsl/mcflirt.git	2111.0	FSL-Licence	fsl
 fsl-flirt	https://git.fmrib.ox.ac.uk/fsl/flirt.git	2111.2	FSL-Licence	fsl
 fsl-newimage	https://git.fmrib.ox.ac.uk/fsl/newimage.git	2203.12	FSL-Licence	fsl

@@ -121,3 +121,64 @@ def afni_tshift_array(
 ) -> tuple[np.ndarray, dict[str, Any], list[str]]:
     """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
     the shifted voxels, the output header fields and warnings."""
+
+# --- SciPy-compatible interpolation (larmorx/ndimage.py) --------------------------------------
+
+def ndimage_map_coordinates(
+    input: np.ndarray,
+    coordinates: np.ndarray,
+    order: int = 3,
+    mode: str = "constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+    output: str = "float64",
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``scipy.ndimage.map_coordinates`` for a 1- to 4-D ``input`` and ``(ndim, n)`` float64
+    ``coordinates``: the ``n`` values in the ``output`` dtype."""
+
+def ndimage_spline_filter1d(
+    input: np.ndarray, order: int = 3, axis: int = -1, mode: str = "mirror", n_threads: int = 1
+) -> np.ndarray:
+    """``scipy.ndimage.spline_filter1d`` on a float64 array (Fortran-ordered result)."""
+
+def ndimage_spline_filter(
+    input: np.ndarray, order: int = 3, mode: str = "mirror", n_threads: int = 1
+) -> np.ndarray:
+    """``scipy.ndimage.spline_filter`` on a float64 array (Fortran-ordered result)."""
+
+def ndimage_prepared_coefficients(
+    input: np.ndarray, order: int = 3, mode: str = "grid-constant", cval: float = 0.0
+) -> np.ndarray:
+    """The padded, prefiltered coefficients ``map_coordinates`` interpolates (3D float32)."""
+
+# --- nitransforms chains and fMRIPrep's one-shot resampler (larmorx/transforms) ---------------
+
+Step = tuple[Any, ...]  # ("affine", 4x4) or ("field", deltas (x, y, z, 3), affine, inverse)
+
+def nitransforms_ndcoords(shape: list[int], affine: np.ndarray) -> np.ndarray:
+    """``ImageGrid.ndcoords``: ``(x, y, z, 3)`` float64 RAS+ coordinates of every voxel."""
+
+def nitransforms_map(points: np.ndarray, steps: list[Step], n_threads: int = 1) -> np.ndarray:
+    """``TransformChain(steps).map(points)`` for ``(n, 3)`` float64 points."""
+
+def resample_series(
+    source: np.ndarray,
+    target_shape: list[int],
+    target_affine: np.ndarray,
+    steps: list[Step],
+    ras2vox: np.ndarray,
+    hmc: np.ndarray | None = None,
+    fieldmap: np.ndarray | None = None,
+    pe: list[tuple[int, float]] | None = None,
+    order: int = 3,
+    mode: str = "grid-constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+    jacobian: bool = True,
+    output: str = "float32",
+    n_threads: int = 1,
+) -> np.ndarray:
+    """fMRIPrep's ``resample_image`` after loading: a float32 3D/4D ``source`` onto the target
+    grid through ``steps`` and ``ras2vox``, with per-volume voxel-to-voxel head motion ``hmc``
+    (``(t, 4, 4)``), a field map in Hz and readout vectors ``pe``. Fortran-ordered result."""

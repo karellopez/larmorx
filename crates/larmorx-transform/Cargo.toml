@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-transform"
-description = "Spatial transforms for larmorx: ITK's linear family, displacement fields and composites"
+description = "Spatial transforms for larmorx: ITK's linear family, displacement fields and composites; nitransforms chains and fMRIPrep's one-shot resampler"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+larmorx-interp.workspace = true
 libm.workspace = true
 rayon.workspace = true
 thiserror.workspace = true

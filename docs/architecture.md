@@ -14,8 +14,10 @@ How the code is organised and the conventions every tool follows. The plan behin
    larmorx-core      Affine, Grid3, Image<T, D>, DynArray/DynImage, element types, thread pools,
                      small linear algebra (incl. vnl's SVD inverse, bit-exact with ITK)
    larmorx-io        file formats: NIfTI (nibabel and ITK semantics), ITK transform files
-   larmorx-transform ITK transforms: matrix-offset family, displacement fields, composites, -t chains
-   larmorx-interp    the ITK interpolators (linear, nearest, B-spline, Gaussian, label, windowed sinc)
+   larmorx-transform ITK transforms: matrix-offset family, displacement fields, composites, -t chains;
+                     nitransforms chains (RAS) and fMRIPrep's one-shot BOLD resampler
+   larmorx-interp    the ITK interpolators (linear, nearest, B-spline, Gaussian, label, windowed sinc);
+                     SciPy's map_coordinates and spline prefilter (ndimage)
    larmorx-ants      ANTs tools (antsApplyTransforms) and their original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)

@@ -17,8 +17,12 @@
 //!
 //! Callers check [`is_inside`] first, as ITK's resampler does: interpolators assume the index
 //! lies within half a voxel of the grid.
+//!
+//! [`ndimage`] is the other family: SciPy's `map_coordinates` and spline prefilter (orders 0-5,
+//! every boundary mode), as fMRIPrep and nitransforms use them.
 #![forbid(unsafe_code)]
 
+pub mod ndimage;
 mod vnl;
 
 use std::collections::BTreeMap;

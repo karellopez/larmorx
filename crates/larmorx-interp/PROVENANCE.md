@@ -8,8 +8,8 @@ handling and operation order
 | larmorx | Upstream | Licence |
 |---|---|---|
 | `is_inside` | ITK v5.4.5: `Modules/Core/ImageFunction/include/itkImageFunction.h` (`IsInsideBuffer`), `itkImageFunction.hxx` | Apache-2.0 |
-| `linear` | ITK v5.4.5: `itkLinearInterpolateImageFunction.h/.hxx` (3D optimized path) | Apache-2.0 |
-| nearest neighbour | ITK v5.4.5: `itkNearestNeighborInterpolateImageFunction.h` | Apache-2.0 |
+| `linear`, `LinearYz` (the same arithmetic, the y/z part computed once per row) | ITK v5.4.5: `itkLinearInterpolateImageFunction.h/.hxx` (3D optimized path) | Apache-2.0 |
+| `nearest`, `NearestYz` | ITK v5.4.5: `itkNearestNeighborInterpolateImageFunction.h` | Apache-2.0 |
 | `bspline` (prefilter, weights for orders 0–5, mirror boundary) | ITK v5.4.5: `itkBSplineDecompositionImageFilter.hxx`, `itkBSplineInterpolateImageFunction.hxx` | Apache-2.0 |
 | `gaussian` | ITK v5.4.5: `itkGaussianInterpolateImageFunction.hxx` | Apache-2.0 |
 | `multi_label` | ITK v5.4.5: `itkLabelImageGaussianInterpolateImageFunction.hxx` | Apache-2.0 |

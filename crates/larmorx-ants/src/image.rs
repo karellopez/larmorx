@@ -27,6 +27,7 @@ use larmorx_io::nifti::itk::{
     GeometrySource, ItkGeometry, ItkImage, ItkMeta, ItkVoxels, read_itk_image, write_itk_image,
 };
 use larmorx_io::nifti::{self, WriteOptions};
+use rayon::prelude::*;
 
 /// An ITK image `itk::Image<T, D>` as an ANTs program holds it.
 #[derive(Clone, Debug, PartialEq)]
@@ -107,6 +108,26 @@ impl<T: Clone> AntsImage<T> {
 pub trait Pixel: Element + Copy + Send + Sync + 'static {
     fn from_f32(v: f32) -> Self;
     fn from_f64(v: f64) -> Self;
+
+    /// The first `count` values of `v`, converted (in parallel in the current pool: callers
+    /// run it inside `larmorx_core::parallel::with_threads`; without a copy where the type is
+    /// already right).
+    fn from_f32_vec(mut v: Vec<f32>, count: usize) -> Vec<Self> {
+        v.truncate(count);
+        v.par_iter()
+            .with_min_len(1 << 16)
+            .map(|&x| Self::from_f32(x))
+            .collect()
+    }
+
+    /// [`Pixel::from_f32_vec`] for double values.
+    fn from_f64_vec(mut v: Vec<f64>, count: usize) -> Vec<Self> {
+        v.truncate(count);
+        v.par_iter()
+            .with_min_len(1 << 16)
+            .map(|&x| Self::from_f64(x))
+            .collect()
+    }
 }
 
 /// x86-64's conversion of a double to a 32-bit integer (`cvttsd2si`): truncation, with NaN
@@ -127,6 +148,10 @@ impl Pixel for f32 {
     fn from_f64(v: f64) -> Self {
         v as f32
     }
+    fn from_f32_vec(mut v: Vec<f32>, count: usize) -> Vec<Self> {
+        v.truncate(count);
+        v
+    }
 }
 
 impl Pixel for f64 {
@@ -134,6 +159,10 @@ impl Pixel for f64 {
         f64::from(v)
     }
     fn from_f64(v: f64) -> Self {
+        v
+    }
+    fn from_f64_vec(mut v: Vec<f64>, count: usize) -> Vec<Self> {
+        v.truncate(count);
         v
     }
 }
@@ -277,7 +306,7 @@ pub fn read_with<T: Pixel, S: ImageStore + ?Sized>(
         return Err(ReadError::TooShort);
     }
     let image = store.load(name, n_threads)?;
-    from_itk(image, name, dim)
+    from_itk(image, name, dim, n_threads)
 }
 
 /// [`ImageStore::write`] for trait objects.
@@ -300,6 +329,7 @@ pub fn from_itk<T: Pixel>(
     image: ItkImage,
     name: &str,
     dim: usize,
+    n_threads: usize,
 ) -> Result<AntsImage<T>, ReadError> {
     let unsupported = |message: String| ReadError::Unsupported {
         name: name.to_owned(),
@@ -346,10 +376,14 @@ pub fn from_itk<T: Pixel>(
         }
     }
     let count: usize = geometry.size.iter().product();
-    let data: Vec<T> = match &image.voxels {
-        ItkVoxels::F32(v) => v[..count].iter().map(|&x| T::from_f32(x)).collect(),
-        ItkVoxels::F64(v) => v[..count].iter().map(|&x| T::from_f64(x)).collect(),
-    };
+    let data: Vec<T> = larmorx_core::parallel::with_threads(n_threads, || match image.voxels {
+        ItkVoxels::F32(v) => T::from_f32_vec(v, count),
+        ItkVoxels::F64(v) => T::from_f64_vec(v, count),
+    })
+    .map_err(|e| ReadError::Failed {
+        name: name.to_owned(),
+        message: e.to_string(),
+    })?;
     Ok(AntsImage {
         data,
         geometry,

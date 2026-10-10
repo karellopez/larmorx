@@ -104,7 +104,8 @@ fn multiply(
                 .into(),
         );
     }
-    let first: AntsImage<f32> = from_itk(raw, &argv[2], dim).map_err(|e| e.to_string())?;
+    let first: AntsImage<f32> =
+        from_itk(raw, &argv[2], dim, n_threads).map_err(|e| e.to_string())?;
     // The second operand: an image if it reads as one, else a number (`atof`).
     let second: Option<AntsImage<f32>> = match read_with(store, &argv[3], dim, n_threads) {
         Ok(i) => Some(i),

@@ -251,20 +251,36 @@ pub fn arithmetic(
             out
         }
         Arithmetic::VTotal => vec![0.0; a.len()],
-        _ => {
-            let values: Vec<Option<f32>> = parallel::with_threads(n_threads, || {
+        Arithmetic::Divide => {
+            // Where the divisor is not positive, the voxel keeps the previous result: compute
+            // in parallel, marking those voxels, then carry the values in image order.
+            let values: Vec<f32> = parallel::with_threads(n_threads, || {
                 a.par_iter()
                     .enumerate()
                     .with_min_len(CHUNK)
-                    .map(|(i, &x)| op.apply(x, operand(i)))
+                    .map(|(i, &x)| op.apply(x, operand(i)).unwrap_or(f32::NAN))
                     .collect()
             })?;
-            let mut out = Vec::with_capacity(a.len());
-            for v in values {
-                if let Some(v) = v {
-                    result = v;
+            let mut out = values;
+            for (i, v) in out.iter_mut().enumerate() {
+                if operand(i) > 0.0 {
+                    result = *v;
+                } else {
+                    *v = result;
                 }
-                out.push(result);
+            }
+            out
+        }
+        _ => {
+            let out: Vec<f32> = parallel::with_threads(n_threads, || {
+                a.par_iter()
+                    .enumerate()
+                    .with_min_len(CHUNK)
+                    .map(|(i, &x)| op.apply(x, operand(i)).expect("assigned for every voxel"))
+                    .collect()
+            })?;
+            if let Some(&last) = out.last() {
+                result = last;
             }
             out
         }

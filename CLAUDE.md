@@ -31,7 +31,10 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   - `Image`/`Affine` and NIfTI-1/2 I/O: validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`).
   - **antsApplyTransforms (A1) done:** `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms`, `lx.transforms`, crates `larmorx-transform`, `-interp`, `-ants`. It is validated against ANTs itself: 83 cases, 63 of 79 bit-identical (`docs/validation/ants-apply-transforms.md`), and benchmarked (`docs/benchmarks/ants-apply-transforms.md`).
   - **3dTshift clean-room original done** (2026-10-10): `lx.afni.tshift`, `larmorx afni 3dTshift`, crate `larmorx-afni`, written from `specs/3dTshift.md` and black-box runs only. 236 parity cases against AFNI 25.2.09 (oracle built by `scripts/build_afni_oracle.sh`): 217 agree, 158 bit-identical, 0 failures (`docs/validation/afni-tshift.md`).
-  - Next: the bit-exact 3dTshift **replica** in `larmorx-gpl` (`crates-gpl/`). Its recovered starting code, including a verified bit-exact port of AFNI's FFT, is in `<workspace>/archive/2026-10-10-afni-replica-drafts/`. Then A2, the ANTs image filters (`larmorx-image`).
+  - **3dTshift replica done** (2026-10-10): `larmorx-gpl afni 3dTshift`, crates `larmorx-gpl-afni` and `larmorx-gpl-cli` in `crates-gpl/` (GPL-3.0-or-later, a separate Cargo workspace). 217 of 217 compared cases bit-identical to AFNI, Fourier included (`docs/validation/afni-tshift-replica.md`). It carries a translation of glibc 2.35's `sinf`/`cosf` (LGPL-2.1-or-later). The Python `implementation="auto"` switch is not done yet.
+  - **One-shot BOLD resampler done** (2026-10-10): `lx.transforms.resample_series` and `lx.ndimage`, a replica of fMRIPrep's `ResampleSeries`, nitransforms 25.1.0 and SciPy 1.15.2's spline interpolation. All 136 compared cases bit-identical (`docs/validation/resample-series.md`). Its benchmark report is pending.
+  - **mcflirt spec done** (`specs/mcflirt.md`, oracle runs in `oracles/fsl-6.0.7/mcflirt/`). Next: the clean-room original `lx.mri.hmc` (crate `larmorx-mri`).
+  - **A2 in progress:** the ANTs image programs (ImageMath dispatcher, ThresholdImage, MultiplyImages first; then the Gaussian, morphology, components/distance groups). The ANTs 2.6.5 oracle binaries are in `oracles/ants-2.6.5/bin/`.
 - Conventions every tool follows are in `docs/architecture.md`.
 - **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
 - **Decided 2026-10-09:** transcendental functions are correctly rounded (CORE-MATH ports in `larmorx_core::math`; rule 5). See `docs/findings/platform-math.md`.
@@ -131,6 +134,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
   - Log to `oracles/logs/`.
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).
+- **Run at most one or two agents at a time** (user, 2026-10-10): parallel agents exhaust the session limit and get killed mid-task. Brief every agent to commit as soon as its work passes the gates.
 - **Never delete work products** (code, drafts, ports, harnesses, reports). If something must leave the repo or the build, archive it in `<workspace>/archive/<date>-<topic>/` (not under `/tmp`) and tell the user. Ask before deleting anything that is not a temporary build artefact.
 - Verify the environment at session start: `uname -m`, `nproc`, free RAM, `docker --version`, `rustc --version`.
 
@@ -145,7 +149,8 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `scripts/bootstrap_workspace.sh` | recreates the workspace |
 | `docs/overview.md`, `docs/licensing.md` | the concepts in plain terms; the licence tracks and what is published |
 | `Cargo.toml`, `crates/` | Rust workspace: `larmorx-core`, `-io`, `-transform`, `-interp`, `-image`, `-ants`, `-afni`, `-cli` (standalone `larmorx`/`lx`), `-py` (`larmorx._core`) |
-| `crates-gpl/`, `crates-nc/` (planned) | replica workspaces under their upstream's licence (`docs/licensing.md`) |
+| `crates-gpl/` | the GPL-3.0-or-later replica workspace (`docs/licensing.md`); it builds the Apache crates by path, so refresh `crates-gpl/Cargo.lock` whenever their dependencies change (CI checks it with `--locked`) |
+| `crates-nc/` (planned) | the FSL replica workspace |
 | `specs/` | behaviour specs, the input of clean-room originals |
 | `pyproject.toml`, `python/larmorx/` | maturin package (abi3, CPython >= 3.12), including `pipelines/larmorprepx/` |
 | `tests/python/` | Python tests of the installed package |

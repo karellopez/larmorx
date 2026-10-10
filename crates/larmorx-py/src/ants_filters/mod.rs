@@ -16,6 +16,7 @@
 //! [`register`] below. Then add the stubs to `python/larmorx/_core.pyi` and the wrapper to
 //! `python/larmorx/ants/`.
 
+mod components;
 mod gaussian;
 mod image_math;
 mod morphology;
@@ -317,5 +318,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     gaussian::register(m)?;
     resample::register(m)?;
     morphology::register(m)?;
+    components::register(m)?;
     Ok(())
 }

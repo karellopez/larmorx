@@ -354,6 +354,30 @@ def ants_pad_image(
     """ImageMath ``PadImage`` on a path (read in ``dim`` dimensions) or an in-memory image:
     ``(data, ras_affine, descrip, spacing)``."""
 
+# Components, distance maps and label values: ``a`` is float32 in 2 to 4 dimensions.
+
+def ants_largest_component(a: np.ndarray, smallest: int = 50, n_threads: int = 1) -> np.ndarray:
+    """ImageMath ``GetLargestComponent``: 1 in the largest face-connected component(s) of the
+    voxels in ``[0.25, 1e9]``, 0 elsewhere (1 everywhere if no component has ``smallest``
+    voxels)."""
+
+def ants_distance_map(a: np.ndarray, spacing: list[float]) -> np.ndarray:
+    """ImageMath ``D``: ITK's Danielsson distance map to the non-zero voxels (mm)."""
+
+def ants_maurer_distance(
+    a: np.ndarray, spacing: list[float], foreground: float = 1.0, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``MaurerDistance``: ITK's signed Maurer distance map of the voxels equal to
+    ``foreground`` (mm, negative inside)."""
+
+def ants_threshold_at_mean(a: np.ndarray, fraction: float = 1.0, n_threads: int = 1) -> np.ndarray:
+    """ImageMath ``ThresholdAtMean``: 1 where ``mean · fraction ≤ v ≤ max``, else 0."""
+
+def ants_replace_voxel_value(
+    a: np.ndarray, low: float, high: float, value: float, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``ReplaceVoxelValue``: voxels in ``[low, high]`` set to ``value``."""
+
 # --- Head-motion correction, mcflirt-compatible (larmorx/mri) ---------------------------------
 
 def mri_hmc_file(

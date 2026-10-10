@@ -7,6 +7,13 @@ arguments.
 """
 
 from larmorx.ants.apply_transforms import apply_transforms, apply_transforms_to_points
+from larmorx.ants.components import (
+    distance_map,
+    largest_component,
+    maurer_distance,
+    replace_voxel_value,
+    threshold_at_mean,
+)
 from larmorx.ants.image_math import (
     ImageMathError,
     add_to_zero,
@@ -49,6 +56,7 @@ __all__ = [
     "apply_transforms",
     "apply_transforms_to_points",
     "discrete_gaussian",
+    "distance_map",
     "fill_holes",
     "gradient_magnitude",
     "grayscale_close",
@@ -59,6 +67,8 @@ __all__ = [
     "image_math",
     "image_math_operations",
     "laplacian",
+    "largest_component",
+    "maurer_distance",
     "morphological_close",
     "morphological_dilate",
     "morphological_erode",
@@ -69,10 +79,12 @@ __all__ = [
     "normalize_image",
     "otsu_threshold",
     "pad_image",
+    "replace_voxel_value",
     "resample_image",
     "resample_image_by_spacing",
     "rescale_image",
     "smooth_image",
+    "threshold_at_mean",
     "threshold_image",
     "truncate_image_intensity",
     "unsharp_mask",

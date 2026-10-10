@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! ImageMath's intensity operations (`Examples/ImageMath_Templates.hxx`, ANTs v2.6.5):
-//! `TruncateImageIntensity`, `Normalize` and `RescaleImage`.
+//! `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `ThresholdAtMean` and
+//! `ReplaceVoxelValue`.
 
 use larmorx_core::parallel;
 use larmorx_image::FilterError;
@@ -205,9 +206,74 @@ pub fn rescale(
     rescale_intensity(data, min, max, n_threads)
 }
 
+/// `ThresholdAtMean`: `ImageMath d out ThresholdAtMean image [fraction=1]`
+/// (`ImageMath_Templates.hxx:794-847`): 1 where `mean · fraction ≤ v ≤ max`, else 0
+/// (`BinaryThresholdImageFilter`).
+///
+/// The mean is a float sum in image order divided by the voxel count (as float); the maximum
+/// starts at `-1e9` (an image whose voxels are all at or below it keeps that). A lower bound
+/// above the maximum (a fraction above `max / mean`) makes ITK throw, and ANTs abort.
+pub fn threshold_at_mean(
+    data: &[f32],
+    fraction: f32,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    let mut mean = 0.0f32;
+    let mut max = -1.0e9f32;
+    let mut min = 1.0e9f32;
+    for &v in data {
+        mean += v;
+        if v > max {
+            max = v;
+        } else if v < min {
+            min = v;
+        }
+    }
+    if !data.is_empty() {
+        mean /= data.len() as f32;
+    }
+    larmorx_image::threshold::binary_threshold(data, mean * fraction, max, 1.0f32, 0.0, n_threads)
+}
+
+/// `ReplaceVoxelValue`: `ImageMath d out ReplaceVoxelValue image low high value`
+/// (`ImageMath_Templates.hxx:9549-9586`): voxels with `low ≤ v ≤ high` become `value`, the
+/// others keep theirs.
+pub fn replace_voxel_value(
+    data: &[f32],
+    low: f32,
+    high: f32,
+    value: f32,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    Ok(parallel::with_threads(n_threads, || {
+        data.par_iter()
+            .with_min_len(CHUNK)
+            .map(|&v| if v >= low && v <= high { value } else { v })
+            .collect()
+    })?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn threshold_at_mean_and_replace() {
+        let data = [1.0f32, 2.0, 3.0, 6.0];
+        assert_eq!(
+            threshold_at_mean(&data, 1.0, 1).unwrap(),
+            vec![0., 0., 1., 1.]
+        );
+        assert_eq!(
+            threshold_at_mean(&data, 0.5, 2).unwrap(),
+            vec![0., 1., 1., 1.]
+        );
+        assert!(threshold_at_mean(&data, 3.0, 1).is_err());
+        assert_eq!(
+            replace_voxel_value(&data, 2.0, 3.0, -1.0, 1).unwrap(),
+            vec![1., -1., -1., 6.]
+        );
+    }
 
     #[test]
     fn truncation_clips_to_quantiles() {

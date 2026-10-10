@@ -13,7 +13,7 @@ import importlib
 from larmorx_validation.parity.ants_programs import AntsCase, make_suite
 
 #: The case modules, one per ImageMath operation group.
-GROUPS = ("dispatch", "arithmetic", "intensity", "gaussian", "morphology")
+GROUPS = ("dispatch", "arithmetic", "intensity", "gaussian", "morphology", "components")
 
 
 def all_cases() -> list[AntsCase]:

@@ -308,6 +308,43 @@ def test_pad_image_moves_the_origin(tmp_path):
         lx.ants.pad_image(img, -2)
 
 
+# --- Components and distance maps ---------------------------------------------------------------
+
+
+def test_typed_components_and_distances_equal_image_math():
+    mask = cube_mask()
+    img = textured((9, 8, 7))
+    pairs = [
+        (lx.ants.largest_component(mask), ("GetLargestComponent", mask)),
+        (lx.ants.largest_component(mask, 0), ("GetLargestComponent", mask, 0)),
+        (lx.ants.distance_map(mask), ("D", mask)),
+        (lx.ants.maurer_distance(mask), ("MaurerDistance", mask)),
+        (lx.ants.maurer_distance(image(2 * mask.data), 2), ("MaurerDistance", mask, 1)),
+        (lx.ants.threshold_at_mean(img, 1.2), ("ThresholdAtMean", img, 1.2)),
+        (lx.ants.replace_voxel_value(img, 10, 50, -1), ("ReplaceVoxelValue", img, 10, 50, -1)),
+    ]
+    for typed, (op, *operands) in pairs:
+        generic = lx.ants.image_math(op, *operands)
+        np.testing.assert_array_equal(typed.data, generic.data, err_msg=op)
+        assert typed.data.dtype == np.float32
+    # The 343-voxel cube with its hole is the largest component; the corner voxel is not.
+    largest = pairs[1][0].data
+    assert largest[0, 0, 0] == 0 and largest[4, 4, 4] == 1 and largest[5, 5, 5] == 0
+    # Nothing as large as 50 voxels: everything becomes 1.
+    point = np.zeros((6, 6, 6), np.float32)
+    point[2, 2, 2] = 1
+    assert (lx.ants.largest_component(image(point)).data == 1).all()
+    # Distances in millimetres (2 x 2 x 3 mm voxels); Maurer is negative inside.
+    d = lx.ants.distance_map(image(point)).data
+    assert d[2, 2, 2] == 0 and d[3, 2, 2] == 2 and d[2, 2, 3] == 3
+    m = lx.ants.maurer_distance(cube_mask()).data
+    assert np.signbit(m[2, 2, 2]) and m[2, 2, 2] == 0 and m[3, 3, 3] == -2 and m[1, 4, 4] == 2
+    for n in (1, 3):
+        np.testing.assert_array_equal(lx.ants.maurer_distance(cube_mask(), n_threads=n).data, m)
+    with pytest.raises(ValueError, match="Lower threshold"):
+        lx.ants.threshold_at_mean(img, 100)
+
+
 # --- command lines ------------------------------------------------------------------------------
 
 

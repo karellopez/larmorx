@@ -22,7 +22,10 @@ the suites build them here.
   border) and ``holes-uint8`` (enclosed holes of 1, 8 and 64 voxels, a cavity, a hole on the
   border), for the morphology and component filters; ``hole-first-slice-uint8`` (a pocket on
   the first slice, where FillHoles reads outside the image), ``holes-labels-4d`` (holes
-  closed only across time) and ``signed-zeros-float32`` (``-0.0`` next to ``+0.0``).
+  closed only across time) and ``signed-zeros-float32`` (``-0.0`` next to ``+0.0``);
+  ``zeros-uint8``, ``equal-components-uint8`` (tied largest components) and
+  ``sparse-points-uint8`` (scattered points on an anisotropic grid) for components and
+  distance maps.
 - ``thin-3-slices`` (an axis of 3 voxels, too short for ITK's recursive Gaussian filters) and
   ``tiny-4`` (4 x 4 x 4, the smallest they accept), for the Gaussian filters.
 
@@ -384,3 +387,29 @@ def _(t):
     rng = np.random.default_rng(17)
     values = np.array([-0.0, 0.0, -1.0, -2.0], np.float32)
     save(values[rng.integers(0, 4, (14, 12, 10))], t, affine=np.eye(4))
+
+
+@builder("zeros-uint8")
+def _(t):
+    """An empty mask (uint8 zeros, 20 x 18 x 12)."""
+    save(np.zeros((20, 18, 12), np.uint8), t, affine=np.diag([1.5, 1.2, 2.0, 1.0]))
+
+
+@builder("equal-components-uint8")
+def _(t):
+    """Two components of 27 voxels (the largest, tied) and one of 8, on a 1.5 x 1 x 2.5 mm
+    grid."""
+    d = np.zeros((16, 14, 10), np.uint8)
+    d[1:4, 1:4, 1:4] = 1
+    d[8:11, 6:9, 4:7] = 1
+    d[13:15, 11:13, 7:9] = 1
+    save(d, t, affine=np.diag([1.5, 1.0, 2.5, 1.0]))
+
+
+@builder("sparse-points-uint8")
+def _(t):
+    """About 0.3 % of voxels set, at random, on an anisotropic 0.7 x 1.3 x 2.9 mm grid: where
+    Danielsson's propagation is not exactly Euclidean."""
+    rng = np.random.default_rng(19)
+    d = (rng.uniform(size=(40, 37, 23)) < 0.003).astype(np.uint8)
+    save(d, t, affine=np.diag([0.7, 1.3, 2.9, 1.0]))

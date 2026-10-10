@@ -100,14 +100,16 @@ class HmcResult:
         paths = []
         for t, m in enumerate(self.matrices):
             p = d / f"MAT_{t:04d}"
-            p.write_text(_core.mri_mat_text(np.ascontiguousarray(m)), encoding="utf-8")
+            p.write_text(
+                _core.mri_mat_text(np.ascontiguousarray(m)), encoding="utf-8", newline="\n"
+            )
             paths.append(p)
         return paths
 
     def save_par(self, path: str | os.PathLike[str]) -> None:
         """Write the motion parameters as ``mcflirt -plots`` does (``.par``)."""
         text = _core.mri_par_text(np.ascontiguousarray(self.params, dtype=np.float64))
-        Path(path).write_text(text, encoding="utf-8")
+        Path(path).write_text(text, encoding="utf-8", newline="\n")
 
     def save_itk(self, path: str | os.PathLike[str]) -> None:
         """Write one ITK affine per volume to a text file, in the layout of fMRIPrep's
@@ -122,7 +124,7 @@ class HmcResult:
                 "Parameters: " + " ".join(repr(float(v)) for v in params),
                 "FixedParameters: 0 0 0",
             ]
-        Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def read_mats(directory: str | os.PathLike[str]) -> np.ndarray:

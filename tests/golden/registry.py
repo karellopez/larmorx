@@ -251,11 +251,12 @@ def series() -> lx.Image:
     return _frozen(lx.Image(np.asfortranarray(data), aff, hdr))
 
 
-#: An ITK affine transform (matrix, translation, centre; LPS), close to the identity.
+#: An ITK affine transform (matrix, translation, centre; LPS), close to the identity. The
+#: centre is not a multiple of a power of two, so nitransforms' matrix products round.
 AFFINE_XFM = ItkTransform(
     "AffineTransform_double_3_3",
     np.array([1.02, -0.05, 0.01, 0.04, 0.97, 0.03, -0.02, 0.06, 1.01, 1.5, -2.25, 0.75]),
-    np.array([0.5, -1.0, 2.0]),
+    np.array([0.3, -1.1, 2.7]),
 )
 #: A rigid transform (versor and translation) for an inverted ``-t [file,1]``.
 RIGID_XFM = ItkTransform(
@@ -276,7 +277,7 @@ def field_xfm() -> ItkTransform:
     return ItkTransform("DisplacementFieldTransform_double_3_3", vectors, np.array(fixed, float))
 
 
-def itk_text(matrices: list[list[float]]) -> str:
+def itk_text(matrices: list[list[float]], centre: str = "0 0 0") -> str:
     """An ITK text transform file with one ``MatrixOffsetTransformBase`` per parameter list
     (parameters written with ``repr``, so they read back exactly)."""
     lines = ["#Insight Transform File V1.0"]
@@ -285,7 +286,7 @@ def itk_text(matrices: list[list[float]]) -> str:
             f"#Transform {i}",
             "Transform: MatrixOffsetTransformBase_double_3_3",
             "Parameters: " + " ".join(repr(float(p)) for p in params),
-            "FixedParameters: 0 0 0",
+            f"FixedParameters: {centre}",
         ]
     return "\n".join(lines) + "\n"
 
@@ -366,8 +367,8 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "rigid.txt": lambda p: lx.transforms.write(p, RIGID_XFM),
     "warp.nii.gz": _write_warp,
     "composite.h5": _write_composite,
-    "hmc.txt": lambda p: p.write_text(itk_text(HMC_PARAMS), encoding="utf-8"),
-    "coreg.txt": lambda p: p.write_text(itk_text([COREG_PARAMS]), encoding="utf-8"),
+    "hmc.txt": lambda p: p.write_bytes(itk_text(HMC_PARAMS).encode()),
+    "coreg.txt": lambda p: p.write_bytes(itk_text([COREG_PARAMS], "1.7 -0.9 2.3").encode()),
 }
 
 
@@ -437,10 +438,10 @@ def canonical_bytes(a: np.ndarray) -> bytes:
 
 
 def _sample_positions(n: int) -> np.ndarray:
-    return (
-        np.unique(np.linspace(0, max(n - 1, 0), N_SAMPLES).astype(np.int64))
-        if n
-        else np.zeros(0, np.int64)
+    """``N_SAMPLES`` evenly spread indices into ``n`` values (integer arithmetic, as the GPL
+    golden test computes them)."""
+    return np.array(
+        sorted({s * (n - 1) // (N_SAMPLES - 1) for s in range(N_SAMPLES)} if n else ()), np.int64
     )
 
 
@@ -774,12 +775,19 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("io.nibabel", covers=("lx.Image.to_nibabel", "lx.Image.from_nibabel"))
 def _(ctx: Context) -> dict[str, Any]:
-    """Round trip through nibabel's in-memory image (needs nibabel)."""
+    """An image converted from nibabel (the header parsed by larmorx) and to nibabel (needs
+    nibabel). Only what larmorx computes is hashed: nibabel's own header updates may change
+    between its versions."""
     import pytest
 
-    pytest.importorskip("nibabel")
-    back = lx.Image.from_nibabel(bold().to_nibabel())
-    return image_outputs("round_trip", back, geometry=True, header=True)
+    nib = pytest.importorskip("nibabel")
+    image = lx.Image.from_nibabel(nib.load(ctx.file("bold.nii")))
+    nimg = bold().to_nibabel()
+    return {
+        **image_outputs("from_nibabel", image, header=True),
+        "to_nibabel": np.asanyarray(nimg.dataobj),
+        "to_nibabel.affine": np.asarray(nimg.affine),
+    }
 
 
 # --- ANTs: the command line ---------------------------------------------------------------------
@@ -1363,8 +1371,11 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.transforms.ensure_positive_cosines", covers=("lx.transforms.ensure_positive_cosines",))
 def _(ctx: Context) -> dict[str, Any]:
+    """Two axes against their world axes: the new affine's translation sums two rounded
+    products (a numpy matrix product)."""
     flip = anat().affine.copy()
     flip[:3, 0] = -flip[:3, 0]
+    flip[:3, 2] = -flip[:3, 2]
     data, aff, codes = lx.transforms.ensure_positive_cosines(anat().data, flip)
     return {
         "data": np.ascontiguousarray(data),
@@ -1380,10 +1391,12 @@ def _(ctx: Context) -> dict[str, Any]:
     risk)."""
     shape = (14, 12, 10)
     target = (np.array(shape), affine(shape, (2.5, 3.0, 3.5), (0.5, -0.75, 1.0)))
-    img = lx.transforms.resample_series(
-        bold(), target, [ctx.file("hmc.txt"), ctx.file("coreg.txt")], n_threads=2
-    )
-    return image_outputs("out", img, header=True)
+    files = [ctx.file("hmc.txt"), ctx.file("coreg.txt")]
+    img = lx.transforms.resample_series(bold(), target, files, n_threads=2)
+    # float64 output keeps the last bits that float32 (fMRIPrep's) would round away, so a
+    # platform difference in the numpy matrices shows here.
+    exact = lx.transforms.resample_series(bold(), target, files, output_dtype="float64")
+    return {**image_outputs("out", img, header=True), "out.float64": exact.data}
 
 
 @case("py.transforms.resample_series.sdc", covers=("lx.transforms.resample_series",))

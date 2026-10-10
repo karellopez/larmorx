@@ -63,6 +63,7 @@ How the code is organised and the conventions every tool follows. The plan behin
 |---|---|---|
 | Rust unit and property tests (round trips, fuzzed inputs, thread-count invariance) | `crates/*/src/**` | `cargo test`, all six platforms |
 | Python API tests (no external data) | `tests/python/` | pytest, all six platforms |
+| Golden tests: every platform reproduces larmorx's own Linux x86-64 output, bit for bit ([validation/golden.md](validation/golden.md)) | `tests/golden/`, `crates-gpl/larmorx-gpl-cli/tests/golden.rs` | pytest on the release wheel and `cargo test` in `crates-gpl/`, all six platforms |
 | Parity with reference tools, case by case on the test-data catalog | `validation/` suites, `tests/parity/` | locally (smoke or standard tier); in CI on all platforms once the test data are published |
 | Benchmarks against reference tools | `validation/` (`bench`) | on demand; reports in `docs/benchmarks/` |
 
@@ -76,3 +77,4 @@ Test data live in a separate repository, `larmorx-testdata` (next to this one in
 4. Docs page in `docs/api/` with the option-mapping table and the deliberate differences.
 5. A parity suite in `validation/` against the original tool, its report in `docs/validation/`, and the tool's status (`experimental` → `validated` → `stable`).
 6. `PROVENANCE.md` entries for ported code.
+7. A golden case for each new CLI tool, ImageMath operation and public function: a function in `tests/golden/registry.py` (or `CASES` in `crates-gpl/larmorx-gpl-cli/tests/golden.rs` for a replica), recorded on Linux x86-64 with `scripts/record_golden.py` ([validation/golden.md](validation/golden.md), "Adding a golden case").

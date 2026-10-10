@@ -17,6 +17,10 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-resample-image](ants-resample-image.md) | `lx.ants.resample_image`, `larmorx ants ResampleImage` | ResampleImage (ANTs 2.6.5 binary) | `validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences) |
 | [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 
+These records compare larmorx with the original tools on Linux x86-64. That the other five
+platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:
+[golden.md](golden.md).
+
 Reproduce a record:
 
 ```bash

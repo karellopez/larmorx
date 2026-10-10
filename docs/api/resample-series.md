@@ -145,7 +145,8 @@ function. A `larmorx` subcommand can follow if a standalone use appears.
   overflow and read outside its array; larmorx returns NaN there
   ([scipy-ndimage.md](../findings/scipy-ndimage.md)). fMRIPrep never produces them.
 - **The 4×4 matrices come from numpy** (inverses, products, ITK-to-RAS), as in fMRIPrep, so
-  they match fMRIPrep on the same machine. The per-voxel arithmetic is larmorx's and gives the
+  they match fMRIPrep on the same machine. Their last bits depend on the CPU's BLAS kernel and
+  on the BLAS library, for fMRIPrep too ([golden.md](../validation/golden.md), "Known risk"). The per-voxel arithmetic is larmorx's and gives the
   same bits on every platform: SciPy's x86-64 results (no contraction; numpy's BLAS-style fused
   products, which x86-64 and aarch64 OpenBLAS both use).
 - **Not covered yet:** `ReconstructFieldmap` (B-spline field maps reconstructed on the target

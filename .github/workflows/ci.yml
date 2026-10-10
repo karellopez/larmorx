@@ -1,9 +1,12 @@
 name: CI
 
+# CI time is limited (CLAUDE.md rule 10): changes that touch only documentation do not run it.
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
 
 permissions:

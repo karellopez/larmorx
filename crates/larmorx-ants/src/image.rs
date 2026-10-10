@@ -83,6 +83,25 @@ impl<T> AntsImage<T> {
     }
 }
 
+impl<T: Clone> AntsImage<T> {
+    /// The voxels as a [`larmorx_image::Volume`] for the spatial filters: size and spacing of
+    /// a 3D image, or of a 2D image with a third axis of one voxel (spacing 1). `None` for 4D
+    /// images: ITK's spatial filters work in all four dimensions there (a `D`-dimensional
+    /// neighbourhood), which a 3D volume cannot represent.
+    pub fn to_volume(&self) -> Option<larmorx_image::Volume<T>> {
+        let g = &self.geometry;
+        let (size, spacing) = match g.ndim {
+            3 => (
+                [g.size[0], g.size[1], g.size[2]],
+                [g.spacing[0], g.spacing[1], g.spacing[2]],
+            ),
+            2 => ([g.size[0], g.size[1], 1], [g.spacing[0], g.spacing[1], 1.0]),
+            _ => return None,
+        };
+        Some(larmorx_image::Volume::new(self.data.clone(), size, spacing))
+    }
+}
+
 /// A pixel type ANTs programs read images as: the C++ `static_cast` from the value ITK's
 /// NIfTI reader produced.
 pub trait Pixel: Element + Copy + Send + Sync + 'static {
@@ -167,7 +186,9 @@ impl ReadError {
     }
 }
 
-/// An image that a program writes, with its pixel type known at run time.
+/// An image that a program writes, with its pixel type known at run time. To write another
+/// pixel type, add a variant, a `From` impl, and its arms in [`OutputImage::geometry`],
+/// [`FileStore::save`] and `output_to_py` in `crates/larmorx-py/src/ants_filters/mod.rs`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutputImage {
     F32(AntsImage<f32>),
@@ -406,6 +427,8 @@ mod tests {
         let mut store = FileStore;
         let img: AntsImage<f32> = store.read(p3.to_str().unwrap(), 3, 1).unwrap();
         assert_eq!(img.size(), [4, 3, 2]);
+        let vol = img.to_volume().unwrap();
+        assert_eq!((vol.size, vol.spacing), ([4, 3, 2], [2.0, 3.0, 4.0]));
         assert_eq!(img.meta.descrip, b"test");
         assert_eq!(img.data[5], 2.5);
         let ints: AntsImage<i32> = store.read(p3.to_str().unwrap(), 3, 1).unwrap();

@@ -65,7 +65,8 @@ echo "building ANTs ..."
 cmake --build "$OUT/ants-build" -j "$JOBS" > "$OUT/logs/ants-build.log" 2>&1
 
 mkdir -p "$OUT/bin"
-find "$OUT/ants-build" -maxdepth 2 -type f -executable \
+# ANTs' CMake builds ANTs itself as an inner project: the programs are in ANTS-build/Examples.
+find "$OUT/ants-build" -maxdepth 3 -type f -executable \
   \( -name 'ImageMath' -o -name 'ThresholdImage' -o -name 'SmoothImage' -o -name 'ResampleImage*' \
      -o -name 'MultiplyImages' -o -name 'antsApplyTransforms' -o -name 'antsRegistration' \
      -o -name 'N4BiasFieldCorrection' -o -name 'DenoiseImage' -o -name 'Atropos' -o -name 'antsAI' \

@@ -18,7 +18,7 @@
 
 use larmorx_core::parallel::{self, ThreadPoolError};
 use larmorx_core::vnl_svd::vnl_inverse;
-use larmorx_interp::{Interpolation, Interpolator, Volume};
+use larmorx_interp::{LinearYz, NearestYz, Volume, linear, nearest};
 use larmorx_io::nifti::itk::ItkGeometry;
 use rayon::prelude::*;
 
@@ -201,70 +201,154 @@ pub fn resample_identity(
     let in_maps = Maps::new(input_geometry).ok_or(ResampleError::Singular("input"))?;
     let out_maps = Maps::new(output).ok_or(ResampleError::Singular("output"))?;
     let strides = larmorx_image::strides(in_size);
-    // 2D and 3D linear interpolation: ITK's optimised paths (a 2D image is a 3D volume with
-    // one slice and a zero z index, which never interpolates along z).
+    // 2D and 3D: ITK's optimised linear paths (a 2D image is a 3D volume with one slice and
+    // a zero z index, which never interpolates along z).
     let size3: [usize; 3] = std::array::from_fn(|k| if k < d { in_size[k] } else { 1 });
-    let interpolator = if d <= 3 {
-        let method = match interpolation {
-            ResampleInterpolation::Linear => Interpolation::Linear,
-            ResampleInterpolation::NearestNeighbor => Interpolation::NearestNeighbor,
-        };
-        Some(
-            Interpolator::new(Volume::new(input, size3), &method, [1.0; 3])
-                .expect("linear and nearest-neighbour interpolators always build"),
-        )
-    } else {
-        None
-    };
-    let nx = output.size[0];
     let mut out = vec![0.0f32; n_out];
-    parallel::with_threads(n_threads, || {
+    let job = Rows {
+        input,
+        in_size,
+        strides: &strides,
+        output,
+        in_maps: &in_maps,
+        out_maps: &out_maps,
+        volume3: (d <= 3).then(|| Volume::new(input, size3)),
+        interpolation,
+        default_value,
+    };
+    parallel::with_threads(n_threads, || match d {
+        1 => job.run::<1>(&mut out),
+        2 => job.run::<2>(&mut out),
+        3 => job.run::<3>(&mut out),
+        _ => job.run::<4>(&mut out),
+    })?;
+    Ok(out)
+}
+
+/// What every output row of [`resample_identity`] needs.
+struct Rows<'a> {
+    input: &'a [f32],
+    in_size: &'a [usize],
+    strides: &'a [usize],
+    output: &'a ItkGeometry,
+    in_maps: &'a Maps,
+    out_maps: &'a Maps,
+    /// The input as a 3D volume (a 2D image with one slice), for ITK's optimised 2D and 3D
+    /// interpolation; `None` in 4D.
+    volume3: Option<Volume<'a, f32>>,
+    interpolation: ResampleInterpolation,
+    default_value: f32,
+}
+
+impl Rows<'_> {
+    /// Fills `out` row by row (in parallel on the current pool), for `D` dimensions.
+    fn run<const D: usize>(&self, out: &mut [f32]) {
+        let nx = self.output.size[0];
+        let limit: [f64; D] = std::array::from_fn(|k| self.in_size[k] as f64 - 0.5);
         out.par_chunks_mut(nx).enumerate().for_each(|(row, line)| {
-            let mut index = vec![0.0f64; d];
+            let mut index = [0.0f64; D];
             let mut rest = row;
-            for (c, &n) in index.iter_mut().zip(&output.size).skip(1) {
+            for (c, &n) in index.iter_mut().zip(&self.output.size).skip(1) {
                 *c = (rest % n) as f64;
                 rest /= n;
             }
-            let mut point = vec![0.0f64; d];
-            let mut start = vec![0.0f64; d];
-            let mut end = vec![0.0f64; d];
-            index[0] = 0.0;
-            out_maps.voxel_to_point(&index, &mut point);
-            in_maps.point_to_index(&point, &mut start);
+            let (mut point, mut start, mut end) = ([0.0f64; D], [0.0f64; D], [0.0f64; D]);
+            self.out_maps.voxel_to_point(&index, &mut point);
+            self.in_maps.point_to_index(&point, &mut start);
             index[0] = nx as f64;
-            out_maps.voxel_to_point(&index, &mut point);
-            in_maps.point_to_index(&point, &mut end);
-            let vector: Vec<f64> = (0..d).map(|k| end[k] - start[k]).collect();
-            let mut c = vec![0.0f64; d];
+            self.out_maps.voxel_to_point(&index, &mut point);
+            self.in_maps.point_to_index(&point, &mut end);
+            let vector: [f64; D] = std::array::from_fn(|k| end[k] - start[k]);
+            if let Some(volume) = &self.volume3
+                && vector[1..].iter().all(|&v| v == 0.0)
+            {
+                // The row runs along the input's first axis (axis-aligned images): the other
+                // indices are the same for every voxel (`start + alpha·0`), so their part of
+                // the interpolation is computed once.
+                self.aligned_row(volume, &start, &vector, &limit, line);
+                return;
+            }
             for (x, o) in line.iter_mut().enumerate() {
                 let alpha = x as f64 / nx as f64;
-                for k in 0..d {
-                    c[k] = start[k] + alpha * vector[k];
-                }
-                let inside = (0..d).all(|k| c[k] >= -0.5 && c[k] < in_size[k] as f64 - 0.5);
+                let c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
+                let inside = (0..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
                 *o = if !inside {
-                    default_value
-                } else if let Some(interp) = &interpolator {
-                    let c3: [f64; 3] = std::array::from_fn(|k| if k < d { c[k] } else { 0.0 });
-                    interp.evaluate(c3) as f32
+                    self.default_value
+                } else if let Some(volume) = &self.volume3 {
+                    let c3: [f64; 3] = std::array::from_fn(|k| if k < D { c[k] } else { 0.0 });
+                    match self.interpolation {
+                        ResampleInterpolation::Linear => linear(volume, c3) as f32,
+                        ResampleInterpolation::NearestNeighbor => nearest(volume, c3) as f32,
+                    }
                 } else {
-                    match interpolation {
+                    match self.interpolation {
                         ResampleInterpolation::Linear => {
-                            linear_unoptimized(input, in_size, &strides, &c) as f32
+                            linear_unoptimized(self.input, self.in_size, self.strides, &c) as f32
                         }
                         ResampleInterpolation::NearestNeighbor => {
-                            let offset: usize = (0..d)
-                                .map(|k| (c[k] + 0.5).floor() as usize * strides[k])
+                            let offset: usize = (0..D)
+                                .map(|k| (c[k] + 0.5) as i64 as usize * self.strides[k])
                                 .sum();
-                            input[offset]
+                            self.input[offset]
                         }
                     }
                 };
             }
         });
-    })?;
-    Ok(out)
+    }
+
+    /// One output row whose points share every index but the first (`start[1..]`), in 2D or
+    /// 3D: the same values as the general loop of [`Rows::run`].
+    fn aligned_row<const D: usize>(
+        &self,
+        volume: &Volume<'_, f32>,
+        start: &[f64; D],
+        vector: &[f64; D],
+        limit: &[f64; D],
+        line: &mut [f32],
+    ) {
+        let nx = line.len();
+        // `start[k] + alpha · (±0)` for the other axes, at alpha = 0 (the same for every
+        // alpha ≥ 0).
+        let c: [f64; 3] = std::array::from_fn(|k| {
+            if k == 0 || k >= D {
+                0.0
+            } else {
+                start[k] + 0.0 * vector[k]
+            }
+        });
+        let inside = (1..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
+        if !inside {
+            line.fill(self.default_value);
+            return;
+        }
+        let x_value = |x: usize| start[0] + (x as f64 / nx as f64) * vector[0];
+        let x_inside = |cx: f64| cx >= -0.5 && cx < limit[0];
+        match self.interpolation {
+            ResampleInterpolation::Linear => {
+                let yz = LinearYz::new(volume, c[1], c[2]);
+                for (x, o) in line.iter_mut().enumerate() {
+                    let cx = x_value(x);
+                    *o = if x_inside(cx) {
+                        yz.evaluate(volume, cx) as f32
+                    } else {
+                        self.default_value
+                    };
+                }
+            }
+            ResampleInterpolation::NearestNeighbor => {
+                let yz = NearestYz::new(volume, c[1], c[2]);
+                for (x, o) in line.iter_mut().enumerate() {
+                    let cx = x_value(x);
+                    *o = if x_inside(cx) {
+                        yz.evaluate(volume, cx) as f32
+                    } else {
+                        self.default_value
+                    };
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

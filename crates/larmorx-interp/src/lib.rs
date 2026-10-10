@@ -172,13 +172,11 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
     }
 
     /// The value at a continuous index inside the image (see [`is_inside`]).
+    #[inline]
     pub fn evaluate(&self, cidx: [f64; 3]) -> f64 {
         match &self.kind {
             Kind::Linear => linear(&self.volume, cidx),
-            Kind::NearestNeighbor => {
-                let idx = cidx.map(|c| (c + 0.5).floor() as usize);
-                self.volume.at(idx[0], idx[1], idx[2])
-            }
+            Kind::NearestNeighbor => nearest(&self.volume, cidx),
             Kind::BSpline {
                 order,
                 coefficients,
@@ -194,48 +192,127 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
 // ------------------------------------------------------------------------------------------------
 // Linear
 
-/// ITK's 3D linear interpolation: trilinear, combining x, then y, then z as `a + (b − a)·d`. An
-/// axis is skipped when its fractional distance is ≤ 0 or its upper neighbour lies beyond the
-/// last voxel (both happen within half a voxel of the edges).
-fn linear<T: RealElement>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
-    let mut base = [0usize; 3];
-    let mut dist = [0.0f64; 3];
-    let mut active = [false; 3];
-    for d in 0..3 {
-        let b = cidx[d].floor().max(0.0);
-        dist[d] = cidx[d] - b;
-        base[d] = b as usize;
-        active[d] = dist[d] > 0.0 && base[d] + 1 < v.size[d];
-    }
-    let step = |d: usize, on: usize| if active[d] { base[d] + on } else { base[d] };
-    let corner = |x: usize, y: usize, z: usize| v.at(step(0, x), step(1, y), step(2, z));
-    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
-    // Reduce along x for each (y, z) corner that is needed, then along y, then along z.
-    let ys: &[usize] = if active[1] { &[0, 1] } else { &[0] };
-    let zs: &[usize] = if active[2] { &[0, 1] } else { &[0] };
-    let mut plane = [[0.0f64; 2]; 2];
-    for &z in zs {
-        for &y in ys {
-            let a = corner(0, y, z);
-            plane[z][y] = if active[0] {
-                lerp(a, corner(1, y, z), dist[0])
-            } else {
-                a
-            };
+/// ITK's nearest-neighbour interpolation at `cidx` (inside the image, see [`is_inside`]): the
+/// voxel at `floor(c + 0.5)` on each axis (rounding half up). What
+/// [`Interpolation::NearestNeighbor`] evaluates, callable directly in a tight loop.
+#[inline]
+pub fn nearest<T: RealElement>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
+    NearestYz::new(v, cidx[1], cidx[2]).evaluate(v, cidx[0])
+}
+
+/// `floor(c + 0.5)`: the truncation of `c + 0.5` for the non-negative values inside an image
+/// (and both saturate to 0 below it).
+#[inline]
+fn round_half_up(c: f64) -> usize {
+    (c + 0.5) as i64 as usize
+}
+
+/// [`nearest`] split into the part that depends on y and z, computed once for a row of points
+/// that share them, and the part along x.
+#[derive(Clone, Copy, Debug)]
+pub struct NearestYz {
+    offset: usize,
+}
+
+impl NearestYz {
+    #[inline]
+    pub fn new<T: RealElement>(v: &Volume<'_, T>, cy: f64, cz: f64) -> Self {
+        NearestYz {
+            offset: v.size[0] * (round_half_up(cy) + v.size[1] * round_half_up(cz)),
         }
     }
-    let mut line = [0.0f64; 2];
-    for &z in zs {
-        line[z] = if active[1] {
-            lerp(plane[z][0], plane[z][1], dist[1])
-        } else {
-            plane[z][0]
-        };
+
+    /// The value at `(cx, cy, cz)`.
+    #[inline]
+    pub fn evaluate<T: RealElement>(&self, v: &Volume<'_, T>, cx: f64) -> f64 {
+        v.data[self.offset + round_half_up(cx)].to_f64()
     }
-    if active[2] {
-        lerp(line[0], line[1], dist[2])
-    } else {
-        line[0]
+}
+
+/// ITK's 3D linear interpolation at `cidx` (inside the image, see [`is_inside`]): trilinear,
+/// combining x, then y, then z as `a + (b − a)·d`. An axis is skipped when its fractional
+/// distance is ≤ 0 or its upper neighbour lies beyond the last voxel (both happen within half
+/// a voxel of the edges). What [`Interpolation::Linear`] evaluates, callable directly in a
+/// tight loop.
+#[inline]
+pub fn linear<T: RealElement>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
+    LinearYz::new(v, cidx[1], cidx[2]).evaluate(v, cidx[0])
+}
+
+/// One axis of [`linear`]: the base index `max(floor(c), 0)` as an integer (the same as
+/// `max(trunc(c), 0)` for every `c`, and a truncation is one instruction where `f64::floor`
+/// is a call into the C library on baseline x86-64), the fractional distance, and whether
+/// the axis is interpolated.
+#[inline]
+fn axis(c: f64, size: usize) -> (usize, f64, bool) {
+    let b = (c as i64).max(0);
+    let dist = c - b as f64;
+    let base = b as usize;
+    (base, dist, dist > 0.0 && base + 1 < size)
+}
+
+/// [`linear`] split into the part that depends on y and z, computed once for a row of points
+/// that share them, and the part along x. The arithmetic is exactly [`linear`]'s.
+#[derive(Clone, Copy, Debug)]
+pub struct LinearYz {
+    origin: usize,
+    oy: usize,
+    oz: usize,
+    dy: f64,
+    dz: f64,
+    ay: bool,
+    az: bool,
+}
+
+impl LinearYz {
+    #[inline]
+    pub fn new<T: RealElement>(v: &Volume<'_, T>, cy: f64, cz: f64) -> Self {
+        let [nx, ny, nz] = v.size;
+        let (by, dy, ay) = axis(cy, ny);
+        let (bz, dz, az) = axis(cz, nz);
+        LinearYz {
+            origin: nx * (by + ny * bz),
+            oy: if ay { nx } else { 0 },
+            oz: if az { nx * ny } else { 0 },
+            dy,
+            dz,
+            ay,
+            az,
+        }
+    }
+
+    /// The value at `(cx, cy, cz)`.
+    #[inline]
+    pub fn evaluate<T: RealElement>(&self, v: &Volume<'_, T>, cx: f64) -> f64 {
+        let (bx, dx, ax) = axis(cx, v.size[0]);
+        let data = v.data;
+        let origin = bx + self.origin;
+        let ox = usize::from(ax);
+        let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+        // Along x at the (y, z) corner starting at `i`.
+        let along_x = |i: usize| {
+            let a = data[i].to_f64();
+            if ax {
+                lerp(a, data[i + ox].to_f64(), dx)
+            } else {
+                a
+            }
+        };
+        // Along y, for the z corner starting at `i`.
+        let along_y = |i: usize| {
+            let a = along_x(i);
+            if self.ay {
+                lerp(a, along_x(i + self.oy), self.dy)
+            } else {
+                a
+            }
+        };
+        let line0 = along_y(origin);
+        if self.az {
+            lerp(line0, along_y(origin + self.oz), self.dz)
+        } else {
+            line0
+        }
     }
 }
 
@@ -264,6 +341,7 @@ fn gaussian_region(size: [usize; 3], p: &GaussianParams, cidx: [f64; 3]) -> [(us
     std::array::from_fn(|d| erf_weights(cidx[d], size[d], p.scaling[d], p.cutoff[d]))
 }
 
+#[inline(never)]
 fn gaussian<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3]) -> f64 {
     let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region(v.size, p, cidx);
     let (mut sum_me, mut sum_m) = (0.0f64, 0.0f64);
@@ -281,6 +359,7 @@ fn gaussian<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3
 
 /// Label voting: the label whose summed Gaussian weight first exceeds the running maximum, in
 /// scan order (x fastest), wins.
+#[inline(never)]
 fn multi_label<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3]) -> f64 {
     let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region(v.size, p, cidx);
     let mut weights: Vec<(f64, f64)> = Vec::new();
@@ -317,6 +396,7 @@ fn multi_label<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64
 /// For each label (ascending), the linear interpolation of its indicator image; the label with
 /// the strictly highest value wins, starting from label 0 at 0. Only labels present among the
 /// neighbours can be non-zero, so only those are evaluated.
+#[inline(never)]
 fn generic_label<T: RealElement>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
     let base = cidx.map(|c| c.floor().max(0.0) as usize);
     let mut labels = BTreeMap::new();
@@ -445,6 +525,7 @@ fn sinc(x: f64) -> f64 {
 /// ITK's windowed sinc with radius 3: 6 taps per axis (offsets −2..=3 around `floor(index)`),
 /// a delta when the index falls on a voxel, zero outside the image, summed in neighbourhood
 /// order (x fastest) with weights multiplied in axis order.
+#[inline(never)]
 fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, cidx: [f64; 3]) -> f64 {
     let taps = (2 * SINC_RADIUS) as usize;
     let mut base = [0i64; 3];
@@ -673,6 +754,7 @@ mod bspline {
 
     /// ITK's B-spline evaluation: support from `floor(float(x) + ½·even)`, weights per axis,
     /// mirror boundaries, then the sum over the support with x fastest.
+    #[inline(never)]
     pub(super) fn evaluate(
         coefficients: &[f64],
         size: [usize; 3],

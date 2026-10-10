@@ -1,0 +1,12 @@
+[package]
+name = "sincosf-verify"
+description = "Compares larmorx-gpl-afni's glibc sinf/cosf port with the platform's C library, exhaustively (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-gpl-afni = { workspace = true, features = ["verification"] }
+rayon.workspace = true

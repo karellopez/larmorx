@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# The GPL replicas are their own workspace (docs/licensing.md); this one never builds them.
+exclude = ["crates-gpl"]
 
 [workspace.package]
 version = "0.0.1"

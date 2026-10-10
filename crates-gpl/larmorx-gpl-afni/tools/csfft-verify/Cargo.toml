@@ -1,0 +1,10 @@
+[package]
+name = "csfft-verify"
+description = "Compares larmorx-gpl-afni's csfft with AFNI's compiled csfft.c, bit for bit (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-gpl-afni = { workspace = true, features = ["verification"] }

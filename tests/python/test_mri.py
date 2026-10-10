@@ -89,6 +89,32 @@ def test_world_transforms_map_reference_points(series):
     assert len(res.affine_series) == 5
 
 
+@pytest.mark.parametrize("ras_storage", [False, True])
+def test_world_transforms_match_nitransforms(series, tmp_path, ras_storage):
+    """The RAS transforms are what nitransforms makes of the FSL matrices (fMRIPrep's
+    MCFLIRT2ITK reads them with the HMC reference as both images)."""
+    fsl = pytest.importorskip("nitransforms.io.fsl")
+    img = nib.load(series)
+    data = np.asarray(img.dataobj)
+    affine = img.affine
+    if ras_storage:  # the same head stored with x reversed (positive determinant)
+        flip = np.eye(4)
+        flip[0, 0], flip[0, 3] = -1.0, data.shape[0] - 1
+        data, affine = data[::-1], affine @ flip
+    path = tmp_path / "bold.nii.gz"
+    nib.Nifti1Image(data, affine).to_filename(path)
+    ref = tmp_path / "ref.nii.gz"
+    nib.Nifti1Image(data[..., 0], affine).to_filename(ref)
+    res = lx.mri.hmc(path, reference=ref, resample=False)
+    res.save_mats(tmp_path / "mats")
+    ref_img = nib.load(ref)
+    for t in range(len(res.matrices)):
+        xfm = fsl.FSLLinearTransform.from_filename(tmp_path / "mats" / f"MAT_{t:04d}")
+        expected = xfm.to_ras(reference=ref_img, moving=ref_img)
+        # The .mat files hold 6 decimals: 5e-7 per entry, times ~100 mm for the translations.
+        np.testing.assert_allclose(res.affines[t], expected, atol=2e-4)
+
+
 def test_separate_reference_and_file_formats(series, tmp_path):
     img = nib.load(series)
     ref = tmp_path / "ref.nii.gz"

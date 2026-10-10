@@ -12,6 +12,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-image-math](ants-image-math.md) | `lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`) | ImageMath (ANTs 2.6.5 binary) | `validated` |
 | [ants-threshold-image](ants-threshold-image.md) | `lx.ants.threshold_image`, `lx.ants.otsu_threshold`, `larmorx ants ThresholdImage` (no `Kmeans` yet) | ThresholdImage (ANTs 2.6.5 binary) | `validated` |
 | [ants-multiply-images](ants-multiply-images.md) | `lx.ants.multiply_images`, `larmorx ants MultiplyImages` | MultiplyImages (ANTs 2.6.5 binary) | `validated` |
+| [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 
 Reproduce a record:
 
@@ -26,4 +27,6 @@ python -m larmorx_validation parity resample-series --tier standard --out docs/v
 python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these three need the ANTs oracle (scripts/build_ants_oracle.sh)
 python -m larmorx_validation parity ants-threshold-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-multiply-images --tier standard --out docs/validation
+python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   # mcflirt's variability band (needs FSL)
+python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
 ```

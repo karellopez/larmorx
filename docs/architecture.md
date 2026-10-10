@@ -25,7 +25,9 @@ How the code is organised and the conventions every tool follows. The plan behin
                      images as ANTs programs read and write them, the original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)
-   (next)            larmorx-optim, -mesh, -mri
+   larmorx-mri       clean-room MRI tools named by function: head-motion correction
+                     (mcflirt-compatible `hmc`)
+   (next)            larmorx-optim, -mesh
 ```
 
 - **The Rust crates know nothing about Python.** Bindings live only in `larmorx-py`, so the same code serves the standalone CLI and Rust users.

@@ -484,7 +484,10 @@ If `|H| > 1e−15` and `P/H < 0` the parabola opens downward: no vertex. Else if
 
 ## 8. `-meanvol` (tier 2)
 
-1. Stages 1–3 as above (with the reference of §5.1).
+1. Stages 1–3 as above (with the reference of §5.1). **(observed:** with `-reffile`, the
+   first pass registers to that file and the mean is formed on its grid: registering the
+   first pass to volume `N/2` instead puts the mean of ds000005 off by up to 33 intensity
+   units and the matrices by 0.17 mm.**)**
 2. Every volume is resampled with its stage-3 matrix (trilinear, with the edge and
    background rules of §9) and the mean is formed: float32 sum in volume order, divided by
    `N` (float32). It is written as `<out>_mean_reg` (§10.1).
@@ -567,7 +570,11 @@ output equals the truncated float32 output of the same data, and is not the roun
   float32 corrected series (before the type conversion); `descrip` = the FSL library's build
   string (`2203.12-dirty 2024-02-01T16:17:47+00:00` here); intent fields and `aux_file` from
   the input; `dim_info`, `slice_code`, `slice_start`, `slice_end`, `slice_duration` set to 0;
-  little-endian, also for big-endian input (ds000258).
+  little-endian, also for big-endian input (ds000258). **(observed** by the clean-room
+  implementer: a single corrected volume is written 3D (`dim[0] = 3`) with `pixdim[4]` kept;
+  the qform quaternion is written back from FSL's own qform matrix, so its last float32 bits
+  can change (up to ~1e−5 mm in the qform where its `w` is small, ds000258), and a stored
+  quaternion whose `(b, c, d)` is longer than 1 comes back normalised (ds000122).**)**
 - **`xyzt_units` is always mm and s**, while `pixdim[4]` is copied unchanged: a series
   whose TR was 2000 in milliseconds (ds003345, units 18) comes out with units 10 and a "TR"
   of 2000 s **(observed)**.
@@ -627,7 +634,9 @@ appended to the raw `-out` string, e.g. `x_mcf.nii.gz_meanvol.nii.gz`) **(observ
 temporal mean, variance (divided by `N − 1`) and standard deviation of the corrected float32
 series, voxel by voxel, float32. **The first and last slices are left at 0.** Written as
 float32. `<out>_mean_reg` of `-meanvol` is named the same way. (nipype expects
-`x_mcf_mean_reg.nii.gz` with FSL ≥ 6 and so does not find these files.)
+`x_mcf_mean_reg.nii.gz` with FSL ≥ 6 and so does not find these files.) **(observed** by the
+clean-room implementer: these images are 3D and keep the input's `cal_min`/`cal_max`, which
+are not recomputed; ds000005: 0 / 1353 as in the input, the synthetic series: 0 / 0.**)**
 
 ## 11. Command line (`larmorx mri hmc [options]`, accepting mcflirt's)
 
@@ -646,7 +655,7 @@ whole word).
 | `-stages n` | `atoi`; ≥ 4 adds stage 4 |
 | `-sinc_final`, `-spline_final`, `-nn_final` | final interpolation (§9.3) |
 | `-dof n` | `atoi`, clamped to 6–12 with a message for values outside (tier 3) |
-| `-cost c` | `mutualinfo`, `corratio`, `woods`, `normcorr`, `normmi`, `leastsquares`; anything else silently keeps `normcorr` **(observed)** (a message only if `-report` came earlier) |
+| `-cost c` | `mutualinfo`, `corratio`, `woods`, `normcorr`, `normmi`, `leastsquares`; anything else silently keeps `normcorr` **(observed)** (a message only if `-report` came earlier: `Unrecognised cost function type: X` and `Using the default (NormCorr)` on stderr **(observed)**) |
 | `-bins n` | histogram bins (`atoi`) |
 | `-smooth x` | edge-weighting width in mm (`atof`); 0 switches the correlation to its centred, unweighted form (§6.4) |
 | `-rotation x` | divides the rotation tolerances (`atof`) **(observed)** |
@@ -656,8 +665,8 @@ whole word).
 | `-init f` | a 4 × 4 matrix (FSL text format) applied **only in the final resampling**, before `M_t` (the source position uses `(M_t · M_init)⁻¹`); it does not affect the estimation or the written `.mat` files **(observed)** |
 | `-gdt` | registers gradient-magnitude images of the test volumes (3 × 3 × 3 derivative masks) to the **unchanged** reference, and writes the reference as `grefvol_<out>`: with an absolute `-out` path that name is invalid and mcflirt aborts **(observed)** (tier 3; of little use) |
 | `-fudge` | no previous-volume initialisation (§5.4) |
-| `-report` | progress messages on stderr; also prints `refnum = r` and `Original_refvol = …` on stdout at the end when there is no `-reffile`/`-meanvol` |
-| `-v` | verbose level 5; `-verbose n` sets it (20 or more prints every evaluated matrix on stderr); `-hist` is accepted and ignored |
+| `-report` | progress messages on stderr; also prints `refnum = r` and `Original_refvol = …` (the `-refvol` value as given, `-1` by default) on stdout at the end when there is no `-reffile`/`-meanvol` and at least one of `-mats`, `-plots`, `-rmsrel`, `-rmsabs` is given **(observed:** `-report -stages 1` alone prints nothing on stdout; adding any one of the four prints both lines**)** |
+| `-v` | verbose level 5; `-verbose n` sets it (20 or more prints every evaluated matrix on stderr); `-hist` is accepted and ignored. **(observed:** each evaluation prints `Cost::affmat = `, the candidate matrix `M` in the `.mat` format and an empty line, in evaluation order; levels 5, 19 and 100 print nothing else, no cost values. These traces are how the clean-room implementation checked its search path evaluation by evaluation.**)** |
 | `-help` | usage on stdout and exit 0, but only with at least one other argument: `mcflirt -help` alone exits 1 **(observed)** |
 
 Errors **(observed)**:
@@ -710,11 +719,11 @@ volume and stage:
 | image values, reference grids, interpolation | float32 |
 | matrices, matrix inverses, parameter vector | double; matrices rounded to float32 entries before use in the sampling loops |
 | sample positions | float32, incremental (§6.1, §9.1) |
-| cost sums, count `N`, correlation | float32 (three-level sums, §6.4) |
+| cost sums, count `N`, correlation | float32 (three-level sums, §6.4). **(observed,** by comparing the first parabola step of every volume of ds000005 run 1 with `-fudge -stages 1` against `-verbose 20` traces: square roots in double, sums in two levels instead of three, or `N` changed by one float32 ulp, each drop the agreement from 140 of 240 volumes to 1–42; `σ` other than `smooth/d` to 0**)** |
 | line-search positions and cost values | float32 |
 | centre of mass | double sums |
 | Euler decomposition | float32 intermediates |
-| rotation composition | the angle vector's norm is rounded to float32 before the rotation is built; the rotation matrix is therefore orthogonal only to about 1e−8 |
+| rotation composition | the angle vector's norm is rounded to float32 before the rotation is built; the rotation matrix is therefore orthogonal only to about 1e−8. **(observed:** the translations of the evaluated matrices (`-verbose 20`) are reproduced only with each elementary rotation's cosine and sine rounded to float32, e.g. `1 − cos` off by 3.2e−8 at an angle of −0.00315; computing them in double reproduces 12 of 240 first parabola steps on ds000005, rounding them to float32 140 of 240**)** |
 | `.mat` output | 6 decimals |
 
 **Determinism.** mcflirt uses no random numbers and runs single-threaded (the FSL library
@@ -765,7 +774,20 @@ deviation as the primary metric there.
 - mcflirt is deterministic and blind to storage details (§13), so repeated runs give no
   spread. The band has to come from perturbations that leave the problem essentially
   unchanged: one-voxel crops of the field of view, ±0.5 LSB noise, reversing the volume
-  order, a reference resampled by an identity transform. These runs are still to be made.
+  order, a reference resampled by an identity transform. **(observed,** made by the clean-room
+  implementer with `larmorx_validation.parity.mri_hmc_band`, outputs in
+  `oracles/fsl-6.0.7/mcflirt/band/`: mcflirt on its own input with uniform noise of ±0.5
+  (three realisations), with the volumes in reverse order (separate reference only) and with
+  the top slice cropped, compared with its unperturbed matrices. On fMRIPrep's command for the
+  nine real runs the 95th percentile of the RMS deviation is 0.013–0.10 mm (median
+  0.008–0.022 mm) under noise and reverse order, and the FD correlation is as low as 0.79
+  (ds000005) where the subject barely moves. `-meanvol` varies more (ds000005: 0.054 mm; the
+  synthetic series: 0.27–0.42 mm with noise), as do `-dof 12` (0.10–0.26 mm with noise,
+  1.2 mm in reverse order) and the 10 × 10 × 8 image (0.26–0.36 mm). The synthetic series
+  with a non-zero background is unstable: one of the three noise realisations moves its
+  matrices by 4.0 mm (95th percentile). Cropping a slice of a thin image changes the problem
+  itself: mcflirt's matrices move by 7.5 mm (tiny image) and 99 mm (the series with a non-zero
+  background).**)**
 - Option changes measured on ds000005 (matrix RMS deviation from fMRIPrep's command, median /
   95th percentile, mm) **(observed)**: `-smooth 2` 0.009 / 0.023; `-rotation 2` 0.010 / 0.024;
   `-stages 2` 0.027 / 0.045; `-cost corratio` 0.028 / 0.050; `-stages 1` 0.045 / 0.062;
@@ -829,8 +851,18 @@ report TR02MJ1 describe MCFLIRT. The implementation departs from or adds to it a
 
 1. The exact numeric form of the correlation (§6.4) mixes float32 and double; whether a
    double-precision clean-room implementation stays within the thresholds is to be
-   measured, not assumed.
-2. The variability band (§14) needs perturbation runs; none are made yet.
+   measured, not assumed. **(observed, partly settled by the clean-room implementer:** an
+   implementation following §6 exactly, with float32 sines and cosines (§13), reproduces the
+   first parabola step of 140 of 240 volumes of ds000005 (`-fudge -stages 1`) and of 20 of 20
+   volumes of a synthetic series whose test volumes are constant; with test volumes that vary,
+   50–70 % agree. The remaining steps differ by one or two float32 quanta of `r`, so some detail
+   of how the interpolated test values enter the sums is still unknown. Variants that did not
+   help: other orders of the trilinear steps, the interpolation in double, `(w·y)·x` or
+   `w·(y·y)` forms of the products, positions computed directly or from a double row start,
+   transposed or Gauss–Jordan inverses, float32 or perturbed centres, float32 trial points of
+   other values.**)**
+2. The variability band (§14) needs perturbation runs; none are made yet. **(Settled by
+   the clean-room implementer for 20 runs, see §14; a second FSL build is still missing.)**
 3. `-spline_final` boundary handling (§9.3) is described from analysis only; it is tier 2
    and should be confirmed by black-box comparison before larmorx claims it.
 4. Histogram costs (`mutualinfo`, `normmi`, `corratio`, `woods`) and `leastsquares` are

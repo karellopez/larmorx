@@ -156,10 +156,12 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   - `3dTshift`: the clean-room original 2–3× faster on one thread and 5.6–6.2× on 12; the
     bit-exact replica 1.7–2.2× and 3.4–4.5×;
   - ANTs' `ImageMath`, `ThresholdImage`, `MultiplyImages`: 1.1–2.7× on one thread, up to
-    5× with threads, bit-identical.
+    5× with threads, bit-identical;
+  - head-motion correction (`lx.mri.hmc`, clean-room, mcflirt-compatible): 1.2–2.3× faster
+    than mcflirt on one thread and 4.9–9.4× on 12, within mcflirt's own variability; the
+    matrices alone, all fMRIPrep needs, 5.7–16×.
 - **Planned gains** (PLAN.md G5, §7):
   - the pipeline at least 2× faster than fMRIPrep, with at least 5× less scratch disk;
-  - head-motion correction parallel over volumes;
   - recon-all from 5–8 hours to 30–60 minutes with the same results, and under 20 minutes
     with better optimisers.
 - **Better algorithms are the default once validated (decided 2026-10-10, D11).** An

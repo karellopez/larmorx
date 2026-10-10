@@ -174,6 +174,7 @@ dependencies = [
  "larmorx-afni",
  "larmorx-ants",
  "larmorx-core",
+ "larmorx-mri",
 ]
 
 [[package]]
@@ -223,6 +224,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-mri"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-io",
+ "libm",
+ "rayon",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-py"
 version = "0.0.1"
 dependencies = [
@@ -232,6 +245,7 @@ dependencies = [
  "larmorx-core",
  "larmorx-interp",
  "larmorx-io",
+ "larmorx-mri",
  "larmorx-transform",
  "numpy",
  "pyo3",

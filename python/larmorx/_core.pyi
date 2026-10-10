@@ -251,3 +251,59 @@ def ants_otsu_threshold(
     a: np.ndarray, n_thresholds: int, mask: np.ndarray | None = None, n_threads: int = 1
 ) -> tuple[np.ndarray, np.ndarray]:
     """``ThresholdImage ... Otsu n [mask]``: ``(labels, thresholds)``."""
+
+# --- Head-motion correction, mcflirt-compatible (larmorx/mri) ---------------------------------
+
+def mri_hmc_file(
+    path: str,
+    reference: str | None = None,
+    ref_index: int | None = None,
+    mean: bool = False,
+    stages: int = 3,
+    final_interp: str = "trilinear",
+    dof: int = 6,
+    cost: str = "normcorr",
+    smooth: float = 1.0,
+    rotation: float = 1.0,
+    bins: int = 256,
+    fudge: bool = False,
+    in_plane: str = "auto",
+    fov: int = 20,
+    init: np.ndarray | None = None,
+    resample: bool = True,
+    n_threads: int = 1,
+) -> dict[str, Any]:
+    """Head-motion correction of a NIfTI series: ``matrices``, ``ras``, ``itk``, ``params``,
+    ``rms_abs``, ``rms_rel``, ``fd``, ``reference_index``, ``in_plane``, ``header``, ``data``
+    (float32 or ``None``) and ``mean`` (or ``None``)."""
+
+def mri_hmc_array(
+    data: np.ndarray,
+    header: dict[str, Any],
+    reference: tuple[np.ndarray, dict[str, Any]] | None = None,
+    ref_index: int | None = None,
+    mean: bool = False,
+    stages: int = 3,
+    final_interp: str = "trilinear",
+    dof: int = 6,
+    cost: str = "normcorr",
+    smooth: float = 1.0,
+    rotation: float = 1.0,
+    bins: int = 256,
+    fudge: bool = False,
+    in_plane: str = "auto",
+    fov: int = 20,
+    init: np.ndarray | None = None,
+    resample: bool = True,
+    n_threads: int = 1,
+) -> dict[str, Any]:
+    """:func:`mri_hmc_file` for a float32 ``(x, y, z[, t])`` array placed by header fields."""
+
+def mri_read_mat(text: str) -> np.ndarray:
+    """An FSL text matrix as a ``(1, 4, 4)`` array."""
+
+def mri_mat_text(m: np.ndarray) -> str:
+    """A 4 × 4 matrix in mcflirt's ``.mat`` text format."""
+
+def mri_par_text(params: np.ndarray) -> str:
+    """``(N, 6)`` motion parameters in mcflirt's ``.par`` text format."""

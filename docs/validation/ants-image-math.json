@@ -1,0 +1,1128 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "17a3d2c14f30-dirty",
+  "larmorx_testdata_commit": "5434909ddf09",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`",
+ "results": [
+  {
+   "case": "dispatch/help",
+   "category": "dispatch",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "dispatch/too-few-arguments",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: RescaleImage InputImage min max",
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/unknown-operation",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Operation Bogus not found or not supported for dimension 3; larmorx exit 1: Operation Bogus not found or not supported for dimension 3",
+   "seconds": 0.077,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/case-sensitive",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Operation neg not found or not supported for dimension 3; larmorx exit 1: Operation neg not found or not supported for dimension 3",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/dimension-5",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Dimension 5 is not supported; larmorx exit 1: Dimension 5 is not supported",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/dimension-not-a-number",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ImageMath: the dimension 'three' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/2d-only-operation-in-3d",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Operation TileImages not found or not supported for dimension 3; larmorx exit 1: Operation TileImages not found or not supported for dimension 3",
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/missing-input",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses the null image)",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/missing-operand-image",
+   "category": "dispatch",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs crashes here: it uses the null image)",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "dispatch/dimension-with-trailing-text",
+   "category": "dispatch",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/m-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.07,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/+-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/--image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic//-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/max-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/addtozero-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/overadd-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/Decision-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/exp-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/^-image",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/m-scalar-2.5",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/^-scalar-2",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/m-scalar--0.5",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/+-scalar--3.25",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/--scalar-1e-3",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic//-scalar-0.5",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic//-scalar-0",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic//-scalar--2",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/exp-scalar-0.01",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/exp-scalar--0.5",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/max-scalar-50",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/Decision-scalar-2",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/addtozero-scalar-7",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/overadd-scalar-7",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/overadd-scalar-0",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/^-scalar-0.37",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/exp-overflow",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-no-operand",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-plus-sign",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-leading-point",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-trailing-point",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-exponent-only",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-lone-minus",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/operand-huge",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/abs",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/Neg",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/Neg-constant",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/Neg-outliers",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/total-scalar",
+   "category": "arithmetic",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/total-image",
+   "category": "arithmetic",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/mean-scalar",
+   "category": "arithmetic",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/mean-image",
+   "category": "arithmetic",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/vtotal",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/larger-operand",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/int16-scaled",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/int32-large",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/negative-pixdim",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/las-sform-only",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/dim2",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/dim4",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/dim3-of-4d",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/dim3-of-2d",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-mask-T1w",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.644,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-addtozero-GM-WM",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.604,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-total-boldref",
+   "category": "arithmetic",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-Neg-boldref",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-bold-4d",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.3,
+   "status": "pass"
+  },
+  {
+   "case": "arithmetic/real-divide-T1w",
+   "category": "arithmetic",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.551,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/defaults",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/fmriprep",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/lower-only",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/wide",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/one-bin",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/int16-scaled",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/outliers",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/first-voxel-max",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.059,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/posinf",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/constant",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/mask",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/fractional-mask",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/missing-mask",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/bins-not-a-number",
+   "category": "truncate",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "truncate/negative-pixdim",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/dim2",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/dim4",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/real-T1w-raw",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.65,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/real-T1w-preproc-mask",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.871,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/real-MNI-1mm",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.141,
+   "status": "pass"
+  },
+  {
+   "case": "truncate/real-boldref",
+   "category": "truncate",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.06,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/range",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/option-zero",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/mean",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/mask",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/fractional-mask",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/missing-mask",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/constant",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/outliers",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/int16-scaled",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/real-boldref-mask",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "normalize/real-T1w",
+   "category": "normalize",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.288,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/unit",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/signed",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/int16-scaled",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/point",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/constant",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/outliers",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/reversed",
+   "category": "rescale",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x59c743ba3410): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
+   "seconds": 0.023,
+   "status": "both-error"
+  },
+  {
+   "case": "rescale/too-few-arguments",
+   "category": "rescale",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  std::exception; larmorx exit 1: larmorx: RescaleImage needs an input image, a minimum and a maximum (ANTs aborts: it throws std::exception)",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "rescale/real-MNI-2mm",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.365,
+   "status": "pass"
+  },
+  {
+   "case": "rescale/real-MNI-2mm-mask",
+   "category": "rescale",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.116,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-image-math",
+ "summary": {
+  "both-error": 11,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 99,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

@@ -551,7 +551,8 @@ pub struct ItkImage {
 /// for Analyze files and when the slope is 0 (or not finite); integer data are converted to
 /// float32 **before** scaling and the scaled value is rounded to float32 again
 /// (`f32(f64(f32(x))·slope + inter)`), float32 data are scaled in double and rounded to
-/// float32. Displacement vectors with intent `NIFTI_INTENT_DISPVECT` are converted from RAS to
+/// float32. Non-finite float values (NaN, ±inf) are read as 0, as nifti_clib's
+/// `nifti_read_buffer` sets them. Displacement vectors with intent `NIFTI_INTENT_DISPVECT` are converted from RAS to
 /// LPS (x and y negated); other vector intents are taken as LPS already (ANTs writes
 /// `NIFTI_INTENT_VECTOR`). Complex and RGB data are not supported.
 pub fn read_itk_image(path: impl AsRef<Path>, n_threads: usize) -> Result<ItkImage, Error> {
@@ -619,15 +620,21 @@ fn itk_values<T: RealElement>(v: &[T], slope: f64, inter: f64, rescale: bool) ->
     fn map<T: Copy + Send + Sync, U: Send>(v: &[T], f: impl Fn(T) -> U + Send + Sync) -> Vec<U> {
         v.par_iter().with_min_len(1 << 16).map(|&x| f(x)).collect()
     }
+    // nifti_clib's `nifti_read_buffer` sets every non-finite float32 and float64 value to 0
+    // as it reads (before any scaling).
+    let finite = |x: f64| if x.is_finite() { x } else { 0.0 };
     match T::DATA_TYPE {
-        DataType::F64 if rescale => ItkVoxels::F64(map(v, |x| x.to_f64() * slope + inter)),
-        DataType::F64 => ItkVoxels::F64(map(v, |x| x.to_f64())),
+        DataType::F64 if rescale => ItkVoxels::F64(map(v, |x| finite(x.to_f64()) * slope + inter)),
+        DataType::F64 => ItkVoxels::F64(map(v, |x| finite(x.to_f64()))),
         // Float data are scaled in double and stored back as float; integer data are first
         // converted to float (`CastCopy<float>`).
-        DataType::F32 if rescale => ItkVoxels::F32(map(v, |x| (x.to_f64() * slope + inter) as f32)),
+        DataType::F32 if rescale => {
+            ItkVoxels::F32(map(v, |x| (finite(x.to_f64()) * slope + inter) as f32))
+        }
+        DataType::F32 => ItkVoxels::F32(map(v, |x| finite(x.to_f64()) as f32)),
         _ if rescale => ItkVoxels::F32(map(v, |x| (f64::from(x.to_f32()) * slope + inter) as f32)),
         // Unscaled: the stored values, in float32 when that is exact.
-        DataType::F32 | DataType::U8 | DataType::I8 | DataType::U16 | DataType::I16 => {
+        DataType::U8 | DataType::I8 | DataType::U16 | DataType::I16 => {
             ItkVoxels::F32(map(v, |x| x.to_f32()))
         }
         _ => ItkVoxels::F64(map(v, |x| x.to_f64())),

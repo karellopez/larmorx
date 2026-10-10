@@ -20,9 +20,10 @@ noted.
 |---|---|
 | [afni-tshift.md](afni-tshift.md) | AFNI 3dTshift: slice-timing correction as fMRIPrep runs it, AFNI's FFT |
 | [ants-cli.md](ants-cli.md) | ANTs command lines: argument parser, `antsApplyTransforms` options and outputs |
+| [ants-image-programs.md](ants-image-programs.md) | ImageMath, ThresholdImage, MultiplyImages: dispatch, exit codes, operands, quirks of each operation |
 | [itk-transforms.md](itk-transforms.md) | ITK transforms: composite order, inverses, displacement fields, transform files |
 | [itk-resampling.md](itk-resampling.md) | ITK `ResampleImageFilter` and the interpolators ANTs uses |
-| [itk-nifti.md](itk-nifti.md) | ITK's NIfTI reader and writer: geometry, scaling, vector images |
+| [itk-nifti.md](itk-nifti.md) | ITK's NIfTI reader and writer: geometry, scaling, non-finite values, vector images, the header it writes |
 | [antspy.md](antspy.md) | ANTsPy as an oracle: defaults and quirks of its wrappers |
 | [nibabel.md](nibabel.md) | nibabel as the reference for NIfTI I/O |
-| [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`: glibc vs the `libm` crate, and what it does to bit parity |
+| [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`/`powf`: glibc vs the `libm` crate, and what it does to bit parity |

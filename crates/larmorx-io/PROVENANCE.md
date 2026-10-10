@@ -46,7 +46,25 @@ Single-precision steps are kept where ITK computes in `float`. The SVD compariso
 - `RescaleFunction`;
 - `CastCopy`, which promotes scaled integers to float32;
 - the slope and intercept rules, and nifti_clib's `FIXED_FLOAT`;
-- `ConvertRASToFromLPS_CXYZT` for `NIFTI_INTENT_DISPVECT` vectors (`m_ConvertRASDisplacementVectors`).
+- `ConvertRASToFromLPS_CXYZT` for `NIFTI_INTENT_DISPVECT` vectors (`m_ConvertRASDisplacementVectors`);
+- nifti_clib's `nifti_read_buffer`: non-finite float values read as 0 (public domain).
+
+## ITK's writing of NIfTI headers (`src/nifti/itk/write.rs`)
+
+**Ported** (logic re-expressed in Rust) from ITK v5.4.5 (Apache-2.0) and its bundled
+nifti_clib (public domain):
+- `Modules/IO/NIFTI/src/itkNiftiImageIO.cxx`: `WriteImageInformation`,
+  `SetNIfTIOrientationFromImageIO` (the header fields, both xforms, the dictionary's
+  `descrip` and `aux_file`);
+- `Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c`: `nifti_simple_init_nim`,
+  `nifti_convert_nim2nhdr`, `nifti_make_orthog_mat44`, `nifti_mat44_to_quatern`,
+  `nifti_mat33_polar`, `nifti_mat33_inverse`, `nifti_mat33_determ`, `nifti_mat33_rownorm`,
+  `nifti_mat33_colnorm` (single precision kept where nifti_clib uses `float`);
+- `Modules/Core/Common/include/itkImageBase.hxx`: `SetDirection` (element-wise copy) and
+  `itkSetMacro` for `SetOrigin`, modelled by `ItkGeometry::stored_in_new_image`.
+
+Every output header of the ImageMath, ThresholdImage and MultiplyImages parity suites matches
+ITK's byte for byte.
 
 ## ITK transform files (`src/itk_transform.rs`)
 

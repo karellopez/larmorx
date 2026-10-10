@@ -1,0 +1,933 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "17a3d2c14f30-dirty",
+  "larmorx_testdata_commit": "5434909ddf09",
+  "load_average_before": [
+   2.9736328125,
+   1.34228515625,
+   1.21142578125
+  ],
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 5,
+ "results": [
+  {
+   "best": 0.39108684472739697,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176\u00d7256\u00d7256 int16)",
+   "median": 0.40249658562242985,
+   "operation": "1",
+   "seconds": [
+    0.3942642081528902,
+    0.39108684472739697,
+    0.40249658562242985,
+    0.426024978980422,
+    0.43769593350589275
+   ],
+   "throughput_mb_s": 58.61742147083004,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.17600486241281033,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176\u00d7256\u00d7256 int16)",
+   "median": 0.18058955110609531,
+   "operation": "12",
+   "seconds": [
+    0.18950301967561245,
+    0.17600486241281033,
+    0.18058955110609531,
+    0.17959311977028847,
+    0.20333280973136425
+   ],
+   "throughput_mb_s": 130.64605263977353,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.21036631241440773,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176\u00d7256\u00d7256 int16)",
+   "median": 0.2242074441164732,
+   "operation": "1",
+   "seconds": [
+    0.21036631241440773,
+    0.2242074441164732,
+    0.22701509110629559,
+    0.2542274836450815,
+    0.2154132965952158
+   ],
+   "throughput_mb_s": 105.2298334382847,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.119759326800704,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176\u00d7256\u00d7256 int16)",
+   "median": 0.1275711189955473,
+   "operation": "4",
+   "seconds": [
+    0.119759326800704,
+    0.1202536690980196,
+    0.1310290340334177,
+    0.1275711189955473,
+    0.12793603353202343
+   ],
+   "throughput_mb_s": 184.94242416125155,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.10740083642303944,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176\u00d7256\u00d7256 int16)",
+   "median": 0.1088259331882,
+   "operation": "12",
+   "seconds": [
+    0.10979018174111843,
+    0.10857794061303139,
+    0.10740083642303944,
+    0.1088259331882,
+    0.1103296484798193
+   ],
+   "throughput_mb_s": 216.798618755683,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.639644144102931,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 1
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.6540818978101015,
+   "operation": "1",
+   "seconds": [
+    0.639644144102931,
+    0.6558831911534071,
+    0.6568028051406145,
+    0.645442895591259,
+    0.6540818978101015
+   ],
+   "throughput_mb_s": 52.16538802592902,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.29094015434384346,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 12
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.29399989172816277,
+   "operation": "12",
+   "seconds": [
+    0.29094015434384346,
+    0.29792374931275845,
+    0.3076081797480583,
+    0.29399989172816277,
+    0.2939144987612963
+   ],
+   "throughput_mb_s": 116.05594750200903,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.45758476480841637,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.499488877132535,
+   "operation": "1",
+   "seconds": [
+    0.48400228284299374,
+    0.5119479149580002,
+    0.499488877132535,
+    0.5000653993338346,
+    0.45758476480841637
+   ],
+   "throughput_mb_s": 68.31070232410089,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.23464103415608406,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.24473057314753532,
+   "operation": "4",
+   "seconds": [
+    0.23464103415608406,
+    0.23715360276401043,
+    0.2476069424301386,
+    0.26392705738544464,
+    0.24473057314753532
+   ],
+   "throughput_mb_s": 139.42040653592784,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.1630426850169897,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "TruncateImageIntensity 0.01 0.999 256, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.17474042437970638,
+   "operation": "12",
+   "seconds": [
+    0.18662237375974655,
+    0.17474042437970638,
+    0.19059623032808304,
+    0.1630426850169897,
+    0.16839073039591312
+   ],
+   "throughput_mb_s": 195.26355232980995,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.11528448015451431,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ThresholdImage 0.5 1, MNI brain probability map 1 mm",
+   "median": 0.11861923523247242,
+   "operation": "1",
+   "seconds": [
+    0.118007468059659,
+    0.11861923523247242,
+    0.12006532587110996,
+    0.1269656103104353,
+    0.11528448015451431
+   ],
+   "throughput_mb_s": 287.6467373367402,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.10141853615641594,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ThresholdImage 0.5 1, MNI brain probability map 1 mm",
+   "median": 0.10526211000978947,
+   "operation": "12",
+   "seconds": [
+    0.10222910344600677,
+    0.10607891343533993,
+    0.11030235514044762,
+    0.10141853615641594,
+    0.10526211000978947
+   ],
+   "throughput_mb_s": 324.14736885691127,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.07133333571255207,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ThresholdImage 0.5 1, MNI brain probability map 1 mm",
+   "median": 0.07249889336526394,
+   "operation": "1",
+   "seconds": [
+    0.0745040811598301,
+    0.07249889336526394,
+    0.07133333571255207,
+    0.07388499565422535,
+    0.0715706069022417
+   ],
+   "throughput_mb_s": 470.63388716975874,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.0772816501557827,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ThresholdImage 0.5 1, MNI brain probability map 1 mm",
+   "median": 0.0787650179117918,
+   "operation": "4",
+   "seconds": [
+    0.09571614116430283,
+    0.0787650179117918,
+    0.07904152758419514,
+    0.0772816501557827,
+    0.0777867529541254
+   ],
+   "throughput_mb_s": 433.19276633963506,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.05071140453219414,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ThresholdImage 0.5 1, MNI brain probability map 1 mm",
+   "median": 0.052005911245942116,
+   "operation": "12",
+   "seconds": [
+    0.053759412840008736,
+    0.05071140453219414,
+    0.052005911245942116,
+    0.05149468034505844,
+    0.053465329110622406
+   ],
+   "throughput_mb_s": 656.0876481644638,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.5393415074795485,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ThresholdImage Otsu 3 with a brain mask, fMRIPrep T1w",
+   "median": 0.5419012233614922,
+   "operation": "1",
+   "seconds": [
+    0.5584106035530567,
+    0.5487764347344637,
+    0.5396999195218086,
+    0.5419012233614922,
+    0.5393415074795485
+   ],
+   "throughput_mb_s": 43.53803051716188,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.32548346370458603,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ThresholdImage Otsu 3 with a brain mask, fMRIPrep T1w",
+   "median": 0.34943416714668274,
+   "operation": "12",
+   "seconds": [
+    0.33462102338671684,
+    0.32548346370458603,
+    0.5434185191988945,
+    0.34943416714668274,
+    0.37313484214246273
+   ],
+   "throughput_mb_s": 67.518617863422,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.20607738010585308,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ThresholdImage Otsu 3 with a brain mask, fMRIPrep T1w",
+   "median": 0.2197282873094082,
+   "operation": "1",
+   "seconds": [
+    0.2733538541942835,
+    0.20607738010585308,
+    0.2197282873094082,
+    0.21306482888758183,
+    0.26839216612279415
+   ],
+   "throughput_mb_s": 107.3749415193744,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.1631661169230938,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ThresholdImage Otsu 3 with a brain mask, fMRIPrep T1w",
+   "median": 0.17080078274011612,
+   "operation": "4",
+   "seconds": [
+    0.16460634022951126,
+    0.2003268487751484,
+    0.17080078274011612,
+    0.1631661169230938,
+    0.19898124411702156
+   ],
+   "throughput_mb_s": 138.13351216252138,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.157766068354249,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ThresholdImage Otsu 3 with a brain mask, fMRIPrep T1w",
+   "median": 0.1641911268234253,
+   "operation": "12",
+   "seconds": [
+    0.1641911268234253,
+    0.16371226124465466,
+    0.157766068354249,
+    0.17308358661830425,
+    0.19856121204793453
+   ],
+   "throughput_mb_s": 143.69419624833174,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.16533940471708775,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "MultiplyImages T1w \u00d7 brain mask (fMRIPrep derivatives)",
+   "median": 0.19145312532782555,
+   "operation": "1",
+   "seconds": [
+    0.16533940471708775,
+    0.2066835667937994,
+    0.276279516518116,
+    0.17709075659513474,
+    0.19145312532782555
+   ],
+   "throughput_mb_s": 123.23283811429627,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.16466978006064892,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "MultiplyImages T1w \u00d7 brain mask (fMRIPrep derivatives)",
+   "median": 0.17316565848886967,
+   "operation": "12",
+   "seconds": [
+    0.20842653699219227,
+    0.2520688697695732,
+    0.17316565848886967,
+    0.1670358944684267,
+    0.16466978006064892
+   ],
+   "throughput_mb_s": 136.24706079650588,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.1486736424267292,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "MultiplyImages T1w \u00d7 brain mask (fMRIPrep derivatives)",
+   "median": 0.15151888690888882,
+   "operation": "1",
+   "seconds": [
+    0.2686293590813875,
+    0.21923450380563736,
+    0.15151888690888882,
+    0.14895253255963326,
+    0.1486736424267292
+   ],
+   "throughput_mb_s": 155.71202033834308,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.10867252387106419,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "MultiplyImages T1w \u00d7 brain mask (fMRIPrep derivatives)",
+   "median": 0.11421817913651466,
+   "operation": "4",
+   "seconds": [
+    0.2103367354720831,
+    0.16387196816504002,
+    0.11421817913651466,
+    0.10873126424849033,
+    0.10867252387106419
+   ],
+   "throughput_mb_s": 206.56354512359235,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.1061310563236475,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "MultiplyImages T1w \u00d7 brain mask (fMRIPrep derivatives)",
+   "median": 0.11013068072497845,
+   "operation": "12",
+   "seconds": [
+    0.1119959969073534,
+    0.11013068072497845,
+    0.1061310563236475,
+    0.10654282197356224,
+    0.12390649132430553
+   ],
+   "throughput_mb_s": 214.23014771803608,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.20039480738341808,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath addtozero WM GM (probability maps)",
+   "median": 0.23446178622543812,
+   "operation": "1",
+   "seconds": [
+    0.2634725458920002,
+    0.26382477954030037,
+    0.23446178622543812,
+    0.20039480738341808,
+    0.20344572700560093
+   ],
+   "throughput_mb_s": 100.62753670789968,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.20156037993729115,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath addtozero WM GM (probability maps)",
+   "median": 0.21818609535694122,
+   "operation": "12",
+   "seconds": [
+    0.20634193532168865,
+    0.2954616192728281,
+    0.20156037993729115,
+    0.36552399955689907,
+    0.21818609535694122
+   ],
+   "throughput_mb_s": 108.1338935068367,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.09800787642598152,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath addtozero WM GM (probability maps)",
+   "median": 0.1001830380409956,
+   "operation": "1",
+   "seconds": [
+    0.10282636620104313,
+    0.09954416193068027,
+    0.09800787642598152,
+    0.10234225168824196,
+    0.1001830380409956
+   ],
+   "throughput_mb_s": 235.50206163987013,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.08321583643555641,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath addtozero WM GM (probability maps)",
+   "median": 0.08659112267196178,
+   "operation": "4",
+   "seconds": [
+    0.09148453921079636,
+    0.08659112267196178,
+    0.08681943081319332,
+    0.08321583643555641,
+    0.08464056253433228
+   ],
+   "throughput_mb_s": 272.4680229563477,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.07377428561449051,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath addtozero WM GM (probability maps)",
+   "median": 0.0742691233754158,
+   "operation": "12",
+   "seconds": [
+    0.07377824001014233,
+    0.07685551233589649,
+    0.07377428561449051,
+    0.07808664068579674,
+    0.0742691233754158
+   ],
+   "throughput_mb_s": 317.6732257999122,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.13712147250771523,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath Normalize, fMRIPrep T1w",
+   "median": 0.14338691718876362,
+   "operation": "1",
+   "seconds": [
+    0.15750229358673096,
+    0.13712147250771523,
+    0.13818989507853985,
+    0.14338691718876362,
+    0.14374802261590958
+   ],
+   "throughput_mb_s": 164.54298943424715,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.13943993672728539,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath Normalize, fMRIPrep T1w",
+   "median": 0.14172754622995853,
+   "operation": "12",
+   "seconds": [
+    0.14170614071190357,
+    0.14697188884019852,
+    0.14172754622995853,
+    0.13943993672728539,
+    0.14573103934526443
+   ],
+   "throughput_mb_s": 166.4694876020708,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.08228626474738121,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath Normalize, fMRIPrep T1w",
+   "median": 0.08478971384465694,
+   "operation": "1",
+   "seconds": [
+    0.08788049779832363,
+    0.0840067621320486,
+    0.08478971384465694,
+    0.09729327075183392,
+    0.08228626474738121
+   ],
+   "throughput_mb_s": 278.25677113647606,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.06653505936264992,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath Normalize, fMRIPrep T1w",
+   "median": 0.0700395330786705,
+   "operation": "4",
+   "seconds": [
+    0.06653505936264992,
+    0.06789935566484928,
+    0.0700395330786705,
+    0.07370629720389843,
+    0.07069467194378376
+   ],
+   "throughput_mb_s": 336.8570714698981,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.06624637730419636,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath Normalize, fMRIPrep T1w",
+   "median": 0.07097598351538181,
+   "operation": "12",
+   "seconds": [
+    0.07308887876570225,
+    0.06624637730419636,
+    0.06644255481660366,
+    0.07097598351538181,
+    0.07304500043392181
+   ],
+   "throughput_mb_s": 332.41261101914694,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.18241005577147007,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath RescaleImage 0 1, MNI 1 mm",
+   "median": 0.18668115325272083,
+   "operation": "1",
+   "seconds": [
+    0.18668115325272083,
+    0.1920887753367424,
+    0.18397251702845097,
+    0.20219731144607067,
+    0.18241005577147007
+   ],
+   "throughput_mb_s": 182.7738655214393,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.1702118143439293,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath RescaleImage 0 1, MNI 1 mm",
+   "median": 0.17609927989542484,
+   "operation": "12",
+   "seconds": [
+    0.17484193854033947,
+    0.17715535126626492,
+    0.1702118143439293,
+    0.18529569171369076,
+    0.17609927989542484
+   ],
+   "throughput_mb_s": 193.75681729228052,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.14382904581725597,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath RescaleImage 0 1, MNI 1 mm",
+   "median": 0.14605696126818657,
+   "operation": "1",
+   "seconds": [
+    0.14605696126818657,
+    0.14382904581725597,
+    0.14473606832325459,
+    0.15405140444636345,
+    0.15217706002295017
+   ],
+   "throughput_mb_s": 233.61047432274594,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.10365811549127102,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath RescaleImage 0 1, MNI 1 mm",
+   "median": 0.10685534961521626,
+   "operation": "4",
+   "seconds": [
+    0.1157941222190857,
+    0.10365811549127102,
+    0.10685534961521626,
+    0.10764417797327042,
+    0.1053324956446886
+   ],
+   "throughput_mb_s": 319.3142516763731,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.09865570813417435,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath RescaleImage 0 1, MNI 1 mm",
+   "median": 0.12929415702819824,
+   "operation": "12",
+   "seconds": [
+    0.09865570813417435,
+    0.11745509319007397,
+    0.14886738918721676,
+    0.13155201263725758,
+    0.12929415702819824
+   ],
+   "throughput_mb_s": 263.8977412765725,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.4463690109550953,
+   "data_bytes": 90505312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath 4 m 0.5, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.5132387280464172,
+   "operation": "1",
+   "seconds": [
+    0.4491072576493025,
+    0.5416488125920296,
+    0.5132387280464172,
+    0.4463690109550953,
+    0.5186648648232222
+   ],
+   "throughput_mb_s": 176.3415483950282,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.45373022742569447,
+   "data_bytes": 90505312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath 4 m 0.5, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.4777891803532839,
+   "operation": "12",
+   "seconds": [
+    0.4777891803532839,
+    0.4891868270933628,
+    0.5477615185081959,
+    0.47295804880559444,
+    0.45373022742569447
+   ],
+   "throughput_mb_s": 189.42520199615893,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.5266916025429964,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath 4 m 0.5, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.5296234674751759,
+   "operation": "1",
+   "seconds": [
+    0.5281236208975315,
+    0.5296234674751759,
+    0.5266916025429964,
+    0.8040851838886738,
+    0.9336572121828794
+   ],
+   "throughput_mb_s": 170.88614375691748,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.482439735904336,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath 4 m 0.5, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.5010867323726416,
+   "operation": "4",
+   "seconds": [
+    0.6276354417204857,
+    0.4909715000540018,
+    0.5010867323726416,
+    0.482439735904336,
+    0.6125421579927206
+   ],
+   "throughput_mb_s": 180.61805702070396,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.3418584633618593,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath 4 m 0.5, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.35767554864287376,
+   "operation": "12",
+   "seconds": [
+    0.3895079791545868,
+    0.3642114978283644,
+    0.3551792837679386,
+    0.3418584633618593,
+    0.35767554864287376
+   ],
+   "throughput_mb_s": 253.03745906982957,
+   "tool": "larmorx"
+  }
+ ]
+}

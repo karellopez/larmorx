@@ -108,3 +108,18 @@ the crate otherwise denies `unsafe`.
 
 A unit test checks that both copies give the same bits on 200,000 random inputs. Lanczos
 boldref → T1w: 2.13 s on one thread, against 2.76 s before and 1.62 s with the `libm` crate.
+
+## powf
+
+**ITK's `std::pow(float, float)` is glibc's `powf`** (libstdc++ declares a float overload),
+and **glibc's `powf` is not correctly rounded**: it differs from the correctly rounded result
+by one ulp in about 0.06 % of calls (870 of 1.5 M random inputs). The `libm` crate's `powf`
+is an older algorithm and differs from glibc in 10 % of calls. *Verified* (2026-10-10, glibc
+2.35, libm 0.2.16). ImageMath's `^` calls it (`ImageMath_Templates.hxx:5697`); its `exp`
+calls the double `exp` (line 5701) and rounds to float (matched exactly on 262,144 voxels, where
+`expf` would differ in 164).
+
+*larmorx:* `larmorx_core::math::powf`, a port of CORE-MATH's `cr_powf` (correctly rounded).
+It is bit-identical to the C on 1.5 M random inputs and on all 460,475 cases of CORE-MATH's
+`powf.wc`. In the ImageMath suite the `^` cases differ from ANTs in at most 35 of 35,840
+voxels, by one ulp. *Validated.*

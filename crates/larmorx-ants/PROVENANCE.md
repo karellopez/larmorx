@@ -10,6 +10,17 @@ re-expressed in Rust; no code was copied verbatim.
 | `cli::apply_transforms` (options, interpolator selection and defaults, output naming, `-u` casts, time-series output) | ANTs v2.6.5: `Examples/antsApplyTransforms.cxx`, `Examples/make_interpolator_snip.tmpl` | Apache-2.0 |
 | `cli::parser` (word regrouping, option and value rules, `name[p1,p2]`, value order) | ANTs v2.6.5: `Utilities/antsCommandLineParser.cxx/.h`, `Utilities/antsCommandLineOption.cxx` | Apache-2.0 |
 | `transform_points` | ANTs v2.6.5: `Examples/antsApplyTransformsToPoints.cxx` (the point mapping) | Apache-2.0 |
+| `image` (`ReadImage`/`WriteImage` rules, pixel casts, reading into fewer or more dimensions) | ANTs v2.6.5: `Utilities/ReadWriteData.h`, `ReadWriteData.cxx`; ITK v5.4.5: `Modules/IO/ImageBase/include/itkImageFileReader.hxx` (`GenerateOutputInformation`) | Apache-2.0 |
+| `image_math::arithmetic` (`ImageMath<DIM>`, `NegativeImage`) | ANTs v2.6.5: `Examples/ImageMath_Templates.hxx` (`ImageMath`, `NegativeImage`) | Apache-2.0 |
+| `image_math::intensity` (`TruncateImageIntensity`, `NormalizeImage`, `RescaleImage`) | ANTs v2.6.5: `Examples/ImageMath_Templates.hxx` | Apache-2.0 |
+| `threshold_image` | ANTs v2.6.5: `Examples/ThresholdImage.cxx` (`OtsuThreshold` with a mask, `BinaryThreshold_AltInsideOutside_threashold`) | Apache-2.0 |
+| `multiply_images` | ANTs v2.6.5: `Examples/MultiplyImages.cxx` | Apache-2.0 |
+| `cli::image_math` (dispatch tables, usage, exit codes) | ANTs v2.6.5: `Examples/ImageMath.cxx`, `ImageMathHelper{2D,3D,4D}.cxx`, the `ImageMathHelper*` tables of `ImageMath_Templates.hxx` | Apache-2.0 |
+| `cli::threshold_image`, `cli::multiply_images` | ANTs v2.6.5: `Examples/ThresholdImage.cxx`, `Examples/MultiplyImages.cxx` (argument handling) | Apache-2.0 |
+| `cli::cstd` (`from_string<float>`, `std::stoi`, `cout << float`) | ANTs v2.6.5: `Examples/ImageMath_Templates.hxx` (`from_string`); the standard-library semantics are libstdc++'s (`num_get`) and glibc's (`strtod`, `printf %g`), reimplemented from their specifications | Apache-2.0 |
 
 The behaviour found while porting is recorded in [docs/findings/](../../docs/findings/). The
-parity record is [docs/validation/ants-apply-transforms.md](../../docs/validation/ants-apply-transforms.md).
+parity records are [ants-apply-transforms](../../docs/validation/ants-apply-transforms.md),
+[ants-image-math](../../docs/validation/ants-image-math.md),
+[ants-threshold-image](../../docs/validation/ants-threshold-image.md) and
+[ants-multiply-images](../../docs/validation/ants-multiply-images.md).

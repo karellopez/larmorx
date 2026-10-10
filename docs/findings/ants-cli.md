@@ -24,6 +24,11 @@ it starts with `-` and `atof(word) == 0`. So `-f -0.5` passes `-0.5` to `-f`, wh
 would end it. An option with no value gets `"1"` (`-v` alone means verbose on).
 *Read.* *larmorx:* reproduced (`parser::atof` mirrors C `atof`).
 
+**`atof` is glibc's `strtod`:** besides decimals it reads `inf`, `infinity`, `nan` (any
+case, with a sign) and hexadecimal floats (`0x40` is 64, `0x1.8p1` is 3). ThresholdImage
+reads its bounds this way. *Read; validated* (`range/nan-lower`, `range/hex`).
+*larmorx:* `parser::atof` reads them too (since 2026-10-10).
+
 **Values are `name[p1,p2,...]`.** The parameters are split at every comma up to the first
 `]`, without nesting. *Read.*
 

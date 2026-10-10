@@ -75,13 +75,26 @@ impl Parsed {
     }
 }
 
-/// C's `atof`: the number at the start of `s` (0 when there is none).
+/// C's `atof` (glibc's `strtod`): the number at the start of `s` (0 when there is none),
+/// including `inf`, `infinity`, `nan` (any case) and hexadecimal floats (`0x1.8p3`).
 pub fn atof(s: &str) -> f64 {
     let s = s.trim_start();
     let bytes = s.as_bytes();
     let mut end = 0;
     if matches!(bytes.first(), Some(b'+' | b'-')) {
         end = 1;
+    }
+    let negative = bytes.first() == Some(&b'-');
+    let sign = if negative { -1.0 } else { 1.0 };
+    let rest = s[end..].to_ascii_lowercase();
+    if rest.starts_with("inf") {
+        return sign * f64::INFINITY;
+    }
+    if rest.starts_with("nan") {
+        return if negative { -f64::NAN } else { f64::NAN };
+    }
+    if let Some(hex) = rest.strip_prefix("0x") {
+        return sign * hex_float(hex);
     }
     let digits_from = end;
     while bytes.get(end).is_some_and(u8::is_ascii_digit) {
@@ -113,6 +126,71 @@ pub fn atof(s: &str) -> f64 {
         }
     }
     s[..end].parse().unwrap_or(0.0)
+}
+
+/// The value of the hexadecimal float after `0x` (`strtod`): hex digits with an optional
+/// point, then an optional binary exponent `p±d`. Without a hex digit only the `0` counts.
+/// Exact for up to 28 significant hex digits.
+fn hex_float(s: &str) -> f64 {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    let mut mantissa: u128 = 0;
+    let mut exponent: i64 = 0;
+    let mut digits = 0;
+    let mut point = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == b'.' && !point {
+            point = true;
+        } else if let Some(d) = (c as char).to_digit(16) {
+            digits += 1;
+            if mantissa < (1u128 << 112) {
+                mantissa = mantissa * 16 + u128::from(d);
+                if point {
+                    exponent -= 4;
+                }
+            } else if !point {
+                exponent += 4;
+            }
+        } else {
+            break;
+        }
+        i += 1;
+    }
+    if digits == 0 {
+        return 0.0;
+    }
+    if matches!(bytes.get(i), Some(b'p' | b'P')) {
+        let mut j = i + 1;
+        let negative = bytes.get(j) == Some(&b'-');
+        if matches!(bytes.get(j), Some(b'+' | b'-')) {
+            j += 1;
+        }
+        let from = j;
+        let mut e: i64 = 0;
+        while let Some(d) = bytes.get(j).filter(|b| b.is_ascii_digit()) {
+            e = (e * 10 + i64::from(d - b'0')).min(100_000);
+            j += 1;
+        }
+        if j > from {
+            exponent += if negative { -e } else { e };
+        }
+    }
+    let exp = i32::try_from(exponent.clamp(-100_000, 100_000)).unwrap_or(0);
+    // Scale in steps that stay within the f64 exponent range.
+    let mut value = mantissa as f64;
+    let mut e = exp;
+    while e > 0 {
+        let step = e.min(1000);
+        value *= 2f64.powi(step);
+        e -= step;
+    }
+    while e < 0 {
+        let step = (-e).min(1000);
+        value /= 2f64.powi(step);
+        e += step;
+    }
+    value
 }
 
 /// ANTs' `RegroupCommandLineArguments`: joins bracketed values split across words.
@@ -309,5 +387,15 @@ mod tests {
         assert_eq!(atof("t"), 0.0);
         assert_eq!(atof("1e"), 1.0);
         assert_eq!(atof(".5"), 0.5);
+        // strtod also reads infinities, NaN and hexadecimal floats.
+        assert_eq!(atof("inf"), f64::INFINITY);
+        assert_eq!(atof("  -Infinity"), f64::NEG_INFINITY);
+        assert!(atof("nan").is_nan());
+        assert!(atof("-NaN(123)").is_sign_negative());
+        assert_eq!(atof("0x10"), 16.0);
+        assert_eq!(atof("0x1.8p1"), 3.0);
+        assert_eq!(atof("-0x.4P-2"), -0.0625);
+        assert_eq!(atof("0x"), 0.0);
+        assert_eq!(atof("0xg"), 0.0);
     }
 }

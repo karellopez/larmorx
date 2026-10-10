@@ -9,6 +9,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [afni-tshift](afni-tshift.md) | 3dTshift (AFNI 25.2.09 binary); also the GPL replica `larmorx-gpl` |
 | [resample-series](resample-series.md) | fMRIPrep's one-shot resampler (`resample_image`) |
 | [ants-programs](ants-programs.md) | ImageMath, ThresholdImage, MultiplyImages (ANTs 2.6.5 binaries) |
+| [ants-gaussian](ants-gaussian.md) | ImageMath `Laplacian`, `G`, `Grad`; SmoothImage; ResampleImageBySpacing; ResampleImage (ANTs 2.6.5 binaries) |
 | [mri-hmc](mri-hmc.md) | mcflirt (FSL 6.0.7.17 binary) |
 
 Reproduce a report (build larmorx in release mode first):
@@ -20,5 +21,6 @@ python -m larmorx_validation bench ants-apply-transforms --repeats 3 --threads 1
 python -m larmorx_validation bench afni-tshift --repeats 3 --threads 1 0 --out docs/benchmarks
 python -m larmorx_validation bench resample-series --repeats 3 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench ants-programs --repeats 5 --threads 1 4 0 --out docs/benchmarks
+python -m larmorx_validation bench ants-gaussian --repeats 5 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench mri-hmc --repeats 3 --threads 1 4 0 --out docs/benchmarks   # needs FSL
 ```

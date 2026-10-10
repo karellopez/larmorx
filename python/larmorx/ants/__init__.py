@@ -18,22 +18,38 @@ from larmorx.ants.image_math import (
     rescale_image,
     truncate_image_intensity,
 )
+from larmorx.ants.resample import PIXEL_TYPES, resample_image, resample_image_by_spacing
+from larmorx.ants.smoothing import (
+    discrete_gaussian,
+    gradient_magnitude,
+    laplacian,
+    smooth_image,
+    unsharp_mask,
+)
 from larmorx.ants.threshold import OtsuResult, multiply_images, otsu_threshold, threshold_image
 
 __all__ = [
+    "PIXEL_TYPES",
     "ImageMathError",
     "OtsuResult",
     "add_to_zero",
     "apply_transforms",
     "apply_transforms_to_points",
+    "discrete_gaussian",
+    "gradient_magnitude",
     "image_arithmetic",
     "image_math",
     "image_math_operations",
+    "laplacian",
     "multiply_images",
     "negative_image",
     "normalize_image",
     "otsu_threshold",
+    "resample_image",
+    "resample_image_by_spacing",
     "rescale_image",
+    "smooth_image",
     "threshold_image",
     "truncate_image_intensity",
+    "unsharp_mask",
 ]

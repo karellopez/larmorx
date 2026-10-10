@@ -1,0 +1,1337 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "30959407505d-dirty",
+  "larmorx_testdata_commit": "28167dea9be5",
+  "load_average_before": [
+   0.919921875,
+   2.263671875,
+   2.6923828125
+  ],
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 5,
+ "results": [
+  {
+   "best": 1.2236583027988672,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160\u00d7192\u00d7192 int16)",
+   "median": 1.2333454564213753,
+   "operation": "1",
+   "seconds": [
+    1.2339773010462523,
+    1.2333454564213753,
+    1.2578463666141033,
+    1.2236583027988672,
+    1.2254762277007103
+   ],
+   "throughput_mb_s": 19.129524398182316,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.25053488835692406,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160\u00d7192\u00d7192 int16)",
+   "median": 0.27652740478515625,
+   "operation": "12",
+   "seconds": [
+    0.25053488835692406,
+    0.27917044050991535,
+    0.3214495927095413,
+    0.27652740478515625,
+    0.2677692286670208
+   ],
+   "throughput_mb_s": 85.31997766489171,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.335633447393775,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160\u00d7192\u00d7192 int16)",
+   "median": 0.3507437724620104,
+   "operation": "1",
+   "seconds": [
+    0.335633447393775,
+    0.3388919811695814,
+    0.35773055627942085,
+    0.3507437724620104,
+    0.36097127199172974
+   ],
+   "throughput_mb_s": 67.26651719113681,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.14314161986112595,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160\u00d7192\u00d7192 int16)",
+   "median": 0.1455226130783558,
+   "operation": "4",
+   "seconds": [
+    0.15420920588076115,
+    0.14477707259356976,
+    0.14314161986112595,
+    0.1455226130783558,
+    0.14959348365664482
+   ],
+   "throughput_mb_s": 162.1281497144112,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.12115311436355114,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160\u00d7192\u00d7192 int16)",
+   "median": 0.127967381849885,
+   "operation": "12",
+   "seconds": [
+    0.15948012471199036,
+    0.13573959842324257,
+    0.127967381849885,
+    0.127336660400033,
+    0.12115311436355114
+   ],
+   "throughput_mb_s": 184.36973280954257,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.04954237677156925,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.051689449697732925,
+   "operation": "1",
+   "seconds": [
+    0.05312413163483143,
+    0.04954237677156925,
+    0.051689449697732925,
+    0.04984814673662186,
+    0.05768118053674698
+   ],
+   "throughput_mb_s": 10.783786696503515,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.029171572998166084,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.03079024702310562,
+   "operation": "12",
+   "seconds": [
+    0.03297005780041218,
+    0.03079024702310562,
+    0.031943799927830696,
+    0.029969334602355957,
+    0.029171572998166084
+   ],
+   "throughput_mb_s": 18.103394869866094,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.007025118917226791,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.00728951022028923,
+   "operation": "1",
+   "seconds": [
+    0.007261535152792931,
+    0.007376216351985931,
+    0.0073124803602695465,
+    0.00728951022028923,
+    0.007025118917226791
+   ],
+   "throughput_mb_s": 76.46714019942527,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.0038662534207105637,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.0039267465472221375,
+   "operation": "4",
+   "seconds": [
+    0.003943243995308876,
+    0.0038662534207105637,
+    0.0040314216166734695,
+    0.003912283107638359,
+    0.0039267465472221375
+   ],
+   "throughput_mb_s": 141.951611415899,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.0033415518701076508,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.0034467093646526337,
+   "operation": "12",
+   "seconds": [
+    0.0034467093646526337,
+    0.003430478274822235,
+    0.0036783237010240555,
+    0.0035549793392419815,
+    0.0033415518701076508
+   ],
+   "throughput_mb_s": 161.72178766113538,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.6092071235179901,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 1.6369459126144648,
+   "operation": "1",
+   "seconds": [
+    1.6092071235179901,
+    1.6415080446749926,
+    1.6181436963379383,
+    1.6369459126144648,
+    1.6377375684678555
+   ],
+   "throughput_mb_s": 20.843960534715652,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.37279836274683475,
+   "data_bytes": 34120436,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.38264171220362186,
+   "operation": "12",
+   "seconds": [
+    0.4096065126359463,
+    0.38264171220362186,
+    0.3824163470417261,
+    0.42390650510787964,
+    0.37279836274683475
+   ],
+   "throughput_mb_s": 89.17071744087035,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.503265731036663,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.5225322414189577,
+   "operation": "1",
+   "seconds": [
+    0.503265731036663,
+    0.5328244846314192,
+    0.5036458596587181,
+    0.5225322414189577,
+    0.5288606528192759
+   ],
+   "throughput_mb_s": 65.29824055898361,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.22276084311306477,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.23728037625551224,
+   "operation": "4",
+   "seconds": [
+    0.23728037625551224,
+    0.23248491622507572,
+    0.22276084311306477,
+    0.2384372055530548,
+    0.2551630958914757
+   ],
+   "throughput_mb_s": 143.7979682030589,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.19916614145040512,
+   "data_bytes": 34120436,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193\u00d7229\u00d7193)",
+   "median": 0.21819590590894222,
+   "operation": "12",
+   "seconds": [
+    0.19916614145040512,
+    0.21819590590894222,
+    0.22929693758487701,
+    0.22685161605477333,
+    0.2017542626708746
+   ],
+   "throughput_mb_s": 156.37523471333682,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.1888985391706228,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath Grad 1, raw T1w",
+   "median": 1.226877449080348,
+   "operation": "1",
+   "seconds": [
+    1.2536178417503834,
+    1.2308672368526459,
+    1.1888985391706228,
+    1.226877449080348,
+    1.2111210189759731
+   ],
+   "throughput_mb_s": 19.230373838630136,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.2405590508133173,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath Grad 1, raw T1w",
+   "median": 0.2530426140874624,
+   "operation": "12",
+   "seconds": [
+    0.2405590508133173,
+    0.2582335378974676,
+    0.28045056015253067,
+    0.2530426140874624,
+    0.2487305160611868
+   ],
+   "throughput_mb_s": 93.23849299092815,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.2994231414049864,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath Grad 1, raw T1w",
+   "median": 0.30645838379859924,
+   "operation": "1",
+   "seconds": [
+    0.31507267616689205,
+    0.3017598818987608,
+    0.30645838379859924,
+    0.3162408843636513,
+    0.2994231414049864
+   ],
+   "throughput_mb_s": 76.98700132643538,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.14289408177137375,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath Grad 1, raw T1w",
+   "median": 0.14703048951923847,
+   "operation": "4",
+   "seconds": [
+    0.14289408177137375,
+    0.14703048951923847,
+    0.17440647818148136,
+    0.14704662188887596,
+    0.14547024480998516
+   ],
+   "throughput_mb_s": 160.4654386797297,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.12448053620755672,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath Grad 1, raw T1w",
+   "median": 0.1300935596227646,
+   "operation": "12",
+   "seconds": [
+    0.12448053620755672,
+    0.13302122429013252,
+    0.12556927651166916,
+    0.15750584192574024,
+    0.1300935596227646
+   ],
+   "throughput_mb_s": 181.35649503644987,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.7014866471290588,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w",
+   "median": 0.7159941177815199,
+   "operation": "1",
+   "seconds": [
+    0.7425823025405407,
+    0.7159941177815199,
+    0.7061621639877558,
+    0.7014866471290588,
+    0.7282631732523441
+   ],
+   "throughput_mb_s": 32.95182378467433,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.2231266014277935,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w",
+   "median": 0.23223283514380455,
+   "operation": "12",
+   "seconds": [
+    0.25707499869167805,
+    0.23034456744790077,
+    0.2231266014277935,
+    0.23223283514380455,
+    0.2344930674880743
+   ],
+   "throughput_mb_s": 101.593351282089,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.11866023764014244,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w",
+   "median": 0.11890841461718082,
+   "operation": "1",
+   "seconds": [
+    0.12218610942363739,
+    0.11866023764014244,
+    0.11890841461718082,
+    0.11874822713434696,
+    0.1261402778327465
+   ],
+   "throughput_mb_s": 198.4158318480436,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.08011200278997421,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w",
+   "median": 0.08479402214288712,
+   "operation": "4",
+   "seconds": [
+    0.08011200278997421,
+    0.09269133768975735,
+    0.08541824854910374,
+    0.08301970176398754,
+    0.08479402214288712
+   ],
+   "throughput_mb_s": 278.2426331922634,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.05995503067970276,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w",
+   "median": 0.061939461156725883,
+   "operation": "12",
+   "seconds": [
+    0.06297372095286846,
+    0.06021886132657528,
+    0.061939461156725883,
+    0.05995503067970276,
+    0.0745923388749361
+   ],
+   "throughput_mb_s": 380.9092226408245,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.43742325343191624,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "SmoothImage 3 sigma 1 voxel, raw T1w",
+   "median": 0.44221137277781963,
+   "operation": "1",
+   "seconds": [
+    0.4407497178763151,
+    0.45480677112936974,
+    0.44221137277781963,
+    0.4508566651493311,
+    0.43742325343191624
+   ],
+   "throughput_mb_s": 53.35301951144977,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.13264446705579758,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "SmoothImage 3 sigma 1 voxel, raw T1w",
+   "median": 0.13439225405454636,
+   "operation": "12",
+   "seconds": [
+    0.15193341486155987,
+    0.13439225405454636,
+    0.16054596938192844,
+    0.13345537334680557,
+    0.13264446705579758
+   ],
+   "throughput_mb_s": 175.5555940777962,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.1167143601924181,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "SmoothImage 3 sigma 1 voxel, raw T1w",
+   "median": 0.11872006021440029,
+   "operation": "1",
+   "seconds": [
+    0.11830217950046062,
+    0.1167143601924181,
+    0.11872006021440029,
+    0.11963948421180248,
+    0.13638411276042461
+   ],
+   "throughput_mb_s": 198.73062696727155,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.07568276859819889,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "SmoothImage 3 sigma 1 voxel, raw T1w",
+   "median": 0.07884520292282104,
+   "operation": "4",
+   "seconds": [
+    0.07719643041491508,
+    0.07568276859819889,
+    0.07884520292282104,
+    0.08096154034137726,
+    0.08150945603847504
+   ],
+   "throughput_mb_s": 299.23585868749313,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.061644360423088074,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "SmoothImage 3 sigma 1 voxel, raw T1w",
+   "median": 0.06342023983597755,
+   "operation": "12",
+   "seconds": [
+    0.06342023983597755,
+    0.061644360423088074,
+    0.06275464408099651,
+    0.06510264240205288,
+    0.07181239314377308
+   ],
+   "throughput_mb_s": 372.0154963308069,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.938669789582491,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "SmoothImage 3 median radius 1, raw T1w",
+   "median": 1.9989313520491123,
+   "operation": "1",
+   "seconds": [
+    1.938669789582491,
+    1.998527029529214,
+    2.004726517945528,
+    1.9989313520491123,
+    2.014777209609747
+   ],
+   "throughput_mb_s": 11.8029626059016,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.34878737293183804,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "SmoothImage 3 median radius 1, raw T1w",
+   "median": 0.36076261289417744,
+   "operation": "12",
+   "seconds": [
+    0.34883294999599457,
+    0.40256310626864433,
+    0.34878737293183804,
+    0.36076261289417744,
+    0.3845391310751438
+   ],
+   "throughput_mb_s": 65.39843974054105,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.2510110270231962,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "SmoothImage 3 median radius 1, raw T1w",
+   "median": 1.262191291898489,
+   "operation": "1",
+   "seconds": [
+    1.2629803363233805,
+    1.2640333361923695,
+    1.2510110270231962,
+    1.255059165880084,
+    1.262191291898489
+   ],
+   "throughput_mb_s": 18.692342556501714,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.37033829651772976,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "SmoothImage 3 median radius 1, raw T1w",
+   "median": 0.38147659972310066,
+   "operation": "4",
+   "seconds": [
+    0.37033829651772976,
+    0.3882384654134512,
+    0.37607260048389435,
+    0.38147659972310066,
+    0.3936007637530565
+   ],
+   "throughput_mb_s": 61.84733747004531,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.2506638076156378,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "SmoothImage 3 median radius 1, raw T1w",
+   "median": 0.25887085124850273,
+   "operation": "12",
+   "seconds": [
+    0.25970815122127533,
+    0.2506638076156378,
+    0.2715186793357134,
+    0.2516607642173767,
+    0.25887085124850273
+   ],
+   "throughput_mb_s": 91.1393147826892,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.824681095778942,
+   "data_bytes": 90505312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 1.8362412080168724,
+   "operation": "1",
+   "seconds": [
+    1.824681095778942,
+    1.8362412080168724,
+    1.851960375905037,
+    1.8287291396409273,
+    1.838182669132948
+   ],
+   "throughput_mb_s": 49.28835689170983,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.516388114541769,
+   "data_bytes": 90505312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.5239341426640749,
+   "operation": "12",
+   "seconds": [
+    0.5239341426640749,
+    0.5179465655237436,
+    0.516388114541769,
+    0.5499984603375196,
+    0.5298436544835567
+   ],
+   "throughput_mb_s": 172.7417715894654,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.6354028675705194,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.6412878558039665,
+   "operation": "1",
+   "seconds": [
+    0.6479745674878359,
+    0.6354028675705194,
+    0.6369006801396608,
+    0.6524952482432127,
+    0.6412878558039665
+   ],
+   "throughput_mb_s": 141.13055655254186,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.3651794381439686,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.3760764542967081,
+   "operation": "4",
+   "seconds": [
+    0.37014320120215416,
+    0.3651794381439686,
+    0.38388268649578094,
+    0.3760764542967081,
+    0.4081493504345417
+   ],
+   "throughput_mb_s": 240.65668287915526,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.31764888018369675,
+   "data_bytes": 90505312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)",
+   "median": 0.337417833507061,
+   "operation": "12",
+   "seconds": [
+    0.337417833507061,
+    0.33739485405385494,
+    0.31764888018369675,
+    0.34379738196730614,
+    0.35262160934507847
+   ],
+   "throughput_mb_s": 268.22918948682667,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.488408463075757,
+   "data_bytes": 5161632,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w",
+   "median": 0.4958756919950247,
+   "operation": "1",
+   "seconds": [
+    0.4958756919950247,
+    0.48907197266817093,
+    0.5087229404598475,
+    0.488408463075757,
+    0.49777176044881344
+   ],
+   "throughput_mb_s": 10.409124874085961,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.135535828769207,
+   "data_bytes": 5161632,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w",
+   "median": 0.15110800974071026,
+   "operation": "12",
+   "seconds": [
+    0.15110800974071026,
+    0.1411475520581007,
+    0.135535828769207,
+    0.1541326306760311,
+    0.15266228467226028
+   ],
+   "throughput_mb_s": 34.15855988611698,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.14557973854243755,
+   "data_bytes": 5161632,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w",
+   "median": 0.14883769117295742,
+   "operation": "1",
+   "seconds": [
+    0.14557973854243755,
+    0.15992260724306107,
+    0.14883769117295742,
+    0.15971313789486885,
+    0.148293299600482
+   ],
+   "throughput_mb_s": 34.6796027224173,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.08618173934519291,
+   "data_bytes": 5161632,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w",
+   "median": 0.08749578148126602,
+   "operation": "4",
+   "seconds": [
+    0.0892972070723772,
+    0.08618173934519291,
+    0.0868041068315506,
+    0.09307948499917984,
+    0.08749578148126602
+   ],
+   "throughput_mb_s": 58.99292414577921,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.07819191552698612,
+   "data_bytes": 5161632,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w",
+   "median": 0.07963462546467781,
+   "operation": "12",
+   "seconds": [
+    0.0861914400011301,
+    0.11036267690360546,
+    0.07963462546467781,
+    0.07819191552698612,
+    0.07955518551170826
+   ],
+   "throughput_mb_s": 64.81642840512207,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.6024924609810114,
+   "data_bytes": 1245536,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ResampleImageBySpacing 3 to 3 mm, MNI 1 mm",
+   "median": 0.6288572568446398,
+   "operation": "1",
+   "seconds": [
+    0.6398166250437498,
+    0.6288572568446398,
+    0.6067126132547855,
+    0.6024924609810114,
+    0.640781220048666
+   ],
+   "throughput_mb_s": 1.9806338981434568,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.18464532494544983,
+   "data_bytes": 1245536,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ResampleImageBySpacing 3 to 3 mm, MNI 1 mm",
+   "median": 0.19284461624920368,
+   "operation": "12",
+   "seconds": [
+    0.18646783195436,
+    0.19401893578469753,
+    0.19284461624920368,
+    0.205550204962492,
+    0.18464532494544983
+   ],
+   "throughput_mb_s": 6.458754328876128,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.24280002526938915,
+   "data_bytes": 1245536,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ResampleImageBySpacing 3 to 3 mm, MNI 1 mm",
+   "median": 0.2521148808300495,
+   "operation": "1",
+   "seconds": [
+    0.24990556202828884,
+    0.2695403639227152,
+    0.2521148808300495,
+    0.24280002526938915,
+    0.28741217590868473
+   ],
+   "throughput_mb_s": 4.9403509856271235,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.15751149505376816,
+   "data_bytes": 1245536,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ResampleImageBySpacing 3 to 3 mm, MNI 1 mm",
+   "median": 0.16144977323710918,
+   "operation": "4",
+   "seconds": [
+    0.1688146758824587,
+    0.16144977323710918,
+    0.15751149505376816,
+    0.17025738395750523,
+    0.1602123286575079
+   ],
+   "throughput_mb_s": 7.714696496790829,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.14190118573606014,
+   "data_bytes": 1245536,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ResampleImageBySpacing 3 to 3 mm, MNI 1 mm",
+   "median": 0.1484000589698553,
+   "operation": "12",
+   "seconds": [
+    0.1484000589698553,
+    0.14190118573606014,
+    0.14274702221155167,
+    0.1501745879650116,
+    0.15818794816732407
+   ],
+   "throughput_mb_s": 8.393096395285175,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.42760876938700676,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+   "median": 0.43088039569556713,
+   "operation": "1",
+   "seconds": [
+    0.44031480327248573,
+    0.4441744275391102,
+    0.4284521844238043,
+    0.43088039569556713,
+    0.42760876938700676
+   ],
+   "throughput_mb_s": 10.045692594142155,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.41783346235752106,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+   "median": 0.4335126467049122,
+   "operation": "12",
+   "seconds": [
+    0.41783346235752106,
+    0.4185986462980509,
+    0.45998305827379227,
+    0.4335126467049122,
+    0.4445441849529743
+   ],
+   "throughput_mb_s": 9.984696024211635,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.09059781394898891,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+   "median": 0.0912195984274149,
+   "operation": "1",
+   "seconds": [
+    0.09059781394898891,
+    0.0912195984274149,
+    0.09111426770687103,
+    0.09304212778806686,
+    0.09483309462666512
+   ],
+   "throughput_mb_s": 47.45133803065643,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.07055529579520226,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+   "median": 0.07572151720523834,
+   "operation": "4",
+   "seconds": [
+    0.07469724304974079,
+    0.07055529579520226,
+    0.07572151720523834,
+    0.08121703378856182,
+    0.07849789038300514
+   ],
+   "throughput_mb_s": 57.16330258238089,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.06958972290158272,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+   "median": 0.06980207189917564,
+   "operation": "12",
+   "seconds": [
+    0.07111337967216969,
+    0.06980207189917564,
+    0.0696998331695795,
+    0.06958972290158272,
+    0.07885831408202648
+   ],
+   "throughput_mb_s": 62.01093867603547,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.073783652856946,
+   "data_bytes": 20971872,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+   "median": 3.165585560724139,
+   "operation": "1",
+   "seconds": [
+    3.073783652856946,
+    3.165585560724139,
+    3.3397568594664335,
+    3.1630010660737753,
+    3.166349107399583
+   ],
+   "throughput_mb_s": 6.624958194212451,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.9431195128709078,
+   "data_bytes": 20971872,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+   "median": 0.9466416705399752,
+   "operation": "12",
+   "seconds": [
+    0.9466416705399752,
+    0.9431195128709078,
+    0.946303628385067,
+    0.9747136197984219,
+    0.9603690858930349
+   ],
+   "throughput_mb_s": 22.153970876897283,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.4766529686748981,
+   "data_bytes": 20971872,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+   "median": 1.4915899392217398,
+   "operation": "1",
+   "seconds": [
+    1.4924336113035679,
+    1.483612522482872,
+    1.506301799789071,
+    1.4766529686748981,
+    1.4915899392217398
+   ],
+   "throughput_mb_s": 14.060078744525725,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.4747118894010782,
+   "data_bytes": 20971872,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+   "median": 0.48192028515040874,
+   "operation": "4",
+   "seconds": [
+    0.48062022775411606,
+    0.48192028515040874,
+    0.49862668849527836,
+    0.5046289972960949,
+    0.4747118894010782
+   ],
+   "throughput_mb_s": 43.51730492825098,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.3190907631069422,
+   "data_bytes": 20971872,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+   "median": 0.334021745249629,
+   "operation": "12",
+   "seconds": [
+    0.32090899720788,
+    0.334021745249629,
+    0.3190907631069422,
+    0.34508421272039413,
+    0.3643583804368973
+   ],
+   "throughput_mb_s": 62.78594821521816,
+   "tool": "larmorx"
+  },
+  {
+   "best": 7.047836342826486,
+   "data_bytes": 6439148,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+   "median": 7.052280846983194,
+   "operation": "1",
+   "seconds": [
+    7.071352064609528,
+    7.047836342826486,
+    7.052280846983194,
+    7.051643759012222,
+    7.113400923088193
+   ],
+   "throughput_mb_s": 0.9130589294036017,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.1780404802411795,
+   "data_bytes": 6439148,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+   "median": 1.2082410771399736,
+   "operation": "12",
+   "seconds": [
+    1.1784790363162756,
+    1.2082410771399736,
+    1.1780404802411795,
+    1.22674853913486,
+    1.2250466514378786
+   ],
+   "throughput_mb_s": 5.329356965119993,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.7947104554623365,
+   "data_bytes": 6439148,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+   "median": 1.8043692391365767,
+   "operation": "1",
+   "seconds": [
+    1.8044027369469404,
+    1.8032706249505281,
+    1.8083503190428019,
+    1.7947104554623365,
+    1.8043692391365767
+   ],
+   "throughput_mb_s": 3.5686420829703622,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.46805934607982635,
+   "data_bytes": 6439148,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+   "median": 0.47205185145139694,
+   "operation": "4",
+   "seconds": [
+    0.5048179551959038,
+    0.47161196917295456,
+    0.47205185145139694,
+    0.46805934607982635,
+    0.4817357026040554
+   ],
+   "throughput_mb_s": 13.640764208850864,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.31308055482804775,
+   "data_bytes": 6439148,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+   "median": 0.32896645925939083,
+   "operation": "12",
+   "seconds": [
+    0.31443191692233086,
+    0.34099592082202435,
+    0.32896645925939083,
+    0.31308055482804775,
+    0.3290447648614645
+   ],
+   "throughput_mb_s": 19.57387392774507,
+   "tool": "larmorx"
+  }
+ ]
+}

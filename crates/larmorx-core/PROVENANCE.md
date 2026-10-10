@@ -31,7 +31,8 @@ netlib):
 - `v3p/netlib/blas/{dnrm2,ddot,daxpy,dscal,dswap,drot,drotg}.c`.
 
 It is bit-exact with `itk::Matrix::GetInverse` on 2,000 random matrices
-(`docs/findings/itk-transforms.md`).
+(`docs/findings/itk-transforms.md`). `vnl_inverse` is the same inverse for any `n × n` matrix
+(2D and 4D image geometries); it equals `vnl_inverse3` bit for bit in 3D.
 
 ## Integer powers (`src/math/powi.rs`)
 

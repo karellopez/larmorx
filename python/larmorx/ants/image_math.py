@@ -15,8 +15,8 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
-from larmorx.ants._filters import float_input, mask_input, result
-from larmorx.image import Image, as_image
+from larmorx.ants._filters import float_input, mask_input, memory_image, result
+from larmorx.image import Image
 
 __all__ = [
     "ARITHMETIC",
@@ -50,13 +50,8 @@ def _operand(value: Any, index: int, inputs: dict[str, Any]) -> str:
         return repr(float(value)) if isinstance(value, (float, np.floating)) else str(int(value))
     if isinstance(value, (str, os.PathLike)):
         return os.fspath(value)
-    img = as_image(value)
-    data = np.asarray(img.data)
-    if data.dtype not in (np.float32, np.float64):
-        data = data.astype(np.float64)
-    descrip = None if img.header is None else img.header.descrip.split(b"\x00", 1)[0][:79]
     name = f"lx-input-{index}.nii.gz"
-    inputs[name] = (data, np.asarray(img.affine, dtype=np.float64), descrip)
+    inputs[name] = memory_image(value)
     return name
 
 

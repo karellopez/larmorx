@@ -55,7 +55,7 @@ class Job:
 #: The benchmark jobs; add new ones here.
 JOBS: list[Job] = [
     Job(
-        "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176×256×256 int16)",
+        "TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (160×192×192 int16)",
         "ImageMath",
         ("3", "{out}", "TruncateImageIntensity", T1_RAW, "0.01", "0.999", "256"),
     ),
@@ -182,9 +182,34 @@ def run_jobs(
     return results
 
 
-def render(results: list[Measurement], env: dict, repeats: int, command: str) -> str:
+#: The notes of the ``ants-programs`` report.
+NOTES = [
+    "- **Where the time goes.** These programs do little arithmetic per voxel, so reading "
+    "the gzipped inputs dominates: gzip decompression is sequential (zlib-rs in larmorx, "
+    "zlib in ITK). For the 28 MB BOLD series it is about 200 ms of larmorx's 390 ms on one "
+    "thread. The operations themselves run in parallel, and so does larmorx's conversion of "
+    "the voxels to the program's pixel type.",
+    "- **ANTs' threads** help where ITK filters do the work (the label statistics behind "
+    "`TruncateImageIntensity`, the Otsu labeller); ImageMath's own voxel loops are "
+    "single-threaded.",
+    "- **Determinism.** larmorx's results do not depend on the thread count; the "
+    "order-dependent steps of ANTs (running sums, the histogram range of "
+    "`TruncateImageIntensity`, the carried value of `/`) run in image order.",
+]
+
+TITLE = "ANTs image programs (ImageMath, ThresholdImage, MultiplyImages)"
+
+
+def render(
+    results: list[Measurement],
+    env: dict,
+    repeats: int,
+    command: str,
+    title: str = TITLE,
+    notes: list[str] | None = None,
+) -> str:
     lines = [
-        "# Benchmarks: ANTs image programs (ImageMath, ThresholdImage, MultiplyImages)",
+        f"# Benchmarks: {title}",
         "",
         "larmorx against ANTs 2.6.5's own binaries on real images, as fMRIPrep uses these "
         f"programs. Median of {repeats} runs after a warm-up.",
@@ -238,17 +263,7 @@ def render(results: list[Measurement], env: dict, repeats: int, command: str) ->
     lines += [
         "## Notes",
         "",
-        "- **Where the time goes.** These programs do little arithmetic per voxel, so reading "
-        "the gzipped inputs dominates: gzip decompression is sequential (zlib-rs in larmorx, "
-        "zlib in ITK). For the 28 MB BOLD series it is about 200 ms of larmorx's 390 ms on one "
-        "thread. The operations themselves run in parallel, and so does larmorx's conversion of "
-        "the voxels to the program's pixel type.",
-        "- **ANTs' threads** help where ITK filters do the work (the label statistics behind "
-        "`TruncateImageIntensity`, the Otsu labeller); ImageMath's own voxel loops are "
-        "single-threaded.",
-        "- **Determinism.** larmorx's results do not depend on the thread count; the "
-        "order-dependent steps of ANTs (running sums, the histogram range of "
-        "`TruncateImageIntensity`, the carried value of `/`) run in image order.",
+        *(NOTES if notes is None else notes),
         "",
         "## Environment",
         "",
@@ -258,33 +273,44 @@ def render(results: list[Measurement], env: dict, repeats: int, command: str) ->
     return "\n".join(lines)
 
 
-def main(args: argparse.Namespace) -> int:
+def run_suite(
+    args: argparse.Namespace,
+    name: str,
+    jobs: list[Job],
+    title: str = TITLE,
+    notes: list[str] | None = None,
+) -> int:
+    """Time ``jobs`` and write ``<name>.md`` and ``<name>.json`` (to ``args.out``)."""
     repeats = 2 if args.quick else args.repeats
     threads = [t if t > 0 else os.cpu_count() or 1 for t in args.threads]
     ants_threads = sorted({1, max(threads)})
     load_before = os.getloadavg() if hasattr(os, "getloadavg") else None
-    results = run_jobs(JOBS, threads, ants_threads, repeats, args.quick)
+    results = run_jobs(jobs, threads, ants_threads, repeats, args.quick)
     env_info = environment.describe(("nibabel",))
     env_info["load_average_before"] = load_before
-    command = "python -m larmorx_validation bench ants-programs" + (
+    command = f"python -m larmorx_validation bench {name}" + (
         " --quick"
         if args.quick
         else f" --repeats {repeats} --threads {' '.join(map(str, args.threads))}"
     )
-    report = render(results, env_info, repeats, command)
+    report = render(results, env_info, repeats, command, title, notes)
     if args.out:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
-        (out / "ants-programs.md").write_text(report, encoding="utf-8")
+        (out / f"{name}.md").write_text(report, encoding="utf-8")
         write_json(
-            out / "ants-programs.json",
+            out / f"{name}.json",
             {
                 "environment": env_info,
                 "repeats": repeats,
                 "results": [m.to_dict() for m in results],
             },
         )
-        print(f"report: {out / 'ants-programs.md'}", file=sys.stderr)
+        print(f"report: {out / (name + '.md')}", file=sys.stderr)
     else:
         print(report)
     return 0
+
+
+def main(args: argparse.Namespace) -> int:
+    return run_suite(args, "ants-programs", JOBS)

@@ -1,0 +1,598 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "30959407505d-dirty",
+  "larmorx_testdata_commit": "28167dea9be5",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "ResampleImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`",
+ "results": [
+  {
+   "case": "spacing/single-2mm",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.141,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/vector",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/upsample",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.108,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/explicit-mode",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/non-integer-size",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/tiny",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/negative-pixdim",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/las-sform-only",
+   "category": "spacing",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "size/size",
+   "category": "size",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "size/size-single",
+   "category": "size",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "size/size-upsample",
+   "category": "size",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.114,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/nearest",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/gaussian-default",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/gaussian-sigma-uchar",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/gaussian-sigma-float",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/sinc",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.108,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/sinc-window-6",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.381,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/sinc-lanczos",
+   "category": "interpolation",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ResampleImage: 'l' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.013,
+   "status": "both-error"
+  },
+  {
+   "case": "interpolation/bspline",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/bspline-5-uint",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.154,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/bspline-0-char",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/bspline-7-double",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/type-5-linear",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/bspline-scaled-int16",
+   "category": "interpolation",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/char-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/uchar-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/short-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/ushort-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.036,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/int-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/uint-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/float-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/double-scaled-int16",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/char-outliers",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/uchar-outliers",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/ushort-outliers",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "pixel-type/uint-outliers",
+   "category": "pixel-type",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim2",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim2-nearest",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim2-size",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim2-bspline",
+   "category": "dimensions",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "larmorx supports Gaussian, windowed-sinc and B-spline interpolation in 3D only (2D and 4D images are resampled with linear or nearest-neighbour interpolation); ANTs runs them in any dimension.",
+   "seconds": 0.018,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "dimensions/dim4",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim4-nearest-size",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/dim3-of-4d",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "real/T1w-2mm",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.848,
+   "status": "pass"
+  },
+  {
+   "case": "real/T1w-bspline-ushort",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.672,
+   "status": "pass"
+  },
+  {
+   "case": "real/boldref-sinc",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.052,
+   "status": "pass"
+  },
+  {
+   "case": "real/mni-bspline",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.986,
+   "status": "pass"
+  },
+  {
+   "case": "real/gm-gaussian",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.325,
+   "status": "pass"
+  },
+  {
+   "case": "errors/help",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "errors/too-few-arguments",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: 7  :  double; larmorx exit 1: 7  :  double",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/pixel-type-8",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Unsupported pixel type; larmorx exit 1: Unsupported pixel type",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/pixel-type-negative",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Unsupported pixel type; larmorx exit 1: Unsupported pixel type",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/dimension-5",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: Unsupported dimension; larmorx exit 1: Unsupported dimension",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/invalid-spacing",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: Size: [0, 96, 18446744071562067968]; larmorx exit 1: larmorx: ResampleImage: the output spacing is left uninitialised (ANTs crashes here)",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/zero-spacing",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: Refusing to change spacing from [1.5, 1.2, 2] to [0, 0, 0]; larmorx exit 1: larmorx: ResampleImage: an output size of inf voxels along axis 0",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/size-1",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs computes the spacing old\u00b7(n - 1)/(1 - 1), infinite, and writes a 1 x 1 x 1 image of value 0 with infinite spacing (vnl's SVD fails on the grid matrix); larmorx refuses a size below 2.",
+   "seconds": 0.024,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/missing-input",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: ResampleImage: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here)",
+   "seconds": 0.014,
+   "status": "both-error"
+  }
+ ],
+ "suite": "ants-resample-image",
+ "summary": {
+  "both-error": 8,
+  "expected-divergence": 2,
+  "fail": 0,
+  "pass": 47,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

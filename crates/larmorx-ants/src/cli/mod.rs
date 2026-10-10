@@ -13,6 +13,9 @@ pub mod cstd;
 pub mod image_math;
 pub mod multiply_images;
 pub mod parser;
+pub mod resample_image;
+pub mod resample_image_by_spacing;
+pub mod smooth_image;
 pub mod threshold_image;
 
 use std::io::Write;
@@ -43,6 +46,9 @@ pub const TOOLS: &[&str] = &[
     "antsApplyTransforms",
     "ImageMath",
     "MultiplyImages",
+    "ResampleImage",
+    "ResampleImageBySpacing",
+    "SmoothImage",
     "ThresholdImage",
 ];
 
@@ -59,6 +65,9 @@ pub fn run(
         "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
         "ImageMath" => Some(image_math::main(args, out, err)),
         "MultiplyImages" => Some(multiply_images::main(args, out, err)),
+        "ResampleImage" => Some(resample_image::main(args, out, err)),
+        "ResampleImageBySpacing" => Some(resample_image_by_spacing::main(args, out, err)),
+        "SmoothImage" => Some(smooth_image::main(args, out, err)),
         "ThresholdImage" => Some(threshold_image::main(args, out, err)),
         _ => None,
     }

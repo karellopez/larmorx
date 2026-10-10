@@ -16,7 +16,9 @@
 //! [`register`] below. Then add the stubs to `python/larmorx/_core.pyi` and the wrapper to
 //! `python/larmorx/ants/`.
 
+mod gaussian;
 mod image_math;
+mod resample;
 mod threshold;
 
 use std::collections::HashMap;
@@ -90,11 +92,13 @@ impl ImageStore for MemoryStore {
 }
 
 /// An in-memory image (`data`, RAS+ `affine`, `descrip`) as ITK's reader would give it: the
-/// spatial geometry from the affine (LPS), further axes with spacing 1 and origin 0.
+/// spatial geometry from the affine (LPS); further axes with the spacings in `extra` (default
+/// 1, as for a time axis without a header) and origin 0.
 fn itk_image_from_py(
     data: &Bound<'_, PyAny>,
     affine: PyReadonlyArray2<'_, f64>,
     descrip: Option<Vec<u8>>,
+    extra: Option<Vec<f64>>,
 ) -> PyResult<ItkImage> {
     let (shape, voxels) = if let Ok(a) = data.extract::<PyReadonlyArrayDyn<'_, f32>>() {
         (
@@ -136,7 +140,16 @@ fn itk_image_from_py(
             flipped: vec![false; 2],
         };
     } else if shape.len() == 4 {
-        geometry = geometry.with_axis(shape[3], 1.0, 0.0);
+        let t = extra
+            .as_ref()
+            .and_then(|e| e.first().copied())
+            .unwrap_or(1.0);
+        if !(t.is_finite() && t > 0.0) {
+            return Err(PyValueError::new_err(format!(
+                "the spacing of the fourth axis must be positive, not {t}"
+            )));
+        }
+        geometry = geometry.with_axis(shape[3], t, 0.0);
     }
     Ok(ItkImage {
         geometry: geometry.stored_in_new_image(),
@@ -149,8 +162,32 @@ fn itk_image_from_py(
     })
 }
 
+/// [`itk_image_from_py`] from a `(data, ras_affine, descrip)` or
+/// `(data, ras_affine, descrip, extra_spacing)` tuple.
+pub(crate) fn itk_image_from_tuple(value: &Bound<'_, PyAny>) -> PyResult<ItkImage> {
+    let message = "an in-memory image is a (data, affine, descrip[, spacing]) tuple";
+    let tuple = value
+        .cast::<PyTuple>()
+        .map_err(|_| PyValueError::new_err(message))?;
+    if !(3..=4).contains(&tuple.len()) {
+        return Err(PyValueError::new_err(message));
+    }
+    let data = tuple.get_item(0)?;
+    let affine: PyReadonlyArray2<'_, f64> = tuple.get_item(1)?.extract()?;
+    let descrip: Option<Vec<u8>> = tuple.get_item(2)?.extract()?;
+    let extra: Option<Vec<f64>> = if tuple.len() == 4 {
+        tuple.get_item(3)?.extract()?
+    } else {
+        None
+    };
+    itk_image_from_py(&data, affine, descrip, extra)
+}
+
 /// An output image as `(data, ras_affine, descrip)`.
-fn output_to_py<'py>(py: Python<'py>, image: OutputImage) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn output_to_py<'py>(
+    py: Python<'py>,
+    image: OutputImage,
+) -> PyResult<Bound<'py, PyTuple>> {
     let g = image.geometry().clone();
     let affine = affine_to_py(py, &g.ras_affine());
     let shape = g.size.clone();
@@ -159,6 +196,10 @@ fn output_to_py<'py>(py: Python<'py>, image: OutputImage) -> PyResult<Bound<'py,
         OutputImage::F64(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
         OutputImage::I32(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
         OutputImage::U8(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::I8(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::I16(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::U16(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::U32(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
     };
     PyTuple::new(
         py,
@@ -170,9 +211,12 @@ fn output_to_py<'py>(py: Python<'py>, image: OutputImage) -> PyResult<Bound<'py,
     )
 }
 
-/// Runs ANTs program `program` (`ImageMath`, `ThresholdImage`, `MultiplyImages`) with
-/// `args` (after the program name). `inputs` maps placeholder names to
-/// `(data, ras_affine, descrip)`; writes to the names in `outputs` are returned instead of
+/// Runs ANTs program `program` (`ImageMath`, `ThresholdImage`, `MultiplyImages`,
+/// `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`) with `args` (after the program
+/// name). `inputs`
+/// maps placeholder names to `(data, ras_affine, descrip)` or
+/// `(data, ras_affine, descrip, extra_spacing)` (the spacing of the axes after the third,
+/// such as the repetition time); writes to the names in `outputs` are returned instead of
 /// written. Returns `(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})`.
 #[pyfunction]
 #[pyo3(signature = (program, args, inputs, outputs, n_threads = 1))]
@@ -191,14 +235,7 @@ fn ants_program<'py>(
     };
     for (name, value) in inputs.iter() {
         let name: String = name.extract()?;
-        let (data, affine, descrip): (
-            Bound<'_, PyAny>,
-            PyReadonlyArray2<'_, f64>,
-            Option<Vec<u8>>,
-        ) = value.extract()?;
-        store
-            .inputs
-            .insert(name, itk_image_from_py(&data, affine, descrip)?);
+        store.inputs.insert(name, itk_image_from_tuple(&value)?);
     }
     type Run = fn(
         &[String],
@@ -211,6 +248,9 @@ fn ants_program<'py>(
         "ImageMath" => larmorx_ants::cli::image_math::run,
         "ThresholdImage" => larmorx_ants::cli::threshold_image::run,
         "MultiplyImages" => larmorx_ants::cli::multiply_images::run,
+        "SmoothImage" => larmorx_ants::cli::smooth_image::run,
+        "ResampleImage" => larmorx_ants::cli::resample_image::run,
+        "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         other => {
             return Err(PyValueError::new_err(format!(
                 "unknown ANTs image program {other:?}"
@@ -273,5 +313,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ants_read_float, m)?)?;
     image_math::register(m)?;
     threshold::register(m)?;
+    gaussian::register(m)?;
+    resample::register(m)?;
     Ok(())
 }

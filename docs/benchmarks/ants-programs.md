@@ -7,7 +7,7 @@ larmorx against ANTs 2.6.5's own binaries on real images, as fMRIPrep uses these
 - **Same result:** every larmorx output is compared with ANTs' (all values).
 - **Machine load** before the run (1, 5, 15 min): 1.29, 1.31, 1.81; no other benchmark ran meanwhile.
 
-## TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (176×256×256 int16)
+## TruncateImageIntensity 0.01 0.999 256 (fMRIPrep's call), raw T1w ds000005 (160×192×192 int16)
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|

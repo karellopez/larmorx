@@ -20,8 +20,9 @@ T1w and MNI152NLin2009cAsym space through fMRIPrep's own transforms. The behavio
 on is in [fmriprep-resampling.md](../findings/fmriprep-resampling.md) and
 [scipy-ndimage.md](../findings/scipy-ndimage.md).
 
-**Speed:** 4–5× faster than fMRIPrep's implementation on one thread and with all threads, with
-memory bounded by the thread count ([benchmarks](../benchmarks/resample-series.md)).
+**Speed:** 4.1–5.2× faster than fMRIPrep's implementation on one thread and 4.8–6.9× on 12
+threads, bit-identical, with memory bounded by the thread count
+([benchmarks](../benchmarks/resample-series.md)).
 
 ## Quick start
 
@@ -149,5 +150,6 @@ function. A `larmorx` subcommand can follow if a standalone use appears.
   products, which x86-64 and aarch64 OpenBLAS both use).
 - **Not covered yet:** `ReconstructFieldmap` (B-spline field maps reconstructed on the target
   grid; the field map here is given in Hz), multi-echo (each echo resampled separately, as
-  fMRIPrep does today), CIFTI and surfaces, X5 and non-ITK transform formats (FSL, AFNI, LTA),
-  and complex data.
+  fMRIPrep does today; sharing one coordinate mapping between echoes is planned), per-volume
+  readout times in the Python API, CIFTI and surfaces, X5 and non-ITK transform formats (FSL,
+  AFNI, LTA), and complex data.

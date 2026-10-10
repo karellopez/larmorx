@@ -1,0 +1,551 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "46225a79652d",
+  "larmorx_testdata_commit": "28167dea9be5",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "fmriprep": "26.0.0.dev1+g21a490fb8",
+   "nibabel": "5.4.2",
+   "nitransforms": "25.1.0",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "load_average": "3.24 3.24 2.55",
+ "repeats": 3,
+ "results": [
+  {
+   "best": 20.83732220903039,
+   "data_bytes": 133693440,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 21.152676593512297,
+   "operation": "1 threads",
+   "seconds": [
+    20.83732220903039,
+    21.152676593512297,
+    21.629511702805758
+   ],
+   "throughput_mb_s": 6.320402971650638,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 7.098196506500244,
+   "data_bytes": 133693440,
+   "extra": {
+    "threads": 4
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 7.6632773745805025,
+   "operation": "4 threads",
+   "seconds": [
+    7.984518200159073,
+    7.6632773745805025,
+    7.098196506500244
+   ],
+   "throughput_mb_s": 17.445987332191347,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 5.245946325361729,
+   "data_bytes": 133693440,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 5.246752804145217,
+   "operation": "12 threads",
+   "seconds": [
+    5.245946325361729,
+    5.297873767092824,
+    5.246752804145217
+   ],
+   "throughput_mb_s": 25.481177595097485,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 4.5486993584781885,
+   "data_bytes": 133693440,
+   "extra": {
+    "differing": 0,
+    "threads": 1,
+    "values": 33423360
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 4.568166606128216,
+   "operation": "1 threads",
+   "seconds": [
+    4.674218591302633,
+    4.568166606128216,
+    4.5486993584781885
+   ],
+   "throughput_mb_s": 29.26632312855001,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.386881921440363,
+   "data_bytes": 133693440,
+   "extra": {
+    "differing": 0,
+    "threads": 4,
+    "values": 33423360
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 1.4075363669544458,
+   "operation": "4 threads",
+   "seconds": [
+    1.4150452427566051,
+    1.386881921440363,
+    1.4075363669544458
+   ],
+   "throughput_mb_s": 94.98400406468996,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.9212493356317282,
+   "data_bytes": 133693440,
+   "extra": {
+    "differing": 0,
+    "threads": 12,
+    "values": 33423360
+   },
+   "input": "ds000005 run 1 \u2192 boldref (native): 64\u00d764\u00d734, 240 volumes; motion + field map",
+   "median": 0.9321546778082848,
+   "operation": "12 threads",
+   "seconds": [
+    0.9324495159089565,
+    0.9321546778082848,
+    0.9212493356317282
+   ],
+   "throughput_mb_s": 143.42409385783998,
+   "tool": "larmorx"
+  },
+  {
+   "best": 14.358980329707265,
+   "data_bytes": 90504960,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 14.394414097070694,
+   "operation": "1 threads",
+   "seconds": [
+    16.116338660940528,
+    14.394414097070694,
+    14.358980329707265
+   ],
+   "throughput_mb_s": 6.287505652516835,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 4.68577085249126,
+   "data_bytes": 90504960,
+   "extra": {
+    "threads": 4
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 4.72582676820457,
+   "operation": "4 threads",
+   "seconds": [
+    4.882693108171225,
+    4.72582676820457,
+    4.68577085249126
+   ],
+   "throughput_mb_s": 19.15113787261917,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 3.493442013859749,
+   "data_bytes": 90504960,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 3.495013417676091,
+   "operation": "12 threads",
+   "seconds": [
+    3.5160373970866203,
+    3.495013417676091,
+    3.493442013859749
+   ],
+   "throughput_mb_s": 25.89545423267035,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 3.5002262461930513,
+   "data_bytes": 90504960,
+   "extra": {
+    "differing": 0,
+    "threads": 1,
+    "values": 22626240
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 3.515618532896042,
+   "operation": "1 threads",
+   "seconds": [
+    3.529817445203662,
+    3.5002262461930513,
+    3.515618532896042
+   ],
+   "throughput_mb_s": 25.74368042298526,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.0396292991936207,
+   "data_bytes": 90504960,
+   "extra": {
+    "differing": 0,
+    "threads": 4,
+    "values": 22626240
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 1.0824990775436163,
+   "operation": "4 threads",
+   "seconds": [
+    1.0824990775436163,
+    1.102203395217657,
+    1.0396292991936207
+   ],
+   "throughput_mb_s": 83.60742459510627,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.7159181647002697,
+   "data_bytes": 90504960,
+   "extra": {
+    "differing": 0,
+    "threads": 12,
+    "values": 22626240
+   },
+   "input": "ds000005 run 1 \u2192 T1w grid: motion + boldref\u2192T1w affine + field map",
+   "median": 0.7319345064461231,
+   "operation": "12 threads",
+   "seconds": [
+    0.7319345064461231,
+    0.7392396032810211,
+    0.7159181647002697
+   ],
+   "throughput_mb_s": 123.65171911274273,
+   "tool": "larmorx"
+  },
+  {
+   "best": 155.00657058134675,
+   "data_bytes": 1038753600,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 155.00657058134675,
+   "operation": "1 threads",
+   "seconds": [
+    155.00657058134675
+   ],
+   "throughput_mb_s": 6.701352053040015,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 60.802412962540984,
+   "data_bytes": 1038753600,
+   "extra": {
+    "threads": 4
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 60.802412962540984,
+   "operation": "4 threads",
+   "seconds": [
+    60.802412962540984
+   ],
+   "throughput_mb_s": 17.084085143791135,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 42.52508991584182,
+   "data_bytes": 1038753600,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 42.52508991584182,
+   "operation": "12 threads",
+   "seconds": [
+    42.52508991584182
+   ],
+   "throughput_mb_s": 24.426840767549663,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 29.818332647904754,
+   "data_bytes": 1038753600,
+   "extra": {
+    "differing": 0,
+    "threads": 1,
+    "values": 259688400
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 29.9022377692163,
+   "operation": "1 threads",
+   "seconds": [
+    29.959298592060804,
+    29.818332647904754,
+    29.9022377692163
+   ],
+   "throughput_mb_s": 34.738323198987274,
+   "tool": "larmorx"
+  },
+  {
+   "best": 9.130823608487844,
+   "data_bytes": 1038753600,
+   "extra": {
+    "differing": 0,
+    "threads": 4,
+    "values": 259688400
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 9.36147790402174,
+   "operation": "4 threads",
+   "seconds": [
+    9.36147790402174,
+    9.909819116815925,
+    9.130823608487844
+   ],
+   "throughput_mb_s": 110.96042854021437,
+   "tool": "larmorx"
+  },
+  {
+   "best": 6.869426103308797,
+   "data_bytes": 1038753600,
+   "extra": {
+    "differing": 0,
+    "threads": 12,
+    "values": 259688400
+   },
+   "input": "ds000005 run 1 \u2192 MNI152NLin2009cAsym res-2 (97\u00d7115\u00d797): motion + affine + .h5 warp",
+   "median": 6.878745444118977,
+   "operation": "12 threads",
+   "seconds": [
+    6.916263036429882,
+    6.869426103308797,
+    6.878745444118977
+   ],
+   "throughput_mb_s": 151.0091641620622,
+   "tool": "larmorx"
+  },
+  {
+   "best": 45.60462359152734,
+   "data_bytes": 287428608,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 46.20241063274443,
+   "operation": "1 threads",
+   "seconds": [
+    45.60462359152734,
+    46.20241063274443,
+    46.833004392683506
+   ],
+   "throughput_mb_s": 6.221073837136421,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 18.394974829629064,
+   "data_bytes": 287428608,
+   "extra": {
+    "threads": 4
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 18.78806882724166,
+   "operation": "4 threads",
+   "seconds": [
+    18.394974829629064,
+    18.78806882724166,
+    20.367181269451976
+   ],
+   "throughput_mb_s": 15.29846471411923,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 12.63289986923337,
+   "data_bytes": 287428608,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 12.956209313124418,
+   "operation": "12 threads",
+   "seconds": [
+    12.956209313124418,
+    12.979494884610176,
+    12.63289986923337
+   ],
+   "throughput_mb_s": 22.18462214166606,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 9.130952028557658,
+   "data_bytes": 287428608,
+   "extra": {
+    "differing": 0,
+    "threads": 1,
+    "values": 71857152
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 9.14733874425292,
+   "operation": "1 threads",
+   "seconds": [
+    9.251286420971155,
+    9.130952028557658,
+    9.14733874425292
+   ],
+   "throughput_mb_s": 31.422101666518618,
+   "tool": "larmorx"
+  },
+  {
+   "best": 2.6263257525861263,
+   "data_bytes": 287428608,
+   "extra": {
+    "differing": 0,
+    "threads": 4,
+    "values": 71857152
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 2.6620552465319633,
+   "operation": "4 threads",
+   "seconds": [
+    2.860674601048231,
+    2.6263257525861263,
+    2.6620552465319633
+   ],
+   "throughput_mb_s": 107.97244286137652,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.8229347951710224,
+   "data_bytes": 287428608,
+   "extra": {
+    "differing": 0,
+    "threads": 12,
+    "values": 71857152
+   },
+   "input": "ds006010 sub-206 \u2192 native: 96\u00d796\u00d769, 113 volumes (uint16); motion + field map",
+   "median": 1.8787255436182022,
+   "operation": "12 threads",
+   "seconds": [
+    1.880519738420844,
+    1.8787255436182022,
+    1.8229347951710224
+   ],
+   "throughput_mb_s": 152.991270585722,
+   "tool": "larmorx"
+  },
+  {
+   "best": 409.2526057641953,
+   "data_bytes": 2752512000,
+   "extra": {
+    "threads": 1
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 409.2526057641953,
+   "operation": "1 threads",
+   "seconds": [
+    409.2526057641953
+   ],
+   "throughput_mb_s": 6.725704274650245,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 162.55821298621595,
+   "data_bytes": 2752512000,
+   "extra": {
+    "threads": 4
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 162.55821298621595,
+   "operation": "4 threads",
+   "seconds": [
+    162.55821298621595
+   ],
+   "throughput_mb_s": 16.93246960234115,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 108.71076854504645,
+   "data_bytes": 2752512000,
+   "extra": {
+    "threads": 12
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 108.71076854504645,
+   "operation": "12 threads",
+   "seconds": [
+    108.71076854504645
+   ],
+   "throughput_mb_s": 25.319589189174415,
+   "tool": "fMRIPrep"
+  },
+  {
+   "best": 85.49397810921073,
+   "data_bytes": 2752512000,
+   "extra": {
+    "differing": 0,
+    "threads": 1,
+    "values": 688128000
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 86.4370233323425,
+   "operation": "1 threads",
+   "seconds": [
+    89.55920175276697,
+    85.49397810921073,
+    86.4370233323425
+   ],
+   "throughput_mb_s": 31.844132223489943,
+   "tool": "larmorx"
+  },
+  {
+   "best": 25.388873936608434,
+   "data_bytes": 2752512000,
+   "extra": {
+    "differing": 0,
+    "threads": 4,
+    "values": 688128000
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 26.267482064664364,
+   "operation": "4 threads",
+   "seconds": [
+    26.267482064664364,
+    25.388873936608434,
+    26.330960573628545
+   ],
+   "throughput_mb_s": 104.78781305432942,
+   "tool": "larmorx"
+  },
+  {
+   "best": 16.652124231681228,
+   "data_bytes": 2752512000,
+   "extra": {
+    "differing": 0,
+    "threads": 12,
+    "values": 688128000
+   },
+   "input": "ds005454 sub-16 rest \u2192 native: 160\u00d7160\u00d796, 280 volumes (multiband 4); motion + field map",
+   "median": 16.682630494236946,
+   "operation": "12 threads",
+   "seconds": [
+    16.652124231681228,
+    16.702833406627178,
+    16.682630494236946
+   ],
+   "throughput_mb_s": 164.9926851134695,
+   "tool": "larmorx"
+  }
+ ]
+}

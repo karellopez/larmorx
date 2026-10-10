@@ -148,8 +148,15 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 ## Faster and better
 
 - **Faster with the same results.** Rust, multithreading, data kept in memory, and no
-  wasted work. So far: `antsApplyTransforms` 1.1–21× faster than ANTs, mostly
-  bit-identical; `3dTshift` 2–3× faster on one thread, 5.6–6.2× on 12.
+  wasted work. So far, measured on this project's development machine (6 cores):
+  - fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`): 4.1–5.2× faster
+    on one thread and 4.8–6.9× on 12 threads, bit-identical; a 280-volume multiband run
+    takes 16.7 s on 12 threads instead of fMRIPrep's 409 s on one or 109 s on 12;
+  - `antsApplyTransforms`: 1.1–21× faster than ANTs, mostly bit-identical;
+  - `3dTshift`: the clean-room original 2–3× faster on one thread and 5.6–6.2× on 12; the
+    bit-exact replica 1.7–2.2× and 3.4–4.5×;
+  - ANTs' `ImageMath`, `ThresholdImage`, `MultiplyImages`: 1.1–2.7× on one thread, up to
+    5× with threads, bit-identical.
 - **Planned gains** (PLAN.md G5, §7):
   - the pipeline at least 2× faster than fMRIPrep, with at least 5× less scratch disk;
   - head-motion correction parallel over volumes;

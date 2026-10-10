@@ -63,6 +63,8 @@ FD_R = 0.99
 #: largest FD reaches this, and reported otherwise.
 FD_MIN_MM = 0.5
 IMAGE_NCC = 0.999
+#: sform/qform agreement of output images (mm).
+XFORM_ATOL = 1e-4
 #: The synthetic ground truth: larmorx may not be worse than mcflirt by more than this.
 TRUTH_SLACK_MM = 0.05
 
@@ -73,6 +75,9 @@ TRUTH_SLACK_MM = 0.05
 DEGENERATE: dict[str, int | None] = {
     "syn/content/ramp/reffile": 3,
     "syn/content/ramp/reffile-smooth0": None,
+    # Woods' criterion does not register BOLD volumes: mcflirt's matrices are off by tens of
+    # millimetres (spec §14), and so are larmorx's, differently.
+    "real/ds000005/opt-cost-woods": None,
 }
 DEGENERATE_MM = 0.3
 
@@ -264,12 +269,14 @@ def _compare_image(checks: CheckList, name: str, a_path: Path, b_path: Path) -> 
         for k in HEADER_FIELDS
         if not np.array_equal(np.asarray(ha[k]), np.asarray(hb[k]), equal_nan=True)
     ]
+    # mcflirt writes the qform quaternion back from its own matrix: its last float32 bits
+    # differ, which moves the qform by up to ~1e-5 mm where the quaternion's w is small.
     for label, fa, fb in [
         ("sform", ha.get_sform(), hb.get_sform()),
         ("qform", ha.get_qform(), hb.get_qform()),
     ]:
-        if not np.allclose(fa, fb, atol=1e-6):
-            differing.append(f"{label} differs")
+        if not np.allclose(fa, fb, atol=XFORM_ATOL):
+            differing.append(f"{label} differs by {np.abs(fa - fb).max():.2g}")
     checks(
         f"{name}: header (type, shape, voxel sizes, units, xforms)",
         not differing,
@@ -299,19 +306,20 @@ def _text_numbers(path: Path) -> np.ndarray:
     return np.array([[float(x) for x in r] for r in rows])
 
 
-def _thresholds(case: str) -> tuple[float, float, float, str]:
-    """``(p95 RMS mm, median mm, median deg, source)``: the spec's thresholds, widened to
+def _thresholds(case: str) -> tuple[float, float, float, float, str]:
+    """``(p95 RMS mm, median mm, median deg, FD r, source)``: the spec's thresholds, widened to
     mcflirt's own variability for this case where that is larger."""
     from larmorx_validation.parity.mri_hmc_band import band_for
 
     band = band_for(case)
     if band is None:
-        return P95_RMS_MM, MEDIAN_MM, MEDIAN_DEG, "spec"
+        return P95_RMS_MM, MEDIAN_MM, MEDIAN_DEG, FD_R, "spec"
     p95 = max(P95_RMS_MM, band["rms_p95"])
     mm = max(MEDIAN_MM, band["param_mm_median"])
     deg = max(MEDIAN_DEG, band["param_deg_median"])
-    widened = (p95, mm, deg) != (P95_RMS_MM, MEDIAN_MM, MEDIAN_DEG)
-    return p95, mm, deg, "band" if widened else "spec"
+    fd_r = min(FD_R, band["fd_r"])
+    widened = (p95, mm, deg, fd_r) != (P95_RMS_MM, MEDIAN_MM, MEDIAN_DEG, FD_R)
+    return p95, mm, deg, fd_r, "band" if widened else "spec"
 
 
 def _compare_degenerate(
@@ -361,7 +369,7 @@ def _compare_run(
         detail=f"mcflirt {sorted(theirs)}; larmorx {sorted(ours)}",
     )
     centre = _fov_centre(reference)
-    p95_max, mm_max, deg_max, source = _thresholds(case)
+    p95_max, mm_max, deg_max, fd_min, source = _thresholds(case)
     is_degenerate = case in DEGENERATE
     degenerate = DEGENERATE.get(case)
     mat_dirs = [k for k in theirs if k.endswith(".mat") or ".mat+" in k]
@@ -439,12 +447,14 @@ def _compare_run(
             needed = fd_max >= FD_MIN_MM
             checks(
                 "FD (Power, 50 mm) correlation",
-                r > FD_R or not needed,
+                r >= fd_min or not needed,
                 metric="r",
                 value=f"{r:.4f}",
-                threshold=f"> {FD_R}"
-                if needed
-                else f"reported (max FD {fd_max:.3f} mm < {FD_MIN_MM})",
+                threshold=(
+                    f"≥ {fd_min:.4g} ({source})"
+                    if needed
+                    else f"reported (max FD {fd_max:.3f} mm < {FD_MIN_MM})"
+                ),
                 detail=f"max |ΔFD| {fd_diff:.4f} mm, max FD {fd_max:.3f} mm",
             )
             metrics.update(fd_r=r, fd_max_diff=fd_diff, fd_max=fd_max)
@@ -732,7 +742,10 @@ def suite() -> Suite:
             ("Exit status and files written", "the same (errors: both reject)"),
             ("Matrix RMS deviation (radius 80 mm), 95th percentile per run", f"≤ {P95_RMS_MM} mm"),
             ("Median parameter difference per run", f"≤ {MEDIAN_MM} mm and ≤ {MEDIAN_DEG}°"),
-            ("FD (Power, 50 mm) correlation", f"> {FD_R} where the largest FD is ≥ {FD_MIN_MM} mm"),
+            (
+                "FD (Power, 50 mm) correlation",
+                f"≥ {FD_R} where the largest FD is ≥ {FD_MIN_MM} mm (band: mcflirt's own, if lower)",
+            ),
             (
                 "Thresholds marked *band*",
                 "widened to mcflirt's own deviation under small perturbations of that run's input "

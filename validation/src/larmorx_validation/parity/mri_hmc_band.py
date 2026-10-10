@@ -17,6 +17,8 @@ Usage (needs FSL; black-box runs of the binary)::
     python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt \\
         [--cases real/ds000005/fmriprep ...] [--out <oracle>/band]
 
+Without ``--mcflirt`` the finished runs are only summarised again.
+
 Each run is recorded like the oracle runs (``run.json``: argv, environment, exit status, wall
 time, input SHA-256); ``band.json`` summarises the deviations per case and perturbation.
 """
@@ -41,6 +43,7 @@ from larmorx_validation.parity.mri_hmc import (
     _read_mats,
     _resolve,
     decompose,
+    framewise_displacement,
     oracle_dir,
     rms_deviation,
 )
@@ -114,7 +117,8 @@ def _perturb(
     return new, (new_ref if new_ref is not None else reference)
 
 
-def run_band(mcflirt: str, cases: list[str], out_root: Path) -> dict[str, Any]:
+def run_band(mcflirt: str, cases: list[str], out_root: Path) -> None:
+    """Runs mcflirt on the perturbed inputs of every case (black-box runs)."""
     root = oracle_dir()
     if root is None:
         raise SystemExit("the recorded mcflirt runs were not found (LARMORX_MCFLIRT_ORACLE)")
@@ -124,14 +128,11 @@ def run_band(mcflirt: str, cases: list[str], out_root: Path) -> dict[str, Any]:
         "FSLDIR": str(Path(mcflirt).resolve().parents[1]),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
     }
-    summary = []
     for name in cases:
         run = json.loads((root / "runs" / name / "run.json").read_text(encoding="utf-8"))
         argv = run["steps"][0]["argv"][1:]
         series = Path(_resolve(run["inputs"]["in"]["path"]))
         reference = Path(_resolve(run["inputs"]["ref"]["path"])) if "ref" in run["inputs"] else None
-        oracle_mats, _ = _read_mats(root / "runs" / name / "out_mcf.nii.gz.mat")
-        centre = _fov_centre(reference or series)
         for kind in PERTURBATIONS:
             out = out_root / name / kind
             out.mkdir(parents=True, exist_ok=True)
@@ -173,68 +174,100 @@ def run_band(mcflirt: str, cases: list[str], out_root: Path) -> dict[str, Any]:
                 },
             }
             (out / "run.json").write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
-            if p.returncode != 0:
-                continue
-            mats, _ = _read_mats(out / "out_mcf.nii.gz.mat")
-            if kind == "reverse":
-                mats = mats[::-1]
-            idx = [
-                i
-                for i in range(min(len(mats), len(oracle_mats)))
-                if np.isfinite(mats[i]).all() and np.isfinite(oracle_mats[i]).all()
-            ]
-            devs = np.array([rms_deviation(oracle_mats[i], mats[i], centre) for i in idx])
-            pa = np.array([decompose(oracle_mats[i], centre) for i in idx])
-            pb = np.array([decompose(mats[i], centre) for i in idx])
-            summary.append(
-                {
-                    "case": name,
-                    "dataset": name.split("/")[1] if name.startswith("real/") else name,
-                    "perturbation": kind,
-                    "volumes": len(idx),
-                    "rms_median": float(np.median(devs)),
-                    "rms_p95": float(np.percentile(devs, 95)),
-                    "rms_max": float(devs.max()),
-                    "param_mm_median": float(np.median(np.abs(pa[:, 3:] - pb[:, 3:]))),
-                    "param_deg_median": float(np.median(np.degrees(np.abs(pa[:, :3] - pb[:, :3])))),
-                    "wall_s": round(wall, 3),
-                }
-            )
-            print(f"{name} {kind}: p95 {summary[-1]['rms_p95']:.4f} mm", file=sys.stderr)
+            print(f"{name} {kind}: exit {p.returncode}, {wall:.1f} s", file=sys.stderr)
+
+
+def summarise(out_root: Path) -> dict[str, Any]:
+    """Compares every finished band run with mcflirt's unperturbed run; writes ``band.json``."""
+    root = oracle_dir()
+    assert root is not None
+    summary = []
+    for record_path in sorted(out_root.glob("**/run.json")):
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if record.get("exit") != 0:
+            continue
+        name, kind = record["name"].removeprefix("band/").rsplit("/", 1)
+        run = json.loads((root / "runs" / name / "run.json").read_text(encoding="utf-8"))
+        ref_arg = run["inputs"].get("ref", run["inputs"]["in"])["path"]
+        centre = _fov_centre(Path(_resolve(ref_arg)))
+        oracle_mats, _ = _read_mats(root / "runs" / name / "out_mcf.nii.gz.mat")
+        mats, _ = _read_mats(record_path.parent / "out_mcf.nii.gz.mat")
+        if kind == "reverse":
+            mats = mats[::-1]
+        idx = [
+            i
+            for i in range(min(len(mats), len(oracle_mats)))
+            if np.isfinite(mats[i]).all() and np.isfinite(oracle_mats[i]).all()
+        ]
+        devs = np.array([rms_deviation(oracle_mats[i], mats[i], centre) for i in idx])
+        pa = np.array([decompose(oracle_mats[i], centre) for i in idx])
+        pb = np.array([decompose(mats[i], centre) for i in idx])
+        fa, fb = framewise_displacement(pa), framewise_displacement(pb)
+        fd_r = float(np.corrcoef(fa, fb)[0, 1]) if fa.std() > 0 and fb.std() > 0 else 1.0
+        summary.append(
+            {
+                "case": name,
+                "dataset": name.split("/")[1] if name.startswith("real/") else name,
+                "perturbation": kind,
+                "volumes": len(idx),
+                "rms_median": float(np.median(devs)),
+                "rms_p95": float(np.percentile(devs, 95)),
+                "rms_max": float(devs.max()),
+                "param_mm_median": float(np.median(np.abs(pa[:, 3:] - pb[:, 3:]))),
+                "param_deg_median": float(np.median(np.degrees(np.abs(pa[:, :3] - pb[:, :3])))),
+                "fd_r": fd_r,
+                "fd_max_diff": float(np.abs(fa - fb).max()),
+                "wall_s": record.get("wall_s"),
+            }
+        )
     band = {
         "generated_by": "larmorx_validation.parity.mri_hmc_band",
-        "mcflirt": mcflirt,
         "updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "threshold_perturbations": list(THRESHOLD_PERTURBATIONS),
         "runs": summary,
     }
     (out_root / "band.json").write_text(json.dumps(band, indent=1) + "\n", encoding="utf-8")
     return band
 
 
+#: The perturbations that set the parity thresholds: those that leave the geometry unchanged.
+#: Cropping a slice changes the problem more (thin images can fail outright) and is reported.
+THRESHOLD_PERTURBATIONS = ("noise", "reverse")
+
+
 def band_for(case: str) -> dict[str, float] | None:
-    """The worst deviations of mcflirt from itself for ``case`` (over the perturbations)."""
+    """mcflirt's worst deviations from itself for ``case`` under the threshold perturbations
+    (the lowest FD correlation for ``fd_r``)."""
     root = oracle_dir()
     path = None if root is None else root / "band" / "band.json"
     if path is None or not path.is_file():
         return None
-    runs = [b for b in json.loads(path.read_text(encoding="utf-8"))["runs"] if b["case"] == case]
+    runs = [
+        b
+        for b in json.loads(path.read_text(encoding="utf-8"))["runs"]
+        if b["case"] == case and b["perturbation"] in THRESHOLD_PERTURBATIONS
+    ]
     if not runs:
         return None
-    return {
+    worst = {
         k: max(b[k] for b in runs)
         for k in ("rms_median", "rms_p95", "rms_max", "param_mm_median", "param_deg_median")
     }
+    worst["fd_r"] = min(b.get("fd_r", 1.0) for b in runs)
+    return worst
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m larmorx_validation.parity.mri_hmc_band")
-    parser.add_argument("--mcflirt", required=True)
+    parser.add_argument("--mcflirt", help="the mcflirt binary (omit to only summarise)")
     parser.add_argument("--cases", nargs="+", default=list(DEFAULT_CASES))
     parser.add_argument("--out", help="output directory (default: <oracle>/band)")
     args = parser.parse_args(argv)
     root = oracle_dir()
     out = Path(args.out) if args.out else (root / "band" if root else Path("band"))
-    run_band(args.mcflirt, args.cases, out)
+    if args.mcflirt:
+        run_band(args.mcflirt, args.cases, out)
+    summarise(out)
     return 0
 
 

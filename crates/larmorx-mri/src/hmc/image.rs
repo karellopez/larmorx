@@ -321,6 +321,15 @@ pub fn write_like(
     let d = descrip.as_bytes();
     h.descrip[..d.len().min(79)].copy_from_slice(&d[..d.len().min(79)]);
     h.extensions.clear();
+    // A qform quaternion whose (b, c, d) is not shorter than 1 is normalised, as the NIfTI
+    // standard reads it and as mcflirt writes it back (observed on ds000122).
+    let q2 = h.quatern_b * h.quatern_b + h.quatern_c * h.quatern_c + h.quatern_d * h.quatern_d;
+    if 1.0 - q2 < 1e-7 && q2 > 0.0 {
+        let s = 1.0 / q2.sqrt();
+        h.quatern_b *= s;
+        h.quatern_c *= s;
+        h.quatern_d *= s;
+    }
     let nt = volumes.len();
     let shape: Vec<usize> = if nt > 1 {
         vec![shape3[0], shape3[1], shape3[2], nt]

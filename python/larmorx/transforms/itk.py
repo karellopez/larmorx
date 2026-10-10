@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""ITK transform files: ``lx.transforms``.
+"""ITK transform files (``lx.transforms.read`` / ``write``).
 
 Transforms are kept in ITK's stored form: a class name, parameters and fixed parameters
 (:class:`ItkTransform`). A file holds a list of them. When the first is a

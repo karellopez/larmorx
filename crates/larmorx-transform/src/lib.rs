@@ -5,10 +5,16 @@
 //! ITK's matrix-offset family (affine, Euler, versor rigid, similarity, translation),
 //! [`DisplacementField`] dense deformations, and [`Transform::Composite`] ITK's composite
 //! transforms. [`TransformChain`] is what `antsApplyTransforms` builds from its `-t` options.
+//!
+//! Two modules follow other conventions: [`nitransforms`] maps **RAS** points as nitransforms
+//! does (fMRIPrep's transforms), and [`resample_series`] is fMRIPrep's one-shot BOLD resampler
+//! built on it and on SciPy-compatible interpolation (`larmorx_interp::ndimage`).
 #![forbid(unsafe_code)]
 
 pub mod field;
 pub mod linear;
+pub mod nitransforms;
+pub mod resample_series;
 
 pub use field::{DisplacementField, FieldData};
 pub use linear::{LinearKind, LinearTransform};

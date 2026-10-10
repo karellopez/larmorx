@@ -471,7 +471,8 @@ fn write_outputs(
         .flatten()
         .map(|v| Volume::new(shape, voxel, v.data.clone()))
         .collect();
-    let write = |path: &str, vols: &[Volume], dt: DataType| {
+    // Only the corrected series gets cal_min/cal_max (§10.1); the others keep 0.
+    let write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
         image::write_like(
             Path::new(path),
             &series.header,
@@ -480,29 +481,24 @@ fn write_outputs(
             vols,
             dt,
             DESCRIP,
+            cal,
             n_threads,
         )
         .map_err(|e| e.to_string())
     };
     let stem = image::strip_image_extension(out_name);
     let data_type = output_type(series.stored, &series.header);
-    write(&format!("{stem}{ext}"), &corrected, data_type)?;
+    write(&format!("{stem}{ext}"), &corrected, data_type, true)?;
     if o.stats {
         let [m, variance, sigma] = stats::temporal(&corrected);
-        write(&format!("{out_name}_meanvol{ext}"), &[m], DataType::F32)?;
-        write(
-            &format!("{out_name}_variance{ext}"),
-            &[variance],
-            DataType::F32,
-        )?;
-        write(&format!("{out_name}_sigma{ext}"), &[sigma], DataType::F32)?;
+        for (suffix, vol) in [("meanvol", m), ("variance", variance), ("sigma", sigma)] {
+            let path = format!("{out_name}_{suffix}{ext}");
+            write(&path, std::slice::from_ref(&vol), DataType::F32, false)?;
+        }
     }
     if let Some(m) = &est.mean {
-        write(
-            &format!("{out_name}_mean_reg{ext}"),
-            std::slice::from_ref(m),
-            DataType::F32,
-        )?;
+        let path = format!("{out_name}_mean_reg{ext}");
+        write(&path, std::slice::from_ref(m), DataType::F32, false)?;
     }
     Ok(())
 }

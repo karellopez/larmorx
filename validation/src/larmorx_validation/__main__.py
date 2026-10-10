@@ -22,6 +22,7 @@ PARITY_MODULES = {
     "ants-apply-transforms": "ants_apply_transforms",
     "afni-tshift": "afni_tshift",
     "resample-series": "resample_series",
+    "mri-hmc": "mri_hmc",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",
     "ants-multiply-images": "ants_multiply_images",
@@ -33,6 +34,7 @@ BENCH_MODULES = {
     "ants-apply-transforms": "ants_apply_transforms",
     "afni-tshift": "afni_tshift",
     "resample-series": "resample_series",
+    "mri-hmc": "mri_hmc",
     "ants-programs": "ants_programs",
 }
 BENCH_SUITES = tuple(BENCH_MODULES)

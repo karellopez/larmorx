@@ -260,9 +260,10 @@ fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + 
         .collect()
 }
 
-/// Writes a corrected series (or any float32 image on the input's grid) like the input:
-/// the input's header with `scl_slope = 1`, `scl_inter = 0`, `cal_min`/`cal_max` from the
-/// float32 data, the slice fields cleared, units mm and s, little-endian; the data flipped
+/// Writes a corrected series (or any float32 image on the input's grid) like the input
+/// (§10.1): the input's header with `scl_slope = 1`, `scl_inter = 0`, `cal_min`/`cal_max` from
+/// the float32 data (with `cal`; else 0), the slice fields cleared, units mm and s,
+/// little-endian, 3D for a single volume (the other `pixdim` entries kept); the data flipped
 /// back to storage order and converted to `data_type`.
 #[allow(clippy::too_many_arguments)]
 pub fn write_like(
@@ -273,6 +274,7 @@ pub fn write_like(
     volumes: &[Volume],
     data_type: DataType,
     descrip: &str,
+    cal: bool,
     n_threads: usize,
 ) -> Result<(), ImageError> {
     let Some(first) = volumes.first() else {
@@ -300,8 +302,15 @@ pub fn write_like(
     h.byte_order = larmorx_io::nifti::ByteOrder::Little;
     h.scl_slope = 1.0;
     h.scl_inter = 0.0;
-    h.cal_min = f64::from(if lo.is_finite() { lo } else { 0.0 });
-    h.cal_max = f64::from(if hi.is_finite() { hi } else { 0.0 });
+    let finite = |v: f32| {
+        if cal && v.is_finite() {
+            f64::from(v)
+        } else {
+            0.0
+        }
+    };
+    h.cal_min = finite(lo);
+    h.cal_max = finite(hi);
     h.dim_info = 0;
     h.slice_code = 0;
     h.slice_start = 0;
@@ -313,11 +322,23 @@ pub fn write_like(
     h.descrip[..d.len().min(79)].copy_from_slice(&d[..d.len().min(79)]);
     h.extensions.clear();
     let nt = volumes.len();
-    let shape: Vec<usize> = if template.dim[0] >= 4 || nt > 1 {
+    let shape: Vec<usize> = if nt > 1 {
         vec![shape3[0], shape3[1], shape3[2], nt]
     } else {
         shape3.to_vec()
     };
+    if version == NiftiVersion::V1 && shape.iter().any(|&n| n > i16::MAX as usize) {
+        return Err(ImageError::Invalid(format!(
+            "{}: a dimension of {shape:?} is too large for NIfTI-1",
+            path.display()
+        )));
+    }
+    // Set the dimensions here so that writing keeps the other pixdim entries (the TR).
+    h.dim = [1; 8];
+    h.dim[0] = shape.len() as i64;
+    for (k, &n) in shape.iter().enumerate() {
+        h.dim[k + 1] = n as i64;
+    }
     let options = WriteOptions {
         compression_level: 2,
         n_threads,

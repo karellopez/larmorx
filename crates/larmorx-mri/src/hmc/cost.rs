@@ -147,14 +147,6 @@ impl<'a> TestVolume<'a> {
         let w = axis(0) * axis(1) * axis(2);
         if w < 0.0 { 0.0 } else { w }
     }
-
-    #[inline(always)]
-    fn value(&self, p: [f32; 3]) -> f32 {
-        match self.interpolation {
-            CostInterpolation::Trilinear => trilinear_inside(self.vol, p[0], p[1], p[2]),
-            CostInterpolation::Sinc { background } => sinc_cost(self.vol, p, background),
-        }
-    }
 }
 
 /// The admissible grid points of one row (§6.1): the x range where the row's positions
@@ -194,19 +186,21 @@ pub trait Accumulator: Send {
     fn end_row(&mut self);
 }
 
-/// Visits the contributing points of grid slice `z` (§6.1).
+/// Visits the contributing points of grid slice `z` (§6.1), interpolating the test volume
+/// with `value` and weighting with `weight` (both inlined, so the loop has no dispatch).
 #[inline(always)]
-fn sample_slice<A: Accumulator>(
+fn sample_slice<A: Accumulator, V: Fn([f32; 3]) -> f32, W: Fn([f32; 3]) -> f32>(
     grid: &Volume,
     test: &TestVolume<'_>,
     b: &[[f32; 4]; 3],
     z: usize,
     acc: &mut A,
+    value: &V,
+    weight: &W,
 ) {
     let [gx, gy, _] = grid.shape;
     let step = [b[0][0], b[1][0], b[2][0]];
     let zf = z as f32;
-    let weighted = test.weighted();
     for y in 0..gy {
         let yf = y as f32;
         let row0 = [0, 1, 2].map(|k| yf * b[k][1] + zf * b[k][2] + b[k][3]);
@@ -221,8 +215,7 @@ fn sample_slice<A: Accumulator>(
                 x += 1;
             }
             while x <= x1 && test.inside(p) {
-                let w = if weighted { test.weight(p) } else { 1.0 };
-                acc.point(grow[x], test.value(p), w);
+                acc.point(grow[x], value(p), weight(p));
                 p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
                 x += 1;
             }
@@ -242,9 +235,28 @@ pub fn sample<A: Accumulator>(
     make: impl Fn() -> A + Sync,
 ) -> Vec<A> {
     let nz = grid.shape[2];
+    let vol = test.vol;
+    let trilinear = |p: [f32; 3]| trilinear_inside(vol, p[0], p[1], p[2]);
+    let weighted = |p: [f32; 3]| test.weight(p);
+    let unweighted = |_: [f32; 3]| 1.0f32;
     let one = |z: usize| {
         let mut acc = make();
-        sample_slice(grid, test, b, z, &mut acc);
+        match (test.interpolation, test.weighted()) {
+            (CostInterpolation::Trilinear, true) => {
+                sample_slice(grid, test, b, z, &mut acc, &trilinear, &weighted);
+            }
+            (CostInterpolation::Trilinear, false) => {
+                sample_slice(grid, test, b, z, &mut acc, &trilinear, &unweighted);
+            }
+            (CostInterpolation::Sinc { background }, w) => {
+                let sinc = |p: [f32; 3]| sinc_cost(vol, p, background);
+                if w {
+                    sample_slice(grid, test, b, z, &mut acc, &sinc, &weighted);
+                } else {
+                    sample_slice(grid, test, b, z, &mut acc, &sinc, &unweighted);
+                }
+            }
+        }
         acc
     };
     if parallel {

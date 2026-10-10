@@ -27,18 +27,22 @@ pub fn blend(v: [[[f32; 2]; 2]; 2], fx: f32, fy: f32, fz: f32) -> f32 {
 /// (`0 ≤ p` and `⌊p⌋ + 1 ≤ n − 1` on every axis).
 #[inline(always)]
 pub fn trilinear_inside(vol: &Volume, x: f32, y: f32, z: f32) -> f32 {
-    let (ix, iy, iz) = (x as usize, y as usize, z as usize);
+    // Positions are non-negative and below the volume size: i32 truncation is ⌊p⌋, and the
+    // float ↔ i32 conversions are single instructions (unlike usize).
+    let (ix, iy, iz) = (x as i32, y as i32, z as i32);
     let (fx, fy, fz) = (x - ix as f32, y - iy as f32, z - iz as f32);
     let nx = vol.shape[0];
     let sxy = nx * vol.shape[1];
-    let base = ix + nx * iy + sxy * iz;
+    let base = ix as usize + nx * iy as usize + sxy * iz as usize;
     let d = &vol.data;
+    // Four pairs of neighbours along x: one bounds check each.
+    let pair = |at: usize| -> [f32; 2] {
+        let s = &d[at..at + 2];
+        [s[0], s[1]]
+    };
     let v = [
-        [[d[base], d[base + 1]], [d[base + nx], d[base + nx + 1]]],
-        [
-            [d[base + sxy], d[base + sxy + 1]],
-            [d[base + sxy + nx], d[base + sxy + nx + 1]],
-        ],
+        [pair(base), pair(base + nx)],
+        [pair(base + sxy), pair(base + sxy + nx)],
     ];
     blend(v, fx, fy, fz)
 }

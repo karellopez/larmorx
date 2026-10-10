@@ -131,7 +131,7 @@ def record(registry, args: argparse.Namespace) -> None:  # type: ignore[no-untyp
         ),
         "recorded": {
             "commit": commit + ("+dirty" if dirty else ""),
-            "date": datetime.date.today().isoformat(),
+            "date": datetime.datetime.now(datetime.UTC).date().isoformat(),
             "platform": f"{platform.system()} {platform.machine()}",
             "python": platform.python_version(),
             "numpy": np.__version__,

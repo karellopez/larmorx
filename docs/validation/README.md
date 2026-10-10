@@ -14,6 +14,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-multiply-images](ants-multiply-images.md) | `lx.ants.multiply_images`, `larmorx ants MultiplyImages` | MultiplyImages (ANTs 2.6.5 binary) | `validated` |
 | [ants-smooth-image](ants-smooth-image.md) | `lx.ants.smooth_image`, `larmorx ants SmoothImage` (recursive Gaussian and median) | SmoothImage (ANTs 2.6.5 binary) | `validated` |
 | [ants-resample-image-by-spacing](ants-resample-image-by-spacing.md) | `lx.ants.resample_image_by_spacing`, `larmorx ants ResampleImageBySpacing` | ResampleImageBySpacing (ANTs 2.6.5 binary) | `validated` (1 expected divergence: ANTs resamples uninitialised memory) |
+| [ants-resample-image](ants-resample-image.md) | `lx.ants.resample_image`, `larmorx ants ResampleImage` | ResampleImage (ANTs 2.6.5 binary) | `validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences) |
 | [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 
 Reproduce a record:
@@ -26,11 +27,12 @@ python -m larmorx_validation parity afni-tshift --tier standard --out docs/valid
 (cd crates-gpl && cargo build --release)   # the GPL replica, run as a separate program
 python -m larmorx_validation parity afni-tshift --tier standard --implementation replica --out docs/validation
 python -m larmorx_validation parity resample-series --tier standard --out docs/validation   # needs fmriprep, nitransforms, scipy in the environment
-python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these five need the ANTs oracle (scripts/build_ants_oracle.sh)
+python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these six need the ANTs oracle (scripts/build_ants_oracle.sh)
 python -m larmorx_validation parity ants-threshold-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-multiply-images --tier standard --out docs/validation
 python -m larmorx_validation parity ants-smooth-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard --out docs/validation
+python -m larmorx_validation parity ants-resample-image --tier standard --out docs/validation
 python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   # mcflirt's variability band (needs FSL)
 python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
 ```

@@ -11,9 +11,9 @@ compared, all bit-identical with ANTs' exact header bytes and printed text, in 2
 dimensions. One expected divergence: where ANTs resamples uninitialised memory,
 larmorx stops.
 
-**Speed** ([benchmark](../benchmarks/ants-gaussian.md)): a raw T1w to 2 mm takes 148 ms on
-one thread and 88 ms on 12, against 490 ms and 129 ms for ANTs; the 1 mm MNI template to
-3 mm 243 ms against 613 ms on one thread.
+**Speed** ([benchmark](../benchmarks/ants-gaussian.md)): a raw T1w to 2 mm takes 149 ms on
+one thread and 80 ms on 12, against 496 ms and 151 ms for ANTs; the 1 mm MNI template to
+3 mm 252 ms against 629 ms on one thread.
 
 ## Quick start
 

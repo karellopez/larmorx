@@ -10,9 +10,9 @@ ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0): Gaussian smoothing with
 bit-identical with ANTs' exact header bytes, in 2, 3 and 4 dimensions.
 
 **Speed** ([benchmark](../benchmarks/ants-gaussian.md)): sigma 1 voxel on a raw T1w
-(160×192×192) takes 117 ms on one thread and 64 ms on 12, against 450 ms and 139 ms for
-ANTs; fMRIPrep's BOLD series smoothed in 4D 636 ms against 1.82 s on one thread; the median
-filter (radius 1) 1.27 s and 256 ms against 1.92 s and 365 ms.
+(160×192×192) takes 119 ms on one thread and 63 ms on 12, against 442 ms and 134 ms for
+ANTs; fMRIPrep's BOLD series smoothed in 4D 641 ms against 1.84 s on one thread; the median
+filter (radius 1) 1.26 s and 259 ms against 2.00 s and 361 ms.
 
 ## Quick start
 

@@ -177,8 +177,10 @@ impl Pixel for f64 {
     fn from_f32(v: f32) -> Self {
         f64::from(v)
     }
+    /// For `double` pixels ITK returns the interpolated value as it is (the
+    /// `CastComponentWithBoundsChecking` overload for an unchanged component type).
     fn from_f64_bounded(v: f64) -> Self {
-        bounded(v, -f64::MAX, f64::MAX)
+        v
     }
     fn from_f64(v: f64) -> Self {
         v

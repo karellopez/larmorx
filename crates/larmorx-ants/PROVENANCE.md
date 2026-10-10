@@ -17,6 +17,8 @@ re-expressed in Rust; no code was copied verbatim.
 | `smooth_image`, `cli::smooth_image` | ANTs v2.6.5: `Examples/SmoothImage.cxx` | Apache-2.0 |
 | `resample` (`ResampleImageFilter` with an `IdentityTransform` in 1 to 4 dimensions: the scan-line path, point ↔ index with vnl's inverse, 4D `EvaluateUnoptimized`) | ITK v5.4.5: `Modules/Filtering/ImageGrid/include/itkResampleImageFilter.hxx` (`LinearThreadedGenerateData`), `Modules/Core/ImageFunction/include/itkLinearInterpolateImageFunction.h/.hxx`, `itkNearestNeighborInterpolateImageFunction.h`, `Modules/Core/Common/include/itkImageBase.h/.hxx` | Apache-2.0 |
 | `resample_image_by_spacing`, `cli::resample_image_by_spacing` | ANTs v2.6.5: `Examples/ResampleImageBySpacing.cxx` | Apache-2.0 |
+| `resample_image`, `cli::resample_image` | ANTs v2.6.5: `Examples/ResampleImage.cxx` | Apache-2.0 |
+| `image::Pixel::from_f64_bounded` (`CastPixelWithBoundsChecking`), the `char`/`short`/`unsigned short`/`unsigned int` pixels | ITK v5.4.5: `Modules/Filtering/ImageGrid/include/itkResampleImageFilter.hxx` (`CastComponentWithBoundsChecking`); the conversions are x86-64's, as the oracle's GCC emits them | Apache-2.0 |
 | `threshold_image` | ANTs v2.6.5: `Examples/ThresholdImage.cxx` (`OtsuThreshold` with a mask, `BinaryThreshold_AltInsideOutside_threashold`) | Apache-2.0 |
 | `multiply_images` | ANTs v2.6.5: `Examples/MultiplyImages.cxx` | Apache-2.0 |
 | `cli::image_math` (dispatch tables, usage, exit codes) | ANTs v2.6.5: `Examples/ImageMath.cxx`, `ImageMathHelper{2D,3D,4D}.cxx`, the `ImageMathHelper*` tables of `ImageMath_Templates.hxx` | Apache-2.0 |
@@ -28,5 +30,6 @@ parity records are [ants-apply-transforms](../../docs/validation/ants-apply-tran
 [ants-image-math](../../docs/validation/ants-image-math.md),
 [ants-threshold-image](../../docs/validation/ants-threshold-image.md),
 [ants-multiply-images](../../docs/validation/ants-multiply-images.md),
-[ants-smooth-image](../../docs/validation/ants-smooth-image.md) and
-[ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md).
+[ants-smooth-image](../../docs/validation/ants-smooth-image.md),
+[ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md) and
+[ants-resample-image](../../docs/validation/ants-resample-image.md).

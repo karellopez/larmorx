@@ -23,8 +23,9 @@ How the code is organised and the conventions every tool follows. The plan behin
                      (smoothing, Laplacian, gradient magnitude), median, ITK's float
                      comparisons (morphology, components and distance maps next)
    larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages,
-                     SmoothImage, ResampleImageBySpacing), images as ANTs programs read and
-                     write them, ITK's identity resampling in 2-4D, the original command lines
+                     SmoothImage, ResampleImageBySpacing, ResampleImage), images as ANTs
+                     programs read and write them, ITK's identity resampling in 2-4D, the
+                     original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)
    larmorx-mri       clean-room MRI tools named by function: head-motion correction

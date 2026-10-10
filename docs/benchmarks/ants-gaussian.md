@@ -1,111 +1,141 @@
-# Benchmarks: ANTs Gaussian filters (ImageMath Laplacian, G, Grad; SmoothImage; ResampleImageBySpacing)
+# Benchmarks: ANTs Gaussian filters and resampling (ImageMath Laplacian, G, Grad; SmoothImage; ResampleImageBySpacing; ResampleImage)
 
 larmorx against ANTs 2.6.5's own binaries on real images, as fMRIPrep uses these programs. Median of 5 runs after a warm-up.
 
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation bench ants-gaussian --repeats 5 --threads 1 4 0`
 - **What is timed:** the whole command: reading the gzipped inputs, the operation, writing the output as uncompressed `.nii` (ITK compresses on one thread, which would dominate ANTs' time). ANTs runs as its own process; larmorx runs in-process through its console entry point. Both get the thread count through `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`.
 - **Same result:** every larmorx output is compared with ANTs' (all values).
-- **Machine load** before the run (1, 5, 15 min): 0.99, 2.80, 3.12; no other benchmark ran meanwhile.
+- **Machine load** before the run (1, 5, 15 min): 0.92, 2.26, 2.69; no other benchmark ran meanwhile.
 
 ## ImageMath Laplacian 1.5 1 (fMRIPrep's call), raw T1w ds000005 (160×192×192 int16)
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
 | ANTs 2.6.5 | 1 | 1.23 s | 1.0× |  |
-| ANTs 2.6.5 | 12 | 269 ms | **4.6×** |  |
-| larmorx | 1 | 350 ms | **3.5×** | bit-identical |
-| larmorx | 4 | 159 ms | **7.8×** | bit-identical |
-| larmorx | 12 | 131 ms | **9.4×** | bit-identical |
+| ANTs 2.6.5 | 12 | 277 ms | **4.5×** |  |
+| larmorx | 1 | 351 ms | **3.5×** | bit-identical |
+| larmorx | 4 | 146 ms | **8.5×** | bit-identical |
+| larmorx | 12 | 128 ms | **9.6×** | bit-identical |
 
 ## ImageMath Laplacian 1.5 1 (fMRIPrep's call), boldref ds000005 (64×64×34)
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 48 ms | 1.0× |  |
-| ANTs 2.6.5 | 12 | 29 ms | **1.6×** |  |
-| larmorx | 1 | 7 ms | **6.5×** | bit-identical |
+| ANTs 2.6.5 | 1 | 52 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 31 ms | **1.7×** |  |
+| larmorx | 1 | 7 ms | **7.1×** | bit-identical |
 | larmorx | 4 | 4 ms | **13.2×** | bit-identical |
-| larmorx | 12 | 3 ms | **13.7×** | bit-identical |
+| larmorx | 12 | 3 ms | **15.0×** | bit-identical |
 
 ## ImageMath Laplacian 1.5 1, MNI152NLin2009cAsym 1 mm (193×229×193)
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 1.61 s | 1.0× |  |
-| ANTs 2.6.5 | 12 | 384 ms | **4.2×** |  |
-| larmorx | 1 | 510 ms | **3.2×** | bit-identical |
-| larmorx | 4 | 228 ms | **7.1×** | bit-identical |
-| larmorx | 12 | 212 ms | **7.6×** | bit-identical |
+| ANTs 2.6.5 | 1 | 1.64 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 383 ms | **4.3×** |  |
+| larmorx | 1 | 523 ms | **3.1×** | bit-identical |
+| larmorx | 4 | 237 ms | **6.9×** | bit-identical |
+| larmorx | 12 | 218 ms | **7.5×** | bit-identical |
 
 ## ImageMath Grad 1, raw T1w
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 1.20 s | 1.0× |  |
-| ANTs 2.6.5 | 12 | 266 ms | **4.5×** |  |
-| larmorx | 1 | 309 ms | **3.9×** | bit-identical |
-| larmorx | 4 | 146 ms | **8.2×** | bit-identical |
-| larmorx | 12 | 126 ms | **9.6×** | bit-identical |
+| ANTs 2.6.5 | 1 | 1.23 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 253 ms | **4.8×** |  |
+| larmorx | 1 | 306 ms | **4.0×** | bit-identical |
+| larmorx | 4 | 147 ms | **8.3×** | bit-identical |
+| larmorx | 12 | 130 ms | **9.4×** | bit-identical |
 
 ## ImageMath G 2 (discrete Gaussian, sigma 2 mm), raw T1w
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 738 ms | 1.0× |  |
-| ANTs 2.6.5 | 12 | 223 ms | **3.3×** |  |
-| larmorx | 1 | 125 ms | **5.9×** | bit-identical |
-| larmorx | 4 | 67 ms | **11.1×** | bit-identical |
-| larmorx | 12 | 67 ms | **11.1×** | bit-identical |
+| ANTs 2.6.5 | 1 | 716 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 232 ms | **3.1×** |  |
+| larmorx | 1 | 119 ms | **6.0×** | bit-identical |
+| larmorx | 4 | 85 ms | **8.4×** | bit-identical |
+| larmorx | 12 | 62 ms | **11.6×** | bit-identical |
 
 ## SmoothImage 3 sigma 1 voxel, raw T1w
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 450 ms | 1.0× |  |
-| ANTs 2.6.5 | 12 | 139 ms | **3.2×** |  |
-| larmorx | 1 | 117 ms | **3.8×** | bit-identical |
-| larmorx | 4 | 67 ms | **6.8×** | bit-identical |
-| larmorx | 12 | 64 ms | **7.1×** | bit-identical |
+| ANTs 2.6.5 | 1 | 442 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 134 ms | **3.3×** |  |
+| larmorx | 1 | 119 ms | **3.7×** | bit-identical |
+| larmorx | 4 | 79 ms | **5.6×** | bit-identical |
+| larmorx | 12 | 63 ms | **7.0×** | bit-identical |
 
 ## SmoothImage 3 median radius 1, raw T1w
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 1.92 s | 1.0× |  |
-| ANTs 2.6.5 | 12 | 365 ms | **5.3×** |  |
-| larmorx | 1 | 1.27 s | **1.5×** | bit-identical |
-| larmorx | 4 | 373 ms | **5.1×** | bit-identical |
-| larmorx | 12 | 256 ms | **7.5×** | bit-identical |
+| ANTs 2.6.5 | 1 | 2.00 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 361 ms | **5.5×** |  |
+| larmorx | 1 | 1.26 s | **1.6×** | bit-identical |
+| larmorx | 4 | 381 ms | **5.2×** | bit-identical |
+| larmorx | 12 | 259 ms | **7.7×** | bit-identical |
 
 ## SmoothImage 4 sigma 1 voxel, fMRIPrep BOLD series (4D, 28 MB gzipped)
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 1.82 s | 1.0× |  |
-| ANTs 2.6.5 | 12 | 512 ms | **3.5×** |  |
-| larmorx | 1 | 636 ms | **2.9×** | bit-identical |
-| larmorx | 4 | 369 ms | **4.9×** | bit-identical |
-| larmorx | 12 | 336 ms | **5.4×** | bit-identical |
+| ANTs 2.6.5 | 1 | 1.84 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 524 ms | **3.5×** |  |
+| larmorx | 1 | 641 ms | **2.9×** | bit-identical |
+| larmorx | 4 | 376 ms | **4.9×** | bit-identical |
+| larmorx | 12 | 337 ms | **5.4×** | bit-identical |
 
 ## ResampleImageBySpacing 3 to 2 mm (smoothed, linear), raw T1w
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 490 ms | 1.0× |  |
-| ANTs 2.6.5 | 12 | 129 ms | **3.8×** |  |
-| larmorx | 1 | 148 ms | **3.3×** | bit-identical |
+| ANTs 2.6.5 | 1 | 496 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 151 ms | **3.3×** |  |
+| larmorx | 1 | 149 ms | **3.3×** | bit-identical |
 | larmorx | 4 | 87 ms | **5.7×** | bit-identical |
-| larmorx | 12 | 88 ms | **5.6×** | bit-identical |
+| larmorx | 12 | 80 ms | **6.2×** | bit-identical |
 
 ## ResampleImageBySpacing 3 to 3 mm, MNI 1 mm
 
 | Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
 |---|---|---|---|---|
-| ANTs 2.6.5 | 1 | 613 ms | 1.0× |  |
-| ANTs 2.6.5 | 12 | 194 ms | **3.2×** |  |
-| larmorx | 1 | 243 ms | **2.5×** | bit-identical |
-| larmorx | 4 | 156 ms | **3.9×** | bit-identical |
-| larmorx | 12 | 148 ms | **4.1×** | bit-identical |
+| ANTs 2.6.5 | 1 | 629 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 193 ms | **3.3×** |  |
+| larmorx | 1 | 252 ms | **2.5×** | bit-identical |
+| larmorx | 4 | 161 ms | **3.9×** | bit-identical |
+| larmorx | 12 | 148 ms | **4.2×** | bit-identical |
+
+## ResampleImage 3 to 2 mm (linear), MNI 1 mm
+
+| Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
+|---|---|---|---|---|
+| ANTs 2.6.5 | 1 | 431 ms | 1.0× |  |
+| ANTs 2.6.5 | 12 | 434 ms | **1.0×** |  |
+| larmorx | 1 | 91 ms | **4.7×** | bit-identical |
+| larmorx | 4 | 76 ms | **5.7×** | bit-identical |
+| larmorx | 12 | 70 ms | **6.2×** | bit-identical |
+
+## ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w
+
+| Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
+|---|---|---|---|---|
+| ANTs 2.6.5 | 1 | 3.17 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 947 ms | **3.3×** |  |
+| larmorx | 1 | 1.49 s | **2.1×** | bit-identical |
+| larmorx | 4 | 482 ms | **6.6×** | bit-identical |
+| larmorx | 12 | 334 ms | **9.5×** | bit-identical |
+
+## ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref
+
+| Tool | Threads | Median | Speed-up vs ANTs, 1 thread | Output vs ANTs |
+|---|---|---|---|---|
+| ANTs 2.6.5 | 1 | 7.05 s | 1.0× |  |
+| ANTs 2.6.5 | 12 | 1.21 s | **5.8×** |  |
+| larmorx | 1 | 1.80 s | **3.9×** | bit-identical |
+| larmorx | 4 | 472 ms | **14.9×** | bit-identical |
+| larmorx | 12 | 329 ms | **21.4×** | bit-identical |
 
 ## Notes
 
@@ -117,7 +147,7 @@ larmorx against ANTs 2.6.5's own binaries on real images, as fMRIPrep uses these
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (54d3282e3bf5-dirty) |
+| larmorx | 0.0.1 (30959407505d-dirty) |
 | larmorx-testdata | 28167dea9be5 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

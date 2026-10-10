@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Benchmarks of ANTs' Gaussian filters (ImageMath ``Laplacian``, ``G``, ``Grad``,
-``SmoothImage``, ``ResampleImageBySpacing``): larmorx against ANTs 2.6.5's own binaries, with
-the harness of :mod:`larmorx_validation.bench.ants_programs` (same timing rules)."""
+"""Benchmarks of ANTs' Gaussian filters and resampling (ImageMath ``Laplacian``, ``G``,
+``Grad``, ``SmoothImage``, ``ResampleImageBySpacing``, ``ResampleImage``): larmorx against ANTs
+2.6.5's own binaries, with the harness of :mod:`larmorx_validation.bench.ants_programs` (same
+timing rules)."""
 
 from __future__ import annotations
 
@@ -72,9 +73,29 @@ JOBS: list[Job] = [
         ("3", MNI_1MM, "{out}", "3", "3", "3"),
         quick=False,
     ),
+    Job(
+        "ResampleImage 3 to 2 mm (linear), MNI 1 mm",
+        "ResampleImage",
+        ("3", MNI_1MM, "{out}", "2"),
+    ),
+    Job(
+        "ResampleImage 3 to 1 mm, B-spline order 3 as unsigned short, raw T1w",
+        "ResampleImage",
+        ("3", T1_RAW, "{out}", "1", "0", "4", "3"),
+        quick=False,
+    ),
+    Job(
+        "ResampleImage 3 to 1.5 mm, windowed sinc (Hamming), boldref",
+        "ResampleImage",
+        ("3", BOLDREF, "{out}", "1.5", "0", "3"),
+        quick=False,
+    ),
 ]
 
-TITLE = "ANTs Gaussian filters (ImageMath Laplacian, G, Grad; SmoothImage; ResampleImageBySpacing)"
+TITLE = (
+    "ANTs Gaussian filters and resampling (ImageMath Laplacian, G, Grad; SmoothImage; "
+    "ResampleImageBySpacing; ResampleImage)"
+)
 
 NOTES = [
     "- **Where the time goes.** Reading the gzipped input is sequential in both programs "

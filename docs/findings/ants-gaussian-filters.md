@@ -1,10 +1,11 @@
-# ANTs' Gaussian filters: ImageMath G, Laplacian, Grad, UnsharpMask; SmoothImage; ResampleImageBySpacing (ANTs v2.6.5, ITK v5.4.5)
+# ANTs' Gaussian filters and resampling: ImageMath G, Laplacian, Grad, UnsharpMask; SmoothImage; ResampleImageBySpacing; ResampleImage (ANTs v2.6.5, ITK v5.4.5)
 
 What these programs and the ITK filters behind them really compute, found while porting them
 (milestone A2, Gaussian group). Line numbers are at the tags `ANTs-v2.6.5` and `ITK-v5.4.5`.
 The parity records are [ants-image-math](../validation/ants-image-math.md),
-[ants-smooth-image](../validation/ants-smooth-image.md) and
-[ants-resample-image-by-spacing](../validation/ants-resample-image-by-spacing.md). How the
+[ants-smooth-image](../validation/ants-smooth-image.md),
+[ants-resample-image-by-spacing](../validation/ants-resample-image-by-spacing.md) and
+[ants-resample-image](../validation/ants-resample-image.md). How the
 programs read and write images is in [ants-image-programs.md](ants-image-programs.md).
 
 ## ITK's recursive Gaussian filters
@@ -164,3 +165,39 @@ multiplied by the spacing **in double** (unlike `SmoothImage`). A negative thres
 - 4D linear interpolation is ITK's `EvaluateUnoptimized` (the weighted sum of the 16
   neighbours, clamped); 2D and 3D use the optimised paths, which skip an axis whose
   fractional distance is 0. *Read; validated* (`dim4-linear-time`).
+
+## ResampleImage (`Examples/ResampleImage.cxx`)
+
+- **The seventh argument is read twice** (lines 331-334 and 144-236): `std::stoi(argv[7])` is
+  the pixel type (0 `char` … 7 `double`; anything else prints "Unsupported pixel type"), and
+  the same text is the interpolator's parameter: the Gaussian's sigmas
+  (`ConvertVector<double>`), the windowed sinc's window (its first character) or the B-spline
+  order (if 0 to 5, else 3). So `… 2 1.5x1.5x1.5` resamples an `unsigned char` image,
+  `… 4 5` uses order 5 on `unsigned int` pixels, `… 4 6` order 3 on `float`, and
+  `… 3 l` aborts (`std::stoi("l")` throws before the window is read): only the default
+  Hamming window is reachable. *Read; validated* (`interpolation/*`).
+- **`b` ("blackman") is a second Lanczos**: `sb_interpolator` is declared with the Lanczos
+  window (line 76). Unreachable anyway (above). *Read.*
+- **The windowed sinc uses ITK's default boundary condition**, `ZeroFluxNeumannBoundaryCondition`
+  (the nearest edge voxel outside the image; `WindowedSincInterpolateImageFunction<ImageType, 3>`
+  with default template arguments), while `antsApplyTransforms` passes
+  `ConstantBoundaryCondition` (zero outside). *Read; validated* (`interpolation/sinc*`,
+  `real/boldref-sinc`). *larmorx:* `Interpolation::WindowedSincEdge`.
+- **By spacing** the size is `static_cast<int>(old spacing · old size / spacing + 0.5)`
+  (line 110); **by size** the spacing is `old · (old size − 1) / (size − 1)` (line 136), so a
+  size of 1 divides by zero: ANTs writes a 1 × 1 × 1 image of value 0 with infinite spacing
+  after vnl's SVD fails on the grid matrix (exit 0). *Verified.* *larmorx:* refuses sizes
+  below 2 (expected divergence `errors/size-1`).
+- A spacing list of the wrong length prints "Invalid spacing." and leaves the spacing
+  uninitialised (ANTs then aborts in the resampler); a spacing of 0 is refused by ITK.
+  *Verified.*
+- **Pixel types.** The image is read as the pixel type (`ReadImage<itk::Image<T, D>>`: a C++
+  `static_cast` of each value; for `unsigned int` GCC converts through a 64-bit integer and
+  keeps the low 32 bits, so −1 becomes 4294967295), interpolated in double, and written by
+  `CastPixelWithBoundsChecking` (`itkResampleImageFilter.hxx:297-317`): clamped to the
+  type's range, then a `static_cast` (truncation toward zero). For `double` pixels the value
+  is returned unchanged (the overload for an unchanged component type, line 289). Points
+  outside the input get 0. *Read; validated* (`pixel-type/*`, with wrapping negative and hot
+  voxels).
+- The interpolation number is `std::stoi(argv[6])`; numbers other than 1 to 4 (0, 5, …) are
+  linear. *Read; validated.*

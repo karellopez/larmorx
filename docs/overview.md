@@ -157,9 +157,10 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
     bit-exact replica 1.7–2.2× and 3.4–4.5×;
   - ANTs' `ImageMath`, `ThresholdImage`, `MultiplyImages`: 1.1–2.7× on one thread, up to
     5× with threads, bit-identical;
-  - ANTs' Gaussian filters (`ImageMath Laplacian`, `G`, `Grad`, `SmoothImage`,
-    `ResampleImageBySpacing`): 1.5–6.5× on one thread, up to 14× with threads,
-    bit-identical; fMRIPrep's `Laplacian 1.5 1` on a T1w 350 ms instead of 1.23 s;
+  - ANTs' Gaussian filters and resampling (`ImageMath Laplacian`, `G`, `Grad`,
+    `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`): 1.6–7× faster on one thread,
+    up to 21× with threads, bit-identical; fMRIPrep's `Laplacian 1.5 1` on a T1w 351 ms
+    instead of 1.23 s;
   - head-motion correction (`lx.mri.hmc`, clean-room, mcflirt-compatible): 1.2–2.3× faster
     than mcflirt on one thread and 4.9–9.4× on 12, within mcflirt's own variability; the
     matrices alone, all fMRIPrep needs, 5.7–16×.

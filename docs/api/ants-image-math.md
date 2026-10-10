@@ -23,8 +23,8 @@ bit-identical.
 `ImageMath 4 m` are 1.3–2.7× faster on one thread and up to 5× with threads. Reading the
 gzipped input is most of the time. The Gaussian operations
 ([benchmark](../benchmarks/ants-gaussian.md)): fMRIPrep's `Laplacian 1.5 1` on a raw T1w takes
-350 ms on one thread and 131 ms on 12, against 1.23 s and 269 ms for ANTs (7 ms against 48 ms
-on a boldref); `Grad 1` 309 ms against 1.20 s; `G 2` 125 ms against 738 ms.
+351 ms on one thread and 128 ms on 12, against 1.23 s and 277 ms for ANTs (7 ms against 52 ms
+on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms.
 
 **Implemented operations** (the others answer "not supported yet"):
 

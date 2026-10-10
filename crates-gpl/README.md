@@ -41,6 +41,15 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
+`cargo test` includes the golden tests (`larmorx-gpl-cli/tests/golden.rs`, a few hundredths
+of a second): every platform must reproduce the checksums of the replicas' Linux x86_64 output
+in `larmorx-gpl-cli/tests/golden.tsv` (CLAUDE.md rule 10, `docs/validation/golden.md`). To
+record them, on Linux x86_64 only, from a committed tree whose replica parity passes:
+
+```bash
+LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden
+```
+
 Parity with AFNI (needs the AFNI oracle, `scripts/build_afni_oracle.sh`, and the test data):
 
 ```bash

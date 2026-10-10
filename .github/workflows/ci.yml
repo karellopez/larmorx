@@ -79,8 +79,19 @@ jobs:
         run: cargo fmt --all --check
       - name: clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Includes the golden tests (larmorx-gpl-cli/tests/golden.rs, docs/validation/golden.md).
       - name: cargo test
         run: cargo test --workspace --locked
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-mismatches-gpl-${{ matrix.platform }}
+          path: golden-mismatches/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Build the wheel and run the Rust and Python tests on each of the six target platforms.
   test:
@@ -115,13 +126,26 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --out dist
+      # Includes the golden tests (tests/golden, docs/validation/golden.md): every platform must
+      # reproduce larmorx's Linux x86_64 output.
       - name: Test wheel (Python 3.12)
         run: |
           python -m pip install --upgrade pip
           python -m pip install dist/*.whl
           python -m pip install --group test
           python -m pytest
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-mismatches-${{ matrix.platform }}
+          path: golden-mismatches/
+          if-no-files-found: ignore
+          retention-days: 14
       # The abi3 wheel must also work on the newest CPython; checking one platform is enough.
+      # The golden tests ran above, on the same wheel; they run once per platform.
       - name: Set up the newest Python
         if: matrix.platform == 'linux-x64'
         uses: actions/setup-python@v7
@@ -133,7 +157,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install dist/*.whl
           python -m pip install --group test
-          python -m pytest
+          python -m pytest --ignore=tests/golden
       - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.platform }}

@@ -37,6 +37,20 @@ and fMRIPrep (`ras2vox @ M @ vox2ras` for head motion, `np.linalg.inv(source.aff
 ITK-to-RAS conversion) and passes the matrices to Rust. So they carry the same bits as
 fMRIPrep's on the same machine.
 
+**Those bits depend on the CPU's BLAS kernel, so fMRIPrep's do too (2026-10-11).** OpenBLAS
+picks its kernels by CPU at run time. Forcing other kernels on the development machine
+(`OPENBLAS_CORETYPE`, numpy 2.3.5, OpenBLAS 0.3.30): the products `inv(A) @ M @ A` of 10,000
+random affines differ in 99.9 % of cases between the kernels with fused multiply-adds
+(Haswell, Zen) and those without (Nehalem, Sandy Bridge, Prescott); `np.linalg.inv` differs in
+23 % of cases between the Haswell and Sandy Bridge kernels (up to 6e-13 relative) but not
+between Haswell and Nehalem. In the resampler's golden case the float64 output then differs by
+up to 81 ulp at the sampled voxels, and the float32 output, which fMRIPrep writes, did not
+change. numpy's macOS wheels use Accelerate instead of OpenBLAS. *Verified.* So fMRIPrep's
+results differ in the last bits between machines, and larmorx's `lx.transforms` (which
+evaluates the same numpy expressions) would differ between platforms; the golden tests keep it
+visible, and [golden.md](../validation/golden.md) lists the options (a fixed-order Rust
+implementation that reproduces the Haswell kernel is the recommended one).
+
 **The voxel-shift map is float32.** `vsm = fmap_hz * pe_info[1]` multiplies a float32 array by
 a Python float, which NumPy 2 (NEP 50) casts to float32 first. It is added to the float64
 coordinates. The Jacobian `1 + np.gradient(vsm, axis=pe)` is float32 too

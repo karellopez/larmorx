@@ -18,6 +18,15 @@ pub const EXIT_USAGE: u8 = 2;
 /// Exit code when the output streams cannot be written.
 const EXIT_IO_ERROR: u8 = 1;
 
+/// The tool families and their tools, as [`run_with`] dispatches them. Add a new family here
+/// and to [`run_with`]; every tool listed needs a golden case (`tests/golden/registry.py`,
+/// `docs/validation/golden.md`), which the golden coverage test checks through this list.
+pub const FAMILIES: &[(&str, &[&str])] = &[
+    ("afni", larmorx_afni::cli::TOOLS),
+    ("ants", larmorx_ants::cli::TOOLS),
+    ("mri", larmorx_mri::cli::TOOLS),
+];
+
 /// Runs the CLI with `args` (program name first), writing to `out` and `err`, reading
 /// transform files with [`FileLoader`].
 ///
@@ -161,6 +170,10 @@ fn program_name(argv0: &str) -> String {
 }
 
 fn usage(prog: &str) -> String {
+    let tools: String = FAMILIES
+        .iter()
+        .map(|(family, tools)| format!("  {family:<6} {}\n", tools.join(", ")))
+        .collect();
     format!(
         "larmorx {version}: neuroimaging tools in Rust with original-compatible command lines
 
@@ -168,18 +181,12 @@ Usage: {prog} <family> <tool> [original arguments]
        {prog} --version | --help
 
 Tools:
-  afni   {afni}
-  ants   {ants}
-  mri    {mri}
-
+{tools}
 Options:
   -h, --help     Print this help
   -V, --version  Print the version
 ",
         version = larmorx_core::VERSION,
-        afni = larmorx_afni::cli::TOOLS.join(", "),
-        ants = larmorx_ants::cli::TOOLS.join(", "),
-        mri = larmorx_mri::cli::TOOLS.join(", "),
     )
 }
 
@@ -254,6 +261,22 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("mri    hmc"), "{out}");
+    }
+
+    #[test]
+    fn every_listed_tool_is_dispatched() {
+        let (_, help, _) = run_capture(&["lx", "--help"]);
+        for (family, tools) in FAMILIES {
+            assert!(
+                help.contains(&format!("  {family:<6} {}\n", tools.join(", "))),
+                "{help}"
+            );
+            for tool in *tools {
+                let (code, _, err) = run_capture(&["lx", family, tool]);
+                assert_ne!(code, EXIT_USAGE, "{family} {tool}: {err}");
+                assert!(!err.contains("unknown"), "{family} {tool}: {err}");
+            }
+        }
     }
 
     #[test]

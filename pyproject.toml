@@ -49,7 +49,7 @@ python-source = "python"
 module-name = "larmorx._core"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/python", "tests/parity"]
+testpaths = ["tests/python", "tests/golden", "tests/parity"]
 addopts = ["--import-mode=importlib"]
 
 [tool.ruff]

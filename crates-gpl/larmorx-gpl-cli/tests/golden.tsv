@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Golden checksums of the larmorx-gpl replicas (tests/golden.rs): SHA-256 of the NIfTI
+# header and data that larmorx-gpl writes on Linux x86_64, with sampled data values.
+# Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
+# Recorded from 713ca53d37a90d381dfa834b5139b96689c0017e on 2026-10-10 (Linux x86_64)
+# case	output	sha256	type	sample
+3dTshift.cubic.int16.rlt+	data	a1cb86a54de3277e8b9c86c487382f32b45ea90ffcf43f0a50ae4b2bd701b267	int16	21036804a805f90346059903b8041406
+3dTshift.cubic.int16.rlt+	header	e43d4e9602632203bda7a8300a802dd5150d3c085f21f96b26e1276348e7518f	-	-
+3dTshift.fourier.float32.ignore	data	b5f20014a1cb2416197c4c62d09569d2142339164b0e4dc367a6596514b31665	float32	0040484300208e430000b34300c07e43969cab43dc066743ec749b430080c643
+3dTshift.fourier.float32.ignore	header	dac6a425b1874dfcec44d2c3c72f75545837facceb9c815ca62dda0542cecf6b	-	-
+3dTshift.fourier.int16	data	fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f	int16	21037904980509044105ae03d5042506
+3dTshift.fourier.int16	header	e43d4e9602632203bda7a8300a802dd5150d3c085f21f96b26e1276348e7518f	-	-
+3dTshift.heptic.uint8.no_detrend	data	ba23067a93d11ef054a8eac8d1b360656a4713eeb457f24084e18a82a0119581	uint8	153e652f58274a6f
+3dTshift.heptic.uint8.no_detrend	header	79f1d8aa4060841223bab293d8a91504c64fee694c450c3bc02d4efb334d7df6	-	-
+3dTshift.linear.float32	data	d8bbe320fc73af5b40ece09fc8512daea64ed6368bcef3aef243a98cf2d4d946	float32	c6c04b4300208e43ccf0b343214f8043dbeea9431d32694300a09a43d4bdc443
+3dTshift.linear.float32	header	dac6a425b1874dfcec44d2c3c72f75545837facceb9c815ca62dda0542cecf6b	-	-
+3dTshift.quintic.float32.tzero	data	06ee587a75070ec5b5286c608b0240a401c8ba6483b82373216cd6e58888ac29	float32	21a5494323eb8f434a8ab44300c07e436d4eaa43b28b6e43daf09b4375ccc243
+3dTshift.quintic.float32.tzero	header	d209c30d1b0846aceaf2b5a8d3834692b5700d99543d0e23dac6c88f3a345ac8	-	-
+3dTshift.wsinc5.float32.rlt	data	63b1e65144f844b2f80b5c7badd4f5e5a0a89aad4028d1efe083b3d5609d4087	float32	8cacb6c077c6973e40f5b2c0208d91c014771240d13127bf004cbbc080e8aa40
+3dTshift.wsinc5.float32.rlt	header	0c1781804ac66bc041bad02303cc6c42817d30c113afd7181cc8935ac909404b	-	-
+3dTshift.wsinc9.int16.slice	data	d806d4f179dc05c4f6a0734592d3d28cb7f153d811a303c436432ffc9f708962	int16	40035b04a60501044c059703ea043306
+3dTshift.wsinc9.int16.slice	header	612045e2a74599550582aea31dbc7ca1ea6cf6b35ca04ef2af15950df0e4787a	-	-

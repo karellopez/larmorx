@@ -80,6 +80,12 @@ def test_golden(case_id: str, golden: dict, inputs, tmp_path: Path) -> None:  # 
             names = registry.mismatched(recorded, actual)
             saved = f"saved in {registry.dump(case_id, outputs, names, root)}"
         source = golden["recorded"]
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # A workflow annotation: unlike the job log, GitHub's API serves annotations of a
+            # public repository without a login, so the mismatches can be read from anywhere.
+            detail = "; ".join(problems).replace("%", "%25").replace("\n", " ")
+            sys.__stdout__.write(f"::error title=golden {case_id}::{detail[:900]}\n")
+            sys.__stdout__.flush()
         pytest.fail(
             f"{case_id} differs from larmorx on Linux x86_64 (recorded from "
             f"{source['commit'][:12]} on {source['date']}):\n  "

@@ -149,7 +149,14 @@ mod tests {
     fn identity_resampling_copies_the_volume() {
         let data: Vec<f32> = (0..60).map(|i| (i * 7 % 13) as f32).collect();
         let v = Volume::new([5, 4, 3], [2.0, 2.5, 3.0], data);
-        let out = resample(&v, &IDENTITY, v.shape, v.voxel_size, Interpolation::Trilinear, -1.0);
+        let out = resample(
+            &v,
+            &IDENTITY,
+            v.shape,
+            v.voxel_size,
+            Interpolation::Trilinear,
+            -1.0,
+        );
         assert_eq!(out, v);
     }
 
@@ -158,7 +165,14 @@ mod tests {
         let v = Volume::new([4, 4, 4], [1.0; 3], vec![5.0; 64]);
         let mut m = IDENTITY;
         m[0][3] = 3.0; // the output at x = 0 samples the input at x = -3
-        let out = resample(&v, &m, v.shape, v.voxel_size, Interpolation::Trilinear, -7.0);
+        let out = resample(
+            &v,
+            &m,
+            v.shape,
+            v.voxel_size,
+            Interpolation::Trilinear,
+            -7.0,
+        );
         assert_eq!(out.at(0, 0, 0), -7.0);
         assert_eq!(out.at(1, 0, 0), -7.0);
         assert_eq!(out.at(2, 0, 0), 5.0); // x = -1: the extended edge

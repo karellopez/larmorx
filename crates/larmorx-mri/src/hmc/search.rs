@@ -8,16 +8,6 @@ use super::rigid::Params;
 /// The parabola through `(a1, y1)`, `(am, ym)`, `(a2, y2)` (§7.3): its vertex, or `None` if it
 /// opens downward or is degenerate. Float32 throughout.
 fn vertex(a1: f32, y1: f32, am: f32, ym: f32, a2: f32, y2: f32) -> Option<f32> {
-    if super::cost::variant() & (1 << 62) != 0 {
-        let (a1, y1, am, ym, a2, y2) = (f64::from(a1), f64::from(y1), f64::from(am), f64::from(ym), f64::from(a2), f64::from(y2));
-        let p = (am - a2) * (ym - y1) - (am - a1) * (ym - y2);
-        let q = -(am * am - a2 * a2) * (ym - y1) + (am * am - a1 * a1) * (ym - y2);
-        let h = (am - a2) * (a2 - a1) * (a1 - am);
-        if h.abs() > 1e-15 && p / h < 0.0 {
-            return None;
-        }
-        return if p.abs() > 1e-15 { Some((-q / (2.0 * p)) as f32) } else { None };
-    }
     let p = (am - a2) * (ym - y1) - (am - a1) * (ym - y2);
     let q = -(am * am - a2 * a2) * (ym - y1) + (am * am - a1 * a1) * (ym - y2);
     let h = (am - a2) * (a2 - a1) * (a1 - am);
@@ -38,7 +28,7 @@ fn golden(a1: f32, am: f32, a2: f32) -> f32 {
     } else {
         a2
     };
-    0.381_966_0 * far + 0.618_034_0 * am
+    0.381_966 * far + 0.618_034 * am
 }
 
 /// A line search from offset 0 with cost `y0` there, along a parameter of tolerance `u`
@@ -46,7 +36,7 @@ fn golden(a1: f32, am: f32, a2: f32) -> f32 {
 pub fn line_search(phi: &mut dyn FnMut(f32) -> f32, y0: f32, u: f32) -> (f32, f32) {
     // Bracketing.
     let (mut am, mut ym) = (0.0f32, y0);
-    let mut a1 = { let v2 = super::cost::variant2(); if v2 & 64 != 0 { f32::from_bits((10.0 * u).to_bits() - 1) } else if v2 & 128 != 0 { f32::from_bits((10.0 * u).to_bits() + 1) } else { 10.0 * u } };
+    let mut a1 = 10.0 * u;
     let mut y1 = phi(a1);
     if y1 < ym {
         std::mem::swap(&mut am, &mut a1);
@@ -85,7 +75,9 @@ pub fn line_search(phi: &mut dyn FnMut(f32) -> f32, y0: f32, u: f32) -> (f32, f3
     // Refinement.
     let dmin = 0.1 * u;
     for _ in 0..100 {
-        if !((a2 - a1).abs() / u > 1.0) {
+        // A NaN ratio stops the refinement too.
+        let ratio = (a2 - a1).abs() / u;
+        if ratio <= 1.0 || ratio.is_nan() {
             break;
         }
         let mut a = match vertex(a1, y1, am, ym, a2, y2) {

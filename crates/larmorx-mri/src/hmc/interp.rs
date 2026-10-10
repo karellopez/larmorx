@@ -14,86 +14,6 @@ use super::volume::Volume;
 /// z) and the fractions.
 #[inline(always)]
 pub fn blend(v: [[[f32; 2]; 2]; 2], fx: f32, fy: f32, fz: f32) -> f32 {
-    let v2 = super::cost::variant2();
-    if v2 & 262144 != 0 {
-        let d = |x: f32| f64::from(x);
-        let (fx, fy, fz) = (d(fx), d(fy), d(fz));
-        let e00 = (d(v[0][0][1]) - d(v[0][0][0])) * fx + d(v[0][0][0]);
-        let e01 = (d(v[1][0][1]) - d(v[1][0][0])) * fx + d(v[1][0][0]);
-        let e10 = (d(v[0][1][1]) - d(v[0][1][0])) * fx + d(v[0][1][0]);
-        let e11 = (d(v[1][1][1]) - d(v[1][1][0])) * fx + d(v[1][1][0]);
-        let h0 = (e10 - e00) * fy + e00;
-        let h1 = (e11 - e01) * fy + e01;
-        return ((h1 - h0) * fz + h0) as f32;
-    }
-    if v2 & 8192 != 0 {
-        let l = |a: f32, b: f32, f: f32| a * (1.0 - f) + b * f;
-        let e00 = l(v[0][0][0], v[0][0][1], fx);
-        let e01 = l(v[1][0][0], v[1][0][1], fx);
-        let e10 = l(v[0][1][0], v[0][1][1], fx);
-        let e11 = l(v[1][1][0], v[1][1][1], fx);
-        let h0 = l(e00, e10, fy);
-        let h1 = l(e01, e11, fy);
-        return l(h0, h1, fz);
-    }
-    if v2 & 16384 != 0 {
-        // y first, then x, then z
-        let a00 = (v[0][1][0] - v[0][0][0]) * fy + v[0][0][0];
-        let a01 = (v[0][1][1] - v[0][0][1]) * fy + v[0][0][1];
-        let a10 = (v[1][1][0] - v[1][0][0]) * fy + v[1][0][0];
-        let a11 = (v[1][1][1] - v[1][0][1]) * fy + v[1][0][1];
-        let h0 = (a01 - a00) * fx + a00;
-        let h1 = (a11 - a10) * fx + a10;
-        return (h1 - h0) * fz + h0;
-    }
-    if v2 & 32768 != 0 {
-        // z first, then y, then x
-        let a00 = (v[1][0][0] - v[0][0][0]) * fz + v[0][0][0];
-        let a01 = (v[1][0][1] - v[0][0][1]) * fz + v[0][0][1];
-        let a10 = (v[1][1][0] - v[0][1][0]) * fz + v[0][1][0];
-        let a11 = (v[1][1][1] - v[0][1][1]) * fz + v[0][1][1];
-        let h0 = (a10 - a00) * fy + a00;
-        let h1 = (a11 - a01) * fy + a01;
-        return (h1 - h0) * fx + h0;
-    }
-    if v2 & 65536 != 0 {
-        // z first, then x, then y
-        let a00 = (v[1][0][0] - v[0][0][0]) * fz + v[0][0][0];
-        let a01 = (v[1][0][1] - v[0][0][1]) * fz + v[0][0][1];
-        let a10 = (v[1][1][0] - v[0][1][0]) * fz + v[0][1][0];
-        let a11 = (v[1][1][1] - v[0][1][1]) * fz + v[0][1][1];
-        let h0 = (a01 - a00) * fx + a00;
-        let h1 = (a11 - a10) * fx + a10;
-        return (h1 - h0) * fy + h0;
-    }
-    if v2 & 131072 != 0 {
-        // y first, then z, then x
-        let a00 = (v[0][1][0] - v[0][0][0]) * fy + v[0][0][0];
-        let a01 = (v[0][1][1] - v[0][0][1]) * fy + v[0][0][1];
-        let a10 = (v[1][1][0] - v[1][0][0]) * fy + v[1][0][0];
-        let a11 = (v[1][1][1] - v[1][0][1]) * fy + v[1][0][1];
-        let h0 = (a10 - a00) * fz + a00;
-        let h1 = (a11 - a01) * fz + a01;
-        return (h1 - h0) * fx + h0;
-    }
-    if super::cost::variant() & (1 << 54) != 0 {
-        let e00 = (v[0][0][1] - v[0][0][0]) * fx + v[0][0][0];
-        let e01 = (v[1][0][1] - v[1][0][0]) * fx + v[1][0][0];
-        let e10 = (v[0][1][1] - v[0][1][0]) * fx + v[0][1][0];
-        let e11 = (v[1][1][1] - v[1][1][0]) * fx + v[1][1][0];
-        let k0 = (e01 - e00) * fz + e00;
-        let k1 = (e11 - e10) * fz + e10;
-        return (k1 - k0) * fy + k0;
-    }
-    if super::cost::variant() & (1 << 55) != 0 {
-        let e00 = (v[0][0][1] - v[0][0][0]) * fx + v[0][0][0];
-        let e01 = (v[1][0][1] - v[1][0][0]) * fx + v[1][0][0];
-        let e10 = (v[0][1][1] - v[0][1][0]) * fx + v[0][1][0];
-        let e11 = (v[1][1][1] - v[1][1][0]) * fx + v[1][1][0];
-        let h0 = (e10 - e00) * fy + e00;
-        let h1 = (e11 - e01) * fy + e01;
-        return h0 * (1.0 - fz) + h1 * fz;
-    }
     let e00 = (v[0][0][1] - v[0][0][0]) * fx + v[0][0][0];
     let e01 = (v[1][0][1] - v[1][0][0]) * fx + v[1][0][0];
     let e10 = (v[0][1][1] - v[0][1][0]) * fx + v[0][1][0];
@@ -121,24 +41,6 @@ pub fn trilinear_inside(vol: &Volume, x: f32, y: f32, z: f32) -> f32 {
         ],
     ];
     blend(v, fx, fy, fz)
-}
-
-/// DEV variant: weights form.
-pub fn trilinear_weights(vol: &Volume, x: f32, y: f32, z: f32) -> f32 {
-    let (ix, iy, iz) = (x as usize, y as usize, z as usize);
-    let (fx, fy, fz) = (x - ix as f32, y - iy as f32, z - iz as f32);
-    let (gx, gy, gz) = (1.0 - fx, 1.0 - fy, 1.0 - fz);
-    let at = |a: usize, b: usize, c: usize| vol.at(ix + a, iy + b, iz + c);
-    let mut v = 0.0f32;
-    v += gx * gy * gz * at(0, 0, 0);
-    v += fx * gy * gz * at(1, 0, 0);
-    v += gx * fy * gz * at(0, 1, 0);
-    v += fx * fy * gz * at(1, 1, 0);
-    v += gx * gy * fz * at(0, 0, 1);
-    v += fx * gy * fz * at(1, 0, 1);
-    v += gx * fy * fz * at(0, 1, 1);
-    v += fx * fy * fz * at(1, 1, 1);
-    v
 }
 
 /// Trilinear interpolation at a non-negative position, neighbours outside the volume counting

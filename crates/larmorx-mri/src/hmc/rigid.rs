@@ -51,7 +51,8 @@ pub fn mul(a: &Mat4, b: &Mat4) -> Mat4 {
 /// Singular or non-finite matrices give non-finite entries.
 pub fn inverse(m: &Mat4) -> Mat4 {
     let a = |i: usize, j: usize| m[i][j];
-    let cof = |r0: usize, r1: usize, c0: usize, c1: usize| a(r0, c0) * a(r1, c1) - a(r0, c1) * a(r1, c0);
+    let cof =
+        |r0: usize, r1: usize, c0: usize, c1: usize| a(r0, c0) * a(r1, c1) - a(r0, c1) * a(r1, c0);
     let adj = [
         [cof(1, 2, 1, 2), -cof(0, 2, 1, 2), cof(0, 1, 1, 2)],
         [-cof(1, 2, 0, 2), cof(0, 2, 0, 2), -cof(0, 1, 0, 2)],
@@ -59,13 +60,13 @@ pub fn inverse(m: &Mat4) -> Mat4 {
     ];
     let det = a(0, 0) * adj[0][0] + a(0, 1) * adj[1][0] + a(0, 2) * adj[2][0];
     let mut out = IDENTITY;
-    for i in 0..3 {
-        for j in 0..3 {
-            out[i][j] = adj[i][j] / det;
+    for (row, adj_row) in out.iter_mut().zip(&adj) {
+        for (o, a) in row.iter_mut().zip(adj_row) {
+            *o = a / det;
         }
     }
-    for i in 0..3 {
-        out[i][3] = -(out[i][0] * m[0][3] + out[i][1] * m[1][3] + out[i][2] * m[2][3]);
+    for row in out.iter_mut().take(3) {
+        row[3] = -(row[0] * m[0][3] + row[1] * m[1][3] + row[2] * m[2][3]);
     }
     out
 }
@@ -89,20 +90,16 @@ fn translation(t: [f64; 3]) -> Mat4 {
 }
 
 /// `R = Rx(rx)·Ry(ry)·Rz(rz)`, with `Rx(a) = [1 0 0; 0 cos a  sin a; 0 −sin a  cos a]` and
-/// likewise (§4.4).
+/// likewise (§4.4). The sines and cosines are rounded to float32 before the matrices are
+/// multiplied in double, as mcflirt's are (*observed*, `specs/mcflirt.md` §13): this makes `R`
+/// orthogonal only to about 1e−8, and the evaluated matrices match mcflirt's trace.
 pub fn rotation(rx: f64, ry: f64, rz: f64) -> [[f64; 3]; 3] {
-    let v = super::cost::variant();
     let sc = |a: f64| -> (f64, f64) {
-        if v & 512 != 0 {
-            let af = f64::from(a as f32);
-            (f64::from(math::sin(af) as f32), f64::from(math::cos(af) as f32))
-        } else if v & 256 != 0 {
-            (f64::from(math::sin(a) as f32), f64::from(math::cos(a) as f32))
-        } else if v & 2048 != 0 {
-            (math::sin(a), f64::from(math::cos(a) as f32))
-        } else {
-            (math::sin(a), math::cos(a))
-        }
+        let af = f64::from(a as f32);
+        (
+            f64::from(math::sin(af) as f32),
+            f64::from(math::cos(af) as f32),
+        )
     };
     let (sa, ca) = sc(rx);
     let (sb, cb) = sc(ry);
@@ -110,16 +107,6 @@ pub fn rotation(rx: f64, ry: f64, rz: f64) -> [[f64; 3]; 3] {
     let mx = [[1.0, 0.0, 0.0], [0.0, ca, sa], [0.0, -sa, ca]];
     let my = [[cb, 0.0, -sb], [0.0, 1.0, 0.0], [sb, 0.0, cb]];
     let mz = [[cg, sg, 0.0], [-sg, cg, 0.0], [0.0, 0.0, 1.0]];
-    if v & 4096 != 0 {
-        let f = |m: [[f64; 3]; 3]| m.map(|r| r.map(|x| f64::from(x as f32)));
-        return f(mul3(&f(mul3(&mx, &my)), &mz));
-    }
-    if v & 8192 != 0 {
-        return mul3(&mz, &mul3(&my, &mx));
-    }
-    if v & 16384 != 0 {
-        return mul3(&mx, &mul3(&my, &mz));
-    }
     mul3(&mul3(&mx, &my), &mz)
 }
 
@@ -160,21 +147,19 @@ pub fn compose(p: &Params, n: usize, centre: [f64; 3]) -> Mat4 {
     if n > 6 {
         let s = scales(p, n);
         let skew = [
-            [1.0, if n > 9 { p[9] } else { 0.0 }, if n > 10 { p[10] } else { 0.0 }],
+            [
+                1.0,
+                if n > 9 { p[9] } else { 0.0 },
+                if n > 10 { p[10] } else { 0.0 },
+            ],
             [0.0, 1.0, if n > 11 { p[11] } else { 0.0 }],
             [0.0, 0.0, 1.0],
         ];
-        let ks = mul3(&skew, &[[s[0], 0.0, 0.0], [0.0, s[1], 0.0], [0.0, 0.0, s[2]]]);
+        let ks = mul3(
+            &skew,
+            &[[s[0], 0.0, 0.0], [0.0, s[1], 0.0], [0.0, 0.0, s[2]]],
+        );
         linear = mul3(&linear, &ks);
-    }
-    if super::cost::variant() & 32768 != 0 {
-        // translation c + t - L c in f64, as an explicit formula
-        let mut m = embed(&linear);
-        for i in 0..3 {
-            let lc = linear[i][0] * centre[0] + linear[i][1] * centre[1] + linear[i][2] * centre[2];
-            m[i][3] = centre[i] + p[3 + i] - lc;
-        }
-        return m;
     }
     let shift = [centre[0] + p[3], centre[1] + p[4], centre[2] + p[5]];
     let mut m = mul(
@@ -270,24 +255,29 @@ mod tests {
     use super::*;
 
     fn close(a: &Mat4, b: &Mat4, tol: f64) -> bool {
-        a.iter().flatten().zip(b.iter().flatten()).all(|(x, y)| (x - y).abs() <= tol)
+        a.iter()
+            .flatten()
+            .zip(b.iter().flatten())
+            .all(|(x, y)| (x - y).abs() <= tol)
     }
 
     #[test]
     fn rotations_follow_the_sign_convention() {
         let r = rotation(0.04, 0.0, 0.0);
-        assert!((r[1][2] - math::sin(0.04)).abs() < 1e-17);
-        assert!((r[2][1] + math::sin(0.04)).abs() < 1e-17);
+        assert!((r[1][2] - math::sin(0.04)).abs() < 1e-8);
+        assert!((r[2][1] + math::sin(0.04)).abs() < 1e-8);
         let r = rotation(0.0, 0.04, 0.0);
-        assert!((r[0][2] + math::sin(0.04)).abs() < 1e-17);
+        assert!((r[0][2] + math::sin(0.04)).abs() < 1e-8);
         let r = rotation(0.0, 0.0, 0.04);
-        assert!((r[0][1] - math::sin(0.04)).abs() < 1e-17);
+        assert!((r[0][1] - math::sin(0.04)).abs() < 1e-8);
     }
 
     #[test]
     fn decomposition_inverts_composition() {
         let c = [80.0, 90.0, 60.0];
-        let p: Params = [0.02, -0.03, 0.01, 1.5, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0];
+        let p: Params = [
+            0.02, -0.03, 0.01, 1.5, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
+        ];
         let m = compose(&p, 6, c);
         let q = decompose(&m, c);
         for k in 0..6 {
@@ -295,7 +285,9 @@ mod tests {
         }
         assert!(close(&compose(&q, 6, c), &m, 1e-5));
         // An affine matrix round-trips through all 12 parameters.
-        let p: Params = [0.02, -0.03, 0.01, 1.5, -2.0, 0.5, 1.1, 0.9, 1.05, 0.02, -0.01, 0.03];
+        let p: Params = [
+            0.02, -0.03, 0.01, 1.5, -2.0, 0.5, 1.1, 0.9, 1.05, 0.02, -0.01, 0.03,
+        ];
         let m = compose(&p, 12, c);
         let q = decompose(&m, c);
         assert!(close(&compose(&q, 12, c), &m, 1e-5));

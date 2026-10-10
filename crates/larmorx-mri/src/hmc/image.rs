@@ -91,7 +91,10 @@ pub fn scaling(h: &NiftiHeader) -> Option<(f32, f32)> {
     if slope == 0.0 || !slope.is_finite() || (slope == 1.0 && inter == 0.0) {
         None
     } else {
-        Some((slope as f32, if inter.is_finite() { inter as f32 } else { 0.0 }))
+        Some((
+            slope as f32,
+            if inter.is_finite() { inter as f32 } else { 0.0 },
+        ))
     }
 }
 
@@ -106,8 +109,10 @@ fn to_f32_vec<T: RealElement>(a: &ArrayD<T>, scale: Option<(f32, f32)>, n: usize
         None => v.to_f32(),
         Some((s, i)) => v.to_f32() * s + i,
     };
-    parallel::with_threads(n, || src.par_iter().with_min_len(1 << 16).map(convert).collect())
-        .unwrap_or_else(|_| src.iter().map(convert).collect())
+    parallel::with_threads(n, || {
+        src.par_iter().with_min_len(1 << 16).map(convert).collect()
+    })
+    .unwrap_or_else(|_| src.iter().map(convert).collect())
 }
 
 /// Reads a series: a 3D image is a series of one volume; dimensions beyond the fourth count
@@ -209,7 +214,11 @@ pub fn strip_image_extension(name: &str) -> &str {
 /// Converts float32 values to the output type by truncation toward zero (§9.4), saturating
 /// at the type's limits (NaN becomes 0).
 fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + Send) -> Vec<T> {
-    values.par_iter().with_min_len(1 << 16).map(|&v| f(v)).collect()
+    values
+        .par_iter()
+        .with_min_len(1 << 16)
+        .map(|&v| f(v))
+        .collect()
 }
 
 /// Writes a corrected series (or any float32 image on the input's grid) like the input:
@@ -277,10 +286,18 @@ pub fn write_like(
     let dims = IxDyn(&shape).f();
     let array = parallel::with_threads(n_threads, || -> Result<DynArray, ImageError> {
         match data_type {
-            DataType::U8 => ArrayD::from_shape_vec(dims, convert(&values, |v| v as u8)).map(Into::into),
-            DataType::I16 => ArrayD::from_shape_vec(dims, convert(&values, |v| v as i16)).map(Into::into),
-            DataType::I32 => ArrayD::from_shape_vec(dims, convert(&values, |v| v as i32)).map(Into::into),
-            DataType::F64 => ArrayD::from_shape_vec(dims, convert(&values, f64::from)).map(Into::into),
+            DataType::U8 => {
+                ArrayD::from_shape_vec(dims, convert(&values, |v| v as u8)).map(Into::into)
+            }
+            DataType::I16 => {
+                ArrayD::from_shape_vec(dims, convert(&values, |v| v as i16)).map(Into::into)
+            }
+            DataType::I32 => {
+                ArrayD::from_shape_vec(dims, convert(&values, |v| v as i32)).map(Into::into)
+            }
+            DataType::F64 => {
+                ArrayD::from_shape_vec(dims, convert(&values, f64::from)).map(Into::into)
+            }
             _ => ArrayD::from_shape_vec(dims, values).map(Into::into),
         }
         .map_err(|e| ImageError::Invalid(e.to_string()))

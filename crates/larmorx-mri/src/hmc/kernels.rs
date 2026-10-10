@@ -68,7 +68,8 @@ fn blackman() -> &'static Table {
             if u.abs() > 3.0 {
                 0.0
             } else {
-                sinc(u) * (0.42 + 0.5 * math::cos(PI * u / 3.0) + 0.08 * math::cos(2.0 * PI * u / 3.0))
+                sinc(u)
+                    * (0.42 + 0.5 * math::cos(PI * u / 3.0) + 0.08 * math::cos(2.0 * PI * u / 3.0))
             }
         })
     })
@@ -186,10 +187,12 @@ impl Spline {
     /// The spline's value at `p`; `background` where `⌊p⌋ < −1` or `⌊p⌋ ≥ n`.
     pub fn value(&self, p: [f32; 3], background: f32) -> f32 {
         let base = p.map(|v| v.floor() as i64);
-        for k in 0..3 {
-            if base[k] < -1 || base[k] >= self.shape[k] as i64 {
-                return background;
-            }
+        if base
+            .iter()
+            .zip(self.shape)
+            .any(|(&b, n)| b < -1 || b >= n as i64)
+        {
+            return background;
         }
         let w = [0, 1, 2].map(|k| bspline_weights(f64::from(p[k]) - base[k] as f64));
         let mut sum = 0.0f64;

@@ -2,34 +2,19 @@
 //! The registration cost (`specs/mcflirt.md` §6): a reference grid compared with a test
 //! volume at full resolution, sampled at the positions a candidate matrix maps the grid to.
 //!
-//! The sampling loops reproduce the float32 arithmetic of §6.1–§6.4: incremental float32
-//! positions along each row, only points inside the test volume, a linear edge weight, and the
-//! correlation's sums accumulated in three float32 levels (row, slice, grid), with its peculiar
-//! count `N`.
+//! The sampling loop reproduces the float32 arithmetic of §6.1–§6.3: a voxel map rounded to
+//! float32, positions stepped along each row by float32 additions, only points inside the test
+//! volume, trilinear (or, in stage 4, windowed-sinc) interpolation and a linear edge weight. The
+//! normalised correlation (§6.4) accumulates its sums in three float32 levels (row, slice, grid)
+//! and uses mcflirt's count `N`. Black-box runs settled what the spec leaves open (all
+//! *observed* in `specs/mcflirt.md`): square roots in float32, sums in exactly three levels.
+
+use rayon::prelude::*;
+
+use larmorx_core::math;
 
 use super::interp::trilinear_inside;
-
-/// DEV ONLY: second variant word.
-pub fn variant2() -> u64 {
-    static V: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *V.get_or_init(|| {
-        std::env::var("LARMORX_HMC_V2")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0)
-    })
-}
-
-/// DEV ONLY: numeric variants under test (removed before commit).
-pub fn variant() -> u64 {
-    static V: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *V.get_or_init(|| {
-        std::env::var("LARMORX_HMC_VARIANT")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0)
-    })
-}
+use super::kernels::sinc_cost;
 use super::rigid::{self, Mat4};
 use super::volume::Volume;
 
@@ -39,18 +24,20 @@ pub enum CostFunction {
     /// Normalised correlation as mcflirt computes it (the default).
     #[default]
     NormCorr,
-    /// Pearson's correlation, centred (larmorx's option; not an mcflirt cost).
-    Pearson,
+    /// Least squares: the weighted mean squared difference.
     LeastSquares,
+    /// One minus the correlation ratio of the test values given the reference bin.
     CorrRatio,
+    /// Woods' criterion (ratio image uniformity).
     Woods,
+    /// Minus the mutual information.
     MutualInfo,
+    /// Minus the normalised mutual information.
     NormMi,
 }
 
 impl CostFunction {
-    /// The cost named on the command line (`normcorr`, `leastsquares`, `corratio`, `woods`,
-    /// `mutualinfo`, `normmi`).
+    /// The cost named on the command line.
     pub fn from_name(name: &str) -> Option<CostFunction> {
         Some(match name {
             "normcorr" => CostFunction::NormCorr,
@@ -59,16 +46,25 @@ impl CostFunction {
             "woods" => CostFunction::Woods,
             "mutualinfo" => CostFunction::MutualInfo,
             "normmi" => CostFunction::NormMi,
-            "pearson" => CostFunction::Pearson,
             _ => return None,
         })
+    }
+
+    /// Whether the cost bins the reference into a histogram (`-bins` applies).
+    pub fn is_histogram(self) -> bool {
+        matches!(
+            self,
+            CostFunction::CorrRatio
+                | CostFunction::Woods
+                | CostFunction::MutualInfo
+                | CostFunction::NormMi
+        )
     }
 
     /// The name of the cost.
     pub fn name(self) -> &'static str {
         match self {
             CostFunction::NormCorr => "normcorr",
-            CostFunction::Pearson => "pearson",
             CostFunction::LeastSquares => "leastsquares",
             CostFunction::CorrRatio => "corratio",
             CostFunction::Woods => "woods",
@@ -82,39 +78,20 @@ impl CostFunction {
 /// `B = Dv⁻¹ · M⁻¹ · Dg` in double, each entry rounded to float32 (§6.1). Row `k` gives test
 /// voxel coordinate `k` of a grid point `(x, y, z, 1)`.
 pub fn voxel_map(m: &Mat4, test_voxel: [f32; 3], grid_voxel: [f32; 3]) -> [[f32; 4]; 3] {
-    let v = variant();
-    let m = &if v & 4194304 != 0 { m.map(|r| r.map(|x| f64::from(x as f32))) } else { *m };
     let dv_inv = rigid::diagonal(test_voxel.map(|d| 1.0 / f64::from(d)));
     let dg = rigid::diagonal(grid_voxel.map(f64::from));
-    let mut minv = if v & (1 << 45) != 0 {
-        // rigid inverse: R^T and -R^T t
-        let mut r = rigid::IDENTITY;
-        for i in 0..3 { for j in 0..3 { r[i][j] = m[j][i]; } }
-        for i in 0..3 { r[i][3] = -(r[i][0] * m[0][3] + r[i][1] * m[1][3] + r[i][2] * m[2][3]); }
-        r
-    } else if v & (1 << 46) != 0 {
-        larmorx_core::linalg::inverse4(m).unwrap_or(rigid::NAN_MATRIX)
-    } else {
-        rigid::inverse(m)
-    };
-    if v & 8388608 != 0 {
-        minv = minv.map(|r| r.map(|x| f64::from(x as f32)));
-    }
-    let b = if v & 16777216 != 0 {
-        // scale rows/cols explicitly
-        let mut b = minv;
-        for i in 0..3 { for j in 0..4 { b[i][j] = minv[i][j] / f64::from(test_voxel[i]); } }
-        for i in 0..3 { for j in 0..3 { b[i][j] *= f64::from(grid_voxel[j]); } }
-        b
-    } else {
-        rigid::mul(&rigid::mul(&dv_inv, &minv), &dg)
-    };
-    BD.with(|c| c.set(b));
+    let b = rigid::mul(&rigid::mul(&dv_inv, &rigid::inverse(m)), &dg);
     [0, 1, 2].map(|i| [0, 1, 2, 3].map(|j| b[i][j] as f32))
 }
 
-thread_local! {
-    pub static BD: std::cell::Cell<[[f64; 4]; 4]> = const { std::cell::Cell::new([[0.0; 4]; 4]) };
+/// How the test volume is interpolated in the cost.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CostInterpolation {
+    Trilinear,
+    /// Stage 4 (§6.5): Hanning-windowed sinc; `background` where the weights vanish.
+    Sinc {
+        background: f32,
+    },
 }
 
 /// What the cost needs about a test volume, computed once per volume and stage.
@@ -124,15 +101,23 @@ pub struct TestVolume<'a> {
     pub bound: [f32; 3],
     /// The edge-weighting width per axis in voxels (`smooth / d_k`); 0 turns weighting off.
     pub sigma: [f32; 3],
+    pub interpolation: CostInterpolation,
 }
 
 impl<'a> TestVolume<'a> {
+    /// A test volume with edge-weighting width `smooth` mm and trilinear interpolation.
     pub fn new(vol: &'a Volume, smooth: f32) -> TestVolume<'a> {
         TestVolume {
             vol,
-            bound: vol.shape.map(|n| if variant() & 65536 != 0 { n as f32 - 1.0001f32 } else { (n as f64 - 1.0001) as f32 }),
-            sigma: vol.voxel_size.map(|d| { let v2 = variant2(); if v2 & 4 != 0 { smooth } else if v2 & 8 != 0 { smooth / 8.0 } else if v2 & 16 != 0 { 2.0 * smooth / d } else if v2 & 32 != 0 { 0.5 * smooth / d } else { smooth / d } }),
+            bound: vol.shape.map(|n| (n as f64 - 1.0001) as f32),
+            sigma: vol.voxel_size.map(|d| smooth / d),
+            interpolation: CostInterpolation::Trilinear,
         }
+    }
+
+    /// Whether every point is weighted (`smooth > 0`).
+    pub fn weighted(&self) -> bool {
+        self.sigma.iter().all(|&s| s > 0.0)
     }
 
     #[inline(always)]
@@ -145,57 +130,13 @@ impl<'a> TestVolume<'a> {
             && p[2] <= self.bound[2]
     }
 
-    /// The edge weight at `p` (§6.3).
+    /// The edge weight at `p` (§6.3): per axis `p/σ` within `σ` of 0, `(b − p)/σ` within `σ`
+    /// of the bound, else 1; the product of the three in float32.
     #[inline(always)]
     fn weight(&self, p: [f32; 3]) -> f32 {
-        let v = variant();
-        if v & (1 << 47) != 0 {
-            return 1.0;
-        }
-        let wv = (v >> 40) & 0x1f;
-        if wv >= 5 {
-            let axis = |k: usize| -> f32 {
-                let d = self.vol.voxel_size[k];
-                let s = self.sigma[k];
-                let b = self.bound[k];
-                if p[k] < s {
-                    if wv == 5 { (p[k] * d) / 1.0 } else if wv == 6 { p[k] * (d / 1.0) } else { p[k] * d }
-                } else if b - p[k] < s {
-                    if wv == 5 { ((b - p[k]) * d) / 1.0 } else if wv == 6 { (b - p[k]) * (d / 1.0) } else { (b - p[k]) * d }
-                } else {
-                    1.0
-                }
-            };
-            let w = axis(0) * axis(1) * axis(2);
-            return if w < 0.0 { 0.0 } else { w };
-        }
-        if wv != 0 {
-            let axis = |k: usize| -> f64 {
-                let d = f64::from(self.vol.voxel_size[k]);
-                let sig = 1.0 / d; // smooth = 1
-                let pk = f64::from(p[k]);
-                let b = if wv == 3 { self.vol.shape[k] as f64 - 1.0 } else if wv == 4 { f64::from(self.bound[k]) } else { self.vol.shape[k] as f64 - 1.0001 };
-                if pk < sig { pk / sig } else if b - pk < sig { (b - pk) / sig } else { 1.0 }
-            };
-            if wv == 1 || wv == 3 || wv == 4 {
-                let w = (axis(0) as f32) * (axis(1) as f32) * (axis(2) as f32);
-                return if w < 0.0 { 0.0 } else { w };
-            }
-            let w = (axis(0) * axis(1) * axis(2)) as f32;
-            return if w < 0.0 { 0.0 } else { w };
-        }
         let axis = |k: usize| {
             let s = self.sigma[k];
-            if v & 1 != 0 {
-                let inv = 1.0 / s;
-                if p[k] < s {
-                    p[k] * inv
-                } else if self.bound[k] - p[k] < s {
-                    (self.bound[k] - p[k]) * inv
-                } else {
-                    1.0
-                }
-            } else if p[k] < s {
+            if p[k] < s {
                 p[k] / s
             } else if self.bound[k] - p[k] < s {
                 (self.bound[k] - p[k]) / s
@@ -203,8 +144,16 @@ impl<'a> TestVolume<'a> {
                 1.0
             }
         };
-        let w = if v & 64 != 0 { axis(0) * (axis(1) * axis(2)) } else { axis(0) * axis(1) * axis(2) };
+        let w = axis(0) * axis(1) * axis(2);
         if w < 0.0 { 0.0 } else { w }
+    }
+
+    #[inline(always)]
+    fn value(&self, p: [f32; 3]) -> f32 {
+        match self.interpolation {
+            CostInterpolation::Trilinear => trilinear_inside(self.vol, p[0], p[1], p[2]),
+            CostInterpolation::Sinc { background } => sinc_cost(self.vol, p, background),
+        }
     }
 }
 
@@ -213,28 +162,6 @@ impl<'a> TestVolume<'a> {
 /// grid. `None` if empty.
 #[inline]
 fn row_range(row0: [f32; 3], step: [f32; 3], bound: [f32; 3], nx: usize) -> Option<(usize, usize)> {
-    if variant() & (1 << 30) != 0 {
-        return Some((0, nx - 1));
-    }
-    if variant() & (1 << 31) != 0 {
-        let mut lo = 0.0f32;
-        let mut hi = nx as f32 - 1.0;
-        for k in 0..3 {
-            let (r, s, b) = (row0[k], step[k], bound[k]);
-            if s == 0.0 {
-                if !(r >= 0.0 && r <= b) {
-                    return None;
-                }
-                continue;
-            }
-            let (a0, a1) = ((0.0 - r) / s, (b - r) / s);
-            let (l, h) = if s > 0.0 { (a0, a1) } else { (a1, a0) };
-            lo = lo.max(l);
-            hi = hi.min(h);
-        }
-        let (lo, hi) = (lo.ceil(), hi.floor());
-        return if lo <= hi && lo >= 0.0 { Some((lo as usize, hi as usize)) } else { None };
-    }
     let mut lo = 0.0f64;
     let mut hi = nx as f64 - 1.0;
     for k in 0..3 {
@@ -259,8 +186,76 @@ fn row_range(row0: [f32; 3], step: [f32; 3], bound: [f32; 3], nx: usize) -> Opti
     }
 }
 
-/// The five weighted sums of the correlation and the total weight.
-#[derive(Clone, Copy, Default)]
+/// Receives the contributing points of a sampling pass, row by row.
+pub trait Accumulator: Send {
+    /// One contributing point: grid value `g`, interpolated test value `v`, edge weight `w`.
+    fn point(&mut self, g: f32, v: f32, w: f32);
+    /// The end of a row (every row of the grid, also rows without points).
+    fn end_row(&mut self);
+}
+
+/// Visits the contributing points of grid slice `z` (§6.1).
+#[inline(always)]
+fn sample_slice<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    z: usize,
+    acc: &mut A,
+) {
+    let [gx, gy, _] = grid.shape;
+    let step = [b[0][0], b[1][0], b[2][0]];
+    let zf = z as f32;
+    let weighted = test.weighted();
+    for y in 0..gy {
+        let yf = y as f32;
+        let row0 = [0, 1, 2].map(|k| yf * b[k][1] + zf * b[k][2] + b[k][3]);
+        if let Some((x0, x1)) = row_range(row0, step, test.bound, gx) {
+            let x0f = x0 as f32;
+            let mut p = [0, 1, 2].map(|k| row0[k] + x0f * step[k]);
+            let grow = &grid.data[gx * (y + gy * z)..gx * (y + gy * z + 1)];
+            let mut x = x0;
+            // Leading points that fail are dropped; the row ends at the first later failure.
+            while x <= x1 && !test.inside(p) {
+                p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
+                x += 1;
+            }
+            while x <= x1 && test.inside(p) {
+                let w = if weighted { test.weight(p) } else { 1.0 };
+                acc.point(grow[x], test.value(p), w);
+                p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
+                x += 1;
+            }
+        }
+        acc.end_row();
+    }
+}
+
+/// Samples the whole grid: one accumulator per slice (made by `make`), in slice order. With
+/// `parallel`, the slices are sampled in parallel; each has its own accumulator, so the result
+/// is the same.
+pub fn sample<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    parallel: bool,
+    make: impl Fn() -> A + Sync,
+) -> Vec<A> {
+    let nz = grid.shape[2];
+    let one = |z: usize| {
+        let mut acc = make();
+        sample_slice(grid, test, b, z, &mut acc);
+        acc
+    };
+    if parallel {
+        (0..nz).into_par_iter().map(one).collect()
+    } else {
+        (0..nz).map(one).collect()
+    }
+}
+
+/// The five sums of the correlation.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct Sums {
     sx: f32,
     sy: f32,
@@ -280,207 +275,56 @@ impl Sums {
     }
 }
 
-/// The sums of one slice of the grid and the total weight of each of its rows.
-struct SliceSums {
-    sums: Sums,
-    rows: Vec<Sums>,
-    /// The number of contributing points (the count of the unweighted, centred form).
-    points: u32,
+/// The correlation sums of one slice (§6.4): float32 running sums over each row, the row
+/// totals summed over the slice; the total weight of every row; the number of points.
+#[derive(Default)]
+struct CorrSlice {
+    slice: Sums,
+    row: Sums,
+    row_weight: f32,
     row_weights: Vec<f32>,
+    points: u32,
 }
 
-/// Visits the admissible points of grid slice `z` (§6.1), calling `point(g, p, w)` with the
-/// grid value, the test position and the edge weight, and collecting the per-row sums.
-#[inline(always)]
-fn slice_sums(
-    grid: &Volume,
-    test: &TestVolume<'_>,
-    b: &[[f32; 4]; 3],
-    z: usize,
-    weighted: bool,
-) -> SliceSums {
-    let [gx, gy, _] = grid.shape;
-    let step = [b[0][0], b[1][0], b[2][0]];
-    let zf = z as f32;
-    let mut out = SliceSums {
-        sums: Sums::default(),
-        rows: Vec::new(),
-        points: 0,
-        row_weights: Vec::with_capacity(gy),
-    };
-    let mut acc = [0, 1, 2].map(|k| zf * b[k][2] + b[k][3]);
-    for y in 0..gy {
-        let yf = y as f32;
-        let row0 = if variant2() & (1 << 23) != 0 {
-            let bd = BD.with(|c| c.get());
-            [0, 1, 2].map(|k| (f64::from(yf) * bd[k][1] + f64::from(zf) * bd[k][2] + bd[k][3]) as f32)
-        } else if variant() & (1 << 57) != 0 {
-            let r = acc;
-            acc = [acc[0] + b[0][1], acc[1] + b[1][1], acc[2] + b[2][1]];
-            r
-        } else if variant() & (1 << 58) != 0 {
-            [0, 1, 2].map(|k| (f64::from(yf) * f64::from(b[k][1]) + f64::from(zf) * f64::from(b[k][2]) + f64::from(b[k][3])) as f32)
-        } else if variant() & 1048576 != 0 {
-            [0, 1, 2].map(|k| b[k][3] + yf * b[k][1] + zf * b[k][2])
-        } else if variant() & 2097152 != 0 {
-            [0, 1, 2].map(|k| yf * b[k][1] + (zf * b[k][2] + b[k][3]))
-        } else {
-            [0, 1, 2].map(|k| yf * b[k][1] + zf * b[k][2] + b[k][3])
-        };
-        let mut row = Sums::default();
-        let mut row_weight = 0.0f32;
-        let mut had_range = false;
-        let mut had_points = false;
-        let mut terms: Vec<(f32, f32, f32, f32, f32, f32)> = Vec::new();
-        if let Some((x0, x1)) = row_range(row0, step, test.bound, gx) {
-            had_range = true;
-            let x0f = x0 as f32;
-            let vv = variant();
-            let mut p = if vv & (1 << 49) != 0 {
-                [0, 1, 2].map(|k| (f64::from(row0[k]) + x0 as f64 * f64::from(step[k])) as f32)
-            } else {
-                [0, 1, 2].map(|k| row0[k] + x0f * step[k])
-            };
-            let grow = &grid.data[gx * (y + gy * z)..gx * (y + gy * z + 1)];
-            let mut x = x0;
-            while x <= x1 && !test.inside(p) {
-                p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
-                x += 1;
-            }
-            while x <= x1 && test.inside(p) {
-                let g = grow[x];
-                let v = if variant() & 524288 != 0 {
-                    super::interp::trilinear_weights(test.vol, p[0], p[1], p[2])
-                } else {
-                    trilinear_inside(test.vol, p[0], p[1], p[2])
-                };
-                let w = if weighted { test.weight(p) } else { 1.0 };
-                let wg = w * g;
-                let wv = w * v;
-                let v2 = variant2();
-                if v2 & (1 << 22) != 0 {
-                    terms.push((wg, wv, wg * g, wv * v, wg * v, w));
-                    out.points += 1;
-                    had_points = true;
-                    x += 1;
-                    p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
-                    continue;
-                }
-                row.sx += wg;
-                row.sy += wv;
-                row.sxx += if v2 & 1024 != 0 { w * (g * g) } else { wg * g };
-                row.syy += if v2 & 1024 != 0 { w * (v * v) } else { wv * v };
-                row.sxy += if v2 & 2048 != 0 { wv * g } else if v2 & 4096 != 0 { w * (g * v) } else { wg * v };
-                row_weight += w;
-                out.points += 1;
-                had_points = true;
-                x += 1;
-                if vv & (1 << 48) != 0 {
-                    let xf = x as f32;
-                    p = [0, 1, 2].map(|k| row0[k] + xf * step[k]);
-                } else {
-                    p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
-                }
-            }
-        }
-        for t in terms.drain(..).rev() {
-            row.sx += t.0;
-            row.sy += t.1;
-            row.sxx += t.2;
-            row.syy += t.3;
-            row.sxy += t.4;
-            row_weight += t.5;
-        }
-        if std::env::var_os("LARMORX_HMC_DUMP").is_some() {
-            println!("z {z} y {y} row0 {:?} pts {} w {:e} sx {:e} sy {:e} sxx {:e} syy {:e} sxy {:e}", row0, had_points as u8, row_weight, row.sx, row.sy, row.sxx, row.syy, row.sxy);
-        }
-        out.sums.add(&row);
-        out.rows.push(row);
-        let vv = variant();
-        if vv & (1 << 52) != 0 && !had_range {
-            continue;
-        }
-        if vv & (1 << 53) != 0 && !had_points {
-            continue;
-        }
-        out.row_weights.push(row_weight);
+impl Accumulator for CorrSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let wg = w * g;
+        let wv = w * v;
+        self.row.sx += wg;
+        self.row.sy += wv;
+        self.row.sxx += wg * g;
+        self.row.syy += wv * v;
+        self.row.sxy += wg * v;
+        self.row_weight += w;
+        self.points += 1;
     }
-    out
+
+    fn end_row(&mut self) {
+        let row = std::mem::take(&mut self.row);
+        self.slice.add(&row);
+        self.row_weights.push(std::mem::take(&mut self.row_weight));
+    }
 }
 
-/// The normalised-correlation cost `1 − |r|` of the grid against the test volume mapped by
-/// `b` (§6.4). With weighting (`smooth > 0`), the correlation uses mcflirt's count `N`; without,
-/// the number of contributing points.
-pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3]) -> f32 {
-    let weighted = test.sigma.iter().all(|&s| s > 0.0);
+/// The normalised-correlation cost `1 − |r|` (§6.4). With weighting (`smooth > 0`), the
+/// correlation uses mcflirt's count `N` (a float32 running sum of running sums of the row
+/// weights); without, the number of contributing points (Pearson's correlation).
+pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], parallel: bool) -> f32 {
+    let slices = sample(grid, test, b, parallel, CorrSlice::default);
     let mut total = Sums::default();
     let (mut c, mut a, mut n) = (0.0f32, 0.0f32, 0.0f32);
     let mut points = 0u32;
-    let nv = variant() >> 32;
-    let mut wsum = 0.0f32;
-    for z in 0..grid.shape[2] {
-        let s = slice_sums(grid, test, b, z, weighted);
-        if nv == 2 {
-            c = 0.0;
-            a = 0.0;
-        }
+    for s in &slices {
         for &w in &s.row_weights {
             c += w;
             a += c;
-            wsum += w;
         }
         n += a;
-        if variant2() & 256 != 0 {
-            for r in &s.rows {
-                total.add(r);
-            }
-        } else {
-            total.add(&s.sums);
-        }
+        total.add(&s.slice);
         points += s.points;
     }
-    if nv == 1 {
-        n = a;
-    } else if nv == 3 {
-        n = wsum;
-    } else if nv == 4 {
-        n = 2.0 * n;
-    } else if nv == 5 {
-        n = 1.01 * n;
-    } else if nv == 6 {
-        n *= 1.0001;
-    } else if nv == 7 {
-        n *= 1.00001;
-    } else if nv == 8 {
-        n *= 1.000001;
-    } else if nv == 9 {
-        n = f32::from_bits(n.to_bits() + 1);
-    }
-    let v2 = variant2();
-    if weighted && (v2 & (1 << 20) != 0 || v2 & (1 << 21) != 0) {
-        let s = &total;
-        if !(n > 2.0) {
-            return 1.0;
-        }
-        let n1 = f64::from(n) - 1.0;
-        let nn = n * n;
-        let (cov, varx, vary) = if v2 & (1 << 20) != 0 {
-            (
-                f64::from((f64::from(s.sxy) / n1 - f64::from((s.sx * s.sy) / nn)) as f32),
-                f64::from((f64::from(s.sxx) / n1 - f64::from((s.sx * s.sx) / nn)) as f32),
-                f64::from((f64::from(s.syy) / n1 - f64::from((s.sy * s.sy) / nn)) as f32),
-            )
-        } else {
-            (
-                f64::from(s.sxy) / n1 - f64::from((s.sx * s.sy) / nn),
-                f64::from(s.sxx) / n1 - f64::from((s.sx * s.sx) / nn),
-                f64::from(s.syy) / n1 - f64::from((s.sy * s.sy) / nn),
-            )
-        };
-        let r = if varx > 0.0 && vary > 0.0 { cov / varx.sqrt() / vary.sqrt() } else { 0.0 };
-        return (1.0 - r.abs()) as f32;
-    }
-    let r = if weighted {
+    let r = if test.weighted() {
         correlation_weighted(&total, n)
     } else {
         correlation_counted(&total, points as f32)
@@ -488,72 +332,20 @@ pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3]) -> f32 
     1.0 - r.abs()
 }
 
-/// The correlation of §6.4 with mcflirt's count `N`: the divisions by `N − 1` in double, the
-/// products and the second divisions in float32.
+/// The correlation with mcflirt's count `N`: the divisions by `N − 1` in double, the
+/// products and the second divisions in float32, `cov`, `varx`, `vary` and the square roots
+/// in float32.
 fn correlation_weighted(s: &Sums, n: f32) -> f32 {
-    if !(n > 2.0) {
+    if n.partial_cmp(&2.0) != Some(std::cmp::Ordering::Greater) {
         return 0.0;
     }
-    let v = variant();
     let n1 = f64::from(n) - 1.0;
     let nn = n * n;
-    let v2 = variant2();
-    if v2 & (1 << 18) != 0 || v2 & (1 << 19) != 0 {
-        let (cov, varx, vary) = if v2 & (1 << 18) != 0 {
-            (
-                f64::from(s.sxy) / n1 - f64::from((s.sx * s.sy) / nn),
-                f64::from(s.sxx) / n1 - f64::from((s.sx * s.sx) / nn),
-                f64::from(s.syy) / n1 - f64::from((s.sy * s.sy) / nn),
-            )
-        } else {
-            let nn = f64::from(n) * f64::from(n);
-            let (sx, sy) = (f64::from(s.sx), f64::from(s.sy));
-            (f64::from(s.sxy) / n1 - sx * sy / nn, f64::from(s.sxx) / n1 - sx * sx / nn, f64::from(s.syy) / n1 - sy * sy / nn)
-        };
-        return if varx > 0.0 && vary > 0.0 { (cov / varx.sqrt() / vary.sqrt()) as f32 } else { 0.0 };
-    }
-    let (cov, varx, vary) = if v & 16 != 0 {
-        let n1 = n - 1.0;
-        (s.sxy / n1 - (s.sx * s.sy) / nn, s.sxx / n1 - (s.sx * s.sx) / nn, s.syy / n1 - (s.sy * s.sy) / nn)
-    } else if v & 268435456 != 0 {
-        (
-            (f64::from(s.sxy) / n1) as f32 - (s.sx * s.sy) / nn,
-            (f64::from(s.sxx) / n1) as f32 - (s.sx * s.sx) / nn,
-            (f64::from(s.syy) / n1) as f32 - (s.sy * s.sy) / nn,
-        )
-    } else if v & 536870912 != 0 {
-        // divisions by N-1 as multiplications by a double reciprocal
-        let inv = 1.0 / n1;
-        (
-            (f64::from(s.sxy) * inv - f64::from((s.sx * s.sy) / nn)) as f32,
-            (f64::from(s.sxx) * inv - f64::from((s.sx * s.sx) / nn)) as f32,
-            (f64::from(s.syy) * inv - f64::from((s.sy * s.sy) / nn)) as f32,
-        )
-    } else if v & 32 != 0 {
-        let nn = f64::from(n) * f64::from(n);
-        let (sx, sy) = (f64::from(s.sx), f64::from(s.sy));
-        (
-            (f64::from(s.sxy) / n1 - sx * sy / nn) as f32,
-            (f64::from(s.sxx) / n1 - sx * sx / nn) as f32,
-            (f64::from(s.syy) / n1 - sy * sy / nn) as f32,
-        )
-    } else {
-        (
-            (f64::from(s.sxy) / n1 - f64::from((s.sx * s.sy) / nn)) as f32,
-            (f64::from(s.sxx) / n1 - f64::from((s.sx * s.sx) / nn)) as f32,
-            (f64::from(s.syy) / n1 - f64::from((s.sy * s.sy) / nn)) as f32,
-        )
-    };
+    let cov = (f64::from(s.sxy) / n1 - f64::from((s.sx * s.sy) / nn)) as f32;
+    let varx = (f64::from(s.sxx) / n1 - f64::from((s.sx * s.sx) / nn)) as f32;
+    let vary = (f64::from(s.syy) / n1 - f64::from((s.sy * s.sy) / nn)) as f32;
     if varx > 0.0 && vary > 0.0 {
-        if v & 4 != 0 {
-            (f64::from(cov) / f64::from(varx).sqrt() / f64::from(vary).sqrt()) as f32
-        } else if v & 8 != 0 {
-            cov / (varx.sqrt() * vary.sqrt())
-        } else if v & 128 != 0 {
-            (f64::from(cov) / (f64::from(varx) * f64::from(vary)).sqrt()) as f32
-        } else {
-            cov / varx.sqrt() / vary.sqrt()
-        }
+        cov / varx.sqrt() / vary.sqrt()
     } else {
         0.0
     }
@@ -561,7 +353,7 @@ fn correlation_weighted(s: &Sums, n: f32) -> f32 {
 
 /// The unweighted correlation (`-smooth 0`): Pearson's, in float32.
 fn correlation_counted(s: &Sums, n: f32) -> f32 {
-    if !(n > 2.0) {
+    if n.partial_cmp(&2.0) != Some(std::cmp::Ordering::Greater) {
         return 0.0;
     }
     let n1 = n - 1.0;
@@ -573,6 +365,276 @@ fn correlation_counted(s: &Sums, n: f32) -> f32 {
         cov / varx.sqrt() / vary.sqrt()
     } else {
         0.0
+    }
+}
+
+/// Least squares (appendix A): the weighted mean of `(g − v)²`.
+#[derive(Default)]
+struct SquaresSlice {
+    sum: f64,
+    weight: f64,
+}
+
+impl Accumulator for SquaresSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let d = f64::from(g) - f64::from(v);
+        self.sum += f64::from(w) * d * d;
+        self.weight += f64::from(w);
+    }
+    fn end_row(&mut self) {}
+}
+
+/// The least-squares cost; an empty overlap gives `(max − min)²` over both images.
+pub fn least_squares(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    parallel: bool,
+) -> f32 {
+    let slices = sample(grid, test, b, parallel, SquaresSlice::default);
+    let (sum, weight) = slices
+        .iter()
+        .fold((0.0, 0.0), |(s, w), x| (s + x.sum, w + x.weight));
+    if weight > 0.0 {
+        (sum / weight) as f32
+    } else {
+        let (lo, hi) = [grid, test.vol]
+            .iter()
+            .flat_map(|v| v.data.iter())
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &x| {
+                (l.min(x), h.max(x))
+            });
+        (hi - lo) * (hi - lo)
+    }
+}
+
+/// Reference bins (appendix A): `⌊(g − g_min)·B/(g_max − g_min)⌋` clamped to `0 … B−1`,
+/// returned as a grid of bin indices (the histogram costs sample it in place of the values).
+pub fn bin_grid(grid: &Volume, bins: usize) -> Volume {
+    let (lo, hi) = min_max(&grid.data);
+    let range = if hi - lo == 0.0 { 1.0 } else { hi - lo };
+    let b = bins.max(1);
+    let data = grid
+        .data
+        .iter()
+        .map(|&g| {
+            let k = ((g - lo) * b as f32 / range).floor();
+            (k.max(0.0) as usize).min(b - 1) as f32
+        })
+        .collect();
+    Volume::new(grid.shape, grid.voxel_size, data)
+}
+
+/// The smallest and largest finite values.
+pub fn min_max(data: &[f32]) -> (f32, f32) {
+    data.iter()
+        .filter(|v| v.is_finite())
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &x| {
+            (l.min(x), h.max(x))
+        })
+}
+
+/// Per-bin moments of the test values: weighted `[Σw, Σwv, Σwv²]` and unweighted
+/// `[n, Σv, Σv²]`.
+struct BinSlice {
+    weighted: Vec<[f64; 3]>,
+    plain: Vec<[f64; 3]>,
+}
+
+impl BinSlice {
+    fn new(bins: usize) -> BinSlice {
+        BinSlice {
+            weighted: vec![[0.0; 3]; bins],
+            plain: vec![[0.0; 3]; bins],
+        }
+    }
+}
+
+impl Accumulator for BinSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let k = (g as usize).min(self.weighted.len() - 1);
+        let (w, v) = (f64::from(w), f64::from(v));
+        let s = &mut self.weighted[k];
+        s[0] += w;
+        s[1] += w * v;
+        s[2] += w * v * v;
+        let s = &mut self.plain[k];
+        s[0] += 1.0;
+        s[1] += v;
+        s[2] += v * v;
+    }
+    fn end_row(&mut self) {}
+}
+
+fn merge_bins(slices: Vec<BinSlice>, bins: usize) -> BinSlice {
+    let mut out = BinSlice::new(bins);
+    for s in slices {
+        for k in 0..bins {
+            for j in 0..3 {
+                out.weighted[k][j] += s.weighted[k][j];
+                out.plain[k][j] += s.plain[k][j];
+            }
+        }
+    }
+    out
+}
+
+/// One minus the correlation ratio (appendix A): `Σ_b n_b·var_b / (n·var)` over bins with
+/// `n_b > 2`, weighted; 0 if the total variance is not positive. `bin_grid` holds bin indices.
+pub fn corr_ratio(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    parallel: bool,
+) -> f32 {
+    let m = merge_bins(
+        sample(bin_grid, test, b, parallel, || BinSlice::new(bins)),
+        bins,
+    );
+    let (mut n, mut s, mut ss) = (0.0, 0.0, 0.0);
+    for st in &m.weighted {
+        n += st[0];
+        s += st[1];
+        ss += st[2];
+    }
+    if n <= 1.0 {
+        return 1.0;
+    }
+    let var = (ss - s * s / n) / (n - 1.0);
+    if var <= 0.0 {
+        return 0.0;
+    }
+    let within: f64 = m
+        .weighted
+        .iter()
+        .filter(|st| st[0] > 2.0)
+        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
+        .sum();
+    (within / (n * var)) as f32
+}
+
+/// Woods' criterion (appendix A), unweighted: `Σ_b n_b²·σ_b/μ_b / n` (`σ_b` alone where the bin
+/// mean is not positive); `1e10` for an empty overlap.
+pub fn woods(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    parallel: bool,
+) -> f32 {
+    let m = merge_bins(
+        sample(bin_grid, test, b, parallel, || BinSlice::new(bins)),
+        bins,
+    );
+    let n: f64 = m.plain.iter().map(|st| st[0]).sum();
+    if n <= 0.0 {
+        return 1e10;
+    }
+    let mut cost = 0.0;
+    for st in &m.plain {
+        let nb = st[0];
+        if nb > 1.0 {
+            let mean = st[1] / nb;
+            let sd = ((st[2] - st[1] * st[1] / nb) / (nb - 1.0)).max(0.0).sqrt();
+            cost += nb * nb * if mean > 0.0 { sd / mean } else { sd };
+        }
+    }
+    (cost / n) as f32
+}
+
+/// A joint histogram of reference bins and test bins with fuzzy binning (appendix A).
+struct JointSlice {
+    hist: Vec<f64>,
+    bins: usize,
+    lo: f32,
+    range: f32,
+    overlap: f64,
+}
+
+impl Accumulator for JointSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let bins = self.bins;
+        let r = (g as usize).min(bins - 1);
+        // The sample is spread over its bin and the nearer neighbour, linearly within half a
+        // bin of the bin's centre.
+        let t = f64::from((v - self.lo) * bins as f32 / self.range);
+        let k = (t.floor().max(0.0) as usize).min(bins - 1);
+        let frac = t - k as f64 - 0.5;
+        let (other, share) = if frac >= 0.0 {
+            ((k + 1).min(bins - 1), frac.min(0.5))
+        } else {
+            (k.saturating_sub(1), (-frac).min(0.5))
+        };
+        let w = f64::from(w);
+        self.hist[r * bins + k] += w * (1.0 - share);
+        self.hist[r * bins + other] += w * share;
+        self.overlap += 1.0;
+    }
+    fn end_row(&mut self) {}
+}
+
+/// The mutual-information costs (appendix A): `−MI`, or `−(H1 + H2)/H12` when `normalised`.
+/// Entropies use probabilities `count / grid points`, corrected to the overlap size by
+/// `H' = (n_grid/n_overlap)·H − log(n_grid/n_overlap)`.
+pub fn mutual_info(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    normalised: bool,
+    parallel: bool,
+) -> f32 {
+    let (lo, hi) = min_max(&test.vol.data);
+    let range = if hi - lo == 0.0 { 1.0 } else { hi - lo };
+    let make = || JointSlice {
+        hist: vec![0.0; bins * bins],
+        bins,
+        lo,
+        range,
+        overlap: 0.0,
+    };
+    let mut hist = vec![0.0f64; bins * bins];
+    let mut overlap = 0.0;
+    for s in sample(bin_grid, test, b, parallel, make) {
+        for (h, x) in hist.iter_mut().zip(&s.hist) {
+            *h += x;
+        }
+        overlap += s.overlap;
+    }
+    if overlap <= 0.0 {
+        return 0.0;
+    }
+    let n_grid = bin_grid.len() as f64;
+    let entropy = |counts: &mut dyn Iterator<Item = f64>| -> f64 {
+        counts
+            .filter(|&c| c > 0.0)
+            .map(|c| {
+                let q = c / n_grid;
+                -q * math::log(q)
+            })
+            .sum()
+    };
+    let ratio = n_grid / overlap;
+    let correct = |h: f64| ratio * h - math::log(ratio);
+    let h12 = correct(entropy(&mut hist.iter().copied()));
+    let h1 = correct(entropy(
+        &mut (0..bins).map(|r| hist[r * bins..(r + 1) * bins].iter().sum()),
+    ));
+    let h2 = correct(entropy(
+        &mut (0..bins).map(|t| (0..bins).map(|r| hist[r * bins + t]).sum()),
+    ));
+    if normalised {
+        if h12 > 0.0 {
+            (-(h1 + h2) / h12) as f32
+        } else {
+            0.0
+        }
+    } else {
+        (-(h1 + h2 - h12)) as f32
     }
 }
 
@@ -605,12 +667,33 @@ mod tests {
         let v = blob([20, 22, 16], [3.0, 3.0, 4.0]);
         let grid = crate::hmc::grid::subsample(&v, 4.0);
         let test = TestVolume::new(&v, 1.0);
-        let at = |m: &Mat4| normcorr(&grid, &test, &voxel_map(m, v.voxel_size, grid.voxel_size));
-        let c0 = at(&IDENTITY);
+        let at = |m: &Mat4, par| {
+            normcorr(
+                &grid,
+                &test,
+                &voxel_map(m, v.voxel_size, grid.voxel_size),
+                par,
+            )
+        };
+        let c0 = at(&IDENTITY, false);
         let mut shifted = IDENTITY;
         shifted[0][3] = 2.0;
-        assert!(c0 < at(&shifted), "{c0} {}", at(&shifted));
+        assert!(c0 < at(&shifted, false), "{c0} {}", at(&shifted, false));
         assert!((0.0..0.01).contains(&c0));
+        // Parallel slices give the same bits.
+        assert_eq!(at(&shifted, true).to_bits(), at(&shifted, false).to_bits());
+        // The other costs prefer the identity too.
+        let b0 = voxel_map(&IDENTITY, v.voxel_size, grid.voxel_size);
+        let b1 = voxel_map(&shifted, v.voxel_size, grid.voxel_size);
+        assert!(least_squares(&grid, &test, &b0, false) < least_squares(&grid, &test, &b1, false));
+        let bg = bin_grid(&grid, 64);
+        assert!(corr_ratio(&bg, &test, &b0, 64, false) < corr_ratio(&bg, &test, &b1, 64, false));
+        assert!(woods(&bg, &test, &b0, 64, false) < woods(&bg, &test, &b1, 64, false));
+        for normalised in [false, true] {
+            let m0 = mutual_info(&bg, &test, &b0, 64, normalised, false);
+            let m1 = mutual_info(&bg, &test, &b1, 64, normalised, false);
+            assert!(m0 < m1, "{normalised}: {m0} {m1}");
+        }
     }
 
     #[test]
@@ -622,7 +705,13 @@ mod tests {
         let r = row_range([9.5, 1.0, 1.0], [-0.5, 0.0, 0.0], [8.9999, 5.0, 5.0], 40);
         assert_eq!(r, Some((2, 19)));
         // A fixed coordinate outside: empty.
-        assert_eq!(row_range([1.0, -1.0, 1.0], [0.5, 0.0, 0.0], [8.9999, 5.0, 5.0], 40), None);
-        assert_eq!(row_range([f32::NAN; 3], [0.5, 0.0, 0.0], [8.9999; 3], 40), None);
+        assert_eq!(
+            row_range([1.0, -1.0, 1.0], [0.5, 0.0, 0.0], [8.9999, 5.0, 5.0], 40),
+            None
+        );
+        assert_eq!(
+            row_range([f32::NAN; 3], [0.5, 0.0, 0.0], [8.9999; 3], 40),
+            None
+        );
     }
 }

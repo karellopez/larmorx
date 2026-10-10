@@ -646,7 +646,7 @@ whole word).
 | `-stages n` | `atoi`; ≥ 4 adds stage 4 |
 | `-sinc_final`, `-spline_final`, `-nn_final` | final interpolation (§9.3) |
 | `-dof n` | `atoi`, clamped to 6–12 with a message for values outside (tier 3) |
-| `-cost c` | `mutualinfo`, `corratio`, `woods`, `normcorr`, `normmi`, `leastsquares`; anything else silently keeps `normcorr` **(observed)** (a message only if `-report` came earlier) |
+| `-cost c` | `mutualinfo`, `corratio`, `woods`, `normcorr`, `normmi`, `leastsquares`; anything else silently keeps `normcorr` **(observed)** (a message only if `-report` came earlier: `Unrecognised cost function type: X` and `Using the default (NormCorr)` on stderr **(observed)**) |
 | `-bins n` | histogram bins (`atoi`) |
 | `-smooth x` | edge-weighting width in mm (`atof`); 0 switches the correlation to its centred, unweighted form (§6.4) |
 | `-rotation x` | divides the rotation tolerances (`atof`) **(observed)** |
@@ -656,8 +656,8 @@ whole word).
 | `-init f` | a 4 × 4 matrix (FSL text format) applied **only in the final resampling**, before `M_t` (the source position uses `(M_t · M_init)⁻¹`); it does not affect the estimation or the written `.mat` files **(observed)** |
 | `-gdt` | registers gradient-magnitude images of the test volumes (3 × 3 × 3 derivative masks) to the **unchanged** reference, and writes the reference as `grefvol_<out>`: with an absolute `-out` path that name is invalid and mcflirt aborts **(observed)** (tier 3; of little use) |
 | `-fudge` | no previous-volume initialisation (§5.4) |
-| `-report` | progress messages on stderr; also prints `refnum = r` and `Original_refvol = …` on stdout at the end when there is no `-reffile`/`-meanvol` |
-| `-v` | verbose level 5; `-verbose n` sets it (20 or more prints every evaluated matrix on stderr); `-hist` is accepted and ignored |
+| `-report` | progress messages on stderr; also prints `refnum = r` and `Original_refvol = …` (the `-refvol` value as given, `-1` by default) on stdout at the end when there is no `-reffile`/`-meanvol` and at least one of `-mats`, `-plots`, `-rmsrel`, `-rmsabs` is given **(observed:** `-report -stages 1` alone prints nothing on stdout; adding any one of the four prints both lines**)** |
+| `-v` | verbose level 5; `-verbose n` sets it (20 or more prints every evaluated matrix on stderr); `-hist` is accepted and ignored. **(observed:** each evaluation prints `Cost::affmat = `, the candidate matrix `M` in the `.mat` format and an empty line, in evaluation order; levels 5, 19 and 100 print nothing else, no cost values. These traces are how the clean-room implementation checked its search path evaluation by evaluation.**)** |
 | `-help` | usage on stdout and exit 0, but only with at least one other argument: `mcflirt -help` alone exits 1 **(observed)** |
 
 Errors **(observed)**:
@@ -710,11 +710,11 @@ volume and stage:
 | image values, reference grids, interpolation | float32 |
 | matrices, matrix inverses, parameter vector | double; matrices rounded to float32 entries before use in the sampling loops |
 | sample positions | float32, incremental (§6.1, §9.1) |
-| cost sums, count `N`, correlation | float32 (three-level sums, §6.4) |
+| cost sums, count `N`, correlation | float32 (three-level sums, §6.4). **(observed,** by comparing the first parabola step of every volume of ds000005 run 1 with `-fudge -stages 1` against `-verbose 20` traces: square roots in double, sums in two levels instead of three, or `N` changed by one float32 ulp, each drop the agreement from 140 of 240 volumes to 1–42; `σ` other than `smooth/d` to 0**)** |
 | line-search positions and cost values | float32 |
 | centre of mass | double sums |
 | Euler decomposition | float32 intermediates |
-| rotation composition | the angle vector's norm is rounded to float32 before the rotation is built; the rotation matrix is therefore orthogonal only to about 1e−8 |
+| rotation composition | the angle vector's norm is rounded to float32 before the rotation is built; the rotation matrix is therefore orthogonal only to about 1e−8. **(observed:** the translations of the evaluated matrices (`-verbose 20`) are reproduced only with each elementary rotation's cosine and sine rounded to float32, e.g. `1 − cos` off by 3.2e−8 at an angle of −0.00315; computing them in double reproduces 12 of 240 first parabola steps on ds000005, rounding them to float32 140 of 240**)** |
 | `.mat` output | 6 decimals |
 
 **Determinism.** mcflirt uses no random numbers and runs single-threaded (the FSL library
@@ -829,7 +829,16 @@ report TR02MJ1 describe MCFLIRT. The implementation departs from or adds to it a
 
 1. The exact numeric form of the correlation (§6.4) mixes float32 and double; whether a
    double-precision clean-room implementation stays within the thresholds is to be
-   measured, not assumed.
+   measured, not assumed. **(observed, partly settled by the clean-room implementer:** an
+   implementation following §6 exactly, with float32 sines and cosines (§13), reproduces the
+   first parabola step of 140 of 240 volumes of ds000005 (`-fudge -stages 1`) and of 20 of 20
+   volumes of a synthetic series whose test volumes are constant; with test volumes that vary,
+   50–70 % agree. The remaining steps differ by one or two float32 quanta of `r`, so some detail
+   of how the interpolated test values enter the sums is still unknown. Variants that did not
+   help: other orders of the trilinear steps, the interpolation in double, `(w·y)·x` or
+   `w·(y·y)` forms of the products, positions computed directly or from a double row start,
+   transposed or Gauss–Jordan inverses, float32 or perturbed centres, float32 trial points of
+   other values.**)**
 2. The variability band (§14) needs perturbation runs; none are made yet.
 3. `-spline_final` boundary handling (§9.3) is described from analysis only; it is tier 2
    and should be confirmed by black-box comparison before larmorx claims it.

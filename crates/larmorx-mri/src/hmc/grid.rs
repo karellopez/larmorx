@@ -15,12 +15,8 @@ fn positions(n: usize, d: f32, s: f32) -> Vec<f32> {
     let count = ((n as f32 / step).floor() as usize).max(1);
     let mut out = Vec::with_capacity(count);
     let mut p = 0.0f32;
-    for q in 0..count {
-        if super::cost::variant() & 262144 != 0 {
-            out.push(q as f32 * step);
-        } else {
-            out.push(p);
-        }
+    for _ in 0..count {
+        out.push(p);
         p += step;
     }
     out
@@ -40,15 +36,7 @@ pub fn subsample(reference: &Volume, s: f32) -> Volume {
             }
         }
     }
-    let v2 = super::cost::variant2();
-    let vox = if v2 & 1 != 0 {
-        [0, 1, 2].map(|k| reference.voxel_size[k] * (s / reference.voxel_size[k]))
-    } else if v2 & 2 != 0 {
-        [0, 1, 2].map(|k| (f64::from(reference.voxel_size[k]) * f64::from(s / reference.voxel_size[k])) as f32)
-    } else {
-        [s; 3]
-    };
-    Volume::new([px.len(), py.len(), pz.len()], vox, data)
+    Volume::new([px.len(), py.len(), pz.len()], [s; 3], data)
 }
 
 #[cfg(test)]

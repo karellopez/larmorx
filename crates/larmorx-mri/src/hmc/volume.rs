@@ -62,45 +62,16 @@ impl Volume {
     pub fn centre_of_mass(&self) -> [f64; 3] {
         let [nx, ny, nz] = self.shape;
         let vmin = self.min();
-        let var = super::cost::variant();
-        if var & (1 << 60) != 0 || var & (1 << 61) != 0 {
-            let (mut t, mut a, mut b, mut c) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-            for z in 0..nz {
-                for y in 0..ny {
-                    for x in 0..nx {
-                        let w = self.at(x, y, z) - vmin;
-                        t += w;
-                        a += w * x as f32;
-                        b += w * y as f32;
-                        c += w * z as f32;
-                    }
-                }
-            }
-            if t < 1e-5 { t = 1.0; }
-            let d = self.voxel_size;
-            if var & (1 << 61) != 0 {
-                return [f64::from(d[0]) * f64::from(a) / f64::from(t), f64::from(d[1]) * f64::from(b) / f64::from(t), f64::from(d[2]) * f64::from(c) / f64::from(t)];
-            }
-            return [f64::from(d[0] * (a / t)), f64::from(d[1] * (b / t)), f64::from(d[2] * (c / t))];
-        }
         let (mut total, mut sx, mut sy, mut sz) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
         for z in 0..nz {
             for y in 0..ny {
                 let row = &self.data[nx * (y + ny * z)..nx * (y + ny * z + 1)];
-                let var = super::cost::variant();
-                let d = self.voxel_size.map(f64::from);
                 for (x, &v) in row.iter().enumerate() {
-                    let w = if var & 33554432 != 0 { f64::from(v) - f64::from(vmin) } else { f64::from(v - vmin) };
+                    let w = f64::from(v - vmin);
                     total += w;
-                    if var & 67108864 != 0 {
-                        sx += w * (x as f64 * d[0]);
-                        sy += w * (y as f64 * d[1]);
-                        sz += w * (z as f64 * d[2]);
-                    } else {
-                        sx += w * x as f64;
-                        sy += w * y as f64;
-                        sz += w * z as f64;
-                    }
+                    sx += w * x as f64;
+                    sy += w * y as f64;
+                    sz += w * z as f64;
                 }
             }
         }
@@ -108,19 +79,11 @@ impl Volume {
             total = 1.0;
         }
         let d = self.voxel_size.map(f64::from);
-        if super::cost::variant() & 67108864 != 0 {
-            return [sx / total, sy / total, sz / total];
-        }
-        if super::cost::variant() & (1 << 50) != 0 {
-            return [0, 1, 2].map(|k| f64::from((d[k] * ([sx, sy, sz][k] / total)) as f32));
-        }
-        if super::cost::variant() & (1 << 51) != 0 {
-            return [0, 1, 2].map(|k| f64::from(self.voxel_size[k] * (([sx, sy, sz][k] / total) as f32)));
-        }
-        if super::cost::variant() & 134217728 != 0 {
-            return [d[0] * sx / total, d[1] * sy / total, d[2] * sz / total];
-        }
-        [d[0] * (sx / total), d[1] * (sy / total), d[2] * (sz / total)]
+        [
+            d[0] * (sx / total),
+            d[1] * (sy / total),
+            d[2] * (sz / total),
+        ]
     }
 
     /// The background value (§9.2): the value at index `⌊count / 10⌋` of the sorted voxels of

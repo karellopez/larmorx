@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
-use crate::hmc::estimate::{EstimateParams, Reference, estimate};
+use crate::hmc::estimate::{EstimateParams, InPlane, Reference, estimate};
 use crate::hmc::image::{self, Series, output_name, output_type, read_reference, read_series};
 use crate::hmc::report::{self, mat_text, par_text, rms_text};
 use crate::hmc::resample::{Interpolation, resample_series};
@@ -220,7 +220,7 @@ fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
             "-refvol" => o.refvol = atoi(v),
             "-stages" => o.stages = atoi(v),
             "-dof" => o.dof = atoi(v),
-            "-cost" => match CostFunction::from_name(v).filter(|c| *c != CostFunction::Pearson) {
+            "-cost" => match CostFunction::from_name(v) {
                 Some(c) => o.cost = c,
                 None => {
                     if o.report {
@@ -317,7 +317,11 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     if o.gdt {
         return Err("-gdt (registration of gradient images) is not supported".into());
     }
-    note(o, err, &format!("Processed data will be saved as {out_name}\n"));
+    note(
+        o,
+        err,
+        &format!("Processed data will be saved as {out_name}\n"),
+    );
     note(o, err, "larmorx mri hmc - head-motion correction\n");
     note(o, err, "Reading time series... ");
     let series = read_series(Path::new(input), n_threads).map_err(|e| e.to_string())?;
@@ -357,7 +361,10 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     if o.dof != dof as i64 {
         let registered = if ref_index.is_some() { n - 1 } else { n };
         let line = format!("Erroneous dof {} : using {dof} instead\n", o.dof);
-        let _ = err.write_all(line.repeat(registered * o.stages.clamp(0, 4) as usize).as_bytes());
+        let _ = err.write_all(
+            line.repeat(registered * o.stages.clamp(0, 4) as usize)
+                .as_bytes(),
+        );
     }
     let params = EstimateParams {
         stages: o.stages.clamp(0, 4) as usize,
@@ -367,6 +374,11 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
         rotation: o.rotation,
         bins: o.bins.max(1) as usize,
         fudge: o.fudge,
+        in_plane: if o.two_d {
+            InPlane::Force
+        } else {
+            InPlane::Auto { fov: o.fov }
+        },
         n_threads,
     };
     note(o, err, "Registering volumes ...");
@@ -401,12 +413,23 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
         .into_iter()
         .map(|v| Volume::new(shape, series.volumes[0].voxel_size, v.data))
         .collect();
-    if o.report && (o.mats || o.plots || o.rmsrel || o.rmsabs) {
-        if let Some(r) = ref_index {
-            let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
-        }
+    if let Some(r) = ref_index
+        && o.report
+        && (o.mats || o.plots || o.rmsrel || o.rmsabs)
+    {
+        let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
     }
-    write_outputs(o, &out_name, ext, version, &series, &est, ref_grid.as_ref(), &corrected, n_threads)
+    write_outputs(
+        o,
+        &out_name,
+        ext,
+        version,
+        &series,
+        &est,
+        ref_grid.as_ref(),
+        &corrected,
+        n_threads,
+    )
 }
 
 /// A progress message on stderr with `-report`.
@@ -486,11 +509,19 @@ fn write_outputs(
     if o.stats {
         let [mean, variance, sigma] = stats::temporal(corrected);
         write(&format!("{out_name}_meanvol{ext}"), &[mean], DataType::F32)?;
-        write(&format!("{out_name}_variance{ext}"), &[variance], DataType::F32)?;
+        write(
+            &format!("{out_name}_variance{ext}"),
+            &[variance],
+            DataType::F32,
+        )?;
         write(&format!("{out_name}_sigma{ext}"), &[sigma], DataType::F32)?;
     }
     if let Some(mean) = &est.mean {
-        write(&format!("{out_name}_mean_reg{ext}"), std::slice::from_ref(mean), DataType::F32)?;
+        write(
+            &format!("{out_name}_mean_reg{ext}"),
+            std::slice::from_ref(mean),
+            DataType::F32,
+        )?;
     }
     Ok(())
 }

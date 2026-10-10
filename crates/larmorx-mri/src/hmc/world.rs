@@ -48,7 +48,10 @@ impl Geometry {
 
 /// `W`: the world (RAS) transform moving points of the input volume onto the reference.
 pub fn world_matrix(m: &Mat4, reference: &Geometry, input: &Geometry) -> Mat4 {
-    let ref_side = rigid::mul(&reference.affine, &rigid::inverse(&reference.voxel_to_fsl()));
+    let ref_side = rigid::mul(
+        &reference.affine,
+        &rigid::inverse(&reference.voxel_to_fsl()),
+    );
     let in_side = rigid::mul(&input.voxel_to_fsl(), &rigid::inverse(&input.affine));
     rigid::mul(&rigid::mul(&ref_side, m), &in_side)
 }
@@ -78,9 +81,9 @@ mod tests {
         ]);
         let g = Geometry::new(&a, [64, 64, 30], [3.0, 3.0, 4.0], false);
         let w = world_matrix(&rigid::IDENTITY, &g, &g);
-        for i in 0..4 {
-            for j in 0..4 {
-                assert!((w[i][j] - rigid::IDENTITY[i][j]).abs() < 1e-12);
+        for (row, id) in w.iter().zip(&rigid::IDENTITY) {
+            for (a, b) in row.iter().zip(id) {
+                assert!((a - b).abs() < 1e-12);
             }
         }
     }

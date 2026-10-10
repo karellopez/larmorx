@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //! ImageMath's component and distance-map operations (ANTs v2.6.5,
 //! `Examples/ImageMath_Templates.hxx`):
-//! - `GetLargestComponent`: [`largest_component`] (`GetLargestComponent`, lines 427-563);
-//! - `D`: [`distance_map`] (`DistanceMap`, lines 8799-8833), ITK's Danielsson map;
-//! - `MaurerDistance`: [`maurer_distance`] (`GenerateMaurerDistanceImage`, lines 8836-8876),
+//! - `GetLargestComponent`: [`largest_component`] (`GetLargestComponent`, lines 429-563);
+//! - `D`: [`distance_map`] (`DistanceMap`, lines 8801-8834), ITK's Danielsson map;
+//! - `MaurerDistance`: [`maurer_distance`] (`GenerateMaurerDistanceImage`, lines 8838-8876),
 //!   ITK's signed Maurer map;
-//! - `ExtractContours`: [`extract_contours`] (`ExtractContours`, lines 8289-8320), ITK's
+//! - `ExtractContours`: [`extract_contours`] (`ExtractContours`, lines 8291-8320), ITK's
 //!   `LabelContourImageFilter`.
 
 use larmorx_core::parallel;

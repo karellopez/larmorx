@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //! ImageMath's morphology and mask operations (ANTs v2.6.5):
 //! - `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`: [`morphological`], ANTs'
-//!   `ants::Morphological` (`Examples/antsUtilities.h:72-238`) on `float` images, with the
+//!   `ants::Morphological` (`Examples/antsUtilities.h:72-250`) on `float` images, with the
 //!   ITK filters of [`larmorx_image::morphology`];
-//! - `FillHoles`: [`fill_holes`] (`ImageMath_Templates.hxx:8880-9033`), with the connected
+//! - `FillHoles`: [`fill_holes`] (`ImageMath_Templates.hxx:8880-9035`), with the connected
 //!   components of [`larmorx_image::components`];
-//! - `PadImage`: [`pad_image`] (`ImageMath_Templates.hxx:1955-2048`).
+//! - `PadImage`: [`pad_image`] (`ImageMath_Templates.hxx:1955-2053`).
 
 use larmorx_core::parallel;
 use larmorx_image::components::{connected_components, relabel_components};
@@ -234,7 +234,7 @@ pub fn float_labels(n: usize) -> Vec<f32> {
 }
 
 /// FillHoles' `objectedge` and `totaledge` for every relabelled component (the
-/// `holeparam ≤ 1` branch, `ImageMath_Templates.hxx:8967-9014`).
+/// `holeparam ≤ 1` branch, `ImageMath_Templates.hxx:8978-9014`).
 fn edge_counts(
     object: &[bool],
     size: &[usize],

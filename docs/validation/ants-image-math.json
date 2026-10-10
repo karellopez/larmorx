@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "8252e615467a",
+  "larmorx_commit": "57245bee1dee-dirty",
   "larmorx_testdata_commit": "f32b1d60627c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,7 +22,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -31,8 +31,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: PadImage ImageIn Pad-Number [value] : If Pad-Number is negative, de-Padding occurs",
-   "seconds": 0.018,
+   "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: ExtractContours inputImage {fullyConnected=1} : the voxels of each label (the value truncated to an integer) that touch another label",
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation Bogus not found or not supported for dimension 3; larmorx exit 1: Operation Bogus not found or not supported for dimension 3",
-   "seconds": 0.082,
+   "seconds": 0.086,
    "status": "both-error"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation neg not found or not supported for dimension 3; larmorx exit 1: Operation neg not found or not supported for dimension 3",
-   "seconds": 0.017,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -62,7 +62,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: Dimension 5 is not supported; larmorx exit 1: Dimension 5 is not supported",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -72,7 +72,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ImageMath: the dimension 'three' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.015,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -92,7 +92,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses the null image)",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -112,7 +112,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.058,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -182,7 +182,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -202,7 +202,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -232,7 +232,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -252,7 +252,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -262,7 +262,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -272,7 +272,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -282,7 +282,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -292,7 +292,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -302,7 +302,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -322,7 +322,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -332,7 +332,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -342,7 +342,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -352,7 +352,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -362,7 +362,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -372,7 +372,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -382,7 +382,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -402,7 +402,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -412,7 +412,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -422,7 +422,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -432,7 +432,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -442,7 +442,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -462,7 +462,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -472,7 +472,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -482,7 +482,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -492,7 +492,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -502,7 +502,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -512,7 +512,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -522,7 +522,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -542,7 +542,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -552,7 +552,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.055,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -562,7 +562,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -572,7 +572,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -582,7 +582,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -592,7 +592,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -612,7 +612,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -632,7 +632,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -642,7 +642,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.615,
+   "seconds": 0.606,
    "status": "pass"
   },
   {
@@ -652,7 +652,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.508,
+   "seconds": 0.516,
    "status": "pass"
   },
   {
@@ -672,7 +672,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.06,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -682,7 +682,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.234,
+   "seconds": 4.191,
    "status": "pass"
   },
   {
@@ -692,7 +692,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.481,
+   "seconds": 0.593,
    "status": "pass"
   },
   {
@@ -702,7 +702,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -712,7 +712,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -742,7 +742,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -752,7 +752,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -782,7 +782,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -792,7 +792,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -802,7 +802,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -812,7 +812,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -822,7 +822,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -832,7 +832,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.023,
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -862,7 +862,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -872,7 +872,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.433,
+   "seconds": 1.428,
    "status": "pass"
   },
   {
@@ -882,7 +882,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.754,
+   "seconds": 0.761,
    "status": "pass"
   },
   {
@@ -892,7 +892,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.854,
+   "seconds": 1.893,
    "status": "pass"
   },
   {
@@ -902,7 +902,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.057,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -912,7 +912,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -922,7 +922,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -972,7 +972,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -982,7 +982,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -992,7 +992,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1002,7 +1002,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1012,7 +1012,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.174,
+   "seconds": 1.122,
    "status": "pass"
   },
   {
@@ -1022,7 +1022,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -1052,7 +1052,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1062,7 +1062,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1072,7 +1072,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1081,7 +1081,7 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x608e4c5e6410): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
+   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x627dc84a7410): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
    "seconds": 0.023,
    "status": "both-error"
   },
@@ -1102,7 +1102,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.31,
+   "seconds": 0.309,
    "status": "pass"
   },
   {
@@ -1112,7 +1112,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.098,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1132,7 +1132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1142,7 +1142,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1152,7 +1152,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1172,7 +1172,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1182,7 +1182,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1192,7 +1192,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -1202,7 +1202,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1222,7 +1222,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1242,7 +1242,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1252,7 +1252,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1262,7 +1262,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.576,
+   "seconds": 1.525,
    "status": "pass"
   },
   {
@@ -1272,7 +1272,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.718,
+   "seconds": 1.764,
    "status": "pass"
   },
   {
@@ -1282,7 +1282,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.088,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -1292,7 +1292,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.737,
+   "seconds": 1.696,
    "status": "pass"
   },
   {
@@ -1302,7 +1302,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.466,
+   "seconds": 0.458,
    "status": "pass"
   },
   {
@@ -1322,7 +1322,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -1332,7 +1332,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1352,7 +1352,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1382,7 +1382,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1391,8 +1391,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5671f0178330): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
-   "seconds": 0.016,
+   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x6088a551e330): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -1402,7 +1402,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1412,7 +1412,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1422,7 +1422,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1432,7 +1432,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1462,7 +1462,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.536,
+   "seconds": 6.963,
    "status": "pass"
   },
   {
@@ -1472,7 +1472,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1482,7 +1482,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1522,7 +1522,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.081,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1532,7 +1532,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.849,
+   "seconds": 1.81,
    "status": "pass"
   },
   {
@@ -1582,7 +1582,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1591,8 +1591,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x5c47867aa3a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
-   "seconds": 0.023,
+   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x587859e533a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -1602,7 +1602,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws)",
-   "seconds": 0.022,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -1622,7 +1622,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1632,7 +1632,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.515,
+   "seconds": 1.451,
    "status": "pass"
   },
   {
@@ -1642,7 +1642,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1652,7 +1652,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1662,7 +1662,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1672,7 +1672,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1702,7 +1702,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1712,7 +1712,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1722,7 +1722,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1732,7 +1732,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.486,
+   "seconds": 0.479,
    "status": "pass"
   },
   {
@@ -1742,7 +1742,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.511,
+   "seconds": 0.527,
    "status": "pass"
   },
   {
@@ -1752,7 +1752,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.054,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -1762,7 +1762,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1782,7 +1782,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1792,7 +1792,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1812,7 +1812,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1822,7 +1822,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1842,7 +1842,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.295,
+   "seconds": 1.218,
    "status": "pass"
   },
   {
@@ -1852,7 +1852,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.882,
+   "seconds": 0.843,
    "status": "pass"
   },
   {
@@ -1862,7 +1862,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.279,
+   "seconds": 0.252,
    "status": "pass"
   },
   {
@@ -1872,7 +1872,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1882,7 +1882,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1892,7 +1892,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1922,7 +1922,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1932,7 +1932,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1942,7 +1942,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -1952,7 +1952,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -1972,7 +1972,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1982,7 +1982,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1992,7 +1992,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.434,
+   "seconds": 1.398,
    "status": "pass"
   },
   {
@@ -2012,7 +2012,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.089,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -2022,7 +2022,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2032,7 +2032,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2042,7 +2042,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -2052,7 +2052,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2072,7 +2072,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.453,
+   "seconds": 1.405,
    "status": "pass"
   },
   {
@@ -2082,7 +2082,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -2092,7 +2092,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2102,7 +2102,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -2122,7 +2122,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -2132,7 +2132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.297,
+   "seconds": 1.194,
    "status": "pass"
   },
   {
@@ -2142,7 +2142,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -2152,7 +2152,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2162,7 +2162,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -2172,7 +2172,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2192,7 +2192,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.575,
+   "seconds": 1.531,
    "status": "pass"
   },
   {
@@ -2202,7 +2202,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -2212,7 +2212,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2232,7 +2232,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2252,7 +2252,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.844,
+   "seconds": 1.657,
    "status": "pass"
   },
   {
@@ -2262,7 +2262,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -2282,7 +2282,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.157,
+   "seconds": 0.154,
    "status": "pass"
   },
   {
@@ -2292,7 +2292,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2302,7 +2302,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2312,7 +2312,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2332,7 +2332,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2342,7 +2342,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -2352,7 +2352,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2362,7 +2362,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -2372,7 +2372,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2382,7 +2382,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2392,7 +2392,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2402,7 +2402,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -2412,7 +2412,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -2422,7 +2422,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -2432,7 +2432,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.151,
+   "seconds": 3.145,
    "status": "pass"
   },
   {
@@ -2442,7 +2442,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.613,
+   "seconds": 0.59,
    "status": "pass"
   },
   {
@@ -2452,7 +2452,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2472,7 +2472,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -2482,7 +2482,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "For a hole on the first or last slice, ANTs reads the binary image at neighbour indices outside the image (NeighborhoodIterator::GetIndex is not clamped), which land before or after its buffer: the result depends on whatever memory lies there. larmorx reproduces reads that land inside the buffer and refuses the others.",
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "expected-divergence"
   },
   {
@@ -2492,7 +2492,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -2502,7 +2502,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2512,7 +2512,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -2522,7 +2522,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -2532,7 +2532,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -2542,7 +2542,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -2582,7 +2582,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath PadImage needs at least 2 operand(s) (ANTs reads past the arguments here)",
-   "seconds": 0.021,
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -2612,7 +2612,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -2622,7 +2622,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.463,
+   "seconds": 0.433,
    "status": "pass"
   },
   {
@@ -2632,7 +2632,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.032,
+   "seconds": 0.97,
    "status": "pass"
   },
   {
@@ -2642,7 +2642,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2652,16 +2652,646 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/components",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-0",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-above-all",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/empty",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/ties",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-negative",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/min-size-not-a-number",
+   "category": "largest-component",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: GetLargestComponent: the minimum size 'big' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "largest-component/labels",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/fractional",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/holes",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/brain-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-T1w-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.38,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-WM-probseg",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.453,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/real-bold-mask",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/dim2",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "largest-component/dim4",
+   "category": "largest-component",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/components",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/brain-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/sparse-points",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/labels",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/zeros-and-signed-zeros",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/empty",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/all-object",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/negative-pixdim",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/int16-scaled",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/real-bold-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.109,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/real-T1w-mask",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.154,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/dim2",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "danielsson/dim4",
+   "category": "danielsson",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/components",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/brain-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-2",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-0.6",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/sparse-points",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/empty",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/all-object",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/foreground-0",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/negative-pixdim",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/real-T1w-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.044,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/real-mni-mask",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.237,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/dim2",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "maurer/dim4",
+   "category": "maurer",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/labels",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/labels-faces",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/fractional",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/negative-values",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
    "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/int32-large",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/components",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/flag-not-a-number",
+   "category": "extract-contours",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ExtractContours: 'yes' is not a number (ANTs aborts: std::stoi throws)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "extract-contours/real-T1w-mask",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.268,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/dim2",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/dim4",
+   "category": "extract-contours",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/default",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/fraction-1.5",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/fraction-0",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/above-maximum",
+   "category": "threshold-at-mean",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x59a65b4b5600): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "threshold-at-mean/real-T1w",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.351,
+   "status": "pass"
+  },
+  {
+   "case": "threshold-at-mean/dim4",
+   "category": "threshold-at-mean",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/labels",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/range",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/empty-range",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "replace-voxel-value/missing-value",
+   "category": "replace-voxel-value",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath ReplaceVoxelValue needs at least 4 operand(s) (ANTs reads past the arguments here)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "replace-voxel-value/dim2",
+   "category": "replace-voxel-value",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
    "status": "pass"
   }
  ],
  "suite": "ants-image-math",
  "summary": {
-  "both-error": 20,
+  "both-error": 24,
   "expected-divergence": 1,
   "fail": 0,
-  "pass": 243,
+  "pass": 302,
   "skipped": 0
  },
  "tier": "standard"

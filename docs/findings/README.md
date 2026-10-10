@@ -23,7 +23,7 @@ noted.
 | [ants-cli.md](ants-cli.md) | ANTs command lines: argument parser, `antsApplyTransforms` options and outputs |
 | [ants-image-programs.md](ants-image-programs.md) | ImageMath, ThresholdImage, MultiplyImages: dispatch, exit codes, operands, quirks of each operation |
 | [ants-gaussian-filters.md](ants-gaussian-filters.md) | ITK's recursive and discrete Gaussian filters; ImageMath `G`, `Laplacian`, `Grad`, `UnsharpMask`; SmoothImage; ResampleImageBySpacing; ResampleImage (pixel types, interpolators, argument quirks) |
-| [ants-morphology.md](ants-morphology.md) | ITK's ball and binary/grayscale morphology; ImageMath `MD`/`ME`/`MO`/`MC`/`GD`/`GE`/`GO`/`GC`, `FillHoles`, `PadImage`; connected components and relabelling |
+| [ants-morphology.md](ants-morphology.md) | ITK's ball and binary/grayscale morphology; ImageMath `MD`/`ME`/`MO`/`MC`/`GD`/`GE`/`GO`/`GC`, `FillHoles`, `PadImage`; connected components and relabelling, `GetLargestComponent`; Danielsson and signed Maurer distance maps (`D`, `MaurerDistance`); `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue` |
 | [itk-transforms.md](itk-transforms.md) | ITK transforms: composite order, inverses, displacement fields, transform files |
 | [itk-resampling.md](itk-resampling.md) | ITK `ResampleImageFilter` and the interpolators ANTs uses |
 | [itk-nifti.md](itk-nifti.md) | ITK's NIfTI reader and writer: geometry, scaling, non-finite values, vector images, the header it writes |

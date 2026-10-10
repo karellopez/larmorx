@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Benchmarks of ANTs' morphology and mask operations (ImageMath ``MD``, ``ME``, ``MC``,
-``GD``, ``GO``, ``FillHoles``, ``PadImage``), as sMRIPrep's brain extraction runs them on
-masks: larmorx against ANTs 2.6.5's own binaries, with the harness of
-:mod:`larmorx_validation.bench.ants_programs` (same timing rules)."""
+"""Benchmarks of ANTs' morphology, component and distance-map operations (ImageMath ``MD``,
+``ME``, ``MC``, ``GD``, ``GO``, ``FillHoles``, ``PadImage``, ``GetLargestComponent``, ``D``,
+``MaurerDistance``), as sMRIPrep's brain extraction runs them on masks: larmorx against ANTs
+2.6.5's own binaries, with the harness of :mod:`larmorx_validation.bench.ants_programs` (same
+timing rules)."""
 
 from __future__ import annotations
 
 import argparse
 
 from larmorx_validation.bench.ants_programs import Job, run_suite
-from larmorx_validation.parity.ants_image_math.common import T1_MASK, T1_RAW
+from larmorx_validation.parity.ants_image_math.common import BOLD_MASK, T1_MASK, T1_RAW, WM
 
 #: The benchmark jobs; add new ones here.
 JOBS: list[Job] = [
@@ -61,9 +62,39 @@ JOBS: list[Job] = [
         ("3", "{out}", "GO", T1_RAW, "2"),
         quick=False,
     ),
+    Job(
+        "ImageMath GetLargestComponent (sMRIPrep), T1w brain mask",
+        "ImageMath",
+        ("3", "{out}", "GetLargestComponent", T1_MASK),
+    ),
+    Job(
+        "ImageMath GetLargestComponent (sMRIPrep, on the WM class), WM probability map",
+        "ImageMath",
+        ("3", "{out}", "GetLargestComponent", WM),
+        quick=False,
+    ),
+    Job(
+        "ImageMath D (Danielsson distance map), T1w brain mask",
+        "ImageMath",
+        ("3", "{out}", "D", T1_MASK),
+    ),
+    Job(
+        "ImageMath D, BOLD brain mask (64×64×34)",
+        "ImageMath",
+        ("3", "{out}", "D", BOLD_MASK),
+        quick=False,
+    ),
+    Job(
+        "ImageMath MaurerDistance, T1w brain mask",
+        "ImageMath",
+        ("3", "{out}", "MaurerDistance", T1_MASK),
+    ),
 ]
 
-TITLE = "ANTs morphology and mask operations (ImageMath MD, ME, MC, GD, GO, FillHoles, PadImage)"
+TITLE = (
+    "ANTs morphology, components and distance maps (ImageMath MD, ME, MC, GD, GO, FillHoles, "
+    "PadImage, GetLargestComponent, D, MaurerDistance)"
+)
 
 NOTES = [
     "- **Binary morphology** (`MD`, `ME`, `MC`): ITK traces the object's border and paints "
@@ -77,6 +108,13 @@ NOTES = [
     "histogram per voxel; larmorx splits the ball into runs along x and reuses the running "
     "maximum of each run width for every row.",
     "- **PadImage** is a copy: reading the gzipped input and writing the output dominate.",
+    "- **GetLargestComponent**: run-length connected components in both; larmorx extracts the "
+    "runs in parallel and links them in one pass.",
+    "- **D** (Danielsson): the propagation is order-dependent, so larmorx replays ITK's sweeps "
+    "in the same order on one thread too; it is faster because it walks the image with flat "
+    "indices and keeps each voxel's squared length instead of recomputing it.",
+    "- **MaurerDistance**: separable passes in both, threaded over lines; ITK computes the "
+    "inner contour with run-length encoding, larmorx row by row.",
 ]
 
 

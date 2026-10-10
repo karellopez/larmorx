@@ -20,8 +20,10 @@ How the code is organised and the conventions every tool follows. The plan behin
                      SciPy's map_coordinates and spline prefilter (ndimage)
    larmorx-image     ITK image filters on D-dimensional volumes: thresholds, Otsu, histograms
                      and quantiles, intensity rescaling, recursive and discrete Gaussians
-                     (smoothing, Laplacian, gradient magnitude), median, ITK's float
-                     comparisons (morphology, components and distance maps next)
+                     (smoothing, Laplacian, gradient magnitude), median, binary and grayscale
+                     morphology with ITK's ball, connected components and relabelling, label
+                     contours, Danielsson and signed Maurer distance maps, ITK's float
+                     comparisons
    larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages,
                      SmoothImage, ResampleImageBySpacing, ResampleImage), images as ANTs
                      programs read and write them, ITK's identity resampling in 2-4D, the

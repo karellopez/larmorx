@@ -207,7 +207,7 @@ pub fn rescale(
 }
 
 /// `ThresholdAtMean`: `ImageMath d out ThresholdAtMean image [fraction=1]`
-/// (`ImageMath_Templates.hxx:794-847`): 1 where `mean · fraction ≤ v ≤ max`, else 0
+/// (`ImageMath_Templates.hxx:794-848`): 1 where `mean · fraction ≤ v ≤ max`, else 0
 /// (`BinaryThresholdImageFilter`).
 ///
 /// The mean is a float sum in image order divided by the voxel count (as float); the maximum
@@ -236,7 +236,7 @@ pub fn threshold_at_mean(
 }
 
 /// `ReplaceVoxelValue`: `ImageMath d out ReplaceVoxelValue image low high value`
-/// (`ImageMath_Templates.hxx:9549-9586`): voxels with `low ≤ v ≤ high` become `value`, the
+/// (`ImageMath_Templates.hxx:9549-9591`): voxels with `low ≤ v ≤ high` become `value`, the
 /// others keep theirs.
 pub fn replace_voxel_value(
     data: &[f32],

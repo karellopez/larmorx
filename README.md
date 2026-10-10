@@ -3,7 +3,8 @@
 **Status: early development.** Available now:
 - `lx.Image` and NIfTI-1/2 reading and writing, [validated against nibabel](docs/validation/nifti-io.md) (252 files, bit-identical data) and [faster than nibabel and SimpleITK](docs/benchmarks/nifti-io.md) (compressed writes 4–8× faster with threads);
 - `lx.ants.apply_transforms` / `larmorx ants antsApplyTransforms`, [validated against ANTs](docs/validation/ants-apply-transforms.md) (63 of 79 cases bit-identical, all agree);
-- `lx.afni.tshift` / `larmorx afni 3dTshift`, a clean-room implementation [validated against AFNI](docs/validation/afni-tshift.md) (217 of 217 compared cases agree, 158 bit-identical) and [2–6× faster](docs/benchmarks/afni-tshift.md).
+- `lx.afni.tshift` / `larmorx afni 3dTshift`, a clean-room implementation [validated against AFNI](docs/validation/afni-tshift.md) (217 of 217 compared cases agree, 158 bit-identical) and [2–6× faster](docs/benchmarks/afni-tshift.md);
+- `lx.mri.hmc` / `larmorx mri hmc`, head-motion correction accepting mcflirt-style options, a clean-room implementation [validated against FSL's mcflirt](docs/validation/mri-hmc.md) (closer to mcflirt than mcflirt is to itself under small input perturbations) and [5–16× faster with threads](docs/benchmarks/mri-hmc.md).
 
 **larmorx** is a library of neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool:
 - tools from ANTs/ITK, AFNI and FreeSurfer, ported to Rust

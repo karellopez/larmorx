@@ -1,0 +1,1377 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "fc392f579ce7",
+  "larmorx_testdata_commit": "28167dea9be5",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7/mcflirt/`",
+ "results": [
+  {
+   "case": "real/ds000005/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.892,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.602,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/fmriprep-repeat2",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.602,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/fmriprep-repeat3",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.484,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.555,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-2d",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.675,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-bins64",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.559,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-corratio",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.157,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-leastsquares",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.709,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-mutualinfo",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 18.86,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-normcorr",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.641,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-normmi",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 19.922,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-cost-woods",
+   "category": "options (ds000005)",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.325,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-dof12",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 14.574,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-dof7",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.408,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-dof9",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.867,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-fudge",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.385,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-gdt",
+   "category": "options (ds000005)",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: terminate called after throwing an instance of 'NiftiIO::NiftiException' what(): Error: cant open file grefvol_~/VScode_projects/super_fmriprep/oracl; larmorx exit [1]: Error: -gdt (registration of gradient images) is not supported",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "real/ds000005/opt-meanvol",
+   "category": "options (ds000005)",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.055,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-meanvol-noref",
+   "category": "options (ds000005)",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 14.902,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-nn_final",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.266,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-refvol0",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.075,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-rotation2",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.315,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-scaling3",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.608,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-smooth0",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.959,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-smooth2",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.512,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-spline_final",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.151,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-stages1",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.239,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-stages2",
+   "category": "options (ds000005)",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.275,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005/opt-stats",
+   "category": "options (ds000005)",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.675,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000117/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.752,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000117/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.183,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000117/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.101,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000122/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.255,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000122/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.551,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000122/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.575,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000210-rest-echo2/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 12.705,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000210-rest-echo2/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.813,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000210-rest-echo2/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.835,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000258-bigendian/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.469,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000258-bigendian/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.782,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000258-bigendian/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.769,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds003345/default",
+   "category": "real",
+   "checks_passed": 14,
+   "checks_total": 15,
+   "failed_checks": [
+    {
+     "detail": "max |\u0394FD| 0.0851 mm, max FD 1.353 mm",
+     "metric": "r",
+     "name": "FD (Power, 50 mm) correlation",
+     "passed": false,
+     "threshold": "\u2265 0.9893 (band)",
+     "value": "0.9885"
+    }
+   ],
+   "reason": "",
+   "seconds": 8.464,
+   "status": "fail"
+  },
+  {
+   "case": "real/ds003345/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.488,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds003345/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.466,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds003763-truncated/default",
+   "category": "real",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: Image Exception : #22 :: Failed to read volume <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz Erro; larmorx exit [1]: Error: <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "real/ds005040/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.024,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.124,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.024,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006010/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 16.449,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006010/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.695,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006010/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.135,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006736/default",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.675,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006736/fmriprep",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.68,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds006736/fmriprep-reports",
+   "category": "real",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.709,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/bare-input",
+   "category": "synthetic/cli",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.278,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/dof5",
+   "category": "synthetic/cli",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.29,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/help",
+   "category": "synthetic/cli",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [1]: ; larmorx exit [1]: ",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/cli/help-with-input",
+   "category": "synthetic/cli",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/no-arguments",
+   "category": "synthetic/cli",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [1]: ; larmorx exit [1]: ",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/cli/plots-only",
+   "category": "synthetic/cli",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/refvol-minus1",
+   "category": "synthetic/cli",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.279,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/refvol-minus2",
+   "category": "synthetic/cli",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol -2: invalid volume index for a series of 12 volumes",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/cli/rmsrel-only",
+   "category": "synthetic/cli",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "syn/cli/stages0",
+   "category": "synthetic/cli",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtime_error' what(): Att; larmorx exit [1]: Error: -stages 0 with a reference file: nothing would be registered",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/cli/unknown-option-middle",
+   "category": "synthetic/cli",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [255]: Unrecognised option -edge; larmorx exit [255]: Unrecognised option -edge",
+   "seconds": 0.001,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/content/background/default",
+   "category": "synthetic/content",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.195,
+   "status": "pass"
+  },
+  {
+   "case": "syn/content/background/reffile",
+   "category": "synthetic/content",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.21,
+   "status": "pass"
+  },
+  {
+   "case": "syn/content/nan/default",
+   "category": "synthetic/content",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.351,
+   "status": "pass"
+  },
+  {
+   "case": "syn/content/nan/reffile",
+   "category": "synthetic/content",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.304,
+   "status": "pass"
+  },
+  {
+   "case": "syn/content/ramp/reffile",
+   "category": "synthetic/content",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.155,
+   "status": "pass"
+  },
+  {
+   "case": "syn/content/ramp/reffile-smooth0",
+   "category": "synthetic/content",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.15,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/float32/default",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.327,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/float32/reffile",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.335,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/float64/default",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.33,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/float64/reffile",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.338,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/int16-scaled/default",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.32,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/int16-scaled/reffile",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.319,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/uint16/default",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.29,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/uint16/reffile",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.309,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/uint8/default",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.244,
+   "status": "pass"
+  },
+  {
+   "case": "syn/dtypes/uint8/reffile",
+   "category": "synthetic/dtypes",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.238,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/single-volume-3d/default",
+   "category": "synthetic/geometry",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/single-volume-3d/reffile",
+   "category": "synthetic/geometry",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/single-volume/default",
+   "category": "synthetic/geometry",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/single-volume/reffile",
+   "category": "synthetic/geometry",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/thin-slab/default",
+   "category": "synthetic/geometry",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/thin-slab/fov10",
+   "category": "synthetic/geometry",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/thin-slab/rotation2",
+   "category": "synthetic/geometry",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/tiny/default",
+   "category": "synthetic/geometry",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.013,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/two-volumes/default",
+   "category": "synthetic/geometry",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "syn/geometry/two-volumes/reffile",
+   "category": "synthetic/geometry",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/identical-copies/default",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.183,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/identical-copies/reffile",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.179,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/identical-copies/reffile-fudge",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.203,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/large/default",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.298,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/large/reffile",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.288,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/2d",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.221,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/default",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.269,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/default-report",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.294,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/dof12",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.467,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/dof7",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.324,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/fsloutputtype-nifti",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.238,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/fudge",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.294,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/init",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.291,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/meanvol",
+   "category": "synthetic/motion",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.499,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/nifti2",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.28,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/nn_final",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.294,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/no-fsloutputtype",
+   "category": "synthetic/motion",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default).",
+   "seconds": 0.21,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "syn/motion/small/no-input",
+   "category": "synthetic/motion",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [2]: Input filename not found; larmorx exit [2]: Input filename not found",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/motion/small/no-out",
+   "category": "synthetic/motion",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.302,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/out-no-ext",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/out-twice",
+   "category": "synthetic/motion",
+   "checks_passed": 23,
+   "checks_total": 23,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.513,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/reffile",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.291,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/reffile-4d",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.315,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/reffile-grid2",
+   "category": "synthetic/motion",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to c; larmorx exit [1]: Error: the reference has 57600 voxels and the volumes of the series 73216: the corrected series would not fit (resample=False estimates only)",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/motion/small/reffile-ras",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.298,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/refvol-0",
+   "category": "synthetic/motion",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/refvol-out-of-range",
+   "category": "synthetic/motion",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol 12: invalid volume index for a series of 12 volumes",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/motion/small/report",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.294,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/sinc_final",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.389,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/smooth0",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.271,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/spline_final",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.314,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/stages1",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.132,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/stages4",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.246,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/stats",
+   "category": "synthetic/motion",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.337,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/unknown-cost",
+   "category": "synthetic/motion",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.309,
+   "status": "pass"
+  },
+  {
+   "case": "syn/motion/small/unknown-option",
+   "category": "synthetic/motion",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "mcflirt exit [255]: Lacking argument to option -edge; larmorx exit [255]: Lacking argument to option -edge",
+   "seconds": 0.0,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/orientation/oblique/default",
+   "category": "synthetic/orientation",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.309,
+   "status": "pass"
+  },
+  {
+   "case": "syn/orientation/oblique/reffile",
+   "category": "synthetic/orientation",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.296,
+   "status": "pass"
+  },
+  {
+   "case": "syn/orientation/ras-unflipped/default",
+   "category": "synthetic/orientation",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.273,
+   "status": "pass"
+  },
+  {
+   "case": "syn/orientation/ras-unflipped/reffile",
+   "category": "synthetic/orientation",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.317,
+   "status": "pass"
+  },
+  {
+   "case": "syn/orientation/ras/default",
+   "category": "synthetic/orientation",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.293,
+   "status": "pass"
+  },
+  {
+   "case": "syn/orientation/ras/reffile",
+   "category": "synthetic/orientation",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.305,
+   "status": "pass"
+  }
+ ],
+ "suite": "mri-hmc",
+ "summary": {
+  "both-error": 11,
+  "expected-divergence": 1,
+  "fail": 1,
+  "pass": 121,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

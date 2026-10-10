@@ -5,8 +5,8 @@ mcflirt is deterministic: repeated runs are byte-identical, so its variability h
 measured by perturbing the problem in ways that leave it essentially unchanged and comparing
 mcflirt's matrices with its own unperturbed ones:
 
-- ``noise``: the series as float32 with uniform noise of ±0.5 intensity units added (half an
-  integer quantisation step);
+- ``noise``, ``noise2``, ``noise3``: the series as float32 with uniform noise of ±0.5 intensity
+  units added (half an integer quantisation step), three realisations;
 - ``reverse``: the volumes in reverse order (runs with a separate reference only; the matrices
   are put back in order);
 - ``crop``: the top slice removed from the series and, when it has the same grid, from the
@@ -48,7 +48,7 @@ from larmorx_validation.parity.mri_hmc import (
     rms_deviation,
 )
 
-PERTURBATIONS = ("noise", "reverse", "crop")
+PERTURBATIONS = ("noise", "noise2", "noise3", "reverse", "crop")
 SEED = 20261010
 
 #: The default cases: fMRIPrep's command on every real run, and synthetic runs with -mats.
@@ -93,8 +93,9 @@ def _perturb(
         data = data[..., None]
     ref_img = None if reference is None else nib.load(reference)
     new_ref = None
-    if kind == "noise":
-        rng = np.random.default_rng(SEED)
+    if kind.startswith("noise"):
+        # Three realisations of the noise: one run is a noisy estimate of the spread.
+        rng = np.random.default_rng(SEED + int(kind.removeprefix("noise") or 1) - 1)
         data = data + rng.uniform(-0.5, 0.5, data.shape).astype(np.float32)
     elif kind == "reverse":
         if reference is None:
@@ -117,7 +118,9 @@ def _perturb(
     return new, (new_ref if new_ref is not None else reference)
 
 
-def run_band(mcflirt: str, cases: list[str], out_root: Path) -> None:
+def run_band(
+    mcflirt: str, cases: list[str], out_root: Path, perturbations: tuple[str, ...] = PERTURBATIONS
+) -> None:
     """Runs mcflirt on the perturbed inputs of every case (black-box runs)."""
     root = oracle_dir()
     if root is None:
@@ -133,7 +136,7 @@ def run_band(mcflirt: str, cases: list[str], out_root: Path) -> None:
         argv = run["steps"][0]["argv"][1:]
         series = Path(_resolve(run["inputs"]["in"]["path"]))
         reference = Path(_resolve(run["inputs"]["ref"]["path"])) if "ref" in run["inputs"] else None
-        for kind in PERTURBATIONS:
+        for kind in perturbations:
             out = out_root / name / kind
             out.mkdir(parents=True, exist_ok=True)
             made = _perturb(kind, series, reference, out)
@@ -232,7 +235,7 @@ def summarise(out_root: Path) -> dict[str, Any]:
 
 #: The perturbations that set the parity thresholds: those that leave the geometry unchanged.
 #: Cropping a slice changes the problem more (thin images can fail outright) and is reported.
-THRESHOLD_PERTURBATIONS = ("noise", "reverse")
+THRESHOLD_PERTURBATIONS = ("noise", "noise2", "noise3", "reverse")
 
 
 def band_for(case: str) -> dict[str, float] | None:
@@ -262,11 +265,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mcflirt", help="the mcflirt binary (omit to only summarise)")
     parser.add_argument("--cases", nargs="+", default=list(DEFAULT_CASES))
     parser.add_argument("--out", help="output directory (default: <oracle>/band)")
+    parser.add_argument("--perturbations", nargs="+", default=list(PERTURBATIONS))
     args = parser.parse_args(argv)
     root = oracle_dir()
     out = Path(args.out) if args.out else (root / "band" if root else Path("band"))
     if args.mcflirt:
-        run_band(args.mcflirt, args.cases, out)
+        run_band(args.mcflirt, args.cases, out, tuple(args.perturbations))
     summarise(out)
     return 0
 

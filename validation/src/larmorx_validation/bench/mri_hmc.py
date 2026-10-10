@@ -244,7 +244,7 @@ def render(
 def main(args: argparse.Namespace) -> int:
     repeats = 1 if args.quick else args.repeats
     threads = [t if t > 0 else os.cpu_count() or 1 for t in args.threads]
-    load = " ".join(os.getloadavg().__repr__().strip("()").split(", ")[:3])
+    load = " ".join(f"{v:.2f}" for v in os.getloadavg())
     results = run_jobs(threads, repeats, 1, args.quick)
     env_info = environment.describe(("nibabel",))
     command = "python -m larmorx_validation bench mri-hmc" + (

@@ -15,8 +15,9 @@ compared ([validation record](../validation/mri-hmc.md)). The matrices differ fr
 by less than mcflirt differs from itself when its input is perturbed slightly (half an
 intensity unit of noise, the volume order reversed, one slice cropped): on fMRIPrep's command
 for nine real runs, the 95th percentile of the matrix RMS deviation is
-**VALIDATION_P95** (mcflirt's own band: BAND_P95). The numbers are in the record; the
-differences are explained under [Agreement with mcflirt](#agreement-with-mcflirt).
+**0.014–0.030 mm** (mcflirt's own band: 0.016–0.10 mm), and on each run it is below
+mcflirt's own. The numbers are in the record; the differences are explained under
+[Agreement with mcflirt](#agreement-with-mcflirt).
 
 ## Quick start
 
@@ -125,8 +126,52 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 
 ## Agreement with mcflirt
 
-AGREEMENT_SECTION
+The implementation follows mcflirt's algorithm to the float32 operation where the spec
+and black-box runs describe it: the same reference grids, sample positions, edge weights,
+count `N`, correlation, line searches, initialisation chain and output formats. mcflirt's
+`-verbose 20` traces (every evaluated matrix) were used to check the search path evaluation by
+evaluation: the evaluated matrices of each search start out identical, and black-box runs
+settled what the spec left open (the rotations' sines and cosines are rounded to float32; the
+square roots are float32; the sums are in exactly three levels).
+
+The cost values still differ from mcflirt's in the last float32 bit for some evaluations once
+the test volume is interpolated (with test volumes of constant intensity, the first
+parabolic step of 20 of 20 volumes is identical; with real data, of 140 of 240). The searches
+then part ways by up to about one tolerance of the last stage (0.0005 rad, 0.02 mm), which is
+the scale of mcflirt's own sensitivity to its input:
+
+| Comparison (fMRIPrep's command, nine real runs) | 95th pct of the RMS deviation | FD correlation |
+|---|---|---|
+| larmorx against mcflirt | 0.014–0.030 mm | 0.854–0.999 |
+| mcflirt against itself, input perturbed slightly (the band) | 0.016–0.10 mm | 0.794–0.998 |
+
+On every run larmorx is closer to mcflirt than mcflirt is to itself; FD correlations are low
+only for subjects that barely move (FD differences stay below 0.05 mm). On synthetic series
+with known motion, larmorx and mcflirt are equally accurate (mean RMS deviation from the
+truth 0.409 and 0.414 mm). 49 of the 11 271 matrix files compared are identical to mcflirt's as
+text.
+
+Larger differences, all within mcflirt's own band for the same runs: `-meanvol` (the mean
+itself depends on the first pass), `-dof 12`, very small images (10 × 10 × 8 voxels) and
+synthetic copies of one volume. A linear ramp, which only an x translation can align, leaves
+the other parameters unconstrained: both programs find the translation (within 0.3 mm of each
+other) and wander differently elsewhere. Woods' cost registers no BOLD run for either
+program. The other histogram costs (`corratio`, `mutualinfo`, `normmi`) and `leastsquares`
+agree within the thresholds on ds000005, although the spec describes them only in outline.
+
+**Better algorithms (decision D11).** None is the default: the uncentred correlation, the
+single sweep and the tolerance quantisation decide mcflirt's numbers, and changing them moves
+the results beyond mcflirt's band. `fudge=True` (mcflirt's `-fudge`) starts every volume's
+first stage from the identity, which makes that stage parallel too; on ds000005 it moves the
+matrices by 0.05 mm (median) from the default (spec §14), at the edge of the band, so it stays
+an option. `smooth=0` gives Pearson's correlation (mcflirt's `-smooth 0`).
 
 ## Performance
 
-See [docs/benchmarks/mri-hmc.md](../benchmarks/mri-hmc.md).
+On fMRIPrep's command ([benchmark](../benchmarks/mri-hmc.md), 6-core laptop): 1.2–2.3× faster
+than mcflirt on one thread, 3.6–7.1× on 4 and 4.9–9.4× on 12, writing everything mcflirt
+writes; estimating only (`resample=False`, all fMRIPrep uses), 5.7–16× on 12 threads. A
+240-volume run takes 5.4 s instead of 31 s. The first stage is a chain (each volume starts
+from its predecessor's result), so its cost evaluations are parallel over grid slices; the
+later stages are parallel over volumes. `-stages 4` (sinc in the cost) is the slow option:
+110 s on 12 threads for ds000005 (mcflirt: 531 s).

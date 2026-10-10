@@ -1,27 +1,26 @@
-# Parity: 3dTshift
+# Parity: 3dTshift (replica)
 
 **All cases agree.** 236 cases on the `standard` tier: 217 pass, 17 rejected by both, 2 expected divergences, 0 failures.
 
-- **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`)
+- **Validated:** `larmorx-gpl afni 3dTshift` (crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run as a separate process
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `18c8309c46b6`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
+- **Test data:** larmorx-testdata `5434909ddf09`, tier `standard`
+- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 
-**Bit-identical: 158 of 217 passing cases** produce exactly the bytes of AFNI's output data.
-- Lagrange and weighted-sinc methods and copies: 117 of 120 bit-identical.
-- Fourier: 41 of 97 bit-identical. AFNI computes the FFT in float32 with its own kernels; larmorx computes it in double precision with its own FFT, so float32 outputs differ in the last bits and integer outputs occasionally round the other way (by 1).
-- Not bit-identical outside Fourier: `options/float32-no-detrend`, `real/ds003345-quintic`, `real/ds003345-heptic`. Known causes, in the last float32 bit only: `-no_detrend` (its rounding is not reproduced yet); quintic and heptic weights for some fractions (unresolved); weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not correctly rounded, and larmorx uses correctly rounded functions (`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`.
-- The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md).
+**Bit-identical: 217 of 217 passing cases** produce exactly the bytes of AFNI's output data.
+- Fourier: 97 of 97 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 120 of 120 bit-identical.
+- The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|
 | copy | 6 | 6 | 0.0e+00 | 0 | 0.0e+00 |
-| header-timing | 12 | 11 | 8.5e-08 | – | 4.2e-02 |
+| header-timing | 12 | 12 | 0.0e+00 | – | 0.0e+00 |
 | methods | 84 | 84 | 0.0e+00 | 0 | 0.0e+00 |
-| options | 42 | 26 | 4.3e-07 | 0 | 8.2e-01 |
-| real | 20 | 9 | 5.6e-08 | 1 | 3.3e-01 |
-| synthetic | 33 | 20 | 3.7e-07 | 1 | 7.5e-01 |
-| tpattern | 20 | 2 | 8.5e-08 | – | 5.1e-02 |
+| options | 42 | 42 | 0.0e+00 | 0 | 0.0e+00 |
+| real | 20 | 20 | 0.0e+00 | 0 | 0.0e+00 |
+| synthetic | 33 | 33 | 0.0e+00 | 0 | 0.0e+00 |
+| tpattern | 20 | 20 | 0.0e+00 | – | 0.0e+00 |
 
 ## Thresholds
 
@@ -59,20 +58,20 @@
 | Case | What it tests | Errors |
 |---|---|---|
 | `errors/unknown-option` | an unknown option | AFNI: ** FATAL ERROR: Unknown option: -bogus; larmorx: ** FATAL ERROR: Unknown option: -bogus |
-| `errors/no-detrend-fourier` | -no_detrend while the method is Fourier | AFNI: ** FATAL ERROR: found -no_detrend, changing default to -heptic; larmorx: ** FATAL ERROR: -no_detrend needs a non-Fourier method given before it (e.g. -he… |
+| `errors/no-detrend-fourier` | -no_detrend while the method is Fourier | AFNI: ** FATAL ERROR: found -no_detrend, changing default to -heptic; larmorx: ** FATAL ERROR: found -no_detrend, changing default to -heptic |
 | `errors/rlt-no-detrend` | -rlt with -no_detrend | AFNI: ** FATAL ERROR: cannot use both -rlt and -no_detrend; larmorx: ** FATAL ERROR: cannot use both -rlt and -no_detrend |
-| `errors/unknown-pattern` | pattern names are case-sensitive | AFNI: ** ERROR: Unknown tpattern = ALT+Z; larmorx: ** FATAL ERROR: Unknown tpattern = ALT+Z |
+| `errors/unknown-pattern` | pattern names are case-sensitive | AFNI: ** ERROR: Unknown tpattern = ALT+Z; larmorx: ** ERROR: Unknown tpattern = ALT+Z |
 | `errors/slice-too-large` | -slice beyond the last | AFNI: ** FATAL ERROR: -slice value is too large (4 >= 4); larmorx: ** FATAL ERROR: -slice value is too large (4 >= 4) |
 | `errors/ignore-too-large` | -ignore > nt - 5 | AFNI: ** FATAL ERROR: -ignore value 96 is too large; larmorx: ** FATAL ERROR: -ignore value 96 is too large |
 | `errors/negative-tzero` | -tzero < 0 | AFNI: ** FATAL ERROR: illegal value '-1' after -tzero!; larmorx: ** FATAL ERROR: illegal value '-1' after -tzero! |
 | `errors/negative-ignore` | -ignore < 0 | AFNI: ** FATAL ERROR: -ignore value -1 is negative!; larmorx: ** FATAL ERROR: -ignore value -1 is negative! |
 | `errors/zero-TR` | -TR 0 | AFNI: ** FATAL ERROR: illegal value '0' after -TR!; larmorx: ** FATAL ERROR: illegal value '0' after -TR! |
 | `errors/bad-TR` | -TR abc | AFNI: ** FATAL ERROR: illegal value 'abc' after -TR!; larmorx: ** FATAL ERROR: illegal value 'abc' after -TR! |
-| `errors/missing-file` | a missing -tpattern file | AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D: can't read 1D file <tmp>/none.1D… |
-| `errors/file-too-short` | a -tpattern file with fewer values than slices | AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but the dataset… |
+| `errors/missing-file` | a missing -tpattern file | AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D |
+| `errors/file-too-short` | a -tpattern file with fewer values than slices | AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slic… |
 | `errors/file-beyond-tr` | a -tpattern value beyond the TR | AFNI: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D |
 | `errors/file-negative` | a negative -tpattern value | AFNI: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D |
-| `errors/file-text` | a -tpattern file with text | AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D: 1D text <tmp>/st.1D: 'abc' is not a … |
+| `errors/file-text` | a -tpattern file with text | AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D |
 | `errors/missing-dataset` | an input file that does not exist | AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.… |
 | `errors/existing-output` | an output that exists already (AFNI exits 0 without writing; larmorx exits 1) | AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** FATAL ERROR: output dataset name '<tmp>/out.nii' conflicts with existing file |
 
@@ -80,8 +79,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (770872006940) |
-| larmorx-testdata | 18c8309c46b6 |
+| larmorx | 0.0.1 (6d1ca26b1633-dirty) |
+| larmorx-testdata | 5434909ddf09 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -90,7 +89,7 @@
 
 ## Notes
 
-Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. larmorx uses all logical CPUs (`OMP_NUM_THREADS` unset); its results do not depend on the thread count.
+Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. larmorx-gpl uses all logical CPUs (`OMP_NUM_THREADS` unset); its results do not depend on the thread count.
 
 ## All cases
 

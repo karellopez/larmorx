@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "770872006940",
-  "larmorx_testdata_commit": "18c8309c46b6",
+  "larmorx_commit": "3b3f69caabcb-dirty",
+  "larmorx_testdata_commit": "ea0c2b73b3bb",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -16,7 +16,7 @@
  "repeats": 3,
  "results": [
   {
-   "best": 2.4907471761107445,
+   "best": 2.5255379639565945,
    "data_bytes": 70287360,
    "extra": {
     "shape": [
@@ -28,18 +28,18 @@
     "threads": 1
    },
    "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
-   "median": 2.528470853343606,
+   "median": 2.5301795098930597,
    "operation": "1 thread",
    "seconds": [
-    2.4907471761107445,
-    2.61601291783154,
-    2.528470853343606
+    2.534353284165263,
+    2.5255379639565945,
+    2.5301795098930597
    ],
-   "throughput_mb_s": 27.798366711268677,
+   "throughput_mb_s": 27.779594184987594,
    "tool": "AFNI 25.2.09"
   },
   {
-   "best": 1.2646354492753744,
+   "best": 1.217401823028922,
    "data_bytes": 70287360,
    "extra": {
     "bit_identical": false,
@@ -55,18 +55,18 @@
     "threads": 1
    },
    "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
-   "median": 1.2652075234800577,
+   "median": 1.2255468405783176,
    "operation": "1 thread",
    "seconds": [
-    1.2646354492753744,
-    1.2652075234800577,
-    1.2796773873269558
+    1.2434327863156796,
+    1.217401823028922,
+    1.2255468405783176
    ],
-   "throughput_mb_s": 55.55401678822524,
+   "throughput_mb_s": 57.35183484854192,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 1.2191946767270565,
+   "best": 1.2743494771420956,
    "data_bytes": 70287360,
    "extra": {
     "bit_identical": false,
@@ -82,18 +82,18 @@
     "threads": 1
    },
    "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
-   "median": 1.2371805496513844,
+   "median": 1.279935721307993,
    "operation": "1 thread",
    "seconds": [
-    1.2191946767270565,
-    1.2371805496513844,
-    1.241172345355153
+    1.279935721307993,
+    1.2743494771420956,
+    1.2809054590761662
    ],
-   "throughput_mb_s": 56.81253235011312,
+   "throughput_mb_s": 54.914757694372256,
    "tool": "larmorx (Python, no file output)"
   },
   {
-   "best": 0.43819444440305233,
+   "best": 0.4237449951469898,
    "data_bytes": 70287360,
    "extra": {
     "bit_identical": false,
@@ -109,18 +109,18 @@
     "threads": 12
    },
    "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
-   "median": 0.448054663836956,
+   "median": 0.4300555791705847,
    "operation": "12 threads",
    "seconds": [
-    0.448054663836956,
-    0.44992473535239697,
-    0.43819444440305233
+    0.4237449951469898,
+    0.4300555791705847,
+    0.43112824112176895
    ],
-   "throughput_mb_s": 156.87228740816565,
+   "throughput_mb_s": 163.43785176687595,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 0.3819066509604454,
+   "best": 0.3826751373708248,
    "data_bytes": 70287360,
    "extra": {
     "bit_identical": false,
@@ -136,18 +136,72 @@
     "threads": 12
    },
    "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
-   "median": 0.3988550826907158,
+   "median": 0.38478211499750614,
    "operation": "12 threads",
    "seconds": [
-    0.3988550826907158,
-    0.4353544767946005,
-    0.3819066509604454
+    0.38478211499750614,
+    0.39761615730822086,
+    0.3826751373708248
    ],
-   "throughput_mb_s": 176.22280133885855,
+   "throughput_mb_s": 182.66794962768878,
    "tool": "larmorx (Python, no file output)"
   },
   {
-   "best": 7.094552658498287,
+   "best": 1.4248031787574291,
+   "data_bytes": 70287360,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     33,
+     260
+    ],
+    "threads": 1
+   },
+   "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
+   "median": 1.5321007557213306,
+   "operation": "1 thread",
+   "seconds": [
+    1.5402152966707945,
+    1.5321007557213306,
+    1.4248031787574291
+   ],
+   "throughput_mb_s": 45.876460629319325,
+   "tool": "larmorx-gpl (replica, CLI)"
+  },
+  {
+   "best": 0.6956460978835821,
+   "data_bytes": 70287360,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     64,
+     64,
+     33,
+     260
+    ],
+    "threads": 12
+   },
+   "input": "ds000210 sub-02 cuedSGT echo 1: 64\u00d764\u00d733, 260 volumes, int16",
+   "median": 0.700856352224946,
+   "operation": "12 threads",
+   "seconds": [
+    0.7486103121191263,
+    0.700856352224946,
+    0.6956460978835821
+   ],
+   "throughput_mb_s": 100.28782613850186,
+   "tool": "larmorx-gpl (replica, CLI)"
+  },
+  {
+   "best": 6.630005031824112,
    "data_bytes": 287428608,
    "extra": {
     "shape": [
@@ -159,18 +213,18 @@
     "threads": 1
    },
    "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
-   "median": 7.248491106554866,
+   "median": 6.680509600788355,
    "operation": "1 thread",
    "seconds": [
-    7.613029709085822,
-    7.248491106554866,
-    7.094552658498287
+    6.6831725891679525,
+    6.630005031824112,
+    6.680509600788355
    ],
-   "throughput_mb_s": 39.65357807227991,
+   "throughput_mb_s": 43.024952462620675,
    "tool": "AFNI 25.2.09"
   },
   {
-   "best": 2.3226835411041975,
+   "best": 2.4631703794002533,
    "data_bytes": 287428608,
    "extra": {
     "bit_identical": false,
@@ -186,18 +240,18 @@
     "threads": 1
    },
    "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
-   "median": 2.3381039407104254,
+   "median": 2.4645747877657413,
    "operation": "1 thread",
    "seconds": [
-    2.339634157717228,
-    2.3381039407104254,
-    2.3226835411041975
+    2.4631703794002533,
+    2.473192349076271,
+    2.4645747877657413
    ],
-   "throughput_mb_s": 122.93234829956522,
+   "throughput_mb_s": 116.62401539884623,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 2.160307278856635,
+   "best": 2.2165792789310217,
    "data_bytes": 287428608,
    "extra": {
     "bit_identical": false,
@@ -213,18 +267,18 @@
     "threads": 1
    },
    "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
-   "median": 2.213504223152995,
+   "median": 2.2828303333371878,
    "operation": "1 thread",
    "seconds": [
-    2.160307278856635,
-    2.2198146544396877,
-    2.213504223152995
+    2.2828303333371878,
+    2.404958324506879,
+    2.2165792789310217
    ],
-   "throughput_mb_s": 129.8522970923346,
+   "throughput_mb_s": 125.90887890464397,
    "tool": "larmorx (Python, no file output)"
   },
   {
-   "best": 1.1612611673772335,
+   "best": 1.11517103202641,
    "data_bytes": 287428608,
    "extra": {
     "bit_identical": false,
@@ -240,18 +294,18 @@
     "threads": 12
    },
    "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
-   "median": 1.1773622371256351,
+   "median": 1.127411963418126,
    "operation": "12 threads",
    "seconds": [
-    1.2060682512819767,
-    1.1773622371256351,
-    1.1612611673772335
+    1.1610612757503986,
+    1.11517103202641,
+    1.127411963418126
    ],
-   "throughput_mb_s": 244.1292908304216,
+   "throughput_mb_s": 254.94550113568437,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 0.9740198478102684,
+   "best": 0.9700188972055912,
    "data_bytes": 287428608,
    "extra": {
     "bit_identical": false,
@@ -267,18 +321,72 @@
     "threads": 12
    },
    "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
-   "median": 0.9860690999776125,
+   "median": 0.9985532108694315,
    "operation": "12 threads",
    "seconds": [
-    0.9860690999776125,
-    1.0054059475660324,
-    0.9740198478102684
+    0.9700188972055912,
+    1.139506371691823,
+    0.9985532108694315
    ],
-   "throughput_mb_s": 291.4893165261194,
+   "throughput_mb_s": 287.8450591027978,
    "tool": "larmorx (Python, no file output)"
   },
   {
-   "best": 47.82197779789567,
+   "best": 3.015670008957386,
+   "data_bytes": 287428608,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     96,
+     96,
+     69,
+     113
+    ],
+    "threads": 1
+   },
+   "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
+   "median": 3.0273429471999407,
+   "operation": "1 thread",
+   "seconds": [
+    3.015670008957386,
+    3.315460067242384,
+    3.0273429471999407
+   ],
+   "throughput_mb_s": 94.94418472338899,
+   "tool": "larmorx-gpl (replica, CLI)"
+  },
+  {
+   "best": 1.4741225726902485,
+   "data_bytes": 287428608,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     96,
+     96,
+     69,
+     113
+    ],
+    "threads": 12
+   },
+   "input": "ds006010 sub-206 category: 96\u00d796\u00d769, 113 volumes, uint16 (read as float32)",
+   "median": 1.4838780704885721,
+   "operation": "12 threads",
+   "seconds": [
+    1.5095535572618246,
+    1.4741225726902485,
+    1.4838780704885721
+   ],
+   "throughput_mb_s": 193.700960824472,
+   "tool": "larmorx-gpl (replica, CLI)"
+  },
+  {
+   "best": 49.730673648416996,
    "data_bytes": 1376256000,
    "extra": {
     "shape": [
@@ -290,18 +398,18 @@
     "threads": 1
    },
    "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
-   "median": 48.31474972888827,
+   "median": 52.95015776902437,
    "operation": "1 thread",
    "seconds": [
-    48.42002980411053,
-    47.82197779789567,
-    48.31474972888827
+    52.95015776902437,
+    53.86330193839967,
+    49.730673648416996
    ],
-   "throughput_mb_s": 28.48521430251995,
+   "throughput_mb_s": 25.99153728688424,
    "tool": "AFNI 25.2.09"
   },
   {
-   "best": 24.13704418949783,
+   "best": 22.97791799157858,
    "data_bytes": 1376256000,
    "extra": {
     "bit_identical": false,
@@ -317,18 +425,18 @@
     "threads": 1
    },
    "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
-   "median": 24.31799072958529,
+   "median": 23.093847380951047,
    "operation": "1 thread",
    "seconds": [
-    24.452598256990314,
-    24.13704418949783,
-    24.31799072958529
+    22.97791799157858,
+    23.56381336413324,
+    23.093847380951047
    ],
-   "throughput_mb_s": 56.594149381167654,
+   "throughput_mb_s": 59.594054524461974,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 23.195130629464984,
+   "best": 22.146586541086435,
    "data_bytes": 1376256000,
    "extra": {
     "bit_identical": false,
@@ -344,18 +452,18 @@
     "threads": 1
    },
    "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
-   "median": 23.23604829981923,
+   "median": 22.313600471243262,
    "operation": "1 thread",
    "seconds": [
-    23.195130629464984,
-    23.23604829981923,
-    23.3741774559021
+    22.313600471243262,
+    23.03581146709621,
+    22.146586541086435
    ],
-   "throughput_mb_s": 59.22934839185658,
+   "throughput_mb_s": 61.67789917067195,
    "tool": "larmorx (Python, no file output)"
   },
   {
-   "best": 8.583833675831556,
+   "best": 8.377196768298745,
    "data_bytes": 1376256000,
    "extra": {
     "bit_identical": false,
@@ -371,18 +479,18 @@
     "threads": 12
    },
    "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
-   "median": 8.669034091755748,
+   "median": 8.405257290229201,
    "operation": "12 threads",
    "seconds": [
-    8.76299948245287,
-    8.669034091755748,
-    8.583833675831556
+    8.377196768298745,
+    8.407694598659873,
+    8.405257290229201
    ],
-   "throughput_mb_s": 158.75540290109365,
+   "throughput_mb_s": 163.7375219435396,
    "tool": "larmorx (CLI)"
   },
   {
-   "best": 8.180539743974805,
+   "best": 7.634626915678382,
    "data_bytes": 1376256000,
    "extra": {
     "bit_identical": false,
@@ -398,15 +506,69 @@
     "threads": 12
    },
    "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
-   "median": 8.227559246122837,
+   "median": 7.660494819283485,
    "operation": "12 threads",
    "seconds": [
-    8.368299411609769,
-    8.227559246122837,
-    8.180539743974805
+    7.634626915678382,
+    7.660494819283485,
+    7.66083780489862
    ],
-   "throughput_mb_s": 167.2739094098348,
+   "throughput_mb_s": 179.65627971389014,
    "tool": "larmorx (Python, no file output)"
+  },
+  {
+   "best": 28.955584490671754,
+   "data_bytes": 1376256000,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     160,
+     96,
+     280
+    ],
+    "threads": 1
+   },
+   "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
+   "median": 29.869214944541454,
+   "operation": "1 thread",
+   "seconds": [
+    30.668855456635356,
+    29.869214944541454,
+    28.955584490671754
+   ],
+   "throughput_mb_s": 46.076068706703936,
+   "tool": "larmorx-gpl (replica, CLI)"
+  },
+  {
+   "best": 15.513209795579314,
+   "data_bytes": 1376256000,
+   "extra": {
+    "bit_identical": true,
+    "differing_fraction": 0.0,
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "shape": [
+     160,
+     160,
+     96,
+     280
+    ],
+    "threads": 12
+   },
+   "input": "ds005454 sub-16 rest: 160\u00d7160\u00d796, 280 volumes, int16 (multiband 4)",
+   "median": 15.568206407129765,
+   "operation": "12 threads",
+   "seconds": [
+    15.513209795579314,
+    15.778585216030478,
+    15.568206407129765
+   ],
+   "throughput_mb_s": 88.40170563063172,
+   "tool": "larmorx-gpl (replica, CLI)"
   }
  ]
 }

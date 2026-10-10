@@ -1,0 +1,20 @@
+[package]
+name = "larmorx-gpl-cli"
+description = "The larmorx-gpl command line: bit-exact replicas with the original tools' arguments (GPL-3.0-or-later)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+autobins = false
+
+[[bin]]
+name = "larmorx-gpl"
+path = "src/main.rs"
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-gpl-afni.workspace = true
+
+[dev-dependencies]
+larmorx-io.workspace = true
+tempfile.workspace = true

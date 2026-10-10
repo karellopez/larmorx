@@ -6,7 +6,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 |---|---|
 | [nifti-io](nifti-io.md) | nibabel, SimpleITK |
 | [ants-apply-transforms](ants-apply-transforms.md) | antsApplyTransforms (ANTs 2.6.5 via ANTsPy) |
-| [afni-tshift](afni-tshift.md) | 3dTshift (AFNI 25.2.09 binary) |
+| [afni-tshift](afni-tshift.md) | 3dTshift (AFNI 25.2.09 binary); also the GPL replica `larmorx-gpl` |
 
 Reproduce a report (build larmorx in release mode first):
 

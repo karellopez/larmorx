@@ -1,0 +1,20 @@
+[package]
+name = "larmorx-gpl-afni"
+description = "Bit-exact replicas of AFNI tools (3dTshift) for larmorx, translated from AFNI 25.2.09 (GPL-3.0-or-later)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[features]
+# Exposes private routines to the bit-exactness harnesses in tools/ (not an API).
+verification = []
+
+[dev-dependencies]
+tempfile.workspace = true

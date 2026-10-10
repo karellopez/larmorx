@@ -24,6 +24,14 @@ value, because AFNI's FFT is float32 and larmorx's is double; integer outputs th
 at most 1, in a few values per million on the real runs (up to 0.2 % on a synthetic series
 built to clip). The known last-bit differences are listed at the end of this page.
 
+**Bit-exact replica.** `larmorx-gpl afni 3dTshift` (package `larmorx-gpl`, `crates-gpl/`,
+GPL-3.0-or-later) is a translation of AFNI's own source, with AFNI's float32 FFT and a port of
+glibc's `sinf`/`cosf`. It takes the same arguments as `larmorx afni 3dTshift`, follows the
+same conventions (NIfTI output only, an existing output is an error), and gives AFNI's output
+bytes on every compared parity case ([replica record](../validation/afni-tshift-replica.md)).
+It is a separate program because of its licence ([licensing](../licensing.md)); choosing it
+from Python (`implementation="replica"`) is planned.
+
 ## Quick start
 
 ```python

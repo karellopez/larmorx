@@ -4,6 +4,9 @@
 # location: "ws"            = clone into the workspace root (read-only reference)
 #           "tags"          = clone into <workspace>/tags/: the release tags code is ported from (UPSTREAM.md)
 #           "reference_src" = clone into <workspace>/reference_src/ (licence review only; DO NOT READ for implementation)
+#           "fsl"           = not cloned: an FSL conda package installed with FSL 6.0.7.17 under ~/fsl (source in
+#                             ~/fsl/src/<name>/); "commit" is its tag on git.fmrib.ox.ac.uk. Read for specs and the
+#                             larmorx-nc replica only; forbidden to clean-room implementers (specs/mcflirt.md, UPSTREAM.md).
 # Porting must use the release tags listed in CLAUDE.md, not these master/dev snapshots.
 fmriprep	https://github.com/nipreps/fmriprep.git	21a490fb89acee54baca06dd0ca04a2297659e97	Apache-2.0	ws
 smriprep	https://github.com/nipreps/smriprep.git	10d70eed1cb18a7fba13b9c6e566cead464b45e1	Apache-2.0	ws
@@ -29,3 +32,11 @@ ANTs-v2.6.5	https://github.com/ANTsX/ANTs.git	fdce4d2f84b60ac75d7e45aafe18488b1f
 ITK-v5.4.5	https://github.com/InsightSoftwareConsortium/ITK.git	f51594ad88194a72cdc06a314dafff709fcdc2e9	Apache-2.0	tags
 AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags
 core-math	https://gitlab.inria.fr/core-math/core-math.git	040ee482a8caefe2afe71a3a59d43923d2f0c7e6	MIT	tags
+fsl-mcflirt	https://git.fmrib.ox.ac.uk/fsl/mcflirt.git	2111.0	FSL-Licence	fsl
+fsl-flirt	https://git.fmrib.ox.ac.uk/fsl/flirt.git	2111.2	FSL-Licence	fsl
+fsl-newimage	https://git.fmrib.ox.ac.uk/fsl/newimage.git	2203.12	FSL-Licence	fsl
+fsl-miscmaths	https://git.fmrib.ox.ac.uk/fsl/miscmaths.git	2203.2	FSL-Licence	fsl
+fsl-newnifti	https://git.fmrib.ox.ac.uk/fsl/NewNifti.git	4.1.0	FSL-Licence	fsl
+fsl-utils	https://git.fmrib.ox.ac.uk/fsl/utils.git	2203.5	FSL-Licence	fsl
+fsl-znzlib	https://git.fmrib.ox.ac.uk/fsl/znzlib.git	2111.0	FSL-Licence	fsl
+fsl-armawrap	https://git.fmrib.ox.ac.uk/fsl/armawrap.git	0.6.0	Apache-2.0	fsl

@@ -12,7 +12,9 @@ pub mod intensity;
 pub mod morphology;
 
 pub use arithmetic::{Arithmetic, ArithmeticOutput, Operand, arithmetic, negative};
-pub use components::{distance_map, largest_component, maurer_distance};
+pub use components::{
+    distance_map, extract_contours, largest_component, maurer_distance, x86_f32_to_u64,
+};
 pub use gaussian::{
     UnsharpMaskOptions, gradient_magnitude, laplacian, smooth_discrete, unsharp_mask,
 };

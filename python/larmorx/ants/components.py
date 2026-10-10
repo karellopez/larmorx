@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Connected components, distance maps and label values as ANTs computes them: ImageMath's
-``GetLargestComponent``, ``D``, ``MaurerDistance``, ``ThresholdAtMean`` and
-``ReplaceVoxelValue``.
+``GetLargestComponent``, ``D``, ``MaurerDistance``, ``ExtractContours``,
+``ThresholdAtMean`` and ``ReplaceVoxelValue``.
 
 Every function takes an image (path, :class:`~larmorx.Image`, nibabel image or
 ``(array, affine)``) in 2, 3 or 4 dimensions (a 4D image is one 4D volume: components and
@@ -21,6 +21,7 @@ from larmorx.image import Image
 
 __all__ = [
     "distance_map",
+    "extract_contours",
     "largest_component",
     "maurer_distance",
     "replace_voxel_value",
@@ -65,6 +66,17 @@ def maurer_distance(image: Any, foreground: float = 1.0, *, n_threads: int = 1) 
     data = _core.ants_maurer_distance(
         np.asfortranarray(a.data), list(a.spacing), float(foreground), n_threads
     )
+    return result(data, a)
+
+
+def extract_contours(image: Any, fully_connected: bool = True, *, n_threads: int = 1) -> Image:
+    """``ImageMath d out ExtractContours in fully_connected``: ITK's
+    ``LabelContourImageFilter``. Each voxel's label is its value truncated to an unsigned
+    integer (so 1.7 is 1 and 0.6 is 0: contours of probability maps vanish); voxels of a
+    non-zero label that touch another label (through a face, or anywhere in the ``3^D``
+    neighbourhood when ``fully_connected``) keep their label, the others become 0."""
+    a = float_input(image, n_threads)
+    data = _core.ants_extract_contours(np.asfortranarray(a.data), bool(fully_connected), n_threads)
     return result(data, a)
 
 

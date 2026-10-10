@@ -370,6 +370,12 @@ def ants_maurer_distance(
     """ImageMath ``MaurerDistance``: ITK's signed Maurer distance map of the voxels equal to
     ``foreground`` (mm, negative inside)."""
 
+def ants_extract_contours(
+    a: np.ndarray, fully_connected: bool = True, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``ExtractContours``: the voxels of each integer label (values truncated)
+    that touch another label, keeping their label; 0 elsewhere."""
+
 def ants_threshold_at_mean(a: np.ndarray, fraction: float = 1.0, n_threads: int = 1) -> np.ndarray:
     """ImageMath ``ThresholdAtMean``: 1 where ``mean · fraction ≤ v ≤ max``, else 0."""
 

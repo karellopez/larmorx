@@ -12,6 +12,9 @@
 //!   components sorted by size, largest first, **ties in the order of their labels**;
 //!   components smaller than the minimum size (if it is not 0) become background; the others
 //!   are numbered 1, 2, ... in that order.
+//! - `LabelContourImageFilter` ([`label_contour`]; `itkLabelContourImageFilter.hxx`): the
+//!   voxels of a non-background label with a differently labelled neighbour in the image
+//!   (faces, or the whole `3^D` neighbourhood).
 
 use larmorx_core::parallel;
 use rayon::prelude::*;
@@ -289,6 +292,93 @@ pub fn relabel_components(
     })
 }
 
+/// `LabelContourImageFilter`: whether each voxel of `labels` (an image of `size`) is on the
+/// contour of its label: its label is not `background` and a neighbour inside the image has
+/// another label. Neighbours are the voxels one step away along one axis, or with
+/// `fully_connected` the whole `3^D` neighbourhood. (ITK encodes each row as runs of equal
+/// input values and compares the runs' labels, `static_cast<SizeValueType>(value)`; the
+/// voxel sets are the same.)
+pub fn label_contour(
+    labels: &[u64],
+    size: &[usize],
+    fully_connected: bool,
+    background: u64,
+    n_threads: usize,
+) -> Result<Vec<bool>, FilterError> {
+    let n: usize = size.iter().product();
+    if labels.len() != n {
+        return Err(FilterError::SizeMismatch {
+            what: "labels",
+            actual: labels.len(),
+            expected: n,
+        });
+    }
+    if n == 0 {
+        return Ok(Vec::new());
+    }
+    let nx = size[0];
+    let rows = &size[1..];
+    let row_strides = strides(rows);
+    let d = rows.len();
+    // The neighbouring rows (this one included) and how far along x each reaches.
+    let mut offsets: Vec<(Vec<isize>, usize)> = Vec::new();
+    for mut t in 0..3usize.pow(d as u32) {
+        let o: Vec<isize> = (0..d)
+            .map(|_| {
+                let v = (t % 3) as isize - 1;
+                t /= 3;
+                v
+            })
+            .collect();
+        let nonzero = o.iter().filter(|&&v| v != 0).count();
+        if nonzero == 0 || fully_connected {
+            offsets.push((o, 1));
+        } else if nonzero == 1 {
+            offsets.push((o, 0));
+        }
+    }
+    let mut out = vec![false; n];
+    parallel::with_threads(n_threads, || {
+        out.par_chunks_mut(nx)
+            .enumerate()
+            .with_min_len(16)
+            .for_each(|(row, out_row)| {
+                let mine = &labels[row * nx..(row + 1) * nx];
+                if mine.iter().all(|&l| l == background) {
+                    return;
+                }
+                let coord: Vec<usize> = (0..d).map(|a| (row / row_strides[a]) % rows[a]).collect();
+                for (o, reach) in &offsets {
+                    let mut other = 0usize;
+                    let mut inside = true;
+                    for a in 0..d {
+                        let c = coord[a] as isize + o[a];
+                        if c < 0 || c >= rows[a] as isize {
+                            inside = false;
+                            break;
+                        }
+                        other += c as usize * row_strides[a];
+                    }
+                    if !inside {
+                        continue;
+                    }
+                    let theirs = &labels[other * nx..(other + 1) * nx];
+                    for (x, (o, &l)) in out_row.iter_mut().zip(mine).enumerate() {
+                        if l == background || *o {
+                            continue;
+                        }
+                        let lo = x.saturating_sub(*reach);
+                        let hi = (x + reach).min(nx - 1);
+                        if theirs[lo..=hi].iter().any(|&m| m != l) {
+                            *o = true;
+                        }
+                    }
+                }
+            });
+    })?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,6 +447,46 @@ mod tests {
                         assert_eq!(got.count, count, "{size:?} full {full}");
                         assert_eq!(got.labels, expected, "{size:?} full {full}");
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn label_contours_match_brute_force() {
+        for size in [vec![9usize, 8, 7], vec![12, 11], vec![5, 4, 4, 3]] {
+            let n: usize = size.iter().product();
+            let labels: Vec<u64> = (0..n)
+                .map(|i| ((i * 7919 + i / 4) % 11 / 4) as u64)
+                .collect();
+            let st = strides(&size);
+            let d = size.len();
+            for full in [false, true] {
+                let want: Vec<bool> = (0..n)
+                    .map(|i| {
+                        labels[i] != 0
+                            && (0..3usize.pow(d as u32)).any(|mut t| {
+                                let mut j = 0usize;
+                                let mut nz = 0;
+                                for a in 0..d {
+                                    let o = (t % 3) as isize - 1;
+                                    t /= 3;
+                                    nz += usize::from(o != 0);
+                                    let c = ((i / st[a]) % size[a]) as isize + o;
+                                    if c < 0 || c >= size[a] as isize {
+                                        return false;
+                                    }
+                                    j += c as usize * st[a];
+                                }
+                                (full || nz == 1) && labels[j] != labels[i]
+                            })
+                    })
+                    .collect();
+                for threads in [1, 3] {
+                    assert_eq!(
+                        label_contour(&labels, &size, full, 0, threads).unwrap(),
+                        want
+                    );
                 }
             }
         }

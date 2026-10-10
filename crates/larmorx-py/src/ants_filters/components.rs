@@ -7,7 +7,8 @@
 
 use larmorx_ants::VolumeRef;
 use larmorx_ants::image_math::{
-    distance_map, largest_component, maurer_distance, replace_voxel_value, threshold_at_mean,
+    distance_map, extract_contours, largest_component, maurer_distance, replace_voxel_value,
+    threshold_at_mean,
 };
 use numpy::{PyArrayDyn, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::prelude::*;
@@ -107,7 +108,32 @@ fn ants_replace_voxel_value<'py>(
     array_like(py, out, &shape)
 }
 
+/// ImageMath `ExtractContours`: ITK's `LabelContourImageFilter` on the values truncated to
+/// integer labels.
+#[pyfunction]
+#[pyo3(signature = (a, fully_connected = true, n_threads = 1))]
+fn ants_extract_contours<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArrayDyn<'py, f32>,
+    fully_connected: bool,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    let spacing = vec![1.0; a.shape().len()];
+    let (shape, data) = checked(&a, &spacing)?;
+    let out = py
+        .detach(|| {
+            extract_contours(
+                VolumeRef::new(&data, &shape, &spacing),
+                fully_connected,
+                n_threads,
+            )
+        })
+        .map_err(value_err)?;
+    array_like(py, out, &shape)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(ants_extract_contours, m)?)?;
     m.add_function(wrap_pyfunction!(ants_largest_component, m)?)?;
     m.add_function(wrap_pyfunction!(ants_distance_map, m)?)?;
     m.add_function(wrap_pyfunction!(ants_maurer_distance, m)?)?;

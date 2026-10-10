@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """ImageMath's component, distance-map and label-value operations: ``GetLargestComponent``
 (ITK's connected components and relabelling), ``D`` (Danielsson), ``MaurerDistance`` (signed
-Maurer), ``ThresholdAtMean`` and ``ReplaceVoxelValue``. sMRIPrep's brain extraction runs
+Maurer), ``ExtractContours`` (label contours), ``ThresholdAtMean`` and
+``ReplaceVoxelValue``. sMRIPrep's brain extraction runs
 ``GetLargestComponent`` on masks."""
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from larmorx_validation.parity.ants_image_math.common import (
     HEAD,
     HEAD_I16,
     HOLES,
+    INT32,
     MASK,
     MNI_2MM_MASK,
     NEG_PIXDIM,
@@ -232,6 +234,43 @@ add(f"{M}/real-T1w-mask", M, "fMRIPrep's T1w brain mask", "MaurerDistance", T1_M
 add(f"{M}/real-mni-mask", M, "the MNI 2 mm brain mask", "MaurerDistance", MNI_2MM_MASK)
 add(f"{M}/dim2", M, "ImageMath 2, foreground 0", "MaurerDistance", SLICE, "0", dim="2")
 add(f"{M}/dim4", M, "ImageMath 4: distances across time", "MaurerDistance", HOLES_4D, dim="4")
+
+# ExtractContours: LabelContourImageFilter; labels are the values truncated to unsigned long.
+C = "extract-contours"
+add(
+    f"{C}/labels", C, "the contours of a 3-tissue map (fully connected)", "ExtractContours", TISSUES
+)
+add(f"{C}/labels-faces", C, "face connectivity (flag 0)", "ExtractContours", TISSUES, "0")
+add(
+    f"{C}/fractional",
+    C,
+    "values 0.3 to 2: 0.3, 0.6 and 0.999 are label 0, 1 and 1.7 are label 1",
+    "ExtractContours",
+    FRACTIONAL,
+)
+add(
+    f"{C}/negative-values",
+    C,
+    "negative values wrap to labels near 2^64 (written as 1.8446744e19)",
+    "ExtractContours",
+    OPERAND,
+)
+add(f"{C}/int32-large", C, "labels up to ±2^30", "ExtractContours", INT32)
+add(
+    f"{C}/components", C, "binary components, face connectivity", "ExtractContours", COMPONENTS, "0"
+)
+add(
+    f"{C}/flag-not-a-number",
+    C,
+    "a flag that is not a number: std::stoi throws (ANTs aborts)",
+    "ExtractContours",
+    TISSUES,
+    "yes",
+    expect="error",
+)
+add(f"{C}/real-T1w-mask", C, "fMRIPrep's T1w brain mask", "ExtractContours", T1_MASK)
+add(f"{C}/dim2", C, "ImageMath 2", "ExtractContours", SLICE, dim="2")
+add(f"{C}/dim4", C, "ImageMath 4: contours across time", "ExtractContours", HOLES_4D, "0", dim="4")
 
 # ThresholdAtMean and ReplaceVoxelValue.
 add(f"{T}/default", T, "fraction 1: 1 at or above the mean", "ThresholdAtMean", HEAD)

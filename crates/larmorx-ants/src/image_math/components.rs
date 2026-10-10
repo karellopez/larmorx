@@ -4,10 +4,12 @@
 //! - `GetLargestComponent`: [`largest_component`] (`GetLargestComponent`, lines 427-563);
 //! - `D`: [`distance_map`] (`DistanceMap`, lines 8799-8833), ITK's Danielsson map;
 //! - `MaurerDistance`: [`maurer_distance`] (`GenerateMaurerDistanceImage`, lines 8836-8876),
-//!   ITK's signed Maurer map.
+//!   ITK's signed Maurer map;
+//! - `ExtractContours`: [`extract_contours`] (`ExtractContours`, lines 8289-8320), ITK's
+//!   `LabelContourImageFilter`.
 
 use larmorx_core::parallel;
-use larmorx_image::components::{connected_components, relabel_components};
+use larmorx_image::components::{connected_components, label_contour, relabel_components};
 use larmorx_image::distance::{MaurerOptions, danielsson_distance_map, signed_maurer_distance_map};
 use larmorx_image::{FilterError, VolumeRef};
 use rayon::prelude::*;
@@ -121,6 +123,56 @@ pub fn maurer_distance(
     )
 }
 
+/// x86-64's conversion of a float to `unsigned long` as GCC emits it: below 2^63 a signed
+/// 64-bit truncation (so `-1.5` becomes `2^64 - 1`), from 2^63 on the truncation of
+/// `v - 2^63` with the top bit set; NaN and values out of range give the integer
+/// indefinite (`2^63`, which the second branch turns into 0).
+pub fn x86_f32_to_u64(v: f32) -> u64 {
+    const TWO63: f32 = 9.223_372e18;
+    let cvt = |x: f32| -> i64 {
+        if x.is_nan() || x >= TWO63 || x < -TWO63 {
+            i64::MIN
+        } else {
+            x as i64
+        }
+    };
+    if v < TWO63 {
+        cvt(v) as u64
+    } else {
+        (cvt(v - TWO63) as u64) ^ (1 << 63)
+    }
+}
+
+/// `ExtractContours`: `ImageMath d out ExtractContours image [fullyConnected=1]`: ITK's
+/// `LabelContourImageFilter<float, float>` with background 0. Each voxel's label is its
+/// value converted to `unsigned long` (`static_cast`, so 1.7 is 1, 0.6 is 0 and a negative
+/// value wraps to near 2^64); voxels whose label is not 0 and that touch a voxel with
+/// another label (through a face, or anywhere in the `3^D` neighbourhood when fully
+/// connected) keep their label, as a float; the others are 0.
+pub fn extract_contours(
+    input: VolumeRef<'_, f32>,
+    fully_connected: bool,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    let labels: Vec<u64> = parallel::with_threads(n_threads, || {
+        input
+            .data
+            .par_iter()
+            .with_min_len(CHUNK)
+            .map(|&v| x86_f32_to_u64(v))
+            .collect()
+    })?;
+    let contour = label_contour(&labels, input.size, fully_connected, 0, n_threads)?;
+    Ok(parallel::with_threads(n_threads, || {
+        labels
+            .par_iter()
+            .zip(contour.par_iter())
+            .with_min_len(CHUNK)
+            .map(|(&l, &c)| if c { l as f32 } else { 0.0 })
+            .collect()
+    })?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +195,17 @@ mod tests {
         let tie = [1.0f32, 1.0, 0.0, 1.0, 1.0];
         let out = largest_component(VolumeRef::new(&tie, &[5], &sp), 0, 1).unwrap();
         assert_eq!(out, vec![1., 1., 0., 1., 1.]);
+    }
+
+    #[test]
+    fn contours_use_truncated_labels() {
+        assert_eq!(x86_f32_to_u64(1.7), 1);
+        assert_eq!(x86_f32_to_u64(-1.5), u64::MAX);
+        assert_eq!(x86_f32_to_u64(1.0e19), 9_999_999_980_506_447_872);
+        // 1.2 and 1.7 are both label 1: no contour between them; 2 differs.
+        let data = [0.0f32, 1.2, 1.7, 1.2, 2.0, 2.0, 0.0];
+        let out = extract_contours(VolumeRef::new(&data, &[7], &[1.0]), true, 1).unwrap();
+        assert_eq!(out, vec![0., 1., 0., 1., 2., 2., 0.]);
     }
 
     #[test]

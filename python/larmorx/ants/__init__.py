@@ -9,6 +9,7 @@ arguments.
 from larmorx.ants.apply_transforms import apply_transforms, apply_transforms_to_points
 from larmorx.ants.components import (
     distance_map,
+    extract_contours,
     largest_component,
     maurer_distance,
     replace_voxel_value,
@@ -57,6 +58,7 @@ __all__ = [
     "apply_transforms_to_points",
     "discrete_gaussian",
     "distance_map",
+    "extract_contours",
     "fill_holes",
     "gradient_magnitude",
     "grayscale_close",

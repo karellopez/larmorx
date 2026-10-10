@@ -321,6 +321,8 @@ def test_typed_components_and_distances_equal_image_math():
         (lx.ants.maurer_distance(mask), ("MaurerDistance", mask)),
         (lx.ants.maurer_distance(image(2 * mask.data), 2), ("MaurerDistance", mask, 1)),
         (lx.ants.threshold_at_mean(img, 1.2), ("ThresholdAtMean", img, 1.2)),
+        (lx.ants.extract_contours(mask), ("ExtractContours", mask)),
+        (lx.ants.extract_contours(mask, False), ("ExtractContours", mask, 0)),
         (lx.ants.replace_voxel_value(img, 10, 50, -1), ("ReplaceVoxelValue", img, 10, 50, -1)),
     ]
     for typed, (op, *operands) in pairs:

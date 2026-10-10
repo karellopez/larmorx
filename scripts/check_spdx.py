@@ -38,6 +38,14 @@ MIXED = {
     "crates/larmorx-core/src/math/dint.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/vnl_svd.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-interp/src/vnl.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-interp/src/ndimage/mod.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-interp/src/ndimage/splines.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-interp/src/ndimage/geometric.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-transform/src/nitransforms.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-transform/src/resample_series.rs": "Apache-2.0 AND MIT",
+    "python/larmorx/ndimage.py": "Apache-2.0 AND BSD-3-Clause",
+    "python/larmorx/transforms/chain.py": "Apache-2.0 AND MIT",
+    "python/larmorx/transforms/resample.py": "Apache-2.0 AND MIT",
 }
 
 

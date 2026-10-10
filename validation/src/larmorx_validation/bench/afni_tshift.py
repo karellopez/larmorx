@@ -7,6 +7,9 @@ Fourier interpolation) on the same files. AFNI runs as its own binary (single-th
 point with ``OMP_NUM_THREADS`` threads, and through the Python API (no file output). Each
 timing covers reading the gzipped input, shifting, and writing the output (uncompressed
 ``.nii``, so gzip speed does not dominate).
+
+When the GPL replica is built (``larmorx-gpl``, found as the parity suite finds it), it is
+timed too, as a separate process with the same arguments; this package only runs it.
 """
 
 from __future__ import annotations
@@ -27,10 +30,16 @@ import larmorx_testdata as td
 
 from larmorx_validation import environment
 from larmorx_validation.bench.harness import Measurement, measure
-from larmorx_validation.parity.afni_tshift import _fmriprep_args, afni_binary, afni_version
+from larmorx_validation.parity.afni_tshift import (
+    _fmriprep_args,
+    afni_binary,
+    afni_version,
+    replica_binary,
+)
 from larmorx_validation.report import environment_section, table, write_json
 
 OPENNEURO = "openneuro"
+REPLICA_TOOL = "larmorx-gpl (replica, CLI)"
 
 
 @dataclass(frozen=True)
@@ -104,6 +113,7 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
     binary = afni_binary()
     if binary is None:
         raise SystemExit("the AFNI 3dTshift oracle was not found (set LARMORX_AFNI_BIN)")
+    replica = replica_binary()
     env = {**os.environ, "AFNI_DONT_LOGFILE": "YES", "AFNI_NIFTI_TYPE_WARN": "NO"}
     results = []
     with tempfile.TemporaryDirectory(prefix="lx-bench-tshift-") as tmp_name:
@@ -162,6 +172,27 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
                     )
                 )
             os.environ.pop("OMP_NUM_THREADS", None)
+            if replica is None:
+                continue
+            gpl_out = tmp / "larmorx-gpl.nii"
+            for t in threads:
+
+                def run_gpl(out=gpl_out, args=args, src=src, t=t, label=job.label):
+                    out.unlink(missing_ok=True)
+                    p = subprocess.run(
+                        [replica, "afni", "3dTshift", *args, "-prefix", str(out), str(src)],
+                        capture_output=True,
+                        env={**os.environ, "OMP_NUM_THREADS": str(t)},
+                        check=False,
+                    )
+                    if p.returncode != 0 or not out.exists():
+                        raise RuntimeError(f"larmorx-gpl failed on {label}: {p.stderr[-300:]}")
+
+                seconds = measure(run_gpl, repeats=repeats)
+                g = nib.load(gpl_out).dataobj.get_unscaled()
+                extra = {"threads": t, "shape": list(a.shape), **_differences(a, g)}
+                label = f"{t} thread{'s' if t != 1 else ''}"
+                results.append(Measurement(job.label, label, REPLICA_TOOL, seconds, nbytes, extra))
     return results
 
 
@@ -191,7 +222,7 @@ def render(
         afni = next(m for m in ms if m.tool == afni_tool)
         rows = [(afni_tool, "1", _fmt(afni.median), "1.0×", "")]
         for t in threads:
-            for m in (m for m in ms if m.tool.startswith("larmorx") and m.extra["threads"] == t):
+            for m in (m for m in ms if m.tool.startswith("larmorx (") and m.extra["threads"] == t):
                 e = m.extra
                 same = (
                     "bit-identical"
@@ -207,6 +238,36 @@ def render(
             table(("Tool", "Threads", "Median", "Speed-up vs AFNI", "Output vs AFNI"), rows),
             "",
         ]
+    replica = [m for m in results if m.tool == REPLICA_TOOL]
+    if replica:
+        lines += [
+            "## The replica: `larmorx-gpl afni 3dTshift`",
+            "",
+            "The GPL-3.0-or-later replica (`crates-gpl/`, a translation of AFNI's source) on the "
+            "same runs, as a separate process with the same arguments. It keeps AFNI's "
+            "arithmetic (float32 FFT, one voxel pair at a time) and runs the pairs of each slice "
+            "in parallel. Its output is compared with AFNI's on every value "
+            "(`docs/validation/afni-tshift-replica.md`).",
+            "",
+        ]
+        for job in dict.fromkeys(m.input for m in replica):
+            afni = next(m for m in results if m.input == job and m.tool == afni_tool)
+            rows = [(afni_tool, "1", _fmt(afni.median), "1.0×", "")]
+            for m in (m for m in replica if m.input == job):
+                e = m.extra
+                same = (
+                    "bit-identical"
+                    if e["bit_identical"]
+                    else f"{e['differing_fraction']:.1e} of values differ, max {e['max_abs_diff']:.3g}"
+                )
+                speed = f"**{afni.median / m.median:.1f}×**"
+                rows.append((m.tool, str(e["threads"]), _fmt(m.median), speed, same))
+            lines += [
+                f"### {job}",
+                "",
+                table(("Tool", "Threads", "Median", "Speed-up vs AFNI", "Output vs AFNI"), rows),
+                "",
+            ]
     lines += [
         "## Notes",
         "",

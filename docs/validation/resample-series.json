@@ -1,0 +1,1423 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "0d9c2d1b9b48-dirty",
+  "larmorx_testdata_commit": "5434909ddf09+synthetic-series-resampling (staged)",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "fmriprep": "26.0.0.dev1+g21a490fb8",
+   "h5py": "3.16.0",
+   "nibabel": "5.4.2",
+   "nipype": "1.12.0",
+   "nitransforms": "25.1.0",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "fMRIPrep 26.0.0.dev1+g21a490fb8 `ResampleSeries` (run through nipype), nitransforms 25.1.0, SciPy 1.15.3, in-process",
+ "results": [
+  {
+   "case": "ndimage/grid-constant-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.07,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-constant-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.106,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-constant-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.328,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-constant-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.373,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-constant-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.624,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-constant-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.092,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.06,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/constant-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.078,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.1,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.305,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.357,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.566,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/nearest-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.716,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.166,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.257,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.397,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/mirror-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.583,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.069,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.18,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.294,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.418,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/reflect-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.635,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.17,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.262,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.43,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-mirror-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.579,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.082,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.102,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.165,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.258,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.418,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/wrap-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.577,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order0",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order1",
+   "category": "ndimage",
+   "checks_passed": 180,
+   "checks_total": 180,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order2",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.174,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order3",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.259,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order4",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.392,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/grid-wrap-order5",
+   "category": "ndimage",
+   "checks_passed": 184,
+   "checks_total": 184,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.585,
+   "status": "pass"
+  },
+  {
+   "case": "ndimage/overflowing-coordinates",
+   "category": "ndimage",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "For coordinates beyond the range of int64 (or whose index arithmetic overflows), SciPy's C code casts and multiplies with undefined behaviour and then reads outside its buffer or wherever the wrapped offset points; larmorx returns NaN there instead (14 of 48 mode/order pairs differ: nearest/order2, nearest/order3, nearest/order4, nearest/order5, wrap/order0, wrap/order1, wrap/order2, wrap/order3, wrap/order4, wrap/order5, grid-wrap/order2, grid-wrap/order3\u2026). Finite coordinates below about 1e18 always agree.",
+   "seconds": 0.004,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "nitransforms/hmc-series",
+   "category": "nitransforms",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/centred-affine",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/inverse-affine",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/composite-on-grid",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.016,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/composite-off-grid",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/chain-affine-composite",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/fmriprep-mni-warp",
+   "category": "nitransforms",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.383,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/ndcoords-boldref-las",
+   "category": "nitransforms",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.003,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/ndcoords-anat-1",
+   "category": "nitransforms",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "nitransforms/ndcoords-std-2",
+   "category": "nitransforms",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.003,
+   "status": "pass"
+  },
+  {
+   "case": "native/las-hmc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.778,
+   "status": "pass"
+  },
+  {
+   "case": "native/las-hmc-sdc-jacobian",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "native/las-hmc-sdc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "native/ras-hmc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "native/ras-hmc-sdc-jacobian",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "native/ras-hmc-sdc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "native/als-hmc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.036,
+   "status": "pass"
+  },
+  {
+   "case": "native/als-hmc-sdc-jacobian",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "native/als-hmc-sdc",
+   "category": "native",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.036,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-i",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-i-",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-j",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-j-",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.059,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-k",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.081,
+   "status": "pass"
+  },
+  {
+   "case": "pe/las-k-",
+   "category": "phase-encoding",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "anat/las-hmc-coreg-sdc",
+   "category": "anatomical",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.22,
+   "status": "pass"
+  },
+  {
+   "case": "anat/ras-hmc-coreg",
+   "category": "anatomical",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.218,
+   "status": "pass"
+  },
+  {
+   "case": "anat/inverse-affine",
+   "category": "anatomical",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.214,
+   "status": "pass"
+  },
+  {
+   "case": "std/on-grid-warp",
+   "category": "standard",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "std/off-grid-warp",
+   "category": "standard",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.141,
+   "status": "pass"
+  },
+  {
+   "case": "std/als-off-grid",
+   "category": "standard",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.143,
+   "status": "pass"
+  },
+  {
+   "case": "3d/sbref-anat",
+   "category": "3d",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "3d/sbref-native-sdc",
+   "category": "3d",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "3d/sbref-identity",
+   "category": "3d",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.078,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.078,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.078,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order0-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.172,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.111,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.154,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.151,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.156,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.148,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.179,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order1-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.157,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.211,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.132,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.176,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.197,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.184,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.198,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.169,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order2-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.169,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.241,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.175,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.206,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.204,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.197,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.199,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.241,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order3-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.25,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.264,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.192,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.255,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.348,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.288,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.336,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.319,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order4-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.284,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-grid-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.337,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-constant",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.322,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-nearest",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.268,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.487,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-reflect",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.43,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-grid-mirror",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.446,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.536,
+   "status": "pass"
+  },
+  {
+   "case": "interpolation/order5-grid-wrap",
+   "category": "interpolation",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.502,
+   "status": "pass"
+  },
+  {
+   "case": "threads/1",
+   "category": "threads",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.168,
+   "status": "pass"
+  },
+  {
+   "case": "threads/3",
+   "category": "threads",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.171,
+   "status": "pass"
+  },
+  {
+   "case": "threads/12",
+   "category": "threads",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.168,
+   "status": "pass"
+  },
+  {
+   "case": "errors/hmc-not-last",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "fMRIPrep: ValueError: HMC transforms must come last. Found sequence: ['LinearTransformsMapping', 'Affine']; larmorx: ValueError: HMC transforms must come last. Found sequence: ['AffineSeries', 'Affine']",
+   "seconds": 0.012,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/mismatched-inverse",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "fMRIPrep: ValueError: Mismatched number of transforms and inverses; larmorx: ValueError: Mismatched number of transforms and inverses",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "real/native-hmc-sdc",
+   "category": "fmriprep-real",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 16.471,
+   "status": "pass"
+  },
+  {
+   "case": "real/T1w",
+   "category": "fmriprep-real",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.551,
+   "status": "pass"
+  },
+  {
+   "case": "real/MNI152NLin2009cAsym-res2",
+   "category": "fmriprep-real",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 129.89,
+   "status": "pass"
+  }
+ ],
+ "suite": "resample-series",
+ "summary": {
+  "both-error": 2,
+  "expected-divergence": 1,
+  "fail": 0,
+  "pass": 136,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

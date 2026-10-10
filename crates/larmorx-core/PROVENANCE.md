@@ -32,3 +32,14 @@ netlib):
 
 It is bit-exact with `itk::Matrix::GetInverse` on 2,000 random matrices
 (`docs/findings/itk-transforms.md`).
+
+## Integer powers (`src/math/powi.rs`)
+
+**Original larmorx code**, not a port. `powi(x, n)` raises the mantissa of `x` to the power
+`n` as a big integer and rounds once (to nearest, ties to even, subnormals included), so the
+result is the correctly rounded `x^n`. It replaces the C library's `pow(z, n)` in SciPy's
+B-spline prefilter (`larmorx_interp::ndimage`). Verified against exact rational arithmetic
+(Python `fractions`) on 26,000 cases: the six SciPy pole values and four other bases, each
+with `n` = 0 to 2,599, through underflow and overflow: 0 mismatches. glibc 2.35's `pow`
+differs from the exact value in 6 of them, all below 1e-100
+(`docs/findings/scipy-ndimage.md`).

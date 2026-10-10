@@ -6,6 +6,11 @@ Both programs get the same arguments and files. AFNI runs as its own binary (bui
 in-process through its Python console entry point. The outputs are read with nibabel, a
 reader independent of both, and compared value by value and field by field.
 
+``suite("replica")`` runs the same cases against the GPL-3.0-or-later replica
+(``larmorx-gpl afni 3dTshift``, ``crates-gpl/``) instead. This package is Apache-2.0, so it
+runs the replica only as a separate process (``LARMORX_GPL_BIN``, else the ``crates-gpl``
+build, else ``larmorx-gpl`` on the PATH).
+
 Cases cover (``specs/3dTshift.md`` §9):
 - every file of ``larmorx-testdata`` ``synthetic/tshift/`` (every FFT length class and every
   data type AFNI reads);
@@ -549,6 +554,37 @@ def _run_larmorx(args: list[str]) -> tuple[int, str]:
     return code, err.getvalue().strip()
 
 
+REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
+
+
+@functools.cache
+def replica_binary() -> str | None:
+    """The ``larmorx-gpl`` binary (the GPL-3.0-or-later replica): ``LARMORX_GPL_BIN``, else
+    the release (then debug) build of ``crates-gpl`` in this repository, else ``larmorx-gpl``
+    on the PATH.
+
+    The validation package is Apache-2.0: it only runs the replica as a separate process.
+    """
+    if env := os.environ.get("LARMORX_GPL_BIN"):
+        return env
+    exe = ".exe" if os.name == "nt" else ""
+    for profile in ("release", "debug"):
+        for parent in Path(__file__).resolve().parents:
+            candidate = parent / REPLICA.format(profile=profile, exe=exe)
+            if candidate.is_file():
+                return str(candidate)
+    return shutil.which("larmorx-gpl")
+
+
+def _run_replica(args: list[str]) -> tuple[int, str]:
+    binary = replica_binary()
+    assert binary is not None
+    p = subprocess.run(
+        [binary, "afni", "3dTshift", *args], capture_output=True, text=True, encoding="utf-8"
+    )
+    return p.returncode, (p.stdout + p.stderr).strip()
+
+
 def _last_error(log: str, tmp: Path) -> str:
     """The last error line of a log, without colour codes or temporary paths."""
     lines = [ln for ln in log.splitlines() if "ERROR" in ln]
@@ -703,10 +739,20 @@ def _produced(code: int, target: Path, occupied: bool) -> bool:
     return target.exists() or Path(f"{target}+orig.HEAD").exists()
 
 
-def run_case(case: Case, checks: CheckList) -> None:
+#: The implementations a run can compare with AFNI (docs/licensing.md): the clean-room
+#: original (larmorx-afni, in-process) or the GPL replica (the larmorx-gpl binary).
+IMPLEMENTATIONS = ("original", "replica")
+
+
+def run_case(case: Case, checks: CheckList, implementation: str = "original") -> None:
     s: Scenario = case.payload
     if afni_binary() is None:
         raise Outcome("skipped", "the AFNI 3dTshift oracle was not found (LARMORX_AFNI_BIN)")
+    if implementation == "replica" and replica_binary() is None:
+        raise Outcome(
+            "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
+        )
+    ours = _run_replica if implementation == "replica" else _run_larmorx
     with tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name:
         tmp = Path(tmp_name)
         for name, text in s.files:
@@ -715,7 +761,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         image = _image_path(s.image)
         args = _args(s, tmp)
         outputs, logs, codes, produced = {}, {}, {}, {}
-        for tool, runner in [("afni", _run_afni), ("larmorx", _run_larmorx)]:
+        for tool, runner in [("afni", _run_afni), ("larmorx", ours)]:
             target = tmp / ("out.nii" if occupied else f"{tool}{s.suffix}")
             codes[tool], logs[tool] = runner([*args, "-prefix", str(target), str(image)])
             outputs[tool] = target
@@ -766,7 +812,7 @@ def _differing_fraction(r: CaseResult) -> float:
     return 0.0
 
 
-def _highlights(results: list[CaseResult]) -> list[str]:
+def _highlights(results: list[CaseResult], implementation: str = "original") -> list[str]:
     compared = [r for r in results if r.status == PASS]
 
     def identical(r: CaseResult) -> bool:
@@ -784,23 +830,47 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     lines = [
         f"**Bit-identical: {sum(map(identical, compared))} of {len(compared)} passing cases** "
         "produce exactly the bytes of AFNI's output data.",
-        f"- Lagrange and weighted-sinc methods and copies: {sum(map(identical, other))} of "
-        f"{len(other)} bit-identical.",
-        f"- Fourier: {sum(map(identical, fourier))} of {len(fourier)} bit-identical. AFNI "
-        "computes the FFT in float32 with its own kernels; larmorx computes it in double "
-        "precision with its own FFT, so float32 outputs differ in the last bits and integer "
-        "outputs occasionally round the other way (by 1).",
     ]
-    rest = [r.case for r in other if not identical(r)]
-    if rest:
+    if implementation == "replica":
+        lines += [
+            f"- Fourier: {sum(map(identical, fourier))} of {len(fourier)} bit-identical.",
+            f"- Lagrange and weighted-sinc methods and copies: {sum(map(identical, other))} of "
+            f"{len(other)} bit-identical.",
+        ]
+        rest = [r.case for r in compared if not identical(r)]
+        if rest:
+            lines.append(
+                "- Not bit-identical: "
+                + ", ".join(f"`{c}`" for c in rest)
+                + ". See `docs/findings/afni-tshift.md`."
+            )
         lines.append(
-            "- Not bit-identical outside Fourier: "
-            + ", ".join(f"`{c}`" for c in rest)
-            + ". Known causes, in the last float32 bit only: `-no_detrend` (its rounding is "
-            "not reproduced yet); quintic and heptic weights for some fractions (unresolved); "
-            "weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not "
-            "correctly rounded, and larmorx uses correctly rounded functions "
-            "(`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`."
+            "- The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: "
+            "[afni-tshift.md](afni-tshift.md)."
+        )
+    else:
+        lines += [
+            f"- Lagrange and weighted-sinc methods and copies: {sum(map(identical, other))} of "
+            f"{len(other)} bit-identical.",
+            f"- Fourier: {sum(map(identical, fourier))} of {len(fourier)} bit-identical. AFNI "
+            "computes the FFT in float32 with its own kernels; larmorx computes it in double "
+            "precision with its own FFT, so float32 outputs differ in the last bits and integer "
+            "outputs occasionally round the other way (by 1).",
+        ]
+        rest = [r.case for r in other if not identical(r)]
+        if rest:
+            lines.append(
+                "- Not bit-identical outside Fourier: "
+                + ", ".join(f"`{c}`" for c in rest)
+                + ". Known causes, in the last float32 bit only: `-no_detrend` (its rounding is "
+                "not reproduced yet); quintic and heptic weights for some fractions (unresolved); "
+                "weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not "
+                "correctly rounded, and larmorx uses correctly rounded functions "
+                "(`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`."
+            )
+        lines.append(
+            "- The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own "
+            "record: [afni-tshift-replica.md](afni-tshift-replica.md)."
         )
     rows = []
     for category in sorted({r.category for r in compared}):
@@ -833,11 +903,24 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     return lines
 
 
-def suite() -> Suite:
+def suite(implementation: str = "original") -> Suite:
+    """The 3dTshift suite for the clean-room original (``larmorx afni 3dTshift``, in-process)
+    or the GPL replica (``larmorx-gpl afni 3dTshift``, run as a separate process)."""
+    if implementation not in IMPLEMENTATIONS:
+        raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
+    replica = implementation == "replica"
+    tool = (
+        "`larmorx-gpl afni 3dTshift` (crate larmorx-gpl-afni, the GPL-3.0-or-later replica "
+        "translated from AFNI 25.2.09's source), run as a separate process"
+        if replica
+        else "`larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from "
+        "`specs/3dTshift.md`)"
+    )
+    who = "larmorx-gpl" if replica else "larmorx"
     return Suite(
-        name="afni-tshift",
-        title="3dTshift",
-        tool="`larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`)",
+        name="afni-tshift-replica" if replica else "afni-tshift",
+        title="3dTshift (replica)" if replica else "3dTshift",
+        tool=tool,
         reference=f"3dTshift from AFNI ({afni_version()}), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
             ("Exit status", "both succeed, or both reject the arguments"),
@@ -853,9 +936,9 @@ def suite() -> Suite:
             ("Integer outputs", f"max |diff| ≤ {INT_ATOL}, with the fraction of differing values"),
         ],
         cases=cases,
-        run_case=run_case,
+        run_case=functools.partial(run_case, implementation=implementation),
         packages=("nibabel",),
-        highlights=_highlights,
+        highlights=functools.partial(_highlights, implementation=implementation),
         notes=(
             "Both programs read the same files with the same arguments; outputs are read with "
             "nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS "
@@ -863,7 +946,7 @@ def suite() -> Suite:
             "values (reversed when `SliceEncodingDirection` ends in `-`) and "
             "`-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from "
             "the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, "
-            "`slice_duration`, `dim_info` and the time unit. larmorx uses all logical CPUs "
+            f"`slice_duration`, `dim_info` and the time unit. {who} uses all logical CPUs "
             "(`OMP_NUM_THREADS` unset); its results do not depend on the thread count."
         ),
     )

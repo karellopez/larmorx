@@ -13,7 +13,10 @@ pub(crate) mod dint;
 mod exp;
 mod log;
 mod powf;
+mod powi;
 mod sin;
+
+pub use powi::powi;
 
 // Speed: without hardware FMA in the generated code (baseline x86-64), every `mul_add` in the
 // kernels is a call into the platform's `fma`. On x86-64 CPUs with FMA, a copy of each kernel

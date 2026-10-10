@@ -1,0 +1,28 @@
+# The GPL-3.0-or-later replica workspace (docs/licensing.md). It is a separate Cargo
+# workspace, so the Apache-2.0 workspace at the repository root never builds it, and no
+# Apache crate can depend on it. Its crates may depend on the Apache crates (Apache-2.0 code
+# may be included in a GPL-3 work); the reverse is forbidden.
+[workspace]
+resolver = "3"
+members = [
+    "larmorx-gpl-afni",
+    "larmorx-gpl-afni/tools/csfft-verify",
+    "larmorx-gpl-afni/tools/sincosf-verify",
+    "larmorx-gpl-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/karellopez/larmorx"
+
+# Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
+[workspace.dependencies]
+larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
+larmorx-io = { path = "../crates/larmorx-io", version = "0.0.1" }
+larmorx-gpl-afni = { path = "larmorx-gpl-afni", version = "0.0.1" }
+rayon = "1.12.0"
+thiserror = "2.0.21"
+tempfile = "3.27.0"
+

@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Command line: ``python -m larmorx_validation parity <suite> [--tier smoke] [--out DIR]``."""
+"""Command line: ``python -m larmorx_validation parity <suite> [--tier smoke] [--out DIR]``.
+
+``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, as a
+separate process) instead of the clean-room original, where a suite has one.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +21,7 @@ PARITY_MODULES = {
     "itk-geometry": "itk_geometry",
     "ants-apply-transforms": "ants_apply_transforms",
     "afni-tshift": "afni_tshift",
+    "resample-series": "resample_series",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",
     "ants-multiply-images": "ants_multiply_images",
@@ -27,17 +32,25 @@ BENCH_MODULES = {
     "nifti-io": "nifti_io",
     "ants-apply-transforms": "ants_apply_transforms",
     "afni-tshift": "afni_tshift",
+    "resample-series": "resample_series",
     "ants-programs": "ants_programs",
 }
 BENCH_SUITES = tuple(BENCH_MODULES)
 
 
-def _parity_suite(name: str):
+#: Suites that can also validate a replica binary (docs/licensing.md).
+REPLICA_SUITES = ("afni-tshift",)
+
+
+def _parity_suite(name: str, implementation: str = "original"):
     import importlib
 
     if name not in PARITY_MODULES:
         raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
-    return importlib.import_module(f"larmorx_validation.parity.{PARITY_MODULES[name]}").suite()
+    if implementation != "original" and name not in REPLICA_SUITES:
+        raise SystemExit(f"suite {name!r} has no replica; replicas exist for {REPLICA_SUITES}")
+    module = importlib.import_module(f"larmorx_validation.parity.{PARITY_MODULES[name]}")
+    return module.suite(implementation) if name in REPLICA_SUITES else module.suite()
 
 
 def _redacted(result):
@@ -68,7 +81,7 @@ def cmd_parity(args: argparse.Namespace) -> int:
     from larmorx_validation.parity import FAIL, run, summarise
     from larmorx_validation.parity.render import render
 
-    suite = _parity_suite(args.suite)
+    suite = _parity_suite(args.suite, args.implementation)
 
     def progress(r):
         mark = {
@@ -104,6 +117,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
         results = [_redacted(r) for r in results]
         env = environment.describe(suite.packages)
         command = f"python -m larmorx_validation parity {args.suite} --tier {args.tier}"
+        if args.implementation != "original":
+            command += f" --implementation {args.implementation}"
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(
@@ -141,6 +156,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
     p.add_argument("--case", help="only cases whose id contains this text")
     p.add_argument("--out", help="write <suite>.md and <suite>.json to this directory")
+    p.add_argument(
+        "--implementation",
+        default="original",
+        choices=("original", "replica"),
+        help="the clean-room original (in-process) or the GPL replica (the larmorx-gpl binary, "
+        "found through LARMORX_GPL_BIN or the crates-gpl build)",
+    )
     p.set_defaults(func=cmd_parity)
     b = sub.add_parser("bench", help="benchmark larmorx against reference implementations")
     b.add_argument("suite", choices=BENCH_SUITES)

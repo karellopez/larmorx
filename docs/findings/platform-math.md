@@ -109,6 +109,24 @@ the crate otherwise denies `unsafe`.
 A unit test checks that both copies give the same bits on 200,000 random inputs. Lanczos
 boldref → T1w: 2.13 s on one thread, against 2.76 s before and 1.62 s with the `libm` crate.
 
+**`pow` with an integer exponent (2026-10-10).** SciPy's B-spline prefilter calls
+`pow(z, n)` with a filter pole `z` and a line length `n`. Against exact rational arithmetic,
+glibc 2.35's `pow` is not correctly rounded for 5 of 12,012 such powers (the six poles, `n` up
+to 2,599 or underflow), all below 1e-100, where they cannot change a coefficient.
+`larmorx_core::math::powi` gives the correctly rounded value by raising the mantissa to the
+power exactly as a big integer and rounding once (0 mismatches on 26,000 checked values,
+subnormals, underflow and overflow included). It is original code, not a CORE-MATH port.
+The ITK B-spline prefilter (`larmorx-interp`'s `bspline`) still uses the `libm` crate's `pow`.
+*Verified*.
+
+**Fused multiply-adds.** numpy's matrix products go through BLAS, whose x86-64 (Haswell and
+later) and aarch64 kernels fuse multiply-adds, so fMRIPrep's coordinates carry fused results
+([fmriprep-resampling.md](fmriprep-resampling.md)). larmorx reproduces them with
+`f64::mul_add`, correctly rounded everywhere. On baseline x86-64 builds that is a call into
+the C library's `fma` (glibc uses the FMA instruction when the CPU has one); in the resampler's
+head-motion step it costs about 18 ns per voxel and volume, about 11 % of the single-thread
+time. *Verified* (ds000005, 64×64×34).
+
 ## powf
 
 **ITK's `std::pow(float, float)` is glibc's `powf`** (libstdc++ declares a float overload),

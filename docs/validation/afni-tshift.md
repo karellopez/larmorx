@@ -11,6 +11,7 @@
 - Lagrange and weighted-sinc methods and copies: 117 of 120 bit-identical.
 - Fourier: 41 of 97 bit-identical. AFNI computes the FFT in float32 with its own kernels; larmorx computes it in double precision with its own FFT, so float32 outputs differ in the last bits and integer outputs occasionally round the other way (by 1).
 - Not bit-identical outside Fourier: `options/float32-no-detrend`, `real/ds003345-quintic`, `real/ds003345-heptic`. Known causes, in the last float32 bit only: `-no_detrend` (its rounding is not reproduced yet); quintic and heptic weights for some fractions (unresolved); weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not correctly rounded, and larmorx uses correctly rounded functions (`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`.
+- The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md).
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|

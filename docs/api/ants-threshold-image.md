@@ -8,6 +8,10 @@
 [validation record](../validation/ants-threshold-image.md)): 41 cases, every compared case
 bit-identical, with ANTs' exact header bytes. `Kmeans` is not supported yet.
 
+**Speed** ([benchmark](../benchmarks/ants-programs.md)): `0.5 1` on the 1 mm MNI probability
+map 100 ms on one thread, 49 ms on 12 (ANTs: 115 ms and 103 ms); `Otsu 3` with a mask on
+fMRIPrep's T1w 205 ms and 125 ms (ANTs: 558 ms and 315 ms).
+
 ## Quick start
 
 ```python

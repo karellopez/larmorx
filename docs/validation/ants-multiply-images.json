@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "17a3d2c14f30-dirty",
-  "larmorx_testdata_commit": "5434909ddf09",
+  "larmorx_commit": "2960b32a61f4-dirty",
+  "larmorx_testdata_commit": "ea0c2b73b3bb",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -22,7 +22,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.151,
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -32,7 +32,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -62,7 +62,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -72,7 +72,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -82,7 +82,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.059,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -102,7 +102,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -112,7 +112,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.69,
+   "seconds": 0.592,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.439,
+   "seconds": 0.377,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: terminate called without an active exception; larmorx exit 1: larmorx: MultiplyImages: missing output filename (ANTs aborts: throw without an exception)",
-   "seconds": 0.018,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: MultiplyImages: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here)",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: not supported 5; larmorx exit 1: not supported 5",
-   "seconds": 0.021,
+   "seconds": 0.023,
    "status": "both-error"
   }
  ],

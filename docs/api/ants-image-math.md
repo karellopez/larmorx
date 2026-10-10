@@ -13,6 +13,12 @@ bit-identical; every output has ANTs' exact header bytes. The 3 others are `^`, 
 calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35 of 35,840
 voxels differ by one ulp ([why](../findings/platform-math.md#powf)).
 
+**Speed** ([benchmark](../benchmarks/ants-programs.md)): fMRIPrep's
+`TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on
+12, against 388 ms and 175 ms for ANTs; `addtozero`, `Normalize`, `RescaleImage` and
+`ImageMath 4 m` are 1.3–2.7× faster on one thread and up to 5× with threads. Reading the
+gzipped input is most of the time.
+
 **Implemented operations** (the others answer "not supported yet"):
 
 | Group | Operations |

@@ -4,7 +4,7 @@
 
 - **Validated:** `larmorx ants ThresholdImage` / `lx.ants.threshold_image`, `lx.ants.otsu_threshold` (crates larmorx-ants, larmorx-image)
 - **Reference:** ThresholdImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `5434909ddf09`, tier `standard`
+- **Test data:** larmorx-testdata `ea0c2b73b3bb`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-threshold-image --tier standard`
 
 **Bit-identical: 35 of 35 passing cases** produce exactly the values ANTs writes; 35 of 35 also write exactly its header bytes.
@@ -46,8 +46,8 @@
 
 | Case | What it tests | Errors |
 |---|---|---|
-| `errors/lower-above-upper` | lower > upper: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x5ff15c17c120): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmor… |
-| `errors/missing-input` | an input that does not exist | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x59a266a9e900): Input Primary is required but not set.; larmorx exit 1: larmorx: ThresholdImage… |
+| `errors/lower-above-upper` | lower > upper: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x63e0ffa64120): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmor… |
+| `errors/missing-input` | an input that does not exist | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x5aee2e17f900): Input Primary is required but not set.; larmorx exit 1: larmorx: ThresholdImage… |
 | `errors/otsu-count-text` | Otsu 'two': std::stoi throws | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: ThresholdImage: 'two' is not a number (std::stoi throws) (ANTs crashes here) |
 | `errors/dimension-5` | dimension 5: 'Unsupported dimension' | ANTs exit 1: Unsupported dimension; larmorx exit 1: Unsupported dimension |
 | `errors/too-few-arguments` | one argument: the usage, exit 1 | ANTs exit 1: Inclusive thresholds; larmorx exit 1: Inclusive thresholds |
@@ -56,8 +56,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (17a3d2c14f30-dirty) |
-| larmorx-testdata | 5434909ddf09 |
+| larmorx | 0.0.1 (2960b32a61f4-dirty) |
+| larmorx-testdata | ea0c2b73b3bb |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

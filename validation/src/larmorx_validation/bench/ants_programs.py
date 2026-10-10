@@ -196,6 +196,14 @@ def render(results: list[Measurement], env: dict, repeats: int, command: str) ->
         "console entry point. Both get the thread count through "
         "`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`.",
         "- **Same result:** every larmorx output is compared with ANTs' (all values).",
+    ]
+    load = env.get("load_average_before")
+    if load:
+        lines.append(
+            f"- **Machine load** before the run (1, 5, 15 min): "
+            f"{', '.join(f'{x:.2f}' for x in load)}; no other benchmark ran meanwhile."
+        )
+    lines += [
         "",
     ]
     for job in dict.fromkeys(m.input for m in results):
@@ -227,7 +235,26 @@ def render(results: list[Measurement], env: dict, repeats: int, command: str) ->
             ),
             "",
         ]
-    lines += ["## Environment", "", environment_section(env), ""]
+    lines += [
+        "## Notes",
+        "",
+        "- **Where the time goes.** These programs do little arithmetic per voxel, so reading "
+        "the gzipped inputs dominates: gzip decompression is sequential (zlib-rs in larmorx, "
+        "zlib in ITK). For the 28 MB BOLD series it is about 200 ms of larmorx's 390 ms on one "
+        "thread. The operations themselves run in parallel, and so does larmorx's conversion of "
+        "the voxels to the program's pixel type.",
+        "- **ANTs' threads** help where ITK filters do the work (the label statistics behind "
+        "`TruncateImageIntensity`, the Otsu labeller); ImageMath's own voxel loops are "
+        "single-threaded.",
+        "- **Determinism.** larmorx's results do not depend on the thread count; the "
+        "order-dependent steps of ANTs (running sums, the histogram range of "
+        "`TruncateImageIntensity`, the carried value of `/`) run in image order.",
+        "",
+        "## Environment",
+        "",
+        environment_section(env),
+        "",
+    ]
     return "\n".join(lines)
 
 

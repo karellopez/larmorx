@@ -4,7 +4,7 @@
 
 - **Validated:** `larmorx ants MultiplyImages` / `lx.ants.multiply_images` (crate larmorx-ants)
 - **Reference:** MultiplyImages from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `5434909ddf09`, tier `standard`
+- **Test data:** larmorx-testdata `ea0c2b73b3bb`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-multiply-images --tier standard`
 
 **Bit-identical: 12 of 12 passing cases** produce exactly the values ANTs writes; 12 of 12 also write exactly its header bytes.
@@ -44,8 +44,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (17a3d2c14f30-dirty) |
-| larmorx-testdata | 5434909ddf09 |
+| larmorx | 0.0.1 (2960b32a61f4-dirty) |
+| larmorx-testdata | ea0c2b73b3bb |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

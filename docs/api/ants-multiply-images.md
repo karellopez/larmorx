@@ -7,6 +7,9 @@
 [validation record](../validation/ants-multiply-images.md)): 15 cases, every compared case
 bit-identical, with ANTs' exact header bytes.
 
+**Speed** ([benchmark](../benchmarks/ants-programs.md)): T1w × brain mask 128 ms on one thread,
+62 ms on 12 (ANTs: 157 ms either way).
+
 ## Quick start
 
 ```python

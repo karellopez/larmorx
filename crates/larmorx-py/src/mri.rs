@@ -100,6 +100,7 @@ impl Request {
         external: Option<&'a (larmorx_mri::hmc::Volume, larmorx_mri::hmc::world::Geometry)>,
     ) -> ReferenceChoice<'a> {
         match external {
+            Some((v, g)) if self.mean => ReferenceChoice::MeanFrom(v, *g),
             Some((v, g)) => ReferenceChoice::External(v, *g),
             None if self.mean => ReferenceChoice::Mean(self.ref_index),
             None => ReferenceChoice::Index(self.ref_index),

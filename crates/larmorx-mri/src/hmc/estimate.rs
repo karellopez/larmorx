@@ -24,8 +24,9 @@ pub enum Reference {
     /// Volume `index` of the series (`-refvol`; mcflirt's default is `N / 2`). That volume
     /// is not registered (its matrix is the identity).
     Index(usize),
-    /// The mean of the series after a first registration to volume `index` (`-meanvol`).
-    Mean(usize),
+    /// The mean of the series after a first registration to the inner reference (`-meanvol`;
+    /// with `-reffile`, the first registration is to that file).
+    Mean(Box<Reference>),
 }
 
 /// When the in-plane mode (§12) is used.
@@ -93,6 +94,8 @@ pub enum EstimateError {
     BadIndex { index: usize, n: usize },
     #[error("the volumes of the series do not all have the same shape")]
     Shapes,
+    #[error("the first reference of a mean registration cannot itself be a mean")]
+    NestedMean,
     #[error(transparent)]
     Threads(#[from] ThreadPoolError),
 }
@@ -272,16 +275,24 @@ pub fn estimate(
                 in_plane,
             })
         }
-        &Reference::Mean(index) => {
-            if index >= n {
-                return Err(EstimateError::BadIndex { index, n });
-            }
+        Reference::Mean(first_ref) => {
+            let (first_volume, first_index) = match first_ref.as_ref() {
+                &Reference::Index(index) => {
+                    if index >= n {
+                        return Err(EstimateError::BadIndex { index, n });
+                    }
+                    (&series[index], Some(index))
+                }
+                Reference::Volume(v) => (v, None),
+                Reference::Mean(_) => return Err(EstimateError::NestedMean),
+            };
             let first = EstimateParams {
                 stages: params.stages.min(3),
                 ..params.clone()
             };
-            let (matrices, _) = run_stages(series, &series[index], Some(index), &first)?;
-            let mean = super::resample::mean_volume(series, &matrices, params.n_threads)?;
+            let (matrices, _) = run_stages(series, first_volume, first_index, &first)?;
+            let mean =
+                super::resample::mean_volume(series, &matrices, first_volume, params.n_threads)?;
             let (matrices, in_plane) = run_stages(series, &mean, None, params)?;
             Ok(Estimate {
                 matrices,

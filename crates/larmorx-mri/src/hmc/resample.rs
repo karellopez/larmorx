@@ -109,14 +109,15 @@ pub fn resample_series(
     })
 }
 
-/// The mean of the series resampled by `matrices` onto its own grid (trilinear): a float32
-/// sum in volume order divided by `N` (§8).
+/// The mean of the series resampled by `matrices` onto the grid of `reference` (trilinear):
+/// a float32 sum in volume order divided by `N` (§8).
 pub fn mean_volume(
     series: &[Volume],
     matrices: &[Mat4],
+    reference: &Volume,
     n_threads: usize,
 ) -> Result<Volume, ThreadPoolError> {
-    let first = &series[0];
+    let first = reference;
     let moved = resample_series(
         series,
         matrices,

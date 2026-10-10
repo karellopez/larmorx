@@ -183,7 +183,8 @@ def hmc(
     ref_index
         The reference volume of the series (``-refvol``); default ``N // 2``.
     mean
-        Register to the mean of the series after a first registration (``-meanvol``).
+        Register to the mean of the series after a first registration (``-meanvol``) to
+        ``reference`` if given, else to volume ``ref_index``.
     stages
         1 (8 mm), 2 (+ 4 mm), 3 (+ 4 mm, tighter tolerance; the default), 4 (+ sinc
         interpolation in the cost).
@@ -225,8 +226,6 @@ def hmc(
         raise ValueError(f"unknown cost {cost!r}; use one of {', '.join(COSTS)}")
     if final not in INTERPOLATIONS:
         raise ValueError(f"unknown interpolation {final!r}; use one of {', '.join(INTERPOLATIONS)}")
-    if mean and reference is not None:
-        raise ValueError("mean=True registers to the series' own mean: drop reference")
     options = dict(
         ref_index=None if ref_index is None else int(ref_index),
         mean=bool(mean),

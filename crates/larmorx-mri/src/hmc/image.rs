@@ -262,7 +262,7 @@ fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + 
 
 /// Writes a corrected series (or any float32 image on the input's grid) like the input
 /// (§10.1): the input's header with `scl_slope = 1`, `scl_inter = 0`, `cal_min`/`cal_max` from
-/// the float32 data (with `cal`; else 0), the slice fields cleared, units mm and s,
+/// the float32 data (with `cal`; else the input's), the slice fields cleared, units mm and s,
 /// little-endian, 3D for a single volume (the other `pixdim` entries kept); the data flipped
 /// back to storage order and converted to `data_type`.
 #[allow(clippy::too_many_arguments)]
@@ -302,15 +302,11 @@ pub fn write_like(
     h.byte_order = larmorx_io::nifti::ByteOrder::Little;
     h.scl_slope = 1.0;
     h.scl_inter = 0.0;
-    let finite = |v: f32| {
-        if cal && v.is_finite() {
-            f64::from(v)
-        } else {
-            0.0
-        }
-    };
-    h.cal_min = finite(lo);
-    h.cal_max = finite(hi);
+    if cal {
+        let finite = |v: f32| if v.is_finite() { f64::from(v) } else { 0.0 };
+        h.cal_min = finite(lo);
+        h.cal_max = finite(hi);
+    }
     h.dim_info = 0;
     h.slice_code = 0;
     h.slice_start = 0;

@@ -17,9 +17,11 @@ use super::world::{Geometry, itk_transform, ras_transform};
 pub enum ReferenceChoice<'a> {
     /// Volume `index` of the series (`None`: mcflirt's default, `N / 2`).
     Index(Option<usize>),
-    /// The mean of the series after a first registration (`-meanvol`), first registered to
-    /// volume `index` (`None`: `N / 2`).
+    /// The mean of the series after a first registration (`-meanvol`): to volume `index`
+    /// (`None`: `N / 2`), or to a separate volume (`-meanvol` with `-reffile`), whose grid the
+    /// mean is then on.
     Mean(Option<usize>),
+    MeanFrom(&'a Volume, Geometry),
     /// A separate volume and its geometry (`-reffile`).
     External(&'a Volume, Geometry),
 }
@@ -102,16 +104,31 @@ pub fn run(
     let n = series.volumes.len();
     let geometry = series_geometry(series);
     let index = |i: Option<usize>| i.unwrap_or(n / 2);
+    let check_size = |v: &Volume, options: &HmcOptions| {
+        let series_len = series.volumes.first().map_or(0, Volume::len);
+        if options.resample && v.len() != series_len {
+            return Err(HmcError::ReferenceSize {
+                reference: v.len(),
+                series: series_len,
+            });
+        }
+        Ok(())
+    };
     let (reference, reference_geometry) = match reference {
         ReferenceChoice::Index(i) => (Reference::Index(index(*i)), geometry),
-        ReferenceChoice::Mean(i) => (Reference::Mean(index(*i)), geometry),
+        ReferenceChoice::Mean(i) => (
+            Reference::Mean(Box::new(Reference::Index(index(*i)))),
+            geometry,
+        ),
+        ReferenceChoice::MeanFrom(v, g) => {
+            check_size(v, options)?;
+            (
+                Reference::Mean(Box::new(Reference::Volume((*v).clone()))),
+                *g,
+            )
+        }
         ReferenceChoice::External(v, g) => {
-            if options.resample && v.len() != series.volumes.first().map_or(0, Volume::len) {
-                return Err(HmcError::ReferenceSize {
-                    reference: v.len(),
-                    series: series.volumes.first().map_or(0, Volume::len),
-                });
-            }
+            check_size(v, options)?;
             (Reference::Volume((*v).clone()), *g)
         }
     };
@@ -131,7 +148,11 @@ pub fn run(
     let corrected = if options.resample {
         let (shape, voxel) = match &reference {
             Reference::Volume(v) => (v.shape, v.voxel_size),
-            _ => (geometry.shape, geometry.voxel_size),
+            Reference::Mean(first) => match first.as_ref() {
+                Reference::Volume(v) => (v.shape, v.voxel_size),
+                _ => (geometry.shape, geometry.voxel_size),
+            },
+            Reference::Index(_) => (geometry.shape, geometry.voxel_size),
         };
         Some(resample_series(
             &series.volumes,

@@ -328,7 +328,7 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     let series = read_series(Path::new(input), n_threads).map_err(|e| e.to_string())?;
     let n = series.volumes.len();
     let reference_volume;
-    let choice = if o.meanvol {
+    let choice = if o.meanvol && o.reffile.is_none() {
         ReferenceChoice::Mean(Some(reference_index(o.refvol, n)?))
     } else if let Some(path) = &o.reffile {
         if o.stages <= 0 {
@@ -349,7 +349,11 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
             ..s
         });
         reference_volume = vol;
-        ReferenceChoice::External(&reference_volume, geometry)
+        if o.meanvol {
+            ReferenceChoice::MeanFrom(&reference_volume, geometry)
+        } else {
+            ReferenceChoice::External(&reference_volume, geometry)
+        }
     } else {
         ReferenceChoice::Index(Some(reference_index(o.refvol, n)?))
     };
@@ -471,7 +475,8 @@ fn write_outputs(
         .flatten()
         .map(|v| Volume::new(shape, voxel, v.data.clone()))
         .collect();
-    // Only the corrected series gets cal_min/cal_max (§10.1); the others keep 0.
+    // Only the corrected series gets its own cal_min/cal_max (§10.1); the others keep the
+    // input's (observed: -stats and -meanvol images carry the input's values).
     let write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
         image::write_like(
             Path::new(path),

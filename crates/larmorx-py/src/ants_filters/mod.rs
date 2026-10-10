@@ -18,6 +18,7 @@
 
 mod gaussian;
 mod image_math;
+mod morphology;
 mod resample;
 mod threshold;
 
@@ -315,5 +316,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     threshold::register(m)?;
     gaussian::register(m)?;
     resample::register(m)?;
+    morphology::register(m)?;
     Ok(())
 }

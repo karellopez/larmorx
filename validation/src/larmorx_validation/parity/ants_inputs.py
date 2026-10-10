@@ -20,7 +20,9 @@ the suites build them here.
   ``tissues-int16``, ``gm-probseg`` (exact 0, 0.5 and 1).
 - ``components-uint8`` (components of 1 to 343 voxels, edge and corner contacts, one on the
   border) and ``holes-uint8`` (enclosed holes of 1, 8 and 64 voxels, a cavity, a hole on the
-  border), for the morphology and component filters.
+  border), for the morphology and component filters; ``hole-first-slice-uint8`` (a pocket on
+  the first slice, where FillHoles reads outside the image), ``holes-labels-4d`` (holes
+  closed only across time) and ``signed-zeros-float32`` (``-0.0`` next to ``+0.0``).
 - ``thin-3-slices`` (an axis of 3 voxels, too short for ITK's recursive Gaussian filters) and
   ``tiny-4`` (4 x 4 x 4, the smallest they accept), for the Gaussian filters.
 
@@ -346,3 +348,39 @@ def _(t):
     d[0:4, 0:2, 0:28] = 1
     d[1:3, 0:1, 10:12] = 0
     save(d, t)
+
+
+@builder("hole-first-slice-uint8")
+def _(t):
+    """A binary object (20 x 20 x 12) with a background pocket that touches the first slice:
+    FillHoles' ``holeparam ≤ 1`` branch reads outside the image's memory for it."""
+    d = np.zeros((20, 20, 12), np.uint8)
+    d[2:18, 2:18, 0:10] = 1
+    d[8:11, 8:11, 0:3] = 0
+    save(d, t, affine=np.eye(4))
+
+
+@builder("holes-labels-4d")
+def _(t):
+    """A 4D mask (12 x 12 x 10 x 6, TR 2 s) whose holes are closed only across time."""
+    import nibabel as nib
+
+    d = np.zeros((12, 12, 10, 6), np.uint8)
+    d[2:10, 2:10, 2:8, 1:5] = 1
+    d[5, 5, 4, 2] = 0
+    d[4:6, 6:8, 3:5, 2:4] = 0
+    img = nib.Nifti1Image(d, AFFINE)
+    img.header.set_xyzt_units("mm", "sec")
+    img.header.set_zooms((*img.header.get_zooms()[:3], 2.0))
+    img.header.set_qform(AFFINE, code=1)
+    img.header.set_sform(AFFINE, code=1)
+    nib.save(img, t)
+
+
+@builder("signed-zeros-float32")
+def _(t):
+    """A float image of -0.0, +0.0, -1 and -2 in random order: grayscale maxima are zero with
+    both signs in the neighbourhood."""
+    rng = np.random.default_rng(17)
+    values = np.array([-0.0, 0.0, -1.0, -2.0], np.float32)
+    save(values[rng.integers(0, 4, (14, 12, 10))], t, affine=np.eye(4))

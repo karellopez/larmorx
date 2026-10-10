@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 use super::{array_like, slice_f32, value_err};
 
 /// The voxels of `a` and its shape, checked against `spacing`.
-fn checked<'a>(
+pub(crate) fn checked<'a>(
     a: &'a PyReadonlyArrayDyn<'_, f32>,
     spacing: &[f64],
 ) -> PyResult<(Vec<usize>, std::borrow::Cow<'a, [f32]>)> {

@@ -336,6 +336,24 @@ def ants_resample_image(
     ``gaussian``, ``sinc``, ``bspline``; ``pixel_type``: ``char`` ... ``double``):
     ``(data, ras_affine, descrip, spacing)``."""
 
+# The morphology group: ``a`` is float32 in 2 to 4 dimensions; radii are in voxels.
+
+def ants_morphology(
+    a: np.ndarray, operation: str, radius: int = 1, value: float = 1.0, n_threads: int = 1
+) -> np.ndarray:
+    """ImageMath ``MD``/``ME``/``MO``/``MC``/``GD``/``GE``/``GO``/``GC`` (``ants::Morphological``)
+    with ITK's ball of ``radius`` voxels; ``value`` is the binary operations' foreground."""
+
+def ants_fill_holes(a: np.ndarray, hole_param: float = 2.0, n_threads: int = 1) -> np.ndarray:
+    """ImageMath ``FillHoles``: the background regions other than the largest set to 1 (all for
+    ``hole_param`` 2; by their share of object neighbours for ``hole_param ≤ 1``)."""
+
+def ants_pad_image(
+    image: str | ImageTuple, dim: int, pad: float, value: float = 0.0, n_threads: int = 1
+) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
+    """ImageMath ``PadImage`` on a path (read in ``dim`` dimensions) or an in-memory image:
+    ``(data, ras_affine, descrip, spacing)``."""
+
 # --- Head-motion correction, mcflirt-compatible (larmorx/mri) ---------------------------------
 
 def mri_hmc_file(

@@ -23,7 +23,7 @@ use super::{itk_image_from_tuple, output_to_py, value_err};
 
 /// The image a program reads: a path through ANTs' `ReadImage`, or an in-memory tuple placed
 /// as ITK's reader would place it.
-fn ants_input<T: Pixel>(
+pub(crate) fn ants_input<T: Pixel>(
     py: Python<'_>,
     image: &Bound<'_, PyAny>,
     dim: usize,
@@ -48,7 +48,10 @@ fn ants_input<T: Pixel>(
 }
 
 /// `(data, ras_affine, descrip, spacing)` of an output image.
-fn output_with_spacing<'py>(py: Python<'py>, image: OutputImage) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn output_with_spacing<'py>(
+    py: Python<'py>,
+    image: OutputImage,
+) -> PyResult<Bound<'py, PyTuple>> {
     let spacing = image.geometry().spacing.clone();
     let tuple = output_to_py(py, image)?;
     let mut items: Vec<Bound<'py, PyAny>> = tuple.iter().collect();

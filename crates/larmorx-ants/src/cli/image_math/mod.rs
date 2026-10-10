@@ -44,6 +44,7 @@
 mod arithmetic;
 mod gaussian;
 mod intensity;
+mod morphology;
 
 use std::io::Write;
 
@@ -68,6 +69,7 @@ pub const GROUPS: &[&[Operation]] = &[
     arithmetic::OPERATIONS,
     intensity::OPERATIONS,
     gaussian::OPERATIONS,
+    morphology::OPERATIONS,
 ];
 
 /// Every operation name in ANTs v2.6.5's dispatch tables, with the dimensions each table

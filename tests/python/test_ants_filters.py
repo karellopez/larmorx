@@ -232,6 +232,82 @@ def test_resample_image_types_interpolators_and_command_line(tmp_path):
     assert (code, stdout) == (1, "Unsupported pixel type\n")
 
 
+# --- Morphology group ---------------------------------------------------------------------------
+
+
+def cube_mask(shape=(11, 11, 11)):
+    d = np.zeros(shape, np.float32)
+    d[2:9, 2:9, 2:9] = 1.0
+    d[5, 5, 5] = 0.0  # a one-voxel hole
+    d[0, 0, 0] = 1.0  # a one-voxel object
+    return image(d)
+
+
+def test_typed_morphology_equals_image_math():
+    mask = cube_mask()
+    img = textured((9, 8, 7))
+    pairs = [
+        (lx.ants.morphological_dilate(mask, 2), ("MD", mask, 2)),
+        (lx.ants.morphological_erode(mask, 1), ("ME", mask, 1)),
+        (lx.ants.morphological_open(mask, 1), ("MO", mask, 1)),
+        (lx.ants.morphological_close(mask, 1), ("MC", mask, 1)),
+        (lx.ants.morphological_dilate(mask, 1, value=0.0), ("MD", mask, 1, 0)),
+        (lx.ants.grayscale_dilate(img, 2), ("GD", img, 2)),
+        (lx.ants.grayscale_erode(img, 1), ("GE", img, 1)),
+        (lx.ants.grayscale_open(img, 1), ("GO", img, 1)),
+        (lx.ants.grayscale_close(img, 2), ("GC", img, 2)),
+        (lx.ants.fill_holes(mask), ("FillHoles", mask, 2)),
+        (lx.ants.fill_holes(mask, 0.5), ("FillHoles", mask, 0.5)),
+    ]
+    for typed, (op, *operands) in pairs:
+        generic = lx.ants.image_math(op, *operands)
+        np.testing.assert_array_equal(typed.data, generic.data, err_msg=op)
+        assert typed.data.dtype == np.float32
+    # The ball of radius 1 in 3D is the 3 x 3 x 3 cube without its corners.
+    point = np.zeros((5, 5, 5), np.float32)
+    point[2, 2, 2] = 1
+    assert lx.ants.morphological_dilate(image(point), 1).data.sum() == 19
+    assert lx.ants.morphological_dilate(image(point[:, :, 2]), 1).data.sum() == 9
+    closed = lx.ants.morphological_close(mask, 1).data
+    assert closed[5, 5, 5] == 1 and lx.ants.fill_holes(mask).data[5, 5, 5] == 1
+    assert lx.ants.morphological_open(mask, 1).data[0, 0, 0] == 0
+    # ME's output is 0/1, and voxels above 0.5 that are not the foreground stay 1.
+    labels = mask.data * 2
+    eroded = lx.ants.morphological_erode(image(labels), 1).data
+    np.testing.assert_array_equal(eroded, (labels > 0.5).astype(np.float32))
+    for n in (1, 4):
+        np.testing.assert_array_equal(
+            lx.ants.grayscale_close(img, 2, n_threads=n).data, pairs[8][0].data
+        )
+    with pytest.raises(ValueError, match="radius"):
+        lx.ants.morphological_dilate(mask, -1)
+    with pytest.raises(ValueError, match="unknown operation"):
+        lx.ants.morphology(mask, "XX")
+
+
+def test_pad_image_moves_the_origin(tmp_path):
+    img = textured((6, 5, 4))
+    padded = lx.ants.pad_image(img, 3, value=-1)
+    assert padded.shape == (12, 11, 10)
+    np.testing.assert_array_equal(padded.data[3:9, 3:8, 3:7], img.data)
+    assert (padded.data[:3] == -1).all()
+    # Voxel (3, 3, 3) of the padded image is where voxel (0, 0, 0) was.
+    np.testing.assert_allclose(padded.affine @ [3, 3, 3, 1], img.affine @ [0, 0, 0, 1])
+    back = lx.ants.pad_image(padded, -3)
+    np.testing.assert_array_equal(back.data, img.data)
+    np.testing.assert_allclose(back.affine, img.affine)
+    generic = lx.ants.image_math("PadImage", img, 3, -1)
+    np.testing.assert_array_equal(generic.data, padded.data)
+    np.testing.assert_allclose(generic.affine, padded.affine)
+    src = tmp_path / "in.nii.gz"
+    lx.save(img, src)
+    from_path = lx.ants.pad_image(src, 2.5)
+    assert from_path.shape == (11, 10, 9)
+    np.testing.assert_array_equal(from_path.data[2:8, 2:7, 2:6], img.data)
+    with pytest.raises(ValueError, match="voxels"):
+        lx.ants.pad_image(img, -2)
+
+
 # --- command lines ------------------------------------------------------------------------------
 
 

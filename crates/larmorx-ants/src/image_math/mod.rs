@@ -8,6 +8,7 @@
 pub mod arithmetic;
 pub mod gaussian;
 pub mod intensity;
+pub mod morphology;
 
 pub use arithmetic::{Arithmetic, ArithmeticOutput, Operand, arithmetic, negative};
 pub use gaussian::{
@@ -15,4 +16,8 @@ pub use gaussian::{
 };
 pub use intensity::{
     Normalization, TruncateOptions, Truncated, normalize, rescale, truncate_image_intensity,
+};
+pub use morphology::{
+    FillHolesError, Morphology, PadImageError, fill_holes, float_labels, morphological, pad_image,
+    radius_from_f32,
 };

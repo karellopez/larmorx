@@ -1,0 +1,18 @@
+[package]
+name = "larmorx-mri"
+description = "Clean-room MRI tools for larmorx (head-motion correction compatible with mcflirt-style options)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+# atan2 only: larmorx_core::math has no correctly rounded port of it yet (CLAUDE.md rule 5).
+libm.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

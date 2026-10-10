@@ -10,6 +10,18 @@
 
 use super::volume::Volume;
 
+/// `⌊x⌋` without a call into the C library (`f32::floor` is one on baseline x86-64): exact for
+/// finite `|x| < 2³¹`, `f32::floor` otherwise.
+#[inline(always)]
+pub fn floor(x: f32) -> f32 {
+    if x.abs() < 2_147_483_648.0 {
+        let t = x as i32 as f32;
+        if t > x { t - 1.0 } else { t }
+    } else {
+        x.floor()
+    }
+}
+
 /// The formula of §6.2 on the eight neighbours `v[c][b][a]` (`a`, `b`, `c` = offsets in x, y,
 /// z) and the fractions.
 #[inline(always)]
@@ -78,7 +90,7 @@ pub fn trilinear_zero(vol: &Volume, x: f32, y: f32, z: f32) -> f32 {
 /// `[−1, n]` on every axis.
 pub fn trilinear_extended(vol: &Volume, x: f32, y: f32, z: f32) -> f32 {
     let [nx, ny, nz] = vol.shape;
-    let (fx0, fy0, fz0) = (x.floor(), y.floor(), z.floor());
+    let (fx0, fy0, fz0) = (floor(x), floor(y), floor(z));
     let (fx, fy, fz) = (x - fx0, y - fy0, z - fz0);
     let clamp = |i: f32, n: usize| -> [usize; 2] {
         let i = i as i64;
@@ -104,6 +116,27 @@ mod tests {
             }
         }
         Volume::new([3, 3, 3], [1.0; 3], data)
+    }
+
+    #[test]
+    fn floor_matches_the_library() {
+        for x in [
+            -2.5f32,
+            -1.0,
+            -0.5,
+            -0.0,
+            0.0,
+            0.25,
+            1.0,
+            3.75,
+            1e9,
+            -1e9,
+            3e9,
+            f32::NAN,
+        ] {
+            let (a, b) = (floor(x), x.floor());
+            assert!(a == b || (a.is_nan() && b.is_nan()), "{x}: {a} {b}");
+        }
     }
 
     #[test]

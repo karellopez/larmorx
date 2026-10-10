@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 
 use larmorx_core::math;
 
+use super::interp::floor;
 use super::volume::Volume;
 
 /// Nearest neighbour, rounding half away from zero, on the volume extended by its edge voxels.
@@ -50,7 +51,7 @@ impl Table {
     #[inline]
     fn at(&self, u: f32) -> f32 {
         let x = u / 3.0 * self.half + self.half;
-        let n = x.floor();
+        let n = floor(x);
         if !(n >= 0.0 && (n as usize) + 1 < self.values.len()) {
             return 0.0;
         }
@@ -92,35 +93,30 @@ fn hanning() -> &'static Table {
 /// A 7 × 7 × 7 windowed-sinc interpolation over the voxels inside the volume, normalised by
 /// the weight sum; `None` if that sum is at most 1e−9 in magnitude.
 fn windowed(vol: &Volume, p: [f32; 3], table: &Table) -> Option<f32> {
-    let base = p.map(|v| v.floor() as i64);
-    let mut kx = [0.0f32; 7];
-    let mut ky = [0.0f32; 7];
-    let mut kz = [0.0f32; 7];
-    for d in 0..7 {
-        let off = d as i64 - 3;
-        kx[d] = table.at(p[0] - (base[0] + off) as f32);
-        ky[d] = table.at(p[1] - (base[1] + off) as f32);
-        kz[d] = table.at(p[2] - (base[2] + off) as f32);
-    }
-    let [nx, ny, nz] = vol.shape.map(|n| n as i64);
-    let (mut sum, mut wsum) = (0.0f32, 0.0f32);
-    for (dz, &wz) in kz.iter().enumerate() {
-        let z = base[2] + dz as i64 - 3;
-        if z < 0 || z >= nz {
-            continue;
+    let base = p.map(|v| floor(v) as i64);
+    let mut k = [[0.0f32; 7]; 3];
+    for (axis, row) in k.iter_mut().enumerate() {
+        for (d, w) in row.iter_mut().enumerate() {
+            *w = table.at(p[axis] - (base[axis] + d as i64 - 3) as f32);
         }
-        for (dy, &wy) in ky.iter().enumerate() {
-            let y = base[1] + dy as i64 - 3;
-            if y < 0 || y >= ny {
-                continue;
-            }
-            for (dx, &wx) in kx.iter().enumerate() {
-                let x = base[0] + dx as i64 - 3;
-                if x < 0 || x >= nx {
-                    continue;
-                }
-                let w = wx * wy * wz;
-                sum += w * vol.at(x as usize, y as usize, z as usize);
+    }
+    // The voxels of the 7 × 7 × 7 neighbourhood that lie inside the volume, summed with z
+    // outermost and x innermost.
+    let [nx, ny, _] = vol.shape;
+    let range = |axis: usize| {
+        let lo = (base[axis] - 3).max(0);
+        let hi = (base[axis] + 3).min(vol.shape[axis] as i64 - 1);
+        lo..=hi
+    };
+    let (mut sum, mut wsum) = (0.0f32, 0.0f32);
+    for z in range(2) {
+        let wz = k[2][(z - base[2] + 3) as usize];
+        for y in range(1) {
+            let wy = k[1][(y - base[1] + 3) as usize];
+            let row = &vol.data[nx * (y as usize + ny * z as usize)..][..nx];
+            for x in range(0) {
+                let w = k[0][(x - base[0] + 3) as usize] * wy * wz;
+                sum += w * row[x as usize];
                 wsum += w;
             }
         }
@@ -131,7 +127,7 @@ fn windowed(vol: &Volume, p: [f32; 3], table: &Table) -> Option<f32> {
 /// The final `-sinc_final` interpolation (§9.3).
 pub fn sinc_final(vol: &Volume, p: [f32; 3]) -> f32 {
     windowed(vol, p, blackman()).unwrap_or_else(|| {
-        let i = [0, 1, 2].map(|k| (p[k].floor() as i64).clamp(0, vol.shape[k] as i64 - 1) as usize);
+        let i = [0, 1, 2].map(|k| (floor(p[k]) as i64).clamp(0, vol.shape[k] as i64 - 1) as usize);
         vol.at(i[0], i[1], i[2])
     })
 }
@@ -186,7 +182,7 @@ impl Spline {
 
     /// The spline's value at `p`; `background` where `⌊p⌋ < −1` or `⌊p⌋ ≥ n`.
     pub fn value(&self, p: [f32; 3], background: f32) -> f32 {
-        let base = p.map(|v| v.floor() as i64);
+        let base = p.map(|v| floor(v) as i64);
         if base
             .iter()
             .zip(self.shape)

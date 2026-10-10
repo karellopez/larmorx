@@ -26,6 +26,10 @@ Thresholds follow PLAN.md §11.3; the report lists them. Suites so far:
 |---|---|---|
 | `nifti-io` | `larmorx.io.load` / `save` | nibabel |
 | `resample-series` | `lx.transforms.resample_series`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms, SciPy (in-process) |
+| `itk-geometry` | ITK's reading of NIfTI geometry | ITK 5.4.5 (through ANTsPy) |
+| `ants-apply-transforms` | `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTsPy) |
+| `afni-tshift` | `larmorx afni 3dTshift` | the AFNI 25.2.09 binary |
+| `ants-image-math`, `ants-threshold-image`, `ants-multiply-images` | `larmorx ants ImageMath` / `ThresholdImage` / `MultiplyImages` | the ANTs 2.6.5 binaries (`parity/ants_programs.py`, a harness for every ANTs program run as a binary) |
 
 ## Benchmarks
 

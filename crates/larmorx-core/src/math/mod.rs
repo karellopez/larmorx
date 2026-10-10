@@ -12,6 +12,7 @@ mod cos;
 pub(crate) mod dint;
 mod exp;
 mod log;
+mod powf;
 mod powi;
 mod sin;
 
@@ -55,6 +56,10 @@ dispatch!(
     /// The sine of `x`, correctly rounded.
     sin
 );
+
+/// `x^y` for `f32`, correctly rounded (CORE-MATH's `cr_powf`). It has no FMA-compiled copy:
+/// it is only used where speed does not matter (ImageMath's `^`).
+pub use powf::powf;
 
 /// The kernels compiled with FMA enabled. AUDIT (unsafe): each call is guarded by
 /// `is_x86_feature_detected!("fma")` in `dispatch!`. Calling a `#[target_feature]` function

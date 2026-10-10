@@ -35,6 +35,14 @@ float64, so **a scaled int16 BOLD differs between nibabel and ITK by float32 rou
 Float32 data are scaled in double and rounded to float32. Float64 data are scaled in double.
 *Read.* *larmorx:* `nifti::itk::read_itk_image` reproduces it.
 
+**Non-finite float values are read as 0.** nifti_clib's `nifti_read_buffer`
+(`Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c:5013-5049`, compiled in because
+`isfinite` is a macro) replaces every NaN and ±inf of float32 and float64 data by 0 as it
+reads, before any scaling. So ITK, and every ANTs program, never sees a NaN from a NIfTI
+file: `ImageMath abs` turns `-inf` into 0. *Read; verified* (found by the ImageMath parity
+suite: `head-outliers` has a NaN and a `-inf`). *larmorx:* `read_itk_image` does the same
+(it did not before 2026-10-10; no earlier test file had non-finite values).
+
 **When ITK scales.** Only if `|slope| > ε` and (`|slope − 1| > ε` or `|inter| > ε`), with
 `ε` = double epsilon. Analyze files (no NIfTI magic) are never scaled. A slope of 0 is
 replaced by 1. nifti_clib first replaces non-finite slope and intercept by 0
@@ -50,8 +58,40 @@ implemented for float data: unscaled integer vectors throw. *Read.*
 *larmorx:* reproduced in `read_itk_image`. ANTsPy 0.6.3 carries 7 commits after ANTs v2.6.5
 that touch vector I/O, which the parity runs must keep in mind.
 
+## Writing
+
 **ITK writes** both qform and sform with code `SCANNER_ANAT` (1), and `xyzt_units` mm + s.
 *Verified* on antsApplyTransforms output. *larmorx's CLI:* writes the same codes and units.
+
+**The header ITK writes, field by field** (`NiftiImageIO::WriteImageInformation` and
+`SetNIfTIOrientationFromImageIO`, `itkNiftiImageIO.cxx:1429-1790, 2236-2363`; nifti_clib's
+`nifti_simple_init_nim` and `nifti_convert_nim2nhdr`). *Read; validated:* every output of the
+ImageMath, ThresholdImage and MultiplyImages suites (167 cases) has the same 348 header bytes
+as ANTs'.
+- `dim[0]` is the image dimension, `dim[1..7]` its sizes then 1; `pixdim[1..3]` the spacing
+  (float), and **`pixdim[4..7]` are 0** for a 3D image (nifti_clib's initial header has
+  `dim[0] = 3`, so they are never fixed to 1); a 2D image keeps `pixdim[3] = 1`;
+- the direction becomes a rotation through `nifti_make_orthog_mat44` (rows normalised in
+  float, then nifti_clib's single-precision polar decomposition) and `nifti_mat44_to_quatern`;
+  the sform is that rotation with each column multiplied by the float spacing; qoffset and
+  srow translations are the origin in float, x and y negated (LPS → RAS);
+- `pixdim[0]` is the quaternion's `qfac`, `scl_slope` 1, `scl_inter` 0, `regular` `'r'`,
+  `vox_offset` 352, `toffset` the 4th axis origin (else 0), `cal_*`, `slice_*`, `intent_*`,
+  `dim_info` and `glmax/glmin` 0;
+- **`descrip` and `aux_file` come from the image's metadata dictionary**: the input file's
+  when the written image is the object a reader produced (ITK's reader stores `descrip` as
+  `ITK_FileNotes`), empty for images made by filters, `AllocImage` or `CopyInformation`
+  (which does not copy the dictionary).
+*larmorx:* `nifti::itk::itk_header` / `write_itk_image`, with `ItkMeta` for the dictionary.
+
+**Signed zeros in the direction: ITK's setters keep `+0.0`.** The reader computes the LPS
+direction as `−1 · m[i][j]` for the first two rows, which gives `−0.0` where the matrix has
+`0`. But `ImageBase::SetDirection` copies only the elements that compare unequal to the
+current ones (`itkImageBase.hxx:149-160`), and a new image starts with the identity, so those
+`−0.0` never replace its `+0.0`. `SetOrigin` (`itkSetMacro`) replaces the whole point only
+if it differs. The sign survives into the written header (a `−0.0` in an srow), so it decides
+whether the header bytes match. *Read; verified* (a header byte differed until this was
+modelled). *larmorx:* `ItkGeometry::stored_in_new_image`, applied to every geometry read.
 
 ## nifti_clib file naming
 

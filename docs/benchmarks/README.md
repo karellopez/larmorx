@@ -8,6 +8,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [ants-apply-transforms](ants-apply-transforms.md) | antsApplyTransforms (ANTs 2.6.5 via ANTsPy) |
 | [afni-tshift](afni-tshift.md) | 3dTshift (AFNI 25.2.09 binary); also the GPL replica `larmorx-gpl` |
 | [resample-series](resample-series.md) | fMRIPrep's one-shot resampler (`resample_image`) |
+| [ants-programs](ants-programs.md) | ImageMath, ThresholdImage, MultiplyImages (ANTs 2.6.5 binaries) |
 
 Reproduce a report (build larmorx in release mode first):
 
@@ -17,4 +18,5 @@ python -m larmorx_validation bench nifti-io --tier full --out docs/benchmarks
 python -m larmorx_validation bench ants-apply-transforms --repeats 3 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench afni-tshift --repeats 3 --threads 1 0 --out docs/benchmarks
 python -m larmorx_validation bench resample-series --repeats 3 --threads 1 4 0 --out docs/benchmarks
+python -m larmorx_validation bench ants-programs --repeats 5 --threads 1 4 0 --out docs/benchmarks
 ```

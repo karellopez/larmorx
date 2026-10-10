@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-ants"
-description = "ANTs tools ported to Rust for larmorx (antsApplyTransforms, ...)"
+description = "ANTs tools ported to Rust for larmorx (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages, ...)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+larmorx-image.workspace = true
 larmorx-interp.workspace = true
 larmorx-io.workspace = true
 larmorx-transform.workspace = true

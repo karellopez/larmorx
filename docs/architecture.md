@@ -18,10 +18,14 @@ How the code is organised and the conventions every tool follows. The plan behin
                      nitransforms chains (RAS) and fMRIPrep's one-shot BOLD resampler
    larmorx-interp    the ITK interpolators (linear, nearest, B-spline, Gaussian, label, windowed sinc);
                      SciPy's map_coordinates and spline prefilter (ndimage)
-   larmorx-ants      ANTs tools (antsApplyTransforms) and their original command lines
+   larmorx-image     ITK image filters: thresholds, Otsu, histograms and quantiles, intensity
+                     rescaling, ITK's float comparisons (smoothing, morphology, components and
+                     distance maps next)
+   larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages),
+                     images as ANTs programs read and write them, the original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax)
-   (next)            larmorx-image, -optim, -mesh, -mri
+   (next)            larmorx-optim, -mesh, -mri
 ```
 
 - **The Rust crates know nothing about Python.** Bindings live only in `larmorx-py`, so the same code serves the standalone CLI and Rust users.
@@ -61,7 +65,7 @@ Test data live in a separate repository, `larmorx-testdata` (next to this one in
 
 1. Rust API in the family crate, on `Image`/`Affine` types, with an explicit `n_threads`.
 2. Binding in `larmorx-py` and an idiomatic wrapper in `python/larmorx/<family>/` (typed, dataclass results), with `.pyi` stubs.
-3. CLI parser for the original program's arguments in `larmorx-cli`.
+3. CLI parser for the original program's arguments (in the family crate's `cli` module, dispatched by `larmorx-cli`). ANTs image programs read and write through `larmorx_ants::image::ImageStore`, so the same command-line code also runs on in-memory images from Python (`lx.ants.image_math`).
 4. Docs page in `docs/api/` with the option-mapping table and the deliberate differences.
 5. A parity suite in `validation/` against the original tool, its report in `docs/validation/`, and the tool's status (`experimental` → `validated` → `stable`).
 6. `PROVENANCE.md` entries for ported code.

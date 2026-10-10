@@ -49,7 +49,7 @@ VXL, as bundled with ITK v5.4.5 (vnl's SVD, error function and gamma function) -
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
   OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, powf) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.

@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 
 mod afni;
 mod ants;
+mod ants_filters;
 mod ndimage;
 mod nifti;
 mod resample;
@@ -34,6 +35,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cli_main, m)?)?;
     nifti::register(m)?;
     ants::register(m)?;
+    ants_filters::register(m)?;
     afni::register(m)?;
     ndimage::register(m)?;
     resample::register(m)?;

@@ -15,14 +15,27 @@ from pathlib import Path
 from larmorx_validation import environment
 from larmorx_validation.report import write_json
 
-PARITY_SUITES = (
-    "nifti-io",
-    "itk-geometry",
-    "ants-apply-transforms",
-    "afni-tshift",
-    "resample-series",
-)
-BENCH_SUITES = ("nifti-io", "ants-apply-transforms", "afni-tshift", "resample-series")
+#: Parity suites: name -> module (each has ``suite()``). Add new suites here.
+PARITY_MODULES = {
+    "nifti-io": "nifti_io",
+    "itk-geometry": "itk_geometry",
+    "ants-apply-transforms": "ants_apply_transforms",
+    "afni-tshift": "afni_tshift",
+    "resample-series": "resample_series",
+    "ants-image-math": "ants_image_math",
+    "ants-threshold-image": "ants_threshold_image",
+    "ants-multiply-images": "ants_multiply_images",
+}
+PARITY_SUITES = tuple(PARITY_MODULES)
+#: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).
+BENCH_MODULES = {
+    "nifti-io": "nifti_io",
+    "ants-apply-transforms": "ants_apply_transforms",
+    "afni-tshift": "afni_tshift",
+    "resample-series": "resample_series",
+    "ants-programs": "ants_programs",
+}
+BENCH_SUITES = tuple(BENCH_MODULES)
 
 
 #: Suites that can also validate a replica binary (docs/licensing.md).
@@ -30,29 +43,14 @@ REPLICA_SUITES = ("afni-tshift",)
 
 
 def _parity_suite(name: str, implementation: str = "original"):
+    import importlib
+
+    if name not in PARITY_MODULES:
+        raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
     if implementation != "original" and name not in REPLICA_SUITES:
         raise SystemExit(f"suite {name!r} has no replica; replicas exist for {REPLICA_SUITES}")
-    if name == "nifti-io":
-        from larmorx_validation.parity import nifti_io
-
-        return nifti_io.suite()
-    if name == "itk-geometry":
-        from larmorx_validation.parity import itk_geometry
-
-        return itk_geometry.suite()
-    if name == "ants-apply-transforms":
-        from larmorx_validation.parity import ants_apply_transforms
-
-        return ants_apply_transforms.suite()
-    if name == "afni-tshift":
-        from larmorx_validation.parity import afni_tshift
-
-        return afni_tshift.suite(implementation)
-    if name == "resample-series":
-        from larmorx_validation.parity import resample_series
-
-        return resample_series.suite()
-    raise SystemExit(f"unknown parity suite {name!r}; choose from {PARITY_SUITES}")
+    module = importlib.import_module(f"larmorx_validation.parity.{PARITY_MODULES[name]}")
+    return module.suite(implementation) if name in REPLICA_SUITES else module.suite()
 
 
 def _redacted(result):
@@ -142,16 +140,11 @@ def cmd_parity(args: argparse.Namespace) -> int:
 
 
 def cmd_bench(args: argparse.Namespace) -> int:
-    if args.suite == "nifti-io":
-        from larmorx_validation.bench import nifti_io as bench
-    elif args.suite == "ants-apply-transforms":
-        from larmorx_validation.bench import ants_apply_transforms as bench
-    elif args.suite == "afni-tshift":
-        from larmorx_validation.bench import afni_tshift as bench
-    elif args.suite == "resample-series":
-        from larmorx_validation.bench import resample_series as bench
-    else:
+    import importlib
+
+    if args.suite not in BENCH_MODULES:
         raise SystemExit(f"unknown benchmark suite {args.suite!r}; choose from {BENCH_SUITES}")
+    bench = importlib.import_module(f"larmorx_validation.bench.{BENCH_MODULES[args.suite]}")
     return bench.main(args)
 
 

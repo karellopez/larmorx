@@ -20,6 +20,9 @@ use rayon::prelude::*;
 use super::header::{NiftiHeader, NiftiVersion, xform};
 use super::{Error, ReadOptions, Scaling};
 
+mod write;
+pub use write::{ItkMeta, ItkWriteError, is_itk_nifti_name, itk_header, write_itk_image};
+
 /// The geometry ITK gives an image read from a NIfTI file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ItkGeometry {
@@ -37,6 +40,10 @@ pub struct ItkGeometry {
     pub direction: Vec<Vec<f64>>,
     /// Which header transform ITK used.
     pub source: GeometrySource,
+    /// Axes whose stored spacing was negative. ITK's image reader makes the spacing positive
+    /// and flips the direction column (already done in `direction`); when it reads a file into
+    /// an image with fewer dimensions, it uses an identity direction with these axes flipped.
+    pub flipped: Vec<bool>,
 }
 
 /// Which part of the header ITK took the geometry from.
@@ -326,6 +333,7 @@ pub fn itk_geometry(header: &NiftiHeader) -> Result<ItkGeometry, ItkGeometryErro
             origin,
             direction,
             source: GeometrySource::Default,
+            flipped: Vec::new(),
         }
         .with_positive_spacing());
     }
@@ -380,14 +388,47 @@ pub fn itk_geometry(header: &NiftiHeader) -> Result<ItkGeometry, ItkGeometryErro
         origin,
         direction,
         source,
+        flipped: Vec::new(),
     }
     .with_positive_spacing())
 }
 
 impl ItkGeometry {
+    /// The geometry of a 3D ITK image on `grid` (LPS).
+    pub fn from_grid3(grid: &larmorx_core::Grid3) -> Self {
+        ItkGeometry {
+            ndim: 3,
+            size: grid.size.to_vec(),
+            spacing: grid.spacing.to_vec(),
+            origin: grid.origin.to_vec(),
+            direction: grid.direction.iter().map(|r| r.to_vec()).collect(),
+            source: GeometrySource::Default,
+            flipped: vec![false; 3],
+        }
+    }
+
+    /// This geometry with one more axis (such as time) of `size` voxels, `spacing` and
+    /// `origin`, along its own direction.
+    pub fn with_axis(mut self, size: usize, spacing: f64, origin: f64) -> Self {
+        let n = self.ndim;
+        self.ndim += 1;
+        self.size.push(size);
+        self.spacing.push(spacing);
+        self.origin.push(origin);
+        for row in &mut self.direction {
+            row.push(0.0);
+        }
+        let mut last = vec![0.0; n + 1];
+        last[n] = 1.0;
+        self.direction.push(last);
+        self.flipped.push(false);
+        self
+    }
+
     /// ITK's `ImageFileReader` (which ANTs uses) makes every spacing positive, flipping the
     /// matching direction column instead; the geometry describes the image it produces.
     fn with_positive_spacing(mut self) -> Self {
+        self.flipped = self.spacing.iter().map(|&s| s < 0.0).collect();
         for j in 0..self.ndim {
             if self.spacing[j] < 0.0 {
                 self.spacing[j] = -self.spacing[j];
@@ -395,6 +436,27 @@ impl ItkGeometry {
                     row[j] = -row[j];
                 }
             }
+        }
+        self.stored_in_new_image()
+    }
+
+    /// The geometry as stored in a new `itk::Image` by its setters, which change only what
+    /// compares unequal to the image's defaults (`ImageBase::SetDirection` element by element
+    /// against the identity, `SetOrigin` as a whole against zero). So a `−0.0` that the
+    /// NIfTI reader computes (`−1 · 0.0` in the RAS→LPS flip) becomes `+0.0` where the
+    /// default is `+0.0`. It matters only for the sign of zeros, which ITK's writer passes on
+    /// to the qform and sform.
+    pub fn stored_in_new_image(mut self) -> Self {
+        for (i, row) in self.direction.iter_mut().enumerate() {
+            for (j, v) in row.iter_mut().enumerate() {
+                let default = if i == j { 1.0 } else { 0.0 };
+                if *v == default {
+                    *v = default;
+                }
+            }
+        }
+        if self.origin.iter().all(|&o| o == 0.0) {
+            self.origin.iter_mut().for_each(|o| *o = 0.0);
         }
         self
     }
@@ -479,6 +541,8 @@ pub struct ItkImage {
     pub voxels: ItkVoxels,
     /// The header's `intent_code`.
     pub intent_code: i32,
+    /// The `descrip` and `aux_file` ITK keeps in the image's metadata dictionary.
+    pub meta: ItkMeta,
 }
 
 /// Reads a NIfTI image's geometry and voxel values the way ITK 5.4.5's `NiftiImageIO` does.
@@ -487,7 +551,8 @@ pub struct ItkImage {
 /// for Analyze files and when the slope is 0 (or not finite); integer data are converted to
 /// float32 **before** scaling and the scaled value is rounded to float32 again
 /// (`f32(f64(f32(x))·slope + inter)`), float32 data are scaled in double and rounded to
-/// float32. Displacement vectors with intent `NIFTI_INTENT_DISPVECT` are converted from RAS to
+/// float32. Non-finite float values (NaN, ±inf) are read as 0, as nifti_clib's
+/// `nifti_read_buffer` sets them. Displacement vectors with intent `NIFTI_INTENT_DISPVECT` are converted from RAS to
 /// LPS (x and y negated); other vector intents are taken as LPS already (ANTs writes
 /// `NIFTI_INTENT_VECTOR`). Complex and RGB data are not supported.
 pub fn read_itk_image(path: impl AsRef<Path>, n_threads: usize) -> Result<ItkImage, Error> {
@@ -527,6 +592,7 @@ pub fn read_itk_image(path: impl AsRef<Path>, n_threads: usize) -> Result<ItkIma
         geometry,
         voxels,
         intent_code: stored.intent_code,
+        meta: ItkMeta::from_header(&stored),
     })
 }
 
@@ -554,15 +620,21 @@ fn itk_values<T: RealElement>(v: &[T], slope: f64, inter: f64, rescale: bool) ->
     fn map<T: Copy + Send + Sync, U: Send>(v: &[T], f: impl Fn(T) -> U + Send + Sync) -> Vec<U> {
         v.par_iter().with_min_len(1 << 16).map(|&x| f(x)).collect()
     }
+    // nifti_clib's `nifti_read_buffer` sets every non-finite float32 and float64 value to 0
+    // as it reads (before any scaling).
+    let finite = |x: f64| if x.is_finite() { x } else { 0.0 };
     match T::DATA_TYPE {
-        DataType::F64 if rescale => ItkVoxels::F64(map(v, |x| x.to_f64() * slope + inter)),
-        DataType::F64 => ItkVoxels::F64(map(v, |x| x.to_f64())),
+        DataType::F64 if rescale => ItkVoxels::F64(map(v, |x| finite(x.to_f64()) * slope + inter)),
+        DataType::F64 => ItkVoxels::F64(map(v, |x| finite(x.to_f64()))),
         // Float data are scaled in double and stored back as float; integer data are first
         // converted to float (`CastCopy<float>`).
-        DataType::F32 if rescale => ItkVoxels::F32(map(v, |x| (x.to_f64() * slope + inter) as f32)),
+        DataType::F32 if rescale => {
+            ItkVoxels::F32(map(v, |x| (finite(x.to_f64()) * slope + inter) as f32))
+        }
+        DataType::F32 => ItkVoxels::F32(map(v, |x| finite(x.to_f64()) as f32)),
         _ if rescale => ItkVoxels::F32(map(v, |x| (f64::from(x.to_f32()) * slope + inter) as f32)),
         // Unscaled: the stored values, in float32 when that is exact.
-        DataType::F32 | DataType::U8 | DataType::I8 | DataType::U16 | DataType::I16 => {
+        DataType::U8 | DataType::I8 | DataType::U16 | DataType::I16 => {
             ItkVoxels::F32(map(v, |x| x.to_f32()))
         }
         _ => ItkVoxels::F64(map(v, |x| x.to_f64())),

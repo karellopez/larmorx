@@ -28,6 +28,7 @@ PARITY_MODULES = {
     "ants-multiply-images": "ants_multiply_images",
     "ants-smooth-image": "ants_smooth_image",
     "ants-resample-image-by-spacing": "ants_resample_image_by_spacing",
+    "ants-resample-image": "ants_resample_image",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).

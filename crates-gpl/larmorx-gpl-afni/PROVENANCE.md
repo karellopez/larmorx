@@ -103,4 +103,4 @@ Changes from the originals are listed below and in each module's documentation.
 |---|---|---|
 | `csfft` | `tools/csfft-verify/run.sh`: AFNI's compiled `csfft_cox` (from the oracle build's `libmri.a`) and its general radix-2 loop on 3,336 + 160 input records, every length AFNI computes itself | 36,950,784 + 2,621,400 float values, 0 differ |
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
-| 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | `docs/validation/afni-tshift-replica.md` |
+| 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |

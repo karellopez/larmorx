@@ -76,10 +76,12 @@ is a hard error here, while a header pattern outside it only causes a warning an
 - **Kept as stored:** uint8 and int16 stay byte and short, unless both `scl_slope` and
   `scl_inter` are non-zero.
 - **Converted to float32:** float32 stays float32. int8, uint16, int32, uint32 and float64
-  become float32, and so do uint8 and int16 with both slope and intercept. The scaling is
-  then applied in float.
-- **Brick factors:** otherwise a finite non-zero slope becomes the brick factor, even on
-  float data.
+  become float32, and so do uint8 and int16 with both slope and intercept. The scaling
+  `slope·x + inter` is then computed in double (the header fields are double in AFNI's
+  NIfTI-2 structure) and stored as float (`thd_niftiread.c:1078`).
+- **Brick factors:** otherwise a slope other than 0 and 1 becomes the brick factor, even on
+  float data. (Corrected 2026-10-10: a slope of 1 gives no factor, and the factor is the one
+  set when the header is opened; see below.)
 - **Non-finite floats** are read as 0.
 - **On writing,** the datum is kept, `scl_slope` = the brick factor (0 = none),
   `scl_inter` = 0, and an AFNI history extension (code 4) is added.
@@ -169,9 +171,11 @@ the output if it is done any other way; the replica does each as AFNI does.
 
 - **The Lagrange weights square in float.** The macros (`thd_shift2.c:401-408` heptic,
   `:500-505` quintic) write `x*x-1.0` with a float `x`: `x*x` is a float product, and only then
-  does the expression become double. Squaring in double changes some weights in their last
-  float bit, which is why the clean-room original differed on quintic and heptic cases.
-  *Read*, *validated*.
+  does the expression become double, multiplied left to right in the macro's order. Any
+  other evaluation (squaring in double, or the product of the `(x − k)` factors in another
+  order, as the clean-room original computes it) changes some weights in their last float
+  bit; that is why the original differs on `real/ds003345-quintic` and `-heptic`. *Read*,
+  *validated*.
 - **The heptic sum adds its outer taps last:** `m2, m1, 00, p1, p2, p3`, then `m3`, then `p4`
   (`thd_shift2.c:447-449`). *Read*, *validated*.
 - **Sums near the ends are double.** `FINS(i)` is `((i)<0 || (i)>=n) ? 0.0 : f[(i)]`

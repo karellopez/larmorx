@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-gpl replicas (tests/golden.rs): SHA-256 of the NIfTI
 # header and data that larmorx-gpl writes on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from a94aa8e4958c172b9b9b58210db503846c1f65e4+dirty on 2026-10-10 (Linux x86_64)
+# Recorded from 713ca53d37a90d381dfa834b5139b96689c0017e on 2026-10-10 (Linux x86_64)
 # case	output	sha256	type	sample
 3dTshift.cubic.int16.rlt+	data	a1cb86a54de3277e8b9c86c487382f32b45ea90ffcf43f0a50ae4b2bd701b267	int16	21036804a805f90346059903b8041406
 3dTshift.cubic.int16.rlt+	header	e43d4e9602632203bda7a8300a802dd5150d3c085f21f96b26e1276348e7518f	-	-

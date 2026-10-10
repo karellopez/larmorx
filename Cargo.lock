@@ -245,6 +245,7 @@ dependencies = [
  "larmorx-core",
  "larmorx-interp",
  "larmorx-io",
+ "larmorx-mri",
  "larmorx-transform",
  "numpy",
  "pyo3",

@@ -15,11 +15,12 @@ use std::path::{Path, PathBuf};
 use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
-use crate::hmc::estimate::{EstimateParams, InPlane, Reference, estimate};
+use crate::hmc::estimate::{EstimateParams, InPlane};
 use crate::hmc::image::{self, Series, output_name, output_type, read_reference, read_series};
+use crate::hmc::pipeline::{self, HmcOptions, HmcOutput, ReferenceChoice};
 use crate::hmc::report::{self, mat_text, par_text, rms_text};
-use crate::hmc::resample::{Interpolation, resample_series};
-use crate::hmc::rigid::{IDENTITY, Mat4};
+use crate::hmc::resample::Interpolation;
+use crate::hmc::rigid::IDENTITY;
 use crate::hmc::volume::Volume;
 use crate::hmc::{CostFunction, stats};
 
@@ -313,7 +314,7 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     let output_type = std::env::var("FSLOUTPUTTYPE").unwrap_or_else(|_| "NIFTI_GZ".into());
     let (image_path, version) = output_name(&out_name, &output_type)
         .ok_or_else(|| format!("unknown FSLOUTPUTTYPE {output_type:?}"))?;
-    let ext = &image_path[image::strip_image_extension(&image_path).len()..];
+    let ext = image_path[image::strip_image_extension(&image_path).len()..].to_owned();
     if o.gdt {
         return Err("-gdt (registration of gradient images) is not supported".into());
     }
@@ -326,10 +327,9 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     note(o, err, "Reading time series... ");
     let series = read_series(Path::new(input), n_threads).map_err(|e| e.to_string())?;
     let n = series.volumes.len();
-    let shape = series.shape();
-    let (reference, ref_grid, ref_index) = if o.meanvol {
-        let r = default_index(o.refvol, n)?;
-        (Reference::Mean(r), None, None)
+    let reference_volume;
+    let choice = if o.meanvol {
+        ReferenceChoice::Mean(Some(reference_index(o.refvol, n)?))
     } else if let Some(path) = &o.reffile {
         if o.stages <= 0 {
             return Err("-stages 0 with a reference file: nothing would be registered".into());
@@ -344,45 +344,25 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
                  and will be removed in a future release."
             );
         }
-        if vol.len() != series.volumes[0].len() {
-            return Err(format!(
-                "the reference has {} voxels, the volumes of the series {}: the corrected \
-                 series cannot be written",
-                vol.len(),
-                series.volumes[0].len()
-            ));
-        }
-        (Reference::Volume(vol), Some(s), None)
+        let geometry = pipeline::series_geometry(&Series {
+            volumes: vec![vol.clone()],
+            ..s
+        });
+        reference_volume = vol;
+        ReferenceChoice::External(&reference_volume, geometry)
     } else {
-        let r = default_index(o.refvol, n)?;
-        (Reference::Index(r), None, Some(r))
+        ReferenceChoice::Index(Some(reference_index(o.refvol, n)?))
     };
     let dof = o.dof.clamp(6, 12) as usize;
+    let stages = o.stages.clamp(0, 4) as usize;
     if o.dof != dof as i64 {
-        let registered = if ref_index.is_some() { n - 1 } else { n };
+        let registered = match choice {
+            ReferenceChoice::Index(_) => n - 1,
+            _ => n,
+        };
         let line = format!("Erroneous dof {} : using {dof} instead\n", o.dof);
-        let _ = err.write_all(
-            line.repeat(registered * o.stages.clamp(0, 4) as usize)
-                .as_bytes(),
-        );
+        let _ = err.write_all(line.repeat(registered * stages).as_bytes());
     }
-    let params = EstimateParams {
-        stages: o.stages.clamp(0, 4) as usize,
-        dof,
-        cost: o.cost,
-        smooth: o.smooth as f32,
-        rotation: o.rotation,
-        bins: o.bins.max(1) as usize,
-        fudge: o.fudge,
-        in_plane: if o.two_d {
-            InPlane::Force
-        } else {
-            InPlane::Auto { fov: o.fov }
-        },
-        n_threads,
-    };
-    note(o, err, "Registering volumes ...");
-    let est = estimate(&series.volumes, &reference, &params).map_err(|e| e.to_string())?;
     let init = match &o.init {
         Some(path) => Some(
             fs::read_to_string(path)
@@ -392,44 +372,36 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
         ),
         None => None,
     };
-    // The output grid: the reference's with a reference file, else the series'.
-    let (grid_shape, grid_voxel) = match &reference {
-        Reference::Volume(v) => (v.shape, v.voxel_size),
-        _ => (shape, series.volumes[0].voxel_size),
+    let options = HmcOptions {
+        estimate: EstimateParams {
+            stages,
+            dof,
+            cost: o.cost,
+            smooth: o.smooth as f32,
+            rotation: o.rotation,
+            bins: o.bins.max(1) as usize,
+            fudge: o.fudge,
+            in_plane: if o.two_d {
+                InPlane::Force
+            } else {
+                InPlane::Auto { fov: o.fov }
+            },
+            n_threads,
+        },
+        interpolation: o.interpolation,
+        init,
+        resample: true,
     };
+    note(o, err, "Registering volumes ...");
+    let result = pipeline::run(&series, &choice, &options).map_err(|e| e.to_string())?;
     note(o, err, "Saving motion corrected time series... ");
-    let corrected = resample_series(
-        &series.volumes,
-        &est.matrices,
-        init.as_ref(),
-        grid_shape,
-        grid_voxel,
-        o.interpolation,
-        n_threads,
-    )
-    .map_err(|e| e.to_string())?;
-    // Corrected data on another grid of the same size are stored under the input's header.
-    let corrected: Vec<Volume> = corrected
-        .into_iter()
-        .map(|v| Volume::new(shape, series.volumes[0].voxel_size, v.data))
-        .collect();
-    if let Some(r) = ref_index
+    if let Some(r) = result.estimate.reference_index
         && o.report
         && (o.mats || o.plots || o.rmsrel || o.rmsabs)
     {
         let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
     }
-    write_outputs(
-        o,
-        &out_name,
-        ext,
-        version,
-        &series,
-        &est,
-        ref_grid.as_ref(),
-        &corrected,
-        n_threads,
-    )
+    write_outputs(o, &out_name, &ext, version, &series, &result, n_threads)
 }
 
 /// A progress message on stderr with `-report`.
@@ -440,7 +412,7 @@ fn note(o: &Options, err: &mut dyn Write, msg: &str) {
 }
 
 /// The reference index of `-refvol` (`-1`: the default `N / 2`).
-fn default_index(refvol: i64, n: usize) -> Result<usize, String> {
+fn reference_index(refvol: i64, n: usize) -> Result<usize, String> {
     match refvol {
         -1 => Ok(n / 2),
         r if r >= 0 && (r as usize) < n => Ok(r as usize),
@@ -450,23 +422,22 @@ fn default_index(refvol: i64, n: usize) -> Result<usize, String> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Writes the files of §10: the `.mat` directory, `.par`, `.rms`, the corrected series, the
+/// `-stats` images and the mean of `-meanvol`.
 fn write_outputs(
     o: &Options,
     out_name: &str,
     ext: &str,
     version: larmorx_io::nifti::NiftiVersion,
     series: &Series,
-    est: &crate::hmc::Estimate,
-    _ref_series: Option<&Series>,
-    corrected: &[Volume],
+    result: &HmcOutput,
     n_threads: usize,
 ) -> Result<(), String> {
-    let matrices: &[Mat4] = &est.matrices;
+    let est = &result.estimate;
     if o.mats || o.rmsrel || o.rmsabs {
         let dir = mat_directory(out_name)?;
         if o.mats {
-            for (t, m) in matrices.iter().enumerate() {
+            for (t, m) in est.matrices.iter().enumerate() {
                 write_text(dir.join(format!("MAT_{t:04}")), &mat_text(m))?;
             }
         } else if let Some(r) = est.reference_index {
@@ -474,24 +445,32 @@ fn write_outputs(
         }
     }
     if o.plots {
-        let params = report::motion_parameters(matrices, &est.reference);
-        write_text(format!("{out_name}.par"), &par_text(&params))?;
+        write_text(format!("{out_name}.par"), &par_text(&result.params))?;
     }
-    if o.rmsabs || o.rmsrel {
-        let (abs, rel) = report::rms_series(matrices, &est.reference);
-        if o.rmsabs {
-            let mean = abs.iter().sum::<f64>() / abs.len() as f64;
-            write_text(format!("{out_name}_abs.rms"), &rms_text(&abs))?;
-            write_text(format!("{out_name}_abs_mean.rms"), &rms_text(&[mean]))?;
-        }
-        if o.rmsrel {
-            let mean = rel.iter().sum::<f64>() / rel.len() as f64;
-            write_text(format!("{out_name}_rel.rms"), &rms_text(&rel))?;
-            write_text(format!("{out_name}_rel_mean.rms"), &rms_text(&[mean]))?;
-        }
+    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+    if o.rmsabs {
+        write_text(format!("{out_name}_abs.rms"), &rms_text(&result.rms_abs))?;
+        write_text(
+            format!("{out_name}_abs_mean.rms"),
+            &rms_text(&[mean(&result.rms_abs)]),
+        )?;
     }
-    let data_type = output_type(series.stored, &series.header);
-    let stem = image::strip_image_extension(out_name);
+    if o.rmsrel {
+        write_text(format!("{out_name}_rel.rms"), &rms_text(&result.rms_rel))?;
+        write_text(
+            format!("{out_name}_rel_mean.rms"),
+            &rms_text(&[mean(&result.rms_rel)]),
+        )?;
+    }
+    // Corrected data on another grid of the same size are stored under the input's header.
+    let shape = series.shape();
+    let voxel = series.voxel_size();
+    let corrected: Vec<Volume> = result
+        .corrected
+        .iter()
+        .flatten()
+        .map(|v| Volume::new(shape, voxel, v.data.clone()))
+        .collect();
     let write = |path: &str, vols: &[Volume], dt: DataType| {
         image::write_like(
             Path::new(path),
@@ -505,10 +484,12 @@ fn write_outputs(
         )
         .map_err(|e| e.to_string())
     };
-    write(&format!("{stem}{ext}"), corrected, data_type)?;
+    let stem = image::strip_image_extension(out_name);
+    let data_type = output_type(series.stored, &series.header);
+    write(&format!("{stem}{ext}"), &corrected, data_type)?;
     if o.stats {
-        let [mean, variance, sigma] = stats::temporal(corrected);
-        write(&format!("{out_name}_meanvol{ext}"), &[mean], DataType::F32)?;
+        let [m, variance, sigma] = stats::temporal(&corrected);
+        write(&format!("{out_name}_meanvol{ext}"), &[m], DataType::F32)?;
         write(
             &format!("{out_name}_variance{ext}"),
             &[variance],
@@ -516,10 +497,10 @@ fn write_outputs(
         )?;
         write(&format!("{out_name}_sigma{ext}"), &[sigma], DataType::F32)?;
     }
-    if let Some(mean) = &est.mean {
+    if let Some(m) = &est.mean {
         write(
             &format!("{out_name}_mean_reg{ext}"),
-            std::slice::from_ref(mean),
+            std::slice::from_ref(m),
             DataType::F32,
         )?;
     }
@@ -571,9 +552,9 @@ mod tests {
 
     #[test]
     fn reference_indices() {
-        assert_eq!(default_index(-1, 12), Ok(6));
-        assert_eq!(default_index(0, 12), Ok(0));
-        assert!(default_index(12, 12).is_err());
-        assert!(default_index(-2, 12).is_err());
+        assert_eq!(reference_index(-1, 12), Ok(6));
+        assert_eq!(reference_index(0, 12), Ok(0));
+        assert!(reference_index(12, 12).is_err());
+        assert!(reference_index(-2, 12).is_err());
     }
 }

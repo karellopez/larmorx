@@ -115,6 +115,45 @@ fn to_f32_vec<T: RealElement>(a: &ArrayD<T>, scale: Option<(f32, f32)>, n: usize
     .unwrap_or_else(|_| src.iter().map(convert).collect())
 }
 
+impl Series {
+    /// A series from float32 values already scaled (x fastest, volumes last) of `dims`
+    /// (`[nx, ny, nz, nt]`), placed by `header`, which decides the voxel sizes and whether the
+    /// x axis is reversed in memory.
+    pub fn from_values(dims: [usize; 4], values: &[f32], header: NiftiHeader) -> Series {
+        let [nx, ny, nz, _] = dims;
+        let per = nx * ny * nz;
+        let flipped = is_neurological(&header);
+        let vox = voxel_size(&header);
+        let volumes = values
+            .chunks_exact(per.max(1))
+            .map(|c| {
+                let v = Volume::new([nx, ny, nz], vox, c.to_vec());
+                if flipped { v.flipped_x() } else { v }
+            })
+            .collect();
+        Series {
+            volumes,
+            header,
+            flipped,
+            stored: DataType::F32,
+        }
+    }
+}
+
+/// The values of `volumes` in storage order (x fastest, volumes last), the x axis reversed
+/// back if `flipped`.
+pub fn storage_values(volumes: &[Volume], flipped: bool) -> Vec<f32> {
+    let mut values = Vec::with_capacity(volumes.iter().map(Volume::len).sum());
+    for v in volumes {
+        if flipped {
+            values.extend_from_slice(&v.flipped_x().data);
+        } else {
+            values.extend_from_slice(&v.data);
+        }
+    }
+    values
+}
+
 /// Reads a series: a 3D image is a series of one volume; dimensions beyond the fourth count
 /// as more volumes.
 pub fn read_series(path: &Path, n_threads: usize) -> Result<Series, ImageError> {

@@ -36,6 +36,8 @@ pub enum InPlane {
     Auto { fov: i64 },
     /// Always (`-2d`).
     Force,
+    /// Never (larmorx's option; mcflirt has none).
+    Never,
 }
 
 impl Default for InPlane {
@@ -313,6 +315,7 @@ fn run_stages(
         let grid4 = subsample(reference, 4.0);
         let check = |v: &Volume| match params.in_plane {
             InPlane::Force => true,
+            InPlane::Never => false,
             InPlane::Auto { fov } => thin(v, fov),
         };
         let mut in_plane = check(&grid8) || check(&series[0]);

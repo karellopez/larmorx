@@ -13,6 +13,7 @@ pub mod grid;
 pub mod image;
 pub mod interp;
 pub mod kernels;
+pub mod pipeline;
 pub mod report;
 pub mod resample;
 pub mod rigid;

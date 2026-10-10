@@ -4,7 +4,7 @@
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run as a separate process
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `18c8309c46b6-dirty`, tier `standard`
+- **Test data:** larmorx-testdata `5434909ddf09`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 
 **Bit-identical: 217 of 217 passing cases** produce exactly the bytes of AFNI's output data.
@@ -79,8 +79,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (536f1d2edb60-dirty) |
-| larmorx-testdata | 18c8309c46b6-dirty |
+| larmorx | 0.0.1 (6d1ca26b1633-dirty) |
+| larmorx-testdata | 5434909ddf09 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

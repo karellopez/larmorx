@@ -668,8 +668,9 @@ def _band_lines() -> list[str]:
         "mcflirt is deterministic, so its variability is measured by perturbing its input slightly "
         "and comparing its matrices with its own unperturbed ones "
         "(`python -m larmorx_validation.parity.mri_hmc_band`): uniform noise of ±0.5 intensity "
-        "units, the volumes in reverse order (runs with a separate reference), the top slice "
-        "cropped. Noise and reverse order set the widened thresholds; cropping changes the "
+        "units (three realisations: `noise`, `noise2`, `noise3`), the volumes in reverse order "
+        "(runs with a separate reference), the top slice cropped. Noise and reverse order set "
+        "the widened thresholds (the worst of them per run and metric); cropping changes the "
         "problem more (it breaks thin images) and is only reported.",
         "",
         table(
@@ -717,7 +718,8 @@ def _highlights(results: list[CaseResult]) -> list[str]:
         lines += [
             "**fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): "
             "larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its "
-            "input is perturbed slightly (the band, worst of noise and reverse order):",
+            "input is perturbed slightly (the band: the worst of three noise realisations and the "
+            "reverse order):",
             "",
             table(
                 (

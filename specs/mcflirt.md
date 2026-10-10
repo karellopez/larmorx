@@ -776,15 +776,18 @@ deviation as the primary metric there.
   unchanged: one-voxel crops of the field of view, ±0.5 LSB noise, reversing the volume
   order, a reference resampled by an identity transform. **(observed,** made by the clean-room
   implementer with `larmorx_validation.parity.mri_hmc_band`, outputs in
-  `oracles/fsl-6.0.7/mcflirt/band/`: mcflirt on its own input with uniform noise of ±0.5,
-  with the volumes in reverse order (separate reference only) and with the top slice cropped,
-  compared with its unperturbed matrices. On fMRIPrep's command for the nine real runs the
-  95th percentile of the RMS deviation is 0.015–0.10 mm (median 0.007–0.022 mm), and the FD
-  correlation is as low as 0.79 (ds000005) where the subject barely moves. `-meanvol` varies
-  more (ds000005: 0.054 mm; the synthetic series: 0.42 mm with noise), as do `-dof 12`
-  (0.26 mm) and the 10 × 10 × 8 image (0.26 mm). Cropping a slice of a thin image changes
-  the problem itself: mcflirt's matrices move by 7.5 mm (tiny image) and 99 mm (the series
-  with a non-zero background).**)**
+  `oracles/fsl-6.0.7/mcflirt/band/`: mcflirt on its own input with uniform noise of ±0.5
+  (three realisations), with the volumes in reverse order (separate reference only) and with
+  the top slice cropped, compared with its unperturbed matrices. On fMRIPrep's command for the
+  nine real runs the 95th percentile of the RMS deviation is 0.013–0.10 mm (median
+  0.008–0.022 mm) under noise and reverse order, and the FD correlation is as low as 0.79
+  (ds000005) where the subject barely moves. `-meanvol` varies more (ds000005: 0.054 mm; the
+  synthetic series: 0.27–0.42 mm with noise), as do `-dof 12` (0.10–0.26 mm with noise,
+  1.2 mm in reverse order) and the 10 × 10 × 8 image (0.26–0.36 mm). The synthetic series
+  with a non-zero background is unstable: one of the three noise realisations moves its
+  matrices by 4.0 mm (95th percentile). Cropping a slice of a thin image changes the problem
+  itself: mcflirt's matrices move by 7.5 mm (tiny image) and 99 mm (the series with a non-zero
+  background).**)**
 - Option changes measured on ds000005 (matrix RMS deviation from fMRIPrep's command, median /
   95th percentile, mm) **(observed)**: `-smooth 2` 0.009 / 0.023; `-rotation 2` 0.010 / 0.024;
   `-stages 2` 0.027 / 0.045; `-cost corratio` 0.028 / 0.050; `-stages 1` 0.045 / 0.062;

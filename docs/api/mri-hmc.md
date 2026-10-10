@@ -11,13 +11,20 @@ source code ([provenance](../../crates/larmorx-mri/PROVENANCE.md)). It is Apache
 named by what it does, not after the tool it is compatible with (decision D4).
 
 **Status: `validated`** against mcflirt itself: every recorded oracle run is replayed and
-compared ([validation record](../validation/mri-hmc.md)). The matrices differ from mcflirt's
-by less than mcflirt differs from itself when its input is perturbed slightly (half an
-intensity unit of noise, the volume order reversed, one slice cropped): on fMRIPrep's command
-for nine real runs, the 95th percentile of the matrix RMS deviation is
-**0.014–0.030 mm** (mcflirt's own band: 0.016–0.10 mm), and on each run it is below
-mcflirt's own. The numbers are in the record; the differences are explained under
+compared ([validation record](../validation/mri-hmc.md)). On fMRIPrep's command the matrices
+differ from mcflirt's by less than mcflirt differs from itself when its input is perturbed
+slightly (half an intensity unit of noise, the volume order reversed, one slice cropped): for
+nine real runs, the 95th percentile of the matrix RMS deviation is **0.014–0.030 mm**
+(mcflirt's own band: 0.016–0.10 mm), and on each run it is below mcflirt's own. The numbers are in the record; the differences are explained under
 [Agreement with mcflirt](#agreement-with-mcflirt).
+
+One of the 122 compared cases misses its threshold, by a hair: with mcflirt's default
+reference (the middle volume) on ds003345, the framewise displacement correlates with
+mcflirt's at r = 0.9885, where mcflirt against itself reaches 0.9888–0.9903 (three noise
+realisations and the cropped slice). The matrices of that run are at the edge of the band:
+the 95th percentile of the RMS deviation is 0.028 mm, against 0.025–0.026 mm for the noise
+realisations and 0.029 mm for the cropped slice (the threshold is 0.1 mm). The largest FD
+difference, 0.085 mm, is at a volume where the noise realisations move FD by 0.01–0.04 mm.
 
 ## Quick start
 
@@ -145,7 +152,8 @@ the scale of mcflirt's own sensitivity to its input:
 | larmorx against mcflirt | 0.014–0.030 mm | 0.854–0.999 |
 | mcflirt against itself, input perturbed slightly (the band) | 0.016–0.10 mm | 0.794–0.998 |
 
-On every run larmorx is closer to mcflirt than mcflirt is to itself; FD correlations are low
+With fMRIPrep's command, larmorx is closer to mcflirt than mcflirt is to itself on every run
+(with mcflirt's default reference, see the one marginal case above); FD correlations are low
 only for subjects that barely move (FD differences stay below 0.05 mm). On synthetic series
 with known motion, larmorx and mcflirt are equally accurate (mean RMS deviation from the
 truth 0.409 and 0.414 mm). 49 of the 11 271 matrix files compared are identical to mcflirt's as

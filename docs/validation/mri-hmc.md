@@ -7,7 +7,7 @@
 - **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
 - **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
 
-**fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band, worst of noise and reverse order):
+**fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band: the worst of three noise realisations and the reverse order):
 
 | Run | Volumes | RMS dev. median (mm) | 95th pct (mm) | mcflirt band 95th pct (mm) | Median Δparam (mm / °) | FD r | mcflirt band FD r |
 |---|---|---|---|---|---|---|---|
@@ -17,11 +17,11 @@
 | ds000210-rest-echo2 | 204 | 0.0130 | **0.0226** | 0.0229 | 0.0024 / 0.0039 | 0.9820 | 0.9799 |
 | ds000258-bigendian | 239 | 0.0103 | **0.0181** | 0.0193 | 0.0014 / 0.0021 | 0.9949 | 0.9949 |
 | ds003345 | 216 | 0.0141 | **0.0259** | 0.0299 | 0.0023 / 0.0040 | 0.9867 | 0.9840 |
-| ds005040 | 63 | 0.0135 | **0.0252** | 0.0254 | 0.0028 / 0.0032 | 0.8539 | 0.8238 |
-| ds006010 | 113 | 0.0073 | **0.0142** | 0.0161 | 0.0010 / 0.0010 | 0.9263 | 0.8857 |
+| ds005040 | 63 | 0.0135 | **0.0252** | 0.0257 | 0.0028 / 0.0032 | 0.8539 | 0.8238 |
+| ds006010 | 113 | 0.0073 | **0.0142** | 0.0164 | 0.0010 / 0.0010 | 0.9263 | 0.8514 |
 | ds006736 | 69 | 0.0121 | **0.0252** | 0.0259 | 0.0021 / 0.0038 | 0.9987 | 0.9974 |
 
-**All runs with `-mats`** (116): the worst 95th-percentile RMS deviation is 0.2811 mm and the worst median parameter difference 0.0103 mm / 0.0278° (thresholds per run: 0.1 mm and 0.05 mm / 0.05°, or mcflirt's band where wider; 24 runs use the band). 49 of 11271 matrix files are identical to mcflirt's as text (6 decimals).
+**All runs with `-mats`** (116): the worst 95th-percentile RMS deviation is 0.2811 mm and the worst median parameter difference 0.0103 mm / 0.0278° (thresholds per run: 0.1 mm and 0.05 mm / 0.05°, or mcflirt's band where wider; 25 runs use the band). 49 of 11271 matrix files are identical to mcflirt's as text (6 decimals).
 
 | Category | Runs | RMS dev. median (mm) | Worst 95th pct (mm) | Worst median Δparam (mm / °) | Max Δparam (mm / °) | Lowest FD r | Identical .mat |
 |---|---|---|---|---|---|---|---|
@@ -38,80 +38,136 @@
 
 ## mcflirt's own variability band
 
-mcflirt is deterministic, so its variability is measured by perturbing its input slightly and comparing its matrices with its own unperturbed ones (`python -m larmorx_validation.parity.mri_hmc_band`): uniform noise of ±0.5 intensity units, the volumes in reverse order (runs with a separate reference), the top slice cropped. Noise and reverse order set the widened thresholds; cropping changes the problem more (it breaks thin images) and is only reported.
+mcflirt is deterministic, so its variability is measured by perturbing its input slightly and comparing its matrices with its own unperturbed ones (`python -m larmorx_validation.parity.mri_hmc_band`): uniform noise of ±0.5 intensity units (three realisations: `noise`, `noise2`, `noise3`), the volumes in reverse order (runs with a separate reference), the top slice cropped. Noise and reverse order set the widened thresholds (the worst of them per run and metric); cropping changes the problem more (it breaks thin images) and is only reported.
 
 | Run | Perturbation | RMS dev. median (mm) | 95th pct (mm) | Median Δparam (mm / °) | FD r |
 |---|---|---|---|---|---|
 | `real/ds000005/default` | crop | 0.0119 | 0.0223 | 0.0028 / 0.0028 | 0.8700 |
 | `real/ds000005/default` | noise | 0.0113 | 0.0210 | 0.0020 / 0.0027 | 0.8749 |
+| `real/ds000005/default` | noise2 | 0.0120 | 0.0219 | 0.0022 / 0.0035 | 0.8855 |
+| `real/ds000005/default` | noise3 | 0.0111 | 0.0197 | 0.0019 / 0.0029 | 0.8984 |
 | `real/ds000005/fmriprep` | crop | 0.0114 | 0.0811 | 0.0025 / 0.0014 | 0.8979 |
 | `real/ds000005/fmriprep` | noise | 0.0097 | 0.0265 | 0.0017 / 0.0020 | 0.8941 |
+| `real/ds000005/fmriprep` | noise2 | 0.0078 | 0.0159 | 0.0010 / 0.0002 | 0.9279 |
+| `real/ds000005/fmriprep` | noise3 | 0.0077 | 0.0150 | 0.0010 / 0.0003 | 0.9279 |
 | `real/ds000005/fmriprep` | reverse | 0.0221 | 0.1014 | 0.0051 / 0.0068 | 0.7941 |
 | `real/ds000005/opt-meanvol` | crop | 0.0172 | 0.0328 | 0.0036 / 0.0051 | 0.7985 |
 | `real/ds000005/opt-meanvol` | noise | 0.0123 | 0.0233 | 0.0021 / 0.0036 | 0.8544 |
+| `real/ds000005/opt-meanvol` | noise2 | 0.0123 | 0.0211 | 0.0023 / 0.0039 | 0.8696 |
+| `real/ds000005/opt-meanvol` | noise3 | 0.0115 | 0.0229 | 0.0021 / 0.0029 | 0.9090 |
 | `real/ds000005/opt-meanvol` | reverse | 0.0253 | 0.0537 | 0.0051 / 0.0067 | 0.6737 |
 | `real/ds000117/default` | crop | 0.0143 | 0.0252 | 0.0033 / 0.0042 | 0.8357 |
 | `real/ds000117/default` | noise | 0.0131 | 0.0231 | 0.0026 / 0.0038 | 0.8592 |
+| `real/ds000117/default` | noise2 | 0.0122 | 0.0229 | 0.0024 / 0.0038 | 0.8898 |
+| `real/ds000117/default` | noise3 | 0.0125 | 0.0224 | 0.0024 / 0.0038 | 0.8668 |
 | `real/ds000117/fmriprep` | crop | 0.0128 | 0.0207 | 0.0035 / 0.0038 | 0.9046 |
 | `real/ds000117/fmriprep` | noise | 0.0118 | 0.0194 | 0.0026 / 0.0034 | 0.9024 |
+| `real/ds000117/fmriprep` | noise2 | 0.0116 | 0.0202 | 0.0026 / 0.0034 | 0.8860 |
+| `real/ds000117/fmriprep` | noise3 | 0.0114 | 0.0200 | 0.0023 / 0.0037 | 0.9122 |
 | `real/ds000117/fmriprep` | reverse | 0.0138 | 0.0203 | 0.0036 / 0.0041 | 0.8720 |
 | `real/ds000122/default` | crop | 0.0172 | 0.0321 | 0.0029 / 0.0055 | 0.9983 |
 | `real/ds000122/default` | noise | 0.0156 | 0.0284 | 0.0023 / 0.0050 | 0.9990 |
+| `real/ds000122/default` | noise2 | 0.0158 | 0.0276 | 0.0026 / 0.0045 | 0.9987 |
+| `real/ds000122/default` | noise3 | 0.0154 | 0.0289 | 0.0023 / 0.0047 | 0.9989 |
 | `real/ds000122/fmriprep` | crop | 0.0193 | 0.0343 | 0.0043 / 0.0062 | 0.9982 |
 | `real/ds000122/fmriprep` | noise | 0.0168 | 0.0278 | 0.0025 / 0.0051 | 0.9983 |
+| `real/ds000122/fmriprep` | noise2 | 0.0150 | 0.0272 | 0.0023 / 0.0050 | 0.9985 |
+| `real/ds000122/fmriprep` | noise3 | 0.0157 | 0.0271 | 0.0026 / 0.0050 | 0.9983 |
 | `real/ds000122/fmriprep` | reverse | 0.0187 | 0.0312 | 0.0042 / 0.0073 | 0.9977 |
 | `real/ds000210-rest-echo2/default` | crop | 0.0125 | 0.0224 | 0.0030 / 0.0037 | 0.9413 |
 | `real/ds000210-rest-echo2/default` | noise | 0.0105 | 0.0216 | 0.0022 / 0.0031 | 0.9935 |
+| `real/ds000210-rest-echo2/default` | noise2 | 0.0108 | 0.0204 | 0.0023 / 0.0032 | 0.9920 |
+| `real/ds000210-rest-echo2/default` | noise3 | 0.0104 | 0.0221 | 0.0021 / 0.0034 | 0.9923 |
 | `real/ds000210-rest-echo2/fmriprep` | crop | 0.0128 | 0.0238 | 0.0025 / 0.0047 | 0.9854 |
 | `real/ds000210-rest-echo2/fmriprep` | noise | 0.0122 | 0.0226 | 0.0022 / 0.0037 | 0.9820 |
+| `real/ds000210-rest-echo2/fmriprep` | noise2 | 0.0126 | 0.0228 | 0.0026 / 0.0036 | 0.9850 |
+| `real/ds000210-rest-echo2/fmriprep` | noise3 | 0.0121 | 0.0221 | 0.0024 / 0.0041 | 0.9846 |
 | `real/ds000210-rest-echo2/fmriprep` | reverse | 0.0151 | 0.0229 | 0.0036 / 0.0051 | 0.9799 |
 | `real/ds000258-bigendian/default` | crop | 0.0129 | 0.0210 | 0.0030 / 0.0042 | 0.9938 |
 | `real/ds000258-bigendian/default` | noise | 0.0095 | 0.0181 | 0.0012 / 0.0026 | 0.9956 |
+| `real/ds000258-bigendian/default` | noise2 | 0.0101 | 0.0184 | 0.0011 / 0.0027 | 0.9951 |
+| `real/ds000258-bigendian/default` | noise3 | 0.0100 | 0.0186 | 0.0016 / 0.0025 | 0.9948 |
 | `real/ds000258-bigendian/fmriprep` | crop | 0.0147 | 0.0271 | 0.0034 / 0.0052 | 0.9932 |
 | `real/ds000258-bigendian/fmriprep` | noise | 0.0099 | 0.0188 | 0.0015 / 0.0029 | 0.9953 |
+| `real/ds000258-bigendian/fmriprep` | noise2 | 0.0100 | 0.0185 | 0.0014 / 0.0025 | 0.9957 |
+| `real/ds000258-bigendian/fmriprep` | noise3 | 0.0096 | 0.0174 | 0.0015 / 0.0025 | 0.9955 |
 | `real/ds000258-bigendian/fmriprep` | reverse | 0.0118 | 0.0193 | 0.0025 / 0.0040 | 0.9949 |
 | `real/ds003345/default` | crop | 0.0145 | 0.0293 | 0.0030 / 0.0044 | 0.9888 |
 | `real/ds003345/default` | noise | 0.0138 | 0.0249 | 0.0022 / 0.0041 | 0.9893 |
+| `real/ds003345/default` | noise2 | 0.0136 | 0.0256 | 0.0026 / 0.0039 | 0.9899 |
+| `real/ds003345/default` | noise3 | 0.0143 | 0.0261 | 0.0022 / 0.0042 | 0.9903 |
 | `real/ds003345/fmriprep` | crop | 0.0152 | 0.0278 | 0.0031 / 0.0046 | 0.9860 |
 | `real/ds003345/fmriprep` | noise | 0.0144 | 0.0254 | 0.0024 / 0.0037 | 0.9872 |
+| `real/ds003345/fmriprep` | noise2 | 0.0143 | 0.0253 | 0.0028 / 0.0042 | 0.9870 |
+| `real/ds003345/fmriprep` | noise3 | 0.0145 | 0.0282 | 0.0024 / 0.0039 | 0.9866 |
 | `real/ds003345/fmriprep` | reverse | 0.0174 | 0.0299 | 0.0039 / 0.0058 | 0.9840 |
 | `real/ds005040/default` | crop | 0.0140 | 0.0232 | 0.0029 / 0.0043 | 0.8423 |
 | `real/ds005040/default` | noise | 0.0150 | 0.0259 | 0.0031 / 0.0044 | 0.8091 |
+| `real/ds005040/default` | noise2 | 0.0144 | 0.0233 | 0.0025 / 0.0033 | 0.8271 |
+| `real/ds005040/default` | noise3 | 0.0172 | 0.0263 | 0.0032 / 0.0052 | 0.8618 |
 | `real/ds005040/fmriprep` | crop | 0.0124 | 0.0227 | 0.0020 / 0.0028 | 0.8663 |
 | `real/ds005040/fmriprep` | noise | 0.0124 | 0.0213 | 0.0022 / 0.0038 | 0.8529 |
+| `real/ds005040/fmriprep` | noise2 | 0.0119 | 0.0233 | 0.0023 / 0.0032 | 0.9021 |
+| `real/ds005040/fmriprep` | noise3 | 0.0137 | 0.0257 | 0.0021 / 0.0042 | 0.8275 |
 | `real/ds005040/fmriprep` | reverse | 0.0160 | 0.0254 | 0.0038 / 0.0047 | 0.8238 |
 | `real/ds006010/default` | crop | 0.0059 | 0.0147 | 0.0009 / 0.0002 | 0.9208 |
 | `real/ds006010/default` | noise | 0.0063 | 0.0135 | 0.0008 / 0.0002 | 0.9191 |
+| `real/ds006010/default` | noise2 | 0.0060 | 0.0140 | 0.0007 / 0.0001 | 0.9074 |
+| `real/ds006010/default` | noise3 | 0.0066 | 0.0165 | 0.0006 / 0.0001 | 0.9229 |
 | `real/ds006010/fmriprep` | crop | 0.0073 | 0.0131 | 0.0008 / 0.0007 | 0.9320 |
 | `real/ds006010/fmriprep` | noise | 0.0086 | 0.0161 | 0.0019 / 0.0021 | 0.8857 |
+| `real/ds006010/fmriprep` | noise2 | 0.0087 | 0.0164 | 0.0021 / 0.0026 | 0.8514 |
+| `real/ds006010/fmriprep` | noise3 | 0.0081 | 0.0133 | 0.0016 / 0.0016 | 0.8899 |
 | `real/ds006010/fmriprep` | reverse | 0.0087 | 0.0151 | 0.0019 / 0.0030 | 0.9004 |
 | `real/ds006736/default` | crop | 0.0106 | 0.0210 | 0.0020 / 0.0032 | 0.9989 |
 | `real/ds006736/default` | noise | 0.0097 | 0.0233 | 0.0018 / 0.0018 | 0.9989 |
+| `real/ds006736/default` | noise2 | 0.0109 | 0.0185 | 0.0024 / 0.0026 | 0.9989 |
+| `real/ds006736/default` | noise3 | 0.0103 | 0.0210 | 0.0018 / 0.0014 | 0.9989 |
 | `real/ds006736/fmriprep` | crop | 0.0128 | 0.0225 | 0.0020 / 0.0030 | 0.9991 |
 | `real/ds006736/fmriprep` | noise | 0.0117 | 0.0231 | 0.0019 / 0.0036 | 0.9990 |
+| `real/ds006736/fmriprep` | noise2 | 0.0110 | 0.0211 | 0.0018 / 0.0024 | 0.9989 |
+| `real/ds006736/fmriprep` | noise3 | 0.0137 | 0.0212 | 0.0023 / 0.0036 | 0.9984 |
 | `real/ds006736/fmriprep` | reverse | 0.0154 | 0.0259 | 0.0035 / 0.0059 | 0.9974 |
 | `syn/content/background/default` | crop | 38.4359 | 98.9725 | 0.0421 / 0.2072 | -0.1239 |
 | `syn/content/background/default` | noise | 0.0520 | 0.0879 | 0.0057 / 0.0142 | 1.0000 |
+| `syn/content/background/default` | noise2 | 0.0717 | 3.9616 | 0.0122 / 0.0297 | 1.0000 |
+| `syn/content/background/default` | noise3 | 0.0516 | 0.0838 | 0.0043 / 0.0273 | 1.0000 |
 | `syn/geometry/tiny/default` | crop | 3.4466 | 7.5313 | 0.1260 / 2.0623 | 0.2370 |
 | `syn/geometry/tiny/default` | noise | 0.0926 | 0.2606 | 0.0057 / 0.0397 | 0.9963 |
+| `syn/geometry/tiny/default` | noise2 | 0.1571 | 0.2831 | 0.0027 / 0.0992 | 0.9972 |
+| `syn/geometry/tiny/default` | noise3 | 0.0887 | 0.3600 | 0.0025 / 0.0479 | 0.9980 |
 | `syn/motion/identical-copies/reffile` | crop | 0.0321 | 0.0579 | 0.0033 / 0.0167 | 0.6482 |
 | `syn/motion/identical-copies/reffile` | noise | 0.0383 | 0.0549 | 0.0040 / 0.0163 | 0.2677 |
+| `syn/motion/identical-copies/reffile` | noise2 | 0.0349 | 0.0627 | 0.0029 / 0.0144 | 0.8228 |
+| `syn/motion/identical-copies/reffile` | noise3 | 0.0425 | 0.0650 | 0.0022 / 0.0148 | 0.7315 |
 | `syn/motion/identical-copies/reffile` | reverse | 0.0299 | 0.0597 | 0.0023 / 0.0104 | 0.8523 |
 | `syn/motion/large/reffile` | crop | 0.0285 | 0.0873 | 0.0035 / 0.0110 | 0.9992 |
 | `syn/motion/large/reffile` | noise | 0.0283 | 0.0434 | 0.0022 / 0.0157 | 0.9996 |
+| `syn/motion/large/reffile` | noise2 | 0.0288 | 0.0484 | 0.0037 / 0.0105 | 0.9995 |
+| `syn/motion/large/reffile` | noise3 | 0.0354 | 0.0557 | 0.0041 / 0.0097 | 0.9993 |
 | `syn/motion/large/reffile` | reverse | 0.0258 | 0.0887 | 0.0040 / 0.0078 | 0.9991 |
 | `syn/motion/small/default` | crop | 0.0294 | 0.0550 | 0.0037 / 0.0133 | 0.9983 |
 | `syn/motion/small/default` | noise | 0.0232 | 0.0404 | 0.0013 / 0.0094 | 0.9994 |
+| `syn/motion/small/default` | noise2 | 0.0188 | 0.0558 | 0.0014 / 0.0057 | 0.9974 |
+| `syn/motion/small/default` | noise3 | 0.0249 | 0.0436 | 0.0013 / 0.0067 | 0.9980 |
 | `syn/motion/small/dof12` | crop | 0.0699 | 0.1686 | 0.0087 / 0.0368 | 0.9946 |
 | `syn/motion/small/dof12` | noise | 0.0818 | 0.2561 | 0.0070 / 0.0412 | 0.9932 |
+| `syn/motion/small/dof12` | noise2 | 0.0767 | 0.1991 | 0.0070 / 0.0437 | 0.9904 |
+| `syn/motion/small/dof12` | noise3 | 0.0449 | 0.0969 | 0.0037 / 0.0209 | 0.9979 |
 | `syn/motion/small/dof12` | reverse | 0.4105 | 1.1565 | 0.0278 / 0.0734 | 0.8346 |
 | `syn/motion/small/dof7` | crop | 0.0345 | 0.0663 | 0.0033 / 0.0151 | 0.9982 |
 | `syn/motion/small/dof7` | noise | 0.0303 | 0.0715 | 0.0033 / 0.0160 | 0.9973 |
+| `syn/motion/small/dof7` | noise2 | 0.0423 | 0.0759 | 0.0041 / 0.0252 | 0.9973 |
+| `syn/motion/small/dof7` | noise3 | 0.0366 | 0.0752 | 0.0029 / 0.0223 | 0.9968 |
 | `syn/motion/small/dof7` | reverse | 0.0426 | 0.0599 | 0.0036 / 0.0200 | 0.9968 |
 | `syn/motion/small/meanvol` | crop | 0.0280 | 0.6967 | 0.0044 / 0.0106 | 0.8475 |
 | `syn/motion/small/meanvol` | noise | 0.0249 | 0.4161 | 0.0036 / 0.0107 | 0.9015 |
+| `syn/motion/small/meanvol` | noise2 | 0.0399 | 0.2731 | 0.0053 / 0.0121 | 0.9364 |
+| `syn/motion/small/meanvol` | noise3 | 0.0275 | 0.4177 | 0.0020 / 0.0157 | 0.9164 |
 | `syn/motion/small/reffile` | crop | 0.0317 | 0.0606 | 0.0023 / 0.0143 | 0.9984 |
 | `syn/motion/small/reffile` | noise | 0.0291 | 0.0749 | 0.0033 / 0.0148 | 0.9944 |
+| `syn/motion/small/reffile` | noise2 | 0.0332 | 0.0869 | 0.0021 / 0.0098 | 0.9957 |
+| `syn/motion/small/reffile` | noise3 | 0.0358 | 0.0660 | 0.0044 / 0.0180 | 0.9972 |
 | `syn/motion/small/reffile` | reverse | 0.0289 | 0.1068 | 0.0041 / 0.0125 | 0.9942 |
 
 ## Thresholds
@@ -175,7 +231,7 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (fc392f579ce7) |
+| larmorx | 0.0.1 (5e7fb83f1fa2-dirty) |
 | larmorx-testdata | 28167dea9be5 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

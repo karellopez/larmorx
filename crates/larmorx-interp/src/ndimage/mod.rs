@@ -210,19 +210,33 @@ macro_rules! output_uint {
     )*};
 }
 macro_rules! output_int {
-    ($($t:ty),*) => {$(
+    ($cast:ident: $($t:ty),*) => {$(
         impl Output for $t {
             fn from_interp(t: f64) -> Self {
                 let mut t = if t > 0.0 { t + 0.5 } else { t - 0.5 };
                 if t > <$t>::MAX as f64 { t = <$t>::MAX as f64; }
                 if t < <$t>::MIN as f64 { t = <$t>::MIN as f64; }
-                c_cast_i64(t) as $t
+                // Only NaN reaches the cast out of range.
+                $cast(t) as $t
             }
         }
     )*};
 }
 output_uint!(u8, u16, u32, u64);
-output_int!(i8, i16, i32, i64);
+// GCC converts to the narrow types through a 32-bit `cvttsd2si`, to int64 through a 64-bit one.
+output_int!(c_cast_i32: i8, i16, i32);
+output_int!(c_cast_i64: i64);
+
+/// C's `(int)x` as x86-64 executes it: truncation toward zero, and `i32::MIN` for NaN and
+/// values outside the range of `i32`.
+#[inline(always)]
+pub(crate) fn c_cast_i32(x: f64) -> i32 {
+    if x.is_nan() || x >= 2_147_483_648.0 || x < -2_147_483_648.0 {
+        i32::MIN
+    } else {
+        x as i32
+    }
+}
 
 /// C's `(npy_intp)x` as x86-64 executes it (`cvttsd2si`): truncation toward zero, and
 /// `i64::MIN` for NaN and values outside the range of `i64` (undefined behaviour in C).

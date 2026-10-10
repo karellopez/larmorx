@@ -25,6 +25,7 @@ Thresholds follow PLAN.md §11.3; the report lists them. Suites so far:
 | Suite | larmorx | Reference |
 |---|---|---|
 | `nifti-io` | `larmorx.io.load` / `save` | nibabel |
+| `resample-series` | `lx.transforms.resample_series`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms, SciPy (in-process) |
 
 ## Benchmarks
 

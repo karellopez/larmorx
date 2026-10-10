@@ -154,7 +154,7 @@ def _ndimage_case(mode: str, order: int, checks: CheckList) -> None:
     for shape, data, coords in _ndimage_inputs(rng):
         for prefilter in (True, False):
             for cval in (0.0, -3.5):
-                for out in (None, np.float32, np.float64, np.int16):
+                for out in (None, np.float32, np.float64, np.int16, np.int32, np.uint8):
                     kw = dict(order=order, mode=mode, cval=cval, prefilter=prefilter)
                     ref = ndi.map_coordinates(data, coords, output=out, **kw)
                     got = lx.ndimage.map_coordinates(data, coords, output=out, **kw)
@@ -529,7 +529,8 @@ def cases(tier: str) -> list[Case]:
         )
     )
     for cid, spec, desc in _NITRANSFORMS:
-        out.append(Case(f"nitransforms/{cid}", "nitransforms", desc, ("nitransforms", spec)))
+        if _TIERS.index(spec.get("tier", "smoke")) <= rank:
+            out.append(Case(f"nitransforms/{cid}", "nitransforms", desc, ("nitransforms", spec)))
     for target in _NDCOORDS:
         out.append(
             Case(

@@ -27,3 +27,5 @@ noted.
 | [antspy.md](antspy.md) | ANTsPy as an oracle: defaults and quirks of its wrappers |
 | [nibabel.md](nibabel.md) | nibabel as the reference for NIfTI I/O |
 | [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`: glibc vs the `libm` crate, and what it does to bit parity |
+| [scipy-ndimage.md](scipy-ndimage.md) | SciPy's `map_coordinates` and spline prefilter: padding, boundary rules, summation order, undefined behaviour |
+| [fmriprep-resampling.md](fmriprep-resampling.md) | fMRIPrep's one-shot resampler and nitransforms: float32 coordinates, BLAS fused products, voxel-shift map, Jacobian, displacement fields |

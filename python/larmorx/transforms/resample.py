@@ -179,7 +179,8 @@ def _source(
     data, affine, axcodes = np.asarray(img.data), np.asarray(img.affine, dtype=np.float64), ()
     if reorient:
         data, affine, axcodes = ensure_positive_cosines(data, affine)
-    return np.asarray(data, dtype=np.float32), affine, img.header, axcodes
+    # Fortran order (as read from files) lets Rust use the memory without another copy.
+    return np.asfortranarray(data, dtype=np.float32), affine, img.header, axcodes
 
 
 def _fieldmap(fieldmap: Any, shape: tuple[int, int, int]) -> np.ndarray:
@@ -191,7 +192,7 @@ def _fieldmap(fieldmap: Any, shape: tuple[int, int, int]) -> np.ndarray:
         data = fieldmap
     else:
         data = as_image(fieldmap).data
-    data = np.asarray(data, dtype=np.float32)
+    data = np.asfortranarray(data, dtype=np.float32)
     if data.shape[:3] != shape or (data.ndim > 3 and int(np.prod(data.shape[3:])) != 1):
         raise ValueError(f"the field map has shape {data.shape}, the target grid {shape}")
     return data.reshape(shape)

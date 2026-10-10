@@ -145,6 +145,9 @@ fn c_casts_follow_x86_64() {
     assert_eq!(<i16 as Output>::from_interp(-2.5), -3);
     assert_eq!(<u8 as Output>::from_interp(300.0), 255);
     assert_eq!(<u8 as Output>::from_interp(f64::NAN), 0);
+    assert_eq!(<i16 as Output>::from_interp(f64::NAN), 0);
+    assert_eq!(<i32 as Output>::from_interp(f64::NAN), i32::MIN);
+    assert_eq!(<i64 as Output>::from_interp(f64::NAN), i64::MIN);
 }
 
 #[test]

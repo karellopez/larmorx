@@ -237,6 +237,29 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   were recovered from the session transcripts and re-verified bit-exact. From now on, work
   that must leave the build is archived, never deleted.
 
+## 2026-10-10: The one-shot BOLD resampler is `lx.transforms.resample_series`; SciPy's interpolation is `lx.ndimage`
+- **Name.** PLAN.md §9.2 wrote `xfm.resample_series`. The public module for transforms already
+  exists, `lx.transforms`, so the resampler lives there: `lx.transforms.resample_series`, with
+  the chain types it needs (`load_transforms`, `Affine`, `AffineSeries`, `DenseField`,
+  `TransformChain`). `lx.transforms` became a package; the ITK-file API (`read`, `write`,
+  `ItkTransform`) is unchanged. There is no `lx.xfm`.
+- **SciPy's `map_coordinates` gets its own module, `lx.ndimage`,** named after `scipy.ndimage`
+  so that code ported from SciPy users reads the same. It is a tool of its own (orders 0–5,
+  every boundary mode), not only an internal of the resampler.
+- **A replica, exact by default.** fMRIPrep (Apache-2.0), nitransforms (MIT), SciPy
+  (BSD-3-Clause) and nibabel (MIT) are permissive, so the code is ported line by line into the
+  main package with their notices. Every output is bit-identical to fMRIPrep's on the
+  validation set. The speed comes from restructuring (coordinates once per run, one prefilter
+  per volume, a fused per-voxel pass, threads), not from changing arithmetic, so there is no
+  separate "fast" mode (D11). A separable interpolation would be several times faster still,
+  but changes the last bits; it can become the default once its effect is measured against
+  the band (PLAN.md §11.3).
+- **The 4×4 matrices stay in numpy.** Inverses and products of 4×4 matrices are computed by the
+  Python layer with the same numpy expressions as nitransforms and fMRIPrep, so they carry
+  numpy's (LAPACK/BLAS) bits on each machine; porting OpenBLAS's `dgesv` was not worth it. The
+  Rust API takes the matrices as inputs.
+- **No command line**, because fMRIPrep has none for this step (a nipype interface).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

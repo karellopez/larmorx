@@ -18,7 +18,7 @@ PARITY_SUITES = (
     "afni-tshift",
     "resample-series",
 )
-BENCH_SUITES = ("nifti-io", "ants-apply-transforms", "afni-tshift")
+BENCH_SUITES = ("nifti-io", "ants-apply-transforms", "afni-tshift", "resample-series")
 
 
 def _parity_suite(name: str):
@@ -136,6 +136,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
         from larmorx_validation.bench import ants_apply_transforms as bench
     elif args.suite == "afni-tshift":
         from larmorx_validation.bench import afni_tshift as bench
+    elif args.suite == "resample-series":
+        from larmorx_validation.bench import resample_series as bench
     else:
         raise SystemExit(f"unknown benchmark suite {args.suite!r}; choose from {BENCH_SUITES}")
     return bench.main(args)

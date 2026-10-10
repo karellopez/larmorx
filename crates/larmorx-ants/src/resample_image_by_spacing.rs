@@ -20,7 +20,8 @@ use larmorx_image::gaussian::{GaussianOrder, recursive_gaussian};
 use larmorx_io::nifti::itk::ItkGeometry;
 
 use crate::image::AntsImage;
-use crate::resample::{ResampleError, ResampleInterpolation, resample_identity};
+use crate::resample::{ResampleError, resample_identity};
+use larmorx_interp::Interpolation;
 
 /// The parameters of [`resample_image_by_spacing`].
 #[derive(Clone, Debug, PartialEq)]
@@ -129,16 +130,19 @@ pub fn resample_image_by_spacing(
     }
     let source = smoothed.as_deref().unwrap_or(&input.data);
     let interpolation = if options.nearest {
-        ResampleInterpolation::NearestNeighbor
+        Interpolation::NearestNeighbor
     } else {
-        ResampleInterpolation::Linear
+        Interpolation::Linear
     };
+    // `ResampleImageFilter<float, float>`: the double result cast to float (a linear or
+    // nearest value of float voxels is always within float's range).
     let data = resample_identity(
         source,
         &input.geometry,
         &plan.geometry,
-        interpolation,
+        &interpolation,
         default_value,
+        |v| v as f32,
         n_threads,
     )?;
     debug_assert_eq!(plan.geometry.ndim, d);

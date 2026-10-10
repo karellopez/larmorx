@@ -118,6 +118,32 @@ pub trait Pixel: Element + Copy + Send + Sync + 'static {
             .map(|&x| Self::from_f64(x))
             .collect()
     }
+
+    /// ITK's `CastPixelWithBoundsChecking` (the resampler's output): `v` clamped to the
+    /// type's range (`NonpositiveMin` to `max`, compared in double), then a `static_cast`.
+    fn from_f64_bounded(v: f64) -> Self;
+}
+
+/// x86-64's conversion of a double to a 64-bit integer (`cvttsd2si` with a 64-bit
+/// destination, which GCC uses for `unsigned int`): truncation, with NaN and values out of
+/// range giving `i64::MIN`.
+pub fn x86_to_i64(v: f64) -> i64 {
+    if v.is_nan() || v >= 9_223_372_036_854_775_808.0 || v < -9_223_372_036_854_775_808.0 {
+        i64::MIN
+    } else {
+        v as i64
+    }
+}
+
+/// `v` clamped to `[min, max]` as ITK's `CastPixelWithBoundsChecking` compares (NaN passes).
+fn bounded(v: f64, min: f64, max: f64) -> f64 {
+    if v < min {
+        min
+    } else if v > max {
+        max
+    } else {
+        v
+    }
 }
 
 /// x86-64's conversion of a double to a 32-bit integer (`cvttsd2si`): truncation, with NaN
@@ -135,6 +161,9 @@ impl Pixel for f32 {
     fn from_f32(v: f32) -> Self {
         v
     }
+    fn from_f64_bounded(v: f64) -> Self {
+        bounded(v, -f64::from(f32::MAX), f64::from(f32::MAX)) as f32
+    }
     fn from_f64(v: f64) -> Self {
         v as f32
     }
@@ -147,6 +176,9 @@ impl Pixel for f32 {
 impl Pixel for f64 {
     fn from_f32(v: f32) -> Self {
         f64::from(v)
+    }
+    fn from_f64_bounded(v: f64) -> Self {
+        bounded(v, -f64::MAX, f64::MAX)
     }
     fn from_f64(v: f64) -> Self {
         v
@@ -161,17 +193,44 @@ impl Pixel for i32 {
     fn from_f32(v: f32) -> Self {
         x86_to_i32(f64::from(v))
     }
+    fn from_f64_bounded(v: f64) -> Self {
+        x86_to_i32(bounded(v, f64::from(i32::MIN), f64::from(i32::MAX)))
+    }
     fn from_f64(v: f64) -> Self {
         x86_to_i32(v)
     }
 }
 
-impl Pixel for u8 {
+/// Integer pixels that a C++ `static_cast` from `float`/`double` fills with the low bits of
+/// x86-64's 32-bit truncation (`char`, `unsigned char`, `short`, `unsigned short`).
+macro_rules! small_int_pixel {
+    ($($t:ty),*) => {$(
+        impl Pixel for $t {
+            fn from_f32(v: f32) -> Self {
+                x86_to_i32(f64::from(v)) as $t
+            }
+            fn from_f64(v: f64) -> Self {
+                x86_to_i32(v) as $t
+            }
+            fn from_f64_bounded(v: f64) -> Self {
+                x86_to_i32(bounded(v, f64::from(<$t>::MIN), f64::from(<$t>::MAX))) as $t
+            }
+        }
+    )*};
+}
+
+small_int_pixel!(u8, i8, i16, u16);
+
+/// `unsigned int`: GCC converts through a 64-bit truncation and keeps the low 32 bits.
+impl Pixel for u32 {
     fn from_f32(v: f32) -> Self {
-        x86_to_i32(f64::from(v)) as u8
+        x86_to_i64(f64::from(v)) as u32
     }
     fn from_f64(v: f64) -> Self {
-        x86_to_i32(v) as u8
+        x86_to_i64(v) as u32
+    }
+    fn from_f64_bounded(v: f64) -> Self {
+        x86_to_i64(bounded(v, 0.0, f64::from(u32::MAX))) as u32
     }
 }
 
@@ -214,6 +273,10 @@ pub enum OutputImage {
     F64(AntsImage<f64>),
     I32(AntsImage<i32>),
     U8(AntsImage<u8>),
+    I8(AntsImage<i8>),
+    I16(AntsImage<i16>),
+    U16(AntsImage<u16>),
+    U32(AntsImage<u32>),
 }
 
 impl From<AntsImage<f32>> for OutputImage {
@@ -236,6 +299,26 @@ impl From<AntsImage<u8>> for OutputImage {
         OutputImage::U8(i)
     }
 }
+impl From<AntsImage<i8>> for OutputImage {
+    fn from(i: AntsImage<i8>) -> Self {
+        OutputImage::I8(i)
+    }
+}
+impl From<AntsImage<i16>> for OutputImage {
+    fn from(i: AntsImage<i16>) -> Self {
+        OutputImage::I16(i)
+    }
+}
+impl From<AntsImage<u16>> for OutputImage {
+    fn from(i: AntsImage<u16>) -> Self {
+        OutputImage::U16(i)
+    }
+}
+impl From<AntsImage<u32>> for OutputImage {
+    fn from(i: AntsImage<u32>) -> Self {
+        OutputImage::U32(i)
+    }
+}
 
 impl OutputImage {
     pub fn geometry(&self) -> &ItkGeometry {
@@ -244,6 +327,10 @@ impl OutputImage {
             OutputImage::F64(i) => &i.geometry,
             OutputImage::I32(i) => &i.geometry,
             OutputImage::U8(i) => &i.geometry,
+            OutputImage::I8(i) => &i.geometry,
+            OutputImage::I16(i) => &i.geometry,
+            OutputImage::U16(i) => &i.geometry,
+            OutputImage::U32(i) => &i.geometry,
         }
     }
 }
@@ -413,6 +500,10 @@ impl ImageStore for FileStore {
             OutputImage::F64(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
             OutputImage::I32(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
             OutputImage::U8(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
+            OutputImage::I8(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
+            OutputImage::I16(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
+            OutputImage::U16(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
+            OutputImage::U32(i) => write_itk_image(name, &i.geometry, &i.meta, &i.data, &options),
         };
         result.map_err(|e| e.to_string())
     }

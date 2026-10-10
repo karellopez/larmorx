@@ -11,7 +11,7 @@
 //!   number or an image file.
 //! - [`format_g`]: `std::cout << value` for `float` and `double` (`%g` with 6 significant
 //!   digits).
-//! - [`convert_vector_f32`]: ANTs' `ConvertVector<float>` (`1.5x1x2`).
+//! - [`convert_vector_f32`], [`convert_vector_f64`]: ANTs' `ConvertVector` (`1.5x1x2`).
 //! - [`stof`]: `std::stof`, which throws when there is no number.
 
 pub use super::parser::atof;
@@ -54,6 +54,30 @@ pub struct StreamFloat {
 /// sign); the stream is at its end only if every character was taken. The collected text is
 /// converted as `strtof` does, and must be consumed entirely.
 pub fn from_string_f32(s: &str) -> StreamFloat {
+    match stream_text(s) {
+        None => StreamFloat {
+            is_number: true,
+            value: None,
+        },
+        Some((is_number, text)) => StreamFloat {
+            is_number,
+            value: Some(strtof_whole(&text)),
+        },
+    }
+}
+
+/// [`from_string_f32`] for `double` (`istringstream >> double`, converted as `strtod`):
+/// `(is_number, value)`, the value `None` when untouched.
+pub fn from_string_f64(s: &str) -> (bool, Option<f64>) {
+    match stream_text(s) {
+        None => (true, None),
+        Some((is_number, text)) => (is_number, Some(strtod_whole(&text))),
+    }
+}
+
+/// The characters `num_get::_M_extract_float` collects from `s` and whether it reached the
+/// end; `None` when there is nothing but whitespace (the sentry fails, the value is untouched).
+fn stream_text(s: &str) -> Option<(bool, String)> {
     let is_space = |c: u8| matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r');
     let bytes = s.as_bytes();
     let mut i = 0;
@@ -61,11 +85,7 @@ pub fn from_string_f32(s: &str) -> StreamFloat {
         i += 1;
     }
     if i == bytes.len() {
-        // The sentry hits the end while skipping whitespace: eof and fail, value untouched.
-        return StreamFloat {
-            is_number: true,
-            value: None,
-        };
+        return None;
     }
     let mut text = String::new();
     if matches!(bytes[i], b'+' | b'-') {
@@ -95,10 +115,7 @@ pub fn from_string_f32(s: &str) -> StreamFloat {
         }
         i += 1;
     }
-    StreamFloat {
-        is_number: i == bytes.len(),
-        value: Some(strtof_whole(&text)),
-    }
+    Some((i == bytes.len(), text))
 }
 
 /// ANTs' `ConvertVector<float>` (`Examples/antsUtilities.h`): the text split at every `x`,
@@ -111,6 +128,19 @@ pub fn convert_vector_f32(s: &str) -> Option<Vec<f32>> {
     let mut out = Vec::new();
     for piece in s.split('x') {
         if let Some(v) = from_string_f32(piece).value {
+            value = Some(v);
+        }
+        out.push(value?);
+    }
+    Some(out)
+}
+
+/// ANTs' `ConvertVector<double>`: [`convert_vector_f32`] read as `double`.
+pub fn convert_vector_f64(s: &str) -> Option<Vec<f64>> {
+    let mut value: Option<f64> = None;
+    let mut out = Vec::new();
+    for piece in s.split('x') {
+        if let Some(v) = from_string_f64(piece).1 {
             value = Some(v);
         }
         out.push(value?);
@@ -187,9 +217,9 @@ pub fn stof(s: &str) -> Option<f32> {
     v.is_finite().then_some(v)
 }
 
-/// libstdc++'s `__convert_to_v` for float: `strtof` must consume the whole text (else 0);
-/// overflow gives `±FLT_MAX`.
-fn strtof_whole(text: &str) -> f32 {
+/// The text `strtof`/`strtod` would consume entirely, in a form Rust's parser reads; `None`
+/// where they would not consume it all (libstdc++ then stores 0).
+fn normalized_number(text: &str) -> Option<String> {
     let b = text.as_bytes();
     let mut i = usize::from(matches!(b.first(), Some(b'+' | b'-')));
     let mut digits = 0;
@@ -209,7 +239,7 @@ fn strtof_whole(text: &str) -> f32 {
         }
     }
     if digits == 0 {
-        return 0.0;
+        return None;
     }
     if i < b.len() {
         // An exponent: it needs at least one digit after the optional sign.
@@ -218,7 +248,7 @@ fn strtof_whole(text: &str) -> f32 {
             j += 1;
         }
         if j == b.len() || !b[j..].iter().all(u8::is_ascii_digit) {
-            return 0.0;
+            return None;
         }
         normalized.push_str(&text[i..]);
     }
@@ -228,16 +258,37 @@ fn strtof_whole(text: &str) -> f32 {
     if normalized.starts_with('.') || normalized.starts_with("+.") || normalized.starts_with("-.") {
         normalized = normalized.replacen('.', "0.", 1);
     }
-    match normalized.parse::<f32>() {
-        Ok(v) if v.is_infinite() => {
+    Some(normalized)
+}
+
+/// libstdc++'s `__convert_to_v` for float: `strtof` must consume the whole text (else 0);
+/// overflow gives `±FLT_MAX`.
+fn strtof_whole(text: &str) -> f32 {
+    match normalized_number(text).map(|n| n.parse::<f32>()) {
+        Some(Ok(v)) if v.is_infinite() => {
             if v > 0.0 {
                 f32::MAX
             } else {
                 -f32::MAX
             }
         }
-        Ok(v) => v,
-        Err(_) => 0.0,
+        Some(Ok(v)) => v,
+        _ => 0.0,
+    }
+}
+
+/// [`strtof_whole`] for double (`strtod`; overflow gives `±DBL_MAX`).
+fn strtod_whole(text: &str) -> f64 {
+    match normalized_number(text).map(|n| n.parse::<f64>()) {
+        Some(Ok(v)) if v.is_infinite() => {
+            if v > 0.0 {
+                f64::MAX
+            } else {
+                -f64::MAX
+            }
+        }
+        Some(Ok(v)) => v,
+        _ => 0.0,
     }
 }
 
@@ -417,6 +468,10 @@ mod tests {
         assert_eq!(stof("abc"), None);
         assert_eq!(stof("1e60"), None);
         assert_eq!(stof("0.1"), Some(0.1f32));
+        assert_eq!(convert_vector_f64("0.1x2"), Some(vec![0.1, 2.0]));
+        assert_eq!(from_string_f64("1e400"), (true, Some(f64::MAX)));
+        assert_eq!(from_string_f64(" "), (true, None));
+        assert_eq!(from_string_f64("3abc"), (false, Some(3.0)));
     }
 
     #[test]

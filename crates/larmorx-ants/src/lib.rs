@@ -6,7 +6,8 @@
 //! - `antsApplyTransformsToPoints` is [`transform_points`].
 //! - `ThresholdImage` is [`threshold_image()`], `MultiplyImages` is [`multiply_images()`],
 //!   `SmoothImage` is [`smooth_image()`], `ResampleImageBySpacing` is
-//!   [`resample_image_by_spacing()`], and ImageMath's operations are in [`image_math`].
+//!   [`resample_image_by_spacing()`], `ResampleImage` is [`resample_image()`], and ImageMath's
+//!   operations are in [`image_math`].
 //! - [`resample`] is ITK's `ResampleImageFilter` with an identity transform in 2 to 4
 //!   dimensions.
 //! - [`image`] holds images as ANTs programs do, with ANTs' reading and writing rules.
@@ -19,6 +20,7 @@ pub mod image;
 pub mod image_math;
 pub mod multiply_images;
 pub mod resample;
+pub mod resample_image;
 pub mod resample_image_by_spacing;
 pub mod smooth_image;
 pub mod threshold_image;
@@ -30,6 +32,7 @@ pub use image::{AntsImage, FileStore, ImageStore};
 /// The image view the spatial filters take (re-exported for the bindings).
 pub use larmorx_image::VolumeRef;
 pub use multiply_images::multiply_images;
+pub use resample_image::{ResampleImageError, ResampleTarget, resample_image};
 pub use resample_image_by_spacing::{
     ResampleBySpacingError, ResampleBySpacingOptions, ResampleBySpacingPlan,
     resample_image_by_spacing,

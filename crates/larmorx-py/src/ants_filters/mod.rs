@@ -195,6 +195,10 @@ pub(crate) fn output_to_py<'py>(
         OutputImage::F64(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
         OutputImage::I32(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
         OutputImage::U8(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::I8(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::I16(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::U16(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
+        OutputImage::U32(i) => (array_like(py, i.data, &shape)?.into_any(), i.meta.descrip),
     };
     PyTuple::new(
         py,
@@ -207,7 +211,8 @@ pub(crate) fn output_to_py<'py>(
 }
 
 /// Runs ANTs program `program` (`ImageMath`, `ThresholdImage`, `MultiplyImages`,
-/// `SmoothImage`, `ResampleImageBySpacing`) with `args` (after the program name). `inputs`
+/// `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`) with `args` (after the program
+/// name). `inputs`
 /// maps placeholder names to `(data, ras_affine, descrip)` or
 /// `(data, ras_affine, descrip, extra_spacing)` (the spacing of the axes after the third,
 /// such as the repetition time); writes to the names in `outputs` are returned instead of
@@ -243,6 +248,7 @@ fn ants_program<'py>(
         "ThresholdImage" => larmorx_ants::cli::threshold_image::run,
         "MultiplyImages" => larmorx_ants::cli::multiply_images::run,
         "SmoothImage" => larmorx_ants::cli::smooth_image::run,
+        "ResampleImage" => larmorx_ants::cli::resample_image::run,
         "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         other => {
             return Err(PyValueError::new_err(format!(

@@ -14,6 +14,7 @@
 //! | `MultiLabel { sigma, alpha }` | `LabelImageGaussianInterpolateImageFunction` |
 //! | `GenericLabel` | `LabelImageGenericInterpolateImageFunction` (linear) |
 //! | `WindowedSinc(window)` | `WindowedSincInterpolateImageFunction` (radius 3, zero outside) |
+//! | `WindowedSincEdge(window)` | the same with ITK's default boundary (the nearest edge voxel outside) |
 //!
 //! Callers check [`is_inside`] first, as ITK's resampler does: interpolators assume the index
 //! lies within half a voxel of the grid.
@@ -92,6 +93,10 @@ pub enum Interpolation {
     /// Label-wise linear interpolation (ANTs' `GenericLabel`).
     GenericLabel,
     WindowedSinc(Window),
+    /// Windowed sinc with `WindowedSincInterpolateImageFunction`'s default boundary condition,
+    /// `ZeroFluxNeumannBoundaryCondition` (outside the image, the nearest edge voxel), as
+    /// ANTs' `ResampleImage` uses it (`antsApplyTransforms` uses zero outside).
+    WindowedSincEdge(Window),
 }
 
 /// The interpolator could not be built.
@@ -116,7 +121,7 @@ enum Kind {
     Gaussian(GaussianParams),
     MultiLabel(GaussianParams),
     GenericLabel,
-    WindowedSinc(Window),
+    WindowedSinc(Window, bool),
 }
 
 #[derive(Clone, Copy)]
@@ -166,7 +171,8 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
                 Kind::MultiLabel(GaussianParams::new(*sigma, *alpha, spacing)?)
             }
             Interpolation::GenericLabel => Kind::GenericLabel,
-            Interpolation::WindowedSinc(w) => Kind::WindowedSinc(*w),
+            Interpolation::WindowedSinc(w) => Kind::WindowedSinc(*w, false),
+            Interpolation::WindowedSincEdge(w) => Kind::WindowedSinc(*w, true),
         };
         Ok(Interpolator { volume, kind })
     }
@@ -184,7 +190,7 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             Kind::Gaussian(p) => gaussian(&self.volume, p, cidx),
             Kind::MultiLabel(p) => multi_label(&self.volume, p, cidx),
             Kind::GenericLabel => generic_label(&self.volume, cidx),
-            Kind::WindowedSinc(w) => windowed_sinc(&self.volume, *w, cidx),
+            Kind::WindowedSinc(w, edge) => windowed_sinc(&self.volume, *w, *edge, cidx),
         }
     }
 }
@@ -523,10 +529,11 @@ fn sinc(x: f64) -> f64 {
 }
 
 /// ITK's windowed sinc with radius 3: 6 taps per axis (offsets −2..=3 around `floor(index)`),
-/// a delta when the index falls on a voxel, zero outside the image, summed in neighbourhood
-/// order (x fastest) with weights multiplied in axis order.
+/// a delta when the index falls on a voxel, zero outside the image (or, with `edge`, the
+/// nearest edge voxel), summed in neighbourhood order (x fastest) with weights multiplied in
+/// axis order.
 #[inline(never)]
-fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, cidx: [f64; 3]) -> f64 {
+fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, edge: bool, cidx: [f64; 3]) -> f64 {
     let taps = (2 * SINC_RADIUS) as usize;
     let mut base = [0i64; 3];
     let mut weights = [[0.0f64; 6]; 3];
@@ -551,7 +558,12 @@ fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, cidx: [f64; 3]) -
         }
     }
     let pixel = |o: [i64; 3]| -> f64 {
-        let idx: [i64; 3] = std::array::from_fn(|d| base[d] + o[d]);
+        let mut idx: [i64; 3] = std::array::from_fn(|d| base[d] + o[d]);
+        if edge {
+            for (i, &n) in idx.iter_mut().zip(&v.size) {
+                *i = (*i).clamp(0, n as i64 - 1);
+            }
+        }
         if (0..3).all(|d| idx[d] >= 0 && idx[d] < v.size[d] as i64) {
             v.at(idx[0] as usize, idx[1] as usize, idx[2] as usize)
         } else {

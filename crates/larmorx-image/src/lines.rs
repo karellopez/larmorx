@@ -6,10 +6,12 @@
 //! pass is `float → float` with the arithmetic in double, as in ITK's `float` instantiations.
 //! Lines are independent, so the result never depends on how they are shared among threads.
 //!
-//! Lines along the first axis are contiguous and are filtered one by one. Lines along
-//! another axis are strided; they are filtered in groups of [`LANES`] neighbouring lines, laid
-//! out as `n` rows of `w` values (position along the line × line), so that the same operation
-//! runs on contiguous values. Each line still sees exactly the operations of a scalar loop.
+//! Lines are filtered in groups of up to [`LANES`] neighbouring lines, laid out as `n` rows of
+//! `w` values (position along the line × line), so that the same operation runs on contiguous
+//! values and the lines' recursions proceed side by side. Lines along the first axis are
+//! contiguous in the image and are transposed into that layout; lines along another axis are
+//! strided and are gathered row by row. Each line still sees exactly the operations of a
+//! scalar loop.
 
 use larmorx_core::parallel;
 use rayon::prelude::*;
@@ -58,21 +60,32 @@ pub(crate) fn filter_lines<F: LineFilter>(
     let inner: usize = size[..axis].iter().product();
     parallel::with_threads(n_threads, || {
         if inner == 1 {
-            // Contiguous lines.
-            data.par_chunks_mut(n)
-                .with_min_len((1 << 14) / n + 1)
-                .for_each_init(
-                    || Buffers::new(n),
-                    |b, line| {
-                        for (x, &v) in b.input.iter_mut().zip(line.iter()) {
-                            *x = f64::from(v);
+            // Contiguous lines: groups of up to LANES consecutive lines, transposed into the
+            // `n × w` layout.
+            data.par_chunks_mut(n * LANES).for_each_init(
+                || Buffers::new(n * LANES),
+                |b, lines| {
+                    let w = lines.len() / n;
+                    let len = n * w;
+                    for (l, line) in lines.chunks_exact(n).enumerate() {
+                        for (i, &v) in line.iter().enumerate() {
+                            b.input[i * w + l] = f64::from(v);
                         }
-                        filter.filter(&b.input, &mut b.output, &mut b.scratch, n, 1);
-                        for (v, &x) in line.iter_mut().zip(b.output.iter()) {
-                            *v = x as f32;
+                    }
+                    filter.filter(
+                        &b.input[..len],
+                        &mut b.output[..len],
+                        &mut b.scratch[..len],
+                        n,
+                        w,
+                    );
+                    for (l, line) in lines.chunks_exact_mut(n).enumerate() {
+                        for (i, v) in line.iter_mut().enumerate() {
+                            *v = b.output[i * w + l] as f32;
                         }
-                    },
-                );
+                    }
+                },
+            );
         } else {
             // Strided lines: each task owns the pieces of `w ≤ LANES` neighbouring lines, one
             // piece per position along the axis.

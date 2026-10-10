@@ -38,6 +38,7 @@ BENCH_MODULES = {
     "resample-series": "resample_series",
     "mri-hmc": "mri_hmc",
     "ants-programs": "ants_programs",
+    "ants-gaussian": "ants_gaussian",
 }
 BENCH_SUITES = tuple(BENCH_MODULES)
 

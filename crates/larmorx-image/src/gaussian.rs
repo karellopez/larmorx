@@ -242,19 +242,35 @@ impl RecursiveCoefficients {
             outs[at(2) + l] = s2;
             outs[at(3) + l] = s3;
         }
+        let (n0, n1, n2, n3) = (cn[0], cn[1], cn[2], cn[3]);
+        let (d1, d2, d3, d4) = (cd[0], cd[1], cd[2], cd[3]);
+        // The rows as equal-length slices, so that the loops over the lanes compile without
+        // bounds checks; the lanes are independent, so they run side by side.
+        let row = |s: &[f64], i: usize| -> std::ops::Range<usize> {
+            debug_assert!(s.len() >= (i + 1) * w);
+            i * w..(i + 1) * w
+        };
         for i in 4..n {
             let (done, rest) = outs.split_at_mut(at(i));
-            let row = &mut rest[..w];
-            for (l, o) in row.iter_mut().enumerate() {
-                let mut s = data[at(i) + l] * cn[0]
-                    + data[at(i - 1) + l] * cn[1]
-                    + data[at(i - 2) + l] * cn[2]
-                    + data[at(i - 3) + l] * cn[3];
-                s -= done[at(i - 1) + l] * cd[0]
-                    + done[at(i - 2) + l] * cd[1]
-                    + done[at(i - 3) + l] * cd[2]
-                    + done[at(i - 4) + l] * cd[3];
-                *o = s;
+            let o = &mut rest[..w];
+            let (x0, x1, x2, x3) = (
+                &data[row(data, i)],
+                &data[row(data, i - 1)],
+                &data[row(data, i - 2)],
+                &data[row(data, i - 3)],
+            );
+            let (y1, y2, y3, y4) = (
+                &done[row(done, i - 1)],
+                &done[row(done, i - 2)],
+                &done[row(done, i - 3)],
+                &done[row(done, i - 4)],
+            );
+            let (x0, x1, x2, x3) = (&x0[..w], &x1[..w], &x2[..w], &x3[..w]);
+            let (y1, y2, y3, y4) = (&y1[..w], &y2[..w], &y3[..w], &y4[..w]);
+            for l in 0..w {
+                let mut s = x0[l] * n0 + x1[l] * n1 + x2[l] * n2 + x3[l] * n3;
+                s -= y1[l] * d1 + y2[l] * d2 + y3[l] * d3 + y4[l] * d4;
+                o[l] = s;
             }
         }
 
@@ -277,19 +293,29 @@ impl RecursiveCoefficients {
             scratch[at(n - 3) + l] = s3;
             scratch[at(n - 4) + l] = s4;
         }
+        let (m1, m2, m3, m4) = (cm[0], cm[1], cm[2], cm[3]);
         for i in (1..=n - 4).rev() {
             let (head, done) = scratch.split_at_mut(at(i));
-            let row = &mut head[at(i - 1)..];
-            for (l, o) in row.iter_mut().enumerate() {
-                let mut s = data[at(i) + l] * cm[0]
-                    + data[at(i + 1) + l] * cm[1]
-                    + data[at(i + 2) + l] * cm[2]
-                    + data[at(i + 3) + l] * cm[3];
-                s -= done[l] * cd[0]
-                    + done[at(1) + l] * cd[1]
-                    + done[at(2) + l] * cd[2]
-                    + done[at(3) + l] * cd[3];
-                *o = s;
+            let o = &mut head[at(i - 1)..at(i)];
+            let (x0, x1, x2, x3) = (
+                &data[row(data, i)],
+                &data[row(data, i + 1)],
+                &data[row(data, i + 2)],
+                &data[row(data, i + 3)],
+            );
+            let (y1, y2, y3, y4) = (
+                &done[row(done, 0)],
+                &done[row(done, 1)],
+                &done[row(done, 2)],
+                &done[row(done, 3)],
+            );
+            let o = &mut o[..w];
+            let (x0, x1, x2, x3) = (&x0[..w], &x1[..w], &x2[..w], &x3[..w]);
+            let (y1, y2, y3, y4) = (&y1[..w], &y2[..w], &y3[..w], &y4[..w]);
+            for l in 0..w {
+                let mut s = x0[l] * m1 + x1[l] * m2 + x2[l] * m3 + x3[l] * m4;
+                s -= y1[l] * d1 + y2[l] * d2 + y3[l] * d3 + y4[l] * d4;
+                o[l] = s;
             }
         }
 

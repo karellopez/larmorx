@@ -51,10 +51,16 @@ pub fn median(
     // (The order of the offsets does not change the median.)
     let k = offsets.len();
     let nx = size[0];
+    // Floats as integers in the order of `f32::total_cmp`, which select faster.
+    let key = |v: f32| {
+        let b = v.to_bits();
+        if b >> 31 == 1 { !b } else { b | 0x8000_0000 }
+    };
+    let value = |k: u32| f32::from_bits(if k >> 31 == 1 { k & 0x7fff_ffff } else { !k });
     let mut out = vec![0.0f32; input.len()];
     parallel::with_threads(n_threads, || {
         out.par_chunks_mut(nx).enumerate().for_each_init(
-            || (vec![0usize; k], vec![0.0f32; k]),
+            || (vec![0usize; k], vec![0u32; k]),
             |(bases, values), (row, out_row)| {
                 // The row's coordinates on the other axes.
                 let mut coord = vec![0usize; d];
@@ -74,10 +80,10 @@ pub fn median(
                 for (x, o) in out_row.iter_mut().enumerate() {
                     for ((v, &base), off) in values.iter_mut().zip(bases.iter()).zip(&offsets) {
                         let xi = (x as isize + off[0]).clamp(0, nx as isize - 1) as usize;
-                        *v = input.data[base + xi];
+                        *v = key(input.data[base + xi]);
                     }
-                    let (_, m, _) = values.select_nth_unstable_by(k / 2, f32::total_cmp);
-                    *o = *m;
+                    let (_, m, _) = values.select_nth_unstable(k / 2);
+                    *o = value(*m);
                 }
             },
         );

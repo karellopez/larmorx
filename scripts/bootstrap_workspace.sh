@@ -112,6 +112,7 @@ while IFS=$'\t' read -r name url sha licence location; do
     ws) dest="$WS_DIR/$name" ;;
     tags) dest="$WS_DIR/tags/$name" ;;
     reference_src) dest="$WS_DIR/reference_src/$name" ;;
+    fsl) echo "  = $name $sha: FSL conda package, not cloned (install FSL 6.0.7.x; source in ~/fsl/src)"; continue ;;
     *) echo "  ! $name: unknown location '$location'" >&2; fail=1; continue ;;
   esac
   if [[ "$sha" == sha256:* ]]; then

@@ -448,6 +448,102 @@ mod tests {
         assert_eq!(t[3], 0.02);
     }
 
+    /// A smooth asymmetric blob of `shape` voxels of `voxel` mm, moved by `shift` voxels.
+    fn blob(shape: [usize; 3], voxel: [f32; 3], shift: [f32; 3]) -> Volume {
+        let mut data = Vec::new();
+        for z in 0..shape[2] {
+            for y in 0..shape[1] {
+                for x in 0..shape[0] {
+                    let idx = [x, y, z];
+                    let r2: f32 = (0..3)
+                        .map(|k| {
+                            let c = (shape[k] as f32 - 1.0) / 2.0 + shift[k];
+                            let u = (idx[k] as f32 - c) * voxel[k] / [28.0, 34.0, 22.0][k];
+                            u * u
+                        })
+                        .sum();
+                    let lump = ((idx[0] as f32 - 6.0 - shift[0]).powi(2)
+                        + (idx[1] as f32 - 9.0 - shift[1]).powi(2))
+                        / 8.0;
+                    data.push(800.0 * (-r2).exp() + 300.0 * (-lump).exp() + 20.0);
+                }
+            }
+        }
+        Volume::new(shape, voxel, data)
+    }
+
+    fn series() -> Vec<Volume> {
+        let (shape, voxel) = ([20, 22, 14], [3.5, 3.5, 4.0]);
+        [
+            [0.0, 0.0, 0.0],
+            [0.4, 0.0, 0.0],
+            [0.0, -0.3, 0.2],
+            [-0.2, 0.3, 0.0],
+        ]
+        .iter()
+        .map(|&s| blob(shape, voxel, s))
+        .collect()
+    }
+
+    #[test]
+    fn results_do_not_depend_on_the_thread_count() {
+        let s = series();
+        for reference in [Reference::Index(1), Reference::Volume(s[0].clone())] {
+            let run = |n_threads| {
+                let params = EstimateParams {
+                    n_threads,
+                    ..EstimateParams::default()
+                };
+                estimate(&s, &reference, &params).unwrap().matrices
+            };
+            assert_eq!(run(1), run(3));
+        }
+        // The mean pass and the in-plane mode too.
+        let run = |n_threads, reference: &Reference, in_plane| {
+            let params = EstimateParams {
+                n_threads,
+                in_plane,
+                ..EstimateParams::default()
+            };
+            estimate(&s, reference, &params).unwrap()
+        };
+        let mean = Reference::Mean(Box::new(Reference::Index(1)));
+        let a = run(1, &mean, InPlane::default());
+        assert_eq!(a.matrices, run(4, &mean, InPlane::default()).matrices);
+        assert!(a.mean.is_some() && a.reference_index.is_none());
+        let a = run(1, &Reference::Index(0), InPlane::Force);
+        assert!(a.in_plane);
+        assert_eq!(
+            a.matrices,
+            run(2, &Reference::Index(0), InPlane::Force).matrices
+        );
+        // In-plane mode moves only rz, tx and ty: the z row and column stay the identity's.
+        for m in &a.matrices {
+            assert_eq!(
+                [m[2][0], m[2][1], m[2][2], m[0][2], m[1][2]],
+                [0.0, 0.0, 1.0, 0.0, 0.0]
+            );
+        }
+    }
+
+    #[test]
+    fn shifts_are_recovered_and_the_reference_is_the_identity() {
+        let s = series();
+        let est = estimate(&s, &Reference::Index(0), &EstimateParams::default()).unwrap();
+        assert_eq!(est.matrices[0], IDENTITY);
+        // Volume 1's blob moved by +0.4 voxels in x: mapped back by -1.4 mm.
+        assert!(
+            (est.matrices[1][0][3] + 1.4).abs() < 0.2,
+            "{:?}",
+            est.matrices[1]
+        );
+        let err = estimate(&s, &Reference::Index(9), &EstimateParams::default());
+        assert!(matches!(
+            err,
+            Err(EstimateError::BadIndex { index: 9, n: 4 })
+        ));
+    }
+
     #[test]
     fn padding_repeats_the_end_slices() {
         let v = Volume::new([1, 1, 3], [2.0, 2.0, 3.0], vec![1.0, 2.0, 3.0]);

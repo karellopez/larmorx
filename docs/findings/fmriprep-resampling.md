@@ -105,6 +105,13 @@ semaphore of `nthreads` (`resampling.py:396-425`); SciPy releases the GIL, so vo
 in parallel. Each task allocates full-size coordinate and spline-coefficient arrays. *Read*;
 measured in [the benchmark](../benchmarks/resample-series.md).
 
+**The concurrent volumes race when OpenBLAS is multi-threaded (2026-10-11).** Each task's
+`nb.affines.apply_affine` of its head-motion matrix is an OpenBLAS product; with
+`OMP_NUM_THREADS` above 1 (fMRIPrep's image sets 1), fMRIPrep 25.2.6's MNI resampling of
+ds000005 run 01 had 22,635 voxels wrong in 12 of 240 volumes, by up to 846, and other volumes
+on a second run. *Verified* ([fmriprep-oracle.md](fmriprep-oracle.md)). larmorx's products are
+its own and do not depend on threads.
+
 ## What larmorx changes
 
 Nothing in the values: every output is bit-identical to fMRIPrep's on the validation set

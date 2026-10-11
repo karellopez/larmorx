@@ -26,14 +26,19 @@ Paths below are under `work/fmriprep_25_2_wf/sub_01_wf/`; `<run>` is
   antsRegistration and Atropos ran with 8 threads; everything else with 1. So fMRIPrep's
   denoised T1w and its brain-extraction N4s are the 8-thread results, which ANTs does not
   reproduce at another thread count (DenoiseImage not even at the same one).
+- **fMRIPrep's one-shot resampler corrupts random volumes unless OpenBLAS runs one thread**,
+  which only the image's `ENV OMP_NUM_THREADS=1` ensures (below). The oracle run is not
+  affected.
 - **fMRIPrep's ANTs computes N4 as the C++ source says; the repository's ANTs oracle (GCC 11)
   does not, and larmorx follows the oracle.** With correctly rounded maths in both, a scratch
   larmorx build that keeps the source's float roundings is bit-identical to fMRIPrep's N4
   binary (below).
-- **Most other steps larmorx has are bit-identical to fMRIPrep as it ran**, on the steps' own
-  inputs and parameters: the ImageMath, ThresholdImage and MultiplyImages steps, the one-shot
-  resampling in all three spaces, and the antsApplyTransforms calls that do not use
-  `--float 1` or Gaussian weights; see the record for the numbers.
+- **61 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran**, on the steps'
+  own inputs and parameters: every ImageMath, ThresholdImage and MultiplyImages step, the
+  one-shot resampling in all three spaces, and the antsApplyTransforms calls with linear,
+  MultiLabel or nearest-neighbour interpolation in double precision. The others are explained
+  by the thread count, glibc's maths or the ANTs build, except the 14 calls with `--float 1`,
+  which ANTs computes in single precision and larmorx in double (the record).
 - **Parameters differ from the analysis in two places**: the BOLD reference's antsAI uses
   `Affine[0.1]`, not `Rigid[0.1]`; and the BOLD reference's N4 runs with ANTs' default shrink
   factor (4), because `shrink_factor=2` is given to nipype's `Node`, not to the interface (as
@@ -63,7 +68,8 @@ the files from the image against the workspace's clone at `21a490fb`).
 
 **nipype passes `num_threads` to ANTs as `NSLOTS`** (`nipype/interfaces/ants/base.py:21-27`,
 `PREFERED_ITKv4_THREAD_LIMIT_VARIABLE`), and the environment of every node has
-`OMP_NUM_THREADS=1` and `MKL_NUM_THREADS=1` (fMRIPrep's config). ITK reads `NSLOTS`, then
+`OMP_NUM_THREADS=1` and `MKL_NUM_THREADS=1` (from the image, `fmriprep/Dockerfile:90-91`, not
+from fMRIPrep's code). ITK reads `NSLOTS`, then
 `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`, the last one set winning
 (`itkMultiThreaderBase.cxx:266-330`). *Read; verified* in the `_report/report.rst` of each node
 (section "Environment"):
@@ -216,12 +222,13 @@ to float that the source requires; larmorx reproduces that, to be bit-identical 
   CORE-MATH preloaded: 137,675 of 139,264 voxels differ, by at most 0.152 (1 − NCC 7.8e-10);
   as built (glibc's maths in both), 138,068 voxels, at most 1.44 (1 − NCC 7e-8).
 - *Verified:* a scratch build of larmorx with `gcc_double_axes` returning 0 (the source's
-  roundings), run on the same command, is **bit-identical to fMRIPrep's binary with CORE-MATH
-  preloaded**, and differs from the oracle exactly as fMRIPrep's binary does. (The scratch
+  roundings), run on the same commands, is **bit-identical to fMRIPrep's binary with CORE-MATH
+  preloaded (one thread) in all six N4 outputs of the run**: the three BOLD references, the
+  brain extraction's first N4 and its final N4 (corrected image and bias field). (The scratch
   change was reverted; it is not in the repository.)
 - So the "version" link of the record's chain for N4 is not a change between ANTs 2.6.2 and
-  2.6.5: it is one compiler's treatment of two `float` roundings. The brain-extraction N4s show
-  the same link (the record).
+  2.6.5: it is one compiler's treatment of two `float` roundings. With one thread, correctly
+  rounded maths and the source's roundings, larmorx reproduces fMRIPrep's own N4 exactly.
 - **larmorx's N4 currently follows the oracle's GCC 11 build, not the source and not the
   ANTs that fMRIPrep users run.** Which one larmorx should reproduce by default is a decision
   for the project (the N4 validation record and golden checksums follow the oracle today).
@@ -231,7 +238,18 @@ to float that the source requires; larmorx reproduces that, to be bit-identical 
 ## Reproducibility run to run
 
 Each step was re-run in fMRIPrep's image with fMRIPrep's thread count (the record's
-"fMRIPrep's tool re-run" column). The programs that ran single-threaded reproduce fMRIPrep's
-outputs bit for bit, and so do `mcflirt` (all 240 matrices of each run, also FSL 6.0.7's
-`mcflirt` on this machine, despite its older libraries) and `ResampleSeries`.
-**DenoiseImage at 8 threads does not reproduce itself**; see the record for the N4s.
+"fMRIPrep's tool re-run" column). *Verified:*
+
+- Every program that ran single-threaded reproduces fMRIPrep's outputs bit for bit, and so do
+  the two brain-extraction N4s at 8 threads (ITK's per-thread lattices are summed in a fixed
+  order, so N4 depends on the thread count but not on the run).
+- `mcflirt` reproduces all 240 matrices of each run, and so does FSL 6.0.7's `mcflirt` on
+  this machine, despite its older `newimage` and `miscmaths`.
+- `ResampleSeries` reproduces its output with `OMP_NUM_THREADS=1` (and does not with more,
+  above).
+- **DenoiseImage at 8 threads does not reproduce itself**: two re-runs differ from fMRIPrep's
+  output in 163,367 and 346,866 of 5,898,240 voxels, by up to 72.6 (1 − NCC 1.1e-6 and
+  1.9e-6). At one thread,
+  fMRIPrep's binary and the ANTs 2.6.5 oracle agree bit for bit; fMRIPrep's 8-thread result
+  differs from that in 4,900,198 voxels, by up to 271 (1 − NCC 1.1e-4), which is what separates
+  larmorx (ANTs' one-thread result) from fMRIPrep's denoised T1w.

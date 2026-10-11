@@ -239,7 +239,10 @@ def _result_text(stage: Stage, s: dict, results: list[dict]) -> str:
 CAUSE_TEXT = {
     "threads": "fMRIPrep's thread count",
     "run-to-run": "not reproducible run to run",
-    "version": "the ANTs build (fMRIPrep's 2.6.2 vs the oracle's 2.6.5)",
+    "version": (
+        "the ANTs build (fMRIPrep's 2.6.2 vs the oracle's 2.6.5; for N4 the oracle's GCC 11 code "
+        "generation, [fmriprep-oracle.md](../findings/fmriprep-oracle.md))"
+    ),
     "glibc maths": "glibc's maths",
     "larmorx": "**larmorx**",
     "float pipeline": "**larmorx computes `--float 1` in double** (known; ANTs in double "
@@ -411,9 +414,11 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         "",
         "larmorx's outputs and the reference runs are kept in "
         f"`<workspace>/oracles/compare/fmriprep-{run.version}/{run.name}/<node path>/<run>/` "
-        "(`larmorx`, `container-<n>t`, `ants-2.6.5-1t`, `ants-2.6.5-1t-cr`, `fsl-6.0.7`), each with "
+        "(`larmorx`, `container-<n>t`, `container-1t-cr`, `ants-2.6.5-1t`, `ants-2.6.5-1t-cr`, "
+        "`ants-2.6.5-1t-cr-double`, `fsl-6.0.7`, `confounds-*`), each with "
         "`run.json` (arguments, environment, exit status, time). `--reuse` reuses the one-thread "
-        "reference runs of an earlier invocation; `--stage A01 F05` limits the comparison.",
+        "reference runs of an earlier invocation; `--stage A01 F05` limits the comparison; "
+        "`--render` writes this page again from the JSON record, without running anything.",
         "",
     ]
     return "\n".join(redact(x) for x in lines)
@@ -444,6 +449,8 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
     compared = 0
     unexplained = []
     known: list[str] = []
+    #: known divergences that miss PLAN.md §11.3: (output, voxels above, voxels)
+    known_fail: list[tuple[str, int, int]] = []
     for st in present:
         for r in by_stage[st.id]:
             if st.kind == "hmc":
@@ -456,6 +463,11 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
                 c = o.get("cause")
                 if c and c.get("known"):
                     known.append(r["node"])
+                    d = _diff(o["vs_fmriprep"])
+                    if not assess_output(st, d)[0]:
+                        limit = THRESHOLDS[st.threshold][2]
+                        above = (d.over or {}).get(f"{limit:g}", d.voxels)
+                        known_fail.append((f"{st.id} {o['output']}", above, d.voxels))
                 elif c and not c["explained"]:
                     unexplained.append(r["node"])
             if st.kind == "resample" and r.get("status") == "different":
@@ -467,8 +479,9 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
         f"output** (plus {len(hmc)} head-motion corrections, which larmorx does with a clean-room "
         "algorithm and cannot match bit for bit). "
         + (
-            "The other differences are explained by fMRIPrep's thread count, ANTs' version or "
-            "glibc's maths (with those removed, larmorx is bit-identical)"
+            "The other differences are explained by fMRIPrep's thread count, glibc's maths or the "
+            "ANTs build (fMRIPrep's conda-forge 2.6.2 against the repository's GCC 11 build of "
+            "2.6.5; with those removed, larmorx is bit-identical)"
             if not unexplained
             else f"**{len(set(unexplained))} node(s) differ for reasons not found** (see the details)"
         )
@@ -480,6 +493,17 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
         ),
         "",
     ]
+    if known_fail:
+        worst = max(a for _, a, _ in known_fail)
+        text += [
+            f"**{len(known_fail)} of those outputs miss PLAN.md §11.3's interpolation threshold**, "
+            f"each in at most {worst} of {known_fail[0][2]:,} voxels ("
+            + ", ".join(f"`{name}`" for name, _, _ in known_fail)
+            + "): voxels where ANTs' single-precision Gaussian interpolation departs from its own "
+            "double-precision result, which is larmorx's. Everywhere else these outputs stay "
+            "within the threshold.",
+            "",
+        ]
     return text
 
 
@@ -487,8 +511,7 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
 KNOWN_TEXT = {
     "float pipeline": (
         "`antsApplyTransforms --float 1`, which ANTs runs in single precision and larmorx in "
-        "double (ANTs in double precision, rounded to float32, is larmorx's output bit for bit; "
-        "the differences stay within PLAN.md §11.3's interpolation threshold)"
+        "double (ANTs in double precision, rounded to float32, is larmorx's output bit for bit)"
     ),
 }
 

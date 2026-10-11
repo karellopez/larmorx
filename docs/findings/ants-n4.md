@@ -275,9 +275,10 @@ N4BiasFieldCorrection replica. A different compiler or flags would give ANTs oth
 this is the oracle larmorx follows.
 
 *Added 2026-10-11:* **fMRIPrep 25.2.6's own ANTs (conda-forge 2.6.2) follows the source
-here.** On fMRIPrep's BOLD-reference N4 (one thread, CORE-MATH preloaded into both), it
-differs from this oracle in 137,675 of 139,264 voxels (at most 0.152), and a scratch larmorx
-build with `gcc_double_axes` returning 0 reproduces it bit for bit
+here.** On fMRIPrep's BOLD-reference N4 of run 03 (one thread, CORE-MATH preloaded into
+both), it differs from this oracle in 137,675 of 139,264 voxels (at most 0.152), and a scratch
+larmorx build with `gcc_double_axes` returning 0 reproduces it bit for bit, as it does all six
+N4 outputs of fMRIPrep's run
 ([fmriprep-oracle.md](fmriprep-oracle.md)). *Verified.* Whether larmorx should follow the source
 (and fMRIPrep's binary) or this oracle by default is open.
 

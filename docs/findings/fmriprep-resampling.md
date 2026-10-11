@@ -10,11 +10,16 @@ about it. The interpolation itself is SciPy's: [scipy-ndimage.md](scipy-ndimage.
 **numpy's 4×4 products are BLAS calls with fused multiply-adds.** nitransforms maps points
 with `affine.dot(points)` (`base.py:378-384`, `linear.py:278-282`), and nibabel's
 `apply_affine` with `pts @ rzs.T + trans`. numpy hands both to OpenBLAS `dgemm`, whose Haswell
-kernel accumulates `fma(a3, p3, fma(a2, p2, fma(a1, p1, a0·p0)))`. Evaluated with separate
-roundings, about 1,900 of 6,000 values differed; with the fused chain, 0, for both the
-4×N point products and 4×4 matrix products. *Verified* (OpenBLAS 0.3.30, numpy 2.3.5, x86-64
-with FMA). larmorx uses `f64::mul_add` in the same order. A numpy whose BLAS does not fuse
-(an old CPU, another BLAS) gives fMRIPrep results that differ from these in the last bits.
+kernel accumulates `fma(a3, p3, fma(a2, p2, fma(a1, p1, a0·p0)))` and stores the sum added to
++0 (so an exact zero is +0). Evaluated with separate roundings, about 1,900 of 6,000 values
+differed; with the fused chain, 0, for both the 4×N point products and 4×4 matrix products.
+*Verified* (OpenBLAS 0.3.30, numpy 2.3.5, x86-64 with FMA). A **single point** goes through
+`dgemv` instead, with another order (pairwise lanes for `affine.dot`, a contracted chain for
+nibabel's `pts @ rzs.T`): 263 of 300 random affines mapped one point differently from the
+`dgemm` order. *Verified*. larmorx reproduces all of these with `f64::mul_add`
+(`larmorx_transform::openblas`; [numpy-blas.md](numpy-blas.md)). A numpy whose BLAS does not
+fuse (an old CPU, another BLAS) gives fMRIPrep results that differ from these in the last
+bits.
 
 **Points go through float32 before every affine.** `_as_homogeneous` converts its input to
 float32 (`base.py:351-375`), so `Affine.map` and the displacement field's index lookup round
@@ -30,26 +35,27 @@ fMRIPrep's head-motion and coregistration matrices are therefore float32-exact b
 double precision, so ANTs and fMRIPrep apply slightly different transforms (up to about 1e-7
 relative). *Read*; larmorx reproduces nitransforms (it parses with the same numpy call).
 
-**The 4×4 matrices are computed with numpy in both.** `np.linalg.inv` (LAPACK `dgesv` in
-OpenBLAS, which multiplies by reciprocals of the pivots) and the matrix products are not
-re-implemented: larmorx's Python layer evaluates the same numpy expressions as nitransforms
-and fMRIPrep (`ras2vox @ M @ vox2ras` for head motion, `np.linalg.inv(source.affine)`, the
-ITK-to-RAS conversion) and passes the matrices to Rust. So they carry the same bits as
-fMRIPrep's on the same machine.
+**The 4×4 matrices: numpy in fMRIPrep, the same arithmetic in Rust in larmorx.**
+nitransforms and fMRIPrep compute them with numpy: `np.linalg.inv` (LAPACK `dgesv` in
+OpenBLAS, which multiplies by reciprocals of the pivots), the products `ras2vox @ M @ vox2ras`
+for head motion, the ITK-to-RAS conversion `LPS · C⁺ · M · C⁻ · LPS`, and
+`ensure_positive_cosines`' `affine.dot(...)`. larmorx's Python layer evaluates the same
+expressions, but its products and inverses run in Rust (`larmorx_transform::openblas`), in the
+operation order of the OpenBLAS Haswell kernels numpy uses on x86-64 with FMA, and nibabel's
+`io_orientation` SVD is vnl's LINPACK SVD. So they carry fMRIPrep's bits on such a machine
+(18,142,858 of 18,142,858 compared results, [numpy-linalg.md](../validation/numpy-linalg.md))
+and the same bits on every platform. *Validated* (2026-10-11).
 
-**Those bits depend on the CPU's BLAS kernel, so fMRIPrep's do too (2026-10-11).** OpenBLAS
-picks its kernels by CPU at run time. Forcing other kernels on the development machine
-(`OPENBLAS_CORETYPE`, numpy 2.3.5, OpenBLAS 0.3.30): the products `inv(A) @ M @ A` of 10,000
-random affines differ in 99.9 % of cases between the kernels with fused multiply-adds
-(Haswell, Zen) and those without (Nehalem, Sandy Bridge, Prescott); `np.linalg.inv` differs in
-23 % of cases between the Haswell and Sandy Bridge kernels (up to 6e-13 relative) but not
-between Haswell and Nehalem. In the resampler's golden case the float64 output then differs by
-up to 81 ulp at the sampled voxels, and the float32 output, which fMRIPrep writes, did not
-change. numpy's macOS wheels use Accelerate instead of OpenBLAS. *Verified.* So fMRIPrep's
-results differ in the last bits between machines, and larmorx's `lx.transforms` (which
-evaluates the same numpy expressions) would differ between platforms; the golden tests keep it
-visible, and [golden.md](../validation/golden.md) lists the options (a fixed-order Rust
-implementation that reproduces the Haswell kernel is the recommended one).
+**Those bits depend on the CPU's BLAS kernel in fMRIPrep, not in larmorx (2026-10-11).**
+OpenBLAS picks its kernels by CPU at run time, and numpy's macOS wheels use Accelerate. Forcing
+other kernels on the development machine (`OPENBLAS_CORETYPE`, numpy 2.3.5, OpenBLAS 0.3.30),
+numpy's products of random affines differ from the Haswell kernel's in 98.7 % of cases under
+the kernels without fused multiply-adds (SandyBridge, Nehalem, Prescott), and its inverses of
+affines in 18.5 % under SandyBridge (none under Nehalem and Prescott); the AVX-512 kernels
+(SkylakeX) could not be run here. Before the change, the resampler's golden cases gave float64
+outputs differing by up to 112 ulp between CI platforms (the float32 outputs, which fMRIPrep
+writes, were identical). fMRIPrep's results therefore differ in the last bits between
+machines; larmorx's do not ([numpy-blas.md](numpy-blas.md), [golden.md](../validation/golden.md)). *Verified*.
 
 **The voxel-shift map is float32.** `vsm = fmap_hz * pe_info[1]` multiplies a float32 array by
 a Python float, which NumPy 2 (NEP 50) casts to float32 first. It is added to the float64
@@ -105,4 +111,6 @@ Nothing in the values: every output is bit-identical to fMRIPrep's on the valida
 (`docs/validation/resample-series.md`). The work is reorganised: the target grid is mapped
 once per run, the voxel-shift map and Jacobian once per readout setting, each volume is
 prefiltered once and interpolated in one pass with the head motion and voxel shift applied
-per voxel in registers, and only `n_threads` volumes are in flight at a time.
+per voxel in registers, and only `n_threads` volumes are in flight at a time. The 4×4 matrices
+are computed in Rust in numpy's Haswell operation order, so they are fMRIPrep's on an x86-64
+machine with FMA and the same on every platform.

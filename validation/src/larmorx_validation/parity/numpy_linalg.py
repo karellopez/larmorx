@@ -396,6 +396,57 @@ def _run_field(n: int, checks: CheckList) -> None:
     _count(checks, "DenseField.map (1, 2 and 9 points, on and off the grid)", same, total)
 
 
+def _run_one_voxel(n: int, checks: CheckList) -> None:
+    """fMRIPrep's resample_image onto a one-voxel grid: every product of the run (the grid's
+    coordinates, the chain, ras2vox, the head motion) is numpy's single-point ``dgemv``."""
+    import nibabel as nib
+    from fmriprep.interfaces.resampling import resample_image
+    from fmriprep.utils.transforms import load_transforms as fmriprep_load
+
+    import larmorx as lx
+
+    rng = np.random.default_rng(91)
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for i in range(n):
+            vox2ras = _affines(rng, 1, zooms=(2.0, 3.5), shift=10.0, max_angle=0.5)[0]
+            src = nib.Nifti1Image(rng.normal(size=(9, 8, 7, 3)).astype(np.float32), vox2ras)
+            motion = _affines(rng, 3, zooms=(1.0, 1.0), shift=0.7, max_angle=0.05)
+            lines = ["#Insight Transform File V1.0"]
+            for t, m in enumerate(motion):
+                params = [*m[:3, :3].ravel(), *m[:3, 3]]
+                lines += [
+                    f"#Transform {t}",
+                    "Transform: MatrixOffsetTransformBase_double_3_3",
+                    "Parameters: " + " ".join(repr(float(v)) for v in params),
+                    "FixedParameters: 0.3 -0.2 0.1",
+                ]
+            hmc = Path(tmp) / f"hmc{i}.txt"
+            hmc.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            target = np.eye(4)
+            target[:3, 3] = vox2ras[:3, 3] + vox2ras[:3, :3] @ rng.uniform(1, 6, 3)
+            ref = resample_image(
+                src,
+                nib.Nifti1Image(np.zeros((1, 1, 1), np.float32), target),
+                fmriprep_load([hmc], [False]),
+                None,
+                None,
+                jacobian=False,
+                mode="grid-constant",
+                output_dtype="f8",
+            )
+            got = lx.transforms.resample_series(
+                src, ((1, 1, 1), target), [hmc], jacobian=False, output_dtype="float64"
+            )
+            same += bool(
+                _same(
+                    np.asarray(ref.dataobj).reshape(1, 1, -1),
+                    np.asarray(got.data).reshape(1, 1, -1),
+                )[0]
+            )
+    _count(checks, "resample_series onto a one-voxel grid (head motion, 3 volumes)", same, n)
+
+
 # ------------------------------------------------------------------------------------------------
 # Orientation (sdcflows' ensure_positive_cosines)
 
@@ -572,6 +623,14 @@ def cases(tier: str) -> list[Case]:
     out.append(
         Case("points/field", "points", "DenseField.map vs nitransforms", ("field", 0, small))
     )
+    out.append(
+        Case(
+            "points/one-voxel",
+            "points",
+            f"resample_series vs fMRIPrep's resample_image onto one voxel, {max(2, small // 100)} runs",
+            ("one-voxel", 0, max(2, small // 100)),
+        )
+    )
     out += [
         Case(
             f"orientation/{k}",
@@ -613,6 +672,8 @@ def run_case(case: Case, checks: CheckList) -> None:
         _run_points(kind, n, checks)
     elif what == "field":
         _run_field(n, checks)
+    elif what == "one-voxel":
+        _run_one_voxel(n, checks)
     elif what == "orientation":
         _run_orientation(kind, n, checks)
     else:

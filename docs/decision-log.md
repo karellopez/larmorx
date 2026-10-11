@@ -280,6 +280,32 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   or Linux (OpenBLAS). Those last bits may differ by platform; the fix would be to compute them
   in Rust with a fixed operation order.
 
+## 2026-10-11: `lx.transforms` computes its 4×4 matrices in Rust, in numpy's Haswell order
+- **What CI showed.** The golden tests (run 38095330520) passed on all six platforms except four
+  `lx.transforms` cases: numpy's 4×4 products and inverses gave different last bits on Linux
+  aarch64, Windows arm64, macOS (Accelerate) and, in that run, Windows x64 (1 to 112 ulp in the
+  float64 outputs; the float32 outputs were identical). The runner's CPU changes numpy's
+  OpenBLAS kernel, so fMRIPrep's own last bits depend on the machine too.
+- **Decision (user).** Do the 4×4 matrix arithmetic in Rust with a fixed operation order,
+  reproducing what numpy does on the validation machine: OpenBLAS 0.3.30's Haswell kernels
+  (x86-64 with AVX2 and FMA). This supersedes the 2026-10-10 bullet "The 4×4 matrices stay in
+  numpy" (porting OpenBLAS's `dgesv` turned out to be small: for 4×4 it is the unblocked
+  `getf2_k` and two triangular solves). Alternatives weighed in `docs/validation/golden.md`:
+  the same in Python (`math.fma` needs Python 3.13), a tolerance in the golden tests, pinning
+  `OPENBLAS_CORETYPE`.
+- **Done.** `larmorx_transform::openblas` (BSD-3-Clause replica in the main package):
+  `matmul4` (`dgemm`: fused chains), `inv4` (`dgesv`: `getf2_k`, `getrs`, reciprocal pivots,
+  `idamax` with its NaN rules), and the per-point orders (`dgemm`, and `dgemv` for a single
+  point); nibabel's `io_orientation` SVD uses vnl's LINPACK SVD. 18,142,858 of 18,142,858
+  results bit-identical to numpy on the Haswell kernels (`docs/validation/numpy-linalg.md`);
+  resample-series parity still 136 of 136 bit-identical; the recorded golden checksums
+  unchanged (three single-point outputs added); speed unchanged.
+- **Consequence.** larmorx gives the same bits on every platform; it is bit-identical to
+  fMRIPrep on x86-64 machines whose numpy runs the Haswell kernels (AVX2 and FMA without
+  AVX-512, including AMD Zen), and differs from fMRIPrep exactly where fMRIPrep differs from
+  itself (`docs/findings/numpy-blas.md`). One divergence is documented: exactly 45° oblique
+  grids, where nibabel's axis decision follows its SVD's rounding.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

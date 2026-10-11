@@ -32,3 +32,4 @@ noted.
 | [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`/`powf`: glibc vs the `libm` crate, and what it does to bit parity |
 | [scipy-ndimage.md](scipy-ndimage.md) | SciPy's `map_coordinates` and spline prefilter: padding, boundary rules, summation order, undefined behaviour |
 | [fmriprep-resampling.md](fmriprep-resampling.md) | fMRIPrep's one-shot resampler and nitransforms: float32 coordinates, BLAS fused products, voxel-shift map, Jacobian, displacement fields |
+| [numpy-blas.md](numpy-blas.md) | numpy's 4×4 products and inverses: which BLAS/LAPACK routine, OpenBLAS's kernels per CPU, the Haswell operation order larmorx reproduces, how often the kernels differ |

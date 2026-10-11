@@ -100,9 +100,15 @@ affine and a float32 header: the target's, with the source's time step.
 | `TransformChain` | `TransformChain` | `transforms`, `steps()`, `map`, `+` |
 
 `TransformChain.map` (and `Affine.map`, `DenseField.map`) map `(n, 3)` RAS+ points exactly as
-nitransforms does: float32 inputs at every affine, numpy's fused products, the displacement
-field looked up when every point is on its grid and interpolated otherwise, no displacement
-outside it.
+nitransforms does: float32 inputs at every affine, numpy's fused products (its `dgemv` order
+for a single point), the displacement field looked up when every point is on its grid and
+interpolated otherwise, no displacement outside it.
+
+The 4×4 matrices (`Affine.inverse`, `~`, the ITK-to-RAS conversion of loaded files, head motion
+in voxel space, `ensure_positive_cosines`) are computed with nitransforms' expressions, in Rust,
+in the operation order of the OpenBLAS kernels numpy uses on x86-64 with FMA: the same bits as
+nitransforms on such a machine, and on every platform
+([numpy-blas.md](../findings/numpy-blas.md)).
 
 ### `lx.ndimage`
 
@@ -130,8 +136,10 @@ plan.resample_series(&source_f32, n_volumes, Some(&hmc_vox2vox), &[PeInfo { axis
 
 `larmorx_interp::ndimage` has `Spline` (an input prefiltered once, then `sample` /
 `sample_batch` at any coordinates), `map_coordinates`, `spline_filter`, `spline_filter1d` and
-`Mode`. The Rust API takes the 4×4 matrices ready-made; the Python layer computes them with
-numpy, exactly as nitransforms and fMRIPrep do.
+`Mode`. The Rust API takes the 4×4 matrices ready-made; compute them as nitransforms and
+fMRIPrep do with `larmorx_transform::openblas::{matmul4, inv4}` (numpy's `@` and
+`np.linalg.inv` in the operation order of OpenBLAS's Haswell kernels), as the Python layer
+does.
 
 ## Command line
 
@@ -144,11 +152,19 @@ function. A `larmorx` subcommand can follow if a standalone use appears.
 - **Undefined behaviour in SciPy.** Coordinates beyond about 1e18 make SciPy's index arithmetic
   overflow and read outside its array; larmorx returns NaN there
   ([scipy-ndimage.md](../findings/scipy-ndimage.md)). fMRIPrep never produces them.
-- **The 4×4 matrices come from numpy** (inverses, products, ITK-to-RAS), as in fMRIPrep, so
-  they match fMRIPrep on the same machine. Their last bits depend on the CPU's BLAS kernel and
-  on the BLAS library, for fMRIPrep too ([golden.md](../validation/golden.md), "Known risk"). The per-voxel arithmetic is larmorx's and gives the
-  same bits on every platform: SciPy's x86-64 results (no contraction; numpy's BLAS-style fused
-  products, which x86-64 and aarch64 OpenBLAS both use).
+- **The same bits on every platform.** The 4×4 matrices (inverses, products, ITK-to-RAS,
+  head motion, `ensure_positive_cosines`) and the per-voxel arithmetic are larmorx's, in a
+  fixed order: numpy's results on x86-64 with FMA (OpenBLAS's Haswell kernels; 18,142,858 of
+  18,142,858 compared results bit-identical, [numpy-linalg.md](../validation/numpy-linalg.md))
+  and SciPy's x86-64 interpolation (no contraction). fMRIPrep's own matrices depend on numpy's
+  BLAS kernel, so on a CPU with AVX-512 or without FMA, or on macOS or ARM, fMRIPrep's last
+  bits differ from larmorx's (and from its own on this machine)
+  ([numpy-blas.md](../findings/numpy-blas.md)).
+- **Exactly 45° oblique grids.** With distortion correction, the axis flips of
+  `ensure_positive_cosines` follow nibabel's `io_orientation`, computed with a platform-
+  independent SVD. When two direction cosines tie exactly (a grid rotated by exactly 45°),
+  nibabel's choice follows its SVD's rounding: 4,300 of 4,800 such grids get the same flips.
+  A tie needs a rotation of exactly 45° to within rounding.
 - **Not covered yet:** `ReconstructFieldmap` (B-spline field maps reconstructed on the target
   grid; the field map here is given in Hz), multi-echo (each echo resampled separately, as
   fMRIPrep does today; sharing one coordinate mapping between echoes is planned), per-volume

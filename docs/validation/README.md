@@ -9,6 +9,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [resample-series](resample-series.md) | `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process) | `validated` |
+| [numpy-linalg](numpy-linalg.md) | `larmorx_transform::openblas` through `lx.transforms`: 4×4 products and inverses, point mapping, `ensure_positive_cosines`, loaded transforms | numpy 2.3.5 on OpenBLAS 0.3.30's Haswell kernels, nitransforms, sdcflows, fMRIPrep (in-process); other kernels in [numpy-linalg-kernels.json](numpy-linalg-kernels.json) | `validated` (1 expected divergence: exactly 45° grids) |
 | [ants-image-math](ants-image-math.md) | `lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`, `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`) | ImageMath (ANTs 2.6.5 binary) | `validated` |
 | [ants-threshold-image](ants-threshold-image.md) | `lx.ants.threshold_image`, `lx.ants.otsu_threshold`, `larmorx ants ThresholdImage` (no `Kmeans` yet) | ThresholdImage (ANTs 2.6.5 binary) | `validated` |
 | [ants-multiply-images](ants-multiply-images.md) | `lx.ants.multiply_images`, `larmorx ants MultiplyImages` | MultiplyImages (ANTs 2.6.5 binary) | `validated` |
@@ -31,6 +32,8 @@ python -m larmorx_validation parity afni-tshift --tier standard --out docs/valid
 (cd crates-gpl && cargo build --release)   # the GPL replica, run as a separate program
 python -m larmorx_validation parity afni-tshift --tier standard --implementation replica --out docs/validation
 python -m larmorx_validation parity resample-series --tier standard --out docs/validation   # needs fmriprep, nitransforms, scipy in the environment
+python -m larmorx_validation parity numpy-linalg --tier standard --out docs/validation   # needs numpy on the Haswell kernels, threadpoolctl, sdcflows
+python -m larmorx_validation.parity.numpy_linalg kernels --n 200000 --kernels Haswell SandyBridge Nehalem Prescott --out docs/validation/numpy-linalg-kernels.json
 python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these six need the ANTs oracle (scripts/build_ants_oracle.sh)
 python -m larmorx_validation parity ants-threshold-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-multiply-images --tier standard --out docs/validation

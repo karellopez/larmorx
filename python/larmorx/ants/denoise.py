@@ -21,7 +21,7 @@ __all__ = ["DenoiseResult", "denoise_image"]
 
 @dataclass(frozen=True)
 class DenoiseResult:
-    """The denoised image and the noise removed from it (``image − denoised``, as ANTs
+    """The denoised image and the noise removed from it (``image - denoised``, as ANTs
     computes it: the noise is estimated at the filter's resolution and resampled onto the
     image's grid, then subtracted)."""
 

@@ -45,6 +45,7 @@ BENCH_MODULES = {
     "ants-gaussian": "ants_gaussian",
     "ants-morphology": "ants_morphology",
     "ants-n4": "ants_n4",
+    "ants-denoise": "ants_denoise",
 }
 BENCH_SUITES = tuple(BENCH_MODULES)
 

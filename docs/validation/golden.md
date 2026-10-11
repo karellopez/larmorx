@@ -183,6 +183,9 @@ between platforms (`py.transforms.resample_series`, `out.float64`, 36-112 ulp, u
 the previous one, as the runner's CPU changed numpy's kernel. Every other case was identical on
 all six platforms, and so were the float32 outputs fMRIPrep writes.
 
+**Result after the fix:** CI run 38100125479 (2026-10-11) passed every golden case on all six
+platforms, in both packages.
+
 **The fix (option 1 of the four weighed here before: Rust arithmetic in a fixed order).** The
 products and inverses now run in Rust, `larmorx_transform::openblas`, in the operation order of
 OpenBLAS 0.3.30's Haswell kernels, which numpy uses on x86-64 CPUs with AVX2 and FMA:

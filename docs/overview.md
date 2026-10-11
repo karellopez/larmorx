@@ -2,7 +2,9 @@
 
 How larmorx is built, licensed, published and installed, and the words the other documents
 use. The details are in [PLAN.md](../PLAN.md), [licensing.md](licensing.md) and the
-[decision log](decision-log.md). Written 2026-10-10, from questions the project owner asked;
+[decision log](decision-log.md); how a tool is ported is in the
+[porting guide](porting-guide.md), and every defect found in the original tools in the
+[defect register](findings/upstream-defects.md). Written 2026-10-10, from questions the project owner asked;
 keep it current.
 
 ## What larmorx is
@@ -193,6 +195,16 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   improved algorithm becomes the default when its results stay within the original tool's
   own variability across versions, platforms, thread counts and seeds (PLAN.md G4, §11).
   Changes that move results further stay opt-in. Replicas always stay exact.
+- **Correct by default, faithful on request (decided 2026-10-11, D13).** When an original
+  tool has a deterministic bug that changes results, larmorx fixes it by default, warns when
+  the bug would have changed the result, and keeps a documented compatibility switch that
+  reproduces the original bit for bit. Crashes, reads outside an image, races and
+  nondeterminism are never reproduced. The [defect register](findings/upstream-defects.md)
+  lists the 120 defects and questionable behaviours found so far (in ANTs and ITK, AFNI, FSL,
+  fMRIPrep and its libraries, SciPy, numpy, nibabel, glibc), and the 47 that larmorx still
+  reproduces by default and will switch: among them sMRIPrep's `GetLargestComponent`
+  turning an empty result into a full image, mcflirt's last volume not starting from its
+  neighbour, and AFNI's sign-flipped output for a negative scale factor.
 
 ## Against a real fMRIPrep run
 

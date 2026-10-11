@@ -40,7 +40,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   - **A2 parts 3-4 done** (2026-10-11): binary and grayscale morphology, FillHoles, PadImage, connected components, GetLargestComponent, Danielsson and Maurer distance maps, ExtractContours, ThresholdAtMean, ReplaceVoxelValue. ImageMath: 327 cases, 296 of 301 compared outputs bit-identical (the rest explained), all headers byte-identical. Every ImageMath op that fMRIPrep, sMRIPrep and sdcflows call is ported. Left of A2, to do with registration (A4): the shrink filter and histogram matching.
   - **Golden tests in place** (2026-10-11): 86 cases cover every CLI tool, ImageMath op and public Python function, in both packages (`tests/golden/`, `crates-gpl/larmorx-gpl-cli/tests/golden.rs`, `docs/validation/golden.md`). Record checksums with `scripts/record_golden.py` on Linux x64 after parity passes. `lx.transforms`' 4x4 products and inverses run in Rust in numpy's OpenBLAS Haswell order (`larmorx_transform::openblas`, 2026-10-11), so they no longer depend on the platform's BLAS (`docs/findings/numpy-blas.md`). **CI run 38100125479: every golden case bit-identical on all six platforms.**
 - Conventions every tool follows are in `docs/architecture.md`.
-- **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does.
+- **Findings about the upstream tools** go in `docs/findings/`. Keep adding to it while porting and validating: the behaviour, its upstream file and line, how it is known, and what larmorx does. Every defect found also gets an entry in `docs/findings/upstream-defects.md` (its class, evidence, effect on fMRIPrep users, what larmorx does, and the D13 gap); its top lists the defects larmorx still reproduces by default.
 - **Decided 2026-10-09:** transcendental functions are correctly rounded (CORE-MATH ports in `larmorx_core::math`; rule 5). See `docs/findings/platform-math.md`.
 - Development moved from the user's Mac to this **Linux machine**. It is always on, so it is suited to long oracle runs and benchmarks.
 - **Decided:** names (D1), licence Apache-2.0 (D2) and distributions (D3), see above.
@@ -93,7 +93,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
      - AFNI's MCW files and Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`);
      - FSL: `larmorx-nc` (the FSL Licence's non-commercial terms, `crates-nc/`);
      - FreeSurfer: `larmorx-freesurfer`.
-   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary.
+   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates or source-derived findings (`docs/findings/afni-tshift.md`, `fsl-mcflirt.md` and the sections of `upstream-defects.md` marked restricted). Who may read what: `docs/porting-guide.md` §1.
    - **Never** move replica code into the main package, even renamed. Never link code from different licence families into one binary: `larmorx-gpl` and `larmorx-nc` are incompatible with each other.
    - **MSM_HOCR:** no replica can be published (its ELC library forbids public distribution of derivatives, and its FastPD optimiser is patented). Its original must avoid those optimisation methods.
    - **Every file records its origin** with an SPDX header and in its crate's `PROVENANCE.md`.
@@ -115,7 +115,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
    - ≥ 3.12.
    - Typed dataclass inputs and outputs; no global config; no pickles in caches.
    - UTF-8 I/O; no `shell=True`; `spawn` only.
-7. **The per-tool contract** (PLAN.md §4) is mandatory for every tool:
+7. **The per-tool contract** (PLAN.md §4) is mandatory for every tool. Start every port from `docs/porting-guide.md`: the method, and the contract as a checklist with the models to copy (§11).
    - Rust API, Python wrapper, compatible CLI
    - `.pyi` stubs + a docs page with the option-mapping table
    - a validation record and status (`experimental` / `validated` / `stable`)
@@ -174,6 +174,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `upstream.tsv` | pinned upstream commits |
 | `scripts/bootstrap_workspace.sh` | recreates the workspace |
 | `docs/overview.md`, `docs/licensing.md` | the concepts in plain terms; the licence tracks and what is published |
+| `docs/porting-guide.md` | how to port a tool: tracks and who may read what, the source as the specification, the original's own variability, oracle coverage, the pipeline's real parameters, separating causes, validation records, D11/D13, determinism, working safely, the per-tool checklist |
 | `Cargo.toml`, `crates/` | Rust workspace: `larmorx-core`, `-io`, `-transform`, `-interp`, `-image`, `-ants`, `-afni`, `-cli` (standalone `larmorx`/`lx`), `-py` (`larmorx._core`) |
 | `crates-gpl/` | the GPL-3.0-or-later replica workspace (`docs/licensing.md`); it builds the Apache crates by path, so refresh `crates-gpl/Cargo.lock` whenever their dependencies change (CI checks it with `--locked`) |
 | `crates-nc/` (planned) | the FSL replica workspace |
@@ -183,4 +184,5 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
 | `validation/` | parity suites and benchmarks (dev-only package `larmorx-validation`) |
 | `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/`, `docs/findings/` | conventions, user docs per tool, validation records, benchmark reports, findings about the upstream tools |
+| `docs/findings/upstream-defects.md` | the register of every defect found in the originals (class, evidence, fMRIPrep impact, what larmorx does, D13 gap), with the list of defects larmorx still reproduces by default |
 | `../larmorx-testdata/` (separate repo) | test-data catalog, generated edge cases, hash-verified downloader (`pip install -e`) |

@@ -258,6 +258,25 @@ must change with the original's, see "Decisions" item 3):
 
 ### Decisions needed before switching
 
+**Decided by the user on 2026-10-11** (decision log, "D13's details"):
+- Item 1, undefined conversions: **clamp and warn by default**; the compatibility switch
+  reproduces x86-64's wraparound.
+- Item 3, replicas: **the same corrected default as the originals**; the compatibility switch
+  must give **exactly the original program's result**.
+- Item 4, FSL-02: **measure first** (against mcflirt's band and the synthetic ground truth),
+  then decide between fixing by default and keeping it opt-in.
+- Item 5, refusals: **a switch for these too.** Where the original's output is deterministic
+  (e.g. a one-voxel image with infinite spacing), the switch reproduces it exactly. Where it
+  depends on memory contents and changes from run to run (an unfilled buffer, an out-of-bounds
+  read), no program can reproduce it, not even the original. There the switch reproduces
+  everything defined (exit code, files, headers), fills the undefined part deterministically
+  and warns that it does.
+- Items 2, 6 and 7, defaults until decided otherwise: questionable behaviours stay faithful
+  and documented until evidence shows a bug; pipeline choices are made with larmorprepx;
+  ResampleImage's corrected command line is designed by the implementer and reviewed.
+
+The original proposals, for the record:
+
 1. **Undefined conversions** (ANTS-06, SCI-02). On 2026-10-09 larmorx decided that its
    command lines reproduce ANTs on x86-64 where C++ is undefined (an out-of-range `-u` cast
    wraps through int32), as fMRIPrep users see. D13 says undefined behaviour is never

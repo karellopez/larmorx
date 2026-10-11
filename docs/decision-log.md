@@ -440,6 +440,25 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   4. later: a multi-echo dataset (tedana) and a run with FreeSurfer recon-all (surfaces).
 - Each run is compared step by step with `python -m larmorx_validation pipeline-stages`.
 
+## 2026-10-11: D13's details
+Decided by the user on the questions the defect register raised
+(`docs/findings/upstream-defects.md`, "Decisions needed before switching"):
+- **Undefined float-to-integer conversions** (e.g. antsApplyTransforms `-u`): clamp and warn
+  by default; the compatibility switch reproduces x86-64's wraparound. This replaces the
+  2026-10-09 choice to reproduce x86-64 by default.
+- **Replicas share the corrected default.** "Yes, but remember the switch should give the same
+  result as the source one": with the switch, a replica gives exactly the original program's
+  result.
+- **mcflirt's inflated weight count (FSL-02):** measured first, against mcflirt's band and the
+  synthetic ground truth, then decided.
+- **Failures and garbage** get a switch too. It is exact where the original is deterministic.
+  Where the original's values depend on memory contents (unfilled buffers, out-of-bounds
+  reads), the defined parts are reproduced and the rest is filled deterministically, with a
+  warning; nothing can reproduce such values, not even the original.
+- **Defaults otherwise:** questionable behaviours stay faithful and documented until shown to
+  be bugs; larmorprepx's pipeline choices are made with larmorprepx; ResampleImage's corrected
+  command line is designed and reviewed.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

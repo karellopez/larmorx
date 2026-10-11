@@ -14,8 +14,8 @@ Three kinds of node:
   3. the same, with **CORE-MATH**'s correctly rounded functions preloaded (glibc's maths;
      the image has the same glibc as this machine);
   4. the ANTs **2.6.5** oracle build, one thread, CORE-MATH preloaded (the version and the
-     build: fMRIPrep 25.2.6 ships ANTs 2.6.2 from conda-forge; larmorx replicates 2.6.5 as
-     the repository's GCC 11 build computes it);
+     build: fMRIPrep 25.2.6 ships ANTs 2.6.2 from conda-forge; larmorx replicates 2.6.5's
+     source, which the repository's oracle, ``scripts/build_ants_oracle.sh``, honours);
   5. larmorx, which must be bit-identical to 4.
 
   ANTs 2.6.5 as built (glibc's maths) is run too, for the headline of the tool's own records.

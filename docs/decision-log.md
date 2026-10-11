@@ -368,7 +368,9 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   reference and sMRIPrep before the anatomical template (`docs/findings/ants-n4.md`).
 - **The oracle's compiler is part of the reference.** GCC 11 at `-O3` keeps two float values
   of the 2D/3D fit in double precision; larmorx reproduces that code generation
-  (`GridFit::double_axes`), since ANTs' bits depend on it.
+  (`GridFit::double_axes`), since ANTs' bits depend on it. *(Superseded the same day: the
+  source is the specification, the behaviour is GCC bug 110182, and the oracle is rebuilt;
+  see "The ANTs oracle is built by a fixed compiler" below.)*
 - **Correctly rounded maths kept (rule 5).** glibc's `expf`, `logf` and `exp` are not always
   correctly rounded, and one misrounded value changes an N4 run slightly. larmorx keeps the
   correctly rounded functions (new: `larmorx_core::math::{expf, logf}`), so it gives the same
@@ -501,6 +503,57 @@ Decided by the user on the questions the defect register raised
 - **Found while doing it:** the 3dTshift replica writes a metre or micrometre input's sform
   unconverted (its qform matches AFNI's); the new unit cases are expected divergences in the
   replica's record until its owner fixes it.
+
+## 2026-10-11: The ANTs oracle is built by a fixed compiler; N4 follows the source
+- **The cause of the N4 artefact is a GCC bug.** GCC's SLP vectorizer computes the first two
+  axes of ITK's B-spline fit as a `vector(2) double`, rounds it to a `vector(2) float` for the
+  source's float stores and converts it back; match.pd's rule for two conversions in a row
+  then removes the round trip because it compares `TYPE_PRECISION`, a vector's lane count,
+  instead of the element precision. GCC bug 110182 (wrong code), fixed in GCC 11.5, 12.4 and
+  13.2; Ubuntu 22.04's GCC 11.4 and 12.3 have it. The C++ standard requires assignments to
+  round, and x86-64 uses no excess precision, so this is not allowed behaviour
+  ([findings/ants-n4.md](findings/ants-n4.md), "GCC 11 miscompiles the fit").
+- **Chosen oracle build:** ITK 5.4.5 and ANTs 2.6.5 by conda-forge's GCC 14.3.0 (the
+  compiler of fMRIPrep 25.2.6's ANTs), installed with conda in a user-level environment
+  (`oracles/toolchains/gcc-14.3`, no system packages), with ITK's and ANTs' own flags
+  (`-O3`, `-march=corei7`) and static libstdc++. `scripts/build_ants_oracle.sh` now takes the
+  compiler and flags as options, records them and the flags each build used in
+  `BUILD_INFO.txt`, and refuses a compiler that miscompiles a probe of the bug. The build is
+  `oracles/ants-2.6.5` (a link to `oracles/ants-2.6.5-src`); the GCC 11 build is kept as
+  `oracles/ants-2.6.5-gcc11-O3`.
+- **Alternatives measured and not chosen:** GCC 11.4 with `-O2`, `-O3 -fno-tree-vectorize` or
+  `-O3 -fno-tree-slp-vectorize` also gives the source's N4 bits (38 of 38 smoke cases), but
+  leaves a compiler with a known wrong-code bug in the reference and slows the oracle that the
+  benchmarks time; FSL's copy of conda-forge's GCC 13.3 is fixed too, but would tie the oracle
+  to FSL's installation. `-mtune=generic` and conda-forge's `CXXFLAGS` do not avoid the bug.
+- **N4 follows the source** (`r` and the points rounded to float on every axis). A compiler
+  artefact is not an upstream defect, so there is no D13 switch;
+  `larmorx_image::bspline::fit::gcc11_double_axes` stays as a documented hook, 0 everywhere,
+  to reproduce GCC 11 builds in comparisons.
+- **The antsApplyTransforms suite** now runs the oracle binary, like the other ANTs suites
+  (it ran ANTsPy in-process before; ANTsPy remains the fallback).
+- **Re-validation** against the new oracle, standard tier: every suite passes, records
+  from commit `38b2a0c97ecf`.
+  Only N4 changed: 29 of 45 cases bit-identical to ANTs as built (27 against the GCC 11
+  build), 45 of 45 with CORE-MATH. antsApplyTransforms (now the binary: 63 of 79, as with
+  ANTsPy), ImageMath, ThresholdImage, MultiplyImages, SmoothImage, ResampleImageBySpacing,
+  ResampleImage and DenoiseImage give the same numbers as before; run case by case, the two
+  builds give byte-identical outputs in every one of those suites except a case that
+  resamples uninitialised memory, and in 6 of 45 N4 cases. fMRIPrep 25.2.6's own N4
+  (ANTs 2.6.2) is bit-identical to larmorx in 45 of 45 cases with CORE-MATH.
+- **Golden checksums** re-recorded from `f58d32a` after the smoke-tier parity passed against
+  the new oracle: the two N4 cases changed (`cli.ants.N4BiasFieldCorrection`: the corrected
+  image's and the bias field's data, headers unchanged; `py.ants.n4`: 15 of 18 outputs, all
+  but the 4D case's), the other 80 cases did not.
+- **For A4:** in the old build, GCC 11 also miscompiled `CenteredTransformInitializer` for
+  float Euler transforms (antsRegistration's `--initial-moving-transform [f,m,0|1]` with
+  `--float 1`, as fMRIPrep's normalization runs it); registration must be validated against
+  the new oracle. The same scan of GCC's dumps finds the bug also in
+  `ImageRegistrationMethodv4`'s metric sample points and in registration's B-spline and
+  velocity-field transforms; no tool ported so far uses them except N4.
+- **Also fixed:** the build script passed `-DSUPERBUILD_ANTS=OFF`, a name ANTs does not have,
+  so the old oracle was a superbuild against the system ITK; it now passes `ANTS_SUPERBUILD=OFF`
+  and builds only the programs used.
 
 ## Open decisions (PLAN.md §16)
 

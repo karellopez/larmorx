@@ -3,9 +3,9 @@
 **All cases agree.** 57 cases on the `standard` tier: 47 pass, 8 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ResampleImage` / `lx.ants.resample_image` (crates larmorx-ants, larmorx-interp)
-- **Reference:** ResampleImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image --tier standard`
+- **Reference:** ResampleImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image --tier standard`
 
 **Bit-identical: 46 of 46 passing cases** produce exactly the values ANTs writes; 46 of 46 also write exactly its header bytes.
 
@@ -58,7 +58,7 @@
 | `errors/pixel-type-8` | pixel type 8: 'Unsupported pixel type' | ANTs exit 1: Unsupported pixel type; larmorx exit 1: Unsupported pixel type |
 | `errors/pixel-type-negative` | pixel type -1 (unsigned: 4294967295): 'Unsupported pixel type' | ANTs exit 1: Unsupported pixel type; larmorx exit 1: Unsupported pixel type |
 | `errors/dimension-5` | dimension 5: 'Unsupported dimension' | ANTs exit 1: Unsupported dimension; larmorx exit 1: Unsupported dimension |
-| `errors/invalid-spacing` | two spacings in 3D: 'Invalid spacing.', then an uninitialised grid (ANTs aborts) | ANTs killed by signal 6: Size: [0, 96, 18446744071562067968]; larmorx exit 1: larmorx: ResampleImage: the output spacing is left uninitialised (ANTs crashes he… |
+| `errors/invalid-spacing` | two spacings in 3D: 'Invalid spacing.', then an uninitialised grid (ANTs aborts) | ANTs killed by signal 6: Refusing to change spacing from [1.5, 1.2, 2] to [0, 0, 0]; larmorx exit 1: larmorx: ResampleImage: the output spacing is left uniniti… |
 | `errors/zero-spacing` | spacing 0: ITK refuses a zero spacing (ANTs aborts) | ANTs killed by signal 6: Refusing to change spacing from [1.5, 1.2, 2] to [0, 0, 0]; larmorx exit 1: larmorx: ResampleImage: an output size of inf voxels along… |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: ResampleImage: cannot read image '<tmp>/none.nii.gz' (ANTs crashes … |
 
@@ -66,8 +66,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (30959407505d-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

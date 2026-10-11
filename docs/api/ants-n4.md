@@ -9,15 +9,22 @@ bias field correction (Tustison et al., *N4ITK: Improved N3 Bias Correction*, IE
 **Status: `validated`** against N4BiasFieldCorrection itself (see the
 [validation record](../validation/ants-n4.md)), on every command line fMRIPrep, sMRIPrep and
 sdcflows give it (standard tier: 45 compared cases, 54 outputs, in 2, 3 and 4 dimensions):
-- against the **unmodified ANTs 2.6.5 binary** at one thread: 27 of 45 cases (30 of 54
+- against the **unmodified ANTs 2.6.5 binary** at one thread: 29 of 45 cases (35 of 54
   outputs) bit-identical. The others differ only because glibc's `expf`, `logf` and `exp` are
   not always correctly rounded and larmorx's are; the differences are smaller than ANTs' own
-  difference between thread counts in 16 of the 18 cases, up to 2.6 times that in two, and
-  NCC is at least 0.9999999 (corrected images) and 0.999996 (bias fields);
+  difference between thread counts in 14 of the 16 cases, up to 4.2 times that in two, and
+  NCC is at least 0.9999999 (corrected images) and 0.9999998 (bias fields);
 - against the **same binary run with glibc's `expf`, `logf`, `exp`, `log`, `sin`, `cos` and
   `sincos` replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
   `scripts/build_crmath_preload.sh`), which is the arithmetic larmorx uses: **54 of 54 outputs
-  bit-identical**. ANTs' own code is not changed; only those C-library functions are.
+  bit-identical**. ANTs' own code is not changed; only those C-library functions are;
+- the same against **fMRIPrep 25.2.6's own ANTs (2.6.2)**: 45 of 45 cases bit-identical with
+  CORE-MATH, 29 of 45 as built.
+
+larmorx computes what ITK's C++ source defines. ANTs built by GCC 11.4 at `-O3` (Ubuntu
+22.04's compiler) does not: GCC bug 110182 drops two float roundings of the B-spline fit, so
+such a build gives slightly different N4 results
+([findings](../findings/ants-n4.md), "GCC 11 miscompiles the fit").
 
 **Speed** ([benchmark](../benchmarks/ants-n4.md)): sMRIPrep's N4 before the anatomical template (ANTs'
 defaults) on a raw T1w (160×192×192) takes 8.7 s on one thread and 2.4 s on 12, against

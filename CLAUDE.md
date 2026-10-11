@@ -25,7 +25,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
-## Status (2026-10-10)
+## Status (2026-10-11)
 - **Phase L0 done:** a buildable, tested skeleton, CI green on all six targets.
 - **Phase L1 in progress:**
   - `Image`/`Affine` and NIfTI-1/2 I/O: validated against nibabel (`docs/validation/nifti-io.md`) and benchmarked (`docs/benchmarks/nifti-io.md`).
@@ -56,6 +56,23 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 - **Stage-by-stage comparison with fMRIPrep 25.2.6 done** (2026-10-11): `python -m larmorx_validation pipeline-stages --oracle <run dir> --out docs/validation` (`validation/.../stages/`) reads nipype's `command.txt` and `_report/report.rst`, runs larmorx on fMRIPrep's own inputs and parameters for every step it has, compares with fMRIPrep's output as it ran, and takes differences apart by re-running the step in fMRIPrep's image (one thread, CORE-MATH preloaded) and with the ANTs 2.6.5 oracle. Record `docs/validation/fmriprep-stages.md`: 61 of 92 nodes bit-identical, the rest explained by threads, glibc's maths or the ANTs build, except 14 `antsApplyTransforms --float 1` calls (larmorx computes them in double; known since A1); HMC within thresholds. Findings `docs/findings/fmriprep-oracle.md`: fMRIPrep's image ships **ANTs 2.6.2 on ITK 5.4.4**; nipype passes threads as `NSLOTS` (now read by `larmorx ants`); **fMRIPrep's N4 binary follows the C++ source, where the GCC 11 oracle and larmorx's N4 do not** (open decision: which to follow); fMRIPrep's `ResampleSeries` races with multi-threaded OpenBLAS (only the image's `OMP_NUM_THREADS=1` prevents it).
 - **D13 switch and first corrections done** (2026-10-11): `upstream_defects="fix"|"reproduce"` (Python), `LARMORX_UPSTREAM_DEFECTS` (command line), `larmorx_core::defects` (Rust), `lx.UpstreamDefectWarning` ([docs/api/upstream-defects.md](docs/api/upstream-defects.md)). Corrected by default: PIPE-03, PIPE-04, SCI-03, AFNI-01/02/03/05/07 (clean-room original), FSL-01/03/05–10/13/14; FSL-02 opt-in and measured (`docs/validation/mri-hmc-normcorr-count.md`: a change about the size of mcflirt's band, no gain against the ground truth), pending the user's decision. PIPE-03 measured on real geometry (`docs/validation/resample-series-jacobian.md`: fMRIPrep's factor off by more than 1 % in 40 % of T1w-space brain voxels). Parity compares in `reproduce` mode (bit-identical as before) and reports a fix pass; golden `*.reproduce` cases equal the pre-D13 checksums. Still to do: the ANTs/ITK entries, the 3dTshift replica's switch, and the replica's sform for metre/micrometre inputs (an expected divergence in its record).
 - **Next (user decisions, 2026-10-11):** (1) a stage-by-stage comparison with the fMRIPrep 25.2.6 oracle run, feeding fMRIPrep's own intermediates to larmorx's tools (done, above); (2) then the missing tools, natively: A4 (antsRegistration rigid/affine, antsAI, antsAffineInitializer, histogram matching), A5 (SyN), A6 (Atropos), AFNI's 3dvolreg/3dUnifize/3dAutomask, FSL's BET/FAST/FLIRT-BBR, FreeSurfer's mri_coreg/lta_convert, and the confounds; then larmorprepx. **fMRIPrep oracle:** fMRIPrep 25.2.6 runs through Apptainer as the user, no Docker and no sudo (`scripts/run_fmriprep_oracle.sh`, image `oracles/images/fmriprep-25.2.6.sif`, digest and settings in each run's `RUN_INFO.txt`). First run done: ds000005 sub-01, `--fs-no-reconall`, outputs and working directory in `oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/`. Never ask the user for their sudo password.
+
+- **D13 part 2a done** (2026-10-11): the shared compatibility switch (`larmorx_core::defects`, Python `upstream_defects="fix"|"reproduce"` and `lx.UpstreamDefectWarning`, CLI `LARMORX_UPSTREAM_DEFECTS`; `docs/api/upstream-defects.md`) and the fixes for PIPE-03/-04, SCI-03, the head-motion original's FSL-* and the 3dTshift original's AFNI-* defects. FSL-02 stays opt-in (`normcorr_count="weights"`). Reports for fMRIPrep (PIPE-02, PIPE-03) are drafts in `docs/upstream-reports/`, not yet filed by the user.
+
+### Work in progress and queue (2026-10-11, evening)
+One agent at a time. The queue, in order:
+1. **Running: `antsApplyTransforms --float 1`.** The exact single-precision path, and the template-prior step that is slower than ANTs (20.5 s vs 16 s). Worktree branch `worktree-agent-a689dd2fa349688de`, plan in its `NOTES-float.md`. It must not change antsApplyTransforms' D13 defaults (ANTS-33).
+2. **D13 part 1:** the ANTs/ITK defects in the register's "D13 gaps" (ANTS-*, ITK-*), and the decided details (float-to-integer clamps with a warning; a switch even for failure and garbage cases).
+3. **D13 part 2b:** the same fixes in the GPL 3dTshift replica (replica author, may read AFNI source), plus its bug: it writes a metre or micrometre input's sform unconverted (the two expected divergences in `REPLICA_DIVERGENCES`).
+4. **Stage comparisons on the new oracle runs:** `python -m larmorx_validation pipeline-stages --oracle <run>` for each run below, once finished. Confirm PIPE-03 on real PEPOLAR data (ds005040). Regenerate `docs/validation/fmriprep-stages.md` for ds000005 too: its N4 rows predate the source-faithful N4, and D13 changed defaults.
+5. **Pending measurements on a quiet machine:** `docs/benchmarks/ants-n4.md` against the new oracle; antsApplyTransforms after `--float`.
+6. **A4** (linear registration, antsAI, antsAffineInitializer, histogram matching), validated against the GCC 14.3 oracle only. Then A5, A6, AFNI's 3dvolreg/3dUnifize/3dAutomask, FSL's BET/FAST/FLIRT-BBR, FreeSurfer's mri_coreg/lta_convert, the confounds, larmorprepx.
+
+**fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`; done when its `RUN_INFO.txt` has `finished:`):
+- `ds000005-sub-01-noreconall`: done; no field maps, no slice timing.
+- `ds001600-sub-1-noreconall`: done, anatomy only; its BOLD runs have 5 volumes, which fMRIPrep skips.
+- `ds005040-sub-002-noreconall` (PEPOLAR plus slice timing): running since 20:43 on 2026-10-11.
+- Then `ds005454-sub-16-noreconall` (`phasediff`, multiband) and `ds005752-sub-ON01016-noreconall` (direct `fieldmap`), started one after another by the chain in `oracles/logs/fmriprep-25.2.6-sdc-chain.log`.
 
 ## The user's direction (settled; do not re-propose the alternatives)
 - **Not a fork of fMRIPrep.** No nipype, traits, niworkflows/smriprep/sdcflows runtime dependencies, or graph engines. Ops are plain typed functions; per-subject orchestration is readable Python.
@@ -164,7 +181,17 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 - **The ANTs oracle is built with conda-forge GCC 14.3** (`oracles/toolchains/gcc-14.3`, user-level). Ubuntu 22.04's GCC 11.4 and 12.3 miscompile float roundings at `-O3` (GCC bug 110182); `scripts/build_ants_oracle.sh` probes for it and refuses such a compiler. The old GCC 11 build is kept as evidence in `oracles/ants-2.6.5-gcc11-O3`; validate registration (A4/A5) against the new build only.
 - **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"` also matches its own command line, so it never ends (four such loops ran for a day, 2026-10-11). Use a bracket: `pgrep -f "[l]armorx_validation bench"`.
 - **Never delete work products** (code, drafts, ports, harnesses, reports). If something must leave the repo or the build, archive it in `<workspace>/archive/<date>-<topic>/` (not under `/tmp`) and tell the user. Ask before deleting anything that is not a temporary build artefact.
-- Verify the environment at session start: `uname -m`, `nproc`, free RAM, `docker --version`, `rustc --version`.
+- Verify the environment at session start: `uname -m`, `nproc`, free RAM, `apptainer --version`, `rustc --version`. Docker is not installed; Apptainer replaces it.
+- **Merging an agent's work: the checklist** (the user: "Make sure everything works before merging"). Nothing reaches `main` or GitHub before steps 1-5 pass on the merged tree in the main checkout:
+  0. Start from a clean tree; chain the merge with `&&` and check `.git/MERGE_HEAD`. On 2026-10-11 an uncommitted file made `git merge` abort, and the checks then ran on the old tree.
+  1. Both Rust workspaces: `cargo fmt --check`, `clippy -D warnings`, `cargo test --locked`, in the root and in `crates-gpl`.
+  2. `maturin develop --release`, then `pytest tests/python tests/golden`.
+  3. `ruff check`, `ruff format --check`, `scripts/check_spdx.py`.
+  4. `pytest tests/parity` (the smoke tier against the real oracles).
+  5. Re-run the new or changed tool's standard-tier parity yourself, from the committed merge (a clean tree, so the record's commit is clean), and compare with the agent's record.
+  6. Commit, check for AI attribution, push, then watch CI on all six platforms.
+- **Reading CI results without a login:** GitHub serves job logs only to logged-in users. Golden mismatches are printed as workflow annotations, which `https://api.github.com/repos/karellopez/larmorx/check-runs/<job id>/annotations` serves without a login.
+- **Detached jobs (`nohup ... &`) send no notice when they end.** Watch their log for a final line in a tracked background command.
 
 ## Repo map
 | Path | Contents |

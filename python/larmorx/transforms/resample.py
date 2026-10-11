@@ -8,6 +8,13 @@ A replica of fMRIPrep's ``ResampleSeries`` interface and its ``resample_image``,
 in Hz along the phase-encoding axis, with its Jacobian), the transforms to the target space
 and cubic B-spline interpolation are applied in one step, exactly as fMRIPrep computes them.
 
+Two upstream defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
+``ResampleSeries`` takes the field map's Jacobian along the target grid's axis with the
+source's phase-encoding index, in target voxels (PIPE-03), and nitransforms reads the
+transforms of a composite ``.h5`` file in name order (PIPE-04); SciPy's ``reflect`` boundary
+(SCI-03) applies when that mode is chosen. ``upstream_defects="reproduce"`` gives fMRIPrep's
+result bit for bit.
+
 The orientation helpers are ported from nibabel 5.4.2 (MIT): ``io_orientation``,
 ``ornt_transform``, ``ornt2axcodes``, ``inv_ornt_aff`` and ``apply_orientation``, as
 sdcflows' ``ensure_positive_cosines`` uses them.
@@ -26,7 +33,8 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 from larmorx.io.nifti import NiftiHeader
 from larmorx.transforms._linalg import closest_orthogonal, inv, matmul
@@ -222,6 +230,7 @@ def resample_series(
     prefilter: bool = True,
     output_dtype: Literal["float32", "float64"] = "float32",
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """Resample a BOLD run onto a target grid in one step, as fMRIPrep's ``ResampleSeries``.
 
@@ -249,13 +258,21 @@ def resample_series(
         readout time (s) of the source. Both are needed for distortion correction; the source
         is then reoriented to positive direction cosines first, as fMRIPrep does.
     jacobian
-        Multiply by the Jacobian of the voxel-shift map, ``1 + d(vsm)/d(pe)``.
+        Multiply by the Jacobian of the voxel-shift map. larmorx differentiates along the
+        phase-encoding direction mapped into the target grid,
+        ``1 + ∇vsm · ∂t/∂s_pe``; fMRIPrep differentiates along the target axis with the
+        source's phase-encoding index, in target voxels, which is the same only when the
+        target's axes are the source's (PIPE-03; ``upstream_defects="reproduce"``).
     order, mode, cval, prefilter
         SciPy's ``map_coordinates`` settings (default: cubic, ``grid-constant``, 0, True).
     output_dtype
         ``float32`` (fMRIPrep's) or ``float64``.
     n_threads
         Worker threads (0 = all). The result does not depend on it.
+    upstream_defects
+        ``"fix"`` (default) corrects PIPE-03, PIPE-04 and SCI-03; ``"reproduce"`` gives
+        fMRIPrep's (nitransforms', SciPy's) result bit for bit. A
+        :class:`~larmorx.UpstreamDefectWarning` says when a defect changed the result.
 
     Returns
     -------
@@ -263,6 +280,7 @@ def resample_series(
         The resampled data on the target grid (plus the volumes), with the target's affine and
         a float32 header: the target's, with the source's time step.
     """
+    _defects.check(upstream_defects)
     if order < 0 or order > 5:
         raise RuntimeError("spline order not supported")
     if pe_dir is not None and pe_dir not in PE_DIRECTIONS:
@@ -277,7 +295,7 @@ def resample_series(
     if isinstance(transforms, (Affine, AffineSeries, DenseField, TransformChain)):
         chain: Transform = transforms
     else:
-        chain = load_transforms(list(transforms or []), inverse)
+        chain = load_transforms(list(transforms or []), inverse, upstream_defects=upstream_defects)
 
     pe_info = None
     if distort:
@@ -304,7 +322,7 @@ def resample_series(
     steps = _rust_steps(TransformChain(tuple(transform_list)).steps())
     fmap = None if fieldmap is None else _fieldmap(fieldmap, shape)
 
-    out = _core.resample_series(
+    out, notices = _core.resample_series(
         data,
         list(shape),
         np.ascontiguousarray(target_affine, dtype=np.float64),
@@ -320,7 +338,9 @@ def resample_series(
         jacobian=bool(jacobian),
         output=output_dtype,
         n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
     )
+    _defects.warn(notices)
     if nvols == 1 and data.ndim == 3:
         out = out.reshape(shape)
     return Image(out, target_affine, _output_header(out, target_affine, target_header, src_header))

@@ -41,6 +41,7 @@
 //! OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //! DEALINGS IN THE SOFTWARE.
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::linalg::{Mat3, Mat4};
 use larmorx_core::vnl_svd::vnl_svd;
 use larmorx_interp::ndimage::{Mode, Spline};
@@ -213,6 +214,7 @@ impl DenseField {
         // Three cubic interpolations, one component at a time, NaN outside the field.
         let mut mapped = vec![[0.0f64; 3]; points.len()];
         for c in 0..3 {
+            // `constant` mode: the reflect boundary of SCI-03 is not involved.
             let spline = Spline::new(
                 &self.field[c],
                 self.shape,
@@ -221,6 +223,7 @@ impl DenseField {
                 f64::NAN,
                 true,
                 true,
+                UpstreamDefects::Fix,
             )
             .map_err(|e| TransformError::Invalid(e.to_string()))?;
             mapped
@@ -292,6 +295,82 @@ pub fn map_points(steps: &[Step], points: &mut [[f64; 3]]) -> Result<(), Transfo
         }
     }
     Ok(())
+}
+
+/// `m · p` for an affine `m`, in plain double precision (no float32 rounding, no fused
+/// products): for derivatives of a mapping, not for reproducing nitransforms' values.
+#[inline]
+pub fn exact_affine(m: &Mat4, p: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|r| m[r][0] * p[0] + m[r][1] * p[1] + m[r][2] * p[2] + m[r][3])
+}
+
+/// A chain mapped one point at a time in double precision, without nitransforms' float32
+/// roundings and without its exact lookup of points on a field's grid (a field is always
+/// interpolated, which gives the node values at the nodes). Points outside a field are not
+/// displaced, as in nitransforms. Used for the Jacobian of the mapping (PIPE-03), where the
+/// float32 noise of the replica's coordinates would swamp finite differences.
+pub struct ExactChain<'a> {
+    steps: Vec<ExactStep<'a>>,
+}
+
+enum ExactStep<'a> {
+    Affine(&'a Mat4),
+    Field {
+        inverse: &'a Mat4,
+        components: Box<[Spline<3>; 3]>,
+    },
+}
+
+impl<'a> ExactChain<'a> {
+    /// Prepares `steps` (each field's three components prefiltered once).
+    pub fn new(steps: &'a [Step]) -> Result<ExactChain<'a>, TransformError> {
+        let steps = steps
+            .iter()
+            .map(|s| match s {
+                Step::Affine(m) => Ok(ExactStep::Affine(m)),
+                Step::DenseField(f) => {
+                    let spline = |c: usize| {
+                        Spline::new(
+                            &f.field[c],
+                            f.shape,
+                            3,
+                            Mode::Constant,
+                            f64::NAN,
+                            true,
+                            true,
+                            UpstreamDefects::Fix,
+                        )
+                        .map_err(|e| TransformError::Invalid(e.to_string()))
+                    };
+                    Ok(ExactStep::Field {
+                        inverse: &f.inverse,
+                        components: Box::new([spline(0)?, spline(1)?, spline(2)?]),
+                    })
+                }
+            })
+            .collect::<Result<_, TransformError>>()?;
+        Ok(ExactChain { steps })
+    }
+
+    /// The image of `p` (RAS+ mm) through every step in list order.
+    pub fn map(&self, mut p: [f64; 3]) -> [f64; 3] {
+        for s in &self.steps {
+            p = match s {
+                ExactStep::Affine(m) => exact_affine(m, p),
+                ExactStep::Field {
+                    inverse,
+                    components,
+                } => {
+                    let q = exact_affine(inverse, p);
+                    std::array::from_fn(|c| {
+                        let v = components[c].sample(q);
+                        if v.is_nan() { p[c] } else { v }
+                    })
+                }
+            };
+        }
+        p
+    }
 }
 
 #[cfg(test)]

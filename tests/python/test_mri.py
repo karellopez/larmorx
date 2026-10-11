@@ -208,6 +208,6 @@ def test_command_line_errors(series):
     code, out, err = cli("-out", "x", "-mats")
     assert code == 2 and "Input filename not found" in err
     code, _, err = cli("-in", series, "-edge", "-out", "x")
-    assert code == 255 and err == "Unrecognised option -edge\n"
+    assert code == 255 and err.startswith("Unrecognised option -edge\n")
     code, _, err = cli("-in", series, "-refvol", "99", "-out", "x")
     assert code == 1 and "-refvol 99" in err

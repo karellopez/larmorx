@@ -459,6 +459,28 @@ Decided by the user on the questions the defect register raised
   be bugs; larmorprepx's pipeline choices are made with larmorprepx; ResampleImage's corrected
   command line is designed and reviewed.
 
+## 2026-10-11: D13's switch, and the first corrections
+- **The switch** (shared by every tool, [api/upstream-defects.md](api/upstream-defects.md)):
+  `upstream_defects="fix" | "reproduce"` on every affected Python function (default `"fix"`),
+  `LARMORX_UPSTREAM_DEFECTS=fix|reproduce` on the command line (an environment variable, like
+  `LARMORX_IMPLEMENTATION`, so that no flag clashes with an original's arguments; invalid
+  values exit 2), and `larmorx_core::defects::UpstreamDefects` in each tool's Rust options.
+  Tools return `Notice`s for the defects that changed a result (or, reproduced, would have);
+  Python raises them as `lx.UpstreamDefectWarning` (attributes `entry`, `tool`, `mode`,
+  `detail`), the command line prints one `upstream defect <ID> (<tool>) corrected|reproduced:
+  ...` line on standard error. Replica programs receive the same variable and write the same
+  lines. The register's entries with a switch are listed in `larmorx_core::defects::DEFECTS`.
+- **Corrected by default:** PIPE-03 (the Jacobian along the phase-encoding direction mapped
+  into the target grid), PIPE-04, SCI-03, and in the clean-room originals AFNI-01, -02, -03,
+  -05, -07 and FSL-01, -03, -05 to -10, -13, -14. FSL-02 is implemented as an opt-in
+  (`normcorr_count="weights"`) and measured, for the user to decide. AFNI-08's trigger was not
+  found by black-box runs. Left for the next tasks: the ANTs and ITK entries, and the 3dTshift
+  replica's switch.
+- **Parity** compares with the originals in `reproduce` mode (bit-identity as before D13) and
+  runs a fix pass that reports what the corrections change and checks that a defect is named
+  exactly when the two passes differ. Golden cases record the default, plus `*.reproduce`
+  cases whose checksums equal those recorded before D13.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

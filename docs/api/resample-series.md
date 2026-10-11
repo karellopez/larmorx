@@ -57,7 +57,7 @@ points = chain.map(ras_points)                 # (n, 3) RAS+ mm, as nitransforms
 values = lx.ndimage.map_coordinates(vol, coords, order=3, mode="grid-constant")
 ```
 
-## `lx.transforms.resample_series(source, target, transforms=None, *, inverse=False, fieldmap=None, pe_dir=None, ro_time=None, jacobian=True, order=3, mode="grid-constant", cval=0.0, prefilter=True, output_dtype="float32", n_threads=1)`
+## `lx.transforms.resample_series(source, target, transforms=None, *, inverse=False, fieldmap=None, pe_dir=None, ro_time=None, jacobian=True, order=3, mode="grid-constant", cval=0.0, prefilter=True, output_dtype="float32", n_threads=1, upstream_defects="fix")`
 
 For each volume `t` and each target voxel, as fMRIPrep's `resample_vol`:
 
@@ -66,7 +66,10 @@ For each volume `t` and each target voxel, as fMRIPrep's `resample_vol`:
 2. volume `t`'s head-motion affine moves it (voxel to voxel);
 3. the voxel-shift map, `fieldmap (Hz) × readout time`, is added along the phase-encoding axis;
 4. the volume is interpolated there (SciPy's cubic B-spline, prefiltered in float64);
-5. with `jacobian`, the value is multiplied by `1 + d(vsm)/d(axis)`.
+5. with `jacobian`, the value is multiplied by the Jacobian of the voxel-shift map: by default
+   `1 + ∇vsm · ∂t/∂s_pe`, the derivative along the phase-encoding direction mapped into the
+   target grid; fMRIPrep's `1 + np.gradient(vsm, axis=pe)` with `upstream_defects="reproduce"`
+   (PIPE-03, [below](#upstream-defects-d13)).
 
 Returns an `lx.Image` on the target grid (plus the volumes for a 4D source) with the target's
 affine and a float32 header: the target's, with the source's time step.
@@ -84,16 +87,17 @@ affine and a float32 header: the target's, with the source's time step.
 | `jacobian` (mandatory) | `jacobian` (default `True`, `resample_image`'s default) | |
 | `num_threads` | `n_threads` | 0 = all; the result does not depend on it |
 | `output_data_type` (`float32`) | `output_dtype` | `float32` or `float64` |
-| `order` (3), `mode` (`grid-constant`), `cval` (0), `prefilter` (True) | the same | SciPy's `map_coordinates` settings; every SciPy mode and order 0–5 |
+| `order` (3), `mode` (`grid-constant`), `cval` (0), `prefilter` (True) | the same | SciPy's `map_coordinates` settings; every SciPy mode and order 0–5 (`reflect`, `grid-mirror` and `nearest` with the exact boundary by default, SCI-03) |
+| – | `upstream_defects` | `"fix"` (default) corrects PIPE-03, PIPE-04 and SCI-03; `"reproduce"` gives fMRIPrep's result bit for bit |
 | – (output file `*_resampled.nii.gz`) | – | the image is returned; `lx.save` writes it |
 
 ### Transforms (`lx.transforms`)
 
 | nitransforms / fMRIPrep | larmorx | Notes |
 |---|---|---|
-| `fmriprep.utils.transforms.load_transforms(paths, inverse)` | `load_transforms(paths, inverse)` | `.h5` → composite, anything else → ITK linear; the last file first |
+| `fmriprep.utils.transforms.load_transforms(paths, inverse)` | `load_transforms(paths, inverse, *, upstream_defects="fix")` | `.h5` → composite, anything else → ITK linear; the last file first |
 | `nt.linear.load` | `load_itk_linear` | ITK text (one or more transforms; values parsed as float32), MATLAB `.mat` |
-| `nt.manip.load(path, fmt="h5")` | `load_itk_composite` | affines and displacement fields from ITK's HDF5 layout |
+| `nt.manip.load(path, fmt="h5")` | `load_itk_composite(path, *, upstream_defects="fix")` | affines and displacement fields from ITK's HDF5 layout, in numeric order (nitransforms' name order with `reproduce`, PIPE-04) |
 | `Affine` | `Affine` | `matrix` (4×4 RAS+), `inverse`, `~`, `map` |
 | `LinearTransformsMapping` | `AffineSeries` | `matrices` `(t, 4, 4)`; head motion |
 | `DenseFieldTransform` | `DenseField` | `deltas` `(x, y, z, 3)` RAS+ mm and the grid's `affine` |
@@ -114,9 +118,26 @@ nitransforms on such a machine, and on every platform
 
 | SciPy | larmorx | Notes |
 |---|---|---|
-| `map_coordinates(input, coordinates, output, order, mode, cval, prefilter)` | the same, plus `n_threads` | `output` is a dtype, not an array; 1- to 4-D inputs; float, integer outputs |
-| `spline_filter(input, order, output, mode)` | `spline_filter(input, order, mode, n_threads=)` | float64 result |
-| `spline_filter1d(input, order, axis, output, mode)` | `spline_filter1d(input, order, axis, mode, n_threads=)` | float64 result |
+| `map_coordinates(input, coordinates, output, order, mode, cval, prefilter)` | the same, plus `n_threads`, `upstream_defects` | `output` is a dtype, not an array; 1- to 4-D inputs; float, integer outputs |
+| `spline_filter(input, order, output, mode)` | `spline_filter(input, order, mode, n_threads=, upstream_defects=)` | float64 result |
+| `spline_filter1d(input, order, axis, output, mode)` | `spline_filter1d(input, order, axis, mode, n_threads=, upstream_defects=)` | float64 result |
+
+## Upstream defects (D13)
+
+Three defects of fMRIPrep's resampler and its libraries are corrected by default and reproduced
+with `upstream_defects="reproduce"`; an `lx.UpstreamDefectWarning` names each one that changed
+the result, in both modes ([upstream-defects.md](upstream-defects.md); register entries in
+[findings/upstream-defects.md](../findings/upstream-defects.md)):
+
+| ID | fMRIPrep, nitransforms, SciPy | larmorx by default |
+|---|---|---|
+| PIPE-03 | `ResampleSeries` multiplies by `1 + np.gradient(vsm, axis=pe)`: the gradient along the *target* array axis whose index is the source's phase-encoding axis, in target voxels. It is the Jacobian only when the target's axes are the source's (the native boldref); in T1w or standard space it is taken along another direction (a target whose axes are permuted or flipped relative to the BOLD grid) or at another scale (a target voxel smaller than the source's: the derivative per target voxel is a fraction of the derivative per source voxel) | `1 + ∇_t vsm · ∂t/∂s_pe`, the Jacobian determinant of the corrected mapping relative to the uncorrected one (the matrix determinant lemma), with `∂t/∂s_pe` column `pe` of the inverse Jacobian of the map from target voxels to source voxels: exact for a chain of affines, by central differences (±0.5 voxel) through a displacement field. Where the target's axes are the source's, it is fMRIPrep's float32 value bit for bit. Head motion is left out, as in fMRIPrep |
+| PIPE-04 | nitransforms reads the transforms of a composite `.h5` file in h5py's name order, so a composite of 10 or more transforms is applied out of order (`"10"` before `"2"`) | numeric order |
+| SCI-03 | SciPy's spline prefilter, for the reflect boundary (modes `reflect`, `grid-mirror`, `nearest`), reads a coefficient it has already updated, so its splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: the splines pass through the samples |
+
+fMRIPrep's own calls (`grid-constant`, composites of two or three transforms) meet only PIPE-03,
+with field maps in T1w and standard spaces (PEPOLAR field maps apply the Jacobian by default).
+The parity record's "D13 fix pass" lists what the corrections change, case by case.
 
 ## Rust API
 
@@ -130,8 +151,10 @@ let plan = SeriesResampler::new(
     &ras2vox, source_shape, Some(fmap_hz), ResampleOptions::default(), n_threads,
 )?;
 // All volumes (or one at a time with `resample_volume`, for streaming).
-plan.resample_series(&source_f32, n_volumes, Some(&hmc_vox2vox), &[PeInfo { axis: 1, readout: -0.0312 }],
-                     &mut out_f32, n_threads)?;
+// The notices name the upstream defects that changed the result (ResampleOptions::
+// upstream_defects: UpstreamDefects::Fix by default, Reproduce for fMRIPrep's result).
+let notices = plan.resample_series(&source_f32, n_volumes, Some(&hmc_vox2vox),
+                                   &[PeInfo { axis: 1, readout: -0.0312 }], &mut out_f32, n_threads)?;
 ```
 
 `larmorx_interp::ndimage` has `Spline` (an input prefiltered once, then `sample` /

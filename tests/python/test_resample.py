@@ -75,12 +75,14 @@ def test_bit_identical_to_scipy(mode, order):
     coords[:, :50] = np.round(coords[:, :50]) + 0.5
     coords[:, 50] = np.nan
     ref = ndi.map_coordinates(data, coords, order=order, mode=mode, cval=-1.5)
-    got = lx.ndimage.map_coordinates(data, coords, order=order, mode=mode, cval=-1.5)
+    # SciPy's reflect boundary (SCI-03) is reproduced on request only.
+    rep = {"upstream_defects": "reproduce"}
+    got = lx.ndimage.map_coordinates(data, coords, order=order, mode=mode, cval=-1.5, **rep)
     assert np.array_equal(ref, got, equal_nan=True)
     if order >= 2:
         d = data.astype(np.float64)
         assert np.array_equal(
-            ndi.spline_filter(d, order, mode=mode), lx.ndimage.spline_filter(d, order, mode)
+            ndi.spline_filter(d, order, mode=mode), lx.ndimage.spline_filter(d, order, mode, **rep)
         )
 
 

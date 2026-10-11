@@ -10,6 +10,12 @@ count.
 Differences from SciPy: complex inputs and ``output`` arrays are not supported (pass a dtype),
 and arrays have 1 to 4 dimensions. See ``docs/api/resample-series.md``.
 
+One SciPy defect is corrected by default (D13, ``docs/api/upstream-defects.md``): the spline
+prefilter's ``reflect`` boundary (modes ``reflect``, ``grid-mirror`` and ``nearest``) reads a
+coefficient it has already updated, so SciPy's splines do not pass through the samples on short
+axes (SCI-03). ``upstream_defects="reproduce"`` gives SciPy's result; a
+:class:`~larmorx.UpstreamDefectWarning` says when the correction changed one.
+
 The argument checks and their messages follow ``scipy/ndimage/_interpolation.py`` (SciPy
 1.15.2, BSD-3-Clause; the notice is in the NOTICE file of larmorx).
 """
@@ -20,7 +26,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 
 __all__ = ["MODES", "map_coordinates", "spline_filter", "spline_filter1d"]
 
@@ -66,6 +73,7 @@ def map_coordinates(
     prefilter: bool = True,
     *,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """Map ``input`` to new coordinates by spline interpolation (``scipy.ndimage``).
 
@@ -73,7 +81,9 @@ def map_coordinates(
     the shape ``coordinates.shape[1:]``. ``output`` is a dtype (default: the input's), not an
     array. With ``prefilter`` and ``order > 1`` the input is padded (``nearest`` and
     ``grid-constant``) and spline-filtered in float64 first, as SciPy does.
+    ``upstream_defects="reproduce"`` gives SciPy's ``reflect`` boundary (SCI-03).
     """
+    _defects.check(upstream_defects)
     if order < 0 or order > 5:
         raise RuntimeError("spline order not supported")
     data = np.asarray(input)
@@ -91,7 +101,7 @@ def map_coordinates(
         raise RuntimeError("invalid shape for coordinate array")
     out_dtype = np.dtype(data.dtype if output is None else output)
     flat = np.ascontiguousarray(coords.reshape(data.ndim, -1), dtype=np.float64)
-    values = _core.ndimage_map_coordinates(
+    values, notices = _core.ndimage_map_coordinates(
         data,
         flat,
         order=int(order),
@@ -100,7 +110,9 @@ def map_coordinates(
         prefilter=bool(prefilter),
         output=out_dtype.name,
         n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
     )
+    _defects.warn(notices)
     return values.reshape(out_shape)
 
 
@@ -111,14 +123,24 @@ def spline_filter1d(
     mode: str = "mirror",
     *,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """The 1D B-spline prefilter along ``axis`` (float64 result), as ``scipy.ndimage``."""
+    """The 1D B-spline prefilter along ``axis`` (float64 result), as ``scipy.ndimage``;
+    ``upstream_defects`` as for :func:`map_coordinates`."""
+    _defects.check(upstream_defects)
     if order < 0 or order > 5:
         raise RuntimeError("spline order not supported")
     data = np.asarray(input, dtype=np.float64)
-    return _core.ndimage_spline_filter1d(
-        data, order=int(order), axis=int(axis), mode=_check_mode(mode), n_threads=int(n_threads)
+    out, notices = _core.ndimage_spline_filter1d(
+        data,
+        order=int(order),
+        axis=int(axis),
+        mode=_check_mode(mode),
+        n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
     )
+    _defects.warn(notices)
+    return out
 
 
 def spline_filter(
@@ -127,11 +149,20 @@ def spline_filter(
     mode: str = "mirror",
     *,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """The multidimensional B-spline prefilter (float64 result), as ``scipy.ndimage``."""
+    """The multidimensional B-spline prefilter (float64 result), as ``scipy.ndimage``;
+    ``upstream_defects`` as for :func:`map_coordinates`."""
+    _defects.check(upstream_defects)
     if order < 2 or order > 5:
         raise RuntimeError("spline order not supported")
     data = np.asarray(input, dtype=np.float64)
-    return _core.ndimage_spline_filter(
-        data, order=int(order), mode=_check_mode(mode), n_threads=int(n_threads)
+    out, notices = _core.ndimage_spline_filter(
+        data,
+        order=int(order),
+        mode=_check_mode(mode),
+        n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
     )
+    _defects.warn(notices)
+    return out

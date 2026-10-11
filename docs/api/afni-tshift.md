@@ -62,7 +62,7 @@ larmorx afni 3dTshift -ignore 0 -tzero 0.969 -TR 2.0s -tpattern @slice_timing.1D
     -prefix sub-01_desc-stc_bold.nii.gz sub-01_task-rest_bold.nii.gz
 ```
 
-## `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1, implementation="auto")`
+## `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 Each voxel's time series is detrended (least-squares line), shifted in time so that its slice
 refers to `tzero`, clipped to its own range, and given its trend back. The output at time
@@ -98,11 +98,12 @@ and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `
 | `-ignore n` | `ignore=n` | at most nt − 5 |
 | `-Fourier` `-linear` `-cubic` `-quintic` `-heptic` `-wsinc5` `-wsinc9` | `method="fourier"` (default), `"linear"`, … | the CLI compares 4 characters (`-cub`), 7 for `-wsinc5/9` (any case) |
 | `-rlt` / `-rlt+` | `restore="none"` / `"intercept"` | `-rlt+` adds back the fitted intercept, not the mean |
-| `-no_detrend` | `detrend=False` | AFNI's voxel-pair behaviour is reproduced, with a warning (below) |
+| `-no_detrend` | `detrend=False` | every voxel's mean removed and restored; AFNI's voxel pairs with `upstream_defects="reproduce"` (AFNI-05, below) |
 | `-verbose` | – | progress on stderr |
 | `-voxshift dset` | – | not supported |
 | (threads: `OMP_NUM_THREADS`) | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
 | (`LARMORX_IMPLEMENTATION=auto\|replica\|original`) | `implementation="auto"` | larmorx's choice between the replica and the original (below) |
+| (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | AFNI's defects corrected (default) or reproduced ([upstream defects](#upstream-defects-d13), [upstream-defects.md](upstream-defects.md)) |
 
 ## Choosing the implementation
 
@@ -159,11 +160,35 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
 | int8, uint16, int32, uint32, float64 | any | float32 | converted, then scaled if the slope is not 0 |
 
 Non-finite values read as 0. Outputs keep the type and brick factor (`scl_slope`); integers are
-rounded half to even and clamped (shorts to ±32767). A **negative** `scl_slope` is applied on
-output but not on input, so AFNI's output is sign-flipped; larmorx reproduces this and warns.
+rounded half to even and clamped (shorts to ±32767). Three of these rules are AFNI defects that
+larmorx corrects by default: a **negative** `scl_slope` (AFNI-01), float32 data with a slope and
+an intercept (AFNI-02) and metre or micron units (AFNI-07); see below.
 The output header is NIfTI-1 with qform and sform both from AFNI's matrix (the sform if
 `sform_code > 0`, else the qform), codes mapped 1, 2 → 1, 3, 5 → 3, 4 → 4, the slice axis
 third (`dim_info` 48) and slice range `0..nz−1`; AFNI's history extension is not written.
+
+## Upstream defects (D13)
+
+larmorx corrects five of 3dTshift's defects by default and reproduces them with
+`upstream_defects="reproduce"` (command line: `LARMORX_UPSTREAM_DEFECTS=reproduce`); a warning
+names each one that changed the output, in both modes ([upstream-defects.md](upstream-defects.md),
+register entries in [findings/upstream-defects.md](../findings/upstream-defects.md)):
+
+| ID | AFNI 25.2.09 | larmorx by default | Where |
+|---|---|---|---|
+| AFNI-01 | a negative `scl_slope` is applied when values are stored but not when they are read: shifted slices come out sign-flipped and scaled (int16 with slope −0.5: a mean of 942 comes out −1884) | the factor is applied when reading too, so the output has the input's values | files with a negative `scl_slope`; slices left unshifted and copies are the same in both modes |
+| AFNI-02 | float32 data with a slope and an intercept are scaled when read, and the slope is also kept as the output's `scl_slope`: the output reads back scaled twice | scaled once, written without a factor | float32 files with both fields set |
+| AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
+| AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
+| AFNI-07 | metre and micron units: the voxel sizes and directions are converted to millimetres, the origin is not | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
+
+On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
+`-no_detrend`) none of them applies, so the default output is AFNI's. The register's AFNI-08 (an
+all-zero slice-time list writes `slice_end` 0) has no switch: no black-box run found an input
+that makes AFNI do it, and larmorx writes `nz − 1` (`specs/3dTshift.md` §6). The replica
+(`larmorx-gpl`) receives the choice as `LARMORX_UPSTREAM_DEFECTS`; its corrections are a
+separate task, and until then it gives AFNI's output in both modes. The parity record's "D13 fix
+pass" lists what the corrections change, case by case.
 
 ## Behaviour found by black-box runs
 
@@ -183,8 +208,9 @@ The spec left these open; each was settled by running AFNI 25.2.09 (details in
   float32.
 - **`-no_detrend`**: within each slice, voxels are taken in pairs in index order (x fastest);
   the first of a pair has its mean removed and restored, the second is shifted as raw values
-  (zeros beyond the ends, clipped to its range). The last bits of these cases are not
-  bit-identical yet.
+  (zeros beyond the ends, clipped to its range); reproduced with
+  `upstream_defects="reproduce"` (AFNI-05). The last bits of these cases are not bit-identical
+  yet.
 - **`-TR … ms`** switches every time to milliseconds (header offsets, `-tzero`, `@file`
   values are taken as milliseconds); the output is written in seconds.
 - **`@file`**: AFNI 1D text read column by column (one line reads left to right); `#`
@@ -224,8 +250,10 @@ values; integer outputs only where a value sits on a rounding boundary):
 use larmorx_afni::dataset::{self, OutputTiming};
 use larmorx_afni::timing::{Pattern, mean_time};
 use larmorx_afni::tshift::{Method, Restore, TshiftParams, tshift};
+use larmorx_core::UpstreamDefects;
 
-let mut image = dataset::read("bold.nii.gz", 8)?;
+let defects = UpstreamDefects::Fix; // or Reproduce: AFNI's output
+let mut image = dataset::read("bold.nii.gz", 8, defects)?;
 let nz = image.bricks.shape[2];
 let slice_times = Pattern::AltPlus.times(nz, image.tr);
 let params = TshiftParams {
@@ -237,10 +265,11 @@ let params = TshiftParams {
     restore: Restore::Trend,
     detrend: true,
     n_threads: 8,
+    upstream_defects: defects,
 };
-tshift(&mut image.bricks, &params)?;
+let notices = tshift(&mut image.bricks, &params)?; // the defects that changed the output
 let timing = OutputTiming { tr: params.tr, toffset: params.tzero, slices: None };
-let header = dataset::output_header(&image.header, &image.bricks, &timing)?;
+let header = dataset::output_header(&image.header, &image.bricks, &timing, defects)?;
 dataset::write("bold_stc.nii.gz", &header, &image.bricks, 8)?;
 ```
 

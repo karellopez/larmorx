@@ -436,7 +436,12 @@ def _run_one_voxel(n: int, checks: CheckList) -> None:
                 output_dtype="f8",
             )
             got = lx.transforms.resample_series(
-                src, ((1, 1, 1), target), [hmc], jacobian=False, output_dtype="float64"
+                src,
+                ((1, 1, 1), target),
+                [hmc],
+                jacobian=False,
+                output_dtype="float64",
+                upstream_defects="reproduce",
             )
             same += bool(
                 _same(
@@ -528,7 +533,11 @@ def _run_real(checks: CheckList) -> None:
             xfms = [rs._resolve(p, Path(tmp)) for p in s.transforms]
             inverse = list(s.inverse) if len(s.inverse) == len(xfms) else [s.inverse[0]] * len(xfms)
             ref_chain = fmriprep_load(xfms, inverse) if xfms else None
-            mine = lx.transforms.load_transforms(xfms, inverse) if xfms else None
+            mine = (
+                lx.transforms.load_transforms(xfms, inverse, upstream_defects="reproduce")
+                if xfms
+                else None
+            )
             ref_steps = (
                 list(ref_chain.transforms) if hasattr(ref_chain, "transforms") else [ref_chain]
             )

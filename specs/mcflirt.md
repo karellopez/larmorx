@@ -35,6 +35,15 @@ analysis of the program's behaviour.
 
 mcflirt calls itself "McFLIRT v 2.0" (with `-report`).
 
+**Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
+reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`;
+`docs/api/upstream-defects.md`): FSL-01 (the last volume's start, §5.4), FSL-03 (the in-plane
+mode's padding, §12), FSL-05 to FSL-07 (the command line, §11), FSL-08 (`-stats`, §10.5),
+FSL-09 (output types and conversion, §9.4, §10.1), FSL-10 (units, §10.1), FSL-13 (the `.mat`
+directory, §10.2) and FSL-14 (NaN voxels, §12). FSL-02 (the count `N`, §6.4) is corrected only
+on request (`normcorr_count="weights"`) until it is decided. This spec describes what mcflirt
+does; the reproduced mode follows it.
+
 **Importance tiers** used below: **tier 1** is what fMRIPrep runs (§2); **tier 2** is what
 other pipelines commonly use (`-plots`, `-rmsrel`/`-rmsabs`, `-refvol`, `-meanvol`,
 `-stages 4`, `-sinc_final`, `-spline_final`, `-dof`, `-stats`); **tier 3** is the rest.
@@ -543,6 +552,11 @@ applies; the precedence is sinc, then nearest neighbour, then spline.
 The resampled series is float32. It is written in the input's storage type (§10.1),
 converted by **truncation toward zero** (no rounding, no clamping) **(observed:** the int16
 output equals the truncated float32 output of the same data, and is not the rounded one**)**.
+**(observed** by the clean-room implementer: values beyond the type's range wrap around, as
+x86-64's conversion through a 32-bit integer does. A uint8 series with a sharp 0/255 edge,
+resampled half a voxel off by `-init` with `-sinc_final` and `-spline_final`, gives 272.53 →
+16, −17.53 → 239, −1.84 → 255, 256.84 → 0 and 280.62 → 24, where the float32 run of the same
+data has the values on the left.**)**
 
 ## 10. Outputs
 

@@ -38,6 +38,7 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
+from larmorx_validation.parity import defects
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -126,6 +127,12 @@ def compare(checks: CheckList, name: str, actual: np.ndarray, expected: np.ndarr
 # ndimage
 
 
+#: SCI-03 is named when the reflect boundary changes a prefiltered coefficient; the sampled
+#: values need not change (with ``nearest`` the change stays in the 12-voxel padding unless a
+#: coordinate lies far outside the array).
+SILENT = ("SCI-03",)
+
+
 def _ndimage_inputs(rng: np.random.Generator):
     for shape in [(9,), (7, 5), (8, 6, 5), (1, 4, 3), (2, 3, 2), (13, 11, 9)]:
         for dtype in (np.float32, np.float64, np.int16):
@@ -151,13 +158,23 @@ def _ndimage_case(mode: str, order: int, checks: CheckList) -> None:
     del scipy
     rng = np.random.default_rng(1000 + order * 17 + MODES.index(mode))
     groups: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {}
+    change, entries = defects.Change(0, 0, 0.0), []
+    rep = {"upstream_defects": defects.REPRODUCE}
     for shape, data, coords in _ndimage_inputs(rng):
         for prefilter in (True, False):
             for cval in (0.0, -3.5):
                 for out in (None, np.float32, np.float64, np.int16, np.int32, np.uint8):
                     kw = dict(order=order, mode=mode, cval=cval, prefilter=prefilter)
                     ref = ndi.map_coordinates(data, coords, output=out, **kw)
-                    got = lx.ndimage.map_coordinates(data, coords, output=out, **kw)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        got = lx.ndimage.map_coordinates(data, coords, output=out, **kw, **rep)
+                    # D13's fix pass: larmorx's default (the exact reflect boundary, SCI-03).
+                    with warnings.catch_warnings(record=True) as record:
+                        warnings.simplefilter("always")
+                        fixed = lx.ndimage.map_coordinates(data, coords, output=out, **kw)
+                    change = change + defects.Change.of(fixed, got)
+                    entries += [e for e in defects.warning_entries(record) if e not in entries]
                     key = (
                         f"map_coordinates {len(shape)}D {np.dtype(data.dtype).name} -> "
                         f"{np.dtype(out or data.dtype).name}"
@@ -166,23 +183,26 @@ def _ndimage_case(mode: str, order: int, checks: CheckList) -> None:
                     groups.setdefault(key, []).append((got, ref))
         if order >= 2:
             d64 = data.astype(np.float64)
-            groups.setdefault("spline_filter", []).append(
-                (
-                    lx.ndimage.spline_filter(d64, order, mode),
-                    ndi.spline_filter(d64, order, mode=mode),
-                )
-            )
-            for axis in range(d64.ndim):
-                groups.setdefault("spline_filter1d", []).append(
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                groups.setdefault("spline_filter", []).append(
                     (
-                        lx.ndimage.spline_filter1d(d64, order, axis, mode),
-                        ndi.spline_filter1d(d64, order, axis, mode=mode),
+                        lx.ndimage.spline_filter(d64, order, mode, **rep),
+                        ndi.spline_filter(d64, order, mode=mode),
                     )
                 )
+                for axis in range(d64.ndim):
+                    groups.setdefault("spline_filter1d", []).append(
+                        (
+                            lx.ndimage.spline_filter1d(d64, order, axis, mode, **rep),
+                            ndi.spline_filter1d(d64, order, axis, mode=mode),
+                        )
+                    )
     for key, pairs in groups.items():
         got = np.concatenate([g.ravel() for g, _ in pairs])
         ref = np.concatenate([r.ravel() for _, r in pairs])
         compare(checks, key, got, ref)
+    defects.add_fix_check(checks, entries, change, silent_ok=SILENT)
 
 
 def _overflow_case(checks: CheckList) -> None:
@@ -197,7 +217,11 @@ def _overflow_case(checks: CheckList) -> None:
     for mode in MODES:
         for order in range(6):
             ref = ndi.map_coordinates(data, coords, order=order, mode=mode)
-            got = lx.ndimage.map_coordinates(data, coords, order=order, mode=mode)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                got = lx.ndimage.map_coordinates(
+                    data, coords, order=order, mode=mode, upstream_defects=defects.REPRODUCE
+                )
             bad = ~((ref == got) | (np.isnan(ref) & np.isnan(got)))
             if bad.any():
                 differ.append(f"{mode}/order{order}")
@@ -236,7 +260,9 @@ def _nitransforms_case(spec: dict, checks: CheckList) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         expected_chain = fmriprep_load(paths, list(inverse))
-        got_chain = lx.transforms.load_transforms(paths, list(inverse))
+        got_chain = lx.transforms.load_transforms(
+            paths, list(inverse), upstream_defects=defects.REPRODUCE
+        )
         coords = nt.base.SpatialReference.factory(ref_img).ndcoords.astype("f4")
         if isinstance(expected_chain, nt.linear.LinearTransformsMapping):
             exp_mats = expected_chain.matrix
@@ -725,21 +751,21 @@ def _fmriprep_case(s: Scenario, checks: CheckList) -> None:
             expected, exp_affine = _run_fmriprep(s, src, ref, xfms, fmap, tmp)
         except Exception as e:
             err_ref = f"{type(e).__name__}: {str(e).strip().splitlines()[-1][:200]}"
+        kwargs = dict(
+            inverse=list(s.inverse) if len(s.inverse) > 1 else s.inverse[0],
+            fieldmap=fmap,
+            pe_dir=s.pe_dir,
+            ro_time=s.ro_time,
+            jacobian=s.jacobian,
+            order=s.order,
+            mode=s.mode,
+            n_threads=s.threads,
+        )
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 got = lx.transforms.resample_series(
-                    src,
-                    ref,
-                    xfms,
-                    inverse=list(s.inverse) if len(s.inverse) > 1 else s.inverse[0],
-                    fieldmap=fmap,
-                    pe_dir=s.pe_dir,
-                    ro_time=s.ro_time,
-                    jacobian=s.jacobian,
-                    order=s.order,
-                    mode=s.mode,
-                    n_threads=s.threads,
+                    src, ref, xfms, upstream_defects=defects.REPRODUCE, **kwargs
                 )
         except Exception as e:
             err_lx = f"{type(e).__name__}: {e}"
@@ -762,6 +788,16 @@ def _fmriprep_case(s: Scenario, checks: CheckList) -> None:
             metric="max |diff| (mm)",
             value=f"{d:.1e}",
             threshold="1e-06",
+        )
+        # D13's fix pass: larmorx's default (PIPE-03's Jacobian, PIPE-04, SCI-03).
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            fixed = lx.transforms.resample_series(src, ref, xfms, **kwargs)
+        defects.add_fix_check(
+            checks,
+            defects.warning_entries(record),
+            defects.Change.of(np.asarray(fixed.data), np.asarray(got.data)),
+            silent_ok=SILENT,
         )
 
 
@@ -791,11 +827,12 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     differ = sorted({r.case for r in compared} - {r.case for r in identical})
     lines = [
         f"**Bit-identical: {len(identical)} of {len(compared)} passing cases** produce exactly the "
-        "values of the reference (SciPy, nitransforms or fMRIPrep's ResampleSeries)."
+        "values of the reference (SciPy, nitransforms or fMRIPrep's ResampleSeries), with "
+        '`upstream_defects="reproduce"`.'
     ]
     if differ:
         lines.append("Cases with differing values: " + ", ".join(f"`{c}`" for c in differ) + ".")
-    return lines
+    return lines + defects.summary(results)
 
 
 def suite() -> Suite:

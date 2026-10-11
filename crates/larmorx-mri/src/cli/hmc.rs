@@ -7,11 +7,16 @@
 //! index out of range, a reference grid with another number of voxels, `-stages 0` with a
 //! reference file) are errors reported before any work, with exit code 1 (mcflirt aborts);
 //! `-gdt` is not supported.
+//!
+//! mcflirt's defects FSL-01, -03, -05 to -10, -13 and -14 are corrected unless the environment
+//! variable `LARMORX_UPSTREAM_DEFECTS` is `reproduce` (D13, `docs/api/upstream-defects.md`); a
+//! line on standard error names each one that changed (or would have changed) the outputs.
 
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
@@ -124,6 +129,8 @@ struct Options {
     gdt: bool,
     fudge: bool,
     report: bool,
+    /// The upstream defects the command line itself met (FSL-05, -06, -07).
+    notices: Vec<Notice>,
 }
 
 impl Default for Options {
@@ -155,6 +162,89 @@ impl Default for Options {
             gdt: false,
             fudge: false,
             report: false,
+            notices: Vec::new(),
+        }
+    }
+}
+
+/// C's `atoi` reading of an integer option (FSL-07): mcflirt's (reproduced, with a notice
+/// when the text is not exactly an integer), or a strict reading (corrected: anything but an
+/// integer is an error).
+fn int_value(
+    option: &str,
+    v: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<i64, String> {
+    let strict = v.trim().parse::<i64>().ok();
+    match (mode, strict) {
+        (_, Some(n)) if n == atoi(v) => Ok(n),
+        (UpstreamDefects::Fix, _) => {
+            notices.push(Notice::new(
+                &defects::FSL_07,
+                mode,
+                format!(
+                    "'{option} {v}' is not an integer: an error; mcflirt reads it as {}",
+                    atoi(v)
+                ),
+            ));
+            Err(format!(
+                "{option} needs an integer, not '{v}' (mcflirt reads it with C's atoi as {}; \
+                 {}=reproduce does too)",
+                atoi(v),
+                defects::ENV
+            ))
+        }
+        (UpstreamDefects::Reproduce, _) => {
+            notices.push(Notice::new(
+                &defects::FSL_07,
+                mode,
+                format!(
+                    "'{option} {v}' is read as {}, as C's atoi reads it",
+                    atoi(v)
+                ),
+            ));
+            Ok(atoi(v))
+        }
+    }
+}
+
+/// C's `atof` reading of a number option, strict when corrected ([`int_value`]).
+fn float_value(
+    option: &str,
+    v: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<f64, String> {
+    let strict = v.trim().parse::<f64>().ok().filter(|x| x.is_finite());
+    match (mode, strict) {
+        (_, Some(x)) if x.to_bits() == atof(v).to_bits() => Ok(x),
+        (UpstreamDefects::Fix, _) => {
+            notices.push(Notice::new(
+                &defects::FSL_07,
+                mode,
+                format!(
+                    "'{option} {v}' is not a number: an error; mcflirt reads it as {}",
+                    atof(v)
+                ),
+            ));
+            Err(format!(
+                "{option} needs a number, not '{v}' (mcflirt reads it with C's atof as {}; \
+                 {}=reproduce does too)",
+                atof(v),
+                defects::ENV
+            ))
+        }
+        (UpstreamDefects::Reproduce, _) => {
+            notices.push(Notice::new(
+                &defects::FSL_07,
+                mode,
+                format!(
+                    "'{option} {v}' is read as {}, as C's atof reads it",
+                    atof(v)
+                ),
+            ));
+            Ok(atof(v))
         }
     }
 }
@@ -165,9 +255,19 @@ enum Parsed {
     Exit(u8),
 }
 
-fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
+fn parse(
+    args: &[String],
+    mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Parsed {
     let mut o = Options::default();
     let mut i = 0;
+    // A value error of the corrected command line: exit 255, as mcflirt's option errors.
+    let bad = |err: &mut dyn Write, message: String| {
+        let _ = writeln!(err, "Error: {message}");
+        Parsed::Exit(255)
+    };
     while i < args.len() {
         let a = args[i].as_str();
         if !a.starts_with('-') {
@@ -200,7 +300,8 @@ fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
                     let _ = out.write_all(USAGE.as_bytes());
                     return Parsed::Exit(0);
                 }
-                _ => {} // -v, -hist: no effect on the results
+                "-hist" => o.notices.push(ignored_option("-hist", mode)),
+                _ => {} // -v: progress messages only
             }
             i += 1;
             continue;
@@ -211,18 +312,51 @@ fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
         }
         if !VALUED.contains(&a) {
             let _ = writeln!(err, "Unrecognised option {a}");
+            if a == "-edge" && mode.fix() {
+                let _ = writeln!(
+                    err,
+                    "(-edge is not an mcflirt option: nipype's MCFLIRT interface emits it for \
+                     use_contour)"
+                );
+            }
             return Parsed::Exit(255);
         }
         let v = args[i + 1].as_str();
-        match a {
-            "-in" => o.input = Some(v.to_owned()),
-            "-out" | "-o" => o.out = Some(v.to_owned()),
-            "-reffile" | "-r" => o.reffile = Some(v.to_owned()),
-            "-refvol" => o.refvol = atoi(v),
-            "-stages" => o.stages = atoi(v),
-            "-dof" => o.dof = atoi(v),
+        let notices = &mut o.notices;
+        let parsed = match a {
+            "-in" => {
+                o.input = Some(v.to_owned());
+                Ok(())
+            }
+            "-out" | "-o" => {
+                o.out = Some(v.to_owned());
+                Ok(())
+            }
+            "-reffile" | "-r" => {
+                o.reffile = Some(v.to_owned());
+                Ok(())
+            }
+            "-refvol" => int_value(a, v, mode, notices).map(|n| o.refvol = n),
+            "-stages" => int_value(a, v, mode, notices).map(|n| o.stages = n),
+            "-dof" => int_value(a, v, mode, notices).map(|n| o.dof = n),
             "-cost" => match CostFunction::from_name(v) {
-                Some(c) => o.cost = c,
+                Some(c) => {
+                    o.cost = c;
+                    Ok(())
+                }
+                None if mode.fix() => {
+                    notices.push(Notice::new(
+                        &defects::FSL_06,
+                        mode,
+                        format!("the unknown cost '{v}' is an error; mcflirt uses normcorr"),
+                    ));
+                    Err(format!(
+                        "Unrecognised cost function type: {v} (use mutualinfo, woods, corratio, \
+                     normcorr, normmi or leastsquares; mcflirt silently uses normcorr, and so \
+                     does {}=reproduce)",
+                        defects::ENV
+                    ))
+                }
                 None => {
                     if o.report {
                         let _ = writeln!(
@@ -230,15 +364,34 @@ fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
                             "Unrecognised cost function type: {v}\nUsing the default (NormCorr)"
                         );
                     }
+                    notices.push(Notice::new(
+                        &defects::FSL_06,
+                        mode,
+                        format!("the unknown cost '{v}' is replaced by normcorr, as in mcflirt"),
+                    ));
                     o.cost = CostFunction::NormCorr;
+                    Ok(())
                 }
             },
-            "-bins" => o.bins = atoi(v),
-            "-smooth" => o.smooth = atof(v),
-            "-rotation" => o.rotation = atof(v),
-            "-fov" => o.fov = atoi(v),
-            "-init" => o.init = Some(v.to_owned()),
-            _ => {} // -scaling, -verbose: no effect on the results
+            "-bins" => int_value(a, v, mode, notices).map(|n| o.bins = n),
+            "-smooth" => float_value(a, v, mode, notices).map(|x| o.smooth = x),
+            "-rotation" => float_value(a, v, mode, notices).map(|x| o.rotation = x),
+            "-fov" => int_value(a, v, mode, notices).map(|n| o.fov = n),
+            "-init" => {
+                o.init = Some(v.to_owned());
+                Ok(())
+            }
+            "-scaling" => {
+                notices.push(ignored_option("-scaling", mode));
+                Ok(())
+            }
+            _ => Ok(()), // -verbose: progress messages only
+        };
+        if let Err(message) = parsed {
+            for n in &o.notices {
+                print_notice(err, n);
+            }
+            return bad(err, message);
         }
         i += 2;
     }
@@ -254,22 +407,65 @@ fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parsed {
     Parsed::Run(Box::new(o))
 }
 
-/// Runs `larmorx mri hmc` with `args` (mcflirt-style options); returns the exit code.
+/// FSL-05: an option mcflirt documents (or accepts) and ignores.
+fn ignored_option(option: &str, mode: UpstreamDefects) -> Notice {
+    let detail = match mode {
+        UpstreamDefects::Fix => format!("{option} has no effect, here as in mcflirt"),
+        UpstreamDefects::Reproduce => format!("{option} is accepted and ignored, as in mcflirt"),
+    };
+    Notice::new(&defects::FSL_05, mode, detail)
+}
+
+/// Runs `larmorx mri hmc` with `args` (mcflirt-style options); returns the exit code. The D13
+/// mode comes from `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    match UpstreamDefects::from_env() {
+        Ok(mode) => main_with(args, mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "Error: {e}");
+            EXIT_BAD_MODE
+        }
+    }
+}
+
+/// Prints an upstream-defect notice on standard error (`Notice::line`).
+fn print_notice(err: &mut dyn Write, notice: &Notice) {
+    let _ = writeln!(err, "larmorx: {}", notice.line());
+}
+
+/// [`main`] with the D13 mode given.
+pub fn main_with(
+    args: &[String],
+    mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     if args.len() < 2 {
         let _ = out.write_all(USAGE.as_bytes());
+        // FSL-07: `mcflirt -help` alone exits 1.
+        if args.len() == 1 && args[0] == "-help" {
+            let detail = match mode {
+                UpstreamDefects::Fix => "-help alone prints the usage and exits 0; mcflirt exits 1",
+                UpstreamDefects::Reproduce => "-help alone exits 1, as in mcflirt",
+            };
+            print_notice(err, &Notice::new(&defects::FSL_07, mode, detail));
+            return if mode.fix() { 0 } else { 1 };
+        }
         return 1;
     }
-    let o = match parse(args, out, err) {
+    let mut o = match parse(args, mode, out, err) {
         Parsed::Run(o) => o,
         Parsed::Exit(code) => return code,
     };
+    for n in std::mem::take(&mut o.notices) {
+        print_notice(err, &n);
+    }
     if o.input.is_none() {
         let _ = writeln!(err, "Input filename not found\n");
         let _ = out.write_all(USAGE.as_bytes());
         return 2;
     }
-    match execute(&o, out, err) {
+    match execute(&o, mode, out, err) {
         Ok(()) => 0,
         Err(message) => {
             let _ = writeln!(err, "Error: {message}");
@@ -304,7 +500,12 @@ fn write_text(path: impl AsRef<Path>, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), String> {
+fn execute(
+    o: &Options,
+    mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), String> {
     let n_threads = threads();
     let input = o.input.as_deref().unwrap_or_default();
     let out_name = o
@@ -391,6 +592,8 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
                 InPlane::Auto { fov: o.fov }
             },
             n_threads,
+            upstream_defects: mode,
+            normcorr_count: Default::default(),
         },
         interpolation: o.interpolation,
         init,
@@ -398,6 +601,9 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     };
     note(o, err, "Registering volumes ...");
     let result = pipeline::run(&series, &choice, &options).map_err(|e| e.to_string())?;
+    for n in &result.estimate.notices {
+        print_notice(err, n);
+    }
     note(o, err, "Saving motion corrected time series... ");
     if let Some(r) = result.estimate.reference_index
         && o.report
@@ -405,7 +611,12 @@ fn execute(o: &Options, out: &mut dyn Write, err: &mut dyn Write) -> Result<(), 
     {
         let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
     }
-    write_outputs(o, &out_name, &ext, version, &series, &result, n_threads)
+    for n in write_outputs(
+        o, mode, &out_name, &ext, version, &series, &result, n_threads,
+    )? {
+        print_notice(err, &n);
+    }
+    Ok(())
 }
 
 /// A progress message on stderr with `-report`.
@@ -427,18 +638,35 @@ fn reference_index(refvol: i64, n: usize) -> Result<usize, String> {
 }
 
 /// Writes the files of §10: the `.mat` directory, `.par`, `.rms`, the corrected series, the
-/// `-stats` images and the mean of `-meanvol`.
+/// `-stats` images and the mean of `-meanvol`. Returns the upstream defects that changed them
+/// (FSL-08, -09, -10, -13), or would have.
+#[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
+    mode: UpstreamDefects,
     out_name: &str,
     ext: &str,
     version: larmorx_io::nifti::NiftiVersion,
     series: &Series,
     result: &HmcOutput,
     n_threads: usize,
-) -> Result<(), String> {
+) -> Result<Vec<Notice>, String> {
     let est = &result.estimate;
-    if o.mats || o.rmsrel || o.rmsabs {
+    let mut notices = Vec::new();
+    // FSL-13: -rmsrel and -rmsabs make mcflirt create the .mat directory.
+    if (o.rmsrel || o.rmsabs) && !o.mats {
+        let detail = match mode {
+            UpstreamDefects::Fix => {
+                "without -mats no .mat directory is created; mcflirt creates one for -rmsrel and \
+                 -rmsabs"
+            }
+            UpstreamDefects::Reproduce => {
+                "-rmsrel and -rmsabs create the .mat directory without -mats, as in mcflirt"
+            }
+        };
+        notices.push(Notice::new(&defects::FSL_13, mode, detail));
+    }
+    if o.mats || ((o.rmsrel || o.rmsabs) && mode.reproduce()) {
         let dir = mat_directory(out_name)?;
         if o.mats {
             for (t, m) in est.matrices.iter().enumerate() {
@@ -477,8 +705,8 @@ fn write_outputs(
         .collect();
     // Only the corrected series gets its own cal_min/cal_max (§10.1); the others keep the
     // input's (observed: -stats and -meanvol images carry the input's values).
-    let write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
-        image::write_like(
+    let mut write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
+        let written = image::write_like(
             Path::new(path),
             &series.header,
             version,
@@ -488,24 +716,58 @@ fn write_outputs(
             DESCRIP,
             cal,
             n_threads,
+            mode,
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+        for n in written {
+            defects::push_once(&mut notices, n);
+        }
+        Ok::<(), String>(())
     };
     let stem = image::strip_image_extension(out_name);
-    let data_type = output_type(series.stored, &series.header);
+    let data_type = output_type(series.stored, &series.header, mode);
     write(&format!("{stem}{ext}"), &corrected, data_type, true)?;
+    // FSL-08: mcflirt names the -stats and -meanvol images after the -out string with its
+    // extension inside (`x.nii.gz_meanvol.nii.gz`), and leaves the -stats images' first and
+    // last slices at 0.
+    let derived = |suffix: &str| match mode {
+        UpstreamDefects::Fix => format!("{stem}_{suffix}{ext}"),
+        UpstreamDefects::Reproduce => format!("{out_name}_{suffix}{ext}"),
+    };
     if o.stats {
-        let [m, variance, sigma] = stats::temporal(&corrected);
+        let [m, variance, sigma] = stats::temporal(&corrected, mode.reproduce());
         for (suffix, vol) in [("meanvol", m), ("variance", variance), ("sigma", sigma)] {
-            let path = format!("{out_name}_{suffix}{ext}");
-            write(&path, std::slice::from_ref(&vol), DataType::F32, false)?;
+            write(
+                &derived(suffix),
+                std::slice::from_ref(&vol),
+                DataType::F32,
+                false,
+            )?;
         }
     }
     if let Some(m) = &est.mean {
-        let path = format!("{out_name}_mean_reg{ext}");
-        write(&path, std::slice::from_ref(m), DataType::F32, false)?;
+        write(
+            &derived("mean_reg"),
+            std::slice::from_ref(m),
+            DataType::F32,
+            false,
+        )?;
     }
-    Ok(())
+    if o.stats || (est.mean.is_some() && stem != out_name) {
+        let detail = match mode {
+            UpstreamDefects::Fix => format!(
+                "the -stats and -meanvol images are named after '{stem}' and the -stats images \
+                 cover every slice; mcflirt names them after '{out_name}' and leaves the first \
+                 and last slices at 0"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the -stats and -meanvol images are named after '{out_name}' and the -stats \
+                 images leave the first and last slices at 0, as in mcflirt"
+            ),
+        };
+        notices.push(Notice::new(&defects::FSL_08, mode, detail));
+    }
+    Ok(notices)
 }
 
 /// The `descrip` field of output images.
@@ -515,10 +777,10 @@ const DESCRIP: &str = "larmorx mri hmc";
 mod tests {
     use super::*;
 
-    fn run(args: &[&str]) -> (u8, String, String) {
+    fn run_mode(args: &[&str], mode: UpstreamDefects) -> (u8, String, String) {
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let code = main(&args, &mut out, &mut err);
+        let code = main_with(&args, mode, &mut out, &mut err);
         (
             code,
             String::from_utf8(out).unwrap(),
@@ -526,13 +788,34 @@ mod tests {
         )
     }
 
+    fn run(args: &[&str]) -> (u8, String, String) {
+        run_mode(args, UpstreamDefects::Reproduce)
+    }
+
+    fn parsed(args: &[&str], mode: UpstreamDefects) -> Result<Box<Options>, (u8, String)> {
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        match parse(&args, mode, &mut out, &mut err) {
+            Parsed::Run(o) => Ok(o),
+            Parsed::Exit(code) => Err((code, String::from_utf8(err).unwrap())),
+        }
+    }
+
+    const FIX: UpstreamDefects = UpstreamDefects::Fix;
+    const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
     #[test]
     fn usage_and_errors() {
         let (code, out, _) = run(&[]);
         assert_eq!(code, 1);
         assert!(out.starts_with("Usage: larmorx mri hmc"));
-        let (code, _, _) = run(&["-help"]);
+        // FSL-07: -help alone exits 1 in mcflirt, 0 corrected; both print the usage.
+        let (code, out, err) = run(&["-help"]);
         assert_eq!(code, 1);
+        assert!(out.starts_with("Usage") && err.contains("FSL-07"), "{err}");
+        let (code, out, err) = run_mode(&["-help"], FIX);
+        assert_eq!(code, 0);
+        assert!(out.starts_with("Usage") && err.contains("FSL-07 (mcflirt) corrected"));
         let (code, out, _) = run(&["-in", "x.nii", "-help"]);
         assert_eq!(code, 0);
         assert!(out.starts_with("Usage"));
@@ -549,6 +832,76 @@ mod tests {
         let (code, _, err) = run(&["-in", "x.nii", "-mats", "-refvol"]);
         assert_eq!(code, 255);
         assert_eq!(err, "Lacking argument to option -refvol\n");
+        // Corrected, -edge says where it comes from; the exit code is mcflirt's.
+        let (code, _, err) = run_mode(&["-in", "x.nii", "-edge", "-out", "y"], FIX);
+        assert_eq!(code, 255);
+        assert!(
+            err.starts_with("Unrecognised option -edge\n(-edge is not"),
+            "{err}"
+        );
+    }
+
+    /// FSL-06: an unknown cost is an error when corrected, normcorr (with a notice) as mcflirt.
+    #[test]
+    fn unknown_costs_both_modes() {
+        let args = ["-in", "x.nii", "-cost", "bogus"];
+        let o = parsed(&args, REPRODUCE).unwrap();
+        assert_eq!(o.cost, CostFunction::NormCorr);
+        assert_eq!(o.notices[0].defect.id, "FSL-06");
+        let (code, err) = parsed(&args, FIX).map(|_| ()).unwrap_err();
+        assert_eq!(code, 255);
+        assert!(
+            err.contains("Unrecognised cost function type: bogus"),
+            "{err}"
+        );
+        assert_eq!(
+            parsed(&["-in", "x", "-cost", "woods"], FIX).unwrap().cost,
+            CostFunction::Woods
+        );
+    }
+
+    /// FSL-07: numbers are read with atoi/atof as mcflirt (with a notice when the text is not
+    /// a plain number), strictly when corrected.
+    #[test]
+    fn numbers_both_modes() {
+        for (args, expect) in [
+            (["-in", "x", "-refvol", "abc"], 0.0),
+            (["-in", "x", "-stages", "1.5"], 1.0),
+            (["-in", "x", "-smooth", "2mm"], 2.0),
+        ] {
+            let o = parsed(&args, REPRODUCE).unwrap();
+            let got = [o.refvol as f64, o.stages as f64, o.smooth].contains(&expect);
+            assert!(got, "{args:?}");
+            assert_eq!(o.notices[0].defect.id, "FSL-07", "{args:?}");
+            let (code, err) = parsed(&args, FIX).map(|_| ()).unwrap_err();
+            assert_eq!(code, 255, "{args:?}");
+            assert!(err.contains("needs"), "{err}");
+        }
+        // Plain numbers: the same in both modes, and nothing said.
+        for mode in [FIX, REPRODUCE] {
+            let o = parsed(
+                &["-in", "x", "-refvol", "+3", "-smooth", "0.5", "-dof", " 7"],
+                mode,
+            )
+            .unwrap();
+            assert_eq!((o.refvol, o.smooth, o.dof), (3, 0.5, 7));
+            assert!(o.notices.is_empty());
+        }
+    }
+
+    /// FSL-05: -scaling and -hist have no effect; a notice says so in both modes.
+    #[test]
+    fn ignored_options_both_modes() {
+        for mode in [FIX, REPRODUCE] {
+            let o = parsed(&["-in", "x", "-scaling", "6", "-hist"], mode).unwrap();
+            assert_eq!(
+                o.notices
+                    .iter()
+                    .map(|n| (n.defect.id, n.mode))
+                    .collect::<Vec<_>>(),
+                [("FSL-05", mode), ("FSL-05", mode)]
+            );
+        }
     }
 
     #[test]

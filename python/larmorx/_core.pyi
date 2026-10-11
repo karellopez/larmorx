@@ -32,6 +32,15 @@ def replica_find(family: str, tool: str, dirs: list[str]) -> Path | None:
     ``PATH``), or ``None``; ``ValueError`` if the variable names no file, ``KeyError`` if the
     tool has no replica."""
 
+# --- Upstream defects, D13 (larmorx/_defects.py) -----------------------------------------------
+
+#: A notice as Rust returns it: ``(entry, tool, mode, detail)``.
+Notice = tuple[str, str, str, str]
+
+def upstream_defects() -> list[tuple[str, str, str, bool]]:
+    """Every register entry larmorx has a switch for: ``(id, tool, what,
+    fixed_by_default)``."""
+
 def nifti_read(
     path: str, scaling: str = "auto", n_threads: int = 1
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], list[str], bool]:
@@ -121,10 +130,11 @@ def afni_tshift_file(
     restore: str = "trend",
     detrend: bool = True,
     n_threads: int = 1,
-) -> tuple[np.ndarray, dict[str, Any], list[str]]:
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, dict[str, Any], list[str], list[Notice]]:
     """Read a NIfTI file with AFNI's rules and shift it (``3dTshift``): the voxels in AFNI's
     storage type (before the brick factor, the header's ``scl_slope``), the output header
-    fields and warnings."""
+    fields, warnings and upstream-defect notices."""
 
 def afni_tshift_array(
     data: np.ndarray,
@@ -138,9 +148,10 @@ def afni_tshift_array(
     restore: str = "trend",
     detrend: bool = True,
     n_threads: int = 1,
-) -> tuple[np.ndarray, dict[str, Any], list[str]]:
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, dict[str, Any], list[str], list[Notice]]:
     """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
-    the shifted voxels, the output header fields and warnings."""
+    the shifted voxels, the output header fields, warnings and upstream-defect notices."""
 
 # --- SciPy-compatible interpolation (larmorx/ndimage.py) --------------------------------------
 
@@ -153,22 +164,36 @@ def ndimage_map_coordinates(
     prefilter: bool = True,
     output: str = "float64",
     n_threads: int = 1,
-) -> np.ndarray:
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """``scipy.ndimage.map_coordinates`` for a 1- to 4-D ``input`` and ``(ndim, n)`` float64
-    ``coordinates``: the ``n`` values in the ``output`` dtype."""
+    ``coordinates``: the ``n`` values in the ``output`` dtype, and upstream-defect notices."""
 
 def ndimage_spline_filter1d(
-    input: np.ndarray, order: int = 3, axis: int = -1, mode: str = "mirror", n_threads: int = 1
-) -> np.ndarray:
+    input: np.ndarray,
+    order: int = 3,
+    axis: int = -1,
+    mode: str = "mirror",
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """``scipy.ndimage.spline_filter1d`` on a float64 array (Fortran-ordered result)."""
 
 def ndimage_spline_filter(
-    input: np.ndarray, order: int = 3, mode: str = "mirror", n_threads: int = 1
-) -> np.ndarray:
+    input: np.ndarray,
+    order: int = 3,
+    mode: str = "mirror",
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """``scipy.ndimage.spline_filter`` on a float64 array (Fortran-ordered result)."""
 
 def ndimage_prepared_coefficients(
-    input: np.ndarray, order: int = 3, mode: str = "grid-constant", cval: float = 0.0
+    input: np.ndarray,
+    order: int = 3,
+    mode: str = "grid-constant",
+    cval: float = 0.0,
+    upstream_defects: str = "fix",
 ) -> np.ndarray:
     """The padded, prefiltered coefficients ``map_coordinates`` interpolates (3D float32)."""
 
@@ -209,10 +234,12 @@ def resample_series(
     jacobian: bool = True,
     output: str = "float32",
     n_threads: int = 1,
-) -> np.ndarray:
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """fMRIPrep's ``resample_image`` after loading: a float32 3D/4D ``source`` onto the target
     grid through ``steps`` and ``ras2vox``, with per-volume voxel-to-voxel head motion ``hmc``
-    (``(t, 4, 4)``), a field map in Hz and readout vectors ``pe``. Fortran-ordered result."""
+    (``(t, 4, 4)``), a field map in Hz and readout vectors ``pe``. Fortran-ordered result, and
+    upstream-defect notices (PIPE-03, SCI-03)."""
 
 # --- ANTs image programs: ImageMath, ThresholdImage, MultiplyImages (larmorx/ants) -------------
 
@@ -479,10 +506,12 @@ def mri_hmc_file(
     init: np.ndarray | None = None,
     resample: bool = True,
     n_threads: int = 1,
+    upstream_defects: str = "fix",
+    normcorr_count: str = "mcflirt",
 ) -> dict[str, Any]:
     """Head-motion correction of a NIfTI series: ``matrices``, ``ras``, ``itk``, ``params``,
-    ``rms_abs``, ``rms_rel``, ``fd``, ``reference_index``, ``in_plane``, ``header``, ``data``
-    (float32 or ``None``) and ``mean`` (or ``None``)."""
+    ``rms_abs``, ``rms_rel``, ``fd``, ``reference_index``, ``in_plane``, ``notices``,
+    ``header``, ``data`` (float32 or ``None``) and ``mean`` (or ``None``)."""
 
 def mri_hmc_array(
     data: np.ndarray,
@@ -503,6 +532,8 @@ def mri_hmc_array(
     init: np.ndarray | None = None,
     resample: bool = True,
     n_threads: int = 1,
+    upstream_defects: str = "fix",
+    normcorr_count: str = "mcflirt",
 ) -> dict[str, Any]:
     """:func:`mri_hmc_file` for a float32 ``(x, y, z[, t])`` array placed by header fields."""
 

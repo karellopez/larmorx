@@ -20,8 +20,22 @@
 //! one pass, without temporary coordinate arrays. Every value is bit-identical to fMRIPrep's.
 //! Volumes run in parallel (or, with fewer volumes than threads, the voxels of each volume),
 //! and the result does not depend on the thread count.
+//!
+//! **PIPE-03, corrected by default** (D13, `docs/api/upstream-defects.md`). fMRIPrep takes
+//! the gradient of the voxel-shift map along the *target* array axis whose index is the
+//! source's phase-encoding axis, in target voxels. That is the derivative along the
+//! phase-encoding direction only when the target grid's axes are the source's (the native
+//! boldref); in T1w or standard space it is taken along another direction, or at another
+//! scale. The Jacobian determinant of the corrected mapping `t ↦ s(t) + vsm(t)·e_pe`,
+//! relative to the uncorrected one, is `1 + ∇_t vsm · ∂t/∂s_pe` (the matrix determinant
+//! lemma), where `∂t/∂s_pe` is column `pe` of the inverse of `J = ∂s/∂t`, the Jacobian of the
+//! target-to-source voxel map. larmorx multiplies by that. Where the target's axes are the
+//! source's (`∂t/∂s_pe = e_pe`), it is fMRIPrep's float32 `1 + gradient` bit for bit.
+//! [`UpstreamDefects::Reproduce`] gives fMRIPrep's everywhere. Head motion is left out of `J`,
+//! as fMRIPrep leaves it out of its Jacobian.
 
-use larmorx_core::linalg::Mat4;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::linalg::{Mat3, Mat4, inverse3};
 use larmorx_core::parallel;
 use larmorx_interp::ndimage::{Mode, NdimageError, Output, Spline};
 use rayon::prelude::*;
@@ -57,13 +71,16 @@ pub struct ResampleOptions {
     pub mode: Mode,
     pub cval: f64,
     pub prefilter: bool,
-    /// Multiply by `1 + d(vsm)/d(pe)`.
+    /// Multiply by the Jacobian of the voxel-shift map, `1 + d(vsm)/d(pe)`.
     pub jacobian: bool,
+    /// D13: correct (default) or reproduce fMRIPrep's Jacobian axis (PIPE-03) and SciPy's
+    /// reflect boundary (SCI-03).
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl Default for ResampleOptions {
     /// `ResampleSeries`' defaults: cubic, `grid-constant`, `cval` 0, prefilter, Jacobian on
-    /// (`resample_image`'s default; fMRIPrep sets it per run).
+    /// (`resample_image`'s default; fMRIPrep sets it per run); defects corrected.
     fn default() -> Self {
         ResampleOptions {
             order: 3,
@@ -71,6 +88,7 @@ impl Default for ResampleOptions {
             cval: 0.0,
             prefilter: true,
             jacobian: true,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -97,8 +115,48 @@ struct Distortion {
     pe: PeInfo,
     /// `fmap_hz * readout` in float32, per target voxel (Fortran order).
     vsm: Vec<f32>,
-    /// `1 + np.gradient(vsm, axis=pe)` in float32, when the Jacobian is applied.
+    /// The Jacobian factor per target voxel (float32), when the Jacobian is applied: the
+    /// corrected one, or fMRIPrep's `1 + np.gradient(vsm, axis=pe)` (PIPE-03).
     jacobian: Option<Vec<f32>>,
+    /// PIPE-03: how many factors differ from fMRIPrep's, the largest difference, and the
+    /// number of voxels.
+    pipe03: Option<(usize, f64, usize)>,
+}
+
+/// `∂t/∂s`, the inverse of the Jacobian `J = ∂s/∂t` of the map from target voxels to source
+/// voxels (before head motion), for the corrected Jacobian of PIPE-03. Entries within 1e-9
+/// of an integer are snapped to it, so that grids whose axes are the source's give exactly
+/// `±1` and `0`.
+enum InverseJacobian {
+    /// The same everywhere: the steps are affines.
+    Constant(Mat3),
+    /// Per target voxel (Fortran order): a step is a displacement field.
+    PerVoxel(Vec<[[f32; 3]; 3]>),
+}
+
+impl InverseJacobian {
+    /// `∂t/∂s_pe` at target voxel `n`: column `pe` of the inverse.
+    fn column(&self, n: usize, pe: usize) -> [f64; 3] {
+        match self {
+            InverseJacobian::Constant(m) => [m[0][pe], m[1][pe], m[2][pe]],
+            InverseJacobian::PerVoxel(v) => {
+                let m = &v[n];
+                [m[0][pe], m[1][pe], m[2][pe]].map(f64::from)
+            }
+        }
+    }
+}
+
+/// `v` rounded to the nearest integer when it lies within 1e-9 of it.
+fn snap(v: f64) -> f64 {
+    let r = v.round();
+    if (v - r).abs() < 1e-9 { r } else { v }
+}
+
+/// The inverse of `j` with its entries snapped ([`snap`]); `None` if `j` is singular.
+fn snapped_inverse(j: &Mat3) -> Option<Mat3> {
+    let j = j.map(|row| row.map(snap));
+    inverse3(&j).map(|m| m.map(|row| row.map(snap)))
 }
 
 /// A run's resampling plan: the source voxel coordinates of every target voxel, and the
@@ -111,6 +169,8 @@ pub struct SeriesResampler {
     /// The field map in Hz on the target grid (Fortran order); zeros when absent.
     fmap: Option<Vec<f32>>,
     options: ResampleOptions,
+    /// For the corrected Jacobian (PIPE-03), when a field map is applied with the Jacobian.
+    inverse_jacobian: Option<InverseJacobian>,
 }
 
 impl SeriesResampler {
@@ -140,26 +200,41 @@ impl SeriesResampler {
                 f.len()
             )));
         }
-        let coords = parallel::with_threads(n_threads, || -> Result<_, ResampleError> {
-            let mut coords = nitransforms::ndcoords(target_shape, target_affine);
-            for p in &mut coords {
-                *p = nitransforms::to_f32(*p);
-            }
-            nitransforms::map_points(steps, &mut coords)?;
-            nitransforms::affine_map(ras2vox, &mut coords);
-            Ok(coords)
-        })??;
+        let needs_jacobian = options.jacobian && fmap_hz.is_some();
+        let (coords, inverse_jacobian) =
+            parallel::with_threads(n_threads, || -> Result<_, ResampleError> {
+                let mut coords = nitransforms::ndcoords(target_shape, target_affine);
+                for p in &mut coords {
+                    *p = nitransforms::to_f32(*p);
+                }
+                nitransforms::map_points(steps, &mut coords)?;
+                nitransforms::affine_map(ras2vox, &mut coords);
+                let inverse = if needs_jacobian {
+                    Some(chain_inverse_jacobian(
+                        target_shape,
+                        target_affine,
+                        steps,
+                        ras2vox,
+                    )?)
+                } else {
+                    None
+                };
+                Ok((coords, inverse))
+            })??;
         Ok(SeriesResampler {
             target_shape,
             source_shape,
             coords,
             fmap: fmap_hz,
             options,
+            inverse_jacobian,
         })
     }
 
     /// A plan from source voxel coordinates computed elsewhere (`coords[n]` for target voxel
-    /// `n`, Fortran order).
+    /// `n`, Fortran order). The corrected Jacobian (PIPE-03) then takes `∂s/∂t` from the
+    /// coordinates' central differences (numpy's `gradient` of each coordinate along each
+    /// target axis).
     pub fn from_coordinates(
         target_shape: [usize; 3],
         coords: Vec<[f64; 3]>,
@@ -173,12 +248,15 @@ impl SeriesResampler {
                 "coordinates and field map must cover the target grid",
             ));
         }
+        let inverse_jacobian = (options.jacobian && fmap_hz.is_some())
+            .then(|| coordinates_inverse_jacobian(&coords, target_shape));
         Ok(SeriesResampler {
             target_shape,
             source_shape,
             coords,
             fmap: fmap_hz,
             options,
+            inverse_jacobian,
         })
     }
 
@@ -206,17 +284,66 @@ impl SeriesResampler {
             Some(f) => f.iter().map(|&v| v * ro).collect(),
             None => vec![0.0f32 * ro; n],
         };
-        let jacobian = if self.options.jacobian {
-            Some(jacobian(&vsm, self.target_shape, pe.axis)?)
-        } else {
-            None
+        if !self.options.jacobian {
+            return Ok(Distortion {
+                pe,
+                vsm,
+                jacobian: None,
+                pipe03: None,
+            });
+        }
+        let fix = self.options.upstream_defects.fix();
+        let Some(inverse) = &self.inverse_jacobian else {
+            // No field map: vsm is 0, and both Jacobians are 1 (fMRIPrep's still needs two
+            // voxels along the axis).
+            return Ok(Distortion {
+                pe,
+                jacobian: Some(jacobian(&vsm, self.target_shape, pe.axis)?),
+                vsm,
+                pipe03: None,
+            });
         };
-        Ok(Distortion { pe, vsm, jacobian })
+        // fMRIPrep's gradient fails with fewer than two voxels along the axis; the corrected
+        // one leaves such an axis out.
+        let fmriprep = jacobian(&vsm, self.target_shape, pe.axis);
+        if !fix {
+            let fmriprep = fmriprep?;
+            let (changed, max) =
+                compare_jacobians(&vsm, self.target_shape, pe.axis, inverse, &fmriprep);
+            return Ok(Distortion {
+                pe,
+                vsm,
+                jacobian: Some(fmriprep),
+                pipe03: Some((changed, max, n)),
+            });
+        }
+        let corrected = corrected_jacobian(&vsm, self.target_shape, pe.axis, inverse);
+        let (changed, max) = match &fmriprep {
+            Ok(f) => {
+                let mut changed = 0usize;
+                let mut max = 0f64;
+                for (a, b) in corrected.iter().zip(f) {
+                    if a.to_bits() != b.to_bits() {
+                        changed += 1;
+                        max = max.max((f64::from(*a) - f64::from(*b)).abs());
+                    }
+                }
+                (changed, max)
+            }
+            Err(_) => (n, f64::INFINITY),
+        };
+        Ok(Distortion {
+            pe,
+            vsm,
+            jacobian: Some(corrected),
+            pipe03: Some((changed, max, n)),
+        })
     }
 
     /// Resamples one 3D volume (`data`, Fortran order, the source shape) into `out` (the
     /// target grid, Fortran order): `resample_vol`. `hmc` is the volume's voxel-to-voxel
-    /// head-motion affine. `parallel` spreads the voxels over the current rayon pool.
+    /// head-motion affine. `parallel` spreads the voxels over the current rayon pool. Returns
+    /// the upstream defects that changed (or would have changed) the result.
     pub fn resample_volume<O: Jacobian>(
         &self,
         data: &[f32],
@@ -224,11 +351,54 @@ impl SeriesResampler {
         pe: PeInfo,
         out: &mut [O],
         parallel: bool,
-    ) -> Result<(), ResampleError> {
+    ) -> Result<Vec<Notice>, ResampleError> {
         let d = self.distortion(pe)?;
-        self.volume(data, hmc, &d, out, parallel)
+        let sci03 = self.volume(data, hmc, &d, out, parallel)?;
+        Ok(self.notices(std::slice::from_ref(&d), sci03))
     }
 
+    /// The notices of a resampling: PIPE-03 for the Jacobians, SCI-03 for the prefilter.
+    fn notices(&self, distortions: &[Distortion], sci03: Option<Notice>) -> Vec<Notice> {
+        let mode = self.options.upstream_defects;
+        let (mut changed, mut max, mut n) = (0usize, 0f64, 0usize);
+        for d in distortions {
+            if let Some((c, m, len)) = d.pipe03 {
+                changed += c;
+                max = max.max(m);
+                n += len;
+            }
+        }
+        let mut notices = Vec::new();
+        if changed > 0 {
+            let axes = distortions
+                .iter()
+                .map(|d| d.pe.axis.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let size = if max.is_finite() {
+                format!("by up to {max:.3e}")
+            } else {
+                "where fMRIPrep's gradient fails (fewer than 2 voxels along the axis)".to_owned()
+            };
+            let detail = match mode {
+                UpstreamDefects::Fix => format!(
+                    "the Jacobian is taken along the phase-encoding direction mapped into the \
+                     target grid; fMRIPrep's (along target axis {axes}, in target voxels) \
+                     differs in {changed} of {n} voxels, {size}"
+                ),
+                UpstreamDefects::Reproduce => format!(
+                    "the Jacobian is taken along target axis {axes} in target voxels, as \
+                     fMRIPrep does; along the phase-encoding direction it differs in {changed} \
+                     of {n} voxels, {size}"
+                ),
+            };
+            notices.push(Notice::new(&defects::PIPE_03, mode, detail));
+        }
+        notices.extend(sci03);
+        notices
+    }
+
+    /// Resamples one volume; returns the SCI-03 notice of its prefilter, if any.
     fn volume<O: Output + Jacobian>(
         &self,
         data: &[f32],
@@ -236,7 +406,7 @@ impl SeriesResampler {
         d: &Distortion,
         out: &mut [O],
         parallel: bool,
-    ) -> Result<(), ResampleError> {
+    ) -> Result<Option<Notice>, ResampleError> {
         let n = self.coords.len();
         if out.len() != n {
             return Err(invalid("the output does not match the target grid"));
@@ -250,6 +420,7 @@ impl SeriesResampler {
             o.cval,
             o.prefilter,
             parallel,
+            o.upstream_defects,
         )?;
         let axis = d.pe.axis;
         let single = n == 1;
@@ -289,13 +460,13 @@ impl SeriesResampler {
         } else {
             run(0, out);
         }
-        Ok(())
+        Ok(spline.notices().into_iter().next())
     }
 
     /// Resamples every volume of `source` (Fortran order: the source shape, then `n_volumes`)
     /// into `out` (the target grid, then the volumes): `resample_series`. `hmc` holds one
     /// voxel-to-voxel affine per volume (or none), `pe` one readout vector per volume (or one
-    /// for all).
+    /// for all). Returns the upstream defects that changed (or would have changed) the result.
     pub fn resample_series<O: Output + Jacobian>(
         &self,
         source: &[f32],
@@ -304,7 +475,7 @@ impl SeriesResampler {
         pe: &[PeInfo],
         out: &mut [O],
         n_threads: usize,
-    ) -> Result<(), ResampleError> {
+    ) -> Result<Vec<Notice>, ResampleError> {
         let n_src: usize = self.source_shape.iter().product();
         let n_out = self.coords.len();
         if source.len() != n_src * n_volumes {
@@ -352,38 +523,219 @@ impl SeriesResampler {
             which.push(i);
         }
         if n_volumes == 0 {
-            return Ok(());
+            return Ok(self.notices(&distortions, None));
         }
         let threads = parallel::resolve_threads(n_threads);
-        parallel::with_threads(threads, || -> Result<(), ResampleError> {
-            if n_volumes >= threads && threads > 1 {
-                // Whole volumes per task: at most `threads` prefiltered volumes in memory.
-                out.par_chunks_mut(n_out)
-                    .enumerate()
-                    .with_max_len(1)
-                    .try_for_each(|(t, vol_out)| {
-                        self.volume(
+        let sci03 =
+            parallel::with_threads(threads, || -> Result<Option<Notice>, ResampleError> {
+                if n_volumes >= threads && threads > 1 {
+                    // Whole volumes per task: at most `threads` prefiltered volumes in memory.
+                    let notices: Vec<Option<Notice>> = out
+                        .par_chunks_mut(n_out)
+                        .enumerate()
+                        .with_max_len(1)
+                        .map(|(t, vol_out)| {
+                            self.volume(
+                                &source[t * n_src..(t + 1) * n_src],
+                                hmc.map(|h| &h[t]),
+                                &distortions[which[t]],
+                                vol_out,
+                                false,
+                            )
+                        })
+                        .collect::<Result<_, _>>()?;
+                    Ok(notices.into_iter().flatten().next())
+                } else {
+                    let mut first = None;
+                    for (t, vol_out) in out.chunks_mut(n_out).enumerate() {
+                        let notice = self.volume(
                             &source[t * n_src..(t + 1) * n_src],
                             hmc.map(|h| &h[t]),
                             &distortions[which[t]],
                             vol_out,
-                            false,
-                        )
-                    })
-            } else {
-                for (t, vol_out) in out.chunks_mut(n_out).enumerate() {
-                    self.volume(
-                        &source[t * n_src..(t + 1) * n_src],
-                        hmc.map(|h| &h[t]),
-                        &distortions[which[t]],
-                        vol_out,
-                        threads > 1,
-                    )?;
+                            threads > 1,
+                        )?;
+                        first = first.or(notice);
+                    }
+                    Ok(first)
                 }
-                Ok(())
-            }
-        })?
+            })??;
+        Ok(self.notices(&distortions, sci03))
     }
+}
+
+/// [`InverseJacobian`] of the chain `ras2vox ∘ steps ∘ target_affine` (target voxels to source
+/// voxels, in double precision): constant for a chain of affines, else per target voxel, by
+/// central differences (±0.5 voxel) of the chain without nitransforms' float32 roundings
+/// ([`nitransforms::ExactChain`]).
+fn chain_inverse_jacobian(
+    shape: [usize; 3],
+    target_affine: &Mat4,
+    steps: &[Step],
+    ras2vox: &Mat4,
+) -> Result<InverseJacobian, ResampleError> {
+    let lin = |m: &Mat4| -> Mat3 { std::array::from_fn(|i| std::array::from_fn(|j| m[i][j])) };
+    let identity: Mat3 =
+        std::array::from_fn(|i| std::array::from_fn(|j| f64::from(u8::from(i == j))));
+    if steps.iter().all(|s| matches!(s, Step::Affine(_))) {
+        // J = ras2vox · M_n ⋯ M_1 · target_affine (linear parts; the steps apply in list order).
+        let mut j = lin(target_affine);
+        for s in steps {
+            if let Step::Affine(m) = s {
+                j = larmorx_core::linalg::mul3(&lin(m), &j);
+            }
+        }
+        j = larmorx_core::linalg::mul3(&lin(ras2vox), &j);
+        return Ok(InverseJacobian::Constant(
+            snapped_inverse(&j).unwrap_or(identity),
+        ));
+    }
+    let chain = nitransforms::ExactChain::new(steps)?;
+    let [nx, ny, nz] = shape;
+    let n = nx * ny * nz;
+    let map = |t: [f64; 3]| -> [f64; 3] {
+        let world = nitransforms::exact_affine(target_affine, t);
+        nitransforms::exact_affine(ras2vox, chain.map(world))
+    };
+    let mut out = vec![[[0f32; 3]; 3]; n];
+    out.par_chunks_mut(nx.max(1))
+        .enumerate()
+        .for_each(|(row, chunk)| {
+            let (y, z) = (row % ny, row / ny);
+            for (x, o) in chunk.iter_mut().enumerate() {
+                let t = [x as f64, y as f64, z as f64];
+                let mut j = [[0f64; 3]; 3];
+                for k in 0..3 {
+                    let (mut a, mut b) = (t, t);
+                    a[k] += 0.5;
+                    b[k] -= 0.5;
+                    let (sa, sb) = (map(a), map(b));
+                    for i in 0..3 {
+                        j[i][k] = sa[i] - sb[i];
+                    }
+                }
+                let inv = snapped_inverse(&j).unwrap_or(identity);
+                *o = inv.map(|r| r.map(|v| v as f32));
+            }
+        });
+    Ok(InverseJacobian::PerVoxel(out))
+}
+
+/// [`InverseJacobian`] from coordinates computed elsewhere: `J` from numpy-style gradients of
+/// each coordinate along each target axis (unit spacing, first-order edges; 0 along an axis
+/// of one voxel).
+fn coordinates_inverse_jacobian(coords: &[[f64; 3]], shape: [usize; 3]) -> InverseJacobian {
+    let identity: Mat3 =
+        std::array::from_fn(|i| std::array::from_fn(|j| f64::from(u8::from(i == j))));
+    let strides = [1, shape[0], shape[0] * shape[1]];
+    let out = (0..coords.len())
+        .into_par_iter()
+        .map(|n| {
+            let idx = [n % shape[0], (n / shape[0]) % shape[1], n / strides[2]];
+            let mut j = [[0f64; 3]; 3];
+            for k in 0..3 {
+                let (len, s) = (shape[k], strides[k]);
+                if len < 2 {
+                    continue;
+                }
+                let (lo, hi, h) = if idx[k] == 0 {
+                    (n, n + s, 1.0)
+                } else if idx[k] == len - 1 {
+                    (n - s, n, 1.0)
+                } else {
+                    (n - s, n + s, 2.0)
+                };
+                for i in 0..3 {
+                    j[i][k] = (coords[hi][i] - coords[lo][i]) / h;
+                }
+            }
+            snapped_inverse(&j)
+                .unwrap_or(identity)
+                .map(|r| r.map(|v| v as f32))
+        })
+        .collect();
+    InverseJacobian::PerVoxel(out)
+}
+
+/// numpy's `gradient(vsm, axis=k)` at voxel `n` (float32, unit spacing, first-order edges), or
+/// 0 along an axis of one voxel.
+#[inline]
+fn gradient_at(vsm: &[f32], shape: [usize; 3], k: usize, n: usize) -> f32 {
+    let len = shape[k];
+    if len < 2 {
+        return 0.0;
+    }
+    let stride: usize = shape[..k].iter().product();
+    let t = (n / stride) % len;
+    if t == 0 {
+        (vsm[n + stride] - vsm[n]) / 1.0
+    } else if t == len - 1 {
+        (vsm[n] - vsm[n - stride]) / 1.0
+    } else {
+        (vsm[n + stride] - vsm[n - stride]) / 2.0
+    }
+}
+
+/// The corrected Jacobian factor at voxel `n` for direction `d = ∂t/∂s_pe`: `1 + Σ d_k·g_k`.
+/// When `d` is a signed unit vector `±e_k`, it is the float32 `1 ± g_k`, numpy's arithmetic
+/// (so a target whose axes are the source's gives fMRIPrep's value); else the sum is taken
+/// in double and rounded to float32.
+#[inline]
+fn corrected_factor(vsm: &[f32], shape: [usize; 3], n: usize, d: [f64; 3]) -> f32 {
+    let nonzero = d.iter().filter(|&&v| v != 0.0).count();
+    if nonzero == 1 {
+        let k = d.iter().position(|&v| v != 0.0).unwrap_or(0);
+        if d[k] == 1.0 {
+            return 1.0 + gradient_at(vsm, shape, k, n);
+        }
+        if d[k] == -1.0 {
+            return 1.0 - gradient_at(vsm, shape, k, n);
+        }
+    }
+    let mut sum = 1.0f64;
+    for (k, &dk) in d.iter().enumerate() {
+        if dk != 0.0 {
+            sum += dk * f64::from(gradient_at(vsm, shape, k, n));
+        }
+    }
+    sum as f32
+}
+
+/// The corrected Jacobian factors (PIPE-03), per target voxel.
+fn corrected_jacobian(
+    vsm: &[f32],
+    shape: [usize; 3],
+    pe: usize,
+    inverse: &InverseJacobian,
+) -> Vec<f32> {
+    (0..vsm.len())
+        .into_par_iter()
+        .with_min_len(4096)
+        .map(|n| corrected_factor(vsm, shape, n, inverse.column(n, pe)))
+        .collect()
+}
+
+/// How many of fMRIPrep's factors the corrected Jacobian would change, and by how much at
+/// most (the reproduced mode's PIPE-03 notice).
+fn compare_jacobians(
+    vsm: &[f32],
+    shape: [usize; 3],
+    pe: usize,
+    inverse: &InverseJacobian,
+    fmriprep: &[f32],
+) -> (usize, f64) {
+    (0..vsm.len())
+        .into_par_iter()
+        .with_min_len(4096)
+        .map(|n| {
+            let c = corrected_factor(vsm, shape, n, inverse.column(n, pe));
+            if c.to_bits() == fmriprep[n].to_bits() {
+                (0usize, 0f64)
+            } else {
+                (1, (f64::from(c) - f64::from(fmriprep[n])).abs())
+            }
+        })
+        .reduce(|| (0, 0.0), |a, b| (a.0 + b.0, a.1.max(b.1)))
 }
 
 /// nibabel's `apply_affine(h, p)` for one point, as numpy evaluates `pts @ rzs.T + trans`:
@@ -535,5 +887,188 @@ mod tests {
         let j = jacobian(&vsm, shape, 1).unwrap();
         assert_eq!(j, vec![2.0, -0.5, -9.0, 2.0, -0.5, -9.0]);
         assert!(jacobian(&vsm, shape, 2).is_err());
+    }
+
+    fn options(defects: UpstreamDefects) -> ResampleOptions {
+        ResampleOptions {
+            order: 1,
+            mode: Mode::Nearest,
+            upstream_defects: defects,
+            ..ResampleOptions::default()
+        }
+    }
+
+    /// A field map in Hz on a target grid, varying along every axis.
+    fn field(shape: [usize; 3]) -> Vec<f32> {
+        let n: usize = shape.iter().product();
+        (0..n)
+            .map(|i| {
+                let (x, y, z) = (
+                    i % shape[0],
+                    (i / shape[0]) % shape[1],
+                    i / (shape[0] * shape[1]),
+                );
+                (x * x) as f32 * 0.5 + (y * 3) as f32 - (z * y) as f32 * 0.25 + (i % 5) as f32
+            })
+            .collect()
+    }
+
+    /// Resamples with the Jacobian only (a constant source, so the output is the Jacobian
+    /// factor): returns the output and the notices.
+    fn jacobian_of(
+        target_shape: [usize; 3],
+        target_affine: &Mat4,
+        steps: &[Step],
+        defects: UpstreamDefects,
+    ) -> (Vec<f32>, Vec<Notice>) {
+        let source_shape = [6, 5, 4];
+        let src = vec![1.0f32; 120];
+        let fmap = field(target_shape);
+        let plan = SeriesResampler::new(
+            target_shape,
+            target_affine,
+            steps,
+            &eye(),
+            source_shape,
+            Some(fmap),
+            options(defects),
+            2,
+        )
+        .unwrap();
+        let mut out = vec![0f32; target_shape.iter().product()];
+        let pe = [PeInfo {
+            axis: 1,
+            readout: 0.01,
+        }];
+        let notices = plan
+            .resample_series(&src, 1, None, &pe, &mut out, 2)
+            .unwrap();
+        (out, notices)
+    }
+
+    /// PIPE-03: on the source's own grid the corrected Jacobian is fMRIPrep's, bit for bit, and
+    /// nothing is said.
+    #[test]
+    fn native_grid_jacobian_is_fmriprep_s() {
+        let fixed = jacobian_of([6, 5, 4], &eye(), &[], UpstreamDefects::Fix);
+        let reproduced = jacobian_of([6, 5, 4], &eye(), &[], UpstreamDefects::Reproduce);
+        assert_eq!(fixed, reproduced);
+        assert!(fixed.1.is_empty());
+        // An affine step and its inverse in the chain change nothing either.
+        let mut m = eye();
+        m[0][1] = 0.3;
+        m[2][3] = 4.0;
+        let inv = larmorx_core::linalg::inverse4(&m).unwrap();
+        let steps = [Step::Affine(m), Step::Affine(inv)];
+        let fixed = jacobian_of([6, 5, 4], &eye(), &steps, UpstreamDefects::Fix);
+        assert!(fixed.1.is_empty());
+    }
+
+    /// PIPE-03: a target whose axes 0 and 1 are the source's 1 and 0. fMRIPrep differentiates
+    /// along target axis 1 (the source's x); the corrected Jacobian along target axis 0 (the
+    /// source's phase-encoding axis y).
+    #[test]
+    fn permuted_target_jacobian() {
+        let shape = [5, 6, 4];
+        let mut swap = [[0.0; 4]; 4];
+        (swap[0][1], swap[1][0], swap[2][2], swap[3][3]) = (1.0, 1.0, 1.0, 1.0);
+        let (fixed, nf) = jacobian_of(shape, &swap, &[], UpstreamDefects::Fix);
+        let (fmriprep, nr) = jacobian_of(shape, &swap, &[], UpstreamDefects::Reproduce);
+        let vsm: Vec<f32> = field(shape).iter().map(|v| v * 0.01f32).collect();
+        assert_eq!(fmriprep, jacobian(&vsm, shape, 1).unwrap());
+        assert_eq!(fixed, jacobian(&vsm, shape, 0).unwrap());
+        for notices in [&nf, &nr] {
+            assert_eq!(notices.len(), 1);
+            assert_eq!(notices[0].defect.id, "PIPE-03");
+        }
+        assert_eq!(nf[0].mode, UpstreamDefects::Fix);
+        assert_eq!(nr[0].mode, UpstreamDefects::Reproduce);
+        // A reversed axis takes the derivative with the other sign.
+        let mut flip = eye();
+        (flip[1][1], flip[1][3]) = (-1.0, 4.0);
+        let (fixed, _) = jacobian_of([6, 5, 4], &flip, &[], UpstreamDefects::Fix);
+        let vsm: Vec<f32> = field([6, 5, 4]).iter().map(|v| v * 0.01f32).collect();
+        let expected: Vec<f32> = (0..120)
+            .map(|n| 1.0 - gradient_at(&vsm, [6, 5, 4], 1, n))
+            .collect();
+        assert_eq!(fixed, expected);
+    }
+
+    /// PIPE-03: a target with half the voxel size along the phase-encoding axis: the
+    /// derivative per source voxel is twice the derivative per target voxel.
+    #[test]
+    fn finer_target_jacobian() {
+        let shape = [6, 9, 4];
+        let mut half = eye();
+        half[1][1] = 0.5;
+        let (fixed, notices) = jacobian_of(shape, &half, &[], UpstreamDefects::Fix);
+        let vsm: Vec<f32> = field(shape).iter().map(|v| v * 0.01f32).collect();
+        for (n, &f) in fixed.iter().enumerate() {
+            let g = f64::from(gradient_at(&vsm, shape, 1, n));
+            assert_eq!(f, (1.0 + 2.0 * g) as f32);
+        }
+        assert_eq!(notices.len(), 1);
+        // The per-voxel path (a displacement field that is zero) gives the same factors. The
+        // field's splines bend near its edges (mirror boundary), so it extends 25 nodes beyond
+        // the target, where the bend is below 1e-12.
+        let n = 56;
+        let mut corner = eye();
+        for (k, row) in corner.iter_mut().take(3).enumerate() {
+            row[3] = -25.0;
+            row[k] = 1.0;
+        }
+        let inverse = larmorx_core::linalg::inverse4(&corner).unwrap();
+        let zero = nitransforms::DenseField::from_deltas(
+            [n, n, n],
+            &corner,
+            &inverse,
+            [
+                vec![0.0; n * n * n],
+                vec![0.0; n * n * n],
+                vec![0.0; n * n * n],
+            ],
+        )
+        .unwrap();
+        let (per_voxel, _) = jacobian_of(
+            shape,
+            &half,
+            &[Step::DenseField(zero)],
+            UpstreamDefects::Fix,
+        );
+        for (a, b) in per_voxel.iter().zip(&fixed) {
+            assert!((a - b).abs() <= 1e-6, "{a} {b}");
+        }
+    }
+
+    /// PIPE-03 from coordinates computed elsewhere: `J` from their differences.
+    #[test]
+    fn jacobian_from_coordinates() {
+        let shape = [5, 6, 4];
+        let coords: Vec<[f64; 3]> = (0..120)
+            .map(|i| {
+                let (x, y, z) = (i % 5, (i / 5) % 6, i / 30);
+                [y as f64, x as f64, z as f64]
+            })
+            .collect();
+        let fmap = field(shape);
+        let plan = SeriesResampler::from_coordinates(
+            shape,
+            coords,
+            [6, 5, 4],
+            Some(fmap.clone()),
+            options(UpstreamDefects::Fix),
+        )
+        .unwrap();
+        let mut out = vec![0f32; 120];
+        let pe = PeInfo {
+            axis: 1,
+            readout: 0.01,
+        };
+        let notices = plan
+            .resample_volume(&[1.0f32; 120], None, pe, &mut out, false)
+            .unwrap();
+        let vsm: Vec<f32> = fmap.iter().map(|v| v * 0.01f32).collect();
+        assert_eq!(out, jacobian(&vsm, shape, 0).unwrap());
+        assert_eq!(notices[0].defect.id, "PIPE-03");
     }
 }

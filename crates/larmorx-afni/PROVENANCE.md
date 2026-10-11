@@ -11,7 +11,8 @@ derived from it. Its only inputs were:
 |---|---|
 | [`specs/3dTshift.md`](../../specs/3dTshift.md) | the behaviour spec: inputs, the maths of each step, AFNI's NIfTI rules, the command line |
 | `3dTshift -help` (AFNI 25.2.09) | AFNI's published documentation of the options and slice patterns |
-| Black-box runs of the AFNI 25.2.09 binary (`oracles/afni-25.2.09/bin/3dTshift`) | every rule marked *(observed)* in the spec, and the ones found while implementing (listed in `docs/api/afni-tshift.md`) |
+| Black-box runs of the AFNI 25.2.09 binary (`oracles/afni-25.2.09/bin/3dTshift`) | every rule marked *(observed)* in the spec, and the ones found while implementing (listed in `docs/api/afni-tshift.md`); for D13, float32 data with a slope and an intercept, metre and micron units, and the search for AFNI-08's trigger (spec §6) |
+| The defect register's summary table and "D13 gaps" list (`docs/findings/upstream-defects.md`, which describe the AFNI entries by observable behaviour only; the restricted AFNI section was not opened) | which of 3dTshift's behaviours are defects, and the corrections larmorx makes by default (`larmorx_core::defects`, `upstream_defects`): AFNI-01, -02, -03, -05, -07 |
 | Textbook mathematics | the FFT (`fft.rs`: Stockham autosort, Van Loan 1992 §1.7), least squares, Lagrange interpolation |
 
 | larmorx | Behaviour reproduced | Source |

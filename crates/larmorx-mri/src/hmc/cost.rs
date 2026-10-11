@@ -94,6 +94,29 @@ pub enum CostInterpolation {
     },
 }
 
+/// The count `N` of the weighted normalised correlation (§6.4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NormCorrCount {
+    /// mcflirt's count: a float32 running sum of running sums of the row weights, many orders
+    /// of magnitude larger than the number of points, which makes the correlation effectively
+    /// uncentred (FSL-02). The default, pending a decision (D13 item 4).
+    #[default]
+    Mcflirt,
+    /// The sum of the weights: the weighted Pearson correlation (FSL-02 corrected).
+    Weights,
+}
+
+impl NormCorrCount {
+    /// `mcflirt` or `weights`.
+    pub fn from_name(name: &str) -> Option<NormCorrCount> {
+        match name {
+            "mcflirt" => Some(NormCorrCount::Mcflirt),
+            "weights" => Some(NormCorrCount::Weights),
+            _ => None,
+        }
+    }
+}
+
 /// What the cost needs about a test volume, computed once per volume and stage.
 pub struct TestVolume<'a> {
     pub vol: &'a Volume,
@@ -102,6 +125,11 @@ pub struct TestVolume<'a> {
     /// The edge-weighting width per axis in voxels (`smooth / d_k`); 0 turns weighting off.
     pub sigma: [f32; 3],
     pub interpolation: CostInterpolation,
+    /// Leave out points whose reference or interpolated test value is NaN or infinite
+    /// (FSL-14 corrected; set only when the volume or the grid has such values).
+    pub skip_non_finite: bool,
+    /// The count of the normalised correlation.
+    pub count: NormCorrCount,
 }
 
 impl<'a> TestVolume<'a> {
@@ -112,6 +140,8 @@ impl<'a> TestVolume<'a> {
             bound: vol.shape.map(|n| (n as f64 - 1.0001) as f32),
             sigma: vol.voxel_size.map(|d| smooth / d),
             interpolation: CostInterpolation::Trilinear,
+            skip_non_finite: false,
+            count: NormCorrCount::Mcflirt,
         }
     }
 
@@ -214,10 +244,21 @@ fn sample_slice<A: Accumulator, V: Fn([f32; 3]) -> f32, W: Fn([f32; 3]) -> f32>(
                 p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
                 x += 1;
             }
-            while x <= x1 && test.inside(p) {
-                acc.point(grow[x], value(p), weight(p));
-                p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
-                x += 1;
+            if test.skip_non_finite {
+                while x <= x1 && test.inside(p) {
+                    let (g, v) = (grow[x], value(p));
+                    if g.is_finite() && v.is_finite() {
+                        acc.point(g, v, weight(p));
+                    }
+                    p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
+                    x += 1;
+                }
+            } else {
+                while x <= x1 && test.inside(p) {
+                    acc.point(grow[x], value(p), weight(p));
+                    p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
+                    x += 1;
+                }
             }
         }
         acc.end_row();
@@ -321,7 +362,8 @@ impl Accumulator for CorrSlice {
 
 /// The normalised-correlation cost `1 − |r|` (§6.4). With weighting (`smooth > 0`), the
 /// correlation uses mcflirt's count `N` (a float32 running sum of running sums of the row
-/// weights); without, the number of contributing points (Pearson's correlation).
+/// weights), or with [`NormCorrCount::Weights`] the sum of the weights (FSL-02 corrected);
+/// without weighting, the number of contributing points (Pearson's correlation).
 pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], parallel: bool) -> f32 {
     let slices = sample(grid, test, b, parallel, CorrSlice::default);
     let mut total = Sums::default();
@@ -337,7 +379,11 @@ pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], paralle
         points += s.points;
     }
     let r = if test.weighted() {
-        correlation_weighted(&total, n)
+        match test.count {
+            NormCorrCount::Mcflirt => correlation_weighted(&total, n),
+            // `c` is the float32 running total of every row's weight: Σ w.
+            NormCorrCount::Weights => correlation_weighted(&total, c),
+        }
     } else {
         correlation_counted(&total, points as f32)
     };

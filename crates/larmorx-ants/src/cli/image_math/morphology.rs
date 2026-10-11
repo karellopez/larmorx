@@ -82,9 +82,7 @@ fn run_morph(ctx: &mut Context<'_>) -> Result<(), OpError> {
         )));
     };
     let data = morphological(image.view(), operation, radius, value, ctx.n_threads)?;
-    if output.len() > 3 {
-        ctx.write(&output, image.derived(data))?;
-    }
+    ctx.write_if_long(&output, image.derived(data))?;
     Ok(())
 }
 
@@ -95,10 +93,12 @@ fn run_fill_holes(ctx: &mut Context<'_>) -> Result<(), OpError> {
     let fn1 = ctx.required(4)?.to_owned();
     let hole_param = ctx.arg(5).map_or(2.0f32, |s| atof(s) as f32);
     let image: AntsImage<f32> = ctx.read(&fn1)?;
-    let data = fill_holes(image.view(), hole_param, ctx.n_threads).map_err(|e| match e {
+    let (data, notices) = fill_holes(image.view(), hole_param, ctx.n_threads, ctx.notices.mode())
+        .map_err(|e| match e {
         FillHolesError::Filter(e) => OpError::from(e),
         other => OpError::unsupported(format!("larmorx: FillHoles: {other}")),
     })?;
+    ctx.notices.extend(notices);
     ctx.write(&output, image.with_data(data))?;
     Ok(())
 }
@@ -109,12 +109,19 @@ fn run_pad_image(ctx: &mut Context<'_>) -> Result<(), OpError> {
     let fn1 = ctx.required(4)?.to_owned();
     let pad = atof(ctx.required(5)?) as f32;
     let value = ctx.arg(6).map_or(0.0f32, |s| atof(s) as f32);
-    if fn1.len() <= 3 {
+    if fn1.len() <= 3 && !ctx.fix() {
         return Err(OpError::crash(format!(
             "larmorx: PadImage: ANTs reads no image for a name of 3 characters or fewer ('{fn1}') and then uses the null image"
         )));
     }
     let image: AntsImage<f32> = ctx.read(&fn1)?;
+    if fn1.len() <= 3 {
+        // Only an image that exists changes the result: a missing one fails either way.
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_03,
+            format!("the image '{fn1}' is read like any other name; ANTs' PadImage reads no name of 3 characters or fewer"),
+        );
+    }
     let padded = pad_image(&image, pad, value).map_err(|e| {
         OpError::crash(format!(
             "larmorx: {e} (ANTs cannot allocate or write such an image)"

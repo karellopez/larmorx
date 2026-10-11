@@ -78,10 +78,16 @@ def test_generic_image_math_equals_the_typed_functions():
     np.testing.assert_array_equal(t1.data, t2.data)
 
 
-def test_division_keeps_the_previous_value_where_the_divisor_is_not_positive():
+def test_division_where_the_divisor_is_not_positive():
     a = image([[[6.0, 8.0, 10.0, 12.0]]])
     b = image([[[2.0, 0.0, -1.0, 4.0]]])
-    out = lx.ants.image_arithmetic(a, "divide", b)
+    # ANTS-08 corrected: divided wherever the divisor is not 0, 0 where it is.
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-08"):
+        out = lx.ants.image_arithmetic(a, "divide", b)
+    np.testing.assert_array_equal(out.data.ravel(), [3, 0, -10, 3])
+    # ANTs keeps the previous voxel's value.
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-08"):
+        out = lx.ants.image_arithmetic(a, "divide", b, upstream_defects="reproduce")
     np.testing.assert_array_equal(out.data.ravel(), [3, 3, 3, 3])
 
 
@@ -89,7 +95,12 @@ def test_add_to_zero_and_running_total():
     a = image([[[0.0, 1.0, 0.0, 2.0]]])
     b = image([[[5.0, 5.0, 5.0, 5.0]]])
     np.testing.assert_array_equal(lx.ants.add_to_zero(a, b).data.ravel(), [5, 1, 5, 2])
-    total = lx.ants.image_arithmetic(a, "total", 1.0)
+    # ANTS-09: the total in every voxel; ANTs writes the running sum.
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-09"):
+        total = lx.ants.image_arithmetic(a, "total", 1.0)
+    np.testing.assert_array_equal(total.data.ravel(), [3, 3, 3, 3])
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-09"):
+        total = lx.ants.image_arithmetic(a, "total", 1.0, upstream_defects="reproduce")
     np.testing.assert_array_equal(total.data.ravel(), [0, 1, 1, 3])
 
 
@@ -133,8 +144,8 @@ def textured(shape=(9, 8, 7), affine=AFFINE, seed=0):
 def test_typed_gaussian_functions_equal_image_math():
     img = textured()
     pairs = [
-        # ANTs reads Laplacian's normalize flag from the sigma argument: stoi("1.5") is 1.
-        (lx.ants.laplacian(img, 1.5, normalize=True), ("Laplacian", 1.5, 0)),
+        # larmorx reads Laplacian's normalize flag from its own argument (ANTS-16).
+        (lx.ants.laplacian(img, 1.5, normalize=True), ("Laplacian", 1.5, 1)),
         (lx.ants.laplacian(img, 0.8), ("Laplacian", 0.8)),
         (lx.ants.gradient_magnitude(img, 1.2), ("Grad", 1.2)),
         (lx.ants.gradient_magnitude(img, 2.0, normalize=True), ("Grad", 2.0, 1)),
@@ -148,6 +159,10 @@ def test_typed_gaussian_functions_equal_image_math():
         assert typed.data.dtype == np.float32
     lap = lx.ants.laplacian(img, 1.5, normalize=True).data
     assert (lap.min(), lap.max()) == (0.0, 1.0)
+    # ANTs reads the flag from the sigma's argument: stoi("1.5") is 1, so it normalizes.
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-16"):
+        ants = lx.ants.image_math("Laplacian", img, 1.5, 0, upstream_defects="reproduce")
+    np.testing.assert_array_equal(ants.data, lap)
 
 
 def test_smooth_image_modes_threads_and_dimensions():
@@ -207,7 +222,11 @@ def test_resample_image_types_interpolators_and_command_line(tmp_path):
     for args, kw in [
         (["1.5"], {}),
         (["1.5", "0", "1"], {"interpolation": "nearest"}),
-        (["0.8", "0", "4", "5"], {"interpolation": "bspline", "order": 5, "pixel_type": "uint"}),
+        # The pixel type after the B-spline order (ANTS-30: ANTs reads both from argument 7).
+        (
+            ["0.8", "0", "4", "5", "5"],
+            {"interpolation": "bspline", "order": 5, "pixel_type": "uint"},
+        ),
         (["1.2", "0", "3"], {"interpolation": "sinc"}),
         (["2", "0", "2"], {"interpolation": "gaussian"}),
         (["20x18x16", "1"], {"size": [20, 18, 16]}),
@@ -332,10 +351,14 @@ def test_typed_components_and_distances_equal_image_math():
     # The 343-voxel cube with its hole is the largest component; the corner voxel is not.
     largest = pairs[1][0].data
     assert largest[0, 0, 0] == 0 and largest[4, 4, 4] == 1 and largest[5, 5, 5] == 0
-    # Nothing as large as 50 voxels: everything becomes 1.
+    # Nothing as large as 50 voxels: everything becomes 0 (ANTS-20; ANTs makes it all 1).
     point = np.zeros((6, 6, 6), np.float32)
     point[2, 2, 2] = 1
-    assert (lx.ants.largest_component(image(point)).data == 1).all()
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-20"):
+        assert (lx.ants.largest_component(image(point)).data == 0).all()
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-20"):
+        ants = lx.ants.largest_component(image(point), upstream_defects="reproduce")
+    assert (ants.data == 1).all()
     # Distances in millimetres (2 x 2 x 3 mm voxels); Maurer is negative inside.
     d = lx.ants.distance_map(image(point)).data
     assert d[2, 2, 2] == 0 and d[3, 2, 2] == 2 and d[2, 2, 3] == 3

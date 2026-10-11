@@ -16,7 +16,13 @@
 //! ANTs' result depends on its thread count (ITK's threads add to shared voxels without
 //! locks); larmorx computes ITK's single-thread result with any number of threads
 //! (`docs/findings/ants-denoise.md`).
+//!
+//! The filter's Rician correction factor overflows at a high signal-to-noise ratio and ITK
+//! then sets the bias to 0 (ANTS-43): corrected unless [`DenoiseOptions::upstream_defects`] is
+//! [`UpstreamDefects::Reproduce`].
 
+use larmorx_core::IndexFloor;
+use larmorx_core::defects::{Notice, Notices, UpstreamDefects};
 use larmorx_image::adaptive_denoising::{AdaptiveNlmParameters, MaskRef, adaptive_non_local_means};
 use larmorx_image::shrink::{shrink, shrink_plan};
 use larmorx_image::{FilterError, ItkGrid, VolumeRef};
@@ -49,6 +55,8 @@ pub struct DenoiseOptions {
     pub patch_radius: Vec<u32>,
     /// `-r`: the search radius per axis (default 2); empty means 2 on every axis.
     pub search_radius: Vec<u32>,
+    /// Correct the filter's defect (ANTS-43; the default) or reproduce it.
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl Default for DenoiseOptions {
@@ -58,6 +66,7 @@ impl Default for DenoiseOptions {
             shrink_factor: 1,
             patch_radius: Vec::new(),
             search_radius: Vec::new(),
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -97,6 +106,8 @@ pub struct DenoiseOutput {
     pub noise: AntsImage<f32>,
     /// The size of the image the filter ran on (the input's, unless shrunk).
     pub shrunk_size: Vec<usize>,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
 /// A radius option: one value for every axis, or one per axis.
@@ -172,6 +183,7 @@ pub fn denoise_image(
         AdaptiveNlmParameters::denoise_image(d, options.noise_model == NoiseModel::Rician);
     parameters.patch_radius = patch;
     parameters.search_radius = search;
+    parameters.upstream_defects = options.upstream_defects;
     let result = adaptive_non_local_means(
         VolumeRef::new(&shrunk, &small.size, &small.spacing),
         mask_ref,
@@ -189,6 +201,7 @@ pub fn denoise_image(
             .collect()
     })
     .map_err(FilterError::from)?;
+    let floor = IndexFloor::new(options.upstream_defects);
     let noise = resample_identity_with(
         &small_noise,
         &small,
@@ -197,8 +210,12 @@ pub fn denoise_image(
         0.0f32,
         f32::from_f64_bounded,
         Coordinates::Float,
+        &floor,
         n_threads,
     )?;
+    let mut notices = Notices::new(options.upstream_defects);
+    notices.extend(result.notices);
+    floor.notice(&mut notices, "output voxels");
     let denoised: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
         input
             .data
@@ -213,6 +230,7 @@ pub fn denoise_image(
         denoised: input.derived(denoised),
         noise: input.derived(noise),
         shrunk_size: small.size,
+        notices: notices.into_vec(),
     })
 }
 

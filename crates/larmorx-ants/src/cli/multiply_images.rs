@@ -9,7 +9,9 @@
 //! As in ANTs:
 //! - fewer than three arguments print the usage (exit 0 for `--help`/`-h`, else 1);
 //! - the second operand is read as an image if it can be, else taken as a number with
-//!   `atof`; **a missing file therefore multiplies by 0**, silently;
+//!   `atof`; **a missing file therefore multiplies by 0**, silently (ANTS-27: larmorx refuses
+//!   an argument that is neither a readable image nor a number, unless
+//!   `LARMORX_UPSTREAM_DEFECTS=reproduce`);
 //! - the product is computed at the first image's voxel indices, in float, and written with
 //!   the first image's geometry (the second image's is ignored);
 //! - no output name (`MultiplyImages 3 a.nii b.nii`) aborts ANTs ("missing output filename",
@@ -20,8 +22,10 @@
 
 use std::io::Write;
 
-use super::cstd::{atof, stoi};
-use crate::image::{AntsImage, FileStore, ImageStore, ReadError, from_itk, read_with};
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
+
+use super::cstd::{StrictNumber, atof, stoi, strict_f32};
+use crate::image::{AntsImage, FileStore, ImageStore, ReadError, from_itk};
 use crate::image_math::Operand;
 use crate::multiply_images::multiply_images;
 
@@ -32,16 +36,24 @@ MultiplyImages ImageDimension img1.nii img2.nii product.nii {smoothing}
  Program handles vector and tensor images as well (larmorx: scalar images only)
 ";
 
-/// Runs `MultiplyImages` on files; returns the exit code.
+/// Runs `MultiplyImages` on files, in the D13 mode of `LARMORX_UPSTREAM_DEFECTS`; returns the
+/// exit code.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    run(args, &mut FileStore, super::itk_threads(), out, err)
+    match UpstreamDefects::from_env() {
+        Ok(mode) => run(args, &mut FileStore, super::itk_threads(), mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
 }
 
-/// Runs `MultiplyImages` with images from `store`.
+/// Runs `MultiplyImages` with images from `store` in the D13 mode `mode`.
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -52,7 +64,8 @@ pub fn run(
         let help = matches!(argv.get(1).map(String::as_str), Some("--help" | "-h"));
         return if help { 0 } else { 1 };
     }
-    match multiply(&argv, store, n_threads, out) {
+    let mut notices = Notices::new(mode);
+    let code = match multiply(&argv, store, n_threads, &mut notices, out) {
         Ok(()) => 0,
         Err(message) => {
             if !message.is_empty() {
@@ -60,13 +73,16 @@ pub fn run(
             }
             1
         }
-    }
+    };
+    notices.print(err);
+    code
 }
 
 fn multiply(
     argv: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    notices: &mut Notices,
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let dim = stoi(&argv[1]).ok_or_else(|| {
@@ -77,7 +93,7 @@ fn multiply(
     })?;
     // ANTs opens the first image (`CreateImageIO`) before checking the dimension; a missing
     // or unreadable one crashes it.
-    let raw = match store.load(&argv[2], n_threads) {
+    let raw = match store.load(&argv[2], n_threads, notices) {
         Ok(i) => i,
         Err(ReadError::Unsupported { name, message }) => {
             return Err(format!("larmorx: {name}: {message}"));
@@ -105,15 +121,47 @@ fn multiply(
         );
     }
     let first: AntsImage<f32> =
-        from_itk(raw, &argv[2], dim, n_threads).map_err(|e| e.to_string())?;
-    // The second operand: an image if it reads as one, else a number (`atof`).
-    let second: Option<AntsImage<f32>> = match read_with(store, &argv[3], dim, n_threads) {
-        Ok(i) => Some(i),
-        Err(ReadError::Unsupported { name, message }) => {
+        from_itk(raw, &argv[2], dim, n_threads, notices).map_err(|e| e.to_string())?;
+    // The second operand: an image if ITK's reader reads it, else a number (`atof`).
+    let second: Option<AntsImage<f32>> = match store.load(&argv[3], n_threads, notices) {
+        Ok(raw) => {
+            Some(from_itk(raw, &argv[3], dim, n_threads, notices).map_err(|e| e.to_string())?)
+        }
+        Err(ReadError::Unsupported { name, message })
+            if strict_f32(&argv[3]) == StrictNumber::NotANumber =>
+        {
             return Err(format!("larmorx: {name}: {message}"));
         }
         Err(_) => None,
     };
+    if second.is_none() && strict_f32(&argv[3]) == StrictNumber::NotANumber {
+        // ANTS-27: neither an image nor a number; ANTs multiplies by atof of the name.
+        let value = atof(&argv[3]) as f32;
+        if notices.fix() {
+            notices.add(
+                &defects::ANTS_27,
+                format!(
+                    "'{}' is neither a readable image nor a number: an error; ANTs multiplies \
+                     by {value}",
+                    argv[3]
+                ),
+            );
+            return Err(format!(
+                "larmorx: MultiplyImages: cannot read '{}' as an image, and it is not a number \
+                 ({}=reproduce multiplies by {value}, as ANTs does)",
+                argv[3],
+                defects::ENV
+            ));
+        }
+        notices.add(
+            &defects::ANTS_27,
+            format!(
+                "'{}' is neither a readable image nor a number: multiplied by {value}, as ANTs \
+                 does",
+                argv[3]
+            ),
+        );
+    }
     let operand = match &second {
         Some(i) => Operand::Image {
             data: &i.data,
@@ -121,8 +169,15 @@ fn multiply(
         },
         None => Operand::Scalar(atof(&argv[3]) as f32),
     };
-    let product = multiply_images(&first.data, first.size(), operand, n_threads)
-        .map_err(|e| format!("larmorx: MultiplyImages: {e} (ANTs reads outside the image)"))?;
+    let (product, product_notices) = multiply_images(
+        &first.data,
+        first.size(),
+        operand,
+        n_threads,
+        notices.mode(),
+    )
+    .map_err(|e| format!("larmorx: MultiplyImages: {e}"))?;
+    notices.extend(product_notices);
     let output = first.derived(product);
     store
         .save(&argv[4], &output.into(), n_threads)

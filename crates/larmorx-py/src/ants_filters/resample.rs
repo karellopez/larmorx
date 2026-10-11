@@ -14,24 +14,27 @@ use larmorx_ants::resample_image_by_spacing::{
     ResampleBySpacingOptions, resample_image_by_spacing,
 };
 use larmorx_core::RealElement;
+use larmorx_core::defects::Notices;
 use larmorx_interp::{Interpolation, Window};
 use pyo3::exceptions::{PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 use super::{itk_image_from_tuple, output_to_py, value_err};
+use crate::defects::{mode_from_py, with_notices};
 
 /// The image a program reads: a path through ANTs' `ReadImage`, or an in-memory tuple placed
-/// as ITK's reader would place it.
+/// as ITK's reader would place it (with the D13 mode and notices of `notices`).
 pub(crate) fn ants_input<T: Pixel>(
     py: Python<'_>,
     image: &Bound<'_, PyAny>,
     dim: usize,
     n_threads: usize,
+    notices: &mut Notices,
 ) -> PyResult<AntsImage<T>> {
     if let Ok(path) = image.extract::<String>() {
         return py
-            .detach(|| read_with::<T, _>(&mut FileStore, &path, dim, n_threads))
+            .detach(|| read_with::<T, _>(&mut FileStore, &path, dim, n_threads, notices))
             .map_err(|e| match e {
                 ReadError::Missing(n) => PyFileNotFoundError::new_err(format!("{n}: no such file")),
                 other => value_err(other),
@@ -44,7 +47,7 @@ pub(crate) fn ants_input<T: Pixel>(
             itk.geometry.ndim
         )));
     }
-    from_itk(itk, "image", dim, n_threads).map_err(value_err)
+    from_itk(itk, "image", dim, n_threads, notices).map_err(value_err)
 }
 
 /// `(data, ras_affine, descrip, spacing)` of an output image.
@@ -59,9 +62,11 @@ pub(crate) fn output_with_spacing<'py>(
     PyTuple::new(py, items)
 }
 
-/// `ResampleImageBySpacing` (float pixels).
+/// `ResampleImageBySpacing` (float pixels): `((data, ras_affine, descrip, spacing),
+/// notices)`.
 #[pyfunction]
-#[pyo3(signature = (image, spacing, smooth = true, add_voxels = 0, nearest = false, n_threads = 1))]
+#[pyo3(signature = (image, spacing, smooth = true, add_voxels = 0, nearest = false, n_threads = 1, upstream_defects = "fix"))]
+#[allow(clippy::too_many_arguments)]
 fn ants_resample_image_by_spacing<'py>(
     py: Python<'py>,
     image: &Bound<'py, PyAny>,
@@ -70,21 +75,29 @@ fn ants_resample_image_by_spacing<'py>(
     add_voxels: i32,
     nearest: bool,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let input: AntsImage<f32> = ants_input(py, image, spacing.len(), n_threads)?;
+    let mode = mode_from_py(upstream_defects)?;
+    let mut notices = Notices::new(mode);
+    let input: AntsImage<f32> = ants_input(py, image, spacing.len(), n_threads, &mut notices)?;
     let options = ResampleBySpacingOptions {
         spacing,
         smooth,
         add_voxels,
         nearest,
     };
-    let (out, _) = py
-        .detach(|| resample_image_by_spacing(&input, &options, n_threads))
+    let (out, _, resample_notices) = py
+        .detach(|| resample_image_by_spacing(&input, &options, n_threads, mode))
         .map_err(value_err)?;
-    output_with_spacing(py, OutputImage::F32(out))
+    notices.extend(resample_notices);
+    with_notices(
+        py,
+        output_with_spacing(py, OutputImage::F32(out))?.into_any(),
+        notices.into_vec(),
+    )
 }
 
-/// `ResampleImage` in pixel type `T`.
+/// `ResampleImage` in pixel type `T`: `((data, ras_affine, descrip, spacing), notices)`.
 fn resample_as<'py, T>(
     py: Python<'py>,
     image: &Bound<'py, PyAny>,
@@ -92,16 +105,23 @@ fn resample_as<'py, T>(
     target: ResampleTarget<'_>,
     interpolation: &Interpolation,
     n_threads: usize,
+    mut notices: Notices,
 ) -> PyResult<Bound<'py, PyTuple>>
 where
     T: Pixel + RealElement,
     AntsImage<T>: Into<OutputImage>,
 {
-    let input: AntsImage<T> = ants_input(py, image, dim, n_threads)?;
-    let out = py
-        .detach(|| resample_image(&input, target, interpolation, n_threads))
+    let mode = notices.mode();
+    let input: AntsImage<T> = ants_input(py, image, dim, n_threads, &mut notices)?;
+    let (out, resample_notices) = py
+        .detach(|| resample_image(&input, target, interpolation, n_threads, mode))
         .map_err(value_err)?;
-    output_with_spacing(py, out.into())
+    notices.extend(resample_notices);
+    with_notices(
+        py,
+        output_with_spacing(py, out.into())?.into_any(),
+        notices.into_vec(),
+    )
 }
 
 /// `ResampleImage`: `spacing` or `size` (one value or one per axis), the interpolator by
@@ -109,7 +129,7 @@ where
 /// `bspline` with `order`) and the pixel type (`char`, `uchar`, `short`, `ushort`, `int`,
 /// `uint`, `float`, `double`).
 #[pyfunction]
-#[pyo3(signature = (image, dim, spacing = None, size = None, interpolation = "linear", sigma = None, alpha = 1.0, window = "hamming", order = 3, pixel_type = "float", n_threads = 1))]
+#[pyo3(signature = (image, dim, spacing = None, size = None, interpolation = "linear", sigma = None, alpha = 1.0, window = "hamming", order = 3, pixel_type = "float", n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn ants_resample_image<'py>(
     py: Python<'py>,
@@ -124,7 +144,9 @@ fn ants_resample_image<'py>(
     order: u32,
     pixel_type: &str,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
+    let n = Notices::new(mode_from_py(upstream_defects)?);
     let target = match (&spacing, &size) {
         (Some(s), None) => ResampleTarget::Spacing(s),
         (None, Some(n)) => ResampleTarget::Size(n),
@@ -173,14 +195,14 @@ fn ants_resample_image<'py>(
         }
     };
     match pixel_type {
-        "char" => resample_as::<i8>(py, image, dim, target, &interpolation, n_threads),
-        "uchar" => resample_as::<u8>(py, image, dim, target, &interpolation, n_threads),
-        "short" => resample_as::<i16>(py, image, dim, target, &interpolation, n_threads),
-        "ushort" => resample_as::<u16>(py, image, dim, target, &interpolation, n_threads),
-        "int" => resample_as::<i32>(py, image, dim, target, &interpolation, n_threads),
-        "uint" => resample_as::<u32>(py, image, dim, target, &interpolation, n_threads),
-        "float" => resample_as::<f32>(py, image, dim, target, &interpolation, n_threads),
-        "double" => resample_as::<f64>(py, image, dim, target, &interpolation, n_threads),
+        "char" => resample_as::<i8>(py, image, dim, target, &interpolation, n_threads, n),
+        "uchar" => resample_as::<u8>(py, image, dim, target, &interpolation, n_threads, n),
+        "short" => resample_as::<i16>(py, image, dim, target, &interpolation, n_threads, n),
+        "ushort" => resample_as::<u16>(py, image, dim, target, &interpolation, n_threads, n),
+        "int" => resample_as::<i32>(py, image, dim, target, &interpolation, n_threads, n),
+        "uint" => resample_as::<u32>(py, image, dim, target, &interpolation, n_threads, n),
+        "float" => resample_as::<f32>(py, image, dim, target, &interpolation, n_threads, n),
+        "double" => resample_as::<f64>(py, image, dim, target, &interpolation, n_threads, n),
         other => Err(PyValueError::new_err(format!(
             "unknown pixel type {other:?}"
         ))),

@@ -38,11 +38,15 @@
 //! each output voxel then sums its contributions in the order the single thread adds them
 //! (centres in raster order), see `docs/findings/ants-denoise.md`.
 
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::math;
 use rayon::prelude::*;
 
 use crate::FilterError;
-use crate::discrete_gaussian::{DiscreteGaussianOptions, bessel_i0, bessel_i1, discrete_gaussian};
+use crate::discrete_gaussian::{
+    DiscreteGaussianOptions, bessel_i0, bessel_i1, discrete_gaussian, scaled_bessel_i0,
+    scaled_bessel_i1,
+};
 use crate::itk_math::almost_equal_f32;
 use crate::neighborhood::{BoxNeighborhood, mean_filter, variance_filter};
 use crate::volume::{VolumeRef, strides};
@@ -66,6 +70,10 @@ pub struct AdaptiveNlmParameters {
     pub variance_threshold: f32,
     /// The variance of the bias image's smoothing, physical units² (`SmoothingVariance`).
     pub smoothing_variance: f32,
+    /// ANTS-43: at a high signal-to-noise ratio ITK's Rician correction factor overflows
+    /// (NaN) and the bias becomes 0 ([`UpstreamDefects::Reproduce`]); the default computes the
+    /// factor without the overflow ([`corrected_correction_factor`]).
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl AdaptiveNlmParameters {
@@ -82,6 +90,7 @@ impl AdaptiveNlmParameters {
             mean_threshold: 0.95,
             variance_threshold: 0.5,
             smoothing_variance: 2.0,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -102,6 +111,8 @@ pub struct AdaptiveNlmOutput {
     pub denoised: Vec<f32>,
     /// The bias image after the correction (Rician model; empty otherwise).
     pub rician_bias: Vec<f32>,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
 /// The largest dimension handled.
@@ -698,6 +709,7 @@ fn run(
         return Ok(AdaptiveNlmOutput {
             denoised: Vec::new(),
             rician_bias: Vec::new(),
+            notices: Vec::new(),
         });
     }
     let mean = mean_filter(input, &parameters.local_radius, n_threads)?;
@@ -858,6 +870,8 @@ fn run(
 
     // AfterThreadedGenerateData.
     let mut bias_image = Vec::new();
+    let overflowed = std::sync::atomic::AtomicUsize::new(0);
+    let fix = parameters.upstream_defects.fix();
     if rician {
         let options = DiscreteGaussianOptions::new(d, f64::from(parameters.smoothing_variance));
         let smoothed = discrete_gaussian(
@@ -886,13 +900,43 @@ fn run(
                         }
                     }
                     let snr = m / s.sqrt();
-                    let mut v = 2.0f32 * s / correction_factor(snr);
+                    let factor = correction_factor(snr);
+                    let mut v = 2.0f32 * s / factor;
                     if v.is_nan() || v.is_infinite() {
-                        v = 0.0;
+                        // ANTS-43: a NaN factor is ITK's overflow at a high SNR.
+                        if factor.is_nan() {
+                            overflowed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        v = if fix && factor.is_nan() {
+                            2.0f32 * s / corrected_correction_factor(snr)
+                        } else {
+                            0.0
+                        };
+                        if v.is_nan() || v.is_infinite() {
+                            v = 0.0;
+                        }
                     }
                     *b = v;
                 });
         })?;
+    }
+    let mut notices = Notices::new(parameters.upstream_defects);
+    let overflowed = overflowed.into_inner();
+    if overflowed > 0 {
+        notices.add(
+            &defects::ANTS_43,
+            if fix {
+                format!(
+                    "the Rician correction factor of {overflowed} voxel(s) (a high SNR) is \
+                     computed without overflow; ITK's is NaN and their bias 0"
+                )
+            } else {
+                format!(
+                    "the Rician correction factor of {overflowed} voxel(s) (a high SNR) \
+                     overflows and their bias is 0, as in ITK"
+                )
+            },
+        );
     }
     let denoised: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
         sums.par_iter()
@@ -918,6 +962,7 @@ fn run(
     Ok(AdaptiveNlmOutput {
         denoised,
         rician_bias: bias_image,
+        notices: notices.into_vec(),
     })
 }
 
@@ -989,6 +1034,21 @@ fn gather(
                 bias[i] = last_bias.unwrap_or(0.0);
             }
         });
+}
+
+/// ITK's Rician correction factor without the overflow (ANTS-43): the same formula with
+/// `e^{-θ²/2} [(2 + θ²) I₀(θ²/4) + θ² I₁(θ²/4)]²` computed as
+/// `[(2 + θ²) e^{-θ²/4} I₀(θ²/4) + θ² e^{-θ²/4} I₁(θ²/4)]²`, in double, then ITK's clamp
+/// (outside `[0.001, 10]`: 1). It tends to 1 at a high SNR, as the factor does.
+fn corrected_correction_factor(snr: f32) -> f32 {
+    let s2 = f64::from(snr) * f64::from(snr);
+    let quarter = 0.25 * s2;
+    let t = (2.0 + s2) * scaled_bessel_i0(quarter) + s2 * scaled_bessel_i1(quarter);
+    let mut value = 2.0 + s2 - 0.125 * std::f64::consts::PI * (t * t);
+    if !(0.001..=10.0).contains(&value) {
+        value = 1.0;
+    }
+    value as f32
 }
 
 /// `CalculateCorrectionFactor`: the Rician bias correction factor for a signal-to-noise
@@ -1241,6 +1301,7 @@ mod tests {
         for rician in [true, false] {
             for (patch, search) in [(1usize, 2usize), (1, 1), (2, 1), (0, 3)] {
                 let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
+                p.upstream_defects = UpstreamDefects::Reproduce;
                 p.patch_radius = vec![patch; 3];
                 p.search_radius = vec![search; 3];
                 for m in [None, Some(&mask[..])] {
@@ -1281,6 +1342,7 @@ mod tests {
         for rician in [true, false] {
             for (patch, search) in [(1usize, 2usize), (2, 1), (1, 3)] {
                 let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
+                p.upstream_defects = UpstreamDefects::Reproduce;
                 p.patch_radius = vec![patch; 3];
                 p.search_radius = vec![search; 3];
                 for m in [None, Some(&mask[..])] {
@@ -1311,6 +1373,7 @@ mod tests {
         let data = phantom(size, 3);
         for (rician, patch) in [(true, 1usize), (false, 2)] {
             let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
+            p.upstream_defects = UpstreamDefects::Reproduce;
             p.patch_radius = vec![patch; 3];
             let expected = reference(&data, size, [1.0; 3], None, &p);
             for block in [1usize, 9, 20, 64, 1000] {
@@ -1318,6 +1381,35 @@ mod tests {
                 assert_eq!(got.denoised, expected, "block {block}");
             }
         }
+    }
+
+    #[test]
+    fn rician_bias_at_a_high_snr() {
+        // ANTS-43: the phantom's SNR is high enough for ITK's correction factor to overflow.
+        let size = [9usize, 7, 6];
+        let data = phantom(size, 3);
+        let v = VolumeRef::new(&data, &size, &[1.0; 3]);
+        let mut p = AdaptiveNlmParameters::denoise_image(3, true);
+        let fixed = adaptive_non_local_means(v, None, &p, 2).unwrap();
+        p.upstream_defects = UpstreamDefects::Reproduce;
+        let ants = adaptive_non_local_means(v, None, &p, 2).unwrap();
+        assert_eq!(fixed.notices[0].defect.id, "ANTS-43");
+        assert_eq!(ants.notices[0].defect.id, "ANTS-43");
+        assert_ne!(fixed.denoised, ants.denoised);
+        // The corrected bias is never 0 where ITK's became 0, so the corrected values are lower.
+        assert!(
+            fixed
+                .denoised
+                .iter()
+                .zip(&ants.denoised)
+                .all(|(f, a)| f <= a)
+        );
+        // The Gaussian model has no such factor.
+        let mut g = AdaptiveNlmParameters::denoise_image(3, false);
+        let a = adaptive_non_local_means(v, None, &g, 1).unwrap();
+        g.upstream_defects = UpstreamDefects::Reproduce;
+        assert_eq!(a, adaptive_non_local_means(v, None, &g, 1).unwrap());
+        assert!(a.notices.is_empty());
     }
 
     #[test]
@@ -1329,7 +1421,20 @@ mod tests {
             assert!((0.001..=10.0).contains(&cf), "{snr}: {cf}");
         }
         // At a high SNR, float(I₀) overflows and expf underflows: 0 · ∞ is NaN, as in ITK
-        // (the caller then sets the bias to 0).
+        // (the caller then sets the bias to 0; ANTS-43).
         assert!(correction_factor(20.0).is_nan());
+        // Corrected: the same values where ITK's are finite (to float rounding), and close to
+        // 1 above.
+        for snr in [0.5f32, 1.0, 2.0, 5.0, 10.0, 12.0, 18.0] {
+            let (a, b) = (correction_factor(snr), corrected_correction_factor(snr));
+            assert!(
+                a.is_nan() || (a - b).abs() <= 2e-4 * a.abs().max(1.0),
+                "{snr}: {a} {b}"
+            );
+        }
+        for snr in [20.0f32, 50.0, 100.0] {
+            let c = corrected_correction_factor(snr);
+            assert!((c - 1.0).abs() < 1e-2, "{snr}: {c}");
+        }
     }
 }

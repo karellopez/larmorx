@@ -12,25 +12,36 @@ use larmorx_ants::image_math::{
 };
 use numpy::{PyArrayDyn, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 
 use super::gaussian::checked;
 use super::{array_like, slice_f32, value_err};
+use crate::defects::{mode_from_py, with_notices};
 
 /// ImageMath `GetLargestComponent` with a minimum object size of `smallest` voxels.
 #[pyfunction]
-#[pyo3(signature = (a, smallest = 50, n_threads = 1))]
+#[pyo3(signature = (a, smallest = 50, n_threads = 1, upstream_defects = "fix"))]
 fn ants_largest_component<'py>(
     py: Python<'py>,
     a: PyReadonlyArrayDyn<'py, f32>,
     smallest: u64,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
     let spacing = vec![1.0; a.shape().len()];
     let (shape, data) = checked(&a, &spacing)?;
-    let out = py
-        .detach(|| largest_component(VolumeRef::new(&data, &shape, &spacing), smallest, n_threads))
+    let (out, notices) = py
+        .detach(|| {
+            largest_component(
+                VolumeRef::new(&data, &shape, &spacing),
+                smallest,
+                n_threads,
+                mode,
+            )
+        })
         .map_err(value_err)?;
-    array_like(py, out, &shape)
+    with_notices(py, array_like(py, out, &shape)?.into_any(), notices)
 }
 
 /// ImageMath `D`: ITK's Danielsson distance map in physical units (sequential).
@@ -111,25 +122,28 @@ fn ants_replace_voxel_value<'py>(
 /// ImageMath `ExtractContours`: ITK's `LabelContourImageFilter` on the values truncated to
 /// integer labels.
 #[pyfunction]
-#[pyo3(signature = (a, fully_connected = true, n_threads = 1))]
+#[pyo3(signature = (a, fully_connected = true, n_threads = 1, upstream_defects = "fix"))]
 fn ants_extract_contours<'py>(
     py: Python<'py>,
     a: PyReadonlyArrayDyn<'py, f32>,
     fully_connected: bool,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
     let spacing = vec![1.0; a.shape().len()];
     let (shape, data) = checked(&a, &spacing)?;
-    let out = py
+    let (out, notices) = py
         .detach(|| {
             extract_contours(
                 VolumeRef::new(&data, &shape, &spacing),
                 fully_connected,
                 n_threads,
+                mode,
             )
         })
         .map_err(value_err)?;
-    array_like(py, out, &shape)
+    with_notices(py, array_like(py, out, &shape)?.into_any(), notices)
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

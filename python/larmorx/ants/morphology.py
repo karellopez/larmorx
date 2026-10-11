@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import float_input, result
 from larmorx.ants.resample import _result, _source
 from larmorx.image import Image
@@ -124,7 +125,13 @@ def grayscale_close(image: Any, radius: int = 1, *, n_threads: int = 1) -> Image
     return morphology(image, "GC", radius, n_threads=n_threads)
 
 
-def fill_holes(image: Any, hole_param: float = 2.0, *, n_threads: int = 1) -> Image:
+def fill_holes(
+    image: Any,
+    hole_param: float = 2.0,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``ImageMath d out FillHoles in hole_param``: the background regions enclosed by the
     object (voxels in ``[0.5, 1e9]``) set to 1; the other voxels keep their value.
 
@@ -132,10 +139,16 @@ def fill_holes(image: Any, hole_param: float = 2.0, *, n_threads: int = 1) -> Im
     others are holes. With ``hole_param`` 2 (ANTs' default, as sMRIPrep calls it) every hole
     is filled; with ``hole_param ≤ 1`` a hole is filled when the share of its neighbouring
     voxels that belong to the object exceeds ``hole_param`` (1 means "enclosed by the object
-    only"); between 1 and 2 every hole, above 2 none.
+    only"); between 1 and 2 every hole, above 2 none. Neighbours outside the image are not
+    counted; ANTs reads them at other rows of the image or outside its memory (ANTS-19), which
+    ``upstream_defects="reproduce"`` gives where defined (0 beyond the image's memory).
     """
+    check(upstream_defects)
     a = float_input(image, n_threads)
-    data = _core.ants_fill_holes(np.asfortranarray(a.data), float(hole_param), n_threads)
+    data, notices = _core.ants_fill_holes(
+        np.asfortranarray(a.data), float(hole_param), n_threads, upstream_defects
+    )
+    warn(notices)
     return result(data, a)
 
 

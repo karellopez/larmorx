@@ -69,6 +69,48 @@ impl NiftiPaths {
     pub fn is_single(&self) -> bool {
         matches!(self, NiftiPaths::Single(_))
     }
+
+    /// The file nifti_clib, ITK's NIfTI library, reads the voxels from
+    /// (`nifti_findimgname`, ITK v5.4.5 `Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c:2851`):
+    /// the first that exists of `<base>.nii`, `<base>.nii.gz`, `<base>.img`, `<base>.img.gz`
+    /// for a single file, of `<base>.img`, `<base>.img.gz`, `<base>.nii`, `<base>.nii.gz` for
+    /// a pair (upper case when the name's extension is). The header is read from the file
+    /// named. So asked for `x.nii.gz`, ITK reads the voxels of `x.nii` when that file exists
+    /// (defect ITK-08). `None` when none of them exists.
+    pub fn nifti_clib_image_path(&self) -> Option<PathBuf> {
+        let named = self.header_path();
+        let name = named.file_name()?.to_str()?;
+        let lower = name.to_ascii_lowercase();
+        let stem_len = if lower.ends_with(".gz") {
+            name.len() - 3
+        } else {
+            name.len()
+        };
+        let ext_start = stem_len.checked_sub(4)?;
+        if !name.is_char_boundary(ext_start) {
+            return None;
+        }
+        let base = &name[..ext_start];
+        let upper = name[ext_start + 1..stem_len]
+            .chars()
+            .all(|c| c.is_ascii_uppercase());
+        let ext = |e: &str| {
+            if upper {
+                e.to_ascii_uppercase()
+            } else {
+                e.to_owned()
+            }
+        };
+        let order = if self.is_single() {
+            [".nii", ".nii.gz", ".img", ".img.gz"]
+        } else {
+            [".img", ".img.gz", ".nii", ".nii.gz"]
+        };
+        order
+            .iter()
+            .map(|e| named.with_file_name(format!("{base}{}", ext(e))))
+            .find(|p| p.is_file())
+    }
 }
 
 /// Whether a name asks for gzip compression (ends with `.gz`, any case).
@@ -109,5 +151,40 @@ mod tests {
         assert_eq!(NiftiPaths::from_path(Path::new("y.mgz")), None);
         assert_eq!(NiftiPaths::from_path(Path::new("nii")), None);
         assert!(wants_gzip(Path::new("a.nii.GZ")) && !wants_gzip(Path::new("a.nii")));
+    }
+
+    #[test]
+    fn nifti_clib_finds_the_uncompressed_file_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let gz = dir.path().join("x.nii.gz");
+        let plain = dir.path().join("x.nii");
+        std::fs::write(&gz, b"").unwrap();
+        let paths = NiftiPaths::from_path(&gz).unwrap();
+        assert_eq!(paths.nifti_clib_image_path(), Some(gz.clone()));
+        std::fs::write(&plain, b"").unwrap();
+        assert_eq!(paths.nifti_clib_image_path(), Some(plain.clone()));
+        let paths = NiftiPaths::from_path(&plain).unwrap();
+        assert_eq!(paths.nifti_clib_image_path(), Some(plain));
+        // A pair looks for .img first.
+        let hdr = dir.path().join("y.hdr.gz");
+        std::fs::write(&hdr, b"").unwrap();
+        std::fs::write(dir.path().join("y.img.gz"), b"").unwrap();
+        let pair = NiftiPaths::from_path(&hdr).unwrap();
+        assert_eq!(
+            pair.nifti_clib_image_path(),
+            Some(dir.path().join("y.img.gz"))
+        );
+        std::fs::write(dir.path().join("y.img"), b"").unwrap();
+        assert_eq!(pair.nifti_clib_image_path(), Some(dir.path().join("y.img")));
+        // Upper case.
+        let upper = dir.path().join("Z.NII.GZ");
+        std::fs::write(&upper, b"").unwrap();
+        std::fs::write(dir.path().join("Z.NII"), b"").unwrap();
+        assert_eq!(
+            NiftiPaths::from_path(&upper)
+                .unwrap()
+                .nifti_clib_image_path(),
+            Some(dir.path().join("Z.NII"))
+        );
     }
 }

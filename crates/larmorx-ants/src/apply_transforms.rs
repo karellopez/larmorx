@@ -21,10 +21,15 @@
 //! - the interpolators take float indices ([`Interpolator::with_precision`]) and return double;
 //! - the output pixel is float: the interpolated value is clamped to ±`FLT_MAX`
 //!   (`CastComponentWithBoundsChecking`) and rounded, the default value is a float.
+//!
+//! **Upstream defects (D13),** corrected unless [`ApplyTransformsOptions::upstream_defects`]
+//! is [`UpstreamDefects::Reproduce`]: ITK's floor of the windowed sinc's and the displacement
+//! fields' base indices (ITK-01) and a versor that fails to load in float (ITK-10).
 
+use larmorx_core::defects::{Notice, Notices, UpstreamDefects};
 use larmorx_core::element::RealElement;
 use larmorx_core::parallel::{self, ThreadPoolError};
-use larmorx_core::{Grid3, ItkReal, Precision};
+use larmorx_core::{Grid3, IndexFloor, ItkReal, Precision, same_value};
 use larmorx_interp::{InterpError, Interpolation, Interpolator, Volume, is_inside};
 use larmorx_transform::{PrecisionChain, TransformChain, TransformError};
 use rayon::prelude::*;
@@ -40,6 +45,8 @@ pub struct ApplyTransformsOptions {
     /// The computation type: [`Precision::Double`] (ANTs' default) or [`Precision::Float`]
     /// (`--float 1`).
     pub precision: Precision,
+    /// Correct ITK's defects (ITK-01, ITK-10; the default) or reproduce them.
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl Default for ApplyTransformsOptions {
@@ -49,6 +56,7 @@ impl Default for ApplyTransformsOptions {
             default_value: 0.0,
             n_threads: 1,
             precision: Precision::Double,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -73,14 +81,15 @@ pub enum ApplyTransformsError {
 /// after the other, as a 4D time series). Each volume is resampled the same way (`-e 3`) and
 /// the result has as many volumes, on `reference`, in the same layout. With
 /// [`Precision::Float`] the values are `f32` values (the output image's pixels), returned as
-/// `f64`.
+/// `f64`. The notices name the upstream defects that changed the result (or, reproduced,
+/// would have).
 pub fn apply_transforms<T: RealElement>(
     input: &[T],
     input_grid: &Grid3,
     reference: &Grid3,
     chain: &TransformChain,
     options: &ApplyTransformsOptions,
-) -> Result<Vec<f64>, ApplyTransformsError> {
+) -> Result<(Vec<f64>, Vec<Notice>), ApplyTransformsError> {
     match options.precision {
         Precision::Double => apply_as::<T, f64>(input, input_grid, reference, chain, options),
         Precision::Float => apply_as::<T, f32>(input, input_grid, reference, chain, options),
@@ -113,7 +122,7 @@ fn apply_as<T: RealElement, R: ItkReal>(
     reference: &Grid3,
     chain: &TransformChain,
     options: &ApplyTransformsOptions,
-) -> Result<Vec<f64>, ApplyTransformsError> {
+) -> Result<(Vec<f64>, Vec<Notice>), ApplyTransformsError> {
     let n_in = input_grid.len();
     if n_in == 0 || !input.len().is_multiple_of(n_in) {
         return Err(ApplyTransformsError::InputSize {
@@ -124,10 +133,13 @@ fn apply_as<T: RealElement, R: ItkReal>(
     let n_volumes = input.len() / n_in;
     let n_out = reference.len();
     if n_out == 0 || n_volumes == 0 {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     }
     let nx = reference.size[0];
-    let points = chain.with_precision::<R>()?;
+    let mode = options.upstream_defects;
+    let mut notices = Notices::new(mode);
+    let (points, chain_notices) = chain.prepare::<R>(mode)?;
+    notices.extend(chain_notices);
     let mapper = IndexMapper {
         linear: points.is_linear(),
         chain: points,
@@ -135,14 +147,19 @@ fn apply_as<T: RealElement, R: ItkReal>(
         reference,
     };
     let default_value = R::from_f64(options.default_value).to_f64();
-    parallel::with_threads(options.n_threads, || {
+    // The floor of the displacement-field lookups and of the windowed sinc (ITK-01). A voxel
+    // whose mapping or interpolation met a differing floor is computed again with the other
+    // floor, and counted if its value changed.
+    let floor = IndexFloor::new(mode);
+    let floor = &floor;
+    let output = parallel::with_threads(options.n_threads, || {
         // With several volumes, map every voxel once and reuse the indices (ITK recomputes
         // them per volume, with the same result).
-        let cached: Option<Vec<[f64; 3]>> = (n_volumes > 1).then(|| {
-            let mut all = vec![[0.0; 3]; n_out];
+        let cached: Option<Vec<Mapped>> = (n_volumes > 1).then(|| {
+            let mut all = vec![Mapped::default(); n_out];
             all.par_chunks_mut(nx)
                 .enumerate()
-                .for_each(|(row, out)| mapper.row(row, out));
+                .for_each(|(row, out)| mapper.row(row, out, floor));
             all
         });
         let mut output = vec![0.0f64; n_out * n_volumes];
@@ -153,28 +170,53 @@ fn apply_as<T: RealElement, R: ItkReal>(
                 input_grid.spacing,
                 R::PRECISION,
             )?;
+            let value = |c: [f64; 3], floor: &IndexFloor| {
+                if is_inside(c, input_grid.size) {
+                    output_pixel::<R>(interpolator.evaluate_with_floor(c, floor))
+                } else {
+                    default_value
+                }
+            };
             out.par_chunks_mut(nx).enumerate().for_each_init(
-                || vec![[0.0f64; 3]; nx],
+                || vec![Mapped::default(); nx],
                 |buffer, (row, out_row)| {
-                    let indices: &[[f64; 3]] = match &cached {
+                    let mapped: &[Mapped] = match &cached {
                         Some(all) => &all[row * nx..(row + 1) * nx],
                         None => {
-                            mapper.row(row, buffer);
+                            mapper.row(row, buffer, floor);
                             buffer
                         }
                     };
-                    for (o, &c) in out_row.iter_mut().zip(indices) {
-                        *o = if is_inside(c, input_grid.size) {
-                            output_pixel::<R>(interpolator.evaluate(c))
-                        } else {
-                            default_value
-                        };
+                    for (x, (o, m)) in out_row.iter_mut().zip(mapped).enumerate() {
+                        let local = floor.local();
+                        *o = value(m.index, &local);
+                        let differing = m.differing + local.differing();
+                        if differing > 0 {
+                            let other = floor.alternative();
+                            let index = if m.differing > 0 {
+                                mapper.voxel_with(mapper.voxel_index(row, x), &other)
+                            } else {
+                                m.index
+                            };
+                            let changed = !same_value(o, &value(index, &other));
+                            floor.record(differing, changed);
+                        }
                     }
                 },
             );
         }
-        Ok(output)
-    })?
+        Ok::<_, ApplyTransformsError>(output)
+    })??;
+    floor.notice(&mut notices, "output voxels");
+    Ok((output, notices.into_vec()))
+}
+
+/// A reference voxel mapped to the input: its continuous index, and how many floors of
+/// displacement-field lookups differed from ITK's on the way (ITK-01).
+#[derive(Clone, Copy, Debug, Default)]
+struct Mapped {
+    index: [f64; 3],
+    differing: usize,
 }
 
 /// Maps reference voxels to continuous indices of the input, in the computation type `R`
@@ -191,33 +233,50 @@ impl<R: ItkReal> IndexMapper<'_, R> {
     /// double, stored as `Point<R>`, mapped by the chain in `R`, then
     /// `TransformPhysicalPointToContinuousIndex<R>` (double arithmetic, stored as `R`).
     #[inline]
-    fn voxel(&self, index: [usize; 3]) -> [R; 3] {
+    fn voxel(&self, index: [usize; 3], floor: &IndexFloor) -> [R; 3] {
         let point = self.reference.voxel_to_point(index).map(R::from_f64);
-        let mapped = self.chain.transform_point(point);
+        let mapped = self.chain.transform_point_with(point, floor);
         self.input
             .point_to_index(mapped.map(|x| x.to_f64()))
             .map(R::from_f64)
     }
 
-    /// The continuous indices of output scan line `row` (`j + ny·k`).
-    fn row(&self, row: usize, out: &mut [[f64; 3]]) {
+    /// [`IndexMapper::voxel`] as `f64` values.
+    fn voxel_with(&self, index: [usize; 3], floor: &IndexFloor) -> [f64; 3] {
+        self.voxel(index, floor).map(|v| v.to_f64())
+    }
+
+    /// The index of voxel `x` of output scan line `row`.
+    fn voxel_index(&self, row: usize, x: usize) -> [usize; 3] {
+        let ny = self.reference.size[1];
+        [x, row % ny, row / ny]
+    }
+
+    /// The continuous indices of output scan line `row` (`j + ny·k`), the displacement-field
+    /// lookups taking the floor of `floor`'s kind.
+    fn row(&self, row: usize, out: &mut [Mapped], floor: &IndexFloor) {
         let [nx, ny, _] = self.reference.size;
         let (j, k) = (row % ny, row / ny);
         if self.linear {
             // ITK's LinearThreadedGenerateData: the line from index 0 to index nx (one past the
             // end), sampled at x / nx; the difference of the ends in R, each index computed in
             // double and stored as R.
-            let start = self.voxel([0, j, k]);
-            let end = self.voxel([nx, j, k]);
+            // A linear chain looks nothing up, so takes no floor.
+            let start = self.voxel([0, j, k], floor);
+            let end = self.voxel([nx, j, k], floor);
             let vector: [f64; 3] = std::array::from_fn(|d| (end[d] - start[d]).to_f64());
             let start = start.map(|s| s.to_f64());
             for (x, c) in out.iter_mut().enumerate() {
                 let alpha = x as f64 / nx as f64;
-                *c = std::array::from_fn(|d| R::from_f64(start[d] + alpha * vector[d]).to_f64());
+                c.index =
+                    std::array::from_fn(|d| R::from_f64(start[d] + alpha * vector[d]).to_f64());
+                c.differing = 0;
             }
         } else {
             for (x, c) in out.iter_mut().enumerate() {
-                *c = self.voxel([x, j, k]).map(|v| v.to_f64());
+                let local = floor.local();
+                c.index = self.voxel_with([x, j, k], &local);
+                c.differing = local.differing();
             }
         }
     }
@@ -244,6 +303,18 @@ pub enum OutputType {
 }
 
 impl OutputType {
+    /// The `-u` name.
+    pub fn name(self) -> &'static str {
+        match self {
+            OutputType::Char => "char",
+            OutputType::UChar => "uchar",
+            OutputType::Short => "short",
+            OutputType::Int => "int",
+            OutputType::Float => "float",
+            OutputType::Double => "double",
+        }
+    }
+
     /// The `-u` names (`default` is the computation type and is handled by the caller).
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {

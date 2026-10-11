@@ -18,10 +18,18 @@
 //!   dimension <d>" and exits 1.
 //! - **Every known operation exits 0**, whatever happened inside it (the tables discard the
 //!   operation's return value; `Mattes` and `ComponentToVector` are the exceptions). An
-//!   operation that prints an error and returns therefore still exits 0, and larmorx does
-//!   the same ([`OpError::Reported`]). Where ANTs crashes instead (a missing input file
-//!   dereferences a null image; `throw` without a handler aborts), larmorx prints a message
-//!   and exits 1 ([`OpError::Crash`]).
+//!   operation that prints an error and returns therefore still exits 0 (ANTS-04): larmorx
+//!   exits 1 there by default and 0 with `LARMORX_UPSTREAM_DEFECTS=reproduce`
+//!   ([`OpError::Reported`]). Where ANTs crashes instead (a missing input file dereferences a
+//!   null image; `throw` without a handler aborts), larmorx prints a message and exits 1
+//!   ([`OpError::Crash`]).
+//!
+//! # Upstream defects (D13)
+//!
+//! The operations' defects are corrected by default and reproduced with
+//! `LARMORX_UPSTREAM_DEFECTS=reproduce` (`docs/api/upstream-defects.md`): the mode is
+//! [`Context::notices`]'s, every operation adds a notice where a defect changed its result,
+//! and [`run`] prints them on standard error.
 //!
 //! # How to add an ImageMath operation group
 //!
@@ -48,6 +56,8 @@ mod intensity;
 mod morphology;
 
 use std::io::Write;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use crate::image::{AntsImage, ImageStore, OutputImage, Pixel, ReadError, read_with, write_with};
 
@@ -293,7 +303,7 @@ pub fn implemented() -> Vec<&'static str> {
 #[derive(Debug)]
 pub enum OpError {
     /// ANTs prints this (to stdout or stderr as `to_stderr` says) and returns; ImageMath
-    /// still exits 0.
+    /// still exits 0 (ANTS-04: larmorx exits 1 unless reproducing).
     Reported { message: String, to_stderr: bool },
     /// ANTs crashes here (segmentation fault or abort); larmorx prints this and exits 1.
     Crash(String),
@@ -316,7 +326,8 @@ impl From<larmorx_image::FilterError> for OpError {
     }
 }
 
-/// What an operation sees: the arguments, the image store, the output streams.
+/// What an operation sees: the arguments, the image store, the output streams, and the D13
+/// mode with the notices collected so far.
 pub struct Context<'a> {
     /// `argv` as ANTs numbers it: `[ImageMath, dim, output, op, operands...]`.
     pub argv: Vec<String>,
@@ -327,6 +338,8 @@ pub struct Context<'a> {
     pub store: &'a mut dyn ImageStore,
     pub out: &'a mut dyn Write,
     pub err: &'a mut dyn Write,
+    /// The D13 mode and the notices of this run.
+    pub notices: Notices,
 }
 
 impl Context<'_> {
@@ -361,11 +374,22 @@ impl Context<'_> {
         &self.argv[3]
     }
 
+    /// Whether defects are corrected (the default) rather than reproduced.
+    pub fn fix(&self) -> bool {
+        self.notices.fix()
+    }
+
     /// ANTs' `ReadImage<itk::Image<T, dim>>`: prints ANTs' message on failure (none for
     /// names shorter than 3 characters) and returns `None`, as `ReadImage` leaves a null
     /// image. Errors larmorx cannot read past (unsupported files) end the operation.
     pub fn try_read<T: Pixel>(&mut self, name: &str) -> Result<Option<AntsImage<T>>, OpError> {
-        match read_with::<T, _>(self.store, name, self.dim, self.n_threads) {
+        match read_with::<T, _>(
+            self.store,
+            name,
+            self.dim,
+            self.n_threads,
+            &mut self.notices,
+        ) {
             Ok(image) => Ok(Some(image)),
             Err(ReadError::Unsupported { name, message }) => {
                 Err(OpError::unsupported(format!("larmorx: {name}: {message}")))
@@ -389,10 +413,43 @@ impl Context<'_> {
         })
     }
 
-    /// `ANTs::WriteImage(image, name)`: nothing for names shorter than 3 characters.
+    /// `ANTs::WriteImage(image, name)`: nothing for names shorter than 3 characters (ANTS-03,
+    /// reproduced only; corrected, the name is written like any other).
     pub fn write(&mut self, name: &str, image: impl Into<OutputImage>) -> Result<bool, OpError> {
-        write_with(self.store, name, image.into(), self.n_threads)
-            .map_err(|e| OpError::crash(format!("larmorx: cannot write '{name}': {e}")))
+        write_with(
+            self.store,
+            name,
+            image.into(),
+            self.n_threads,
+            &mut self.notices,
+        )
+        .map_err(|e| OpError::crash(format!("larmorx: cannot write '{name}': {e}")))
+    }
+
+    /// `if (outname.length() > 3) WriteImage(image, outname)`: the operations that test the
+    /// name themselves write nothing for names of 3 characters or fewer (ANTS-03, reproduced
+    /// only).
+    pub fn write_if_long(
+        &mut self,
+        name: &str,
+        image: impl Into<OutputImage>,
+    ) -> Result<bool, OpError> {
+        // Shorter names are WriteImage's own case (`write`); a name of exactly 3 characters
+        // WriteImage would write, but the operation's test stops it.
+        if name.len() == 3 {
+            if self.notices.reproduce() {
+                self.notices.add(
+                    &defects::ANTS_03,
+                    format!("nothing is written to '{name}' (this ImageMath operation writes no name of 3 characters or fewer)"),
+                );
+                return Ok(false);
+            }
+            self.notices.add(
+                &defects::ANTS_03,
+                format!("'{name}' is written like any other name; this ImageMath operation writes no name of 3 characters or fewer"),
+            );
+        }
+        self.write(name, image)
     }
 }
 
@@ -418,22 +475,32 @@ Operations ported to larmorx (ANTs v2.6.5); the other ANTs operations are not su
     s
 }
 
-/// Runs `ImageMath` with `args` (the arguments after the program name) on files.
+/// Runs `ImageMath` with `args` (the arguments after the program name) on files, in the D13
+/// mode of `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    run(
-        args,
-        &mut crate::image::FileStore,
-        super::itk_threads(),
-        out,
-        err,
-    )
+    match UpstreamDefects::from_env() {
+        Ok(mode) => run(
+            args,
+            &mut crate::image::FileStore,
+            super::itk_threads(),
+            mode,
+            out,
+            err,
+        ),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
 }
 
-/// Runs `ImageMath` with `args` on images from `store`; returns the exit code.
+/// Runs `ImageMath` with `args` on images from `store` in the D13 mode `mode`; returns the
+/// exit code. The upstream-defect notices are printed on `err`.
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -493,18 +560,40 @@ pub fn run(
         store,
         out,
         err,
+        notices: Notices::new(mode),
     };
-    match (operation.run)(&mut ctx) {
+    let code = match (operation.run)(&mut ctx) {
         Ok(()) => 0,
         Err(OpError::Reported { message, to_stderr }) => {
             let stream: &mut dyn Write = if to_stderr { ctx.err } else { ctx.out };
             let _ = writeln!(stream, "{message}");
-            0
+            reported_exit(&op, &mut ctx.notices)
         }
         Err(OpError::Crash(message) | OpError::Unsupported(message)) => {
             let _ = writeln!(ctx.err, "{message}");
             1
         }
+    };
+    ctx.notices.print(ctx.err);
+    code
+}
+
+/// The exit code after operation `op` reported a failure and wrote nothing: ANTs' dispatch
+/// tables return `EXIT_SUCCESS` whatever the operation returned (ANTS-04), so 0 with
+/// [`UpstreamDefects::Reproduce`], 1 otherwise; with the notice.
+fn reported_exit(op: &str, notices: &mut Notices) -> u8 {
+    if notices.fix() {
+        notices.add(
+            &defects::ANTS_04,
+            format!("ImageMath {op} failed and wrote nothing: exit 1; ANTs exits 0"),
+        );
+        1
+    } else {
+        notices.add(
+            &defects::ANTS_04,
+            format!("ImageMath {op} failed and wrote nothing, and exits 0 as ANTs does"),
+        );
+        0
     }
 }
 
@@ -551,6 +640,67 @@ mod tests {
         let (code, out, _) = run_capture(&["3", "o.nii", "TileImages", "a.nii"]);
         assert_eq!(code, 1);
         assert!(out.contains("not found"));
+    }
+
+    #[test]
+    fn a_reported_failure_exits_1_unless_reproduced() {
+        // ANTS-04.
+        let mut fix = Notices::new(UpstreamDefects::Fix);
+        assert_eq!(reported_exit("G", &mut fix), 1);
+        assert!(fix.contains(&defects::ANTS_04));
+        let mut reproduce = Notices::new(UpstreamDefects::Reproduce);
+        assert_eq!(reported_exit("G", &mut reproduce), 0);
+        assert!(reproduce.contains(&defects::ANTS_04));
+    }
+
+    #[test]
+    fn short_output_names() {
+        // ANTS-03: a name of 3 characters is not written by ImageMath's own test, exit 0, as
+        // ANTs; corrected, it is written like any other name, and so fails: no NIfTI name is
+        // that short.
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.nii");
+        use larmorx_core::ndarray::ShapeBuilder;
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[4, 3, 2]).f(),
+            1.0f32,
+        );
+        let h = larmorx_io::nifti::NiftiHeader::new(
+            larmorx_io::nifti::NiftiVersion::V1,
+            &[4, 3, 2],
+            larmorx_core::DataType::F32,
+        )
+        .unwrap();
+        larmorx_io::nifti::write(&input, &h, data.view(), &Default::default()).unwrap();
+        let args: Vec<String> = ["3", "abc", "m", input.to_str().unwrap(), "2"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let mut store = crate::image::FileStore;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run(
+            &args,
+            &mut store,
+            1,
+            UpstreamDefects::Reproduce,
+            &mut out,
+            &mut err,
+        );
+        let text = String::from_utf8(err).unwrap();
+        assert_eq!(code, 0, "{text}");
+        assert!(text.contains("ANTS-03"), "{text}");
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run(
+            &args,
+            &mut store,
+            1,
+            UpstreamDefects::Fix,
+            &mut out,
+            &mut err,
+        );
+        let text = String::from_utf8(err).unwrap();
+        assert_eq!(code, 1, "{text}");
+        assert!(text.contains("ANTS-03"), "{text}");
     }
 
     #[test]

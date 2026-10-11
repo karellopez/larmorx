@@ -19,6 +19,7 @@ use larmorx_io::nifti::itk::ItkGeometry;
 use rayon::prelude::*;
 
 use crate::image::{AntsImage, x86_to_i64};
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 
 const CHUNK: usize = 1 << 16;
 
@@ -127,12 +128,6 @@ pub fn radius_from_f32(rad: f32, max: usize) -> Option<usize> {
 pub enum FillHolesError {
     #[error(transparent)]
     Filter(#[from] FilterError),
-    /// ANTs reads outside the image's memory here; its result is undefined.
-    #[error(
-        "the hole of label {label} touches the image's first or last slice: ANTs reads outside \
-         the image's memory there (its result is undefined)"
-    )]
-    OutOfBounds { label: usize },
     /// More components than ANTs' float labels tell apart.
     #[error("{0} components: ANTs' float labels no longer tell neighbouring labels apart")]
     TooManyComponents(usize),
@@ -149,14 +144,19 @@ pub enum FillHolesError {
 /// - `hole_param ≤ 1`: a hole is filled when the fraction of its neighbours (over the 3^D
 ///   neighbourhood of each of its voxels, counted with repeats) that are object voxels exceeds
 ///   `hole_param`. ANTs reads the neighbours of voxels on the image's faces at indices outside
-///   the image, which land on other rows of the image (reproduced) or outside its memory (an
-///   error here, [`FillHolesError::OutOfBounds`]).
+///   the image (ANTS-19): they land on other rows of the image, or outside its memory, where
+///   the result depends on whatever is there. With [`UpstreamDefects::Fix`] (the default) a
+///   neighbour outside the image is not counted. With [`UpstreamDefects::Reproduce`] the
+///   reads that land inside the image's memory are ANTs', and those outside it read as 0
+///   (background), with a notice.
 /// - otherwise: every hole if `hole_param < 2`, none if above.
 pub fn fill_holes(
     input: VolumeRef<'_, f32>,
     hole_param: f32,
     n_threads: usize,
-) -> Result<Vec<f32>, FillHolesError> {
+    mode: UpstreamDefects,
+) -> Result<(Vec<f32>, Vec<Notice>), FillHolesError> {
+    let mut notices = Notices::new(mode);
     let size = input.size;
     let (low, high) = (0.5f32, 1.0e9f32);
     let object: Vec<bool> = parallel::with_threads(n_threads, || {
@@ -192,7 +192,7 @@ pub fn fill_holes(
                 });
         })
         .map_err(FilterError::from)?;
-        return Ok(out);
+        return Ok((out, notices.into_vec()));
     }
     let objects = relabel.sizes.len();
     if objects > 1 << 21 {
@@ -201,12 +201,43 @@ pub fn fill_holes(
     // Which labels to fill (labels 2..=objects).
     let mut fill = vec![false; objects + 1];
     if hole_param <= 1.0 {
-        let (object_edge, total_edge) =
-            edge_counts(&object, size, &relabel.map, &cc.labels, objects)?;
-        for lab in 2..=objects {
-            let erat = object_edge[lab] as f32 / total_edge[lab] as f32;
-            fill[lab] = erat > hole_param;
+        let counts = |mode| edge_counts(&object, size, &relabel.map, &cc.labels, objects, mode);
+        let ants = counts(UpstreamDefects::Reproduce);
+        let corrected = counts(UpstreamDefects::Fix);
+        let decide = |e: &EdgeCounts| -> Vec<bool> {
+            (0..=objects)
+                .map(|lab| lab >= 2 && e.object[lab] as f32 / e.total[lab] as f32 > hole_param)
+                .collect()
+        };
+        let (ants_fill, fixed_fill) = (decide(&ants), decide(&corrected));
+        let changed = (2..=objects)
+            .filter(|&l| ants_fill[l] != fixed_fill[l])
+            .count();
+        // Named where the correction changes a decision, or where ANTs' own decision depends
+        // on memory outside the image.
+        if changed > 0 || ants.outside_memory > 0 {
+            let decisions = if changed > 0 {
+                format!("; the correction changes the decision for {changed} hole(s)")
+            } else {
+                String::new()
+            };
+            let detail = if mode.fix() {
+                format!(
+                    "{} neighbour(s) of the holes lie outside the image and are not counted; \
+                     ANTs reads them at other rows of the image or outside its memory{decisions}",
+                    ants.outside_image
+                )
+            } else {
+                format!(
+                    "{} neighbour(s) of the holes lie outside the image and are read as ANTs \
+                     reads them; {} of those reads land outside the image's memory, whose \
+                     values depend on memory: here 0{decisions}",
+                    ants.outside_image, ants.outside_memory
+                )
+            };
+            notices.add(&defects::ANTS_19, detail);
         }
+        fill = if mode.fix() { fixed_fill } else { ants_fill };
     } else {
         for f in fill.iter_mut().skip(2) {
             *f = 2.0 > hole_param;
@@ -218,7 +249,7 @@ pub fn fill_holes(
             *o = 1.0;
         }
     }
-    Ok(out)
+    Ok((out, notices.into_vec()))
 }
 
 /// The labels `RelabelComponentImageFilter<_, float>` writes for `n` objects: ITK counts
@@ -233,20 +264,33 @@ pub fn float_labels(n: usize) -> Vec<f32> {
     out
 }
 
-/// FillHoles' `objectedge` and `totaledge` for every relabelled component (the
-/// `holeparam ≤ 1` branch, `ImageMath_Templates.hxx:8978-9014`).
+/// FillHoles' `objectedge` and `totaledge` for every relabelled component, and how many
+/// neighbour reads fall outside the image and outside its memory.
+struct EdgeCounts {
+    object: Vec<u64>,
+    total: Vec<u64>,
+    outside_image: u64,
+    outside_memory: u64,
+}
+
+/// FillHoles' edge counts (the `holeparam ≤ 1` branch, `ImageMath_Templates.hxx:8978-9014`):
+/// ANTs' with [`UpstreamDefects::Reproduce`] (neighbours outside the image read at their
+/// unclamped offset, 0 beyond the image's memory), larmorx's with [`UpstreamDefects::Fix`]
+/// (neighbours outside the image not counted).
 fn edge_counts(
     object: &[bool],
     size: &[usize],
     map: &[u32],
     labels: &[u32],
     objects: usize,
-) -> Result<(Vec<u64>, Vec<u64>), FillHolesError> {
+    mode: UpstreamDefects,
+) -> EdgeCounts {
     let d = size.len();
     let st = strides(size);
     let n = object.len() as isize;
     let mut object_edge = vec![0u64; objects + 1];
     let mut total_edge = vec![0u64; objects + 1];
+    let (mut outside_image, mut outside_memory) = (0u64, 0u64);
     let relabelled = |i: usize| map[labels[i] as usize] as usize;
     let count = 3usize.pow(d as u32);
     let mut coord = vec![0usize; d];
@@ -263,26 +307,41 @@ fn edge_counts(
             // image (`ZeroFluxNeumannBoundaryCondition`).
             let mut clamped = 0usize;
             let mut linear = 0isize;
+            let mut inside = true;
             for a in 0..d {
                 let o = (t % 3) as isize - 1;
                 t /= 3;
                 let p = coord[a] as isize + o;
                 linear += p * st[a] as isize;
                 clamped += p.clamp(0, size[a] as isize - 1) as usize * st[a];
+                inside &= p >= 0 && p < size[a] as isize;
             }
             if relabelled(clamped) == lab {
                 continue;
             }
-            if linear < 0 || linear >= n {
-                return Err(FillHolesError::OutOfBounds { label: lab });
+            if !inside {
+                outside_image += 1;
+                if mode.fix() {
+                    continue;
+                }
             }
             total_edge[lab] += 1;
+            if linear < 0 || linear >= n {
+                // Outside the image's memory: undefined in ANTs, background here.
+                outside_memory += 1;
+                continue;
+            }
             if object[linear as usize] {
                 object_edge[lab] += 1;
             }
         }
     }
-    Ok((object_edge, total_edge))
+    EdgeCounts {
+        object: object_edge,
+        total: total_edge,
+        outside_image,
+        outside_memory,
+    }
 }
 
 /// Why [`pad_image`] could not run.
@@ -473,15 +532,76 @@ mod tests {
         data[at(2, 2, 2)] = 3.0;
         let spacing = [1.0; 3];
         let v = VolumeRef::new(&data, &size, &spacing);
-        let filled = fill_holes(v, 2.0, 2).unwrap();
-        assert_eq!(filled[at(3, 3, 3)], 1.0);
-        assert_eq!(filled[at(2, 2, 2)], 3.0);
-        assert_eq!(filled[at(0, 0, 0)], 0.0);
-        // The hole is surrounded by object voxels only: its edge ratio is 1.
-        assert_eq!(fill_holes(v, 0.99, 1).unwrap()[at(3, 3, 3)], 1.0);
-        assert_eq!(fill_holes(v, 1.0, 1).unwrap()[at(3, 3, 3)], 0.0);
-        assert_eq!(fill_holes(v, 2.5, 1).unwrap()[at(3, 3, 3)], 0.0);
-        assert_eq!(fill_holes(v, 1.5, 1).unwrap()[at(3, 3, 3)], 1.0);
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let fill = |p: f32| fill_holes(v, p, 1, mode).unwrap();
+            let (filled, notices) = fill_holes(v, 2.0, 2, mode).unwrap();
+            assert_eq!(filled[at(3, 3, 3)], 1.0);
+            assert_eq!(filled[at(2, 2, 2)], 3.0);
+            assert_eq!(filled[at(0, 0, 0)], 0.0);
+            assert!(notices.is_empty());
+            // The hole is surrounded by object voxels only: its edge ratio is 1.
+            assert_eq!(fill(0.99).0[at(3, 3, 3)], 1.0);
+            assert_eq!(fill(1.0).0[at(3, 3, 3)], 0.0);
+            assert_eq!(fill(2.5).0[at(3, 3, 3)], 0.0);
+            assert_eq!(fill(1.5).0[at(3, 3, 3)], 1.0);
+            assert!(fill(0.99).1.is_empty());
+        }
+    }
+
+    #[test]
+    fn fill_holes_on_the_first_slice() {
+        // ANTS-19: a hole on the image's first slice; its neighbours below the slice are
+        // outside the image and, in ANTs, outside its memory.
+        let size = [7usize, 7, 3];
+        let at = |x: usize, y: usize, z: usize| x + 7 * (y + 7 * z);
+        let mut data = vec![0.0f32; 7 * 7 * 3];
+        for z in 0..3 {
+            for y in 1..6 {
+                for x in 1..6 {
+                    data[at(x, y, z)] = 1.0;
+                }
+            }
+        }
+        data[at(3, 3, 0)] = 0.0;
+        let spacing = [1.0; 3];
+        let v = VolumeRef::new(&data, &size, &spacing);
+        // Corrected: the neighbours outside the image are not counted, the 17 others are
+        // object voxels (ratio 1): filled.
+        let (fixed, notices) = fill_holes(v, 0.9, 1, UpstreamDefects::Fix).unwrap();
+        assert_eq!(fixed[at(3, 3, 0)], 1.0);
+        assert_eq!(notices[0].defect.id, "ANTS-19");
+        assert!(notices[0].detail.contains("the decision for 1 hole"));
+        // Reproduced: 8 of them (the one straight below has the hole's own label through
+        // ITK's boundary condition) read outside the memory, here as background (17 / 25):
+        // not filled.
+        let (ants, notices) = fill_holes(v, 0.9, 1, UpstreamDefects::Reproduce).unwrap();
+        assert_eq!(ants[at(3, 3, 0)], 0.0);
+        assert!(
+            notices[0].detail.contains("8 of those reads land outside"),
+            "{notices:?}"
+        );
+        // Where both decide alike, the outputs agree, but ANTs' reads outside its memory are
+        // still named.
+        let (a, _) = fill_holes(v, 0.5, 1, UpstreamDefects::Fix).unwrap();
+        let (b, notices) = fill_holes(v, 0.5, 1, UpstreamDefects::Reproduce).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(notices.len(), 1);
+        // A hole on the middle slice's x face reads only inside the memory (other rows):
+        // named only where the decision changes.
+        let mut data = vec![0.0f32; 7 * 7 * 3];
+        for z in 0..3 {
+            for y in 1..6 {
+                for x in 0..6 {
+                    data[at(x, y, z)] = 1.0;
+                }
+            }
+        }
+        data[at(0, 3, 1)] = 0.0;
+        let v = VolumeRef::new(&data, &size, &spacing);
+        let (a, na) = fill_holes(v, 0.2, 1, UpstreamDefects::Fix).unwrap();
+        let (b, nb) = fill_holes(v, 0.2, 1, UpstreamDefects::Reproduce).unwrap();
+        assert_eq!(a, b);
+        assert!(na.is_empty() && nb.is_empty(), "{na:?} {nb:?}");
     }
 
     #[test]

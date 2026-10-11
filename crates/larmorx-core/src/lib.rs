@@ -36,7 +36,7 @@ pub use defects::{Notice, UpstreamDefects};
 pub use element::{DataType, Element, RealElement};
 pub use grid::Grid3;
 pub use image::{DynImage, Image, Image3, Image4};
-pub use itk_real::{ItkReal, Precision};
+pub use itk_real::{IndexFloor, ItkReal, Precision, same_value};
 pub use ndarray;
 pub use num_complex::Complex;
 

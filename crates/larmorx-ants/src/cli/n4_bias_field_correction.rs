@@ -15,12 +15,19 @@
 //! - options that need brackets do nothing without them: `-b 200`, `-c 50x50` and
 //!   `-t 0.15` set no parameter. `-c` without parameters leaves ITK's defaults (one level
 //!   of 50 iterations, threshold 0.001); without `-c` at all, ANTs' (four levels of 50,
-//!   threshold 0);
+//!   threshold 0) (ANTS-35);
 //! - `-c [iterations]` sets the threshold to 0, `-c [iterations,threshold]` to `threshold`;
 //! - without `-d`, the dimension is the input file's;
 //! - a mask that cannot be read is replaced by an image of ones ("Mask not read"), but
-//!   still counts as given: outside-mask restoration and rescaling happen;
-//! - rescaling is on when a mask is given, unless `-r 0`.
+//!   still counts as given: outside-mask restoration and rescaling happen (ANTS-36);
+//! - rescaling is on when a mask is given, unless `-r 0`; without a mask `-r 1` does nothing
+//!   (ANTS-36).
+//!
+//! **Upstream defects (D13).** By default larmorx reads an unbracketed value as the option's
+//! first parameter (`-b 200` is `-b [200]`, `-c 50x50` is `-c [50x50]`, `-t 0.15` is
+//! `-t [0.15]`; ANTS-35), refuses a mask it cannot read, and says that `-r 1` has no effect
+//! without a mask (ANTS-36); ITK's filter defects ANTS-38 and ANTS-39 are corrected too. With
+//! `LARMORX_UPSTREAM_DEFECTS=reproduce` it behaves as ANTs does.
 //!
 //! `-v` prints ANTs' progress lines; ITK's filter dump (`Print`) is not reproduced. ANTs uses
 //! `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` threads and its result depends on it; larmorx uses
@@ -29,6 +36,8 @@
 
 use std::io::Write;
 use std::time::Instant;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use super::cstd::{
     format_g, parser_convert_bool, parser_convert_f32, parser_convert_i32, parser_convert_u32,
@@ -85,16 +94,24 @@ OPTIONS:
      --help
 ";
 
-/// Runs `N4BiasFieldCorrection` on files; returns the exit code.
+/// Runs `N4BiasFieldCorrection` on files, in the D13 mode of `LARMORX_UPSTREAM_DEFECTS`;
+/// returns the exit code.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    run(args, &mut FileStore, super::itk_threads(), out, err)
+    match UpstreamDefects::from_env() {
+        Ok(mode) => run(args, &mut FileStore, super::itk_threads(), mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
 }
 
-/// Runs `N4BiasFieldCorrection` with images from `store`.
+/// Runs `N4BiasFieldCorrection` with images from `store` in the D13 mode `mode`.
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -109,7 +126,8 @@ pub fn run(
             return 1;
         }
     };
-    match execute(&parsed, store, n_threads, out, err) {
+    let mut notices = Notices::new(mode);
+    let code = match execute(&parsed, store, n_threads, &mut notices, out, err) {
         Ok(code) => code,
         Err(message) => {
             if !message.is_empty() {
@@ -117,7 +135,9 @@ pub fn run(
             }
             1
         }
-    }
+    };
+    notices.print(err);
+    code
 }
 
 /// ANTs aborts here: an uncaught exception from `Convert<T>`.
@@ -140,11 +160,48 @@ struct Settings {
     verbose: bool,
 }
 
-fn settings(p: &Parsed, dim: usize, verbose: bool) -> Result<Settings, String> {
-    let mut o = N4Options::default();
+/// The parameters of an option that ANTs reads only in brackets (ANTS-35): its parameters,
+/// or, when it has none and a value, with `fix` that value as its first parameter (noted).
+fn bracketed(option: &OptionValue, long: &str, notices: &mut Notices) -> Vec<String> {
+    if !option.parameters.is_empty() || option.name.is_empty() {
+        return option.parameters.clone();
+    }
+    let given = format!("--{long} {}", option.name);
+    if notices.fix() {
+        notices.add(
+            &defects::ANTS_35,
+            format!(
+                "'{given}' is read as --{long} [{}]; ANTs sets nothing without brackets",
+                option.name
+            ),
+        );
+        vec![option.name.clone()]
+    } else {
+        notices.add(
+            &defects::ANTS_35,
+            format!(
+                "'{given}' sets nothing, as in ANTs (only --{long} [{}] would)",
+                option.name
+            ),
+        );
+        Vec::new()
+    }
+}
+
+fn settings(
+    p: &Parsed,
+    dim: usize,
+    verbose: bool,
+    notices: &mut Notices,
+) -> Result<Settings, String> {
+    let mut o = N4Options {
+        upstream_defects: notices.mode(),
+        ..N4Options::default()
+    };
     // -c
     if let Some(c) = p.last("convergence") {
-        if let Some(iters) = c.parameters.first() {
+        let parameters = bracketed(c, "convergence", notices);
+        if let Some(iters) = parameters.first() {
             o.iterations =
                 parser_convert_vector_u32(iters).ok_or_else(|| throws("convergence", iters))?;
             o.convergence_threshold = 0.0;
@@ -153,18 +210,19 @@ fn settings(p: &Parsed, dim: usize, verbose: bool) -> Result<Settings, String> {
             o.iterations = vec![50];
             o.convergence_threshold = 0.001;
         }
-        if let Some(t) = c.parameters.get(1) {
+        if let Some(t) = parameters.get(1) {
             o.convergence_threshold =
                 parser_convert_f32(t).ok_or_else(|| throws("convergence", t))?;
         }
     }
     // -b
     if let Some(b) = p.last("bspline-fitting") {
-        if let Some(order) = b.parameters.get(1) {
+        let parameters = bracketed(b, "bspline-fitting", notices);
+        if let Some(order) = parameters.get(1) {
             o.spline_order =
                 parser_convert_u32(order).ok_or_else(|| throws("bspline-fitting", order))?;
         }
-        if let Some(mesh) = b.parameters.first() {
+        if let Some(mesh) = parameters.first() {
             let values =
                 parser_convert_vector_f32(mesh).ok_or_else(|| throws("bspline-fitting", mesh))?;
             o.mesh = if values.len() == 1 {
@@ -187,7 +245,7 @@ fn settings(p: &Parsed, dim: usize, verbose: bool) -> Result<Settings, String> {
     }
     // -t
     if let Some(t) = p.last("histogram-sharpening") {
-        let params = &t.parameters;
+        let params = &bracketed(t, "histogram-sharpening", notices);
         if let Some(v) = params.first() {
             o.fwhm = parser_convert_f32(v).ok_or_else(|| throws("histogram-sharpening", v))?;
         }
@@ -221,9 +279,10 @@ fn read(
     name: &str,
     dim: usize,
     n_threads: usize,
+    notices: &mut Notices,
     err: &mut dyn Write,
 ) -> Result<Option<AntsImage<f32>>, String> {
-    match read_with::<f32, _>(store, name, dim, n_threads) {
+    match read_with::<f32, _>(store, name, dim, n_threads, notices) {
         Ok(image) => Ok(Some(image)),
         Err(ReadError::Unsupported { name, message }) => Err(format!("larmorx: {name}: {message}")),
         Err(e) => {
@@ -245,6 +304,7 @@ fn execute(
     p: &Parsed,
     store: &mut dyn ImageStore,
     n_threads: usize,
+    notices: &mut Notices,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<u8, String> {
@@ -284,7 +344,7 @@ fn execute(
                 return Ok(1);
             };
             let name = i.parameters.first().unwrap_or(&i.name).clone();
-            match store.load(&name, n_threads) {
+            match store.load(&name, n_threads, notices) {
                 Ok(image) => image.geometry.ndim,
                 Err(_) => {
                     return Err(format!(
@@ -310,7 +370,7 @@ fn execute(
         }
         return Ok(1);
     };
-    let Some(input) = read(store, &input_option.name, dim, n_threads, err)? else {
+    let Some(input) = read(store, &input_option.name, dim, n_threads, notices, err)? else {
         return Err(
             "larmorx: N4BiasFieldCorrection: cannot read the input image (ANTs crashes here)"
                 .into(),
@@ -320,9 +380,37 @@ fn execute(
     // The mask (read as float); a mask that cannot be read becomes ones but counts as given.
     let mask_given = p.has("mask-image");
     let mut mask = match p.last("mask-image") {
-        Some(m) => read(store, &m.name, dim, n_threads, err)?,
+        Some(m) => read(store, &m.name, dim, n_threads, notices, err)?,
         None => None,
     };
+    if mask_given && mask.is_none() {
+        // ANTS-36: ANTs goes on with a mask of ones, which still counts as given.
+        let name = p
+            .last("mask-image")
+            .map_or("", |m| m.name.as_str())
+            .to_owned();
+        if notices.fix() {
+            notices.add(
+                &defects::ANTS_36,
+                format!(
+                    "the mask '{name}' cannot be read: an error; ANTs uses a mask of ones and \
+                     still restores and rescales as with a mask"
+                ),
+            );
+            return Err(format!(
+                "larmorx: N4BiasFieldCorrection: cannot read the mask '{name}' ({}=reproduce \
+                 uses a mask of ones, as ANTs does)",
+                defects::ENV
+            ));
+        }
+        notices.add(
+            &defects::ANTS_36,
+            format!(
+                "the mask '{name}' cannot be read: a mask of ones is used, and still counts as \
+                 given, as in ANTs"
+            ),
+        );
+    }
     if mask.is_none() {
         if verbose {
             let _ = write!(
@@ -335,12 +423,12 @@ fn execute(
         }
     }
 
-    let settings = settings(p, dim, verbose)?;
+    let settings = settings(p, dim, verbose, notices)?;
     let mut options = settings.options;
 
     // The weight image.
     let weight = match p.last("weight-image") {
-        Some(w) => read(store, &w.name, dim, n_threads, err)?,
+        Some(w) => read(store, &w.name, dim, n_threads, notices, err)?,
         None => None,
     };
 
@@ -348,6 +436,13 @@ fn execute(
     // value aborts before anything is written either way).
     let rescale_flag = bool_of(p, "rescale-intensities")?;
     options.rescale_intensities = mask_given && rescale_flag != Some(false);
+    if rescale_flag == Some(true) && !mask_given {
+        // ANTS-36: ANTs rescales only with a mask.
+        notices.add(
+            &defects::ANTS_36,
+            "-r 1 has no effect without a mask (-x), in larmorx as in ANTs",
+        );
+    }
 
     let start = Instant::now();
     let mut lines: Vec<String> = Vec::new();
@@ -442,12 +537,19 @@ fn execute(
         );
     }
 
+    notices.extend(result.notices);
     if let Some(o) = p.last("output") {
         let (corrected_name, bias_name) = outputs(o);
-        write_with(store, &corrected_name, result.corrected.into(), n_threads)
-            .map_err(|e| format!("larmorx: cannot write '{corrected_name}': {e}"))?;
+        write_with(
+            store,
+            &corrected_name,
+            result.corrected.into(),
+            n_threads,
+            notices,
+        )
+        .map_err(|e| format!("larmorx: cannot write '{corrected_name}': {e}"))?;
         if let Some(name) = bias_name {
-            write_with(store, &name, result.bias_field.into(), n_threads)
+            write_with(store, &name, result.bias_field.into(), n_threads, notices)
                 .map_err(|e| format!("larmorx: cannot write '{name}': {e}"))?;
         }
     }
@@ -496,7 +598,7 @@ mod tests {
         let parse = |a: &[&str]| {
             let args: Vec<String> = a.iter().map(|s| s.to_string()).collect();
             let p = parser::parse(&args, SPECS).unwrap();
-            settings(&p, 3, false)
+            settings(&p, 3, false, &mut Notices::new(UpstreamDefects::Reproduce))
         };
         let s = parse(&[
             "-c", "[", "50x40,", "1e-7", "]", "-b", "[", "200", "]", "-s", "2",
@@ -521,5 +623,31 @@ mod tests {
         );
         assert!(parse(&["-s", "2.5"]).is_err());
         assert!(parse(&["-b", "[2x2]"]).is_err());
+    }
+
+    #[test]
+    fn unbracketed_values_are_read() {
+        // ANTS-35 corrected: an unbracketed value is the option's first parameter.
+        let args: Vec<String> = ["-b", "200", "-c", "50x50", "-t", "0.2"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let p = parser::parse(&args, SPECS).unwrap();
+        let mut notices = Notices::new(UpstreamDefects::Fix);
+        let s = settings(&p, 3, false, &mut notices).unwrap().options;
+        assert_eq!(s.mesh, BSplineMesh::Distance(200.0));
+        assert_eq!((s.iterations, s.convergence_threshold), (vec![50, 50], 0.0));
+        assert_eq!(s.fwhm, 0.2);
+        assert!(notices.contains(&defects::ANTS_35));
+        let mut notices = Notices::new(UpstreamDefects::Reproduce);
+        let s = settings(&p, 3, false, &mut notices).unwrap().options;
+        assert_eq!(s.mesh, BSplineMesh::Default);
+        assert!(notices.contains(&defects::ANTS_35));
+        // Brackets: nothing to say.
+        let args: Vec<String> = ["-b", "[200]"].iter().map(|s| s.to_string()).collect();
+        let p = parser::parse(&args, SPECS).unwrap();
+        let mut notices = Notices::new(UpstreamDefects::Fix);
+        settings(&p, 3, false, &mut notices).unwrap();
+        assert!(notices.is_empty());
     }
 }

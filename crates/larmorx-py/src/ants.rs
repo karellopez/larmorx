@@ -273,6 +273,7 @@ fn interpolation(
     alpha: Option<f64>,
     order: u32,
     spacing: [f64; 3],
+    notices: &mut larmorx_core::defects::Notices,
 ) -> PyResult<Interpolation> {
     Ok(match name {
         "linear" => Interpolation::Linear,
@@ -282,9 +283,20 @@ fn interpolation(
             sigma: sigma.unwrap_or(spacing),
             alpha: alpha.unwrap_or(1.0),
         },
+        // ANTS-33: antsApplyTransforms ignores MultiLabel's alpha (always 4).
         "multilabel" => Interpolation::MultiLabel {
             sigma: sigma.unwrap_or(spacing),
-            alpha: alpha.unwrap_or(4.0),
+            alpha: match alpha {
+                Some(a) if a.to_bits() != 4.0f64.to_bits() && notices.reproduce() => {
+                    notices.add(
+                        &larmorx_core::defects::ANTS_33,
+                        format!("MultiLabel's alpha {a} is ignored: 4, as in ANTs"),
+                    );
+                    4.0
+                }
+                Some(a) => a,
+                None => 4.0,
+            },
         },
         "genericlabel" => Interpolation::GenericLabel,
         "cosinewindowedsinc" => Interpolation::WindowedSinc(Window::Cosine),
@@ -303,9 +315,10 @@ fn interpolation(
 /// Resamples `data` (3D, or 4D for a time series; float32 or float64) from `input_grid` onto
 /// `reference_grid` through `transforms` (`[(parts, invert), ...]` in `-t` order), computing in
 /// `precision` (`float64`, or `float32` as `antsApplyTransforms --float 1`). Returns data of
-/// that type shaped like the reference grid (plus the time axis).
+/// that type shaped like the reference grid (plus the time axis), with the notices:
+/// `(data, notices)`.
 #[pyfunction]
-#[pyo3(signature = (data, input_grid, reference_grid, transforms, interpolation_name = "linear", sigma = None, alpha = None, order = 3, default_value = 0.0, n_threads = 1, precision = "float64"))]
+#[pyo3(signature = (data, input_grid, reference_grid, transforms, interpolation_name = "linear", sigma = None, alpha = None, order = 3, default_value = 0.0, n_threads = 1, precision = "float64", upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn ants_apply_transforms<'py>(
     py: Python<'py>,
@@ -320,16 +333,27 @@ fn ants_apply_transforms<'py>(
     default_value: f64,
     n_threads: usize,
     precision: &str,
-) -> PyResult<Bound<'py, PyAny>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
+    let mut notices = larmorx_core::defects::Notices::new(mode);
     let precision = precision_from(precision)?;
     let input_grid = grid_from_dict(input_grid)?;
     let reference = grid_from_dict(reference_grid)?;
     let chain = chain_from_py(transforms)?;
     let options = ApplyTransformsOptions {
-        interpolation: interpolation(interpolation_name, sigma, alpha, order, input_grid.spacing)?,
+        interpolation: interpolation(
+            interpolation_name,
+            sigma,
+            alpha,
+            order,
+            input_grid.spacing,
+            &mut notices,
+        )?,
         default_value,
         n_threads,
         precision,
+        upstream_defects: mode,
     };
     let n_in = input_grid.len().max(1);
     let (n_volumes, result) = if let Ok(a) = data.extract::<PyReadonlyArrayDyn<'_, f32>>() {
@@ -358,25 +382,89 @@ fn ants_apply_transforms<'py>(
         let r = py.detach(|| apply_transforms(values, &input_grid, &reference, &chain, &options));
         (values.len() / n_in, r)
     };
-    let values = result.map_err(value_err)?;
+    let (values, result_notices) = result.map_err(value_err)?;
+    notices.extend(result_notices);
     let mut shape = reference.size.to_vec();
     if data.getattr("ndim")?.extract::<usize>()? > 3 {
         shape.push(n_volumes);
     }
-    if precision == Precision::Float {
+    let array = if precision == Precision::Float {
         // Float values: exact as float32.
         let values: Vec<f32> = values.iter().map(|&v| v as f32).collect();
-        return Ok(PyArray::from_owned_array(
+        PyArray::from_owned_array(
             py,
             ArrayD::from_shape_vec(IxDyn(&shape).f(), values).map_err(value_err)?,
         )
-        .into_any());
+        .into_any()
+    } else {
+        PyArray::from_owned_array(
+            py,
+            ArrayD::from_shape_vec(IxDyn(&shape).f(), values).map_err(value_err)?,
+        )
+        .into_any()
+    };
+    crate::defects::with_notices(py, array, notices.into_vec())
+}
+
+/// `antsApplyTransforms -u`'s cast of `values` (float64, any shape) to `dtype` (`int8`,
+/// `uint8`, `int16`, `int32`, `float32`, `float64`): `(array, notices)`. Out of an integer
+/// type's range, x86-64's wraparound with `reproduce`, clamped with `fix` (ANTS-06).
+#[pyfunction]
+#[pyo3(signature = (values, dtype, upstream_defects = "fix"))]
+fn ants_cast_output<'py>(
+    py: Python<'py>,
+    values: numpy::PyReadonlyArrayDyn<'py, f64>,
+    dtype: &str,
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    use larmorx_ants::OutputType;
+    use larmorx_core::array::DynArray;
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
+    let ty = match dtype {
+        "int8" => OutputType::Char,
+        "uint8" => OutputType::UChar,
+        "int16" => OutputType::Short,
+        "int32" => OutputType::Int,
+        "float32" => OutputType::Float,
+        "float64" => OutputType::Double,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "antsApplyTransforms writes int8, uint8, int16, int32, float32 or float64, not {other}"
+            )));
+        }
+    };
+    let view = values.as_array();
+    let shape = view.shape().to_vec();
+    let flat: Vec<f64> = view.t().iter().copied().collect();
+    let (array, undefined) =
+        larmorx_ants::cli::apply_transforms::cast_output(flat, &shape, ty, mode);
+    let mut notices = larmorx_core::defects::Notices::new(mode);
+    if undefined > 0 {
+        notices.add(
+            &larmorx_core::defects::ANTS_06,
+            if mode.fix() {
+                format!(
+                    "{undefined} value(s) are NaN or outside the range of {dtype}: clamped to \
+                     the range (NaN to 0); ANTs on x86-64 wraps them around"
+                )
+            } else {
+                format!(
+                    "{undefined} value(s) are NaN or outside the range of {dtype}: wrapped \
+                     around as ANTs on x86-64 converts them"
+                )
+            },
+        );
     }
-    Ok(PyArray::from_owned_array(
-        py,
-        ArrayD::from_shape_vec(IxDyn(&shape).f(), values).map_err(value_err)?,
-    )
-    .into_any())
+    let out = match array {
+        DynArray::I8(a) => PyArray::from_owned_array(py, a).into_any(),
+        DynArray::U8(a) => PyArray::from_owned_array(py, a).into_any(),
+        DynArray::I16(a) => PyArray::from_owned_array(py, a).into_any(),
+        DynArray::I32(a) => PyArray::from_owned_array(py, a).into_any(),
+        DynArray::F32(a) => PyArray::from_owned_array(py, a).into_any(),
+        DynArray::F64(a) => PyArray::from_owned_array(py, a).into_any(),
+        _ => unreachable!("cast_output makes only these types"),
+    };
+    crate::defects::with_notices(py, out, notices.into_vec())
 }
 
 /// The array's memory when it is Fortran-contiguous (the layout of arrays read from files),
@@ -445,6 +533,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(itk_transform_read, m)?)?;
     m.add_function(wrap_pyfunction!(itk_transform_write, m)?)?;
     m.add_function(wrap_pyfunction!(ants_apply_transforms, m)?)?;
+    m.add_function(wrap_pyfunction!(ants_cast_output, m)?)?;
     m.add_function(wrap_pyfunction!(ants_transform_points, m)?)?;
     Ok(())
 }

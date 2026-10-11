@@ -19,6 +19,8 @@ use pyo3::types::PyTuple;
 use super::gaussian::checked;
 use super::resample::{ants_input, output_with_spacing};
 use super::{array_like, value_err};
+use crate::defects::{mode_from_py, with_notices};
+use larmorx_core::defects::Notices;
 
 /// `ants::Morphological`: `operation` is ImageMath's name (`MD`, `ME`, `MO`, `MC`, `GD`, `GE`,
 /// `GO`, `GC`), `radius` in voxels, `value` the binary operations' foreground.
@@ -53,27 +55,30 @@ fn ants_morphology<'py>(
     array_like(py, out, &shape)
 }
 
-/// ImageMath `FillHoles` with `hole_param` (2: every hole).
+/// ImageMath `FillHoles` with `hole_param` (2: every hole): `(data, notices)`.
 #[pyfunction]
-#[pyo3(signature = (a, hole_param = 2.0, n_threads = 1))]
+#[pyo3(signature = (a, hole_param = 2.0, n_threads = 1, upstream_defects = "fix"))]
 fn ants_fill_holes<'py>(
     py: Python<'py>,
     a: PyReadonlyArrayDyn<'py, f32>,
     hole_param: f32,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
     let spacing = vec![1.0; a.shape().len()];
     let (shape, data) = checked(&a, &spacing)?;
-    let out = py
+    let (out, notices) = py
         .detach(|| {
             fill_holes(
                 VolumeRef::new(&data, &shape, &spacing),
                 hole_param,
                 n_threads,
+                mode,
             )
         })
         .map_err(|e: FillHolesError| value_err(e))?;
-    array_like(py, out, &shape)
+    with_notices(py, array_like(py, out, &shape)?.into_any(), notices)
 }
 
 /// ImageMath `PadImage`: the image (a path, read as a `dim`-dimensional float image, or an
@@ -89,7 +94,7 @@ fn ants_pad_image<'py>(
     value: f32,
     n_threads: usize,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads)?;
+    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads, &mut Notices::default())?;
     let out = py
         .detach(|| pad_image(&input, pad, value))
         .map_err(value_err)?;

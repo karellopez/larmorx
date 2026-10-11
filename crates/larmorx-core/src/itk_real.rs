@@ -14,7 +14,9 @@
 
 use std::fmt::Debug;
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::defects::UpstreamDefects;
 use crate::element::RealElement;
 use crate::{linalg, math, vnl_svd_f32};
 
@@ -200,6 +202,151 @@ impl ItkReal for f32 {
     }
 }
 
+/// The floor ITK's interpolators take of a continuous index (defect ITK-01), and how often
+/// the choice changed a value.
+///
+/// On x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is `round_half_to_even(2x − 0.5) >> 1`,
+/// which gives 0 instead of −1 for negative values closer to 0 than 2⁻²⁶ (float) or 2⁻⁵⁵
+/// (double), so linear interpolation along a fourth axis, the windowed-sinc kernel and
+/// displacement-field lookups then mix in the next voxel with a tiny negative weight. Callers
+/// compute ITK's floor as before and pass it to [`IndexFloor::pick`] with the index: with
+/// [`UpstreamDefects::Fix`] (the default) the exact floor replaces it where the two differ;
+/// with [`UpstreamDefects::Reproduce`] ITK's is kept.
+///
+/// The two floors differ only in the last bits of the values they give, and most such
+/// differences vanish when the value is stored. So a caller computes each output value
+/// through [`IndexFloor::checked`], which computes it again with the other floor where a
+/// floor differed and counts the values that changed (atomically: one `IndexFloor` serves
+/// every thread), for the notice ([`IndexFloor::notice`]).
+#[derive(Debug, Default)]
+pub struct IndexFloor {
+    exact: bool,
+    differing: AtomicUsize,
+    changed: AtomicUsize,
+}
+
+impl Clone for IndexFloor {
+    fn clone(&self) -> Self {
+        IndexFloor {
+            exact: self.exact,
+            differing: AtomicUsize::new(self.differing.load(Ordering::Relaxed)),
+            changed: AtomicUsize::new(self.changed.load(Ordering::Relaxed)),
+        }
+    }
+}
+
+impl IndexFloor {
+    /// The exact floor with [`UpstreamDefects::Fix`], ITK's with [`UpstreamDefects::Reproduce`].
+    pub fn new(mode: UpstreamDefects) -> Self {
+        IndexFloor {
+            exact: mode.fix(),
+            differing: AtomicUsize::new(0),
+            changed: AtomicUsize::new(0),
+        }
+    }
+
+    /// ITK's floor (as computed in `R`), as ITK uses it.
+    pub fn itk() -> Self {
+        Self::new(UpstreamDefects::Reproduce)
+    }
+
+    /// A fresh floor of the same kind (counts at 0).
+    pub fn local(&self) -> Self {
+        IndexFloor {
+            exact: self.exact,
+            ..IndexFloor::default()
+        }
+    }
+
+    /// A fresh floor of the other kind (counts at 0).
+    pub fn alternative(&self) -> Self {
+        IndexFloor {
+            exact: !self.exact,
+            ..IndexFloor::default()
+        }
+    }
+
+    /// The floor of `x` to use, given ITK's floor `itk` of it.
+    #[inline]
+    pub fn pick(&self, itk: i64, x: f64) -> i64 {
+        if !(x.is_finite() && x.abs() < 4.0e18) {
+            return itk;
+        }
+        let exact = x.floor() as i64;
+        if exact == itk {
+            return itk;
+        }
+        self.differing.fetch_add(1, Ordering::Relaxed);
+        if self.exact { exact } else { itk }
+    }
+
+    /// `value(floor)`, one output value computed with this kind of floor. Where a floor
+    /// differed from ITK's while computing it, the value is computed again with the other
+    /// floor, and counted as changed if `same` says the two differ.
+    #[inline]
+    pub fn checked<V>(&self, value: impl Fn(&IndexFloor) -> V, same: impl Fn(&V, &V) -> bool) -> V {
+        let local = self.local();
+        let v = value(&local);
+        let differing = local.differing();
+        if differing > 0 {
+            self.differing.fetch_add(differing, Ordering::Relaxed);
+            if !same(&v, &value(&self.alternative())) {
+                self.changed.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        v
+    }
+
+    /// Records one output value computed in parts (as [`IndexFloor::checked`] does in one):
+    /// `differing` floors differed from ITK's while computing it, and the other floor
+    /// `changed` it or not.
+    pub fn record(&self, differing: usize, changed: bool) {
+        self.differing.fetch_add(differing, Ordering::Relaxed);
+        if changed {
+            self.changed.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// How many floors differed from ITK's so far.
+    pub fn differing(&self) -> usize {
+        self.differing.load(Ordering::Relaxed)
+    }
+
+    /// How many values computed through [`IndexFloor::checked`] the choice of floor changed.
+    pub fn changed(&self) -> usize {
+        self.changed.load(Ordering::Relaxed)
+    }
+
+    /// Adds the ITK-01 notice to `notices` if the choice of floor changed any value (`what`
+    /// names the values: "output voxels").
+    pub fn notice(&self, notices: &mut crate::defects::Notices, what: &str) {
+        let n = self.changed();
+        if n == 0 {
+            return;
+        }
+        let detail = if self.exact {
+            format!(
+                "{n} {what} use the exact floor of an index just below 0, where ITK's floor (on \
+                 x86-64) is 0 and changes them"
+            )
+        } else {
+            format!(
+                "{n} {what} use ITK's floor of an index just below 0, which is 0 on x86-64, as \
+                 ANTs does; the exact floor changes them"
+            )
+        };
+        notices.add(&crate::defects::ITK_01, detail);
+    }
+}
+
+/// Whether two stored values are the same, NaN equal to NaN (for [`IndexFloor::checked`]).
+#[inline]
+pub fn same_value<V: PartialEq>(a: &V, b: &V) -> bool {
+    #[allow(clippy::eq_op)]
+    let both_nan = a != a && b != b;
+    a == b || both_nan
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,6 +372,29 @@ mod tests {
         assert_eq!((-1e-9f32).itk_floor(), 0);
         assert_eq!((-1e-6f32).itk_floor(), -1);
         assert_eq!(f32::NAN.itk_floor(), i64::MIN >> 1);
+        // ITK-01: the exact floor where ITK's differs, and the count.
+        let fix = IndexFloor::new(UpstreamDefects::Fix);
+        let x = -1e-9f32;
+        assert_eq!(fix.pick(x.itk_floor(), f64::from(x)), -1);
+        assert_eq!(fix.pick((-0.5f32).itk_floor(), -0.5), -1);
+        assert_eq!(fix.differing(), 1);
+        let itk = IndexFloor::itk();
+        assert_eq!(itk.pick(x.itk_floor(), f64::from(x)), 0);
+        assert_eq!(itk.differing(), 1);
+        assert_eq!(itk.pick(f32::NAN.itk_floor(), f64::NAN), i64::MIN >> 1);
+        // A notice only where a value changed.
+        let mut notices = crate::defects::Notices::new(UpstreamDefects::Reproduce);
+        itk.notice(&mut notices, "lookups");
+        assert!(notices.is_empty());
+        let lookup = |f: &IndexFloor| f.pick(x.itk_floor(), f64::from(x));
+        assert_eq!(itk.checked(lookup, same_value), 0);
+        assert_eq!(itk.checked(|f| lookup(f).max(0), same_value), 0);
+        assert_eq!((itk.differing(), itk.changed()), (3, 1));
+        itk.notice(&mut notices, "lookups");
+        assert!(notices.contains(&crate::defects::ITK_01));
+        assert_eq!(fix.checked(lookup, same_value), -1);
+        assert_eq!(fix.changed(), 1);
+        assert!(same_value(&f32::NAN, &f32::NAN) && !same_value(&1.0, &f64::NAN));
         // The rounding is round_ties_even.
         let mut x = 0x1234_5678_9abc_def0u64;
         for _ in 0..100_000 {

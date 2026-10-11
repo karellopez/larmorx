@@ -57,10 +57,10 @@ fn run_largest_component(ctx: &mut Context<'_>) -> Result<(), OpError> {
         }
     };
     let image: AntsImage<f32> = ctx.read(&fn1)?;
-    let data = largest_component(image.view(), smallest, ctx.n_threads)?;
-    if output.len() > 3 {
-        ctx.write(&output, image.with_data(data))?;
-    }
+    let (data, notices) =
+        largest_component(image.view(), smallest, ctx.n_threads, ctx.notices.mode())?;
+    ctx.notices.extend(notices);
+    ctx.write_if_long(&output, image.with_data(data))?;
     Ok(())
 }
 
@@ -71,9 +71,7 @@ fn run_distance_map(ctx: &mut Context<'_>) -> Result<(), OpError> {
     let fn1 = ctx.required(4)?.to_owned();
     let image: AntsImage<f32> = ctx.read(&fn1)?;
     let data = distance_map(image.view())?;
-    if output.len() > 3 {
-        ctx.write(&output, image.derived(data))?;
-    }
+    ctx.write_if_long(&output, image.derived(data))?;
     Ok(())
 }
 
@@ -102,7 +100,13 @@ fn run_extract_contours(ctx: &mut Context<'_>) -> Result<(), OpError> {
         })? != 0,
     };
     let image: AntsImage<f32> = ctx.read(&fn1)?;
-    let data = extract_contours(image.view(), fully_connected, ctx.n_threads)?;
+    let (data, notices) = extract_contours(
+        image.view(),
+        fully_connected,
+        ctx.n_threads,
+        ctx.notices.mode(),
+    )?;
+    ctx.notices.extend(notices);
     ctx.write(&output, image.derived(data))?;
     Ok(())
 }

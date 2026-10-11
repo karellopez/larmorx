@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import float_input, mask_input, result
 from larmorx.image import Image
 
@@ -55,7 +56,12 @@ class OtsuResult:
 
 
 def otsu_threshold(
-    image: Any, n_thresholds: int = 1, *, mask: Any = None, n_threads: int = 1
+    image: Any,
+    n_thresholds: int = 1,
+    *,
+    mask: Any = None,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> OtsuResult:
     """``ThresholdImage d in out Otsu n [mask]``: ``n`` thresholds that maximise the
     between-class variance.
@@ -64,7 +70,11 @@ def otsu_threshold(
     histogram: voxels are labelled ``0..n``. With a mask (its voxels equal to 1 after
     conversion to ``int``) it is ANTs' own variant: a 200-bin histogram of the masked voxels,
     labels ``1..n+1`` inside the mask, 0 outside, and the output takes the mask's geometry.
+    Its histogram covers the masked voxels' true range; ANTs' starts the maximum at the
+    smallest positive float and can miss the minimum (ANTS-25), which
+    ``upstream_defects="reproduce"`` gives.
     """
+    check(upstream_defects)
     a = float_input(image, n_threads)
     like = a
     m = None
@@ -72,20 +82,30 @@ def otsu_threshold(
         m = np.asfortranarray(mask_input(mask, a.data.shape, n_threads))
         if not isinstance(mask, np.ndarray):
             like = float_input(mask, n_threads)  # the output takes the mask's geometry
-    labels, thresholds = _core.ants_otsu_threshold(
-        np.asfortranarray(a.data), int(n_thresholds), m, n_threads
+    labels, thresholds, notices = _core.ants_otsu_threshold(
+        np.asfortranarray(a.data), int(n_thresholds), m, n_threads, upstream_defects
     )
+    warn(notices)
     return OtsuResult(result(labels, like), tuple(float(t) for t in thresholds))
 
 
-def multiply_images(image: Any, other: Any, *, n_threads: int = 1) -> Image:
+def multiply_images(
+    image: Any,
+    other: Any,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``MultiplyImages d image other out``: the voxel-wise product in float32, with
     ``other`` a number or an image (read at ``image``'s voxel indices; its geometry is
     ignored, as in ANTs).
 
-    Unlike the command line, a path that does not exist is an error here (ANTs multiplies by
-    ``atof(path)``, usually 0).
+    A path that does not exist is an error (ANTs multiplies by ``atof(path)``, usually 0:
+    ANTS-27, which the command line reproduces with ``LARMORX_UPSTREAM_DEFECTS=reproduce``).
+    A smaller ``other`` image is an error (ANTS-07); ``upstream_defects="reproduce"`` reads it
+    as ANTs does, with 0 where ANTs reads beyond it.
     """
+    check(upstream_defects)
     a = float_input(image, n_threads)
     if isinstance(other, (int, float, np.integer, np.floating)):
         b: Any = float(other)
@@ -93,5 +113,8 @@ def multiply_images(image: Any, other: Any, *, n_threads: int = 1) -> Image:
         if isinstance(other, (str, os.PathLike)) and not os.path.exists(other):
             raise FileNotFoundError(f"{os.fspath(other)}: no such file")
         b = np.asfortranarray(float_input(other, n_threads).data)
-    data, _result, _count = _core.ants_arithmetic("m", np.asfortranarray(a.data), b, n_threads)
+    data, _result, _count, notices = _core.ants_arithmetic(
+        "m", np.asfortranarray(a.data), b, n_threads, upstream_defects
+    )
+    warn(notices)
     return result(data, a)

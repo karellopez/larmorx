@@ -94,10 +94,10 @@ fn run_truncate(ctx: &mut Context<'_>) -> Result<(), OpError> {
         mask.as_ref().map(|m| m.data.as_slice()),
         &options,
         ctx.n_threads,
+        ctx.notices.mode(),
     )?;
-    if output.len() > 3 {
-        ctx.write(&output, image.with_data(truncated.data))?;
-    }
+    ctx.notices.extend(truncated.notices);
+    ctx.write_if_long(&output, image.with_data(truncated.data))?;
     Ok(())
 }
 
@@ -129,10 +129,9 @@ fn run_normalize(ctx: &mut Context<'_>) -> Result<(), OpError> {
         None if larmorx_image::itk_math::almost_equal_f32(option, 0.0) => Normalization::Range,
         None => Normalization::Mean,
     };
-    let data = normalize(&image.data, mode, ctx.n_threads)?;
-    if output.len() > 3 {
-        ctx.write(&output, image.with_data(data))?;
-    }
+    let (data, notices) = normalize(&image.data, mode, ctx.n_threads, ctx.notices.mode())?;
+    ctx.notices.extend(notices);
+    ctx.write_if_long(&output, image.with_data(data))?;
     Ok(())
 }
 

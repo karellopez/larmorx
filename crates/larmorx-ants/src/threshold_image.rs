@@ -11,9 +11,12 @@
 //!   then each masked voxel gets `i + 1` for the first threshold it is below (compared in
 //!   float), or `n + 1`; voxels outside the mask are 0. The histogram range comes from a loop
 //!   that starts the maximum at `FLT_MIN` (the smallest positive float) and updates it only
-//!   when a voxel does not lower the minimum.
+//!   when a voxel does not lower the minimum (defect ANTS-25): reproduced with
+//!   [`UpstreamDefects::Reproduce`]; corrected (the default), the range is the masked voxels'
+//!   true minimum and maximum.
 //! - `Kmeans` is not supported yet.
 
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::parallel;
 use larmorx_image::FilterError;
 use larmorx_image::statistics::label_histogram;
@@ -53,13 +56,17 @@ pub struct ThresholdOutput {
     pub data: Vec<f32>,
     /// The Otsu thresholds (empty for a range threshold).
     pub thresholds: Vec<f64>,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
-/// `ThresholdImage` on the voxels of a `float` image.
+/// `ThresholdImage` on the voxels of a `float` image, with ANTs' defects corrected or
+/// reproduced as `defects_mode` says (see the module).
 pub fn threshold_image(
     data: &[f32],
     mode: ThresholdMode<'_>,
     n_threads: usize,
+    defects_mode: UpstreamDefects,
 ) -> Result<ThresholdOutput, FilterError> {
     match mode {
         ThresholdMode::Range {
@@ -70,6 +77,7 @@ pub fn threshold_image(
         } => Ok(ThresholdOutput {
             data: binary_threshold(data, lower, upper, inside, outside, n_threads)?,
             thresholds: Vec::new(),
+            notices: Vec::new(),
         }),
         ThresholdMode::Otsu {
             thresholds,
@@ -79,12 +87,13 @@ pub fn threshold_image(
             Ok(ThresholdOutput {
                 data: r.labels,
                 thresholds: r.thresholds,
+                notices: Vec::new(),
             })
         }
         ThresholdMode::Otsu {
             thresholds: n,
             mask: Some(mask),
-        } => masked_otsu(data, mask, n, n_threads),
+        } => masked_otsu(data, mask, n, n_threads, defects_mode),
     }
 }
 
@@ -94,6 +103,7 @@ fn masked_otsu(
     mask: &[i32],
     n: usize,
     n_threads: usize,
+    mode: UpstreamDefects,
 ) -> Result<ThresholdOutput, FilterError> {
     if mask.len() != data.len() {
         return Err(FilterError::SizeMismatch {
@@ -104,6 +114,7 @@ fn masked_otsu(
     }
     check_otsu(n, MASKED_OTSU_BINS)?;
     let (mut min, mut max) = (f32::MAX, f32::MIN_POSITIVE);
+    let (mut true_min, mut true_max) = (f32::INFINITY, f32::NEG_INFINITY);
     for (&v, &m) in data.iter().zip(mask) {
         if m == 1 {
             if v < min {
@@ -111,6 +122,21 @@ fn masked_otsu(
             } else if v > max {
                 max = v;
             }
+            true_min = true_min.min(v);
+            true_max = true_max.max(v);
+        }
+    }
+    let mut notices = Notices::new(mode);
+    if true_min <= true_max && (min, max) != (true_min, true_max) {
+        notices.add(
+            &defects::ANTS_25,
+            format!(
+                "the histogram's range is [{true_min}, {true_max}]; ANTs finds [{min}, {max}]{}",
+                if mode.fix() { "" } else { ", and uses it" }
+            ),
+        );
+        if mode.fix() {
+            (min, max) = (true_min, true_max);
         }
     }
     let histogram = label_histogram(
@@ -147,6 +173,7 @@ fn masked_otsu(
     Ok(ThresholdOutput {
         data: labels,
         thresholds,
+        notices: notices.into_vec(),
     })
 }
 
@@ -155,7 +182,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn masked_otsu_range() {
+        // ANTS-25: the first masked voxel is the smallest, so ANTs never compares it with the
+        // maximum... and the maximum starts at FLT_MIN: with all values negative it stays there.
+        let data = [-5.0f32, -4.0, -3.0, -2.0, -1.0, -4.5];
+        let mask = [1i32; 6];
+        let otsu = |mode| {
+            threshold_image(
+                &data,
+                ThresholdMode::Otsu {
+                    thresholds: 1,
+                    mask: Some(&mask),
+                },
+                1,
+                mode,
+            )
+            .unwrap()
+        };
+        let (f, r) = (otsu(UpstreamDefects::Fix), otsu(UpstreamDefects::Reproduce));
+        assert_eq!(f.notices[0].defect.id, "ANTS-25");
+        assert_eq!(r.notices[0].defect.id, "ANTS-25");
+        assert_ne!(f.thresholds, r.thresholds);
+        assert!(
+            f.thresholds[0] > -5.0 && f.thresholds[0] < -1.0,
+            "{:?}",
+            f.thresholds
+        );
+    }
+
+    #[test]
     fn range_and_otsu() {
+        let mode = UpstreamDefects::Fix;
         let mut data: Vec<f32> = (0..400).map(|i| 10.0 + (i % 9) as f32).collect();
         data.extend((0..400).map(|i| 80.0 + (i % 13) as f32));
         let r = threshold_image(
@@ -167,6 +224,7 @@ mod tests {
                 outside: 0.0,
             },
             2,
+            mode,
         )
         .unwrap();
         assert_eq!(r.data.iter().sum::<f32>(), 400.0);
@@ -177,6 +235,7 @@ mod tests {
                 mask: None,
             },
             2,
+            mode,
         )
         .unwrap();
         assert_eq!(o.data.iter().sum::<f32>(), 400.0);
@@ -188,6 +247,7 @@ mod tests {
                 mask: Some(&mask),
             },
             3,
+            mode,
         )
         .unwrap();
         assert!(m.data.iter().step_by(2).all(|&l| l == 1.0 || l == 2.0));

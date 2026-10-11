@@ -12,12 +12,14 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 use super::resample::{ants_input, output_with_spacing};
+use crate::defects::{mode_from_py, tuple_with_notices};
+use larmorx_core::defects::Notices;
 
-/// `DenoiseImage` with ANTs' options: returns `(denoised, noise)`, each as `(data, ras_affine,
-/// descrip, spacing)`. `patch_radius` and `search_radius` hold one value for every axis or one
-/// per axis.
+/// `DenoiseImage` with ANTs' options: returns `(denoised, noise, notices)`, the images as
+/// `(data, ras_affine, descrip, spacing)`. `patch_radius` and `search_radius` hold one value
+/// for every axis or one per axis.
 #[pyfunction]
-#[pyo3(signature = (image, dim, mask = None, rician = true, shrink_factor = 1, patch_radius = vec![1], search_radius = vec![2], n_threads = 1))]
+#[pyo3(signature = (image, dim, mask = None, rician = true, shrink_factor = 1, patch_radius = vec![1], search_radius = vec![2], n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn ants_denoise_image<'py>(
     py: Python<'py>,
@@ -29,15 +31,18 @@ fn ants_denoise_image<'py>(
     patch_radius: Vec<u32>,
     search_radius: Vec<u32>,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
+    let mut notices = Notices::new(mode);
     if !(2..=4).contains(&dim) {
         return Err(PyValueError::new_err(format!(
             "DenoiseImage runs on 2, 3 or 4 dimensions, not {dim}"
         )));
     }
-    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads)?;
+    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads, &mut notices)?;
     let mask: Option<AntsImage<u8>> = mask
-        .map(|m| ants_input(py, m, dim, n_threads))
+        .map(|m| ants_input(py, m, dim, n_threads, &mut notices))
         .transpose()?;
     let options = DenoiseOptions {
         noise_model: if rician {
@@ -48,6 +53,7 @@ fn ants_denoise_image<'py>(
         shrink_factor,
         patch_radius,
         search_radius,
+        upstream_defects: mode,
     };
     let out = py
         .detach(|| denoise_image(&input, mask.as_ref(), &options, n_threads))
@@ -58,12 +64,14 @@ fn ants_denoise_image<'py>(
             ),
             other => PyValueError::new_err(other.to_string()),
         })?;
-    PyTuple::new(
+    notices.extend(out.notices);
+    tuple_with_notices(
         py,
-        [
-            output_with_spacing(py, OutputImage::F32(out.denoised))?,
-            output_with_spacing(py, OutputImage::F32(out.noise))?,
+        vec![
+            output_with_spacing(py, OutputImage::F32(out.denoised))?.into_any(),
+            output_with_spacing(py, OutputImage::F32(out.noise))?.into_any(),
         ],
+        notices.into_vec(),
     )
 }
 

@@ -11,9 +11,17 @@
 //! `--float 1` computes in single precision exactly as ANTs' float pipeline does
 //! ([`crate::apply_transforms`]): the input is read as float, text transforms are read in
 //! float, and the output defaults to float.
+//!
+//! **Upstream defects (D13).** By default larmorx refuses an unknown `-u` type, honours
+//! `MultiLabel[sigma,alpha]`'s alpha and `GenericLabel[interpolator]`'s interpolator (Linear
+//! or NearestNeighbor; ANTS-33), clamps `-u` integer outputs to their range (ANTS-06), and
+//! corrects ITK-01 and ITK-10 ([`crate::apply_transforms`]). With
+//! `LARMORX_UPSTREAM_DEFECTS=reproduce` it reads and computes as ANTs does.
 
 use std::io::Write;
 use std::path::Path;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use larmorx_core::array::DynArray;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
@@ -83,10 +91,28 @@ OPTIONS:
      --help
 ";
 
-/// Runs `antsApplyTransforms` with `args`; returns the exit code.
+/// Runs `antsApplyTransforms` with `args`, in the D13 mode of `LARMORX_UPSTREAM_DEFECTS`;
+/// returns the exit code.
 pub fn main(
     args: &[String],
     loader: &dyn TransformLoader,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match UpstreamDefects::from_env() {
+        Ok(mode) => main_with(args, loader, mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
+}
+
+/// [`main`] in the D13 mode `mode`.
+pub fn main_with(
+    args: &[String],
+    loader: &dyn TransformLoader,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -105,13 +131,16 @@ pub fn main(
         let _ = out.write_all(USAGE.as_bytes());
         return 0;
     }
-    match run(&parsed, loader, out) {
+    let mut notices = Notices::new(mode);
+    let code = match run(&parsed, loader, &mut notices, out) {
         Ok(()) => 0,
         Err(message) => {
             let _ = writeln!(err, "{message}");
             1
         }
-    }
+    };
+    notices.print(err);
+    code
 }
 
 /// ANTs' `Convert<bool>` (an integer read by `istringstream`).
@@ -143,8 +172,13 @@ fn image_type(p: &Parsed) -> Result<ImageType, String> {
 }
 
 /// The interpolator `-n` names (`make_interpolator_snip.tmpl`); Gaussian sigmas default to
-/// the input spacing.
-fn interpolation(p: &Parsed, input_spacing: [f64; 3]) -> Result<Interpolation, String> {
+/// the input spacing. ANTS-33: ANTs ignores `MultiLabel`'s alpha (always 4) and
+/// `GenericLabel`'s interpolator (always linear); larmorx honours them unless reproducing.
+fn interpolation(
+    p: &Parsed,
+    input_spacing: [f64; 3],
+    notices: &mut Notices,
+) -> Result<Interpolation, String> {
     let Some(v) = p.last("interpolation") else {
         return Ok(Interpolation::Linear);
     };
@@ -172,17 +206,72 @@ fn interpolation(p: &Parsed, input_spacing: [f64; 3]) -> Result<Interpolation, S
             sigma: sigma(),
             alpha: v.parameters.get(1).map_or(1.0, |a| atof(a)),
         },
-        // ANTs reads no alpha for MultiLabel: it is always 4.
-        "multilabel" => Interpolation::MultiLabel {
-            sigma: sigma(),
-            alpha: 4.0,
-        },
+        // ANTs reads no alpha for MultiLabel: it is always 4 (ANTS-33).
+        "multilabel" => {
+            let given = v.parameters.get(1).map(|a| atof(a));
+            let alpha = match given {
+                Some(a) if a.to_bits() != 4.0f64.to_bits() => {
+                    if notices.fix() {
+                        notices.add(
+                            &defects::ANTS_33,
+                            format!("MultiLabel's alpha is {a}, as given; ANTs always uses 4"),
+                        );
+                        a
+                    } else {
+                        notices.add(
+                            &defects::ANTS_33,
+                            format!("MultiLabel's alpha {a} is ignored: 4, as in ANTs"),
+                        );
+                        4.0
+                    }
+                }
+                _ => 4.0,
+            };
+            Interpolation::MultiLabel {
+                sigma: sigma(),
+                alpha,
+            }
+        }
         "cosinewindowedsinc" => Interpolation::WindowedSinc(Window::Cosine),
         "hammingwindowedsinc" => Interpolation::WindowedSinc(Window::Hamming),
         "lanczoswindowedsinc" => Interpolation::WindowedSinc(Window::Lanczos),
         "blackmanwindowedsinc" => Interpolation::WindowedSinc(Window::Blackman),
         "welchwindowedsinc" => Interpolation::WindowedSinc(Window::Welch),
-        "genericlabel" => Interpolation::GenericLabel,
+        // ANTs ignores the interpolator GenericLabel names: always linear (ANTS-33).
+        "genericlabel" => match v.parameters.first().map(|s| s.trim().to_lowercase()) {
+            None => Interpolation::GenericLabel,
+            Some(inner) if inner == "linear" => Interpolation::GenericLabel,
+            Some(inner) if notices.reproduce() => {
+                notices.add(
+                    &defects::ANTS_33,
+                    format!("GenericLabel[{inner}] interpolates linearly, as in ANTs"),
+                );
+                Interpolation::GenericLabel
+            }
+            // Label-wise nearest-neighbour interpolation is nearest-neighbour interpolation.
+            Some(inner) if inner == "nearestneighbor" => {
+                notices.add(
+                    &defects::ANTS_33,
+                    "GenericLabel[NearestNeighbor] interpolates by nearest neighbour; ANTs \
+                     interpolates linearly",
+                );
+                Interpolation::NearestNeighbor
+            }
+            Some(inner) => {
+                notices.add(
+                    &defects::ANTS_33,
+                    format!(
+                        "GenericLabel[{inner}]: an error; ANTs ignores the interpolator and \
+                         interpolates linearly"
+                    ),
+                );
+                return Err(format!(
+                    "larmorx: GenericLabel[{inner}] is not supported (Linear or NearestNeighbor; \
+                     {}=reproduce interpolates linearly, as ANTs does)",
+                    defects::ENV
+                ));
+            }
+        },
         _ => return Err(format!("Error:  Unrecognized interpolation option. {name}")),
     })
 }
@@ -252,7 +341,12 @@ fn output_path(p: &Parsed) -> Result<String, String> {
     Ok(v.name.clone())
 }
 
-fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<(), String> {
+fn run(
+    p: &Parsed,
+    loader: &dyn TransformLoader,
+    notices: &mut Notices,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let verbose = flag(p.last("verbose"));
     let mut log = |line: String| {
         if verbose {
@@ -276,15 +370,38 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     if time_index.is_some() && image_type == ImageType::TimeSeries {
         image_type = ImageType::Scalar;
     }
-    let output_type = match p.last("output-data-type").map(|v| v.name.to_lowercase()) {
-        Some(name) => OutputType::from_name(&name),
-        None => None,
-    }
-    .unwrap_or(if single {
+    let default_type = if single {
         OutputType::Float
     } else {
         OutputType::Double
-    });
+    };
+    // ANTS-33: ANTs takes an unknown -u name for the default type.
+    let output_type = match p.last("output-data-type").map(|v| v.name.to_lowercase()) {
+        None => default_type,
+        Some(name) => match OutputType::from_name(&name) {
+            Some(t) => t,
+            None if name == "default" => default_type,
+            None if notices.fix() => {
+                notices.add(
+                    &defects::ANTS_33,
+                    format!("-u {name}: an error; ANTs writes its default type"),
+                );
+                return Err(format!(
+                    "larmorx: unknown output data type '{name}' (-u char, uchar, short, int, \
+                     float, double or default; {}=reproduce writes the default type, as ANTs \
+                     does)",
+                    defects::ENV
+                ));
+            }
+            None => {
+                notices.add(
+                    &defects::ANTS_33,
+                    format!("-u {name} is unknown: the default type is written, as in ANTs"),
+                );
+                default_type
+            }
+        },
+    };
     // `Convert<PixelType>`: `istringstream >> T`, so in float the text is rounded once to
     // float (strtof), not to double and then to float.
     let default_value = p.last("default-value").map_or(0.0, |v| {
@@ -343,7 +460,7 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     log(format!("Reference image: {reference_path}"));
 
     let chain = transform_chain(p, loader, precision)?;
-    let interpolation = interpolation(p, input_grid.spacing)?;
+    let interpolation = interpolation(p, input_grid.spacing, notices)?;
     log(format!("Interpolation: {interpolation:?}"));
     log(format!("Default pixel value: {default_value}"));
 
@@ -373,12 +490,14 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
         default_value,
         n_threads,
         precision,
+        upstream_defects: notices.mode(),
     };
-    let result = match &voxels {
+    let (result, result_notices) = match &voxels {
         ItkVoxels::F32(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options),
         ItkVoxels::F64(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options),
     }
     .map_err(|e| e.to_string())?;
+    notices.extend(result_notices);
 
     // Write it as ITK's NIfTI writer does (larmorx_io::nifti::itk::itk_header).
     let [nx, ny, nz] = reference_grid.size;
@@ -387,7 +506,25 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     } else {
         vec![nx, ny, nz]
     };
-    let data = cast_output(result, &shape, output_type);
+    let (data, undefined) = cast_output(result, &shape, output_type, notices.mode());
+    if undefined > 0 {
+        notices.add(
+            &defects::ANTS_06,
+            if notices.fix() {
+                format!(
+                    "{undefined} value(s) are NaN or outside the range of -u {}: clamped to the \
+                     range (NaN to 0); ANTs on x86-64 wraps them around",
+                    output_type.name()
+                )
+            } else {
+                format!(
+                    "{undefined} value(s) are NaN or outside the range of -u {}: wrapped around \
+                     as ANTs on x86-64 converts them",
+                    output_type.name()
+                )
+            },
+        );
+    }
     let mut geometry = ItkGeometry::from_grid3(&reference_grid);
     if shape.len() == 4 {
         // The fourth axis comes from the input (read as a 4D image: size 1, spacing 1,
@@ -430,11 +567,18 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
 }
 
 /// ANTs' output cast (`CastImageFilter`, a `static_cast`): floats round to nearest, integers
-/// truncate toward zero. Out of range, the C++ cast is undefined; x86-64 builds (where ANTs
-/// and fMRIPrep usually run) convert through a 32-bit integer (`cvttsd2si`, which gives
-/// `i32::MIN` for NaN and values beyond its range) and keep the low bits, so `-u uchar` wraps
-/// 400.7 to 144. This reproduces that, on every platform.
-pub fn cast_output(values: Vec<f64>, shape: &[usize], ty: OutputType) -> DynArray {
+/// truncate toward zero. Out of range, the C++ cast is undefined (ANTS-06); x86-64 builds
+/// (where ANTs and fMRIPrep usually run) convert through a 32-bit integer (`cvttsd2si`, which
+/// gives `i32::MIN` for NaN and values beyond its range) and keep the low bits, so `-u uchar`
+/// wraps 400.7 to 144: [`UpstreamDefects::Reproduce`] gives that, on every platform.
+/// [`UpstreamDefects::Fix`] clamps such values to the type's range, NaN to 0. Returns the
+/// array and how many conversions were undefined.
+pub fn cast_output(
+    values: Vec<f64>,
+    shape: &[usize],
+    ty: OutputType,
+    mode: UpstreamDefects,
+) -> (DynArray, usize) {
     fn array<T>(v: Vec<T>, shape: &[usize]) -> ArrayD<T> {
         ArrayD::from_shape_vec(IxDyn(shape).f(), v).expect("shape matches the data")
     }
@@ -446,24 +590,38 @@ pub fn cast_output(values: Vec<f64>, shape: &[usize], ty: OutputType) -> DynArra
             v as i32
         }
     }
+    /// Whether C++ defines the conversion of `v` to an integer type with range `[min, max]`.
+    fn defined(v: f64, min: f64, max: f64) -> bool {
+        v > min - 1.0 && v < max + 1.0
+    }
+    let fix = mode.fix();
+    macro_rules! int {
+        ($t:ty, $variant:ident) => {{
+            let (min, max) = (f64::from(<$t>::MIN), f64::from(<$t>::MAX));
+            let undefined = values.iter().filter(|&&v| !defined(v, min, max)).count();
+            let data = values
+                .iter()
+                .map(|&v| {
+                    if fix && !defined(v, min, max) {
+                        v as $t
+                    } else {
+                        to_i32(v) as $t
+                    }
+                })
+                .collect();
+            (DynArray::$variant(array(data, shape)), undefined)
+        }};
+    }
     match ty {
-        OutputType::Double => DynArray::F64(array(values, shape)),
-        OutputType::Float => {
-            DynArray::F32(array(values.iter().map(|&v| v as f32).collect(), shape))
-        }
-        OutputType::Int => DynArray::I32(array(values.iter().map(|&v| to_i32(v)).collect(), shape)),
-        OutputType::Short => DynArray::I16(array(
-            values.iter().map(|&v| to_i32(v) as i16).collect(),
-            shape,
-        )),
-        OutputType::UChar => DynArray::U8(array(
-            values.iter().map(|&v| to_i32(v) as u8).collect(),
-            shape,
-        )),
-        OutputType::Char => DynArray::I8(array(
-            values.iter().map(|&v| to_i32(v) as i8).collect(),
-            shape,
-        )),
+        OutputType::Double => (DynArray::F64(array(values, shape)), 0),
+        OutputType::Float => (
+            DynArray::F32(array(values.iter().map(|&v| v as f32).collect(), shape)),
+            0,
+        ),
+        OutputType::Int => int!(i32, I32),
+        OutputType::Short => int!(i16, I16),
+        OutputType::UChar => int!(u8, U8),
+        OutputType::Char => int!(i8, I8),
     }
 }
 
@@ -474,19 +632,35 @@ mod tests {
     #[test]
     fn integer_casts_follow_x86_64() {
         let values = vec![400.7, -3.7, 255.9, 1e12, f64::NAN, -128.5];
-        let DynArray::U8(u) = cast_output(values.clone(), &[6], OutputType::UChar) else {
+        let r = UpstreamDefects::Reproduce;
+        let (DynArray::U8(u), n) = cast_output(values.clone(), &[6], OutputType::UChar, r) else {
             panic!()
         };
         assert_eq!(
             u.as_slice_memory_order().unwrap(),
             [144, 253, 255, 0, 0, 128]
         );
-        let DynArray::I32(i) = cast_output(values, &[6], OutputType::Int) else {
+        assert_eq!(n, 5);
+        let (DynArray::I32(i), n) = cast_output(values.clone(), &[6], OutputType::Int, r) else {
             panic!()
         };
         assert_eq!(
             i.as_slice_memory_order().unwrap(),
             [400, -3, 255, i32::MIN, i32::MIN, -128]
+        );
+        assert_eq!(n, 2);
+        // ANTS-06 corrected: clamped, NaN to 0.
+        let f = UpstreamDefects::Fix;
+        let (DynArray::U8(u), _) = cast_output(values.clone(), &[6], OutputType::UChar, f) else {
+            panic!()
+        };
+        assert_eq!(u.as_slice_memory_order().unwrap(), [255, 0, 255, 255, 0, 0]);
+        let (DynArray::I32(i), _) = cast_output(values, &[6], OutputType::Int, f) else {
+            panic!()
+        };
+        assert_eq!(
+            i.as_slice_memory_order().unwrap(),
+            [400, -3, 255, i32::MAX, 0, -128]
         );
     }
 }

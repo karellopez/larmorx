@@ -21,7 +21,11 @@
 //! ANTs' result depends on its thread count (ITK's B-spline fit accumulates per thread);
 //! larmorx computes ITK's single-thread result with any number of threads
 //! (`docs/findings/ants-n4.md`).
+//!
+//! ITK's defects in the filter (ANTS-38, ANTS-39, [`larmorx_image::n4`]) are corrected unless
+//! [`N4Options::upstream_defects`] is [`UpstreamDefects::Reproduce`].
 
+use larmorx_core::defects::{Notice, UpstreamDefects};
 use larmorx_image::bspline::evaluate;
 use larmorx_image::itk_math::almost_equal_f32;
 use larmorx_image::n4::{N4Iteration, N4Parameters, n4_bias_field};
@@ -64,6 +68,8 @@ pub struct N4Options {
     /// `-r`: rescale to the input's intensity range in the mask. ANTs does this only when a
     /// mask is given (and does it by default then); without a mask this has no effect.
     pub rescale_intensities: bool,
+    /// Correct the filter's defects (ANTS-38, ANTS-39; the default) or reproduce them.
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl Default for N4Options {
@@ -78,6 +84,7 @@ impl Default for N4Options {
             wiener_noise: 0.01,
             bins: 200,
             rescale_intensities: false,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -156,6 +163,8 @@ pub struct N4Output {
     pub control_points: Vec<usize>,
     /// The size of the (padded) image N4 ran on before shrinking.
     pub padded_size: Vec<usize>,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
 /// `ImageBase::IsCongruentImageGeometry` with ITK's default tolerances: origin and spacing
@@ -338,6 +347,7 @@ pub fn n4_bias_field_correction(
         bins: options.bins,
         // ITK's source: `r` and the points' coordinates rounded to float on every axis.
         double_axes: 0,
+        upstream_defects: options.upstream_defects,
     };
     let result = n4_bias_field(
         &small_input,
@@ -411,6 +421,7 @@ pub fn n4_bias_field_correction(
         padding,
         control_points,
         padded_size,
+        notices: result.notices,
     })
 }
 

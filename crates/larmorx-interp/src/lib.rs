@@ -38,7 +38,7 @@ mod vnl;
 use std::collections::BTreeMap;
 
 use larmorx_core::math;
-use larmorx_core::{ItkReal, Precision, RealElement};
+use larmorx_core::{IndexFloor, ItkReal, Precision, RealElement};
 use rayon::prelude::*;
 
 /// A 3D scalar image in Fortran order (`x` fastest), read as f64.
@@ -122,6 +122,8 @@ pub struct Interpolator<'a, T> {
     volume: Volume<'a, T>,
     kind: Kind,
     precision: Precision,
+    /// The floor of the windowed sinc's base index (ITK's by default; defect ITK-01).
+    floor: IndexFloor,
 }
 
 enum Kind {
@@ -200,7 +202,20 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             volume,
             kind,
             precision,
+            floor: IndexFloor::itk(),
         })
+    }
+
+    /// The floor the windowed sinc takes of its base index: ITK's (the default here; 0 just
+    /// below 0, defect ITK-01) or the exact one.
+    pub fn with_index_floor(mut self, floor: IndexFloor) -> Self {
+        self.floor = floor;
+        self
+    }
+
+    /// The floor choice, with its counts ([`IndexFloor::checked`]).
+    pub fn index_floor(&self) -> &IndexFloor {
+        &self.floor
     }
 
     /// The coordinate type this interpolator was prepared with.
@@ -211,14 +226,21 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
     /// The value at a continuous index inside the image (see [`is_inside`]).
     #[inline]
     pub fn evaluate(&self, cidx: [f64; 3]) -> f64 {
+        self.evaluate_with_floor(cidx, &self.floor)
+    }
+
+    /// [`Interpolator::evaluate`] with the floor choice `floor` instead of the interpolator's
+    /// own (ITK-01).
+    #[inline]
+    pub fn evaluate_with_floor(&self, cidx: [f64; 3], floor: &IndexFloor) -> f64 {
         match self.precision {
-            Precision::Double => self.evaluate_as::<f64>(cidx),
-            Precision::Float => self.evaluate_as::<f32>(cidx),
+            Precision::Double => self.evaluate_as::<f64>(cidx, floor),
+            Precision::Float => self.evaluate_as::<f32>(cidx, floor),
         }
     }
 
     #[inline]
-    fn evaluate_as<R: ItkReal>(&self, cidx: [f64; 3]) -> f64 {
+    fn evaluate_as<R: ItkReal>(&self, cidx: [f64; 3], floor: &IndexFloor) -> f64 {
         match &self.kind {
             Kind::Linear => linear(&self.volume, cidx),
             Kind::NearestNeighbor => match R::PRECISION {
@@ -232,7 +254,9 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             Kind::Gaussian(p) => gaussian::<T, R>(&self.volume, p, cidx),
             Kind::MultiLabel(p) => multi_label::<T, R>(&self.volume, p, cidx),
             Kind::GenericLabel => generic_label(&self.volume, cidx),
-            Kind::WindowedSinc(w, edge) => windowed_sinc::<T, R>(&self.volume, *w, *edge, cidx),
+            Kind::WindowedSinc(w, edge) => {
+                windowed_sinc::<T, R>(&self.volume, *w, *edge, cidx, floor)
+            }
         }
     }
 }
@@ -670,12 +694,14 @@ fn windowed_sinc<T: RealElement, R: ItkReal>(
     w: Window,
     edge: bool,
     cidx: [f64; 3],
+    floor: &IndexFloor,
 ) -> f64 {
     let taps = (2 * SINC_RADIUS) as usize;
     let mut base = [0i64; 3];
     let mut weights = [[0.0f64; 6]; 3];
     for d in 0..3 {
-        base[d] = R::from_f64(cidx[d]).itk_floor();
+        let c = R::from_f64(cidx[d]);
+        base[d] = floor.pick(c.itk_floor(), c.to_f64());
         let dist = cidx[d] - base[d] as f64;
         if dist == 0.0 {
             for (i, wt) in weights[d].iter_mut().enumerate() {

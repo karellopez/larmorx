@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import float_input, result
 from larmorx.image import Image
 
@@ -62,14 +63,24 @@ def smooth_image(
     return result(data, a)
 
 
-def discrete_gaussian(image: Any, sigma: float | Sequence[float], *, n_threads: int = 1) -> Image:
+def discrete_gaussian(
+    image: Any,
+    sigma: float | Sequence[float],
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``ImageMath d out G in sigma``: ITK's ``DiscreteGaussianImageFilter`` with variance
     ``sigma²`` in physical units (one sigma or one per axis), maximum error 0.01 and kernels
-    of at most 32 voxels on each side."""
+    of at most 32 voxels on each side. Above a variance of about 709 voxels², ITK's kernel
+    overflows and ANTs' image is NaN (ANTS-14); larmorx computes it without the overflow
+    unless ``upstream_defects="reproduce"``."""
+    check(upstream_defects)
     a = float_input(image, n_threads)
-    data = _core.ants_discrete_gaussian(
-        np.asfortranarray(a.data), list(a.spacing), _floats(sigma), n_threads
+    data, notices = _core.ants_discrete_gaussian(
+        np.asfortranarray(a.data), list(a.spacing), _floats(sigma), n_threads, upstream_defects
     )
+    warn(notices)
     return result(data, a)
 
 

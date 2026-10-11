@@ -155,6 +155,19 @@ pub enum NdimageError {
 /// stored in the input's type (`np.pad(..., constant_values=cval)`), read back as a double.
 pub trait Sample: RealElement + Send + Sync {
     fn pad_value(cval: f64) -> f64;
+
+    /// Whether C defines the conversion of `cval` to this type (always for floating types;
+    /// for integer types, when it is not NaN and its truncation is within the type's range).
+    /// Where it is not, numpy's cast gives x86-64's answer, and SCI-02 applies.
+    fn pad_defined(_cval: f64) -> bool {
+        true
+    }
+
+    /// [`Sample::pad_value`] with SCI-02 corrected: an undefined conversion clamps to the
+    /// type's range, NaN to 0.
+    fn pad_value_clamped(cval: f64) -> f64 {
+        Self::pad_value(cval)
+    }
 }
 
 impl Sample for f64 {
@@ -177,6 +190,12 @@ macro_rules! sample_int {
                 // "integer indefinite" value for NaN and out-of-range values).
                 c_cast_i64(cval) as $t as f64
             }
+            fn pad_defined(cval: f64) -> bool {
+                cval > <$t>::MIN as f64 - 1.0 && cval < <$t>::MAX as f64 + 1.0
+            }
+            fn pad_value_clamped(cval: f64) -> f64 {
+                cval as $t as f64
+            }
         }
     )*};
 }
@@ -185,6 +204,18 @@ sample_int!(u8, i8, u16, i16, u32, i32, u64, i64);
 /// Output element types and SciPy's conversion of the interpolated double (`CASE_INTERP_OUT*`).
 pub trait Output: Copy + Send + Sync + Default {
     fn from_interp(t: f64) -> Self;
+
+    /// Whether SciPy's conversion of `t` reaches an undefined cast: NaN into a signed integer
+    /// output (SCI-02). x86-64 gives `i32::MIN` there (0 once narrowed to 8 or 16 bits),
+    /// `i64::MIN` for int64.
+    fn interp_undefined(_t: f64) -> bool {
+        false
+    }
+
+    /// [`Output::from_interp`] with SCI-02 corrected: NaN is 0.
+    fn from_interp_clamped(t: f64) -> Self {
+        Self::from_interp(t)
+    }
 }
 
 impl Output for f64 {
@@ -222,6 +253,12 @@ macro_rules! output_int {
                 if t < <$t>::MIN as f64 { t = <$t>::MIN as f64; }
                 // Only NaN reaches the cast out of range.
                 $cast(t) as $t
+            }
+            fn interp_undefined(t: f64) -> bool {
+                t.is_nan()
+            }
+            fn from_interp_clamped(t: f64) -> Self {
+                if t.is_nan() { 0 } else { Self::from_interp(t) }
             }
         }
     )*};
@@ -570,6 +607,17 @@ pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
     const CHUNK: usize = 4096;
     // 3D inputs take the batched path (the same values, faster).
     let spline3 = (&spline as &dyn std::any::Any).downcast_ref::<Spline<3>>();
+    // SCI-02: NaN into a signed integer output is an undefined cast in SciPy.
+    let undefined = std::sync::atomic::AtomicUsize::new(0);
+    let convert = |t: f64| -> O {
+        if O::interp_undefined(t) {
+            undefined.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if defects.fix() {
+                return O::from_interp_clamped(t);
+            }
+        }
+        O::from_interp(t)
+    };
     output
         .par_chunks_mut(CHUNK)
         .zip(coordinates.par_chunks(CHUNK))
@@ -580,16 +628,31 @@ pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
                 let mut t = vec![0.0f64; pts3.len()];
                 s3.sample_batch(&pts3, &mut t);
                 for (o, t) in out.iter_mut().zip(t) {
-                    *o = O::from_interp(t);
+                    *o = convert(t);
                 }
             }
             None => {
                 for (o, p) in out.iter_mut().zip(pts) {
-                    *o = O::from_interp(spline.sample(*p));
+                    *o = convert(spline.sample(*p));
                 }
             }
         });
-    Ok(spline.notices())
+    let mut notices = spline.notices();
+    let n = undefined.into_inner();
+    if n > 0 {
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "{n} NaN value(s) written to the integer output are 0; SciPy's cast is undefined \
+                 (x86-64 gives the integer type's minimum, or 0 once narrowed)"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "{n} NaN value(s) written to the integer output are converted as SciPy on x86-64 \
+                 converts them"
+            ),
+        };
+        notices.push(Notice::new(&defects::SCI_02, defects, detail));
+    }
+    Ok(notices)
 }
 
 #[cfg(test)]

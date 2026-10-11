@@ -30,6 +30,7 @@ use std::path::PathBuf;
 
 use larmorx_ants::image::{FileStore, ImageStore, OutputImage, ReadError};
 use larmorx_core::Grid3;
+use larmorx_core::defects::Notices;
 use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry, ItkImage, ItkMeta, ItkVoxels};
 use numpy::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use numpy::{PyArray, PyArrayDyn, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -78,10 +79,15 @@ struct MemoryStore {
 }
 
 impl ImageStore for MemoryStore {
-    fn load(&mut self, name: &str, n_threads: usize) -> Result<ItkImage, ReadError> {
+    fn load(
+        &mut self,
+        name: &str,
+        n_threads: usize,
+        notices: &mut Notices,
+    ) -> Result<ItkImage, ReadError> {
         match self.inputs.get(name) {
             Some(image) => Ok(image.clone()),
-            None => FileStore.load(name, n_threads),
+            None => FileStore.load(name, n_threads, notices),
         }
     }
 
@@ -221,9 +227,11 @@ pub(crate) fn output_to_py<'py>(
 /// maps placeholder names to `(data, ras_affine, descrip)` or
 /// `(data, ras_affine, descrip, extra_spacing)` (the spacing of the axes after the third,
 /// such as the repetition time); writes to the names in `outputs` are returned instead of
-/// written. Returns `(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})`.
+/// written. Returns `(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})`. The
+/// program runs in the D13 mode `upstream_defects` (`"fix"` or `"reproduce"`); its notices
+/// are lines of `stderr` (`larmorx._defects.parse_line`).
 #[pyfunction]
-#[pyo3(signature = (program, args, inputs, outputs, n_threads = 1))]
+#[pyo3(signature = (program, args, inputs, outputs, n_threads = 1, upstream_defects = "fix"))]
 fn ants_program<'py>(
     py: Python<'py>,
     program: &str,
@@ -231,7 +239,9 @@ fn ants_program<'py>(
     inputs: &Bound<'py, PyDict>,
     outputs: Vec<String>,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
     let mut store = MemoryStore {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
@@ -245,6 +255,7 @@ fn ants_program<'py>(
         &[String],
         &mut dyn ImageStore,
         usize,
+        larmorx_core::UpstreamDefects,
         &mut dyn std::io::Write,
         &mut dyn std::io::Write,
     ) -> u8;
@@ -264,7 +275,7 @@ fn ants_program<'py>(
         }
     };
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = py.detach(|| run(&args, &mut store, n_threads, &mut out, &mut err));
+    let code = py.detach(|| run(&args, &mut store, n_threads, mode, &mut out, &mut err));
     let produced = PyDict::new(py);
     for (name, image) in store.outputs {
         produced.set_item(name, output_to_py(py, image)?)?;
@@ -303,7 +314,15 @@ fn ants_read_float<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let name = path.to_string_lossy().into_owned();
     let image = py
-        .detach(|| larmorx_ants::image::read_with::<f32, _>(&mut FileStore, &name, dim, n_threads))
+        .detach(|| {
+            larmorx_ants::image::read_with::<f32, _>(
+                &mut FileStore,
+                &name,
+                dim,
+                n_threads,
+                &mut Notices::default(),
+            )
+        })
         .map_err(|e| match e {
             ReadError::Missing(n) => {
                 pyo3::exceptions::PyFileNotFoundError::new_err(format!("{n}: no such file"))

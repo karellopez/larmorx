@@ -7,7 +7,7 @@
 //! `itkVectorLinearInterpolateImageFunction.hxx`.
 
 use larmorx_core::linalg::Mat3;
-use larmorx_core::{Grid3, ItkReal};
+use larmorx_core::{Grid3, IndexFloor, ItkReal};
 
 use crate::TransformError;
 
@@ -112,9 +112,9 @@ impl DisplacementField {
     /// product in `R` (the field's components are `R`), summed in double; the 8 neighbours in
     /// a fixed order, indices clamped to the grid, stopping once the overlaps sum to 1.
     #[inline]
-    fn displacement<R: ItkReal>(&self, cidx: [R; 3]) -> [f64; 3] {
+    fn displacement<R: ItkReal>(&self, cidx: [R; 3], floor: &IndexFloor) -> [f64; 3] {
         let size = self.grid.size;
-        let base: [i64; 3] = cidx.map(R::itk_floor);
+        let base: [i64; 3] = cidx.map(|c| floor.pick(c.itk_floor(), c.to_f64()));
         let distance: [R; 3] = std::array::from_fn(|d| cidx[d] - R::from_f64(base[d] as f64));
         let end = size.map(|n| n as i64 - 1);
         let mut out = [0.0f64; 3];
@@ -158,6 +158,13 @@ impl DisplacementField {
     /// each coordinate is `x + d` computed in double and stored as `R`.
     #[inline]
     pub fn transform_point_as<R: ItkReal>(&self, p: [R; 3]) -> [R; 3] {
+        self.transform_point_with(p, &IndexFloor::itk())
+    }
+
+    /// [`DisplacementField::transform_point_as`] with the floor of the base index chosen by
+    /// `floor` (ITK's is 0 just below 0, defect ITK-01).
+    #[inline]
+    pub fn transform_point_with<R: ItkReal>(&self, p: [R; 3], floor: &IndexFloor) -> [R; 3] {
         let cidx: [R; 3] = self
             .grid
             .point_to_index(p.map(|x| x.to_f64()))
@@ -165,7 +172,7 @@ impl DisplacementField {
         if !self.grid.is_inside(cidx.map(|c| c.to_f64())) {
             return p;
         }
-        let d = self.displacement(cidx);
+        let d = self.displacement(cidx, floor);
         std::array::from_fn(|i| R::from_f64(p[i].to_f64() + d[i]))
     }
 }

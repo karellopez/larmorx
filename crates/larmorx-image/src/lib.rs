@@ -37,6 +37,7 @@ pub mod itk_math;
 mod lines;
 pub mod median;
 pub mod morphology;
+pub mod n4;
 pub mod shrink;
 pub mod statistics;
 pub mod threshold;

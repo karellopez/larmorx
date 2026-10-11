@@ -13,6 +13,10 @@
 //!   digits).
 //! - [`convert_vector_f32`], [`convert_vector_f64`]: ANTs' `ConvertVector` (`1.5x1x2`).
 //! - [`stof`]: `std::stof`, which throws when there is no number.
+//! - [`parser_convert_f32`], [`parser_convert_i32`], [`parser_convert_u32`],
+//!   [`parser_convert_bool`], [`parser_convert_vector_u32`], [`parser_convert_vector_f32`]:
+//!   the strict `Convert<T>` and `ConvertVector<T>` of ANTs' command-line parser, which throw
+//!   (and so abort the program) unless the whole text is read.
 
 pub use super::parser::atof;
 
@@ -290,6 +294,112 @@ fn strtod_whole(text: &str) -> f64 {
         Some(Ok(v)) => v,
         _ => 0.0,
     }
+}
+
+/// The text `CommandLineParser::Convert` reads: trailing `" \n\r\t"` removed.
+fn strip_end(s: &str) -> &str {
+    s.trim_end_matches([' ', '\n', '\r', '\t'])
+}
+
+/// libstdc++'s integer extraction (`num_get::_M_extract_int`, decimal): leading whitespace,
+/// an optional sign, digits. Returns `(negative, magnitude, characters read)`, or `None`
+/// without digits or when the magnitude exceeds `limit`.
+fn extract_int(s: &str, limit: u64) -> Option<(bool, u64, usize)> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() && matches!(b[i], b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r') {
+        i += 1;
+    }
+    let negative = b.get(i) == Some(&b'-');
+    if matches!(b.get(i), Some(b'+' | b'-')) {
+        i += 1;
+    }
+    let from = i;
+    let mut value: u64 = 0;
+    while let Some(d) = b.get(i).filter(|c| c.is_ascii_digit()) {
+        value = value.checked_mul(10)?.checked_add(u64::from(d - b'0'))?;
+        if value > limit {
+            return None;
+        }
+        i += 1;
+    }
+    (i > from).then_some((negative, value, i))
+}
+
+/// ANTs' `CommandLineParser::Convert<int>` (`Utilities/antsCommandLineParser.h:120-138`):
+/// `istringstream >> int` must succeed and read every character (after trailing whitespace
+/// is removed); otherwise ITK throws and ANTs aborts (`None`).
+pub fn parser_convert_i32(s: &str) -> Option<i32> {
+    let s = strip_end(s);
+    let (negative, magnitude, read) = extract_int(s, 1 << 31)?;
+    if read != s.len() || (!negative && magnitude > i32::MAX as u64) {
+        return None;
+    }
+    let v = magnitude as i64;
+    Some((if negative { -v } else { v }) as i32)
+}
+
+/// `Convert<unsigned int>`: as [`parser_convert_i32`]; a minus sign negates modulo 2³²
+/// (libstdc++), so `-1` reads as 4294967295.
+pub fn parser_convert_u32(s: &str) -> Option<u32> {
+    let s = strip_end(s);
+    let (negative, magnitude, read) = extract_int(s, u64::from(u32::MAX))?;
+    if read != s.len() {
+        return None;
+    }
+    let v = magnitude as u32;
+    Some(if negative { v.wrapping_neg() } else { v })
+}
+
+/// `Convert<bool>`: an integer, 0 or 1 (`noboolalpha`); anything else throws.
+pub fn parser_convert_bool(s: &str) -> Option<bool> {
+    match parser_convert_i32(s)? {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+/// `Convert<float>`: `istringstream >> float` must read every character and give a finite
+/// number (an overflow sets `failbit`, so ANTs throws).
+pub fn parser_convert_f32(s: &str) -> Option<f32> {
+    let s = strip_end(s);
+    let (at_end, text) = stream_text(s)?;
+    if !at_end {
+        return None;
+    }
+    let v: f32 = normalized_number(&text)?.parse().ok()?;
+    v.is_finite().then_some(v)
+}
+
+/// The pieces `ConvertVector` reads: `std::getline(stream, piece, 'x')` on the text with its
+/// trailing whitespace removed (no piece after a final `x`; none at all for an empty text).
+fn getline_pieces(s: &str) -> Vec<&str> {
+    let s = strip_end(s);
+    if s.is_empty() {
+        return Vec::new();
+    }
+    let mut pieces: Vec<&str> = s.split('x').collect();
+    if s.ends_with('x') {
+        pieces.pop();
+    }
+    pieces
+}
+
+/// `ConvertVector<unsigned int>`: `Convert<unsigned int>` of each piece; `None` if any throws.
+pub fn parser_convert_vector_u32(s: &str) -> Option<Vec<u32>> {
+    getline_pieces(s)
+        .into_iter()
+        .map(parser_convert_u32)
+        .collect()
+}
+
+/// `ConvertVector<float>`: `Convert<float>` of each piece; `None` if any throws.
+pub fn parser_convert_vector_f32(s: &str) -> Option<Vec<f32>> {
+    getline_pieces(s)
+        .into_iter()
+        .map(parser_convert_f32)
+        .collect()
 }
 
 /// `std::ostream << value` with the default format: `%g` with 6 significant digits, as glibc

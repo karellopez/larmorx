@@ -1,0 +1,47 @@
+larmorx-gpl
+Copyright 2026 Karel Lopez Vilaret
+
+larmorx-gpl holds bit-exact replicas of GPL-licensed neuroimaging tools: Rust translations of
+their source code. It is free software, licensed under the GNU General Public License,
+version 3 or (at your option) any later version (see LICENSE). It comes with ABSOLUTELY NO
+WARRANTY. Its source code is published at https://github.com/karellopez/larmorx (directory
+crates-gpl/). Each translated file names its licence in an SPDX header and its origin in a
+comment; each crate's PROVENANCE.md lists the upstream files it was translated from and the
+changes made.
+
+The program is a separate work from larmorx (Apache-2.0), which runs it as a separate process
+when it is installed. It does not present itself as AFNI or as any other upstream tool.
+
+
+Translated works
+================
+
+AFNI 25.2.09 (tag AFNI_25.2.09) - GNU General Public License, version 2 or any later version
+  Translated: the 3dTshift program and the routines it uses (crate larmorx-gpl-afni).
+  Major portions of AFNI are copyrighted by the Medical College of Wisconsin, 1994-2000
+  (Robert W. Cox et al.), and are released under the GNU General Public License, Version 2.
+  AFNI's doc/README/README.copyright: "The MCW-copyrighted part of this software is released
+  to the public under the GNU General Public License, Version 2 (or any later edition)."
+  The translated AFNI files written at the NIH are a "United States Government Work" in the
+  public domain (AFNI's LICENSE.txt); the NIfTI library states "This code is released to the
+  public domain."
+  The translation is modified from the originals; larmorx-gpl-afni/PROVENANCE.md lists the
+  changes.
+
+The GNU C Library 2.35 (sinf, cosf) - GNU Lesser General Public License, version 2.1 or any
+later version
+  Copyright (C) 2018-2022 Free Software Foundation, Inc.
+  Translated in larmorx-gpl-afni/src/glibc_sincosf.rs, modified from the original. Section 3
+  of the LGPL-2.1 permits applying the GNU GPL (version 2 or later) instead; this translation
+  is distributed as part of larmorx-gpl under the GNU GPL version 3 or later. The text of the
+  LGPL-2.1 is in LICENSES/LGPL-2.1.txt.
+
+
+Apache-2.0 code included
+========================
+
+The program includes crates of larmorx (larmorx-core, larmorx-io, larmorx-interp,
+larmorx-transform), Copyright 2026 Karel Lopez Vilaret, licensed under the Apache License,
+Version 2.0 (LICENSES/Apache-2.0.txt). Their NOTICE, with the notices of the works they were
+translated from (CORE-MATH, VXL, SciPy, OpenBLAS, nibabel, ...), is LICENSES/NOTICE-larmorx.txt.
+Apache-2.0 code may be included in a work licensed under the GNU GPL version 3.

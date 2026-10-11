@@ -43,6 +43,21 @@ command-line binary. Code from different families is never linked into one binar
 - **`larmorx-gpl` and `larmorx-nc` are separate,** and neither may link the other. The FSL
   Licence's non-commercial and "impose these conditions" clauses are incompatible with the
   GPL, which forbids added restrictions.
+- **A replica package is a program, not a Python module** (decided 2026-10-11). `larmorx-gpl`
+  is a binary-only wheel (maturin's `bin` bindings, `crates-gpl/pyproject.toml`): it installs
+  the `larmorx-gpl` program into the environment's scripts directory and nothing that Python
+  can import. Its licence metadata is `GPL-3.0-or-later`; the wheel carries the GPL
+  (`crates-gpl/LICENSE`), the AFNI and glibc notices (`crates-gpl/NOTICE`), the LGPL-2.1 of the
+  glibc translation, and the Apache-2.0 text and `NOTICE` of the larmorx crates the program
+  includes (`crates-gpl/LICENSES/`; copies of the repository's files, kept identical by
+  `crates-gpl/larmorx-gpl-cli/tests/notices.rs`, because maturin takes licence files only from
+  below `crates-gpl/`). `larmorx-nc` will be packaged the same way.
+- **Nothing is on PyPI yet.** Build the wheels locally:
+  ```bash
+  maturin build --release --locked --out dist                    # larmorx (repository root)
+  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl
+  pip install --find-links dist "larmorx[exact]"
+  ```
 - **In the repository** (all in this one repository; for FSL decided 2026-10-10):
   - `crates/` holds the Apache crates;
   - `crates-gpl/`, `crates-nc/` and `crates-freesurfer/` hold the others, each directory
@@ -80,14 +95,42 @@ command-line binary. Code from different families is never linked into one binar
 
 ## Choosing at run time
 
-- **Python:** `lx.<family>.<tool>(..., implementation="auto")`. `"auto"` uses the replica
-  when its package is installed and the original otherwise; `"replica"` and `"original"`
-  force one. The returned image (and the CLI's verbose output) records which one ran.
-  Installing the replicas is explicit: `pip install larmorx[exact]` adds `larmorx-gpl`;
+**The licences stay separate through process boundaries** (decided 2026-10-11). The Apache
+package `larmorx` never imports, loads or links replica code, in Rust or in Python. It runs
+the replica package's program as a separate process, with the tool's original arguments, and
+the two exchange NIfTI files. Loading a GPL extension module into the Python process would make
+one combined work of the two, under the GPL, so it is not done. larmorx knows the replica's
+program name and arguments, nothing more.
+
+- **Python:** `lx.<family>.<tool>(..., implementation="auto")` (built for `lx.afni.tshift`).
+  - `"auto"` (the default) runs the replica when its program is found, and the original
+    otherwise; `"replica"` and `"original"` force one.
+  - `"replica"` without the program raises `lx.ReplicaNotFoundError`, which names the
+    install command.
+  - A replica that is found but fails raises `lx.ReplicaError`. larmorx never falls back to
+    the original then: the two differ in the last bits, so a silent fallback would change
+    results without notice.
+  - The wrapper writes in-memory inputs to a temporary directory, runs the program there and
+    reads its output back. Thread counts reach it as `OMP_NUM_THREADS`.
+  - The result records what ran: `Image.implementation` (`lx.Implementation`: `"original"` or
+    `"replica"`, the package, its version, the program's path).
+  - There is no global setting; each call looks for the program again.
+- **Command line:** `larmorx <family> <tool>` runs the replica's program, with the same
+  arguments, when it is found, and the original otherwise.
+  - `LARMORX_IMPLEMENTATION=auto|replica|original` overrides (default `auto`), so no option
+    clashes with the tool's own arguments.
+  - The replica's output and exit code pass through unchanged. larmorx's own exit codes:
+    127 when `replica` is asked for and the program is missing, 126 when it cannot be
+    started, 2 for an invalid `LARMORX_IMPLEMENTATION` or `LARMORX_GPL_BIN`.
+  - With `-verbose`, each implementation's first line names it, with its package and version.
+- **Finding the program** (the same rules for both, `larmorx_cli::replica`):
+  1. the package's environment variable, `LARMORX_GPL_BIN` (an error if it names no file);
+  2. the current Python environment's scripts directory (`sysconfig`), where `pip` puts the
+     program, so a venv works without being activated; for the standalone `larmorx` binary,
+     the directory of that binary;
+  3. `PATH`.
+- **Installing the replicas is explicit:** `pip install "larmorx[exact]"` adds `larmorx-gpl`;
   `larmorx-nc` must be installed by name, so its licence is accepted knowingly.
-- **Command line:** `larmorx <family> <tool>` runs the original. When the replica package's
-  binary is on `PATH` (`larmorx-gpl`, `larmorx-nc`), the dispatcher runs that binary in a
-  separate process. Separate processes keep the licences separate.
 - **larmorprepx** (Apache-2.0) uses `implementation="auto"`, so it gives the most accurate
   results whenever the replicas are installed. Its reports say which tools ran which
   implementation.
@@ -128,3 +171,15 @@ Each tool's validation record reports both.
    but AFNI's MCW files and Workbench share a licence. One wheel per licence family is
    simpler. Rejected for now.
 6. **Both tracks, one package per licence family** (this page). Chosen.
+
+How `larmorx` reaches a replica (2026-10-11):
+
+1. **A Python extension module in the replica package** (`larmorx_gpl._core`), imported by
+   `lx.afni.tshift`. Fastest (no files, no process), but importing GPL code into the process
+   makes one combined work, so `larmorx` and every program built on it would fall under the
+   GPL whenever the replica is installed. Rejected.
+2. **The replica's program, run as a separate process, files in a temporary directory**
+   (this page). Costs a process start and a NIfTI write and read per call: on two real BOLD
+   runs, `lx.afni.tshift` with the replica took at most 15 ms longer than the program run by
+   hand (`docs/api/afni-tshift.md`, "Choosing the implementation"). Chosen, for the command
+   line and Python alike.

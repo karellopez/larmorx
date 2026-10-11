@@ -614,8 +614,9 @@ def case(case_id: str, covers: tuple[str, ...] | list[str] = ()) -> Callable:
 
 
 def cli(*argv: str) -> str:
-    """Run ``larmorx <argv...>`` in process (``larmorx.cli``); its standard output."""
-    code, out, err = _core.cli_main(["larmorx", *argv])
+    """Run ``larmorx <argv...>`` in process (``larmorx.cli``); its standard output. Tools with a
+    replica run the original (the replica has its own golden cases, in ``crates-gpl``)."""
+    code, out, err = _core.cli_main(["larmorx", *argv], [], "original")
     if code != 0:
         raise RuntimeError(f"larmorx {' '.join(argv)} exited with {code}:\n{err}{out}")
     return out
@@ -1167,12 +1168,19 @@ def _(ctx: Context) -> dict[str, Any]:
 SLICE_TIMES = (0.0, 1.2, 0.4, 1.6, 0.8)
 
 
+#: ``lx.afni.tshift`` cases run the clean-room original, whatever is installed (the replica's
+#: golden cases are in ``crates-gpl/larmorx-gpl-cli/tests/golden.rs``).
+ORIGINAL = "original"
+
+
 @case("py.afni.tshift", covers=("lx.afni.tshift",))
 def _(ctx: Context) -> dict[str, Any]:
     """Every interpolation method on float32 data in memory."""
     out: dict[str, Any] = {}
     for method in lx.afni.METHODS:
-        img = lx.afni.tshift(series(), slice_times=SLICE_TIMES, method=method)
+        img = lx.afni.tshift(
+            series(), slice_times=SLICE_TIMES, method=method, implementation=ORIGINAL
+        )
         out[method] = img.data
     out["header"] = img.header.to_bytes()
     return out
@@ -1185,14 +1193,19 @@ def _(ctx: Context) -> dict[str, Any]:
     u8 = series().with_data(np.asfortranarray((_series_values() // 8 - 80).astype(np.uint8)))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        no_detrend = lx.afni.tshift(u8, slice_times="seq-z", slice=1, detrend=False, method="cubic")
+        no_detrend = lx.afni.tshift(u8, slice_times="seq-z", slice=1, detrend=False, method="cubic", implementation=ORIGINAL)  # fmt: skip
     file_img = lx.afni.tshift(
-        ctx.file("series.nii"), slice_times="alt-z", ignore=2, restore="intercept", method="quintic"
+        ctx.file("series.nii"),
+        slice_times="alt-z",
+        ignore=2,
+        restore="intercept",
+        method="quintic",
+        implementation=ORIGINAL,
     )
     return {
         **image_outputs("file", file_img, header=True),
         "uint8_no_detrend": no_detrend.data,
-        "restore_none": lx.afni.tshift(series(), slice_times=SLICE_TIMES, tzero=0.3, restore="none", method="wsinc5", tr=2.5).data,
+        "restore_none": lx.afni.tshift(series(), slice_times=SLICE_TIMES, tzero=0.3, restore="none", method="wsinc5", tr=2.5, implementation=ORIGINAL).data,
     }  # fmt: skip
 
 

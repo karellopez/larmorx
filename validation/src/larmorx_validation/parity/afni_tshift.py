@@ -3,13 +3,20 @@
 
 Both programs get the same arguments and files. AFNI runs as its own binary (built by
 ``scripts/build_afni_oracle.sh``; set ``LARMORX_AFNI_BIN`` to use another); larmorx runs
-in-process through its Python console entry point. The outputs are read with nibabel, a
+in-process through its Python console entry point, with the implementation forced
+(``larmorx.cli.run(..., implementation="original")``). The outputs are read with nibabel, a
 reader independent of both, and compared value by value and field by field.
 
 ``suite("replica")`` runs the same cases against the GPL-3.0-or-later replica
-(``larmorx-gpl afni 3dTshift``, ``crates-gpl/``) instead. This package is Apache-2.0, so it
-runs the replica only as a separate process (``LARMORX_GPL_BIN``, else the ``crates-gpl``
-build, else ``larmorx-gpl`` on the PATH).
+(``larmorx-gpl afni 3dTshift``, ``crates-gpl/``) instead, the way users reach it: through
+larmorx's own dispatch (``implementation="replica"``), which runs the replica's program as a
+separate process. This package is Apache-2.0 and never loads the replica. The program under
+test is ``LARMORX_GPL_BIN``, else the ``crates-gpl`` build, else ``larmorx-gpl`` on the PATH.
+
+Every case the Python API can express (a ``-tpattern`` name, fMRIPrep's slice timing, the
+options in seconds) also runs through ``lx.afni.tshift(..., implementation=...)``, from the file
+and, for unscaled uint8, int16 and float32 inputs, from memory; the results must be the
+command line's output, bit for bit.
 
 Cases cover (``specs/3dTshift.md`` §9):
 - every file of ``larmorx-testdata`` ``synthetic/tshift/`` (every FFT length class and every
@@ -33,6 +40,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -545,13 +553,33 @@ def _run_afni(args: list[str]) -> tuple[int, str]:
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
-def _run_larmorx(args: list[str]) -> tuple[int, str]:
+def _run_larmorx(args: list[str], implementation: str = "original") -> tuple[int, str]:
+    """``larmorx afni 3dTshift`` in process, with the implementation forced: the original, or
+    the replica's program, which larmorx runs as a separate process."""
     from larmorx.cli import run
 
     err = io.StringIO()
     with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
-        code = run(["larmorx", "afni", "3dTshift", *args])
+        code = run(["larmorx", "afni", "3dTshift", *args], implementation=implementation)
     return code, err.getvalue().strip()
+
+
+@contextlib.contextmanager
+def _replica_program(implementation: str):
+    """For the replica, larmorx's dispatch finds the program under test through
+    ``LARMORX_GPL_BIN`` (:func:`replica_binary`)."""
+    if implementation != "replica":
+        yield
+        return
+    previous = os.environ.get("LARMORX_GPL_BIN")
+    os.environ["LARMORX_GPL_BIN"] = str(replica_binary())
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("LARMORX_GPL_BIN", None)
+        else:
+            os.environ["LARMORX_GPL_BIN"] = previous
 
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
@@ -576,13 +604,13 @@ def replica_binary() -> str | None:
     return shutil.which("larmorx-gpl")
 
 
-def _run_replica(args: list[str]) -> tuple[int, str]:
+@functools.cache
+def replica_version() -> str:
     binary = replica_binary()
-    assert binary is not None
-    p = subprocess.run(
-        [binary, "afni", "3dTshift", *args], capture_output=True, text=True, encoding="utf-8"
-    )
-    return p.returncode, (p.stdout + p.stderr).strip()
+    if binary is None:
+        return "not found"
+    out = subprocess.run([binary, "--version"], capture_output=True, text=True, encoding="utf-8")
+    return out.stdout.strip() or "unknown version"
 
 
 def _last_error(log: str, tmp: Path) -> str:
@@ -739,8 +767,114 @@ def _produced(code: int, target: Path, occupied: bool) -> bool:
     return target.exists() or Path(f"{target}+orig.HEAD").exists()
 
 
+# ------------------------------------------------------------------------------------------------
+# The Python API
+
+#: The checks that compare the Python API with the command line.
+PY_FILE = "Python API: the command line's output"
+PY_MEMORY = "Python API, image in memory: the same values"
+
+
+def _python_method(arg: str) -> str | None:
+    """``lx.afni.tshift``'s method for a method option (as 3dTshift matches them), or ``None``."""
+    if arg[:4] in _METHOD_NAMES:
+        return _METHOD_NAMES[arg[:4]].lower()
+    if arg[:7].lower() in ("-wsinc5", "-wsinc9"):
+        return arg[1:7].lower()
+    return None
+
+
+def _python_call(s: Scenario, args: list[str]) -> dict | None:
+    """``lx.afni.tshift``'s keyword arguments for a command line, or ``None`` when the Python
+    API has no equivalent: the header's slice timing (no ``-tpattern``), AFNI 1D files and
+    strings other than fMRIPrep's, ``-TR`` in milliseconds, options it does not have."""
+    kw: dict = {}
+    if s.sidecar:  # fMRIPrep's call: the BIDS SliceTiming, as _fmriprep_args writes it
+        meta = json.loads(td.get(s.sidecar).read_text(encoding="utf-8"))
+        times = [float(t) for t in meta["SliceTiming"]]
+        if str(meta.get("SliceEncodingDirection", "")).endswith("-"):
+            times = times[::-1]
+        kw["slice_times"] = times
+    i = 0
+    while i < len(args):
+        a = args[i]
+        value = args[i + 1] if i + 1 < len(args) else ""
+        step = 2
+        if a == "-tpattern":
+            if not value.startswith("@"):
+                kw["slice_times"] = value
+            elif not s.sidecar:
+                return None
+        elif a == "-TR":
+            m = re.fullmatch(r"([0-9.]+)s?", value)
+            if m is None:
+                return None
+            kw["tr"] = float(m.group(1))
+        elif a in ("-tzero", "-slice", "-ignore"):
+            kw[a[1:]] = float(value) if a == "-tzero" else int(value)
+        else:
+            step = 1
+            if a in ("-rlt", "-rlt+"):
+                kw["restore"] = "none" if a == "-rlt" else "intercept"
+            elif a == "-no_detrend":
+                kw["detrend"] = False
+            elif (method := _python_method(a)) is not None:
+                kw["method"] = method
+            elif not a.startswith("-verb"):
+                return None
+        i += step
+    return kw if "slice_times" in kw else None
+
+
+def _differing(a: np.ndarray, b: np.ndarray) -> int:
+    """How many values differ (all of them if the types or shapes do)."""
+    if a.dtype != b.dtype or a.shape != b.shape:
+        return max(a.size, b.size)
+    return int(np.count_nonzero(a != b))
+
+
+def _check_python(
+    checks: CheckList, s: Scenario, args: list[str], image: Path, cli_out: Path, implementation: str
+) -> None:
+    """``lx.afni.tshift(..., implementation=...)`` gives the command line's output, from the
+    file and from memory."""
+    import larmorx as lx
+
+    kw = _python_call(s, args)
+    if kw is None:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        from_file = lx.afni.tshift(str(image), implementation=implementation, **kw)
+    expected = lx.load(cli_out)
+    header = lx.io.read_header(cli_out)
+    differing = _differing(from_file.data, expected.data)
+    same_header = (
+        from_file.header.replace(vox_offset=header.vox_offset).to_bytes() == header.to_bytes()
+    )
+    ran = from_file.implementation.kind if from_file.implementation else "unknown"
+    checks(
+        PY_FILE,
+        differing == 0 and same_header and ran == implementation,
+        metric="differing values",
+        value=differing,
+        threshold=0,
+        detail=f"ran the {ran}; header {'identical' if same_header else 'differs'}",
+    )
+    # In memory: only data 3dTshift reads as they are (uint8, int16, float32, unscaled).
+    loaded = lx.load(image)
+    unscaled = lx.io.read_header(image).slope_inter in (None, (1.0, 0.0))
+    if loaded.data.dtype in (np.uint8, np.int16, np.float32) and unscaled:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            in_memory = lx.afni.tshift(loaded, implementation=implementation, **kw)
+        d = _differing(in_memory.data, from_file.data)
+        checks(PY_MEMORY, d == 0, metric="differing values", value=d, threshold=0)
+
+
 #: The implementations a run can compare with AFNI (docs/licensing.md): the clean-room
-#: original (larmorx-afni, in-process) or the GPL replica (the larmorx-gpl binary).
+#: original (larmorx-afni, in-process) or the GPL replica (the larmorx-gpl program, which
+#: larmorx runs as a separate process).
 IMPLEMENTATIONS = ("original", "replica")
 
 
@@ -752,8 +886,11 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
         raise Outcome(
             "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
         )
-    ours = _run_replica if implementation == "replica" else _run_larmorx
-    with tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name:
+    ours = functools.partial(_run_larmorx, implementation=implementation)
+    with (
+        _replica_program(implementation),
+        tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name,
+    ):
         tmp = Path(tmp_name)
         for name, text in s.files:
             (tmp / name).write_text(text, encoding="utf-8")
@@ -801,6 +938,8 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
                 )
             )
             _compare(checks, outputs["afni"], outputs["larmorx"])
+            if s.expect == "pass" and not copy:
+                _check_python(checks, s, args, image, outputs["larmorx"], implementation)
 
 
 def _differing_fraction(r: CaseResult) -> float:
@@ -872,6 +1011,18 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
             "- The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own "
             "record: [afni-tshift-replica.md](afni-tshift-replica.md)."
         )
+
+    def python(name: str) -> tuple[int, int]:
+        rs = [c for r in compared for c in r.checks if c.name == name]
+        return sum(c.passed for c in rs), len(rs)
+
+    (file_ok, file_n), (memory_ok, memory_n) = python(PY_FILE), python(PY_MEMORY)
+    lines.append(
+        f'- Python API (`lx.afni.tshift(..., implementation="{implementation}")`): run on the '
+        f"{file_n} passing cases it can express; {file_ok} give the command line's output bit "
+        f"for bit (data and header). From an image in memory: {memory_ok} of {memory_n} give "
+        "the same values."
+    )
     rows = []
     for category in sorted({r.category for r in compared}):
         rs = [r for r in compared if r.category == category]
@@ -905,16 +1056,19 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
 
 def suite(implementation: str = "original") -> Suite:
     """The 3dTshift suite for the clean-room original (``larmorx afni 3dTshift``, in-process)
-    or the GPL replica (``larmorx-gpl afni 3dTshift``, run as a separate process)."""
+    or the GPL replica (``larmorx-gpl afni 3dTshift``, which larmorx runs as a separate
+    process); both through larmorx's command line and its Python API."""
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
     replica = implementation == "replica"
     tool = (
-        "`larmorx-gpl afni 3dTshift` (crate larmorx-gpl-afni, the GPL-3.0-or-later replica "
-        "translated from AFNI 25.2.09's source), run as a separate process"
+        f"`larmorx-gpl afni 3dTshift` ({replica_version()}; crate larmorx-gpl-afni, the "
+        "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
+        "separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and "
+        '`lx.afni.tshift(..., implementation="replica")`'
         if replica
         else "`larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from "
-        "`specs/3dTshift.md`)"
+        '`specs/3dTshift.md`), with `implementation="original"`'
     )
     who = "larmorx-gpl" if replica else "larmorx"
     return Suite(
@@ -947,6 +1101,12 @@ def suite(implementation: str = "original") -> Suite:
             "`-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from "
             "the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, "
             f"`slice_duration`, `dim_info` and the time unit. {who} uses all logical CPUs "
-            "(`OMP_NUM_THREADS` unset); its results do not depend on the thread count."
+            "(`OMP_NUM_THREADS` unset) on the command line and 1 thread through the Python API "
+            "(its default); its results do not depend on the thread count. The Python API runs "
+            "every passing case it can express (a `-tpattern` name or fMRIPrep's slice timing, "
+            "options in seconds; not the header's timing, AFNI 1D files or copies of the input) "
+            "and must give the command line's output: the same values and the same header bytes "
+            "(`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs "
+            "on the image loaded in memory."
         ),
     )

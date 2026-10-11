@@ -29,8 +29,9 @@ GPL-3.0-or-later) is a translation of AFNI's own source, with AFNI's float32 FFT
 glibc's `sinf`/`cosf`. It takes the same arguments as `larmorx afni 3dTshift`, follows the
 same conventions (NIfTI output only, an existing output is an error), and gives AFNI's output
 bytes on every compared parity case ([replica record](../validation/afni-tshift-replica.md)).
-It is a separate program because of its licence ([licensing](../licensing.md)); choosing it
-from Python (`implementation="replica"`) is planned.
+It is a separate program because of its licence ([licensing](../licensing.md)). When it is
+installed, `lx.afni.tshift` and `larmorx afni 3dTshift` run it by default (see
+[Choosing the implementation](#choosing-the-implementation)).
 
 ## Quick start
 
@@ -61,7 +62,7 @@ larmorx afni 3dTshift -ignore 0 -tzero 0.969 -TR 2.0s -tpattern @slice_timing.1D
     -prefix sub-01_desc-stc_bold.nii.gz sub-01_task-rest_bold.nii.gz
 ```
 
-## `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1)`
+## `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1, implementation="auto")`
 
 Each voxel's time series is detrended (least-squares line), shifted in time so that its slice
 refers to `tzero`, clipped to its own range, and given its trend back. The output at time
@@ -70,7 +71,8 @@ point `n` estimates the signal at `n·TR + tzero`.
 Returns an `lx.Image` with the header `3dTshift` writes: `pixdim[4]` = TR (seconds),
 `toffset` = `tzero`, no slice timing, millimetres and seconds. Data keep AFNI's storage type
 (`uint8`, `int16` or `float32`); when the output has a brick factor (`scl_slope`), the data
-are the scaled values, as `lx.load` returns them.
+are the scaled values, as `lx.load` returns them. `img.implementation` says which
+implementation computed it (below).
 
 **Files and in-memory images.** Paths are read with AFNI's rules (below), which is what makes
 the result match AFNI. In-memory images (`lx.Image`, nibabel images, `(array, affine)`) keep
@@ -100,6 +102,53 @@ and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `
 | `-verbose` | – | progress on stderr |
 | `-voxshift dset` | – | not supported |
 | (threads: `OMP_NUM_THREADS`) | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
+| (`LARMORX_IMPLEMENTATION=auto\|replica\|original`) | `implementation="auto"` | larmorx's choice between the replica and the original (below) |
+
+## Choosing the implementation
+
+```python
+img = lx.afni.tshift("bold.nii.gz", slice_times="alt+z")   # implementation="auto"
+img.implementation
+# Implementation(kind='replica', package='larmorx-gpl', version='0.0.1',
+#                licence='GPL-3.0-or-later', program='/.../venv/bin/larmorx-gpl')
+lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
+```
+
+- **`"auto"`** (the default) runs the bit-exact replica when the `larmorx-gpl` program is
+  installed, and the clean-room original otherwise. **`"replica"`** and **`"original"`** force
+  one; `"replica"` without the program raises `lx.ReplicaNotFoundError`, which names the
+  install command.
+- **Installing the replica:** `pip install "larmorx[exact]"`. Neither package is on PyPI yet;
+  build them from the repository (`docs/licensing.md`, "Packages").
+- **How it runs** (`docs/licensing.md`, "Choosing at run time"): as a separate program, on
+  files in a temporary directory. A path is passed as it is; an in-memory image is written
+  first, with its data as they are (no scaling). The keyword arguments become `3dTshift`
+  options with the same meaning; `slice_times` as numbers become a `-tpattern` file, and
+  `detrend=False` with `method="fourier"` becomes `-linear -no_detrend -Fourier`, the order
+  AFNI accepts. `n_threads` reaches it as `OMP_NUM_THREADS`; its warnings come back as Python
+  warnings. The extra cost per call is one program start, the output written and read back,
+  and for in-memory images the input written as well. Measured on this project's development
+  machine (2026-10-11, median of 5) on two real runs called as fMRIPrep calls 3dTshift
+  (ds001600, 64×64×44×5, and ds003345, 64×64×34×216, both int16 `.nii.gz`), on 1 thread and
+  all 12: `lx.afni.tshift(path, implementation="replica")` took 0-15 ms longer than running
+  the program directly and reading its output with `lx.load`; from the image in memory it took
+  2-133 ms less, because the input is then written uncompressed instead of read from gzip.
+- **The two differ only in the last bits** of some values (Fourier, quintic, heptic,
+  weighted sinc and `-no_detrend` cases; see the [validation record](../validation/afni-tshift.md)).
+  So larmorx never falls back from one to the other: a replica that is found but fails
+  raises `lx.ReplicaError`, with its exit code and messages.
+- **Errors.** Both implementations check the arguments that do not need the image the same
+  way (`ValueError`). The checks that need the image (the number of slice times, their range,
+  `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the original,
+  an `lx.ReplicaError` with AFNI's message from the replica.
+- **Where the program is looked for:** `LARMORX_GPL_BIN` (the path of the program), then the
+  Python environment's scripts directory, then `PATH`, once per call.
+- **Command line:** `larmorx afni 3dTshift` follows the same rule; `LARMORX_IMPLEMENTATION`
+  overrides it. The replica's output, output files and exit code are passed on unchanged;
+  127 means `replica` was asked for and the program is missing. With `-verbose`, the first
+  line names the implementation: `++ implementation: original (larmorx 0.0.1, Apache-2.0),
+  clean-room 3dTshift` or `++ implementation: replica (larmorx-gpl 0.0.1, GPL-3.0-or-later),
+  bit-exact translation of AFNI 25.2.09's 3dTshift`.
 
 ## How AFNI reads and writes NIfTI (reproduced)
 
@@ -147,6 +196,9 @@ The spec left these open; each was settled by running AFNI 25.2.09 (details in
 
 - Output is NIfTI only (`-prefix` must end in `.nii` or `.nii.gz`); an existing output is an
   error (AFNI warns and exits 0 without writing).
+- Any `-prefix` path is accepted; AFNI refuses names with blanks, shell metacharacters or
+  non-ASCII characters ("illegal value ... after -prefix"). The replica follows larmorx here
+  too, and says with `-verbose` when AFNI would have refused the name.
 - `-voxshift`, AFNI's own formats, sub-brick selectors and 1D selectors (`file[2]`,
   `file'`) are not supported; hexadecimal numbers in 1D files are rejected.
 - The Fourier method uses larmorx's own FFT in double precision (AFNI uses float32): float32

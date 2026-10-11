@@ -9,11 +9,15 @@ Use it as ``import larmorx as lx``::
 
 from larmorx import afni, ants, io, mri, ndimage, transforms
 from larmorx._core import __version__
+from larmorx._replica import Implementation, ReplicaError, ReplicaNotFoundError
 from larmorx.image import Image, as_image
 from larmorx.io import load, save
 
 __all__ = [
     "Image",
+    "Implementation",
+    "ReplicaError",
+    "ReplicaNotFoundError",
     "__version__",
     "afni",
     "ants",

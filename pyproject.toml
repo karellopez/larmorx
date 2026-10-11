@@ -28,6 +28,10 @@ dependencies = ["numpy>=1.26", "h5py>=3.10"]
 [project.optional-dependencies]
 # Pipeline-only dependencies (PLAN.md §2.2); library users do not need them.
 prep = ["templateflow", "matplotlib", "nilearn", "pandas", "jinja2"]
+# The bit-exact replicas of GPL-licensed tools (crates-gpl/, GPL-3.0-or-later): a separate
+# program that larmorx runs as a separate process, never imports (docs/licensing.md). Not on
+# PyPI yet: build it with `maturin build --release` in crates-gpl/.
+exact = ["larmorx-gpl"]
 
 [project.scripts]
 larmorx = "larmorx.cli:main"

@@ -16,8 +16,13 @@
 //!   writes its own format otherwise, and by default, with the prefix `tshift`);
 //! - an existing output file is an error (AFNI prints "dataset NOT written to disk" and exits
 //!   with status 0);
+//! - any `-prefix` path is accepted, so paths with blanks or non-ASCII characters work on every
+//!   platform; AFNI refuses names that `THD_filename_ok` rejects (blanks, shell metacharacters,
+//!   non-ASCII bytes), and `-verbose` says when AFNI would have;
 //! - `-voxshift`, sub-brick selectors and AFNI's own formats are not supported;
-//! - AFNI's history extension is not written, and the version banner is not printed.
+//! - AFNI's history extension is not written, and the version banner is not printed;
+//! - with `-verbose`, a first line on standard error names the implementation that runs (the
+//!   replica), as `larmorx afni 3dTshift` names the clean-room original.
 
 use std::io::Write;
 use std::path::Path;
@@ -29,6 +34,13 @@ use crate::tpattern::{TpatternError, parse_tpattern};
 use crate::tshift::{Rlt, TshiftParams, fft_length, slice_shift, tshift};
 
 use super::threads;
+
+/// The first `-verbose` line: which implementation runs (larmorx's addition, not AFNI's).
+const IMPLEMENTATION: &str = concat!(
+    "implementation: replica (larmorx-gpl ",
+    env!("CARGO_PKG_VERSION"),
+    ", GPL-3.0-or-later), bit-exact translation of AFNI 25.2.09's 3dTshift"
+);
 
 const USAGE: &str = "\
 Usage: 3dTshift [options] dataset   (larmorx-gpl: replica of AFNI 25.2.09's 3dTshift)
@@ -136,9 +148,14 @@ struct Options {
     detrend: bool,
     tpattern: Option<String>,
     dataset: String,
+    /// Whether AFNI would accept `prefix` ([`filename_ok`]); larmorx-gpl accepts any path.
+    prefix_afni_ok: bool,
 }
 
-/// `THD_filename_ok`: no control characters, blanks, shell metacharacters or non-ASCII bytes.
+/// `THD_filename_ok`: no control characters, blanks, shell metacharacters or non-ASCII bytes
+/// (without its `AFNI_ALLOW_ARBITRARY_FILENAMES` escape, which accepts any name). larmorx-gpl
+/// accepts any `-prefix`, as AFNI does with that variable set; this only says when AFNI would
+/// not (`docs/findings/afni-tshift.md`, "Output names").
 fn filename_ok(name: &str) -> bool {
     if name.is_empty() {
         return false;
@@ -196,6 +213,7 @@ fn parse(args: &[String], io: &mut Io<'_>) -> Result<Options, Fail> {
         detrend: true,
         tpattern: None,
         dataset: String::new(),
+        prefix_afni_ok: true,
     };
     let mut nopt = 0;
     while nopt < args.len() && args[nopt].starts_with('-') {
@@ -267,9 +285,8 @@ fn parse(args: &[String], io: &mut Io<'_>) -> Result<Options, Fail> {
             }
             "-prefix" => {
                 let v = value(&mut nopt, "-prefix")?;
-                if !filename_ok(&v) {
-                    return Err(format!("illegal value '{v}' after -prefix").into());
-                }
+                // AFNI: "illegal value '...' after -prefix" (larmorx accepts any path).
+                o.prefix_afni_ok = filename_ok(&v);
                 o.prefix = v;
             }
             "-rlt" => {
@@ -362,6 +379,14 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
 
     // Open the dataset; extract values, check for errors.
     if o.verbose > 0 {
+        io.info(IMPLEMENTATION);
+        if !o.prefix_afni_ok {
+            io.info(format!(
+                "AFNI would refuse the -prefix '{}' (blanks, shell metacharacters or non-ASCII \
+                 characters); larmorx-gpl accepts it",
+                o.prefix
+            ));
+        }
         io.print("++ opening input dataset header");
     }
     let mut warnings = Vec::new();
@@ -592,7 +617,14 @@ mod tests {
         assert!(parse_args(&["-ignore", "-1", "x"]).is_err());
         assert!(parse_args(&["-TR", "0", "x"]).is_err());
         assert!(parse_args(&["-TR", "abc", "x"]).is_err());
-        assert!(parse_args(&["-prefix", "a b.nii", "x"]).is_err());
+        // AFNI refuses this -prefix; larmorx accepts any path, and notes what AFNI would do.
+        let o = parse_args(&["-prefix", "a b.nii", "x"]).unwrap();
+        assert!(!o.prefix_afni_ok && o.prefix == "a b.nii");
+        assert!(
+            parse_args(&["-prefix", "a.nii", "x"])
+                .unwrap()
+                .prefix_afni_ok
+        );
         assert!(parse_args(&["-bogus", "x"]).is_err());
         assert!(parse_args(&["-TR"]).is_err());
         assert!(parse_args(&["-linear"]).is_err());

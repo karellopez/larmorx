@@ -306,6 +306,49 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   itself (`docs/findings/numpy-blas.md`). One divergence is documented: exactly 45° oblique
   grids, where nibabel's axis decision follows its SVD's rounding.
 
+## 2026-10-11: `implementation="auto"`: replicas run as separate programs, from Python too
+
+- **Decision (user).** The licences stay separate through process boundaries. The Apache
+  package `larmorx` never imports, loads or links GPL code, in Rust or in Python; it runs the
+  replica package's program (`larmorx-gpl`) as a separate process and exchanges NIfTI files
+  with it in a temporary directory. This was already the rule for the command line; it now
+  holds for Python. Loading a GPL extension module into the Python process would make one
+  combined work, under the GPL, so it is not done (`docs/licensing.md`, "Choosing at run
+  time" and "Options considered").
+- **Packaging (user).** `larmorx-gpl` is a binary-only wheel (maturin `bin`,
+  `crates-gpl/pyproject.toml`, licence `GPL-3.0-or-later`) that carries the GPL and the AFNI,
+  glibc (LGPL-2.1) and larmorx (Apache-2.0) notices. The main package has the extra
+  `exact = ["larmorx-gpl"]`. Neither is on PyPI yet; the release workflow will build and
+  publish both.
+- **Finding the program (user):** `LARMORX_GPL_BIN`, then the Python environment's scripts
+  directory (`sysconfig`; for the standalone binary, its own directory), then `PATH`; once per
+  call, no global state.
+- **Done.**
+  - Rust: `larmorx_cli::replica`, a registry of tools with a replica (one line each), the
+    search, `auto`/`replica`/`original`, and running the program with its output and exit
+    code passed through. `larmorx <family> <tool>` uses it; `LARMORX_IMPLEMENTATION`
+    overrides; `-verbose` names the implementation in both 3dTshift implementations.
+  - Python: `larmorx/_replica.py` on the same registry and search (through `larmorx._core`);
+    `lx.afni.tshift(..., implementation="auto")`; `Image.implementation`; `lx.Implementation`,
+    `lx.ReplicaError`, `lx.ReplicaNotFoundError`. A replica that is found but fails raises;
+    nothing falls back silently, because the two implementations differ in the last bits.
+  - How to add a replica: `docs/architecture.md`.
+- **One behaviour aligned.** The replica refused a `-prefix` that AFNI's `THD_filename_ok`
+  rejects (blanks, shell metacharacters, non-ASCII bytes), so installing it would have broken
+  output paths with spaces on the command line. It now accepts any path, like the original
+  (one of the larmorx conventions the two share) and like AFNI with
+  `AFNI_ALLOW_ARBITRARY_FILENAMES` set; `-verbose` says when AFNI would refuse the name
+  (`docs/findings/afni-tshift.md`, "Output names").
+- **Validation.** The 3dTshift parity suite runs the larmorx side through this dispatch, and
+  every case the Python API can express also through `lx.afni.tshift(..., implementation=...)`
+  (`docs/validation/afni-tshift.md`, `afni-tshift-replica.md`; standard tier, 236 cases each).
+  - Replica: 217 of 217 compared cases bit-identical to AFNI, as before.
+  - Original: 217 agree, 158 bit-identical, as before.
+  - Python API, both implementations: identical to the command line (data and header bytes)
+    on all 186 cases it can express, and from an image in memory on 143 of 143.
+  - Cost: `lx.afni.tshift` with the replica takes at most 15 ms longer than running its
+    program by hand (`docs/api/afni-tshift.md`).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -1,0 +1,36 @@
+# The larmorx-gpl wheel: the `larmorx-gpl` program only (maturin's "bin" bindings), no Python
+# module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
+# (docs/licensing.md). Build: `maturin build --release --locked` in this directory.
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "larmorx-gpl"
+description = "Bit-exact replicas of GPL-licensed neuroimaging tools (AFNI's 3dTshift), run by larmorx as a separate program"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+# The GPL; the AFNI and glibc notices (NOTICE); the texts and notices of the Apache-2.0
+# larmorx crates the program includes, and the LGPL-2.1 of the glibc translation (LICENSES/).
+license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
+keywords = ["neuroimaging", "mri", "fmri", "afni", "slice-timing"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/karellopez/larmorx"
+Source = "https://github.com/karellopez/larmorx/tree/main/crates-gpl"
+Issues = "https://github.com/karellopez/larmorx/issues"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "larmorx-gpl-cli/Cargo.toml"

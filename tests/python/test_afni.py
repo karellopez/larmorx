@@ -14,6 +14,10 @@ import pytest
 import larmorx as lx
 from larmorx.cli import run as cli_run
 
+# These tests are about the clean-room original; tests/python/test_replica.py covers the choice
+# of implementation.
+pytestmark = pytest.mark.usefixtures("no_replica")
+
 TR = 2.0
 AFFINE = np.array(
     [[-3.0, 0.1, 0.0, 90.0], [0.0, 3.0, 0.2, -100.0], [0.0, -0.2, 3.5, -60.0], [0, 0, 0, 1]]
@@ -65,6 +69,9 @@ def test_python_matches_the_command_line(tmp_path, method):
     np.testing.assert_array_equal(img.data, np.asanyarray(expected.dataobj))
     np.testing.assert_allclose(img.affine, expected.affine)
     assert img.header.toffset == expected.header["toffset"]
+    assert img.implementation == lx.Implementation(
+        "original", "larmorx", lx.__version__, "Apache-2.0"
+    )
 
 
 def test_in_memory_images_match_files(tmp_path):
@@ -188,6 +195,9 @@ def test_cli_errors(tmp_path):
     assert code == 1 and "conflicts with existing file" in err
     assert cli("-no_detrend", "-heptic", "-prefix", tmp_path / "y.nii", src)[0] == 1
     assert "Unknown tpattern" in cli("-tpattern", "bogus", "-prefix", tmp_path / "z.nii", src)[1]
+    # -verbose names the implementation first.
+    code, err = cli("-verbose", "-tpattern", "alt+z", "-prefix", tmp_path / "v.nii", src)
+    assert code == 0 and err.startswith("++ implementation: original (larmorx "), err
 
 
 def test_cli_copies_input_without_slice_timing(tmp_path):

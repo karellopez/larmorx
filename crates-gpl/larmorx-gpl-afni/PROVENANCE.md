@@ -60,7 +60,7 @@ Changes from the originals are listed below and in each module's documentation.
 | `tshift` | `src/thd_initdblk.c` | `THD_need_brick_factor` | MCW 1994-2000 |
 | `tshift` | `src/mrilib.h` | `SHORTIZE`, `BYTEIZE` | MCW 1994-2000 |
 | `cli::tshift` | `src/3dTshift.c` | `main` (option scan, checks, messages), `TS_copy_input_to_output` | MCW 1994-2000 |
-| `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (used only to say, with `-verbose`, that AFNI would refuse a `-prefix`) | MCW 1994-2000 |
 | `cli::tshift` | `src/debugtrace.c` | the message prefixes of `INFO_message`, `WARNING_message`, `ERROR_message`, `ERROR_exit` | NIH, public domain |
 
 ## glibc files translated (`glibc_sincosf`)
@@ -95,7 +95,11 @@ Changes from the originals are listed below and in each module's documentation.
   output depends on are read (time axis, matrix, space); none is written. The `AFNI_*`
   environment variables are not read.
 - **Output** (the larmorx conventions shared with `larmorx afni 3dTshift`): NIfTI only, and
-  an existing output file is an error.
+  an existing output file is an error. Any `-prefix` path is accepted (2026-10-11), so that
+  paths with blanks or non-ASCII characters work on every platform whichever implementation
+  `larmorx afni 3dTshift` runs. AFNI refuses the names `THD_filename_ok` rejects unless
+  `AFNI_ALLOW_ARBITRARY_FILENAMES` is set; `-verbose` says when it would have.
+- **`-verbose`** starts with a line naming the implementation (the replica, with its version).
 
 ## Verification
 

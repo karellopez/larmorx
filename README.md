@@ -3,7 +3,7 @@
 **Status: early development.** Available now:
 - `lx.Image` and NIfTI-1/2 reading and writing, [validated against nibabel](docs/validation/nifti-io.md) (252 files, bit-identical data) and [faster than nibabel and SimpleITK](docs/benchmarks/nifti-io.md) (compressed writes 4–8× faster with threads);
 - `lx.ants.apply_transforms` / `larmorx ants antsApplyTransforms`, [validated against ANTs](docs/validation/ants-apply-transforms.md) (63 of 79 cases bit-identical, all agree);
-- `lx.afni.tshift` / `larmorx afni 3dTshift`, a clean-room implementation [validated against AFNI](docs/validation/afni-tshift.md) (217 of 217 compared cases agree, 158 bit-identical) and [2–6× faster](docs/benchmarks/afni-tshift.md);
+- `lx.afni.tshift` / `larmorx afni 3dTshift`, a clean-room implementation [validated against AFNI](docs/validation/afni-tshift.md) (217 of 217 compared cases agree, 158 bit-identical) and [2–6× faster](docs/benchmarks/afni-tshift.md); with the separate GPL package `larmorx-gpl` installed (`larmorx[exact]`, built from `crates-gpl/`), it runs a bit-exact replica instead, as a separate program ([217 of 217 bit-identical](docs/validation/afni-tshift-replica.md), [licensing](docs/licensing.md));
 - `lx.mri.hmc` / `larmorx mri hmc`, head-motion correction accepting mcflirt-style options, a clean-room implementation, `experimental`, [compared with FSL's mcflirt](docs/validation/mri-hmc.md) (with fMRIPrep's command, closer to mcflirt than mcflirt is to itself under small input perturbations; 121 of 122 compared cases within thresholds) and [5–16× faster with threads](docs/benchmarks/mri-hmc.md).
 
 **larmorx** is a library of neuroimaging tools in Rust, with a Python wrapper and a CLI for every tool:

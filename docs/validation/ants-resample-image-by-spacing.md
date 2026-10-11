@@ -3,9 +3,9 @@
 **All cases agree.** 35 cases on the `standard` tier: 29 pass, 5 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ResampleImageBySpacing` / `lx.ants.resample_image_by_spacing` (crates larmorx-ants, larmorx-image)
-- **Reference:** ResampleImageBySpacing from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard`
+- **Reference:** ResampleImageBySpacing from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard`
 
 **Bit-identical: 28 of 28 passing cases** produce exactly the values ANTs writes; 28 of 28 also write exactly its header bytes.
 
@@ -51,15 +51,15 @@
 | `errors/too-few-arguments` | three arguments: the usage, exit 1 | ANTs exit 1: addvox pads each dimension by addvox; larmorx exit 1: addvox pads each dimension by addvox |
 | `errors/dimension-5` | dimension 5: no branch in ANTs, nothing written, exit 0 | ANTs exit 0: ; larmorx exit 0: |
 | `errors/missing-spacing` | two spacings in 3D with smoothing: atof(nullptr) (ANTs crashes) | ANTs killed by signal 11: smoothing by : 0.666667 dir 1; larmorx exit 1: larmorx: ResampleImageBySpacing: smoothing needs all 3 spacings (ANTs calls atof on a … |
-| `errors/dim4-addvox-without-nn` | 4D with addvox but no nn argument: std::stoi(nullptr) (ANTs aborts) | ANTs killed by signal 6: what(): basic_string::_M_construct null not valid; larmorx exit 1: larmorx: ResampleImageBySpacing: no nn argument after addvox (std::… |
+| `errors/dim4-addvox-without-nn` | 4D with addvox but no nn argument: std::stoi(nullptr) (ANTs aborts) | ANTs killed by signal 6: what(): basic_string: construction from null is not valid; larmorx exit 1: larmorx: ResampleImageBySpacing: no nn argument after addvo… |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: ResampleImageBySpacing: cannot read image '<tmp>/none.nii.gz' (ANTs… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (54d3282e3bf5-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

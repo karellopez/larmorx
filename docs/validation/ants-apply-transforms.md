@@ -3,9 +3,9 @@
 **All cases agree.** 83 cases on the `standard` tier: 79 pass, 4 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
-- **Reference:** antsApplyTransforms from ANTs 2.6.5 on ITK 5.4.5, run in-process through ANTsPy 0.6.3
-- **Test data:** larmorx-testdata `18c8309c46b6`, tier `standard`
-- **Generated:** 2026-10-09 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
+- **Reference:** antsApplyTransforms from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with 4 threads
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
 
 **Bit-identical: 63 of 79 passing cases** produce exactly the bytes of antsApplyTransforms' output data.
 The others differ in the last bits only, where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed-sinc weights, Euler and versor matrices) or where `--float` makes ANTs compute in single precision: `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `output/float-LanczosWindowedSinc`, `output/float-Linear`, `time-series/LanczosWindowedSinc`. See `docs/findings/platform-math.md`.
@@ -39,15 +39,15 @@ The others differ in the last bits only, where ITK calls the platform's `exp`, `
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-xa4g6xsa/missing.mat: /tmp/lx-aat-xa4g6xsa/missing.mat: No such file or directory (os error 2) |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-59zpcfx1/missing.mat: /tmp/lx-aat-59zpcfx1/missing.mat: No such file or directory (os error 2) |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (a50f8f922e52) |
-| larmorx-testdata | 18c8309c46b6 |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -58,7 +58,7 @@ The others differ in the last bits only, where ITK calls the platform's `exp`, `
 
 ## Notes
 
-Both programs read the same files with the same arguments; the outputs are read with nibabel. larmorx runs through its Python console entry point, so `.h5` transforms are read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses the `libm` crate (the same bits on every platform), which can differ from glibc in the last bit; that is the only remaining source of difference (docs/findings/platform-math.md).
+Both programs read the same files with the same arguments; the outputs are read with nibabel. larmorx runs through its Python console entry point, so `.h5` transforms are read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported yet), the same bits on every platform, which can differ from glibc in the last bit (docs/findings/platform-math.md). With `--float 1` ANTs computes in single precision and larmorx in double (to be changed before A4, decision log 2026-10-11).
 
 ## All cases
 

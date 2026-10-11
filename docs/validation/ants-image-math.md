@@ -3,8 +3,8 @@
 **All cases agree.** 327 cases on the `standard` tier: 302 pass, 24 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ImageMath` / `lx.ants.image_math` and the typed `lx.ants` wrappers (crates larmorx-ants, larmorx-image)
-- **Reference:** ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `f32b1d60627c`, tier `standard`
+- **Reference:** ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-image-math --tier standard`
 
 **Bit-identical: 296 of 301 passing cases** produce exactly the values ANTs writes; 301 of 301 also write exactly its header bytes.
@@ -86,28 +86,28 @@ Not bit-identical (each within its declared tolerance; the cause is in the case'
 | `dispatch/missing-input` | a missing input file: ANTs prints 'does not exist' and crashes; larmorx exits 1 | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses t… |
 | `dispatch/missing-operand-image` | an operand that is neither a number nor a readable image (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs … |
 | `truncate/bins-not-a-number` | bins 'many': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throw… |
-| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x627dc84a7410): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
+| `rescale/reversed` | minimum above maximum: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x5d39270e32f0): Minimum output value cannot be greater than Maximum output value.; larmorx exi… |
 | `rescale/too-few-arguments` | no maximum: ANTs throws std::exception | ANTs killed by signal 6: what(): std::exception; larmorx exit 1: larmorx: RescaleImage needs an input image, a minimum and a maximum (ANTs aborts: it throws st… |
 | `laplacian/leading-point` | sigma '.5': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Laplacian: '.5' is not a number (ANTs aborts: std::stoi throws) |
-| `laplacian/thin` | an axis of 3 voxels: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x6088a551e330): The number of pixels along direction 2 is less than 4. This filter requires a… |
+| `laplacian/thin` | an axis of 3 voxels: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5edf1f6bd440): The number of pixels along direction 2 is less than 4. This filter requires a… |
 | `grad/bad-flag` | a normalize flag that is not a number: std::stoi throws | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: Grad: 'yes' is not a number (ANTs aborts: std::stoi throws) |
-| `unsharp/negative-threshold` | a negative threshold: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x587859e533a0): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold mu… |
+| `unsharp/negative-threshold` | a negative threshold: ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x5d8bde383280): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold mu… |
 | `unsharp/bad-amount` | an amount that is not a number: std::stof throws | ANTs killed by signal 6: what(): stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws) |
 | `binary-morphology/MD-radius-negative` | MD -1: a radius near 2^64; ANTs aborts (std::bad_alloc), larmorx refuses | ANTs killed by signal 6: what(): std::bad_alloc; larmorx exit 1: larmorx: MD: a radius of -1 is not supported (ANTs converts it to a radius near 2^64 and canno… |
-| `pad-image/depad-to-zero` | PadImage -14: an axis of 0 voxels; ANTs crashes (munmap_chunk), larmorx refuses | ANTs killed by signal 6: munmap_chunk(): invalid pointer; larmorx exit 1: larmorx: PadImage: padding by -14 gives an axis of 0 voxels (ANTs cannot allocate or … |
+| `pad-image/depad-to-zero` | PadImage -14: an axis of 0 voxels; ANTs crashes (munmap_chunk), larmorx refuses | ANTs killed by signal 6: malloc_consolidate(): invalid chunk size; larmorx exit 1: larmorx: PadImage: padding by -14 gives an axis of 0 voxels (ANTs cannot all… |
 | `pad-image/depad-negative` | PadImage -20: a negative size wraps to 2^32 - 8; ANTs crashes, larmorx refuses | ANTs killed by signal 11: ; larmorx exit 1: larmorx: PadImage: padding by -20 gives an axis of 4294967288 voxels (ANTs cannot allocate or write such an image) |
 | `pad-image/no-pad` | no pad argument: ANTs reads argv[5] (null) and crashes | ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath PadImage needs at least 2 operand(s) (ANTs reads past the arguments here) |
 | `largest-component/min-size-not-a-number` | minimum size 'big': std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: GetLargestComponent: the minimum size 'big' is not a number (ANTs aborts: std::stoi throws) |
 | `extract-contours/flag-not-a-number` | a flag that is not a number: std::stoi throws (ANTs aborts) | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: ExtractContours: 'yes' is not a number (ANTs aborts: std::stoi throws) |
-| `threshold-at-mean/above-maximum` | fraction 100: the lower threshold exceeds the maximum; ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x59a65b4b5600): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmor… |
+| `threshold-at-mean/above-maximum` | fraction 100: the lower threshold exceeds the maximum; ITK throws (ANTs aborts) | ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x564ade4a54e0): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmor… |
 | `replace-voxel-value/missing-value` | no replacement value: ANTs reads argv[7] (null) and crashes | ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath ReplaceVoxelValue needs at least 4 operand(s) (ANTs reads past the arguments here) |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (57245bee1dee-dirty) |
-| larmorx-testdata | f32b1d60627c |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

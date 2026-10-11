@@ -80,11 +80,11 @@ definition.
 
 **What went wrong once.** The N4 port was briefed to match the repository's ANTs oracle bit
 for bit. That oracle, built with GCC 11 at `-O3`, keeps two `float` quantities of ITK's
-B-spline fit in double precision, which the C++ source does not allow. The port reproduced
-the compiler's code. fMRIPrep's own ANTs build follows the source, and a larmorx build that
-follows the source matched all six of fMRIPrep's N4 outputs bit for bit
-([findings/ants-n4.md](findings/ants-n4.md), "GCC 11's code generation";
-[findings/fmriprep-oracle.md](findings/fmriprep-oracle.md)). Brief every port to follow the
+B-spline fit in double precision, which the C++ source does not allow: GCC 11.4 miscompiles
+the code (GCC bug 110182). The port reproduced the compiler's code. fMRIPrep's own ANTs build
+follows the source, and a larmorx build that follows the source matched all six of fMRIPrep's
+N4 outputs bit for bit ([findings/ants-n4.md](findings/ants-n4.md), "GCC 11 miscompiles the
+fit"; [findings/fmriprep-oracle.md](findings/fmriprep-oracle.md)). Brief every port to follow the
 source and to treat a disagreement with the oracle as a question, never to "match the oracle
 at any cost".
 
@@ -117,7 +117,12 @@ at any cost".
 
 **Prefer oracle builds that honour the source.** Build oracles with a baseline target (no
 `-march=native`), and when a build is shown to depart from the source, rebuild it (decided
-2026-10-11 for the ANTs oracle) rather than teach larmorx the departure.
+2026-10-11 for the ANTs oracle) rather than teach larmorx the departure. Choose the compiler
+too: Ubuntu 22.04's GCC 11.4 and 12.3 drop float roundings in vectorized code at `-O3` (GCC
+bug 110182, fixed in 11.5, 12.4 and 13.2), so the ANTs oracle is built by conda-forge's GCC
+14.3 in a user-level environment, and `scripts/build_ants_oracle.sh` refuses a compiler that
+fails its probe of that bug ([validation/README.md](validation/README.md)). (The AFNI oracle
+and the CORE-MATH preload are built by GCC 11.4 at `-O2`, where GCC 11 does not vectorize.)
 
 **Record the oracle's exact build** next to every result: the upstream version and commit,
 compiler and version, flags and target, the C library and its version, the libraries it links

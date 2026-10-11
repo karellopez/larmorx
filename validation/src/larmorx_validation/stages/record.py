@@ -240,8 +240,8 @@ CAUSE_TEXT = {
     "threads": "fMRIPrep's thread count",
     "run-to-run": "not reproducible run to run",
     "version": (
-        "the ANTs build (fMRIPrep's 2.6.2 vs the oracle's 2.6.5; for N4 the oracle's GCC 11 code "
-        "generation, [fmriprep-oracle.md](../findings/fmriprep-oracle.md))"
+        "the ANTs version or build (fMRIPrep's 2.6.2 vs the oracle's 2.6.5, "
+        "[fmriprep-oracle.md](../findings/fmriprep-oracle.md))"
     ),
     "glibc maths": "glibc's maths",
     "larmorx": "**larmorx**",
@@ -480,8 +480,8 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
         "algorithm and cannot match bit for bit). "
         + (
             "The other differences are explained by fMRIPrep's thread count, glibc's maths or the "
-            "ANTs build (fMRIPrep's conda-forge 2.6.2 against the repository's GCC 11 build of "
-            "2.6.5; with those removed, larmorx is bit-identical)"
+            "ANTs build (fMRIPrep's conda-forge 2.6.2 against the repository's build of 2.6.5; "
+            "with those removed, larmorx is bit-identical)"
             if not unexplained
             else f"**{len(set(unexplained))} node(s) differ for reasons not found** (see the details)"
         )

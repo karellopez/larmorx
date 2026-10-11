@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Parity of ``larmorx ants antsApplyTransforms`` with antsApplyTransforms (ANTs 2.6.5).
 
-Both programs get the same arguments and files. ANTs runs in-process through ANTsPy's
-``ants.internal.get_lib_fn``, which is the real command line. larmorx runs through its Python
-console entry point, which also reads ``.h5`` transforms. The two output files are read
-with nibabel, a reader independent of both, and compared.
+Both programs get the same arguments and files. ANTs is the oracle's ``antsApplyTransforms``
+binary (``LARMORX_ANTS_BIN``, else the workspace's ``oracles/ants-2.6.5/bin``, built by
+``scripts/build_ants_oracle.sh``), with ``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=4`` unless set;
+without it, ANTs runs in-process through ANTsPy's ``ants.internal.get_lib_fn``, the same
+command line in ANTsPy's own build. larmorx runs through its Python console entry point, which
+also reads ``.h5`` transforms. The two output files are read with nibabel, a reader
+independent of both, and compared.
 
 Cases cover:
 - every interpolator;
@@ -21,6 +24,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +32,7 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
+from larmorx_validation.parity.ants_programs import ants_bin, ants_version
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     PASS,
@@ -482,7 +487,20 @@ def _args(s: Scenario, tmp: Path, output: Path) -> list[str]:
     return [*args, "-n", s.interpolation, *s.extra, "-o", str(output)]
 
 
+def _oracle() -> Path | None:
+    """The ANTs oracle's ``antsApplyTransforms`` (``LARMORX_ANTS_BIN``, else the workspace's
+    ``oracles/ants-2.6.5/bin``), or ``None``: then ANTsPy runs it in-process."""
+    b = ants_bin()
+    return b / "antsApplyTransforms" if b and (b / "antsApplyTransforms").is_file() else None
+
+
 def _run_ants(args: list[str]) -> int:
+    if (program := _oracle()) is not None:
+        env = {**os.environ}
+        env.setdefault("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "4")
+        return subprocess.run(
+            [str(program), *args], capture_output=True, env=env, timeout=1800
+        ).returncode
     import ants
 
     with _quiet_stderr(), contextlib.redirect_stdout(io.StringIO()):
@@ -625,11 +643,22 @@ def suite() -> Suite:
     os.environ.setdefault("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "4")
     import ants
 
+    threads = os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"]
+    if _oracle() is not None:
+        reference = (
+            f"antsApplyTransforms from {ants_version()}, the binary built by "
+            f"`scripts/build_ants_oracle.sh`, run with {threads} threads"
+        )
+    else:
+        reference = (
+            "antsApplyTransforms from ANTs 2.6.5 on ITK 5.4.5, run in-process through ANTsPy "
+            f"{ants.__version__} (the oracle binary was not found)"
+        )
     return Suite(
         name="ants-apply-transforms",
         title="antsApplyTransforms",
         tool="`larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)",
-        reference=f"antsApplyTransforms from ANTs 2.6.5 on ITK 5.4.5, run in-process through ANTsPy {ants.__version__}",
+        reference=reference,
         thresholds=[
             ("Exit status", "both succeed, or both reject the arguments"),
             ("Output data type and shape", "identical"),
@@ -649,8 +678,9 @@ def suite() -> Suite:
             "Both programs read the same files with the same arguments; the outputs are read with "
             "nibabel. larmorx runs through its Python console entry point, so `.h5` transforms are "
             "read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses "
-            "the `libm` crate (the same bits on every platform), which can differ from glibc in the "
-            "last bit; that is the only remaining source of difference "
-            "(docs/findings/platform-math.md)."
+            "correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported "
+            "yet), the same bits on every platform, which can differ from glibc in the last bit "
+            "(docs/findings/platform-math.md). With `--float 1` ANTs computes in single precision "
+            "and larmorx in double (to be changed before A4, decision log 2026-10-11)."
         ),
     )

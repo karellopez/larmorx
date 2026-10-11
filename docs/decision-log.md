@@ -498,7 +498,10 @@ Decided by the user on the questions the defect register raised
   builds give byte-identical outputs in every one of those suites except a case that
   resamples uninitialised memory, and in 6 of 45 N4 cases. fMRIPrep 25.2.6's own N4
   (ANTs 2.6.2) is bit-identical to larmorx in 45 of 45 cases with CORE-MATH.
-- **Golden checksums:** GOLDEN
+- **Golden checksums** re-recorded from `f58d32a` after the smoke-tier parity passed against
+  the new oracle: the two N4 cases changed (`cli.ants.N4BiasFieldCorrection`: the corrected
+  image's and the bias field's data, headers unchanged; `py.ants.n4`: 15 of 18 outputs, all
+  but the 4D case's), the other 80 cases did not.
 - **For A4:** in the old build, GCC 11 also miscompiled `CenteredTransformInitializer` for
   float Euler transforms (antsRegistration's `--initial-moving-transform [f,m,0|1]` with
   `--float 1`, as fMRIPrep's normalization runs it); registration must be validated against

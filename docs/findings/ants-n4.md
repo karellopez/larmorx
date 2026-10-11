@@ -320,9 +320,12 @@ the same results except `expf` for |x| in [32, 48), which N4 does not reach.
 
 **One misrounded value changes the run.** A log value one ulp off moves a voxel's histogram
 contributions, the Wiener-sharpened mapping, the residual and so every later iteration; like
-the thread band, the difference spreads over most voxels but stays tiny. *Verified:* in the
-parity suite, wherever larmorx and ANTs as built differ, the difference is of the order of
-ANTs' thread band (the record lists the ratio per case), and NCC stays above 0.99999.
+the thread band, the difference spreads over most voxels but stays tiny. *Validated* (standard
+tier, 45 compared cases): larmorx is bit-identical to ANTs as built in 27. In the other 18, the
+difference is smaller than ANTs' own difference between one thread and 2 to 12 threads, except
+in two cases where it is up to 1.6 times larger in max |diff| and 2.6 times in 1 − NCC
+(fMRIPrep's BOLD reference on ds000005, and a phantom shrunk by 3). NCC is at least 0.9999999
+for every corrected image and 0.999996 for every bias field.
 
 **With CORE-MATH preloaded into ANTs, larmorx is bit-identical to it.**
 `scripts/build_crmath_preload.sh` builds `libcrmath.so`, which overrides `expf`, `logf`, `exp`,

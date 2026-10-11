@@ -16,6 +16,7 @@ reproduces the original copyright and MIT notice.
 | `math/log.rs`, `math/dint.rs` | `src/binary64/log/log.c` (`922af9ae4b4b…`), `src/binary64/log/dint.h` (`0da80a15d311…`) | 0 mismatches against mpmath on 1.36 M inputs (all of `log.wc`, plus every input forced through the accurate path); bit-identical to the C on every non-NaN result |
 | `math/expf.rs` | `src/binary32/exp/expf.c` (`598f2e509a12…`) | bit-identical to the C (gcc 11, `-ffp-contract=off`) on all 2^32 inputs; a unit test checks a checksum of every 4099th input, an ignored one of all inputs |
 | `math/logf.rs` | `src/binary32/log/logf.c` (`92c878fb172d…`) | as for `expf` |
+| `math/sinf.rs` (`sinf`, `cosf`) | `src/binary32/sin/sinf.c` (`f27c4baa849b…`), `src/binary32/cos/cosf.c` (`3ea4c6d03d32…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 2^32 inputs of each; unit tests check checksums of every 4099th input, an ignored one of all inputs |
 
 Differences from the C code, all without effect on the result in round-to-nearest:
 - `__builtin_fma` is `f64::mul_add`, which is correctly rounded on every target;
@@ -36,6 +37,14 @@ It is bit-exact with `itk::Matrix::GetInverse` on 2,000 random matrices
 (`docs/findings/itk-transforms.md`). `vnl_inverse` is the same inverse for any `n × n` matrix
 (2D and 4D image geometries); it equals `vnl_inverse3` bit for bit in 3D.
 
+## ITK's computation types (`src/itk_real.rs`)
+
+**Ported** from ITK v5.4.5 (Apache-2.0): `itk::Math::Floor` and `RoundHalfIntegerUp` as
+built on x86-64 (`Modules/Core/Common/include/itkMathDetail.h`, the SSE2 branch:
+`round_half_to_even(2x ∓ 0.5) >> 1`, computed in the argument's type), and
+`itk::Matrix<T, 3, 3>::GetInverse` (`itkMatrix.h`: vnl's determinant compared with 0, then
+`vnl_matrix_inverse<T>`). The trait itself is larmorx's own.
+
 ## vnl's float SVD (`src/vnl_svd_f32.rs`)
 
 **Ported** from the same VXL files in single precision, as `vnl_svd<float>` runs them:
@@ -45,7 +54,10 @@ the f2c code, `snrm2` and `srotg` take the square root in double (`sqrt` of a `d
 and round to float. ITK's B-spline filters solve one small system with it, for the
 coefficients that refine a control-point lattice (`larmorx_image::bspline::kernel`); the
 coefficients are bit-identical to ITK's for orders 1 to 5 (probed against the ITK 5.4.5 build
-of the ANTs oracle).
+of the ANTs oracle). `vnl_inverse3_f32` is `vnl_matrix_inverse<float>` of a 3×3 matrix
+(`vnl_svd.hxx`: `zero_out_absolute`, `pinverse`; `vnl_matrix<float>::operator*`), as
+`itk::Matrix<float, 3, 3>::GetInverse` uses it, and `vnl_determinant3_f32` is
+`vnl_determinant(row0, row1, row2)` (`core/vnl/algo/vnl_determinant.hxx`).
 
 ## Integer powers (`src/math/powi.rs`)
 

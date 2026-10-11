@@ -176,9 +176,11 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
 #: larmorx's documented divergences, by the cause :func:`_check_float_pipeline` confirms.
 KNOWN = {
     "float pipeline": (
-        "larmorx computes `antsApplyTransforms --float 1` in double precision (rounding the "
+        "larmorx computed `antsApplyTransforms --float 1` in double precision (rounding the "
         "input and output to float32), where ANTs runs its whole pipeline, transforms and "
-        'interpolator included, in single precision (docs/findings/ants-cli.md, "Pixel type")'
+        "interpolator included, in single precision. Since 2026-10-11 larmorx computes it in "
+        "single precision as ANTs does (docs/findings/ants-float.md), so this check should "
+        "no longer find anything"
     ),
 }
 
@@ -193,8 +195,8 @@ def _check_float_pipeline(
 ) -> None:
     """For ``antsApplyTransforms --float 1`` outputs that larmorx does not reproduce: run the
     ANTs 2.6.5 reference (correctly rounded maths) in double precision (``--float 0``) and
-    round its output to float32. If that is larmorx's output, bit for bit, the difference is
-    ANTs' single-precision pipeline, which larmorx does not replicate."""
+    round its output to float32. If that is larmorx's output, bit for bit, larmorx computed in
+    double (what it did before 2026-10-11, when it learnt ANTs' single-precision pipeline)."""
     if node.program != "antsApplyTransforms" or not s.ants_oracle:
         return
     try:

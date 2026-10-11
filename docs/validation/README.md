@@ -5,7 +5,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | Record | larmorx | Reference | Status |
 |---|---|---|---|
 | [nifti-io](nifti-io.md) | `larmorx.io.load` / `save` | nibabel | `validated` |
-| [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTs 2.6.5 binary; ANTsPy in-process if the binary is missing) | `validated` |
+| [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` (double, and single precision as `--float 1`) | antsApplyTransforms (ANTs 2.6.5 binary, as built and with CORE-MATH preloaded; ANTsPy in-process if the binary is missing) | `validated` |
 | [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [resample-series](resample-series.md) | `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process) | `validated` |
@@ -26,7 +26,10 @@ working directory of an oracle run), and compares them with fMRIPrep's own outpu
 step; where they differ, the step is re-run in fMRIPrep's image and with the oracle builds to
 separate thread effects, ANTs' version, glibc's maths and larmorx. It is a record of the
 pipeline's stages, not of one tool, so it has no status of its own; it also lists the tools
-larmorx does not have yet.
+larmorx does not have yet. [fmriprep-stages-float](fmriprep-stages-float.md) re-runs the
+antsApplyTransforms stages (A06, A11, F08, F09, F12) after larmorx learnt `--float 1`
+(2026-10-11): all 14 of fMRIPrep's `--float 1` outputs bit-identical to fMRIPrep's own; the
+full record is to be regenerated.
 
 These records compare larmorx with the original tools on Linux x86-64. That the other five
 platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:

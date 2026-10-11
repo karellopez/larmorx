@@ -17,6 +17,7 @@ mod logf;
 mod powf;
 mod powi;
 mod sin;
+mod sinf;
 
 pub use powi::powi;
 
@@ -70,6 +71,12 @@ pub use expf::expf;
 /// The natural logarithm for `f32`, correctly rounded (CORE-MATH's `cr_logf`; no fused
 /// multiply-adds). ITK's `std::log(float)` (glibc's `logf`).
 pub use logf::logf;
+
+/// The sine and cosine for `f32`, correctly rounded (CORE-MATH's `cr_sinf` and `cr_cosf`).
+/// ITK's `std::sin(float)` and `std::cos(float)` (glibc's `sinf`, `cosf` and `sincosf`), as in
+/// `Euler3DTransform<float>`. Their only fused multiply-adds are explicit `mul_add` calls on
+/// tiny arguments, so they have no FMA-compiled copy.
+pub use sinf::{cosf, sinf};
 
 /// The kernels compiled with FMA enabled. AUDIT (unsafe): each call is guarded by
 /// `is_x86_feature_detected!("fma")` in `dispatch!`. Calling a `#[target_feature]` function

@@ -245,8 +245,8 @@ CAUSE_TEXT = {
     ),
     "glibc maths": "glibc's maths",
     "larmorx": "**larmorx**",
-    "float pipeline": "**larmorx computes `--float 1` in double** (known; ANTs in double "
-    "precision, rounded to float32, is larmorx bit for bit)",
+    "float pipeline": "**larmorx computed `--float 1` in double** (ANTs in double "
+    "precision, rounded to float32, is larmorx bit for bit; larmorx before 2026-10-11)",
 }
 
 
@@ -304,6 +304,11 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         by_stage[r["stage"]].append(r)
     present = [st for st in STAGES if st.id in by_stage]
     absent = [st for st in STAGES if st.id not in by_stage]
+    select = tuple(payload.get("select") or ())
+    # With --stage, the stages left out were not looked for.
+    absent = [
+        st for st in absent if not select or any(k == st.id or k.startswith(st.id) for k in select)
+    ]
     busy = payload.get("busy") or []
     load = payload.get("load_before", [0, 0, 0])
     quiet = not busy and load[0] < 1.5
@@ -395,6 +400,13 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         "the output for the resampling).",
         "",
     ]
+    if select:
+        lines += [
+            "**A selection:** only the stages or nodes given with `--stage` ("
+            + ", ".join(f"`{k}`" for k in select)
+            + ") were compared in this run.",
+            "",
+        ]
     if absent:
         lines += ["**Not run in this oracle run:**", ""]
         lines += [f"- {st.id} {st.title}: {st.absent or 'no such node'}." for st in absent]
@@ -510,8 +522,9 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
 #: The known larmorx divergences (``nodes.KNOWN``), for the headline.
 KNOWN_TEXT = {
     "float pipeline": (
-        "`antsApplyTransforms --float 1`, which ANTs runs in single precision and larmorx in "
-        "double (ANTs in double precision, rounded to float32, is larmorx's output bit for bit)"
+        "`antsApplyTransforms --float 1`, which ANTs runs in single precision and larmorx "
+        "computed in double before 2026-10-11 (ANTs in double precision, rounded to float32, is "
+        "larmorx's output bit for bit)"
     ),
 }
 
@@ -880,6 +893,12 @@ def write_record(s, payload: dict, out: Path, name: str) -> tuple[Path, Path]:
         f"python -m larmorx_validation pipeline-stages --oracle {workspace_path(s.run.root)} "
         f"--out {out_text}"
     )
+    if s.select:
+        command += " --stage " + " ".join(s.select)
+    if s.reuse:
+        command += " --reuse"
+    if name != "fmriprep-stages":
+        command += f" --name {name}"
     md = out / f"{name}.md"
     md.write_text(render(s, payload, versions, env, command) + "\n", encoding="utf-8")
     js = out / f"{name}.json"

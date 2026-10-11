@@ -603,6 +603,43 @@ pub fn vnl_svd_solve_f32(m: &[f32], n: usize, b: &[f32], k: usize) -> Option<Vec
     Some(matmul_f32(&vr, n, n, &x, k))
 }
 
+/// `vnl_matrix_inverse<float>(m).as_matrix()` for a 3×3 matrix (row-major), as
+/// `itk::Matrix<float, 3, 3>::GetInverse` computes it: `V · W⁻¹ · Uᵀ` from [`vnl_svd_f32`],
+/// `W⁻¹(k, k) = 1.0f / w[k]` and zero singular values dropped (`zero_out_absolute(0)`), each
+/// product summed from 0 in index order in float (`vnl_matrix<float>::operator*`). The float
+/// counterpart of [`crate::vnl_svd::vnl_inverse3`]. `None` if the SVD fails to converge.
+pub fn vnl_inverse3_f32(m: &[[f32; 3]; 3]) -> Option<[[f32; 3]; 3]> {
+    let flat: Vec<f32> = m.iter().flatten().copied().collect();
+    let (u, w, v) = vnl_svd_f32(&flat, 3, 3)?;
+    // Row-major V and Uᵀ (both are column-major 3 × 3), and the full diagonal W⁻¹.
+    let mut vr = [0.0f32; 9];
+    let mut ut = [0.0f32; 9];
+    let mut winv = [0.0f32; 9];
+    for i in 0..3 {
+        for j in 0..3 {
+            vr[i * 3 + j] = v[i + 3 * j];
+            ut[i * 3 + j] = u[j + 3 * i];
+        }
+        winv[i * 4] = if w[i].abs() <= 0.0 { 0.0 } else { 1.0 / w[i] };
+    }
+    let vw = matmul_f32(&vr, 3, 3, &winv, 3);
+    let out = matmul_f32(&vw, 3, 3, &ut, 3);
+    Some(std::array::from_fn(|i| {
+        std::array::from_fn(|j| out[i * 3 + j])
+    }))
+}
+
+/// vnl's 3×3 determinant (`vnl_determinant(row0, row1, row2)`, `vnl_determinant.hxx`), in
+/// float: the six products summed in vnl's order. ITK only compares it with 0 before
+/// inverting a matrix.
+pub fn vnl_determinant3_f32(m: &[[f32; 3]; 3]) -> f32 {
+    let (r0, r1, r2) = (&m[0], &m[1], &m[2]);
+    r0[0] * r1[1] * r2[2] - r0[0] * r2[1] * r1[2] - r1[0] * r0[1] * r2[2]
+        + r1[0] * r2[1] * r0[2]
+        + r2[0] * r0[1] * r1[2]
+        - r2[0] * r1[1] * r0[2]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -624,5 +661,26 @@ mod tests {
         let m = [0.0f32, 2.0, 0.0, -3.0, 0.0, 0.0, 0.0, 0.0, 1.0];
         let (_, w, _) = vnl_svd_f32(&m, 3, 3).unwrap();
         assert_eq!(w, [3.0, 2.0, 1.0]);
+    }
+
+    #[test]
+    fn the_float_inverse_inverts() {
+        let m = [[1.4f32, 0.3, -0.12], [-0.25, 1.1, 0.4], [0.05, -0.2, 2.1]];
+        let inv = vnl_inverse3_f32(&m).unwrap();
+        for r in 0..3 {
+            for c in 0..3 {
+                let x: f32 = (0..3).map(|k| m[r][k] * inv[k][c]).sum();
+                assert!((x - if r == c { 1.0 } else { 0.0 }).abs() < 1e-6, "{x}");
+            }
+        }
+        let id = [[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        assert_eq!(vnl_inverse3_f32(&id).unwrap(), id);
+        assert_eq!(
+            vnl_determinant3_f32(&m),
+            1.4 * 1.1 * 2.1 - 1.4 * -0.2 * 0.4 - -0.25 * 0.3 * 2.1
+                + -0.25 * -0.2 * -0.12
+                + 0.05 * 0.3 * 0.4
+                - 0.05 * 1.1 * -0.12
+        );
     }
 }

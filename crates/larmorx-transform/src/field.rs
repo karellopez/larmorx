@@ -6,8 +6,8 @@
 //! Ported from ITK v5.4.5: `itkDisplacementFieldTransform.hxx` (`TransformPoint`) and
 //! `itkVectorLinearInterpolateImageFunction.hxx`.
 
-use larmorx_core::Grid3;
 use larmorx_core::linalg::Mat3;
+use larmorx_core::{Grid3, ItkReal};
 
 use crate::TransformError;
 
@@ -26,11 +26,14 @@ impl FieldData {
         }
     }
 
+    /// Component `i` as the field image of a `DisplacementFieldTransform<R>` holds it:
+    /// `static_cast<R>` of the stored value (exact for float values, and for any value in
+    /// double).
     #[inline]
-    fn get(&self, i: usize) -> f64 {
+    fn get_as<R: ItkReal>(&self, i: usize) -> R {
         match self {
-            FieldData::F32(v) => f64::from(v[i]),
-            FieldData::F64(v) => v[i],
+            FieldData::F32(v) => R::from_f64(f64::from(v[i])),
+            FieldData::F64(v) => R::from_f64(v[i]),
         }
     }
 }
@@ -102,35 +105,39 @@ impl DisplacementField {
         out
     }
 
-    /// The displacement at a continuous index, as ITK's `VectorLinearInterpolateImageFunction`:
-    /// a weighted sum over the 8 neighbours (indices clamped to the grid), in a fixed order.
-    fn displacement(&self, cidx: [f64; 3]) -> [f64; 3] {
+    /// The displacement at a continuous index, as ITK's
+    /// `VectorLinearInterpolateImageFunction<…, R>` computes it (`R`, the coordinate type, is
+    /// its `InternalComputationType`): base index `Math::Floor`, distances and overlaps in `R`
+    /// (`overlap *= 1.0 − d` is a double product stored as `R`), each `overlap · value`
+    /// product in `R` (the field's components are `R`), summed in double; the 8 neighbours in
+    /// a fixed order, indices clamped to the grid, stopping once the overlaps sum to 1.
+    #[inline]
+    fn displacement<R: ItkReal>(&self, cidx: [R; 3]) -> [f64; 3] {
         let size = self.grid.size;
-        let base = cidx.map(|c| c.floor());
-        let distance = [cidx[0] - base[0], cidx[1] - base[1], cidx[2] - base[2]];
-        let base = base.map(|b| b as i64);
+        let base: [i64; 3] = cidx.map(R::itk_floor);
+        let distance: [R; 3] = std::array::from_fn(|d| cidx[d] - R::from_f64(base[d] as f64));
         let end = size.map(|n| n as i64 - 1);
         let mut out = [0.0f64; 3];
         let mut total = 0.0f64;
         for counter in 0..8u32 {
-            let mut overlap = 1.0f64;
+            let mut overlap = R::ONE;
             let mut neighbour = [0usize; 3];
             for d in 0..3 {
                 let idx = if counter >> d & 1 == 1 {
-                    overlap *= distance[d];
+                    overlap = overlap * distance[d];
                     (base[d] + 1).min(end[d])
                 } else {
-                    overlap *= 1.0 - distance[d];
+                    overlap = R::from_f64(overlap.to_f64() * (1.0 - distance[d].to_f64()));
                     base[d].max(0)
                 };
                 neighbour[d] = idx as usize;
             }
-            if overlap != 0.0 {
+            if overlap != R::ZERO {
                 let v = 3 * (neighbour[0] + size[0] * (neighbour[1] + size[1] * neighbour[2]));
                 for (k, o) in out.iter_mut().enumerate() {
-                    *o += overlap * self.data.get(v + k);
+                    *o += (overlap * self.data.get_as::<R>(v + k)).to_f64();
                 }
-                total += overlap;
+                total += overlap.to_f64();
             }
             if total == 1.0 {
                 break;
@@ -141,12 +148,25 @@ impl DisplacementField {
 
     /// Maps a point (LPS): `x + d(x)` inside the field, `x` outside.
     pub fn transform_point(&self, p: [f64; 3]) -> [f64; 3] {
-        let cidx = self.grid.point_to_index(p);
-        if !self.grid.is_inside(cidx) {
+        self.transform_point_as(p)
+    }
+
+    /// [`DisplacementField::transform_point`] in the computation type `R`
+    /// (`DisplacementFieldTransform<R>::TransformPoint`): the continuous index of the `R`
+    /// point is computed in double from the field's geometry and stored as `R`; outside the
+    /// buffer (ITK's `IsInsideBuffer` on that index) the point is returned unchanged; inside,
+    /// each coordinate is `x + d` computed in double and stored as `R`.
+    #[inline]
+    pub fn transform_point_as<R: ItkReal>(&self, p: [R; 3]) -> [R; 3] {
+        let cidx: [R; 3] = self
+            .grid
+            .point_to_index(p.map(|x| x.to_f64()))
+            .map(R::from_f64);
+        if !self.grid.is_inside(cidx.map(|c| c.to_f64())) {
             return p;
         }
         let d = self.displacement(cidx);
-        [p[0] + d[0], p[1] + d[1], p[2] + d[2]]
+        std::array::from_fn(|i| R::from_f64(p[i].to_f64() + d[i]))
     }
 }
 

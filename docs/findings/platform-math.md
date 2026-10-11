@@ -169,11 +169,21 @@ weighted mean by about an ulp, in a few voxels
 *larmorx:* `larmorx_core::math::{expf, logf}`, ports of CORE-MATH's `src/binary32/exp/expf.c`
 and `src/binary32/log/logf.c`, bit-identical to the C on all 2^32 inputs.
 
+**`sinf` and `cosf`.** ITK calls them through `std::sin(float)`/`std::cos(float)` (or
+`sincosf`, where GCC pairs the two) when `Euler3DTransform<float>` builds its matrix, that is,
+for Euler transforms under `antsApplyTransforms --float 1` ([ants-float.md](ants-float.md)).
+glibc 2.35's versions misround 29,362,812 (`sinf`) and 28,209,642 (`cosf`) of the 2^32 inputs
+(0.7 %). *Verified* (2026-10-11) against CORE-MATH's C code over every input; the 3dTshift
+replica's own count agrees (GLIBC-03). *larmorx:* `larmorx_core::math::{sinf, cosf}`, ports of
+CORE-MATH's `src/binary32/sin/sinf.c` and `src/binary32/cos/cosf.c`, bit-identical to the C on
+all 2^32 inputs.
+
 ## Making ANTs correctly rounded: the preload library
 
-`scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin` and
-`cos` with a small wrapper (which also provides `sincos`) into
-`oracles/core-math-preload/libcrmath.so`. Run with `LD_PRELOAD` set to it, ANTs' dynamically
+`scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin`,
+`cos`, `sinf` and `cosf` with a small wrapper (which also provides `sincos` and `sincosf`) into
+`oracles/core-math-preload/libcrmath.so` (`sinf`, `cosf` and `sincosf` since 2026-10-11; no
+other suite's result changed, since no other port computes with them). Run with `LD_PRELOAD` set to it, ANTs' dynamically
 linked calls to these functions go to the correctly rounded versions (checked with
 `LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 and DenoiseImage parity
 suites use it as their exact reference: larmorx is bit-identical to N4BiasFieldCorrection run

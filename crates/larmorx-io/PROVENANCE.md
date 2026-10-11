@@ -69,7 +69,9 @@ ITK's byte for byte.
 ## ITK transform files (`src/itk_transform.rs`)
 
 **Ported** (logic re-expressed in Rust) from ITK v5.4.5 (Apache-2.0):
-- `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (text format);
+- `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (text format; with
+  `parse_itk_text_with(_, Precision::Float)`, the numbers of both parameter lines read as
+  float, as `TxtTransformIOTemplate<float>` reads them into `OptimizerParameters<float>`);
 - `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` (MATLAB v4 format);
 - the displacement-field reading path of ANTs v2.6.5's `itk::ants::ReadTransform`
   (`Utilities/itkantsReadWriteTransform.h`).

@@ -38,6 +38,7 @@ MIXED = {
     "crates/larmorx-core/src/math/dint.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/expf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/logf.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/sinf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/vnl_svd.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd_f32.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-image/src/vnl_fft.rs": "Apache-2.0 AND BSD-3-Clause",

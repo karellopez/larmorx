@@ -36,6 +36,8 @@ FUNC = f"{F}/func/sub-01_task-mixedgamblestask_run-1"
 T1W = f"{F}/anat/sub-01_desc-preproc_T1w.nii.gz"
 MNI = f"{F}/anat/sub-01_space-MNI152NLin2009cAsym_res-2_desc-preproc_T1w.nii.gz"
 TO_MNI = f"{F}/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+FROM_MNI = f"{F}/anat/sub-01_from-MNI152NLin2009cAsym_to-T1w_mode-image_xfm.h5"
+MNI_MASK = f"{F}/anat/sub-01_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz"
 
 
 @dataclass(frozen=True)
@@ -74,6 +76,22 @@ JOBS = (
         quick=False,
     ),
     Job(
+        "GM probability → MNI 2 mm (.h5), Gaussian, --float 1 (fMRIPrep's anat2std_tpms)",
+        f"{F}/anat/sub-01_label-GM_probseg.nii.gz",
+        MNI,
+        TO_MNI,
+        "Gaussian",
+        ("--float", "1"),
+    ),
+    Job(
+        "MNI mask → T1w 1 mm (.h5 warp), Gaussian (like the template priors of brain extraction)",
+        MNI_MASK,
+        T1W,
+        FROM_MNI,
+        "Gaussian",
+        quick=False,
+    ),
+    Job(
         "aseg → boldref, GenericLabel",
         f"{F}/anat/sub-01_desc-aseg_dseg.nii.gz",
         f"{FUNC}_boldref.nii.gz",
@@ -96,6 +114,7 @@ PY_INTERP = {
     "Linear": "linear",
     "LanczosWindowedSinc": "lanczos",
     "GenericLabel": "genericlabel",
+    "Gaussian": "gaussian",
 }
 
 
@@ -145,6 +164,7 @@ def worker(threads: int, repeats: int, quick: bool) -> None:
                     [td.get(job.transform)],
                     interpolation=PY_INTERP[job.interpolation],
                     time_series=time_series,
+                    precision="float32" if "--float" in job.extra else "float64",
                     n_threads=threads,
                 )
 

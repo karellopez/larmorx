@@ -9,6 +9,8 @@
 //! - [`parallel`]: running work on an explicit number of threads.
 //! - [`defects`]: D13's switch between correcting an upstream defect and reproducing it, and the
 //!   notices that say when one changed a result.
+//! - [`itk_real`]: ITK's two computation types (`double`, and `float` as ANTs' `--float 1`) as
+//!   a type parameter, [`ItkReal`], and as a run-time choice, [`Precision`].
 //! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions; [`vnl_svd`],
 //!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
@@ -20,6 +22,7 @@ pub mod defects;
 pub mod element;
 pub mod grid;
 pub mod image;
+pub mod itk_real;
 pub mod linalg;
 pub mod math;
 pub mod parallel;
@@ -33,6 +36,7 @@ pub use defects::{Notice, UpstreamDefects};
 pub use element::{DataType, Element, RealElement};
 pub use grid::Grid3;
 pub use image::{DynImage, Image, Image3, Image4};
+pub use itk_real::{ItkReal, Precision};
 pub use ndarray;
 pub use num_complex::Complex;
 

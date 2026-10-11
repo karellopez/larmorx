@@ -99,6 +99,7 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | ITK-07 | ITK NIfTI reader | integer data scaled in float32 | d | scaled inputs | reproduces | – |
 | ITK-08 | nifti_clib | asked for `x.nii.gz`, opens `x.nii` | e | none | opens the named file | decide |
 | ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical | – |
+| ITK-10 | ITK `Versor<float>` | a versor axis of norm ≥ 1 can fail to load in float (`--float 1`) | c | none seen | reproduces (refuses) | **yes** |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
 | PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -165,20 +166,20 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (120 entries; an entry with two classes counts under its first):
+**Counts** (121 entries; an entry with two classes counts under its first):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 13 | |
 | (b) race, nondeterminism | 6 | |
-| (c) deterministic bug that changes results | 54 | 15 |
+| (c) deterministic bug that changes results | 55 | 15 |
 | (d) imprecision | 16 | |
 | (e) command-line or parsing quirk | 25 | |
 | (f) documentation or message only | 6 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
-column (after the first D13 switches, 2026-10-11): 28 **yes**, 6 replica, 25 decide, 1 rule 8, 1
+column (after the first D13 switches, 2026-10-11; ITK-10 added later that day): 29 **yes**, 6 replica, 25 decide, 1 rule 8, 1
 open; 13 entries switched to corrected by default.
 
 ## D13 gaps: what the next task switches to "correct by default"
@@ -833,7 +834,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `itkMathDetail.h:414-422`; verified (the last 7 voxels of a 4D case).
 - **fMRIPrep:** none seen.
 - **larmorx:** reproduces (`larmorx_image::grid::{vnl_floor_f32, itk_floor_f64}`, used by the
-  4D paths of `larmorx_ants::resample`).
+  4D paths of `larmorx_ants::resample`). Since 2026-10-11 also in antsApplyTransforms'
+  displacement-field lookup and windowed-sinc base index, in both precisions
+  (`larmorx_core::ItkReal::itk_floor`; [ants-float.md](ants-float.md)), where larmorx used the
+  true floor before; no parity or golden case changed.
 - **D13 / gap:** the true floor; switch. **Gap.**
 
 ### ITK-02 Extra dimensions are read with an identity direction — (c)
@@ -895,6 +899,23 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** none.
 - **larmorx:** opens exactly the path given.
 - **D13 / gap:** **decide** (Decisions, item 5: no switch proposed).
+
+### ITK-10 A versor axis of norm ≥ 1 can fail to load in float — (c)
+- **What:** `VersorRigid3DTransform<float>::SetParameters` (and `Similarity3DTransform<float>`)
+  scales an axis whose norm reaches `1 − 1e-10` down to norm `1/(1 + 1e-10)`, in double, and
+  stores it as float; rounded to float, the axis can again be longer than 1, and
+  `Versor<float>::Set` throws ("Trying to initialize a Versor with a vector whose magnitude is
+  greater than 1"). The same file reads fine in double. So `antsApplyTransforms --float 1`
+  cannot use some valid versor transforms (axis norm ≥ 1 means a rotation by 180°: such
+  parameters are the axis scaled by its norm).
+- **Evidence:** read: `itkVersorRigid3DTransform.hxx` (`SetParameters`), `itkVersor.hxx`
+  (`Set(const VectorType &)`); verified: parameters `-0.7041559 0.63925344 0.3665738 1 2 3`,
+  ANTs 2.6.5 exits 0 with `--float 0` and 1 with `--float 1` ([ants-float.md](ants-float.md)).
+- **fMRIPrep:** none seen (fMRIPrep's float transforms are affines).
+- **larmorx:** reproduces: the transform is refused in float ("invalid transform: versor with
+  magnitude greater than 1").
+- **D13 / gap:** read it (e.g. as in double, or with the axis renormalised in float); switch.
+  **Gap.**
 
 ### ITK-09 ITK's HDF5 writer is not byte-reproducible — (b)
 - **What:** ITK stores object modification times, so writing the same transform twice gives
@@ -1208,6 +1229,9 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **fMRIPrep:** none (3dTshift's default interpolation is Fourier).
 - **larmorx:** the 3dTshift original uses correctly rounded functions; the replica carries a
   translation of glibc's FMA build (LGPL), the one this machine's AFNI runs.
+  `Euler3DTransform<float>` calls them too, under `antsApplyTransforms --float 1`; larmorx uses
+  correctly rounded ports of CORE-MATH's `sinf` and `cosf` there (2026-10-11), and the CORE-MATH
+  preload replaces glibc's `sinf`, `cosf` and `sincosf` ([ants-float.md](ants-float.md)).
 - **D13 / gap:** not D13.
 
 ### GLIBC-04 `pow` for SciPy's filter poles — (d)

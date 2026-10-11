@@ -93,12 +93,15 @@ def write(path: PathLike, transforms: ItkTransform | Sequence[ItkTransform]) -> 
         _core.itk_transform_write(os.fspath(path), [t._as_tuple() for t in items])
 
 
-def _read_parts(path: PathLike) -> list[tuple[str, np.ndarray, np.ndarray]]:
+def _read_parts(
+    path: PathLike, precision: str = "float64"
+) -> list[tuple[str, np.ndarray, np.ndarray]]:
     """The stored ``(name, parameters, fixed)`` tuples; also used by the command line for
-    ``.h5`` files."""
+    ``.h5`` files. With ``precision="float32"``, text files are read as ITK's float reader
+    reads them (each number rounded once to float); the other formats are read as stored."""
     if _is_h5(path):
         return _read_h5(path)
-    return _core.itk_transform_read(os.fspath(path))
+    return _core.itk_transform_read(os.fspath(path), precision)
 
 
 def _h5py():  # type: ignore[no-untyped-def]

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use larmorx_ants::cli::{FileLoader, TransformLoader};
 use larmorx_ants::{ApplyTransformsOptions, apply_transforms, transform_points};
-use larmorx_core::Grid3;
+use larmorx_core::{Grid3, Precision};
 use larmorx_interp::{Interpolation, Window};
 use larmorx_io::itk_transform::{self, ItkTransformParts, Parameters};
 use larmorx_io::nifti;
@@ -201,12 +201,28 @@ fn chain_from_py(transforms: &Bound<'_, PyAny>) -> PyResult<TransformChain> {
     TransformChain::new(items).map_err(value_err)
 }
 
+fn precision_from(name: &str) -> PyResult<Precision> {
+    Precision::parse(name).ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "precision must be 'float64' or 'float32', not {name:?}"
+        ))
+    })
+}
+
 /// The transforms stored in an ITK text (`.txt`, `.tfm`), MATLAB (`.mat`) or NIfTI
-/// displacement-field (`.nii`, `.nii.gz`) file, as `(name, parameters, fixed)` tuples.
+/// displacement-field (`.nii`, `.nii.gz`) file, as `(name, parameters, fixed)` tuples, read
+/// as ITK's reader for `precision` (`float64` or `float32`) reads them: in float, the numbers
+/// of a text file are rounded once from their text to float (then widened to float64).
 #[pyfunction]
-fn itk_transform_read<'py>(py: Python<'py>, path: PathBuf) -> PyResult<Bound<'py, PyList>> {
+#[pyo3(signature = (path, precision = "float64"))]
+fn itk_transform_read<'py>(
+    py: Python<'py>,
+    path: PathBuf,
+    precision: &str,
+) -> PyResult<Bound<'py, PyList>> {
+    let precision = precision_from(precision)?;
     let t = py
-        .detach(|| itk_transform::read_itk_transform(&path))
+        .detach(|| itk_transform::read_itk_transform_with(&path, precision))
         .map_err(value_err)?;
     parts_to_py(py, &itk_transform::transform_to_parts(&t))
 }
@@ -285,10 +301,11 @@ fn interpolation(
 }
 
 /// Resamples `data` (3D, or 4D for a time series; float32 or float64) from `input_grid` onto
-/// `reference_grid` through `transforms` (`[(parts, invert), ...]` in `-t` order). Returns
-/// float64 data shaped like the reference grid (plus the time axis).
+/// `reference_grid` through `transforms` (`[(parts, invert), ...]` in `-t` order), computing in
+/// `precision` (`float64`, or `float32` as `antsApplyTransforms --float 1`). Returns data of
+/// that type shaped like the reference grid (plus the time axis).
 #[pyfunction]
-#[pyo3(signature = (data, input_grid, reference_grid, transforms, interpolation_name = "linear", sigma = None, alpha = None, order = 3, default_value = 0.0, n_threads = 1))]
+#[pyo3(signature = (data, input_grid, reference_grid, transforms, interpolation_name = "linear", sigma = None, alpha = None, order = 3, default_value = 0.0, n_threads = 1, precision = "float64"))]
 #[allow(clippy::too_many_arguments)]
 fn ants_apply_transforms<'py>(
     py: Python<'py>,
@@ -302,7 +319,9 @@ fn ants_apply_transforms<'py>(
     order: u32,
     default_value: f64,
     n_threads: usize,
+    precision: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let precision = precision_from(precision)?;
     let input_grid = grid_from_dict(input_grid)?;
     let reference = grid_from_dict(reference_grid)?;
     let chain = chain_from_py(transforms)?;
@@ -310,6 +329,7 @@ fn ants_apply_transforms<'py>(
         interpolation: interpolation(interpolation_name, sigma, alpha, order, input_grid.spacing)?,
         default_value,
         n_threads,
+        precision,
     };
     let n_in = input_grid.len().max(1);
     let (n_volumes, result) = if let Ok(a) = data.extract::<PyReadonlyArrayDyn<'_, f32>>() {
@@ -342,6 +362,15 @@ fn ants_apply_transforms<'py>(
     let mut shape = reference.size.to_vec();
     if data.getattr("ndim")?.extract::<usize>()? > 3 {
         shape.push(n_volumes);
+    }
+    if precision == Precision::Float {
+        // Float values: exact as float32.
+        let values: Vec<f32> = values.iter().map(|&v| v as f32).collect();
+        return Ok(PyArray::from_owned_array(
+            py,
+            ArrayD::from_shape_vec(IxDyn(&shape).f(), values).map_err(value_err)?,
+        )
+        .into_any());
     }
     Ok(PyArray::from_owned_array(
         py,
@@ -389,9 +418,15 @@ pub struct PyLoader;
 
 impl TransformLoader for PyLoader {
     fn load(&self, path: &Path) -> Result<Transform, String> {
+        self.load_with(path, Precision::Double)
+    }
+
+    /// HDF5 files are read as stored (ITK casts their values afterwards), the others as
+    /// [`FileLoader`] reads them for `precision`.
+    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
         let name = path.to_string_lossy().to_ascii_lowercase();
         if !(name.ends_with(".h5") || name.ends_with(".hdf5")) {
-            return FileLoader.load(path);
+            return FileLoader.load_with(path, precision);
         }
         Python::attach(|py| -> PyResult<Transform> {
             let read = py.import("larmorx.transforms")?.getattr("_read_parts")?;

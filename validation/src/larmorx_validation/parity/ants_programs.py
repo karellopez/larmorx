@@ -163,8 +163,9 @@ def _env(threads: int = THREADS) -> dict[str, str]:
 
 @functools.cache
 def crmath_preload() -> Path | None:
-    """``libcrmath.so``, glibc's ``expf``/``logf``/``exp``/``log``/``sin``/``cos``/``sincos``
-    replaced by CORE-MATH's correctly rounded functions (``scripts/build_crmath_preload.sh``):
+    """``libcrmath.so``, glibc's ``expf``/``logf``/``exp``/``log``/``sin``/``cos``/``sincos``/
+    ``sinf``/``cosf``/``sincosf`` replaced by CORE-MATH's correctly rounded functions
+    (``scripts/build_crmath_preload.sh``):
     ``LARMORX_CRMATH_PRELOAD``, else the workspace's ``oracles/core-math-preload``. ``None``
     if neither exists."""
     if env := os.environ.get("LARMORX_CRMATH_PRELOAD"):

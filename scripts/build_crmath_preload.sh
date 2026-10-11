@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Build libcrmath.so: glibc's expf, logf, exp, log, sin, cos and sincos replaced by CORE-MATH's
-# correctly rounded functions, for LD_PRELOAD into an oracle program.
+# Build libcrmath.so: glibc's expf, logf, exp, log, sin, cos, sincos, sinf, cosf and sincosf
+# replaced by CORE-MATH's correctly rounded functions, for LD_PRELOAD into an oracle program.
+# (sinf, cosf and sincosf since 2026-10-11: Euler3DTransform<float> calls them under
+# antsApplyTransforms --float 1.)
 #
 # larmorx's transcendental functions are correctly rounded (CLAUDE.md rule 5); glibc's are not
 # always, and ITK calls glibc's. Running an ANTs oracle with this library preloaded gives ANTs'
@@ -45,6 +47,8 @@ mkdir -p "$OUT/obj"
 "$CC" -O2 -fPIC -I"$CM/src/binary64/log" -c "$CM/src/binary64/log/log.c" -o "$OUT/obj/log.o"
 "$CC" -O2 -fPIC -c "$CM/src/binary64/sin/sin.c" -o "$OUT/obj/sin.o"
 "$CC" -O2 -fPIC -c "$CM/src/binary64/cos/cos.c" -o "$OUT/obj/cos.o"
+"$CC" -O2 -fPIC -c "$CM/src/binary32/sin/sinf.c" -o "$OUT/obj/sinf.o"
+"$CC" -O2 -fPIC -c "$CM/src/binary32/cos/cosf.c" -o "$OUT/obj/cosf.o"
 
 cat > "$OUT/obj/preload.c" <<'EOF'
 /* glibc's names for CORE-MATH's correctly rounded functions (LD_PRELOAD). */
@@ -54,6 +58,8 @@ double cr_exp(double);
 double cr_log(double);
 double cr_sin(double);
 double cr_cos(double);
+float cr_sinf(float);
+float cr_cosf(float);
 float expf(float x) { return cr_expf(x); }
 float logf(float x) { return cr_logf(x); }
 double exp(double x) { return cr_exp(x); }
@@ -61,6 +67,9 @@ double log(double x) { return cr_log(x); }
 double sin(double x) { return cr_sin(x); }
 double cos(double x) { return cr_cos(x); }
 void sincos(double x, double *s, double *c) { *s = cr_sin(x); *c = cr_cos(x); }
+float sinf(float x) { return cr_sinf(x); }
+float cosf(float x) { return cr_cosf(x); }
+void sincosf(float x, float *s, float *c) { *s = cr_sinf(x); *c = cr_cosf(x); }
 EOF
 "$CC" -O2 -fPIC -fno-builtin -c "$OUT/obj/preload.c" -o "$OUT/obj/preload.o"
 "$CC" -shared -o "$OUT/libcrmath.so" "$OUT"/obj/*.o -lm
@@ -68,7 +77,7 @@ EOF
 {
   echo "CORE-MATH: $CM ($(git -C "$CM" rev-parse HEAD 2>/dev/null || echo 'no git metadata'))"
   echo "compiler: $($CC --version | head -1)"
-  echo "functions: expf logf exp log sin cos sincos"
+  echo "functions: expf logf exp log sin cos sincos sinf cosf sincosf"
   echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$OUT/BUILD_INFO.txt"
 echo "built $OUT/libcrmath.so"

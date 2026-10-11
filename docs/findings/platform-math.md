@@ -171,6 +171,7 @@ and `src/binary32/log/logf.c`, bit-identical to the C on all 2^32 inputs.
 `oracles/core-math-preload/libcrmath.so`. Run with `LD_PRELOAD` set to it, ANTs' dynamically
 linked calls to these functions go to the correctly rounded versions (checked with
 `LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 parity suite uses it as
-its exact reference: larmorx is bit-identical to N4BiasFieldCorrection run this way in every
-compared case ([ants-n4](../validation/ants-n4.md)). Calls that GCC inlines or evaluates at
-compile time are not affected. *Verified* (2026-10-11).
+its exact reference: larmorx is bit-identical to N4BiasFieldCorrection run this way in all
+54 outputs of the standard tier ([ants-n4](../validation/ants-n4.md)); against the binary
+without the library, in 30 of 54. ANTs' own code is not changed. Calls that GCC inlines or
+evaluates at compile time are not affected. *Verified* (2026-10-11).

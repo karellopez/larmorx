@@ -17,10 +17,11 @@ in [ants-image-programs.md](ants-image-programs.md), its argument parser in
 - **The oracle's compiler (GCC 11, `-O3`) keeps two float quantities of the fit in double
   precision** on the first two axes of 2D and 3D images. larmorx reproduces this.
 - **ITK's `expf`, `logf`, `exp` and `sincos` come from glibc**, which is not always correctly
-  rounded; larmorx's are (CLAUDE.md rule 5). That is the only difference left: with CORE-MATH
-  preloaded into ANTs, larmorx is bit-identical to it in every compared case. Against ANTs as
-  built, outputs that differ do so by about as much as ANTs differs from itself between thread
-  counts.
+  rounded; larmorx's are (CLAUDE.md rule 5). That is the only difference left. Against the
+  unmodified ANTs 2.6.5 binary (one thread), 27 of 45 compared cases (30 of 54 outputs) are
+  bit-identical, and the others differ by about as much as ANTs differs from itself between
+  thread counts. Run with those glibc functions replaced by CORE-MATH's through `LD_PRELOAD`
+  (ANTs' own code unchanged), the same binary gives larmorx's bits in all 54 outputs.
 
 ## How fMRIPrep, sMRIPrep and sdcflows call it
 

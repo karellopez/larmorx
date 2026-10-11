@@ -82,10 +82,10 @@ NOTES = [
     "- **Same result.** ANTs' own result changes with its thread count (ITK's B-spline fit "
     "sums per-thread lattices); larmorx gives ANTs' one-thread result on any number of "
     "threads. Where the table says values differ from ANTs at one thread, the cause is "
-    "glibc's `expf`/`logf`/`exp`, which are not always correctly rounded: with CORE-MATH "
-    "preloaded into ANTs, larmorx is bit-identical to it "
-    "([validation record](../validation/ants-n4.md)).",
-    "- **Where the time goes.** Each iteration sharpens the histogram (three FFTs of 512 "
+    "glibc's `expf`/`logf`/`exp`, which are not always correctly rounded: the same ANTs "
+    "binary with those functions replaced by CORE-MATH's through `LD_PRELOAD` gives "
+    "larmorx's bits ([validation record](../validation/ants-n4.md)).",
+    "- **Where the time goes.** Each iteration sharpens the histogram (seven FFTs of 512 "
     "points), fits a B-spline to the residual at every voxel of the shrunk image, and "
     "evaluates the field on the shrunk grid; the default runs 200 iterations. ITK builds a "
     "point set and recomputes every point's span index and kernel weights at each fit. The "

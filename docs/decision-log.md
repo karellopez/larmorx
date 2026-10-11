@@ -372,9 +372,11 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
 - **Correctly rounded maths kept (rule 5).** glibc's `expf`, `logf` and `exp` are not always
   correctly rounded, and one misrounded value changes an N4 run slightly. larmorx keeps the
   correctly rounded functions (new: `larmorx_core::math::{expf, logf}`), so it gives the same
-  bits on every platform. To prove the port exact anyway, the suite also runs ANTs with
-  CORE-MATH preloaded (`scripts/build_crmath_preload.sh`): larmorx is bit-identical to that run
-  in every compared case. Against ANTs as built, cases that differ do so within about ANTs'
+  bits on every platform. To prove the port exact anyway, the suite also runs the unmodified
+  ANTs binary with glibc's `expf`, `logf`, `exp`, `log`, `sin`, `cos` and `sincos` replaced by
+  CORE-MATH's through `LD_PRELOAD` (`scripts/build_crmath_preload.sh`): larmorx is
+  bit-identical to that run in 54 of 54 outputs (standard tier). Against the binary as built,
+  27 of 45 cases (30 of 54 outputs) are bit-identical and the rest differ within about ANTs'
   own thread band (`docs/validation/ants-n4.md`).
 - **Open question for the user:** bit-identity with ANTs *as built on Linux* would need
   glibc's float `expf`/`logf` (and the double `exp`) instead of correctly rounded ones, for

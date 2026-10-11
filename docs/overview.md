@@ -171,6 +171,11 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
     `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`): 1.3–43× faster
     on one thread, up to 78× with threads, bit-identical; sMRIPrep's `ME 10` on a brain mask
     278 ms instead of 956 ms, `FillHoles 2` 68 ms instead of 2.9 s;
+  - ANTs' `N4BiasFieldCorrection`: 6.4–7.4× faster on one thread on fMRIPrep's, sMRIPrep's
+    and sdcflows' command lines, up to 23× with threads; sMRIPrep's N4 on a T1w 8.7 s on one
+    thread and 2.4 s on 12 instead of 55 s and 11 s. Bit-identical to ANTs at one thread
+    when ANTs uses correctly rounded `expf`/`logf`/`exp`; otherwise within ANTs' own
+    variation between thread counts;
   - head-motion correction (`lx.mri.hmc`, clean-room, mcflirt-compatible): 1.2–2.3× faster
     than mcflirt on one thread and 4.9–9.4× on 12, within mcflirt's own variability; the
     matrices alone, all fMRIPrep needs, 5.7–16×.

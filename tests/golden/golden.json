@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "0311a80e75cc29d1142eff9fbcbc7baf38aaa5f2", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "fb6cc8dccf8f8f2c3477ed3b7a1e323751ce6e59", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
@@ -216,8 +216,14 @@
    "out:header": {"bytes": 352, "sha256": "1c67b9217c425c6731b2558423d5935c8fa126489a1704cc32c74f2cd7c77dae"}
   },
   "cli.ants.antsApplyTransforms.4d": {
-   "out:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "92c7be2114f2cc452c52df3659d2909e51f9a64291e7ec807de0e81780c94da3", "shape": [20, 18, 14, 4], "sum": "4752441.994662315"},
+   "out:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "5bba9a830ee1e42f51697080cb873541ed40b4c31e01db1c6bb4b72b758a6419", "shape": [20, 18, 14, 4], "sum": "4752441.977343656"},
    "out:header": {"bytes": 352, "sha256": "15771a07913dcc18f20686e933149bcaf65cc03e71b6db1df8ee062e395952b4"}
+  },
+  "cli.ants.antsApplyTransforms.float": {
+   "lines:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4e0fdb02cb2e6433cc7b2869a54d178632a32dafbd4c3a0947abb6b32266959b", "shape": [20, 18, 14], "sum": "972793.5718802214"},
+   "lines:header": {"bytes": 352, "sha256": "8d23ad4cffd424d7ef32122a2d6d1852ee25aa1aff681fb34ea2b430ba245e8f"},
+   "out:data": {"dtype": "<f4", "sample": "a7e64941cdcc8cbfcdcc8cbfcdcc8cbfcdcc8cbfcdcc8cbfcdcc8cbfcdcc8cbf", "sha256": "b292ced635e41b2ad59dae10f37a020b91c035e325eb99d0d2c4da1278bd3d4b", "shape": [20, 18, 14], "sum": "962051.5079607787"},
+   "out:header": {"bytes": 352, "sha256": "8d23ad4cffd424d7ef32122a2d6d1852ee25aa1aff681fb34ea2b430ba245e8f"}
   },
   "cli.mri.hmc": {
    "MAT_0000": {"bytes": 153, "sha256": "4fb903a112b0acc5a6a03151a386f83b65490d8437a9868375199001c153e315"},
@@ -317,6 +323,20 @@
   "py.ants.apply_transforms.4d": {
    "series": {"dtype": "<f8", "sample": "00000000000000000000000000000000dcc023a1122346c020810fe2a4295040633c4540ea3d8740000000000000000041d3b973129339400000000000000000", "sha256": "2b586decd0b1d2f45ce234fa6f1b5dd67981534adf94f154f7620ce9b2062040", "shape": [24, 20, 16, 4], "sum": "3569765.290166331"},
    "series.affine": {"dtype": "<f8", "sample": "333333333333f33f00000000000000009ed8899dd889fdbf4fecc44eecc4ee3f9ed8899dd889ed3f7662277662270640382ff4422ff4fabf000000000000f03f", "sha256": "a0456686dd6d4422d6de1e6764c7e679cf9bee68c7dcbcb1c94566ebe83bf6c6", "shape": [4, 4], "sum": "-52.15"}
+  },
+  "py.ants.apply_transforms.float32": {
+   "blackman": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "3d5b4fcd0a2a5435c5ca62c2489f2dd5fa015c5833821360f066b5dcc7e0feac", "shape": [20, 18, 14], "sum": "978875.9097919248"},
+   "bspline": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "dab654cc86c268a3509153fca219865eeb3c9e30f6abfdd0ca2a9049c5e59437", "shape": [20, 18, 14], "sum": "979905.8084628433"},
+   "cosine": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "ceacc57306c370a477511691e0e9cc14dffa17cad716585c46a03f50aae06e7b", "shape": [20, 18, 14], "sum": "972788.8062548059"},
+   "gaussian": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "d1d277660c415eaab8eaeaa2af07bdab99faf7d564f196fa15772930f37cb6ae", "shape": [20, 18, 14], "sum": "958270.3500394821"},
+   "genericlabel": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "98c365fc9babf0dc08fba203cab9c010db1edd71fb84948a9d32406f8d10f536", "shape": [20, 18, 14], "sum": "3755.0"},
+   "hamming": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "8c24993eff05b4b19a2e84a64d5371d495b186f0f944baa3a44482bcb5e4349b", "shape": [20, 18, 14], "sum": "984969.7879072838"},
+   "lanczos": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "4c3ebd388086664740cc508ec01f302a7699d73ea14d1d6ca8fb3ecf351bd0ba", "shape": [20, 18, 14], "sum": "971507.0394091373"},
+   "linear": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "2f4f9b04e010b212f8f42dc314112510782cd0fda8a46f35c7c7201b4922fe14", "shape": [20, 18, 14], "sum": "972929.923291564"},
+   "lines": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "965649908d69c682c338cef314e2b119d3c7a93362f227f5429ea4c77fa33a48", "shape": [20, 18, 14], "sum": "968925.5003290176"},
+   "multilabel": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "25a070df1013e4a09bd9b8ac86e539eb73e228b6eb37f06f7f177ebaa29c4c15", "shape": [20, 18, 14], "sum": "3302.0"},
+   "nearest": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "7e0a9b0c05aff201ea627ee098e62c963c2300b6eb7a1094bc353fedd0bcf878", "shape": [20, 18, 14], "sum": "978617.8574939668"},
+   "welch": {"dtype": "<f4", "sample": "000080bf000080bf000080bf000080bf000080bf000080bf000080bf000080bf", "sha256": "17981615ed0b485f62915fe819a6e8a868a4165339cea9dd9936bb7c51fabfce", "shape": [20, 18, 14], "sum": "974732.9270346686"}
   },
   "py.ants.apply_transforms_to_points": {
    "lps": {"dtype": "<f8", "sample": "736891ed7c2336c0f853e3a59b341540f1d24d62108336c0b83eec5f508f2f4014ae47e17a4c304049a4ad873b9422c000000000008022c00000000000000440", "sha256": "a5b5096431b48b74b2ff2bc1dec01715d4ce16afd1f9f933968bd4ef730a9216", "shape": [50, 4], "sum": "-79.22345487149792"},

@@ -38,9 +38,13 @@ command line on real data, category `fmriprep`):
 | N4 for skull-stripped T1w (`anat/ants.py:927`) | the final N4's options without the weight image | `omp_nthreads` |
 | sdcflows' magnitude brain extraction (`sdcflows/workflows/ancillary.py:87`), niworkflows' EPI reference map (`workflows/epi/refmap.py:153`) | `-d 3 -c [50x50x50x50x50,1e-7] -s 4` | 8, `omp_nthreads` |
 
-nipype's `n_procs` sets the interface's `num_threads`, which becomes
-`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`. So the anatomical results depend on the machine's
-thread count (see the B-spline fit below).
+nipype's `n_procs` sets the interface's `num_threads`, which nipype passes to ANTs as
+`NSLOTS`; ITK reads it like `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (which wins when both are
+set). So the anatomical results depend on the machine's thread count (see the B-spline fit
+below). *Corrected 2026-10-11:* this said the count "becomes
+`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`"; fMRIPrep 25.2.6's working directory shows `NSLOTS=8`
+for both brain-extraction N4s and `NSLOTS=1` for the BOLD reference's
+([fmriprep-oracle.md](fmriprep-oracle.md)).
 
 ## The program: N4BiasFieldCorrection.cxx
 

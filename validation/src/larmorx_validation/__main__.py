@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Command line: ``python -m larmorx_validation parity <suite> [--tier smoke] [--out DIR]``.
 
+``python -m larmorx_validation pipeline-stages --oracle <run dir> --out DIR`` compares larmorx
+with a real fMRIPrep run, stage by stage (:mod:`larmorx_validation.stages`).
+
 ``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, which
 larmorx runs as a separate process) instead of the clean-room original, where a suite has one.
 """
@@ -151,6 +154,12 @@ def cmd_parity(args: argparse.Namespace) -> int:
     return 1 if counts[FAIL] else 0
 
 
+def cmd_pipeline_stages(args: argparse.Namespace) -> int:
+    from larmorx_validation import stages
+
+    return stages.cmd(args)
+
+
 def cmd_bench(args: argparse.Namespace) -> int:
     import importlib
 
@@ -193,6 +202,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--quick", action="store_true", help="fewer files and repeats (for CI smoke runs)"
     )
     b.set_defaults(func=cmd_bench)
+    st = sub.add_parser(
+        "pipeline-stages",
+        help="compare larmorx with an fMRIPrep oracle run, stage by stage, on fMRIPrep's own "
+        "inputs and parameters",
+    )
+    from larmorx_validation.stages import add_arguments
+
+    add_arguments(st)
+    st.set_defaults(func=cmd_pipeline_stages)
     args = parser.parse_args(argv)
     return args.func(args)
 

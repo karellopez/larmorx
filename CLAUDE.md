@@ -63,7 +63,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 ### Work in progress and queue (2026-10-11, evening)
 One agent at a time. The queue, in order:
 1. **Done: `antsApplyTransforms --float 1`** (see the status above; worktree branch `worktree-agent-a689dd2fa349688de`). D13 defaults unchanged (ANTS-33, ITK-01, ITK-10 reproduced).
-2. **D13 part 1:** the ANTs/ITK defects in the register's "D13 gaps" (ANTS-*, ITK-*), and the decided details (float-to-integer clamps with a warning; a switch even for failure and garbage cases).
+2. **Running: D13 part 1** (agent branch `worktree-agent-a448db6a134de1e65`): the ANTs/ITK defects in the register's "D13 gaps" (ANTS-*, ITK-*), and the decided details (float-to-integer clamps with a warning; a switch even for failure and garbage cases).
 3. **D13 part 2b:** the same fixes in the GPL 3dTshift replica (replica author, may read AFNI source), plus its bug: it writes a metre or micrometre input's sform unconverted (the two expected divergences in `REPLICA_DIVERGENCES`).
 4. **Stage comparisons on the new oracle runs:** `python -m larmorx_validation pipeline-stages --oracle <run>` for each run below, once finished. Confirm PIPE-03 on real PEPOLAR data (ds005040). Regenerate `docs/validation/fmriprep-stages.md` for ds000005 too: its N4 rows predate the source-faithful N4, and D13 changed defaults.
 5. **Pending measurements on a quiet machine:** `docs/benchmarks/ants-n4.md` against the new oracle; antsApplyTransforms after `--float`.

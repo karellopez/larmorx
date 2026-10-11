@@ -10,9 +10,11 @@ and of fMRIPrep's ``load_transforms`` (``fmriprep/utils/transforms.py``, Apache-
 - ITK text (``.txt``, ``.tfm``), MATLAB (``.mat``) and composite HDF5 (``.h5``) files.
 
 Transforms map **reference (target) RAS+ points to moving points** and a chain applies its
-steps in order. The 4×4 matrices are computed exactly as nitransforms computes them, with
-numpy (ITK text values read as float32, centres of rotation as float32, ``LPS @ ... @ LPS``),
-so they carry the same bits. Mapping points runs in Rust
+steps in order. The 4×4 matrices are computed with nitransforms' expressions (ITK text values
+read as float32, centres of rotation as float32, ``LPS @ ... @ LPS``); their products and
+inverses run in Rust in the operation order of numpy's OpenBLAS Haswell kernels
+(:mod:`larmorx.transforms._linalg`), so they carry nitransforms' bits on an x86-64 machine with
+FMA and the same bits on every platform. Mapping points runs in Rust
 (``larmorx_transform::nitransforms``).
 
 nitransforms: Copyright (c) 2021 The NiPy developers. MIT License; the full notice is in the
@@ -30,6 +32,7 @@ from typing import Any, Union
 import numpy as np
 
 from larmorx import _core
+from larmorx.transforms._linalg import inv, matmul
 
 __all__ = [
     "Affine",
@@ -98,8 +101,9 @@ class Affine:
 
     @property
     def inverse(self) -> np.ndarray:
-        """``np.linalg.inv(matrix)``, as nitransforms computes it."""
-        return np.linalg.inv(self.matrix)
+        """``np.linalg.inv(matrix)``, as nitransforms computes it (in Rust, with the bits of
+        numpy's OpenBLAS ``dgesv`` on x86-64 with FMA)."""
+        return inv(self.matrix)
 
     def __invert__(self) -> Affine:
         return Affine(self.inverse)
@@ -139,7 +143,7 @@ class AffineSeries:
         return (Affine(m) for m in self.matrices)
 
     def __invert__(self) -> AffineSeries:
-        return AffineSeries(np.linalg.inv(self.matrices))
+        return AffineSeries(inv(self.matrices))
 
     def __add__(self, other: Transform) -> TransformChain:
         return TransformChain((self, other))
@@ -174,7 +178,7 @@ class DenseField:
     @property
     def inverse(self) -> np.ndarray:
         """RAS+ to grid indices: ``np.linalg.inv(affine)`` (``ImageGrid.inverse``)."""
-        return np.linalg.inv(self.affine)
+        return inv(self.affine)
 
     def __add__(self, other: Transform) -> TransformChain:
         return TransformChain((self, other))
@@ -260,7 +264,8 @@ class _ItkLinear:
         offset = self.offset
         c_neg = _from_matvec(np.eye(3), offset * -1.0)
         c_pos = _from_matvec(np.eye(3), offset)
-        return LPS.dot(c_pos.dot(matrix.dot(c_neg.dot(LPS))))
+        # LPS.dot(c_pos.dot(matrix.dot(c_neg.dot(LPS)))), innermost product first
+        return matmul(LPS, matmul(c_pos, matmul(matrix, matmul(c_neg, LPS))))
 
 
 _OFFSET_DTYPE = np.dtype([("offset", "f4", 3)])["offset"]
@@ -365,7 +370,7 @@ def load_itk_composite(path: PathLike) -> TransformChain:
                 field[..., (0, 1)] *= -1.0
                 retval.insert(
                     0,
-                    DenseField(np.squeeze(field.astype("float")), np.array(LPS @ affine, float)),
+                    DenseField(np.squeeze(field.astype("float")), matmul(LPS, affine)),
                 )
                 continue
             raise TransformFileError(f"Unsupported transform type {kind}")

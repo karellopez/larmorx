@@ -1,0 +1,312 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "b4b2401c25ff",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "fmriprep": "26.0.0.dev1+g21a490fb8",
+   "nibabel": "5.4.2",
+   "nitransforms": "25.1.0",
+   "numpy": "2.3.5",
+   "sdcflows": "2.17.1",
+   "threadpoolctl": "3.7.0"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "numpy 2.3.5 with its bundled OpenBLAS, in-process, on the Haswell kernels; nitransforms, sdcflows and fMRIPrep for the mapped points, orientations and loaded transforms",
+ "results": [
+  {
+   "case": "products/general",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.053,
+   "status": "pass"
+  },
+  {
+   "case": "products/affine",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.063,
+   "status": "pass"
+  },
+  {
+   "case": "products/exponents",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.576,
+   "status": "pass"
+  },
+  {
+   "case": "products/sparse",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.642,
+   "status": "pass"
+  },
+  {
+   "case": "products/nonfinite",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.993,
+   "status": "pass"
+  },
+  {
+   "case": "products/itk-to-ras",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.156,
+   "status": "pass"
+  },
+  {
+   "case": "products/head-motion",
+   "category": "products",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.177,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/general",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.953,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/affine",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.029,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/rigid",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.045,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/exponents",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.243,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/near-singular",
+   "category": "inverses",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.803,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/permutation",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.229,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/ties",
+   "category": "inverses",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.607,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/triangular",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.23,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/subnormal",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.837,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/singular",
+   "category": "inverses",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.979,
+   "status": "pass"
+  },
+  {
+   "case": "inverses/nonfinite",
+   "category": "inverses",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.105,
+   "status": "pass"
+  },
+  {
+   "case": "points/affine-1",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.298,
+   "status": "pass"
+  },
+  {
+   "case": "points/affine-2",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.951,
+   "status": "pass"
+  },
+  {
+   "case": "points/affine-3",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.096,
+   "status": "pass"
+  },
+  {
+   "case": "points/affine-5",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.07,
+   "status": "pass"
+  },
+  {
+   "case": "points/affine-64",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.561,
+   "status": "pass"
+  },
+  {
+   "case": "points/field",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.451,
+   "status": "pass"
+  },
+  {
+   "case": "points/one-voxel",
+   "category": "points",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 13.396,
+   "status": "pass"
+  },
+  {
+   "case": "orientation/oblique",
+   "category": "orientation",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 32.69,
+   "status": "pass"
+  },
+  {
+   "case": "orientation/45-degrees",
+   "category": "orientation",
+   "checks_passed": 0,
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "axis decisions agree for 4300 of 4800 grids rotated by exactly 45\u00b0: two cosines tie, and nibabel decides with numpy's LAPACK SVD, larmorx with vnl's",
+   "seconds": 5.818,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "real/resample-series",
+   "category": "real",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.937,
+   "status": "pass"
+  }
+ ],
+ "suite": "numpy-linalg",
+ "summary": {
+  "both-error": 0,
+  "expected-divergence": 1,
+  "fail": 0,
+  "pass": 27,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

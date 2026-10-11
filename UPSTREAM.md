@@ -16,6 +16,7 @@ Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmripre
 | GNU C Library | LGPL-2.1-or-later | `glibc-2.35` release tarball, SHA-256 `5123732f6b67` (tag `glibc-2.35` → `f94f6d8a3572`) | – (AFNI 25.2.09 runs with Ubuntu 22.04's glibc 2.35) | `sinf`/`cosf` (x86-64 FMA build), ported in `crates-gpl/larmorx-gpl-afni` so that the 3dTshift replica's weighted sinc matches AFNI on every platform; LGPL-2.1 §3 allows the GPL-3 package to include it |
 | SciPy | BSD-3-Clause | `v1.15.2` → `0f1fd4a7268b` | 1.15.2 (fMRIPrep's lockfile, `pixi.lock`) | `scipy.ndimage` spline interpolation (`map_coordinates`, `spline_filter`) in `larmorx_interp::ndimage`; the development venv runs 1.15.3, whose `ndimage` interpolation code is identical (checked 2026-10-10) |
 | nitransforms | MIT | `25.1.0` → `c10f63d1a1f7` | 25.1.0 (fMRIPrep's lockfile) | coordinate mapping, transform chains and ITK readers under fMRIPrep's one-shot resampler (`larmorx_transform::nitransforms`, `larmorx.transforms`); identical to the installed wheel |
+| OpenBLAS | BSD-3-Clause | `v0.3.30` release tarball, SHA-256 `27342cff5186` (tag `v0.3.30` → `993fad6aebbc`) | – (fMRIPrep's numpy calls the OpenBLAS its wheel bundles; numpy 2.3.5's is scipy-openblas64 0.3.30) | the operation order of the Haswell kernels behind numpy's 4×4 `@`/`dot` (`dgemm`, `dgemv`) and `np.linalg.inv` (`dgesv`: `getf2_k`, `getrs`, the triangular solves, `idamax`), reproduced in `larmorx_transform::openblas` so that `lx.transforms` gives the same bits on every platform (docs/findings/numpy-blas.md) |
 | fMRIPrep | Apache-2.0 | `master` → `21a490fb89ac` (the workspace clone; the venv runs it as 26.0.0.dev1+g21a490fb8) | – | the one-shot BOLD resampler (`fmriprep/interfaces/resampling.py`, `utils/transforms.py`) in `larmorx_transform::resample_series` and `larmorx.transforms.resample_series` |
 
 **ANTs/ITK patch level (decided 2026-10-09: ANTs v2.6.5 + ITK v5.4.5).** CLAUDE.md first said "ITK v5.4.7 (pinned by ANTs 2.6)", but no ANTs 2.6.x release pins 5.4.7, and fMRIPrep's image runs ANTs 2.6.2 linked against ITK 5.4.4. The candidates were:
@@ -31,6 +32,7 @@ Validation against fMRIPrep's outputs must allow for the patch-level difference 
 
 | Project | Licence | Version | Used for |
 |---|---|---|---|
+| numpy | BSD-3-Clause | 2.3.5 (development venv; sdist SHA-256 `784db1dcdab5`) | which BLAS and LAPACK routine each 4×4 operation calls and with which memory layout (`numpy/_core/src/umath/matmul.c.src`, `_core/src/common/cblasfuncs.c`, `linalg/umath_linalg.cpp`); read, not translated |
 | nibabel | MIT | 5.4.2 (development venv); fMRIPrep's image has 5.3.2 | NIfTI reading/writing semantics (`larmorx-io`), parity oracle |
 | NIfTI-1/2 standard | public domain | `nifti1.h` / `nifti2.h` | file format |
 

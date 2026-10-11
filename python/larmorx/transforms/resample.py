@@ -11,6 +11,11 @@ and cubic B-spline interpolation are applied in one step, exactly as fMRIPrep co
 The orientation helpers are ported from nibabel 5.4.2 (MIT): ``io_orientation``,
 ``ornt_transform``, ``ornt2axcodes``, ``inv_ornt_aff`` and ``apply_orientation``, as
 sdcflows' ``ensure_positive_cosines`` uses them.
+
+The 4×4 products and inverses (``np.linalg.inv(vox2ras)``, ``ras2vox @ M @ vox2ras``,
+``affine.dot(...)``) run in Rust in the operation order of numpy's OpenBLAS Haswell kernels
+(:mod:`larmorx.transforms._linalg`), and ``io_orientation``'s SVD is vnl's LINPACK one: the
+same bits on every platform.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ import numpy as np
 from larmorx import _core
 from larmorx.image import Image, as_image
 from larmorx.io.nifti import NiftiHeader
+from larmorx.transforms._linalg import closest_orthogonal, inv, matmul
 from larmorx.transforms.chain import (
     Affine,
     AffineSeries,
@@ -53,10 +59,8 @@ def _io_orientation(affine: np.ndarray) -> np.ndarray:
     zooms = np.sqrt(np.sum(rzs * rzs, axis=0))
     zooms[zooms == 0] = 1
     rs = rzs / zooms
-    pp, s, qs = np.linalg.svd(rs, full_matrices=False)
-    tol = s.max() * max(rs.shape) * np.finfo(s.dtype).eps
-    keep = s > tol
-    r = np.dot(pp[:, keep], qs[keep])
+    # P, S, Qs = svd(RS); R = P[:, S > tol] @ Qs[S > tol], with a platform-independent SVD.
+    r = closest_orthogonal(rs)
     ornt = np.ones((p, 2), dtype=np.int8) * np.nan
     in_axes = np.argsort(np.min(-(r**2), axis=0), kind="stable")
     for in_ax in in_axes:
@@ -104,7 +108,7 @@ def _inv_ornt_aff(ornt: np.ndarray, shape: Sequence[int]) -> np.ndarray:
     undo_flip = np.diag([*list(ornt[:, 1]), 1.0])
     center_trans = -(shp - 1) / 2.0
     undo_flip[:p, p] = (ornt[:, 1] * center_trans) - center_trans
-    return np.dot(undo_flip, undo_reorder)
+    return matmul(undo_flip, undo_reorder)
 
 
 def _apply_orientation(arr: np.ndarray, ornt: np.ndarray) -> np.ndarray:
@@ -133,7 +137,7 @@ def ensure_positive_cosines(
     if np.array_equal(xfm, [[0, 1], [1, 1], [2, 1]]):
         return data, affine, axcodes
     new_data = _apply_orientation(data, xfm)
-    new_affine = affine.dot(_inv_ornt_aff(xfm, data.shape))
+    new_affine = matmul(affine, _inv_ornt_aff(xfm, data.shape))
     return new_data, new_affine, axcodes
 
 
@@ -294,10 +298,9 @@ def resample_series(
             classes = [type(x).__name__ for x in chain]
             raise ValueError(f"HMC transforms must come last. Found sequence: {classes}")
         transform_list, hmc = chain.transforms, None
-    ras2vox = np.linalg.inv(vox2ras)
-    hmc_xfms = (
-        np.stack([ras2vox @ xfm.matrix @ vox2ras for xfm in hmc]) if hmc is not None else None
-    )
+    ras2vox = inv(vox2ras)
+    # np.stack([ras2vox @ xfm.matrix @ vox2ras for xfm in hmc]), left to right
+    hmc_xfms = matmul(matmul(ras2vox, hmc.matrices), vox2ras) if hmc is not None else None
     steps = _rust_steps(TransformChain(tuple(transform_list)).steps())
     fmap = None if fieldmap is None else _fieldmap(fieldmap, shape)
 

@@ -1317,7 +1317,7 @@ def _(ctx: Context) -> dict[str, Any]:
 )
 def _(ctx: Context) -> dict[str, Any]:
     """ITK transform files written and read (text, MATLAB, HDF5), and loaded as fMRIPrep
-    loads them (the 4×4 matrices are numpy products)."""
+    loads them (the 4×4 products and inverses: ``larmorx_transform::openblas``)."""
     txt, mat = ctx.out("x.txt"), ctx.out("x.mat")
     lx.transforms.write(txt, [AFFINE_XFM, RIGID_XFM])
     lx.transforms.write(mat, AFFINE_XFM)
@@ -1350,7 +1350,8 @@ def _(ctx: Context) -> dict[str, Any]:
     ),
 )
 def _(ctx: Context) -> dict[str, Any]:
-    """Points through an affine, a displacement field (on and off its grid) and a chain."""
+    """Points through an affine, a displacement field (on and off its grid) and a chain; a
+    single point takes numpy's ``dgemv`` order instead of ``dgemm``'s."""
     aff = lx.transforms.Affine(affine((3, 3, 3), (1.0, 1.0, 1.0), (1.5, -2.0, 0.25)))
     grid = (9, 8, 7)
     deltas = ints(30, (*grid, 3), -16, 17) / 8
@@ -1365,6 +1366,8 @@ def _(ctx: Context) -> dict[str, Any]:
         "field": field.map(points),
         "field.on_grid": field.map(on_grid),
         "chain": chain.map(points, n_threads=2),
+        "affine.one_point": aff.map(points[:1]),
+        "field.one_point": field.map(points[:1]),
         "steps": np.array([len(chain.steps())], np.float64),
     }  # fmt: skip
 
@@ -1372,7 +1375,7 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("py.transforms.ensure_positive_cosines", covers=("lx.transforms.ensure_positive_cosines",))
 def _(ctx: Context) -> dict[str, Any]:
     """Two axes against their world axes: the new affine's translation sums two rounded
-    products (a numpy matrix product)."""
+    products (``matmul4``), and the axes come from ``io_orientation``'s SVD (vnl's)."""
     flip = anat().affine.copy()
     flip[:3, 0] = -flip[:3, 0]
     flip[:3, 2] = -flip[:3, 2]
@@ -1387,8 +1390,8 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("py.transforms.resample_series", covers=("lx.transforms.resample_series",))
 def _(ctx: Context) -> dict[str, Any]:
     """fMRIPrep's one-shot resampler: per-volume head motion and a coregistration onto an
-    oblique grid (the 4×4 matrices are numpy products and inverses: PLAN.md §11.4's known
-    risk)."""
+    oblique grid (the 4×4 products and inverses: ``larmorx_transform::openblas``), and onto a
+    single voxel (numpy's single-point ``dgemv`` order at every product)."""
     shape = (14, 12, 10)
     target = (np.array(shape), affine(shape, (2.5, 3.0, 3.5), (0.5, -0.75, 1.0)))
     files = [ctx.file("hmc.txt"), ctx.file("coreg.txt")]
@@ -1396,7 +1399,15 @@ def _(ctx: Context) -> dict[str, Any]:
     # float64 output keeps the last bits that float32 (fMRIPrep's) would round away, so a
     # platform difference in the numpy matrices shows here.
     exact = lx.transforms.resample_series(bold(), target, files, output_dtype="float64")
-    return {**image_outputs("out", img, header=True), "out.float64": exact.data}
+    one = ((1, 1, 1), affine((1, 1, 1), (2.5, 3.0, 3.5), (0.5, -0.75, 1.0)))
+    voxel = lx.transforms.resample_series(
+        bold(), one, files, jacobian=False, output_dtype="float64"
+    )
+    return {
+        **image_outputs("out", img, header=True),
+        "out.float64": exact.data,
+        "one_voxel": voxel.data,
+    }
 
 
 @case("py.transforms.resample_series.sdc", covers=("lx.transforms.resample_series",))

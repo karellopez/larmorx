@@ -44,3 +44,5 @@ fsl-utils	https://git.fmrib.ox.ac.uk/fsl/utils.git	2203.5	FSL-Licence	fsl
 fsl-znzlib	https://git.fmrib.ox.ac.uk/fsl/znzlib.git	2111.0	FSL-Licence	fsl
 fsl-armawrap	https://git.fmrib.ox.ac.uk/fsl/armawrap.git	0.6.0	Apache-2.0	fsl
 glibc-2.35	https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz	sha256:5123732f6b67ccd319305efd399971d58592122bcc2a6518a1bd2510dd0cf52e	LGPL-2.1-or-later	tags
+OpenBLAS-0.3.30	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz	sha256:27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d	BSD-3-Clause	tags
+numpy-2.3.5	https://files.pythonhosted.org/packages/76/65/21b3bc86aac7b8f2862db1e808f1ea22b028e30a225a34a5ede9bf8678f2/numpy-2.3.5.tar.gz	sha256:784db1dcdab56bf0517743e746dfb0f885fc68d948aba86eeec2cba234bdf1c0	BSD-3-Clause	tags

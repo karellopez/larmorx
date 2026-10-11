@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 78 cases, 291 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 78 cases, 294 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |
@@ -168,57 +168,45 @@ cached) and run the golden test (under 0.1 s); `lint` checks a few more files (n
 upload steps run only on failure. In all, about 0.5-1 runner-minute per push before the
 caches are warm, about 0.3 after.
 
-## Known risk: numpy's 4×4 matrices
+## Resolved: numpy's 4×4 matrices (2026-10-11)
 
-**What.** `lx.transforms` computes its 4×4 matrices in Python with numpy, with the same
+**What it was.** `lx.transforms` computed its 4×4 matrices in Python with numpy, with the same
 expressions as nitransforms and fMRIPrep: `np.linalg.inv(vox2ras)`, `ras2vox @ M @ vox2ras`
 for head motion, the ITK-to-RAS conversion `LPS · C⁺ · M · C⁻ · LPS` of every loaded
-transform, `~Affine`, `DenseField.inverse`, and the product in `ensure_positive_cosines`
-([fmriprep-resampling.md](../findings/fmriprep-resampling.md)). numpy hands them to BLAS and
-LAPACK: OpenBLAS on Linux and Windows, Accelerate on macOS (numpy's macOS 14+ wheels), and
-OpenBLAS picks its kernels by CPU at run time.
+transform, `~Affine`, `DenseField.inverse`, and the products and SVD in
+`ensure_positive_cosines`. numpy hands them to BLAS and LAPACK (OpenBLAS on Linux and Windows,
+with kernels picked by CPU at run time; Accelerate on macOS), so their last bits depend on the
+CPU and the platform. CI run 38095330520 confirmed it: four `lx.transforms` cases differed
+between platforms (`py.transforms.resample_series`, `out.float64`, 36-112 ulp, up to 8e-13;
+`py.transforms.resample_series.sdc`, `out`, 21 ulp; `py.transforms.files` and
+`py.transforms.ensure_positive_cosines`, 1 ulp), and Windows x64 differed in that run but not
+the previous one, as the runner's CPU changed numpy's kernel. Every other case was identical on
+all six platforms, and so were the float32 outputs fMRIPrep writes.
 
-**They are platform-dependent by construction.** On this machine, forcing numpy onto other
-OpenBLAS kernels (`OPENBLAS_CORETYPE`; numpy 2.3.5, OpenBLAS 0.3.30) changes the bits:
+**The fix (option 1 of the four weighed here before: Rust arithmetic in a fixed order).** The
+products and inverses now run in Rust, `larmorx_transform::openblas`, in the operation order of
+OpenBLAS 0.3.30's Haswell kernels, which numpy uses on x86-64 CPUs with AVX2 and FMA:
+`dgemm` as fused multiply-add chains, `dgesv` as OpenBLAS's `getf2_k` and `getrs` with their
+separately rounded dot products and reciprocal pivots, `dgemv` for a single point, and
+`idamax`'s handling of NaN. `io_orientation`'s SVD is vnl's LINPACK SVD. The Python layer
+evaluates nitransforms' expressions with these functions (`larmorx.transforms._linalg`). So:
 
-- products `inv(A) @ M @ A` of 10,000 random affines differ in 99.9 % of cases between the
-  kernels with fused multiply-adds (Haswell, Zen) and those without (Nehalem, Sandy Bridge,
-  Prescott); the fused kernels accumulate `fma(a3, b3, fma(a2, b2, fma(a1, b1, a0·b0)))`
-  (300 of 300 random 4×4 products reproduced this way);
-- inverses differ in 23 % of cases between the Haswell and Sandy Bridge kernels (up to 6e-13
-  relative), though not between Haswell and Nehalem;
-- the golden check under the Nehalem kernel fails 2 cases: `py.transforms.files`
-  (`load_transforms`, `load_itk_linear.mat`, `composite.affine`: last bits) and
-  `py.transforms.resample_series` (`out.float64`: 81 ulp, 5.8e-13, at the sampled voxels).
-  The float32 output, which fMRIPrep writes, was identical.
+- every platform and CPU computes the same bits (`f64::mul_add` is a correctly rounded fused
+  multiply-add everywhere);
+- on an x86-64 machine with FMA, larmorx stays bit-identical to fMRIPrep: 18,143,058 of
+  18,143,058 compared results against numpy
+  ([numpy-linalg.md](numpy-linalg.md)), and the resample-series parity is still 136 of 136
+  bit-identical ([resample-series.md](resample-series.md));
+- the recorded checksums did not change: they were recorded on this machine, where numpy
+  already computed the Haswell bits. Three outputs were added so that CI also checks numpy's
+  single-point order: `affine.one_point` and `field.one_point` in `py.transforms.map`, and
+  `one_voxel` (a one-voxel target) in `py.transforms.resample_series`.
 
-*Verified.* So the same numpy expression gives different last bits on different CPUs and
-BLAS libraries, and fMRIPrep's own results carry the same dependence.
-
-**The golden cases stay strict.** No tolerance. Their inputs were chosen so that the risk is
-visible: rotation centres that are not dyadic (else the products are exact), and a float64
-copy of the resampled series (float32 rounds most last-bit differences away). CI will show
-which platforms differ; macOS (Accelerate) is the most likely. Linux x86-64 runners may use
-an AVX-512 kernel (SkylakeX), which could not be checked here.
-
-**Options** (for the project owner; nothing was changed in the resampler's numerics):
-
-1. **Rust 4×4 arithmetic in a fixed order** (recommended). Products as fused chains in index
-   order with `f64::mul_add`, which is correctly rounded on every platform: this reproduces
-   OpenBLAS's Haswell/Zen kernels bit for bit (verified above), so Linux x86-64 stays
-   bit-identical with fMRIPrep on any CPU with fused multiply-adds (x86-64 since 2013), and
-   every platform gets those bits. Inverses need a port of OpenBLAS's `dgesv` path for 4×4
-   (`getrf` with its pivot reciprocals and update order, then `getrs`), verified against numpy
-   on ~10⁵ random matrices under the Haswell kernel; under the Sandy Bridge kernel fMRIPrep's
-   inverses differ anyway. The Python layer would call the Rust functions instead of numpy.
-2. **The same in Python** with an exact fused multiply-add: `math.fma` exists only from
-   Python 3.13, and larmorx supports 3.12; emulating it with fractions is slow. Not
-   recommended.
-3. **Keep numpy and accept the last bits** on these outputs, with the reason in
-   `docs/findings/` and a tolerance in the golden registry. Least work; breaks the
-   bit-identity rule for `lx.transforms`.
-4. **Pin numpy's kernel** (`OPENBLAS_CORETYPE`): changes the user's environment and does not
-   exist for Accelerate. Not recommended.
+fMRIPrep's own results keep the dependence on numpy's kernel: SkylakeX (AVX-512), the kernels
+without FMA, Accelerate and ARM differ from the Haswell bits
+([numpy-blas.md](../findings/numpy-blas.md) has the measurements). The golden cases keep the
+inputs that made the risk visible (rotation centres that are not dyadic, a float64 copy of the
+resampled series), so a regression would show in CI.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Bindings for `larmorx_transform::nitransforms` and `::resample_series` (fMRIPrep's one-shot
-//! resampler).
+//! Bindings for `larmorx_transform::nitransforms`, `::openblas` (numpy's 4×4 products and
+//! inverses in a fixed order) and `::resample_series` (fMRIPrep's one-shot resampler).
 //!
 //! A chain crosses the boundary as a list of steps: `("affine", matrix)` or
 //! `("field", deltas, affine, inverse)` with `deltas` of shape `(x, y, z, 3)` (RAS+ mm).
@@ -9,9 +9,12 @@
 use larmorx_core::linalg::Mat4;
 use larmorx_core::parallel;
 use larmorx_transform::nitransforms::{self, DenseField, Step};
+use larmorx_transform::openblas;
 use larmorx_transform::resample_series::{PeInfo, ResampleError, ResampleOptions, SeriesResampler};
-use numpy::ndarray::{Array2, ArrayD, Axis, IxDyn, ShapeBuilder};
-use numpy::{PyArray, PyArray2, PyReadonlyArray2, PyReadonlyArray3, PyReadonlyArrayDyn};
+use numpy::ndarray::{Array2, Array3, ArrayD, Axis, IxDyn, ShapeBuilder};
+use numpy::{
+    PyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyReadonlyArrayDyn,
+};
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -244,7 +247,88 @@ fn resample_series<'py>(
     }
 }
 
+fn stack4(a: &PyReadonlyArray3<'_, f64>) -> PyResult<Vec<Mat4>> {
+    let a = a.as_array();
+    if a.shape()[1..] != [4, 4] {
+        return Err(PyValueError::new_err("matrices must be 4x4"));
+    }
+    Ok((0..a.shape()[0])
+        .map(|t| std::array::from_fn(|i| std::array::from_fn(|j| a[[t, i, j]])))
+        .collect())
+}
+
+fn to_stack<'py>(py: Python<'py>, ms: &[Mat4]) -> Bound<'py, PyArray3<f64>> {
+    PyArray::from_owned_array(
+        py,
+        Array3::from_shape_fn((ms.len(), 4, 4), |(t, i, j)| ms[t][i][j]),
+    )
+}
+
+/// `a[t] @ b[t]` for two `(n, 4, 4)` float64 stacks, as numpy computes it with OpenBLAS's
+/// Haswell `dgemm` (`larmorx_transform::openblas::matmul4`).
+#[pyfunction]
+fn linalg_matmul4<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray3<'_, f64>,
+    b: PyReadonlyArray3<'_, f64>,
+) -> PyResult<Bound<'py, PyArray3<f64>>> {
+    let (a, b) = (stack4(&a)?, stack4(&b)?);
+    if a.len() != b.len() {
+        return Err(PyValueError::new_err(
+            "the stacks must have the same length",
+        ));
+    }
+    let out: Vec<Mat4> = a
+        .iter()
+        .zip(&b)
+        .map(|(x, y)| openblas::matmul4(x, y))
+        .collect();
+    Ok(to_stack(py, &out))
+}
+
+/// The inverses and the singular flags of [`linalg_inv4`].
+type Inverses<'py> = (Bound<'py, PyArray3<f64>>, Bound<'py, PyArray1<bool>>);
+
+/// `np.linalg.inv` of each matrix of an `(n, 4, 4)` float64 stack, as OpenBLAS computes it
+/// (`larmorx_transform::openblas::inv4`). Returns the inverses (NaN for a singular matrix, as
+/// numpy fills them) and which matrices were singular.
+#[pyfunction]
+fn linalg_inv4<'py>(py: Python<'py>, a: PyReadonlyArray3<'_, f64>) -> PyResult<Inverses<'py>> {
+    let a = stack4(&a)?;
+    let (out, singular): (Vec<Mat4>, Vec<bool>) = a
+        .iter()
+        .map(|m| match openblas::inv4(m) {
+            Some(x) => (x, false),
+            None => ([[f64::NAN; 4]; 4], true),
+        })
+        .unzip();
+    Ok((to_stack(py, &out), PyArray1::from_vec(py, singular)))
+}
+
+/// nibabel's `io_orientation` polar step for a 3×3 matrix of unit columns
+/// (`larmorx_transform::nitransforms::closest_orthogonal`).
+#[pyfunction]
+fn linalg_closest_orthogonal<'py>(
+    py: Python<'py>,
+    rs: PyReadonlyArray2<'_, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let a = rs.as_array();
+    if a.shape() != [3, 3] {
+        return Err(PyValueError::new_err("the matrix must be 3x3"));
+    }
+    let m = std::array::from_fn(|i| std::array::from_fn(|j| a[[i, j]]));
+    let r = nitransforms::closest_orthogonal(&m)
+        .ok_or_else(|| PyValueError::new_err("SVD did not converge"))?;
+    Ok(PyArray::from_owned_array(
+        py,
+        Array2::from_shape_fn((3, 3), |(i, j)| r[i][j]),
+    ))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(linalg_matmul4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_inv4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_closest_orthogonal, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_ndcoords, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_map, m)?)?;
     m.add_function(wrap_pyfunction!(resample_series, m)?)?;

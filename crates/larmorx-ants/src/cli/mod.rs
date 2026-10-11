@@ -79,11 +79,91 @@ pub fn run(
     }
 }
 
-/// The number of threads ANTs would use: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` if set, else
-/// all logical CPUs (0).
+/// The number of threads ANTs would use, read from the environment as ITK reads it; 0 means
+/// all logical CPUs. See [`itk_threads_from`].
 pub(crate) fn itk_threads() -> usize {
-    std::env::var("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
-        .ok()
-        .and_then(|v| v.trim().parse().ok())
-        .unwrap_or(0)
+    itk_threads_from(|name| std::env::var(name).ok())
+}
+
+/// ITK's default thread count from environment variables (`var` looks one up), as
+/// `MultiThreaderBase::GetGlobalDefaultNumberOfThreads` reads them
+/// (`itkMultiThreaderBase.cxx:266-330`, ITK v5.4.5): the variables named in
+/// `ITK_NUMBER_OF_THREADS_ENV_LIST` (separated by `:`), or `NSLOTS` when that list is not set,
+/// and always `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` last; each one that is set replaces the
+/// count with its value read by C's `atoi`, so the last one set wins. 0 (none set, or a value
+/// that is not a positive number) means all logical CPUs.
+///
+/// nipype passes a node's `num_threads` to ANTs as `NSLOTS` (fMRIPrep's working directories
+/// show `NSLOTS=8` for DenoiseImage and the anatomical N4s). larmorx's results do not depend on
+/// the count, so this only decides how many CPUs it uses. ITK takes a negative value as a huge
+/// unsigned one and so uses its maximum; larmorx then uses all logical CPUs.
+pub(crate) fn itk_threads_from(var: impl Fn(&str) -> Option<String>) -> usize {
+    let list = match var("ITK_NUMBER_OF_THREADS_ENV_LIST") {
+        Some(names) => format!("{names}:ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"),
+        None => "NSLOTS:ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS".to_string(),
+    };
+    let mut threads = 0;
+    for name in list.split(':').filter(|n| !n.is_empty()) {
+        if let Some(value) = var(name) {
+            // atoi: leading digits, 0 when there are none
+            threads = cstd::stoi(&value).map_or(0, |v| usize::try_from(v).unwrap_or(0));
+        }
+    }
+    threads
+}
+
+#[cfg(test)]
+mod tests {
+    use super::itk_threads_from;
+
+    fn threads(vars: &[(&str, &str)]) -> usize {
+        itk_threads_from(|name| {
+            vars.iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (*v).to_string())
+        })
+    }
+
+    #[test]
+    fn itk_thread_variables() {
+        assert_eq!(threads(&[]), 0);
+        // nipype's num_threads
+        assert_eq!(threads(&[("NSLOTS", "8")]), 8);
+        assert_eq!(threads(&[("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "3")]), 3);
+        // the last one set wins, even when empty or not a number
+        assert_eq!(
+            threads(&[
+                ("NSLOTS", "8"),
+                ("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "2")
+            ]),
+            2
+        );
+        assert_eq!(
+            threads(&[
+                ("NSLOTS", "8"),
+                ("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "")
+            ]),
+            0
+        );
+        // atoi
+        assert_eq!(threads(&[("NSLOTS", " 6x")]), 6);
+        assert_eq!(threads(&[("NSLOTS", "-4")]), 0);
+        // a list replaces NSLOTS
+        assert_eq!(
+            threads(&[
+                ("ITK_NUMBER_OF_THREADS_ENV_LIST", "PBS_NP:MY_THREADS"),
+                ("NSLOTS", "8"),
+                ("MY_THREADS", "5"),
+            ]),
+            5
+        );
+        assert_eq!(
+            threads(&[
+                ("ITK_NUMBER_OF_THREADS_ENV_LIST", "MY_THREADS"),
+                ("MY_THREADS", "5"),
+                ("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "7"),
+            ]),
+            7
+        );
+    }
 }

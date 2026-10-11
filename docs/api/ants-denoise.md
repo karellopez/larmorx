@@ -63,7 +63,7 @@ larmorx ants DenoiseImage -d 3 -i t1w.nii.gz -n Rician -x mask.nii.gz \
 | `-r 2` / `-r 2x2x2` | `search_radius=2` / `(2, 2, 2)` | one value for every axis or one per axis |
 | `-o out` / `-o [out,noise]` | `DenoiseResult.denoised`, `DenoiseResult.noise` | float32 images on the input's grid; the noise is always returned |
 | `-v 1` | – | ANTs' progress characters and the elapsed time |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
 
 Not exposed by ANTs (fixed as in `DenoiseImage`): local mean and variance radius 1, ε = 1e-5,
 mean threshold 0.95, variance threshold 0.5, smoothing variance 2. The Rust filter

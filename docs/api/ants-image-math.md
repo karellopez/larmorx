@@ -141,7 +141,7 @@ converted to float32 as a C++ `static_cast` converts them.
 | operation ANTs has but larmorx not yet | – | "not supported yet", exit 1 |
 | missing input file | " file f does not exist . ", then a crash (SIGSEGV) | the message, then exit 1 |
 | an operation that reports an error and returns | exit 0 | exit 0 |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | threads | threads (results do not depend on it) |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | threads | threads (results do not depend on it) |
 
 ## Behaviour worth knowing
 

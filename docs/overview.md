@@ -194,6 +194,63 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   own variability across versions, platforms, thread counts and seeds (PLAN.md G4, §11).
   Changes that move results further stay opt-in. Replicas always stay exact.
 
+## Against a real fMRIPrep run
+
+[fmriprep-stages](validation/fmriprep-stages.md) (2026-10-11) gives larmorx's tools the inputs
+and parameters fMRIPrep 25.2.6 itself used at each step of a real run (ds000005 sub-01, read
+from nipype's working directory) and compares their outputs with fMRIPrep's own for that step:
+
+- **61 of 92 steps are bit-identical to fMRIPrep as it ran**: every ImageMath,
+  ThresholdImage and MultiplyImages step of brain extraction, the nine one-shot BOLD
+  resamplings (boldref, T1w and MNI space), and the antsApplyTransforms calls with linear,
+  MultiLabel and nearest-neighbour interpolation.
+- **The other 31 are explained**, each taken apart by re-running the step in fMRIPrep's image
+  and with the oracle builds: fMRIPrep's thread count (DenoiseImage and the anatomical N4s ran
+  with 8 threads; DenoiseImage at 8 threads does not even reproduce itself), glibc's
+  not-correctly-rounded maths, and the ANTs build. The exception is larmorx's own: 14
+  `antsApplyTransforms --float 1` calls, which ANTs computes in single precision and larmorx in
+  double (known since A1; ANTs in double precision, rounded to float32, is larmorx's output bit
+  for bit). Because of it, three probability maps miss the interpolation threshold of PLAN.md
+  §11.3 in at most 6 of 1.08 million voxels.
+- **Head-motion correction** (clean-room): against mcflirt, median parameter differences of at
+  most 0.0025 mm and 0.0036° (threshold 0.05) and a 95th-percentile RMS deviation of at most
+  0.023 mm; fMRIPrep's own confound code on larmorx's matrices gives FD correlations of
+  0.89–0.93 on these low-motion runs (largest FD 0.33 mm), within mcflirt's own band (0.79).
+- **Two findings about fMRIPrep** ([findings/fmriprep-oracle.md](findings/fmriprep-oracle.md)):
+  its N4 binary (conda-forge ANTs 2.6.2) follows the C++ source where the repository's GCC 11
+  oracle, and so larmorx, do not (larmorx with the source's roundings reproduces fMRIPrep's
+  N4 exactly; which one to follow is open); and its one-shot resampler corrupts random volumes
+  unless OpenBLAS runs one thread, which only its image's `OMP_NUM_THREADS=1` ensures.
+- **Times on this machine**, fMRIPrep's tools re-run at fMRIPrep's thread counts against
+  larmorx at the same counts (sums over the three runs where there are three): one-shot
+  resampling to MNI 215 s → 44 s on 8 threads, writing included; DenoiseImage 55 s → 3.2 s
+  (8 threads); the brain-extraction morphology 31 s → 4.4 s; the N4s 13.1 s → 3.0 s, 7.3 s →
+  1.2 s and 3.0 s → 0.4 s; head-motion correction about as fast as mcflirt on one thread
+  (84 s against 85 s for the whole command, 74 s for the matrices alone) and 15 s on 12
+  threads; antsApplyTransforms through fMRIPrep's warps no faster than ANTs on one thread
+  (the template priors through the SyN warp: 20.5 s against 15.8 s).
+
+## What is still needed
+
+The same comparison lists every step of the run that larmorx cannot do yet, with the time
+fMRIPrep spent on it (its own run of ds000005 sub-01, 8 jobs at once on a shared machine).
+These are the next tools to port, before larmorprepx:
+
+| Tool | What fMRIPrep uses it for | fMRIPrep's time | larmorx milestone |
+|---|---|---|---|
+| antsRegistration | MNI normalisation (SyN, 2,118 s), brain extraction (SyN, 520 s), the BOLD reference's affine premask | 2,639 s | A4 (rigid/affine), A5 (SyN) |
+| 3dUnifize | intensity unifying of the BOLD reference | 169 s | AFNI |
+| FLIRT-BBR | boundary-based BOLD-to-T1w registration | 139 s | FSL (clean-room and `larmorx-nc`) |
+| antsAI | affine initialisation (brain extraction, BOLD premask) | 117 s | A4 |
+| confounds | DVARS, CompCor, global signals, expansion, spikes (fMRIPrep's Python) | 53 s | larmorprepx (numpy) |
+| mri_coreg | BOLD-to-T1w initialisation | 48 s | FreeSurfer |
+| FAST | GM/WM/CSF segmentation and probability maps | 40 s | FSL |
+| 3dvolreg | aligning the volumes averaged into the HMC reference | 32 s (the whole averaging node) | AFNI |
+| Atropos | K-means + MRF segmentation in brain extraction | 12 s | A6 |
+| BET, 3dAutomask, fslmaths, lta_convert | BOLD brain masks, transform formats | < 6 s together | FSL, AFNI, FreeSurfer (small) |
+
+Everything else fMRIPrep computes on this dataset, larmorx already does (above).
+
 ## Working on every platform
 
 - CI builds and tests the wheels on all six platforms for every push

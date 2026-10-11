@@ -40,7 +40,7 @@ larmorx ants SmoothImage 3 sub-01_T1w.nii.gz 1 median.nii.gz 0 1
 | `outimage.ext` | the returned `lx.Image` | float32, the input's grid |
 | fifth argument `1` | `sigma_in_physical_units=True` | sigma in mm (s for time) |
 | sixth argument `1` | `median=True` | `MedianImageFilter`, radius `int(sigma)` voxels per axis |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | results do not depend on it |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | results do not depend on it |
 
 ## Behaviour worth knowing
 

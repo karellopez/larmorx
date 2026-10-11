@@ -20,6 +20,14 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-denoise](ants-denoise.md) | `lx.ants.denoise_image`, `larmorx ants DenoiseImage` | DenoiseImage (ANTs 2.6.5 binary with ITK's AdaptiveDenoising at `24825c8d`, one thread; exact reference with CORE-MATH preloaded) | `validated` |
 | [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 
+**Against a real fMRIPrep run.** [fmriprep-stages](fmriprep-stages.md) runs larmorx's tools,
+step by step, on the inputs and parameters fMRIPrep 25.2.6 itself used (read from nipype's
+working directory of an oracle run), and compares them with fMRIPrep's own output at each
+step; where they differ, the step is re-run in fMRIPrep's image and with the oracle builds to
+separate thread effects, ANTs' version, glibc's maths and larmorx. It is a record of the
+pipeline's stages, not of one tool, so it has no status of its own; it also lists the tools
+larmorx does not have yet.
+
 These records compare larmorx with the original tools on Linux x86-64. That the other five
 platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:
 [golden.md](golden.md).
@@ -47,4 +55,5 @@ python -m larmorx_validation parity ants-n4 --tier standard --out docs/validatio
 python -m larmorx_validation parity ants-denoise --tier standard --out docs/validation   # about an hour (ANTs at four thread counts on whole T1w images)
 python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   # mcflirt's variability band (needs FSL)
 python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
+python -m larmorx_validation pipeline-stages --oracle <workspace>/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall --out docs/validation   # needs the fMRIPrep oracle run (scripts/run_fmriprep_oracle.sh), its image and Apptainer; about an hour
 ```

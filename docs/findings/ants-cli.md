@@ -116,3 +116,14 @@ accepted although the help does not list it. *Read.* *larmorx:* reproduced.
 **Threads.** ITK uses all cores unless `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` is set.
 *larmorx's CLI:* the same environment variable. The result does not depend on the thread
 count, in ANTs or in larmorx.
+
+*Correction (2026-10-11):* ITK reads more than that one variable
+(`MultiThreaderBase::GetGlobalDefaultNumberOfThreads`, `itkMultiThreaderBase.cxx:266-330`,
+ITK v5.4.5): the variables named in `ITK_NUMBER_OF_THREADS_ENV_LIST` (`:`-separated), or
+`NSLOTS` when that is not set, then `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`; every one that is
+set replaces the count with its `atoi` value, so the last one set wins; 0 or less means all
+cores. nipype sets `NSLOTS` (fMRIPrep 25.2.6: `NSLOTS=1` for antsApplyTransforms and the other
+image programs, 8 for DenoiseImage and the anatomical N4s; [fmriprep-oracle.md](fmriprep-oracle.md)).
+*Read; verified* in fMRIPrep's working directory. *larmorx:* every `larmorx ants` program reads
+them the same way (`larmorx_ants::cli::itk_threads_from`, tested); before this, a larmorx
+program run by nipype would have used every core.

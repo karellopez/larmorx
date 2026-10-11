@@ -34,4 +34,5 @@ noted.
 | [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`/`powf`/`expf`/`logf`: glibc vs the `libm` crate and CORE-MATH, what it does to bit parity, the preload library that makes ANTs correctly rounded |
 | [scipy-ndimage.md](scipy-ndimage.md) | SciPy's `map_coordinates` and spline prefilter: padding, boundary rules, summation order, undefined behaviour |
 | [fmriprep-resampling.md](fmriprep-resampling.md) | fMRIPrep's one-shot resampler and nitransforms: float32 coordinates, BLAS fused products, voxel-shift map, Jacobian, displacement fields |
+| [fmriprep-oracle.md](fmriprep-oracle.md) | fMRIPrep 25.2.6 as it actually ran (the first oracle run): the tools and versions in its image, thread counts (`NSLOTS`), seeds, the parameters nipype passes or drops, headers it rewrites, what reproduces run to run; its N4 binary follows the C++ source where the GCC 11 oracle does not; its one-shot resampler races with multi-threaded OpenBLAS |
 | [numpy-blas.md](numpy-blas.md) | numpy's 4×4 products and inverses: which BLAS/LAPACK routine, OpenBLAS's kernels per CPU, the Haswell operation order larmorx reproduces, how often the kernels differ |

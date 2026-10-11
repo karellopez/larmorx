@@ -193,6 +193,10 @@ struct Scratch {
     centre: Vec<[f32; LANES]>,
     /// Per patch offset, whether the lanes' patch voxels are inside the image.
     centre_valid: Vec<[bool; LANES]>,
+    /// The neighbours with a weight in some lane: their padded index and the lanes' weights.
+    weights: Vec<(usize, [f32; LANES])>,
+    /// The neighbours that take part in some lane: their padded index and lane mask.
+    neighbours: Vec<(usize, u8)>,
 }
 
 impl Scratch {
@@ -202,6 +206,8 @@ impl Scratch {
             weighted: Vec::with_capacity(patch),
             centre: Vec::with_capacity(patch),
             centre_valid: Vec::with_capacity(patch),
+            weights: Vec::with_capacity(search),
+            neighbours: Vec::with_capacity(search),
         }
     }
 }
@@ -368,89 +374,96 @@ impl Context<'_> {
                     .map(|&o| lanes(&self.valid, (at as isize + o) as usize).map(|v| v != 0)),
             );
         }
-        // Step 3: the weights, and the weighted sums of the neighbours' patches.
+        // Step 3: the weights, in search order. The patch distances of two neighbours are
+        // computed together (two independent chains of additions); each is still the sum over
+        // the patch offsets in order.
+        let weights = &mut scratch.weights;
+        weights.clear();
+        let mut maximum_weight = [0.0f32; LANES];
+        let mut sum_of_weights = [0.0f32; LANES];
+        let neighbours = &mut scratch.neighbours;
+        neighbours.clear();
+        neighbours.extend(
+            masks
+                .iter()
+                .enumerate()
+                .filter(|&(_, &mask)| mask != 0)
+                .map(|(m, &mask)| ((at as isize + self.search.linear[m]) as usize, mask)),
+        );
+        for pair in neighbours.chunks(2) {
+            let (ba, bb) = (pair[0].0, pair.get(1).map_or(pair[0].0, |q| q.0));
+            let distances = self.distance_sums::<MASKED>(ba, bb, centre, centre_valid);
+            for (&(b0, mask), &(sum, count)) in pair.iter().zip(&distances) {
+                let count = if MASKED { count } else { [np as f32; LANES] };
+                let mut argument = [0.0f32; LANES];
+                let mut candidate = [false; LANES];
+                for l in 0..LANES {
+                    let average_distance = sum[l] / count[l];
+                    argument[l] = -average_distance / minimum_distance[l];
+                    candidate[l] = (mask >> l) & 1 == 1 && average_distance <= three_h[l];
+                }
+                let mut weight = [0.0f32; LANES];
+                let mut any = false;
+                for l in 0..LANES {
+                    if candidate[l] {
+                        weight[l] = math::expf(argument[l]);
+                        any |= weight[l] > 0.0;
+                    }
+                }
+                for l in 0..LANES {
+                    // Lanes without a weight have 0 here, and `0 > maximum` is false.
+                    if weight[l] > maximum_weight[l] {
+                        maximum_weight[l] = weight[l];
+                    }
+                    let added = sum_of_weights[l] + weight[l];
+                    sum_of_weights[l] = if weight[l] > 0.0 {
+                        added
+                    } else {
+                        sum_of_weights[l]
+                    };
+                }
+                if any {
+                    weights.push((b0, weight));
+                }
+            }
+        }
+        // The weighted sums of the neighbours' patches: per patch offset, the neighbours in
+        // search order (as ITK adds them), [`SUMS`] offsets at a time so that the sums stay in
+        // registers.
         let weighted = &mut scratch.weighted;
         weighted.clear();
         weighted.resize(np, [0.0; LANES]);
-        let mut maximum_weight = [0.0f32; LANES];
-        let mut sum_of_weights = [0.0f32; LANES];
-        for (m, &mask) in masks.iter().enumerate() {
-            if mask == 0 {
-                continue;
-            }
-            let b0 = (at as isize + self.search.linear[m]) as usize;
-            let mut sum = [0.0f32; LANES];
-            let mut count = [0.0f32; LANES];
-            for (n, (&o, y)) in self.patch.linear.iter().zip(centre.iter()).enumerate() {
-                let x = lanes(&self.diff, (b0 as isize + o) as usize);
-                if MASKED {
-                    let xv = lanes(&self.valid, (b0 as isize + o) as usize);
-                    let yv = &centre_valid[n];
-                    for l in 0..LANES {
-                        let both = (xv[l] != 0) & yv[l];
-                        let t = x[l] - y[l];
-                        let s = sum[l] + t * t;
-                        sum[l] = if both { s } else { sum[l] };
-                        let c = count[l] + 1.0;
-                        count[l] = if both { c } else { count[l] };
-                    }
-                } else {
-                    for l in 0..LANES {
-                        let t = x[l] - y[l];
-                        sum[l] += t * t;
+        const SUMS: usize = 4;
+        for n0 in (0..np).step_by(SUMS) {
+            // Offsets past the end repeat the last one; their sums are not kept.
+            let offsets: [isize; SUMS] =
+                std::array::from_fn(|j| self.patch.linear[(n0 + j).min(np - 1)]);
+            let mut acc = [[0.0f32; LANES]; SUMS];
+            for &(b0, weight) in weights.iter() {
+                for (a, &o) in acc.iter_mut().zip(&offsets) {
+                    let at = (b0 as isize + o) as usize;
+                    let v = lanes(&self.values, at);
+                    if MASKED {
+                        let xv = lanes(&self.valid, at);
+                        for l in 0..LANES {
+                            let added = a[l] + weight[l] * v[l];
+                            a[l] = if (weight[l] > 0.0) & (xv[l] != 0) {
+                                added
+                            } else {
+                                a[l]
+                            };
+                        }
+                    } else {
+                        for l in 0..LANES {
+                            let added = a[l] + weight[l] * v[l];
+                            a[l] = if weight[l] > 0.0 { added } else { a[l] };
+                        }
                     }
                 }
             }
-            if !MASKED {
-                count = [np as f32; LANES];
-            }
-            let mut argument = [0.0f32; LANES];
-            let mut candidate = [false; LANES];
-            for l in 0..LANES {
-                let average_distance = sum[l] / count[l];
-                argument[l] = -average_distance / minimum_distance[l];
-                candidate[l] = (mask >> l) & 1 == 1 && average_distance <= three_h[l];
-            }
-            let mut weight = [0.0f32; LANES];
-            let mut any = false;
-            for l in 0..LANES {
-                if candidate[l] {
-                    weight[l] = math::expf(argument[l]);
-                    any |= weight[l] > 0.0;
-                }
-            }
-            for l in 0..LANES {
-                // Lanes without a weight have 0 here, and `0 > maximum` is false.
-                if weight[l] > maximum_weight[l] {
-                    maximum_weight[l] = weight[l];
-                }
-                let added = sum_of_weights[l] + weight[l];
-                sum_of_weights[l] = if weight[l] > 0.0 {
-                    added
-                } else {
-                    sum_of_weights[l]
-                };
-            }
-            if !any {
-                continue;
-            }
-            for (acc, &o) in weighted.iter_mut().zip(&self.patch.linear) {
-                let v = lanes(&self.values, (b0 as isize + o) as usize);
-                if MASKED {
-                    let xv = lanes(&self.valid, (b0 as isize + o) as usize);
-                    for l in 0..LANES {
-                        let added = acc[l] + weight[l] * v[l];
-                        acc[l] = if (weight[l] > 0.0) & (xv[l] != 0) {
-                            added
-                        } else {
-                            acc[l]
-                        };
-                    }
-                } else {
-                    for l in 0..LANES {
-                        let added = acc[l] + weight[l] * v[l];
-                        acc[l] = if weight[l] > 0.0 { added } else { acc[l] };
-                    }
+            for (j, a) in acc.iter().enumerate() {
+                if n0 + j < np {
+                    weighted[n0 + j] = *a;
                 }
             }
         }
@@ -480,6 +493,56 @@ impl Context<'_> {
                 }
             }
         }
+    }
+
+    /// The sums of `((input − mean)_b+o − (input − mean)_c+o)²` over the patch offsets `o`
+    /// (those inside the image at both ends when `MASKED`) and their counts, for the
+    /// neighbours `ba` and `bb` of the lanes' centres (whose values are `centre`).
+    #[inline(always)]
+    fn distance_sums<const MASKED: bool>(
+        &self,
+        ba: usize,
+        bb: usize,
+        centre: &[[f32; LANES]],
+        centre_valid: &[[bool; LANES]],
+    ) -> [([f32; LANES], [f32; LANES]); 2] {
+        let mut sa = [0.0f32; LANES];
+        let mut sb = [0.0f32; LANES];
+        let mut ca = [0.0f32; LANES];
+        let mut cb = [0.0f32; LANES];
+        for (n, (&o, y)) in self.patch.linear.iter().zip(centre).enumerate() {
+            let ia = (ba as isize + o) as usize;
+            let ib = (bb as isize + o) as usize;
+            let xa = lanes(&self.diff, ia);
+            let xb = lanes(&self.diff, ib);
+            if MASKED {
+                let va = lanes(&self.valid, ia);
+                let vb = lanes(&self.valid, ib);
+                let yv = &centre_valid[n];
+                for l in 0..LANES {
+                    let ta = xa[l] - y[l];
+                    let tb = xb[l] - y[l];
+                    let both_a = (va[l] != 0) & yv[l];
+                    let both_b = (vb[l] != 0) & yv[l];
+                    let s = sa[l] + ta * ta;
+                    sa[l] = if both_a { s } else { sa[l] };
+                    let s = sb[l] + tb * tb;
+                    sb[l] = if both_b { s } else { sb[l] };
+                    let c = ca[l] + 1.0;
+                    ca[l] = if both_a { c } else { ca[l] };
+                    let c = cb[l] + 1.0;
+                    cb[l] = if both_b { c } else { cb[l] };
+                }
+            } else {
+                for l in 0..LANES {
+                    let ta = xa[l] - y[l];
+                    let tb = xb[l] - y[l];
+                    sa[l] += ta * ta;
+                    sb[l] += tb * tb;
+                }
+            }
+        }
+        [(sa, ca), (sb, cb)]
     }
 
     /// Computes the centres of image row `row`, [`LANES`] at a time.

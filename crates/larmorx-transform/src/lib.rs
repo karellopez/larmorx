@@ -13,6 +13,8 @@
 //! OpenBLAS's Haswell kernels, in a fixed order, so they are the same on every platform.
 #![forbid(unsafe_code)]
 
+use larmorx_core::ItkReal;
+
 pub mod field;
 pub mod linear;
 pub mod nitransforms;
@@ -20,7 +22,7 @@ pub mod openblas;
 pub mod resample_series;
 
 pub use field::{DisplacementField, FieldData};
-pub use linear::{LinearKind, LinearTransform};
+pub use linear::{LinearKind, LinearTransform, MatrixOffset};
 
 /// A transform cannot be built or used.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -66,14 +68,6 @@ impl Transform {
             )),
         }
     }
-
-    /// The transforms in queue order, with nested composites expanded (same mapping).
-    fn flatten_into(self, out: &mut Vec<Transform>) {
-        match self {
-            Transform::Composite(ts) => ts.into_iter().for_each(|t| t.flatten_into(out)),
-            t => out.push(t),
-        }
-    }
 }
 
 /// The transform `antsApplyTransforms` applies: its `-t` options, each optionally inverted.
@@ -88,6 +82,43 @@ impl Transform {
 pub struct TransformChain {
     /// ITK's composite queue (composites expanded): applied from the back.
     transforms: Vec<Transform>,
+    /// For each entry of `transforms` that is an inverted linear transform, the transform
+    /// before inversion: another precision inverts it again in its own arithmetic.
+    inverted_from: Vec<Option<LinearTransform>>,
+}
+
+/// Expands `t` (inverted if `invert`) into ITK's queue order, as
+/// `t.inverse()?.flatten_into(...)` does, and records the original of every inverted linear
+/// transform.
+fn push_flattened(
+    t: Transform,
+    invert: bool,
+    out: &mut Vec<Transform>,
+    from: &mut Vec<Option<LinearTransform>>,
+) -> Result<(), TransformError> {
+    match (t, invert) {
+        (Transform::Composite(ts), false) => {
+            for c in ts {
+                push_flattened(c, false, out, from)?;
+            }
+        }
+        // A composite's inverse is its components inverted, in reverse order.
+        (Transform::Composite(ts), true) => {
+            for c in ts.into_iter().rev() {
+                push_flattened(c, true, out, from)?;
+            }
+        }
+        (Transform::Linear(l), true) => {
+            out.push(Transform::Linear(l.inverse()?));
+            from.push(Some(l));
+        }
+        (Transform::DisplacementField(_), true) => return Err(TransformError::NotInvertible),
+        (t, false) => {
+            out.push(t);
+            from.push(None);
+        }
+    }
+    Ok(())
 }
 
 impl TransformChain {
@@ -95,11 +126,35 @@ impl TransformChain {
     pub fn new(items: impl IntoIterator<Item = (Transform, bool)>) -> Result<Self, TransformError> {
         let items: Vec<(Transform, bool)> = items.into_iter().collect();
         let mut transforms = Vec::new();
+        let mut inverted_from = Vec::new();
         for (t, invert) in items.into_iter().rev() {
-            let t = if invert { t.inverse()? } else { t };
-            t.flatten_into(&mut transforms);
+            push_flattened(t, invert, &mut transforms, &mut inverted_from)?;
         }
-        Ok(TransformChain { transforms })
+        Ok(TransformChain {
+            transforms,
+            inverted_from,
+        })
+    }
+
+    /// The chain instantiated with the computation type `R`, as ANTs builds its
+    /// `CompositeTransform<R>`: each linear transform from its stored parameters in `R`
+    /// (inverted in `R` where the chain inverts it), displacement fields looked up in `R`.
+    /// For `R = f64` it maps points exactly as [`TransformChain::transform_point`].
+    pub fn with_precision<R: ItkReal>(&self) -> Result<PrecisionChain<'_, R>, TransformError> {
+        let mut steps = Vec::with_capacity(self.transforms.len());
+        for (t, from) in self.transforms.iter().zip(&self.inverted_from) {
+            steps.push(match (t, from) {
+                (Transform::Linear(_), Some(original)) => {
+                    Step::Linear(original.with_precision::<R>()?.inverse().ok_or_else(|| {
+                        TransformError::Invalid("singular linear transform".into())
+                    })?)
+                }
+                (Transform::Linear(l), None) => Step::Linear(l.with_precision::<R>()?),
+                (Transform::DisplacementField(f), _) => Step::Field(f),
+                (Transform::Composite(_), _) => unreachable!("composites are expanded"),
+            });
+        }
+        Ok(PrecisionChain { steps })
     }
 
     /// The transforms in ITK's composite-queue order (the last one acts first on a point).
@@ -124,6 +179,36 @@ impl TransformChain {
         self.transforms
             .iter()
             .all(|t| matches!(t, Transform::Linear(_)))
+    }
+}
+
+/// A [`TransformChain`] in the computation type `R` ([`TransformChain::with_precision`]).
+#[derive(Clone, Debug)]
+pub struct PrecisionChain<'a, R> {
+    /// ITK's composite queue, applied from the back.
+    steps: Vec<Step<'a, R>>,
+}
+
+#[derive(Clone, Debug)]
+enum Step<'a, R> {
+    Linear(MatrixOffset<R>),
+    Field(&'a DisplacementField),
+}
+
+impl<R: ItkReal> PrecisionChain<'_, R> {
+    /// Maps a point (LPS) through the chain in `R` (`CompositeTransform<R>::TransformPoint`:
+    /// the queue from the back, each transform taking and returning `Point<R>`).
+    #[inline]
+    pub fn transform_point(&self, p: [R; 3]) -> [R; 3] {
+        self.steps.iter().rev().fold(p, |q, step| match step {
+            Step::Linear(m) => m.transform_point(q),
+            Step::Field(f) => f.transform_point_as(q),
+        })
+    }
+
+    /// Whether every transform is linear (ITK's `TransformCategory::Linear`).
+    pub fn is_linear(&self) -> bool {
+        self.steps.iter().all(|s| matches!(s, Step::Linear(_)))
     }
 }
 
@@ -175,5 +260,41 @@ mod tests {
         assert_eq!(chain.transform_point(p), direct);
         let back = composite.inverse().unwrap().transform_point(direct);
         assert!(p.iter().zip(back).all(|(a, b)| (a - b).abs() < 1e-12));
+    }
+    #[test]
+    fn precision_chains() {
+        let euler = LinearTransform::from_itk(
+            "Euler3DTransform_double_3_3",
+            &[0.1, -0.2, 0.3, 1.0, 2.0, 3.0],
+            &[4.0, 5.0, 6.0],
+        )
+        .unwrap();
+        let chain = TransformChain::new([
+            (Transform::Linear(euler.clone()), true),
+            (translation([1.0, 0.0, 0.5]), false),
+            (scaling(2.0), true),
+        ])
+        .unwrap();
+        let p = [3.0, -1.0, 2.5];
+        // f64: the same mapping as the chain itself.
+        assert_eq!(
+            chain.with_precision::<f64>().unwrap().transform_point(p),
+            chain.transform_point(p)
+        );
+        // f32: close to it, and computed from the original parameters in float.
+        let single = chain.with_precision::<f32>().unwrap();
+        let q = single.transform_point(p.map(|x| x as f32));
+        for (a, b) in q.iter().zip(chain.transform_point(p)) {
+            assert!((f64::from(*a) - b).abs() < 1e-5);
+        }
+        let inverted = euler.with_precision::<f32>().unwrap().inverse().unwrap();
+        let first = single.steps.last().unwrap();
+        assert!(matches!(first, Step::Linear(m) if *m == inverted));
+        // Inverting a composite inverts its components in reverse order.
+        let composite = Transform::Composite(vec![scaling(2.0), translation([0.0, 1.0, 0.0])]);
+        let a = TransformChain::new([(composite.clone(), true)]).unwrap();
+        let b = TransformChain::new([(composite.inverse().unwrap(), false)]).unwrap();
+        assert_eq!(a.transforms(), b.transforms());
+        assert_eq!(a.transform_point(p), b.transform_point(p));
     }
 }

@@ -23,6 +23,7 @@ pub mod threshold_image;
 use std::io::Write;
 use std::path::Path;
 
+use larmorx_core::Precision;
 use larmorx_transform::Transform;
 
 /// Reads the transform files named on a command line.
@@ -31,6 +32,14 @@ use larmorx_transform::Transform;
 /// entry point also reads HDF5 (`.h5`) files, through h5py.
 pub trait TransformLoader: Sync {
     fn load(&self, path: &Path) -> Result<Transform, String>;
+
+    /// [`TransformLoader::load`] as ITK's reader for the computation type `precision` reads
+    /// the file (in float, text files' numbers are read as float). The default reads as
+    /// [`TransformLoader::load`] does.
+    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
+        let _ = precision;
+        self.load(path)
+    }
 }
 
 /// [`TransformLoader`] for the formats the Rust reader supports (`.txt`, `.tfm`, `.mat`,
@@ -39,7 +48,12 @@ pub struct FileLoader;
 
 impl TransformLoader for FileLoader {
     fn load(&self, path: &Path) -> Result<Transform, String> {
-        larmorx_io::itk_transform::read_itk_transform(path).map_err(|e| e.to_string())
+        self.load_with(path, Precision::Double)
+    }
+
+    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
+        larmorx_io::itk_transform::read_itk_transform_with(path, precision)
+            .map_err(|e| e.to_string())
     }
 }
 

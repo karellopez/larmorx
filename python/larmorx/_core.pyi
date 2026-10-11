@@ -94,8 +94,9 @@ def itk_read_image(path: str, n_threads: int = 1) -> tuple[np.ndarray, dict[str,
 def itk_grid(path: str) -> Grid:
     """The 3D grid ITK reads from a NIfTI header."""
 
-def itk_transform_read(path: str) -> Parts:
-    """The transforms stored in an ITK text, MATLAB or NIfTI displacement-field file."""
+def itk_transform_read(path: str, precision: str = "float64") -> Parts:
+    """The transforms stored in an ITK text, MATLAB or NIfTI displacement-field file, read as
+    ITK's reader for ``precision`` (``float64`` or ``float32``) reads them."""
 
 def itk_transform_write(path: str, parts: Parts) -> None:
     """Write linear transforms as ITK text (``.txt``, ``.tfm``) or MATLAB (``.mat``)."""
@@ -111,8 +112,10 @@ def ants_apply_transforms(
     order: int = 3,
     default_value: float = 0.0,
     n_threads: int = 1,
+    precision: str = "float64",
 ) -> np.ndarray:
-    """Resample ``data`` onto ``reference_grid`` (``antsApplyTransforms``); float64 result."""
+    """Resample ``data`` onto ``reference_grid`` (``antsApplyTransforms``), computing in
+    ``precision`` (``float64``, or ``float32`` as ``--float 1``); a result of that type."""
 
 def ants_transform_points(points: np.ndarray, transforms: list[tuple[Parts, bool]]) -> np.ndarray:
     """Map ``(n, 3)`` LPS points through ``transforms``."""

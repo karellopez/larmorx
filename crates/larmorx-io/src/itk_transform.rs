@@ -10,8 +10,8 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use larmorx_core::Grid3;
 use larmorx_core::linalg::Mat3;
+use larmorx_core::{Grid3, Precision};
 use larmorx_transform::{DisplacementField, FieldData, LinearTransform, Transform, TransformError};
 
 use crate::nifti;
@@ -158,8 +158,20 @@ pub fn transform_to_parts(t: &Transform) -> Vec<ItkTransformParts> {
     out
 }
 
-/// Parses ITK's text transform format.
+/// Parses ITK's text transform format, as a double-precision reader does.
 pub fn parse_itk_text(text: &str) -> Result<Vec<ItkTransformParts>, String> {
+    parse_itk_text_with(text, Precision::Double)
+}
+
+/// Parses ITK's text transform format as `TxtTransformIOTemplate<T>` reads it for the
+/// computation type `precision`: every number of a `Parameters` **and** a `FixedParameters`
+/// line is read by `>> T` (`OptimizerParameters<T>`, `itkTxtTransformIO.cxx`), so in float it
+/// is rounded once from its decimal text to `f32` (as `strtof`, not `strtod` then a cast); the
+/// fixed parameters are then widened to double. The values are returned as `f64` either way.
+pub fn parse_itk_text_with(
+    text: &str,
+    precision: Precision,
+) -> Result<Vec<ItkTransformParts>, String> {
     let mut out: Vec<ItkTransformParts> = Vec::new();
     for line in text.lines() {
         let line = line.trim();
@@ -177,9 +189,13 @@ pub fn parse_itk_text(text: &str) -> Result<Vec<ItkTransformParts>, String> {
                 fixed_parameters: vec![],
             }),
             "Parameters" | "FixedParameters" => {
+                let number = |v: &str| match precision {
+                    Precision::Double => v.parse::<f64>(),
+                    Precision::Float => v.parse::<f32>().map(f64::from),
+                };
                 let values = value
                     .split_whitespace()
-                    .map(|v| v.parse::<f64>().map_err(|_| format!("bad number {v:?}")))
+                    .map(|v| number(v).map_err(|_| format!("bad number {v:?}")))
                     .collect::<Result<Vec<_>, _>>()?;
                 let current = out.last_mut().ok_or("parameters before any Transform")?;
                 if name == "Parameters" {
@@ -389,6 +405,19 @@ pub fn read_displacement_field(path: &Path) -> Result<DisplacementField, Transfo
 /// Reads an ITK transform file by its extension, returning its first transform (as ANTs
 /// does): `.txt`/`.tfm` text, `.mat` MATLAB, `.nii`/`.nii.gz` displacement field.
 pub fn read_itk_transform(path: &Path) -> Result<Transform, TransformFileError> {
+    read_itk_transform_with(path, Precision::Double)
+}
+
+/// [`read_itk_transform`] as ITK's reader for the computation type `precision` reads the
+/// file. Only text files differ: their numbers are read in that precision
+/// ([`parse_itk_text_with`]). MATLAB, HDF5 and NIfTI files are read as stored; ITK casts their
+/// values to the transform's type afterwards, as
+/// [`LinearTransform::with_precision`](larmorx_transform::LinearTransform::with_precision)
+/// and the displacement field lookup do.
+pub fn read_itk_transform_with(
+    path: &Path,
+    precision: Precision,
+) -> Result<Transform, TransformFileError> {
     let name = path
         .file_name()
         .and_then(|n| n.to_str())
@@ -404,7 +433,7 @@ pub fn read_itk_transform(path: &Path) -> Result<Transform, TransformFileError> 
     let parts = if name.ends_with(".mat") {
         parse_itk_matlab(&std::fs::read(path).map_err(io)?).map_err(|m| format_err(path, m))?
     } else if name.ends_with(".txt") || name.ends_with(".tfm") {
-        parse_itk_text(&std::fs::read_to_string(path).map_err(io)?)
+        parse_itk_text_with(&std::fs::read_to_string(path).map_err(io)?, precision)
             .map_err(|m| format_err(path, m))?
     } else if name.ends_with(".h5") || name.ends_with(".hdf5") {
         return Err(format_err(
@@ -467,5 +496,19 @@ mod tests {
             (vars[0].name.as_str(), vars[0].values.as_slice()),
             ("x", &[1.5, -2.0][..])
         );
+    }
+    #[test]
+    fn float_text_numbers_are_rounded_once() {
+        // Just below the midpoint 26843547·2⁻²⁸ between the floats 0x3dcccccd and 0x3dccccce:
+        // strtod rounds it onto the midpoint, which a cast to float then rounds to even (up);
+        // read as float (strtof, ITK's `>> float`), it rounds down.
+        let text = "#Insight Transform File V1.0\nTransform: TranslationTransform_double_3_3\nParameters: 0.1000000052154064178466796874999999999999 0 0\nFixedParameters: 0.1000000052154064178466796874999999999999 0 0\n";
+        let double = parse_itk_text(text).unwrap();
+        let single = parse_itk_text_with(text, Precision::Float).unwrap();
+        let d = double[0].parameters.to_f64()[0];
+        let f = single[0].parameters.to_f64()[0];
+        assert_eq!((d as f32).to_bits(), 0x3dcc_ccce);
+        assert_eq!(f, f64::from(f32::from_bits(0x3dcc_cccd)));
+        assert_eq!(single[0].fixed_parameters[0], f);
     }
 }

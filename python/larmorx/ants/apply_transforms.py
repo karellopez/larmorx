@@ -11,11 +11,13 @@ import numpy as np
 
 from larmorx import _core
 from larmorx.image import Image, as_image
-from larmorx.transforms import ItkTransform, read
+from larmorx.transforms import ItkTransform
+from larmorx.transforms.itk import _read_parts
 
 __all__ = ["apply_transforms", "apply_transforms_to_points"]
 
 PathLike = str | os.PathLike[str]
+Precision = Literal["float64", "float32"]
 TransformLike = PathLike | ItkTransform | Sequence[ItkTransform]
 
 # ANTs' -n names (lowercased) and short aliases.
@@ -53,7 +55,9 @@ def _interpolator(name: str) -> str:
 
 
 def _transform_items(
-    transforms: TransformLike | Sequence[TransformLike], invert: Sequence[bool] | None
+    transforms: TransformLike | Sequence[TransformLike],
+    invert: Sequence[bool] | None,
+    precision: Precision = "float64",
 ) -> list[tuple[list[tuple[str, np.ndarray, np.ndarray]], bool]]:
     if isinstance(transforms, (str, os.PathLike, ItkTransform)):
         transforms = [transforms]
@@ -66,11 +70,9 @@ def _transform_items(
     out = []
     for t, flag in zip(items, flags, strict=True):
         if isinstance(t, (str, os.PathLike)):
-            parts = read(t)
-        elif isinstance(t, ItkTransform):
-            parts = [t]
-        else:
-            parts = list(t)
+            out.append((_read_parts(t, precision), flag))
+            continue
+        parts = [t] if isinstance(t, ItkTransform) else list(t)
         out.append(([p._as_tuple() for p in parts], flag))
     return out
 
@@ -103,6 +105,7 @@ def apply_transforms(
     time_series: bool | None = None,
     default_value: float = 0.0,
     dtype: Any = None,
+    precision: Precision = "float64",
     n_threads: int = 1,
 ) -> Image:
     """Resample ``image`` onto the grid of ``reference`` through ``transforms``
@@ -134,12 +137,20 @@ def apply_transforms(
     default_value
         The value of output voxels outside the input (``-f``).
     dtype
-        Output type (``-u``). The default is float64, as ANTs computes. Integer types truncate
-        toward zero and saturate outside their range. (The command line reproduces ANTs on
-        x86-64 instead, which wraps out-of-range values.)
+        Output type (``-u``). The default is the computation type (``precision``), as in ANTs.
+        Integer types truncate toward zero and saturate outside their range. (The command line
+        reproduces ANTs on x86-64 instead, which wraps out-of-range values.)
+    precision
+        The computation type: ``"float64"`` (ANTs' default) or ``"float32"``, which computes
+        in single precision exactly as ``antsApplyTransforms --float 1`` does: the image is
+        read as float32, transform files are read in float (text files' numbers are rounded
+        once to float), points, transforms and continuous indices are float, and the result is
+        float32.
     n_threads
         Worker threads (0 = all). The result does not depend on it.
     """
+    if precision not in ("float64", "float32"):
+        raise ValueError(f"precision must be 'float64' or 'float32', not {precision!r}")
     # The input image.
     if isinstance(image, (str, os.PathLike)):
         data, info = _core.itk_read_image(os.fspath(image), n_threads)
@@ -164,6 +175,9 @@ def apply_transforms(
         raise ValueError("a 4D image needs time_series=True (antsApplyTransforms -e 3)")
     if data.ndim == 3 and time_series:
         data = data[..., np.newaxis]
+    if precision == "float32" and data.dtype != np.float32:
+        # ImageFileReader<Image<float>>: the voxels cast to float.
+        data = data.astype(np.float32)
 
     # The reference grid.
     if isinstance(reference, (str, os.PathLike)):
@@ -178,13 +192,14 @@ def apply_transforms(
         data,
         grid,
         ref_grid,
-        _transform_items(transforms, invert),
+        _transform_items(transforms, invert, precision),
         _interpolator(interpolation),
         sigma,
         alpha,
         order,
         float(default_value),
         n_threads,
+        precision,
     )
     out = values if dtype is None else _cast(values, dtype)
     header = template if out.ndim == 4 else None

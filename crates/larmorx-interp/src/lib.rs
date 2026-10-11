@@ -19,6 +19,15 @@
 //! Callers check [`is_inside`] first, as ITK's resampler does: interpolators assume the index
 //! lies within half a voxel of the grid.
 //!
+//! **Coordinate type.** ITK's interpolators take the continuous index in their `TCoordRep`,
+//! `double` by default and `float` under `antsApplyTransforms --float 1`
+//! ([`Interpolator::with_precision`]). The interpolated values are double either way; what
+//! `float` changes is how the index is rounded: nearest neighbour rounds `2x + 0.5` in float,
+//! the Gaussian interpolators store the ends of their support region as float, and the
+//! windowed sincs evaluate their window on the float offset and store its value as float.
+//! Linear, B-spline and generic-label interpolation compute the same as in double from the
+//! float index.
+//!
 //! [`ndimage`] is the other family: SciPy's `map_coordinates` and spline prefilter (orders 0-5,
 //! every boundary mode), as fMRIPrep and nitransforms use them.
 #![forbid(unsafe_code)]
@@ -28,8 +37,8 @@ mod vnl;
 
 use std::collections::BTreeMap;
 
-use larmorx_core::RealElement;
 use larmorx_core::math;
+use larmorx_core::{ItkReal, Precision, RealElement};
 use rayon::prelude::*;
 
 /// A 3D scalar image in Fortran order (`x` fastest), read as f64.
@@ -112,6 +121,7 @@ pub enum InterpError {
 pub struct Interpolator<'a, T> {
     volume: Volume<'a, T>,
     kind: Kind,
+    precision: Precision,
 }
 
 enum Kind {
@@ -152,6 +162,18 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
         method: &Interpolation,
         spacing: [f64; 3],
     ) -> Result<Self, InterpError> {
+        Self::with_precision(volume, method, spacing, Precision::Double)
+    }
+
+    /// [`Interpolator::new`] with ITK's coordinate type `TCoordRep` (`double`, or `float` as
+    /// in `antsApplyTransforms --float 1`). With `float`, [`Interpolator::evaluate`] expects
+    /// indices that are `f32` values.
+    pub fn with_precision(
+        volume: Volume<'a, T>,
+        method: &Interpolation,
+        spacing: [f64; 3],
+        precision: Precision,
+    ) -> Result<Self, InterpError> {
         let kind = match method {
             Interpolation::Linear => Kind::Linear,
             Interpolation::NearestNeighbor => Kind::NearestNeighbor,
@@ -174,23 +196,43 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             Interpolation::WindowedSinc(w) => Kind::WindowedSinc(*w, false),
             Interpolation::WindowedSincEdge(w) => Kind::WindowedSinc(*w, true),
         };
-        Ok(Interpolator { volume, kind })
+        Ok(Interpolator {
+            volume,
+            kind,
+            precision,
+        })
+    }
+
+    /// The coordinate type this interpolator was prepared with.
+    pub fn precision(&self) -> Precision {
+        self.precision
     }
 
     /// The value at a continuous index inside the image (see [`is_inside`]).
     #[inline]
     pub fn evaluate(&self, cidx: [f64; 3]) -> f64 {
+        match self.precision {
+            Precision::Double => self.evaluate_as::<f64>(cidx),
+            Precision::Float => self.evaluate_as::<f32>(cidx),
+        }
+    }
+
+    #[inline]
+    fn evaluate_as<R: ItkReal>(&self, cidx: [f64; 3]) -> f64 {
         match &self.kind {
             Kind::Linear => linear(&self.volume, cidx),
-            Kind::NearestNeighbor => nearest(&self.volume, cidx),
+            Kind::NearestNeighbor => match R::PRECISION {
+                Precision::Double => nearest(&self.volume, cidx),
+                Precision::Float => nearest_as::<T, R>(&self.volume, cidx),
+            },
             Kind::BSpline {
                 order,
                 coefficients,
             } => bspline::evaluate(coefficients, self.volume.size, *order, cidx),
-            Kind::Gaussian(p) => gaussian(&self.volume, p, cidx),
-            Kind::MultiLabel(p) => multi_label(&self.volume, p, cidx),
+            Kind::Gaussian(p) => gaussian::<T, R>(&self.volume, p, cidx),
+            Kind::MultiLabel(p) => multi_label::<T, R>(&self.volume, p, cidx),
             Kind::GenericLabel => generic_label(&self.volume, cidx),
-            Kind::WindowedSinc(w, edge) => windowed_sinc(&self.volume, *w, *edge, cidx),
+            Kind::WindowedSinc(w, edge) => windowed_sinc::<T, R>(&self.volume, *w, *edge, cidx),
         }
     }
 }
@@ -206,8 +248,19 @@ pub fn nearest<T: RealElement>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
     NearestYz::new(v, cidx[1], cidx[2]).evaluate(v, cidx[0])
 }
 
+/// Nearest-neighbour interpolation with ITK's coordinate type `R`: each index rounded by
+/// `itk::Math::RoundHalfIntegerUp` (`round_half_to_even(2c + 0.5) >> 1`, computed in `R`). In
+/// double this is [`nearest`]; in float `2c + 0.5` rounds in float, so the largest float below
+/// a half-integer can round up.
+#[inline]
+pub fn nearest_as<T: RealElement, R: ItkReal>(v: &Volume<'_, T>, cidx: [f64; 3]) -> f64 {
+    let i = cidx.map(|c| R::from_f64(c).itk_round_half_up().max(0) as usize);
+    v.at(i[0], i[1], i[2])
+}
+
 /// `floor(c + 0.5)`: the truncation of `c + 0.5` for the non-negative values inside an image
-/// (and both saturate to 0 below it).
+/// (and both saturate to 0 below it). For doubles it equals ITK's `RoundHalfIntegerUp`
+/// (tested in `larmorx_core::itk_real`).
 #[inline]
 fn round_half_up(c: f64) -> usize {
     (c + 0.5) as i64 as usize
@@ -326,10 +379,12 @@ impl LinearYz {
 // Gaussian and label-Gaussian
 
 /// The voxels within the cut-off of `cidx` along one axis, and their Gaussian weights
-/// (ITK's `ComputeInterpolationRegion` and `ComputeErrorFunctionArray`).
-fn erf_weights(c: f64, size: usize, scaling: f64, cutoff: f64) -> (usize, Vec<f64>) {
-    let begin = (c + 0.5 - cutoff).floor().max(0.0) as usize;
-    let end = ((c + 0.5 + cutoff).ceil().max(0.0) as usize).min(size);
+/// (ITK's `ComputeInterpolationRegion` and `ComputeErrorFunctionArray`). The ends of the
+/// region, `c + 0.5 ∓ cutoff`, are computed in double and stored in the coordinate type `R`
+/// before `floor` and `ceil`.
+fn erf_weights<R: ItkReal>(c: f64, size: usize, scaling: f64, cutoff: f64) -> (usize, Vec<f64>) {
+    let begin = R::from_f64(c + 0.5 - cutoff).to_f64().floor().max(0.0) as usize;
+    let end = (R::from_f64(c + 0.5 + cutoff).to_f64().ceil().max(0.0) as usize).min(size);
     let n = end.saturating_sub(begin);
     let mut t = (-0.5 - c + begin as f64) * scaling;
     let mut e_last = vnl::erf(t);
@@ -343,13 +398,21 @@ fn erf_weights(c: f64, size: usize, scaling: f64, cutoff: f64) -> (usize, Vec<f6
     (begin, out)
 }
 
-fn gaussian_region(size: [usize; 3], p: &GaussianParams, cidx: [f64; 3]) -> [(usize, Vec<f64>); 3] {
-    std::array::from_fn(|d| erf_weights(cidx[d], size[d], p.scaling[d], p.cutoff[d]))
+fn gaussian_region<R: ItkReal>(
+    size: [usize; 3],
+    p: &GaussianParams,
+    cidx: [f64; 3],
+) -> [(usize, Vec<f64>); 3] {
+    std::array::from_fn(|d| erf_weights::<R>(cidx[d], size[d], p.scaling[d], p.cutoff[d]))
 }
 
 #[inline(never)]
-fn gaussian<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3]) -> f64 {
-    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region(v.size, p, cidx);
+fn gaussian<T: RealElement, R: ItkReal>(
+    v: &Volume<'_, T>,
+    p: &GaussianParams,
+    cidx: [f64; 3],
+) -> f64 {
+    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region::<R>(v.size, p, cidx);
     let (mut sum_me, mut sum_m) = (0.0f64, 0.0f64);
     for (k, &w2) in wz.iter().enumerate() {
         for (j, &w1) in wy.iter().enumerate() {
@@ -366,8 +429,12 @@ fn gaussian<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3
 /// Label voting: the label whose summed Gaussian weight first exceeds the running maximum, in
 /// scan order (x fastest), wins.
 #[inline(never)]
-fn multi_label<T: RealElement>(v: &Volume<'_, T>, p: &GaussianParams, cidx: [f64; 3]) -> f64 {
-    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region(v.size, p, cidx);
+fn multi_label<T: RealElement, R: ItkReal>(
+    v: &Volume<'_, T>,
+    p: &GaussianParams,
+    cidx: [f64; 3],
+) -> f64 {
+    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region::<R>(v.size, p, cidx);
     let mut weights: Vec<(f64, f64)> = Vec::new();
     let (mut wmax, mut vmax) = (0.0f64, 0.0f64);
     for (k, &w2) in wz.iter().enumerate() {
@@ -528,19 +595,25 @@ fn sinc(x: f64) -> f64 {
     if x == 0.0 { 1.0 } else { math::sin(px) / px }
 }
 
-/// ITK's windowed sinc with radius 3: 6 taps per axis (offsets −2..=3 around `floor(index)`),
-/// a delta when the index falls on a voxel, zero outside the image (or, with `edge`, the
-/// nearest edge voxel), summed in neighbourhood order (x fastest) with weights multiplied in
-/// axis order.
+/// ITK's windowed sinc with radius 3: 6 taps per axis (offsets −2..=3 around
+/// `Math::Floor(index)`), a delta when the index falls on a voxel, zero outside the image (or,
+/// with `edge`, the nearest edge voxel), summed in neighbourhood order (x fastest) with weights
+/// multiplied in axis order. Each weight is `window(x) · sinc(x)`; the window function is
+/// `XWindowFunction<3, R, R>`, so its argument and its value are stored as `R` (its arithmetic
+/// is double), while `sinc` is double.
 #[inline(never)]
-fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, edge: bool, cidx: [f64; 3]) -> f64 {
+fn windowed_sinc<T: RealElement, R: ItkReal>(
+    v: &Volume<'_, T>,
+    w: Window,
+    edge: bool,
+    cidx: [f64; 3],
+) -> f64 {
     let taps = (2 * SINC_RADIUS) as usize;
     let mut base = [0i64; 3];
     let mut weights = [[0.0f64; 6]; 3];
     for d in 0..3 {
-        let b = cidx[d].floor();
-        let dist = cidx[d] - b;
-        base[d] = b as i64;
+        base[d] = R::from_f64(cidx[d]).itk_floor();
+        let dist = cidx[d] - base[d] as f64;
         if dist == 0.0 {
             for (i, wt) in weights[d].iter_mut().enumerate() {
                 *wt = if i as i64 == SINC_RADIUS - 1 {
@@ -553,7 +626,8 @@ fn windowed_sinc<T: RealElement>(v: &Volume<'_, T>, w: Window, edge: bool, cidx:
             let mut x = dist + SINC_RADIUS as f64;
             for wt in weights[d].iter_mut().take(taps) {
                 x -= 1.0;
-                *wt = window(w, x) * sinc(x);
+                let windowed = R::from_f64(window(w, R::from_f64(x).to_f64())).to_f64();
+                *wt = windowed * sinc(x);
             }
         }
     }

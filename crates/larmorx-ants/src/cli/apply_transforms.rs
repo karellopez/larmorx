@@ -8,15 +8,16 @@
 //! `-o CompositeTransform[...]`, `-o [field,1]`) and transform initializers
 //! (`-t [fixed,moving,feature]`).
 //!
-//! `--float` is accepted but computed in double precision, then rounded to float32, so
-//! results differ from ANTs' float pipeline in the last float bits.
+//! `--float 1` computes in single precision exactly as ANTs' float pipeline does
+//! ([`crate::apply_transforms`]): the input is read as float, text transforms are read in
+//! float, and the output defaults to float.
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::Grid3;
 use larmorx_core::array::DynArray;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
+use larmorx_core::{Grid3, Precision};
 use larmorx_interp::{Interpolation, Window};
 use larmorx_io::nifti;
 use larmorx_io::nifti::itk::{ItkGeometry, ItkMeta, ItkVoxels, write_itk_image};
@@ -186,8 +187,13 @@ fn interpolation(p: &Parsed, input_spacing: [f64; 3]) -> Result<Interpolation, S
     })
 }
 
-/// The `-t` options as a chain (`GetCompositeTransformFromParserOption`).
-fn transform_chain(p: &Parsed, loader: &dyn TransformLoader) -> Result<TransformChain, String> {
+/// The `-t` options as a chain (`GetCompositeTransformFromParserOption`), each file read by
+/// `TransformFileReaderTemplate<T>` for the computation type `precision`.
+fn transform_chain(
+    p: &Parsed,
+    loader: &dyn TransformLoader,
+    precision: Precision,
+) -> Result<TransformChain, String> {
     let mut items = Vec::new();
     for v in p.all("transform") {
         let (name, invert) = match v.parameters.len() {
@@ -210,7 +216,7 @@ fn transform_chain(p: &Parsed, loader: &dyn TransformLoader) -> Result<Transform
             ))
         } else {
             loader
-                .load(Path::new(name))
+                .load_with(Path::new(name), precision)
                 .map_err(|e| format!("Can't read initial transform {name}: {e}"))?
         };
         items.push((transform, invert));
@@ -260,6 +266,11 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
         ));
     }
     let single = flag(p.last("float"));
+    let precision = if single {
+        Precision::Float
+    } else {
+        Precision::Double
+    };
     let mut image_type = image_type(p)?;
     let time_index = p.last("time-index").map(|v| atof(&v.name) as usize);
     if time_index.is_some() && image_type == ImageType::TimeSeries {
@@ -274,12 +285,18 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     } else {
         OutputType::Double
     });
-    let default_value = p.last("default-value").map_or(0.0, |v| atof(&v.name));
-    let default_value = if single {
-        f64::from(default_value as f32)
-    } else {
-        default_value
-    };
+    // `Convert<PixelType>`: `istringstream >> T`, so in float the text is rounded once to
+    // float (strtof), not to double and then to float.
+    let default_value = p.last("default-value").map_or(0.0, |v| {
+        if single {
+            v.name
+                .trim_end()
+                .parse::<f32>()
+                .map_or_else(|_| f64::from(atof(&v.name) as f32), f64::from)
+        } else {
+            atof(&v.name)
+        }
+    });
     let n_threads = itk_threads();
 
     let input_path = &p.last("input").ok_or("An input image is required.")?.name;
@@ -325,7 +342,7 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
     let reference_grid = grid3(&reference)?;
     log(format!("Reference image: {reference_path}"));
 
-    let chain = transform_chain(p, loader)?;
+    let chain = transform_chain(p, loader, precision)?;
     let interpolation = interpolation(p, input_grid.spacing)?;
     log(format!("Interpolation: {interpolation:?}"));
     log(format!("Default pixel value: {default_value}"));
@@ -347,6 +364,7 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
         };
         volumes = 1;
     }
+    // `ImageFileReader<Image<float>>`: the input in float (a static_cast of double data).
     if single && let ItkVoxels::F64(v) = &voxels {
         voxels = ItkVoxels::F32(v.iter().map(|&x| x as f32).collect());
     }
@@ -354,6 +372,7 @@ fn run(p: &Parsed, loader: &dyn TransformLoader, out: &mut dyn Write) -> Result<
         interpolation,
         default_value,
         n_threads,
+        precision,
     };
     let result = match &voxels {
         ItkVoxels::F32(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options),

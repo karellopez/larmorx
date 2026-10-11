@@ -68,8 +68,10 @@ rigid transform from the images. *Read.* *larmorx:* not supported yet (error).
 **Pixel type.** Everything is computed in `double`, or in `float` with `--float 1`. The
 input is read straight into that type, so integer data are converted on reading. The output
 type is the computation type unless `-u` says otherwise. *Read.*
-*larmorx:* double throughout. `--float` rounds the input to float32 and writes float32, but
-the arithmetic stays double, so float results can differ in the last float bits.
+*larmorx:* the same two pipelines (since 2026-10-11): `--float 1` computes in single
+precision exactly as ITK's float instantiation does, transforms and interpolators included
+([ants-float.md](ants-float.md)). *Correction:* before, larmorx rounded the input to float32,
+computed in double and wrote float32, which differed from ANTs in the last float bits.
 
 **`-u` casts with `CastImageFilter`, a plain `static_cast`.** Integers truncate toward zero.
 An unknown `-u` name silently falls back to the default type

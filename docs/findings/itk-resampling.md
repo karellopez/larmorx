@@ -41,6 +41,10 @@ which matters only in that 4D path. Details in
 [ants-denoise.md](ants-denoise.md#the-noise-resampling-float-coordinates). *Read; validated.*
 *larmorx:* `larmorx_ants::resample::Coordinates::Float`.
 
+**`antsApplyTransforms --float 1`** instantiates the filter with `float` for both the
+interpolator and the transform precision, and every interpolator and transform with float
+coordinates: what each one changes is in [ants-float.md](ants-float.md). *Read; validated.*
+
 ## Interpolators
 
 | ANTs `-n` | ITK class | Notes |

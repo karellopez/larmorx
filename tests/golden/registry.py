@@ -962,6 +962,27 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.ants.antsApplyTransforms.float", covers=("cli:ants antsApplyTransforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``--float 1``, ANTs' single-precision pipeline: the nonlinear path (a field, an affine
+    and an inverted Euler transform read from text as float: float sin/cos, the float SVD
+    inverse) with a windowed sinc and a float default value; and the scan-line path (linear
+    transforms only) with nearest-neighbour rounding in float."""
+    out, lines = ctx.out("out.nii"), ctx.out("lines.nii")
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1",
+        "-i", ctx.file("anat.nii"), "-r", ctx.file("reference.nii"), "-o", out,
+        "-n", "LanczosWindowedSinc", "-f", "-1.1",
+        "-t", ctx.file("warp.nii.gz"), "-t", ctx.file("affine.mat"), "-t", f"[{ctx.file('rigid.txt')},1]",
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1",
+        "-i", ctx.file("anat.nii"), "-r", ctx.file("reference.nii"), "-o", lines,
+        "-n", "NearestNeighbor", "-t", ctx.file("affine.mat"), "-t", f"[{ctx.file('rigid.txt')},1]",
+    )  # fmt: skip
+    return {"out": Nifti(out), "lines": Nifti(lines)}
+
+
 @case("cli.ants.antsApplyTransforms.4d", covers=("cli:ants antsApplyTransforms",))
 def _(ctx: Context) -> dict[str, Any]:
     """A time series (``-e 3``) through an ``.h5`` composite (read with h5py), as float."""
@@ -1259,6 +1280,29 @@ def _(ctx: Context) -> dict[str, Any]:
     out["affine"] = img.affine
     out["int16"] = lx.ants.apply_transforms(
         anat(), reference, [AFFINE_XFM], invert=[True], dtype=np.int16
+    ).data
+    return out
+
+
+@case("py.ants.apply_transforms.float32", covers=("lx.ants.apply_transforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``precision="float32"`` (``--float 1``): every interpolator once through a displacement
+    field and an affine (each interpolator's float coordinate handling), and the scan-line path
+    through an inverted Euler transform (float sin/cos and inverse)."""
+    reference = lx.load(ctx.file("reference.nii"))
+    out: dict[str, Any] = {}
+    for interp in APPLY_INTERPOLATORS:
+        image = labels() if "label" in interp else anat()
+        out[interp] = lx.ants.apply_transforms(
+            image,
+            reference,
+            [field_xfm(), AFFINE_XFM],
+            interpolation=interp,
+            default_value=-1.0,
+            precision="float32",
+        ).data
+    out["lines"] = lx.ants.apply_transforms(
+        anat(), reference, [AFFINE_XFM, RIGID_XFM], invert=[False, True], precision="float32"
     ).data
     return out
 

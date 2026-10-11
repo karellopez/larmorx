@@ -20,6 +20,7 @@ import contextlib
 import datetime as dt
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,7 +143,7 @@ def run_jobs(
         tmp = Path(tmp_name)
         for job in (j for j in jobs if j.quick or not quick):
             print(job.label, file=sys.stderr)
-            a_out, l_out = tmp / "ants.nii", tmp / "larmorx.nii"
+            a_out, a_ref, l_out = tmp / "ants.nii", tmp / "ants-ref.nii", tmp / "larmorx.nii"
             a_args = [_resolve(x, tmp, a_out) for x in job.args]
             l_args = [_resolve(x, tmp, l_out) for x in job.args]
             nbytes = 0
@@ -162,6 +163,10 @@ def run_jobs(
 
                 seconds = measure(run_ants, repeats=repeats)
                 nbytes = a_out.stat().st_size
+                if t == ants_threads[0]:
+                    # larmorx is compared with ANTs at its smallest thread count (one): some
+                    # programs (N4) give other bits with more threads.
+                    shutil.copyfile(a_out, a_ref)
                 results.append(
                     Measurement(job.label, f"{t}", "ANTs 2.6.5", seconds, nbytes, {"threads": t})
                 )
@@ -176,7 +181,7 @@ def run_jobs(
                         raise RuntimeError(f"larmorx failed on {job.label}")
 
                 seconds = measure(run_lx, repeats=repeats)
-                extra = {"threads": t, **_compare(a_out, l_out)}
+                extra = {"threads": t, **_compare(a_ref, l_out)}
                 results.append(Measurement(job.label, f"{t}", "larmorx", seconds, nbytes, extra))
             os.environ.pop("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", None)
     return results
@@ -220,7 +225,8 @@ def render(
         "dominate ANTs' time). ANTs runs as its own process; larmorx runs in-process through its "
         "console entry point. Both get the thread count through "
         "`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`.",
-        "- **Same result:** every larmorx output is compared with ANTs' (all values).",
+        "- **Same result:** every larmorx output is compared with ANTs' at one thread (all "
+        "values).",
     ]
     load = env.get("load_average_before")
     if load:

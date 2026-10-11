@@ -11,6 +11,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [ants-programs](ants-programs.md) | ImageMath, ThresholdImage, MultiplyImages (ANTs 2.6.5 binaries) |
 | [ants-gaussian](ants-gaussian.md) | ImageMath `Laplacian`, `G`, `Grad`; SmoothImage; ResampleImageBySpacing; ResampleImage (ANTs 2.6.5 binaries) |
 | [ants-morphology](ants-morphology.md) | ImageMath `MD`, `ME`, `MC`, `GD`, `GO`, `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance` (ANTs 2.6.5 binaries) |
+| [ants-n4](ants-n4.md) | N4BiasFieldCorrection (ANTs 2.6.5 binary) on fMRIPrep's, sMRIPrep's and sdcflows' command lines |
 | [mri-hmc](mri-hmc.md) | mcflirt (FSL 6.0.7.17 binary) |
 
 Reproduce a report (build larmorx in release mode first):
@@ -24,5 +25,6 @@ python -m larmorx_validation bench resample-series --repeats 3 --threads 1 4 0 -
 python -m larmorx_validation bench ants-programs --repeats 5 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench ants-gaussian --repeats 5 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench ants-morphology --repeats 5 --threads 1 4 0 --out docs/benchmarks
+python -m larmorx_validation bench ants-n4 --repeats 3 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench mri-hmc --repeats 3 --threads 1 4 0 --out docs/benchmarks   # needs FSL
 ```

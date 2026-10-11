@@ -16,6 +16,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-smooth-image](ants-smooth-image.md) | `lx.ants.smooth_image`, `larmorx ants SmoothImage` (recursive Gaussian and median) | SmoothImage (ANTs 2.6.5 binary) | `validated` |
 | [ants-resample-image-by-spacing](ants-resample-image-by-spacing.md) | `lx.ants.resample_image_by_spacing`, `larmorx ants ResampleImageBySpacing` | ResampleImageBySpacing (ANTs 2.6.5 binary) | `validated` (1 expected divergence: ANTs resamples uninitialised memory) |
 | [ants-resample-image](ants-resample-image.md) | `lx.ants.resample_image`, `larmorx ants ResampleImage` | ResampleImage (ANTs 2.6.5 binary) | `validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences) |
+| [ants-n4](ants-n4.md) | `lx.ants.n4_bias_field_correction`, `larmorx ants N4BiasFieldCorrection` | N4BiasFieldCorrection (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded, `scripts/build_crmath_preload.sh`) | `validated` |
 | [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 
 These records compare larmorx with the original tools on Linux x86-64. That the other five
@@ -34,12 +35,14 @@ python -m larmorx_validation parity afni-tshift --tier standard --implementation
 python -m larmorx_validation parity resample-series --tier standard --out docs/validation   # needs fmriprep, nitransforms, scipy in the environment
 python -m larmorx_validation parity numpy-linalg --tier standard --out docs/validation   # needs numpy on the Haswell kernels, threadpoolctl, sdcflows
 python -m larmorx_validation.parity.numpy_linalg kernels --n 200000 --kernels Haswell SandyBridge Nehalem Prescott --out docs/validation/numpy-linalg-kernels.json
-python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these six need the ANTs oracle (scripts/build_ants_oracle.sh)
+python -m larmorx_validation parity ants-image-math --tier standard --out docs/validation   # these seven need the ANTs oracle (scripts/build_ants_oracle.sh)
 python -m larmorx_validation parity ants-threshold-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-multiply-images --tier standard --out docs/validation
 python -m larmorx_validation parity ants-smooth-image --tier standard --out docs/validation
 python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard --out docs/validation
 python -m larmorx_validation parity ants-resample-image --tier standard --out docs/validation
+scripts/build_crmath_preload.sh   # ANTs with correctly rounded math, the N4 suite's exact reference
+python -m larmorx_validation parity ants-n4 --tier standard --out docs/validation   # about two hours (ANTs at six thread counts)
 python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   # mcflirt's variability band (needs FSL)
 python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
 ```

@@ -360,6 +360,34 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   thread counts recorded). Until then, fMRIPrep 21.0.1's published ds000005 derivatives in
   the test data are the only fMRIPrep reference.
 
+## 2026-10-11: N4BiasFieldCorrection (A3 part 1): what was decided while porting
+- **ANTs' N4 result depends on its thread count** (ITK's B-spline fit sums per-thread
+  lattices; up to about 1e-3 relative on a T1w between 1 and 12 threads). larmorx computes
+  ANTs' **one-thread** result on any number of threads, in parallel, without shared sums. The
+  references of the parity suite are ANTs at one thread, as fMRIPrep runs it for the BOLD
+  reference and sMRIPrep before the anatomical template (`docs/findings/ants-n4.md`).
+- **The oracle's compiler is part of the reference.** GCC 11 at `-O3` keeps two float values
+  of the 2D/3D fit in double precision; larmorx reproduces that code generation
+  (`GridFit::double_axes`), since ANTs' bits depend on it.
+- **Correctly rounded maths kept (rule 5).** glibc's `expf`, `logf` and `exp` are not always
+  correctly rounded, and one misrounded value changes an N4 run slightly. larmorx keeps the
+  correctly rounded functions (new: `larmorx_core::math::{expf, logf}`), so it gives the same
+  bits on every platform. To prove the port exact anyway, the suite also runs ANTs with
+  CORE-MATH preloaded (`scripts/build_crmath_preload.sh`): larmorx is bit-identical to that run
+  in every compared case. Against ANTs as built, cases that differ do so within about ANTs'
+  own thread band (`docs/validation/ants-n4.md`).
+- **Open question for the user:** bit-identity with ANTs *as built on Linux* would need
+  glibc's float `expf`/`logf` (and the double `exp`) instead of correctly rounded ones, for
+  example as an opt-in "glibc maths" mode. That conflicts with rule 5 (it would differ between
+  platforms unless ported, and glibc is LGPL) and is not done; the default stays correctly
+  rounded.
+- **Python's `rescale_intensities` defaults to `False`**, as in ANTsPy; the command line keeps
+  ANTs' default (rescale whenever a mask is given, unless `-r 0`).
+- **For A4:** `larmorx_image::shrink::{shrink_plan, shrink}` is ITK's `ShrinkImageFilter` for
+  any dimension and pixel type, with the output grid computable without the data
+  (`ShrinkPlan`), and `larmorx_image::ItkGrid` carries ITK's start index and index ↔ point
+  rules.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

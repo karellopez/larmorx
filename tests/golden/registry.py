@@ -952,6 +952,57 @@ def _(ctx: Context) -> dict[str, Any]:
 # --- ANTs: the Python functions -----------------------------------------------------------------
 
 
+@case("cli.ants.N4BiasFieldCorrection", covers=("cli:ants N4BiasFieldCorrection",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A mask (outside restored, inside rescaled), a spline distance (padding), shrink 2, two
+    fitting levels (lattice refinement), the bias field; on the oblique grid, whose first two
+    axes ITK's gcc build computes in double precision."""
+    out, bias = ctx.out("out.nii"), ctx.out("bias.nii")
+    cli(
+        "ants",
+        "N4BiasFieldCorrection",
+        "-d", "3",
+        "-i", ctx.file("anat.nii"),
+        "-x", ctx.file("mask.nii"),
+        "-b", "[20]",
+        "-s", "2",
+        "-c", "[6x4,0]",
+        "-o", f"[{out},{bias}]",
+    )  # fmt: skip
+    return {"out": Nifti(out), "bias": Nifti(bias)}
+
+
+@case("py.ants.n4", covers=("lx.ants.n4_bias_field_correction",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defaults with few iterations; a weight image with a mesh, quadratic splines and
+    other histogram settings; quintic splines (Cox-de Boor kernels); a convergence threshold
+    that ends the level; 2D; 4D."""
+    n4 = lx.ants.n4_bias_field_correction
+    calls = {
+        "default": lambda: n4(anat(), convergence=([5], 0.0)),
+        "weight_mesh": lambda: n4(
+            anat(),
+            weight=probability(),
+            shrink_factor=2,
+            convergence=([4, 3], 0.0),
+            bspline_fitting=(2, 1, 1),
+            spline_order=2,
+            histogram_sharpening=(0.2, 0.02, 64),
+        ),
+        "quintic": lambda: n4(anat(), shrink_factor=2, convergence=([3], 0.0), bspline_fitting=(1, 1, 1), spline_order=5),
+        "threshold": lambda: n4(anat2(), mask=mask(), shrink_factor=2, convergence=([30], 0.02), rescale_intensities=True),
+        "plane": lambda: n4(plane(), bspline_fitting=12.0, shrink_factor=2, convergence=([4, 4], 0.0)),
+        "bold": lambda: n4(bold(), shrink_factor=2, convergence=([3, 2], 0.0)),
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    for name, call in calls.items():
+        r = call()
+        out[f"{name}.corrected"] = r.corrected.data
+        out[f"{name}.bias"] = r.bias_field.data
+        out[f"{name}.convergence"] = np.array([it.convergence for it in r.iterations], np.float32)
+    return out
+
+
 @case("py.ants.image_math", covers=("lx.ants.image_math",))
 def _(ctx: Context) -> dict[str, Any]:
     """The generic ``image_math`` on in-memory images (Normalize by the mean)."""

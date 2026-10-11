@@ -24,12 +24,13 @@ noted.
 | [ants-image-programs.md](ants-image-programs.md) | ImageMath, ThresholdImage, MultiplyImages: dispatch, exit codes, operands, quirks of each operation |
 | [ants-gaussian-filters.md](ants-gaussian-filters.md) | ITK's recursive and discrete Gaussian filters; ImageMath `G`, `Laplacian`, `Grad`, `UnsharpMask`; SmoothImage; ResampleImageBySpacing; ResampleImage (pixel types, interpolators, argument quirks) |
 | [ants-morphology.md](ants-morphology.md) | ITK's ball and binary/grayscale morphology; ImageMath `MD`/`ME`/`MO`/`MC`/`GD`/`GE`/`GO`/`GC`, `FillHoles`, `PadImage`; connected components and relabelling, `GetLargestComponent`; Danielsson and signed Maurer distance maps (`D`, `MaurerDistance`); `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue` |
+| [ants-n4.md](ants-n4.md) | N4BiasFieldCorrection and ITK's N4 filter: how fMRIPrep calls it, the thread dependence of the B-spline fit, GCC 11's double-precision axes, histogram sharpening quirks, vnl's FFT, lattice refinement, `ShrinkImageFilter`, glibc's `expf`/`logf` |
 | [itk-transforms.md](itk-transforms.md) | ITK transforms: composite order, inverses, displacement fields, transform files |
 | [itk-resampling.md](itk-resampling.md) | ITK `ResampleImageFilter` and the interpolators ANTs uses |
 | [itk-nifti.md](itk-nifti.md) | ITK's NIfTI reader and writer: geometry, scaling, non-finite values, vector images, the header it writes |
 | [antspy.md](antspy.md) | ANTsPy as an oracle: defaults and quirks of its wrappers |
 | [nibabel.md](nibabel.md) | nibabel as the reference for NIfTI I/O |
-| [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`/`powf`: glibc vs the `libm` crate, and what it does to bit parity |
+| [platform-math.md](platform-math.md) | `exp`/`log`/`sin`/`cos`/`powf`/`expf`/`logf`: glibc vs the `libm` crate and CORE-MATH, what it does to bit parity, the preload library that makes ANTs correctly rounded |
 | [scipy-ndimage.md](scipy-ndimage.md) | SciPy's `map_coordinates` and spline prefilter: padding, boundary rules, summation order, undefined behaviour |
 | [fmriprep-resampling.md](fmriprep-resampling.md) | fMRIPrep's one-shot resampler and nitransforms: float32 coordinates, BLAS fused products, voxel-shift map, Jacobian, displacement fields |
 | [numpy-blas.md](numpy-blas.md) | numpy's 4×4 products and inverses: which BLAS/LAPACK routine, OpenBLAS's kernels per CPU, the Haswell operation order larmorx reproduces, how often the kernels differ |

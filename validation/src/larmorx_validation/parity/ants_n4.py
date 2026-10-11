@@ -973,7 +973,8 @@ def _metrics(a: np.ndarray, b: np.ndarray) -> dict[str, float]:
         ),
         "max_abs": float(d.max()) if d.size else 0.0,
         "max_rel": float(rel.max()) if rel.size else 0.0,
-        "one_minus_ncc": 1.0 - ncc,
+        # Rounding can put the NCC of nearly identical images a hair above 1.
+        "one_minus_ncc": max(0.0, 1.0 - ncc),
     }
 
 
@@ -1112,7 +1113,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             )
             w = band(i)
             for key, name in (("max_abs", "max |diff|"), ("one_minus_ncc", "1 - NCC")):
-                ratio = m[key] / w[key] if w[key] > 0 else float("inf")
+                ratio = m[key] / w[key] if w[key] > 0 else (0.0 if m[key] == 0 else float("inf"))
                 checks.add(
                     Check(
                         f"{label}: {name} vs ANTs' thread band",

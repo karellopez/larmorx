@@ -158,14 +158,23 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 | FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
 | FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
 
-On fMRIPrep's command (`-reffile <boldref> -mats`) only FSL-01 applies: the last volume's
-matrix changes, the others are mcflirt's. The parity record's "D13 fix pass" lists, run by run,
-what the corrections change. Where the last volume is close to its predecessor the two starts
-reach nearly the same matrix; where it is not, mcflirt's start from the identity can fail: on
-the synthetic `background` series (large translations over a non-zero background) mcflirt's
-last volume converges to a 180° rotation, 106 mm from the true motion, and the corrected one
-to 0.36 mm ([validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md),
-ground truth).
+On fMRIPrep's command (`-reffile <boldref> -mats`) FSL-01 changes the last volume's matrix
+(the others are mcflirt's), and FSL-09 the rounding of the corrected series when the input is
+integer (fMRIPrep uses only the matrices). The parity record's "D13 fix pass" lists, run by
+run, what the corrections change.
+
+Where the last volume is close to its predecessor the two starts reach nearly the same matrix:
+on the 52 real parity runs a run's largest change is 0.024 mm (median), and on fMRIPrep's
+command for ds000005 the last volume moves by 0.06 mm, after which it is 0.021 mm from its
+predecessor instead of 0.055 mm (the other volumes' steps have a median of 0.038 mm). The
+largest real change, 72 mm, is a `-cost woods` run where mcflirt and larmorx both fail on every
+volume (rotations near 90°); corrected, the last volume stays 0.44 mm from its predecessor
+instead of 72 mm. Where the motion is large, mcflirt's start from the identity can fail on its
+own: on the synthetic `background` series (large translations over a non-zero background)
+mcflirt's last volume converges to a 180° rotation, 106 mm from the true motion, and the
+corrected one to 0.36 mm
+([validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md), ground
+truth).
 
 ### The correlation count (FSL-02)
 

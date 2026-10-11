@@ -168,15 +168,19 @@ def summary(results: list[CaseResult]) -> list[str]:
             ),
             default=0.0,
         )
-        # Differences beyond the values (headers, file names): "...; <what> changed".
+        # Differences beyond the values (headers, file names): "...; <what> changed". Their
+        # kinds, with the numbers left out so that one kind is listed once.
         others = [
             rest.split("; ", 1)[1].removesuffix(" changed") for _, _, rest in cases if "; " in rest
         ]
-        beyond = (
-            f", {len(others)} with other changes ({'; '.join(sorted(set(others)))})"
-            if others
-            else ""
+        kinds = sorted(
+            {
+                re.sub(r"\binf\b|\d+(\.\d+)?(e[+-]?\d+)?", "N", item)
+                for other in others
+                for item in other.split("; ")
+            }
         )
+        beyond = f", {len(others)} with other changes ({'; '.join(kinds)})" if others else ""
         lines.append(
             f"  - {entry}: {len(cases)} case(s) named it, {len(changed)} with changed values "
             f"(largest difference {worst:.3g}){beyond}: "

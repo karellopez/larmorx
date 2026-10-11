@@ -1,11 +1,21 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "1414ba561adb920c82a4dacb417df9bc24f859f8", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "fbbcf248f613f76e00a3a9fb4359a452218cfe6a", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
    "out:header": {"bytes": 352, "sha256": "e43d4e9602632203bda7a8300a802dd5150d3c085f21f96b26e1276348e7518f"},
    "stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+  },
+  "cli.ants.DenoiseImage": {
+   "noise:data": {"dtype": "<f4", "sample": "2549923ffaff7fb500e04cbd00000000fcff7fb500ea13400000802b00000000", "sha256": "9ede860481f6c73e2642de8dcd7fc727b5c60160b2272acd32a58aad517dc61e", "shape": [24, 20, 16], "sum": "10543.096957455518"},
+   "noise:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "out:data": {"dtype": "<f4", "sample": "00000000b86d6b4142bdd4439224c94070dbb640e3c5d243000088414992a43f", "sha256": "687eb16c4a281be85e4ee6786fe4b0dff5b3723b04a8021f8997837ce75c0588", "shape": [24, 20, 16], "sum": "800380.6171710414"},
+   "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "shrunk:data": {"dtype": "<f4", "sample": "22de95c060fc0a429f15cc43d6c60141562e0c413163d14374c7be4133435f3f", "sha256": "595499bccde724a574ed944ec7866b34ff533e108eafe7238321cea29a968912", "shape": [24, 20, 16], "sum": "811039.0863401219"},
+   "shrunk:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "shrunk_noise:data": {"dtype": "<f4", "sample": "6b70ba40e541a0c1bc138a4169a4e9bf7b0243c078a1a240ce1ddbc0bec2d33e", "sha256": "b6e342702160a8072f4c53874f55edd8c69116ec50008de6329b305a9e607733", "shape": [24, 20, 16], "sum": "-115.37214010179741"},
+   "shrunk_noise:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.ImageMath.+": {
    "out:data": {"dtype": "<f4", "sample": "92246940dcb68941dbf6d54349920c41b76d0341b72dd54300009c4124497240", "sha256": "3b22e816fafae0e36a5a8d686b8051c5ab401d9eb3bcdbef2f8a06899ba5abea", "shape": [24, 20, 16], "sum": "830123.7145209312"},
@@ -308,6 +318,18 @@
    "maurer_distance": {"dtype": "<f4", "sample": "eacfec41ba3af44065e6cc400b42d74134ff2041000000c01daf8c4124baf141", "sha256": "d1c8d73e573a1b06bdfb839863e7912294edc594cd367efb2119018c6b0676d7", "shape": [24, 20, 16], "sum": "114379.52415561676"},
    "replace_voxel_value": {"dtype": "<f4", "sample": "0000000000000000000040400000000000000000000010410000000000000000", "sha256": "c4b82124c48d6d68e028de87fe2b2dbc2b0dfdcc9c3201123feea2ddaddc4136", "shape": [24, 20, 16], "sum": "7320.0"},
    "threshold_at_mean": {"dtype": "<f4", "sample": "00000000000000000000803f00000000000000000000803f0000000000000000", "sha256": "f605f006446739dae16b4660ad1c2f20d50d7eaa82a7e35164832a285fba39c8", "shape": [24, 20, 16], "sum": "2496.0"}
+  },
+  "py.ants.denoise_image": {
+   "bold.denoised": {"dtype": "<f4", "sample": "000096c1000012410050fdbf80d8aec1b0811ec0006b23c100c0d6400080a3c0", "sha256": "daf3bb7a99884abcf78b9ef4c8c37b37d8024802c0ea970d75f33b5e34cc8135", "shape": [16, 14, 12, 4], "sum": "1267210.1511921883"},
+   "bold.noise": {"dtype": "<f4", "sample": "0000b64100006e4100aa7b4180d8cc416ca00f4180b5a5410070854100c0c041", "sha256": "beadf17ba3bc9ae36d5375ee8c77333222443b84ce93fe1610b93f1133b7c130", "shape": [16, 14, 12, 4], "sum": "565267.5681159012"},
+   "gaussian_mask.denoised": {"dtype": "<f4", "sample": "3e7d8d40145d1440290a4d438f2e12412fba08402f194e430000b040a28bfe40", "sha256": "e8478655e5bc5378c4a62ef14612cc0aa0d88902a0daba1ac7ef9b8d636db86a", "shape": [24, 20, 16], "sum": "395068.2067050338"},
+   "gaussian_mask.noise": {"dtype": "<f4", "sample": "2873083ffdff3f35001af53f000040b60000c02ac0e213400000000000000035", "sha256": "eb8c437311ba7074b9c5b5c965cec33e124e77b5103ee369a7eed35fa7a8e268", "shape": [24, 20, 16], "sum": "-153.0245483015096"},
+   "plane.denoised": {"dtype": "<f4", "sample": "e68e0441fc4f5d43ceee7943e9b2f8439cd90344000000006f4e604361f74740", "sha256": "9ff528cc6eae08f37b65688c6869c111c653d4e5eba3802d2d1593576a03ab92", "shape": [32, 24], "sum": "176578.45432329178"},
+   "plane.noise": {"dtype": "<f4", "sample": "34e2f64020abc0408068464100846f3f000f1140abaa2a3fe0e1c24140df553e", "sha256": "022efde7d3477a9154378f34ac53346e9d7e862549a37736bec3b8a62c96fe18", "shape": [32, 24], "sum": "5658.545457780361"},
+   "rician.denoised": {"dtype": "<f4", "sample": "beb277400000003642bdd44300000000000000005ebdd2430000000000000000", "sha256": "35f91708008e40413e9b30cdfeac6192789a205984ac9e78021bb86e7901ac82", "shape": [24, 20, 16], "sum": "762057.6662235857"},
+   "rician.noise": {"dtype": "<f4", "sample": "2c8e2ec0b56d6b4100e04cbd9224c9406edbb640802c1840000088414992a43f", "sha256": "7b732730b60821205a6b46a30f373c5f75e131d0d0b5af9fbd20233e9933e052", "shape": [24, 20, 16], "sum": "48866.04785830875"},
+   "shrink.denoised": {"dtype": "<f4", "sample": "6ddb16c17ed1cc4008a6c743e886df3f44078740b2c2cf433e2d174200000000", "sha256": "3ae6d4b181c1b8b09bb3b486a9b78bd37c7fff16aabfd8eaaac9bb41727d3442", "shape": [24, 20, 16], "sum": "783137.1507556885"},
+   "shrink.noise": {"dtype": "<f4", "sample": "92242941f80405412e0dd141d8429140a750bf3f9a6005417c5aa6c14992a43f", "sha256": "691e9cdc7c3fedaf8b5f31c4aad80e7196f6715c9dd3440a749423c7ad1eab87", "shape": [24, 20, 16], "sum": "27786.563784833532"}
   },
   "py.ants.image_math": {
    "normalize": {"dtype": "<f4", "sample": "7c55313ccab20e3e46ee80408ad5733ddbaa5d3d5c74804079dd243e2b80473c", "sha256": "94f1b4adf2435d7a23ed9a490f73bad7852be9eaddf4c40e80d46222dcebcf94", "shape": [24, 20, 16], "sum": "7679.977101014461"}

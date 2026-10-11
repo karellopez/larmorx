@@ -61,6 +61,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 - **Port to Rust** where existing Python packages are limited, **including ANTs**: ANTsPy has no Linux-aarch64, Windows-arm64 or Python-3.14 wheels. Also **FreeSurfer recon-all**: the goal is the same results, several times faster.
 - Rust implementations may **reimagine** algorithms for speed, provided validation shows equivalent results.
 - **Better algorithms by default (D11, user decision 2026-10-10).** larmorx should be an evolution of the upstreams: faster and better, not only replicas. An improved algorithm becomes the default once its results stay within the upstream tool's own variability (PLAN.md G4, §11); larger changes stay opt-in. Replicas always stay exact.
+- **Correct by default, faithful on request (D13, user decision 2026-10-11).** "What I like at the end is to have the best and methodically correct implementation." When an original has a *deterministic* bug that changes results (e.g. AFNI's negative-slope scaling, mcflirt's last-volume initialisation), larmorx fixes it by default and warns when the bug would have changed the result; a documented compatibility switch reproduces the original bit for bit, and parity tests use it. Crashes, out-of-bounds reads, races and nondeterminism are never reproduced. Every defect found goes into `docs/findings/upstream-defects.md`, and the method into `docs/porting-guide.md`.
 - **Every platform from the start** (user, 2026-10-10): Linux x64/aarch64, macOS Intel and Apple silicon, Windows x64/arm64. Design, test and benchmark with all six in mind; CI must stay green on all of them.
 - **How to port (user, 2026-10-09):**
   - Make a faithful **replica** when the licence allows it: ANTs/ITK (Apache-2.0), AFNI's NIH public-domain code, CORE-MATH (MIT), nibabel (MIT). Bit-identical results are the target.
@@ -120,7 +121,8 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
    - a validation record and status (`experimental` / `validated` / `stable`)
    - `PROVENANCE.md`
    - at least one **golden case** (rule 10), so every platform is checked against Linux
-8. **No equivalence claims without oracle numbers.** Thresholds are in PLAN.md §11.3; variability bands come from repeated oracle runs.
+8. **The source is the specification; an oracle binary is only a check** (user, 2026-10-11). A replica reproduces what the upstream source defines, not what one compiler made of it. When larmorx and an oracle binary disagree and the cause is the binary's code generation (e.g. GCC 11 at `-O3` dropping two float roundings in N4's B-spline fit), follow the source, record the binary's behaviour in `docs/findings/`, and prefer an oracle build that honours the source.
+   **No equivalence claims without oracle numbers.** Thresholds are in PLAN.md §11.3; variability bands come from repeated oracle runs.
 9. **Git: no AI attribution.** This rule is the user's instruction and overrides any tool default.
    - Never add `Co-Authored-By: Claude …` (or any AI co-author) trailers to commits.
    - Never add "Generated with Claude Code" or similar lines to commit messages, PR descriptions, issues or release notes.
@@ -157,7 +159,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
   - Log to `oracles/logs/`.
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).
-- **Run at most one or two agents at a time** (user, 2026-10-10): parallel agents exhaust the session limit and get killed mid-task. Brief every agent to commit as soon as its work passes the gates.
+- **Run up to two agents at a time** (user, 2026-10-11; one at a time from 2026-10-10, after four parallel agents exhausted the session limit and were killed mid-task). If a usage limit hits again, go back to one. Brief every agent to commit as soon as its work passes the gates.
 - **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"` also matches its own command line, so it never ends (four such loops ran for a day, 2026-10-11). Use a bracket: `pgrep -f "[l]armorx_validation bench"`.
 - **Never delete work products** (code, drafts, ports, harnesses, reports). If something must leave the repo or the build, archive it in `<workspace>/archive/<date>-<topic>/` (not under `/tmp`) and tell the user. Ask before deleting anything that is not a temporary build artefact.
 - Verify the environment at session start: `uname -m`, `nproc`, free RAM, `docker --version`, `rustc --version`.

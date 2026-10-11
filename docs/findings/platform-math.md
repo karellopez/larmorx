@@ -178,6 +178,6 @@ linked calls to these functions go to the correctly rounded versions (checked wi
 `LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 and DenoiseImage parity
 suites use it as their exact reference: larmorx is bit-identical to N4BiasFieldCorrection run
 this way in all 54 outputs of the standard tier ([ants-n4](../validation/ants-n4.md)); against
-the binary without the library, in 30 of 54. For DenoiseImage, see
-[ants-denoise](../validation/ants-denoise.md). ANTs' own code is not changed. Calls that GCC inlines or
+the binary without the library, in 30 of 54. DenoiseImage: 52 of 52 outputs with the library,
+9 of 52 without ([ants-denoise](../validation/ants-denoise.md)). ANTs' own code is not changed. Calls that GCC inlines or
 evaluates at compile time are not affected. *Verified* (2026-10-11).

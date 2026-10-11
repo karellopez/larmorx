@@ -9,16 +9,26 @@ JMRI 31:192-203, 2010). sMRIPrep runs it on every T1w (`-n Rician`, ANTs' other 
 
 **Status: `validated`** against DenoiseImage itself (see the
 [validation record](../validation/ants-denoise.md)), on sMRIPrep's command line on real T1w
-images and on every option, in 2, 3 and 4 dimensions:
-- against the **unmodified ANTs 2.6.5 binary** at one thread: STATS_BUILT;
+images and on every option, in 2, 3 and 4 dimensions (standard tier: 40 compared cases, 52
+outputs):
+- against the **unmodified ANTs 2.6.5 binary** at one thread: 7 of 40 cases (9 of 52 outputs)
+  bit-identical. In the others, glibc's `expf` (or `exp`), which is not always correctly
+  rounded, changes a few voxels by a few float units: on sMRIPrep's command, 5,522 of
+  5,898,240 voxels of ds000005's T1w by at most 2.0e-4 and 5,389 of 11,534,336 of ds000210's
+  by at most 2.1e-3; 1 − NCC at most 2.2e-13 in every case, and every difference at most
+  2.2e-4 of ANTs' own difference between thread counts;
 - against the **same binary run with glibc's `expf`, `exp` (and `logf`, `log`, `sin`, `cos`,
   `sincos`) replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
-  `scripts/build_crmath_preload.sh`), which is the arithmetic larmorx uses: STATS_CR.
+  `scripts/build_crmath_preload.sh`), which is the arithmetic larmorx uses: **52 of 52 outputs
+  bit-identical**. ANTs' own code is not changed; only those C-library functions are.
 - **ANTs' own result depends on its thread count**, far more than on the C library: with 2
   threads a fifth of the voxels of a T1w change, by up to 97; with 8 or 12 the result also
   changes from run to run. larmorx always gives ANTs' one-thread result.
 
-**Speed** ([benchmark](../benchmarks/ants-denoise.md)): STATS_SPEED
+**Speed** ([benchmark](../benchmarks/ants-denoise.md)): sMRIPrep's command on a raw T1w
+(160×192×192) takes 13.0 s on one thread and 2.9 s on 12, against 217 s and 45 s for ANTs. On
+the six command lines measured, larmorx is 10.7–17× faster than ANTs on one thread, and
+5.8–16× faster than ANTs on 12 threads when both use 12.
 
 ## Quick start
 

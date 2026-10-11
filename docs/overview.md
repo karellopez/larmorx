@@ -177,6 +177,11 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
     (one thread): 27 of 45 cases bit-identical; the others differ only through glibc's
     not-correctly-rounded `expf`/`logf`/`exp`, within ANTs' own variation between thread
     counts in 16 of 18 cases and up to 2.6 times it in two (NCC ≥ 0.9999999);
+  - ANTs' `DenoiseImage`: 10.7–17× faster on one thread, 29–76× with 12 threads; sMRIPrep's
+    denoising of a T1w 13.0 s on one thread and 2.9 s on 12 instead of 217 s and 45 s. Against
+    the unmodified ANTs program (one thread): 7 of 40 cases bit-identical; the others differ in
+    a few voxels by a few float units, only through glibc's `expf`/`exp`, while ANTs' own
+    result moves by up to 271 between thread counts;
   - head-motion correction (`lx.mri.hmc`, clean-room, mcflirt-compatible): 1.2–2.3× faster
     than mcflirt on one thread and 4.9–9.4× on 12, within mcflirt's own variability; the
     matrices alone, all fMRIPrep needs, 5.7–16×.

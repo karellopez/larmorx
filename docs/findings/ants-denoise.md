@@ -249,12 +249,15 @@ floats ([ants-n4.md](ants-n4.md#glibcs-math-in-n4)); with hundreds of millions o
 runs meet some of them. One weight one ulp off changes the weighted mean of one centre's
 patch by about one ulp, and so up to 27 output voxels.
 
-*Validated* (smoke tier, 36 compared cases): bit-identical to ANTs as built in 7; in the others
-a few voxels differ by a few float ulps (at most 1.2e-2 on values up to 1e6, in the case with
-outliers), 1 − NCC at most 1e-15, at least 10⁴ times less than ANTs' thread band in every case
-where ANTs' threads change anything. **With CORE-MATH's `expf`, `exp`, `logf`, `log`, `sin`,
-`cos` and `sincos` preloaded into ANTs (`scripts/build_crmath_preload.sh`), all 36 are
-bit-identical**, and so are both outputs of sMRIPrep's command on ds000005's T1w.
+*Validated* (standard tier, 40 compared cases, 52 outputs): bit-identical to ANTs as built in
+7 cases (9 outputs); in the others a few voxels differ by a few float units (sMRIPrep's
+command: 5,522 of 5,898,240 voxels of ds000005's T1w by at most 2.0e-4, 5,389 of 11,534,336 of
+ds000210's by at most 2.1e-3; at most 1.2e-2 on values up to 1e6 in the case with outliers),
+1 − NCC at most 2.2e-13, and every difference at most 2.2e-4 of ANTs' thread band (max |diff|)
+where ANTs' threads change anything (with patch radius 0 they change nothing: no two centres
+write the same voxel). **With CORE-MATH's `expf`, `exp`, `logf`, `log`, `sin`, `cos` and
+`sincos` preloaded into ANTs (`scripts/build_crmath_preload.sh`), all 52 outputs are
+bit-identical.**
 
 *larmorx:* uses the correctly rounded functions (`larmorx_core::math::{expf, exp}`), as rule 5
 requires: the same bits on every platform.

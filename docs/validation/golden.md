@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 80 cases, 316 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 82 cases, 334 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |
@@ -30,9 +30,9 @@ A coverage test fails when anything below has no case; its message says what to 
 
 | Family | Cases | What |
 |---|---|---|
-| Command line, ANTs | 48 | every ImageMath operation once (38, in 3D), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite |
+| Command line, ANTs | 49 | every ImageMath operation once (38, in 3D), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `DenoiseImage` with the Rician model, a mask and the noise image, and with the Gaussian model, shrink 2 and per-axis radii; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite |
 | Command line, AFNI and MRI | 2 | `3dTshift` (int16 with a scale factor, Fourier); `hmc` with `-mats -plots -stats` (gzip output, `.par`, `MAT_*`) |
-| `lx.ants` | 13 | all 38 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series |
+| `lx.ants` | 14 | all 39 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2 |
 | `lx.afni` | 3 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `fmriprep_slice_timing` |
 | `lx.mri` | 3 | `hmc` with the default, each other cost function, the mean volume with sinc interpolation, a separate reference with splines and 12 degrees of freedom, the in-plane mode with nearest neighbour and an initial matrix; `HmcResult.save_mats`/`save_par`/`save_itk`, `read_mats` |
 | `lx.transforms` | 5 | ITK files written and read (text, MATLAB, HDF5); `load_itk_linear`, `load_itk_composite`, `load_transforms`; `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction |
@@ -43,13 +43,13 @@ A coverage test fails when anything below has no case; its message says what to 
 What the coverage test enumerates:
 
 - **CLI tools:** `_core.cli_tools()`, which returns `larmorx_cli::FAMILIES`, the same list the
-  command line dispatches and prints in `--help` (10 tools). For the replica, the families and
+  command line dispatches and prints in `--help` (11 tools). For the replica, the families and
   tools printed by `larmorx-gpl --help`.
 - **ImageMath operations:** `lx.ants.image_math_operations()`, built from the operation
   registry (`GROUPS`), 38 operations.
 - **Public functions:** every function in the `__all__` of `lx.ants`, `lx.afni`, `lx.mri`,
   `lx.transforms`, `lx.ndimage`, `lx.io` and `lx`, and every public method defined on the
-  classes they export (72). Aliases count once (`lx.save` is `lx.io.save`). Properties and
+  classes they export (73). Aliases count once (`lx.save` is `lx.io.save`). Properties and
   constants are not functions and are not enforced; the I/O cases read the computed ones
   (`NiftiHeader.affine`, `qform`, `sform`, `itk_geometry`).
 
@@ -154,7 +154,7 @@ release wheel built with `maturin develop --release`:
 
 | Suite | Time |
 |---|---|
-| `pytest tests/golden` (81 tests) | 0.8 s (1.0 s wall with interpreter start-up); 0.9 s on one core. With N4's two cases (2026-10-11, machine under load 5): 0.93 s |
+| `pytest tests/golden` (81 tests) | 0.8 s (1.0 s wall with interpreter start-up); 0.9 s on one core. With N4's two cases (2026-10-11, machine under load 5): 0.93 s. With DenoiseImage's two (83 tests, 2026-10-11): 0.97 s; the cases themselves 0.74 s |
 | slowest cases | `py.mri.hmc.options` 0.11 s, `io.nibabel` 0.11 s (importing nibabel), `py.ants.apply_transforms` 0.08 s, `py.mri.hmc.costs` 0.07 s, `py.ants.n4` 0.07 s |
 | GPL golden test, debug | 0.03-0.04 s (0.08 s for `cargo test --test golden`) |
 | GPL: building `sha2`, its dependencies and the test binary, debug, from scratch | 2.8 s (cached by `rust-cache` afterwards) |

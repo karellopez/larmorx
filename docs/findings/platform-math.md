@@ -161,6 +161,11 @@ measure, so an integer-valued T1w often meets a misrounded value. One ulp there 
 whole run slightly, as ANTs' own thread count does
 ([ants-n4.md](ants-n4.md#glibcs-math-in-n4)).
 
+DenoiseImage calls `expf` for the weight of almost every pair of similar patches (hundreds of
+millions of calls for a T1w), so most runs meet a misrounded value; each changes one patch's
+weighted mean by about an ulp, in a few voxels
+([ants-denoise.md](ants-denoise.md#glibcs-math-in-denoiseimage)).
+
 *larmorx:* `larmorx_core::math::{expf, logf}`, ports of CORE-MATH's `src/binary32/exp/expf.c`
 and `src/binary32/log/logf.c`, bit-identical to the C on all 2^32 inputs.
 
@@ -170,8 +175,9 @@ and `src/binary32/log/logf.c`, bit-identical to the C on all 2^32 inputs.
 `cos` with a small wrapper (which also provides `sincos`) into
 `oracles/core-math-preload/libcrmath.so`. Run with `LD_PRELOAD` set to it, ANTs' dynamically
 linked calls to these functions go to the correctly rounded versions (checked with
-`LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 parity suite uses it as
-its exact reference: larmorx is bit-identical to N4BiasFieldCorrection run this way in all
-54 outputs of the standard tier ([ants-n4](../validation/ants-n4.md)); against the binary
-without the library, in 30 of 54. ANTs' own code is not changed. Calls that GCC inlines or
+`LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 and DenoiseImage parity
+suites use it as their exact reference: larmorx is bit-identical to N4BiasFieldCorrection run
+this way in all 54 outputs of the standard tier ([ants-n4](../validation/ants-n4.md)); against
+the binary without the library, in 30 of 54. For DenoiseImage, see
+[ants-denoise](../validation/ants-denoise.md). ANTs' own code is not changed. Calls that GCC inlines or
 evaluates at compile time are not affected. *Verified* (2026-10-11).

@@ -245,8 +245,8 @@ CAUSE_TEXT = {
     ),
     "glibc maths": "glibc's maths",
     "larmorx": "**larmorx**",
-    "float pipeline": "**larmorx computes `--float 1` in double** (known; ANTs in double "
-    "precision, rounded to float32, is larmorx bit for bit)",
+    "float pipeline": "**larmorx computed `--float 1` in double** (ANTs in double "
+    "precision, rounded to float32, is larmorx bit for bit; larmorx before 2026-10-11)",
 }
 
 
@@ -510,8 +510,9 @@ def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int)
 #: The known larmorx divergences (``nodes.KNOWN``), for the headline.
 KNOWN_TEXT = {
     "float pipeline": (
-        "`antsApplyTransforms --float 1`, which ANTs runs in single precision and larmorx in "
-        "double (ANTs in double precision, rounded to float32, is larmorx's output bit for bit)"
+        "`antsApplyTransforms --float 1`, which ANTs runs in single precision and larmorx "
+        "computed in double before 2026-10-11 (ANTs in double precision, rounded to float32, is "
+        "larmorx's output bit for bit)"
     ),
 }
 

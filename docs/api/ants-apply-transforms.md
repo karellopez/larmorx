@@ -5,16 +5,20 @@
 `larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
 
 **Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 83 cases:
+[validation record](../validation/ants-apply-transforms.md)). The record covers 166 cases:
 - every interpolator;
 - every transform type and file format;
 - awkward geometries, output types and time series;
-- real fMRIPrep derivatives.
+- real fMRIPrep derivatives;
+- all of them again with `--float 1`, ANTs' single-precision pipeline.
 
-All 83 agree, and 63 of the 79 compared are byte-identical. Every interpolator gives **the same bytes** as ANTs except where ITK calls the
-platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc). There the last bit can
-differ, at most about 1e-15 relative
-([why](../findings/platform-math.md)).
+All 166 agree (8 of them errors both programs report). Of the 158 compared, 144 are
+byte-identical to the unmodified ANTs program, among them all 81 `--float 1` cases; the other 14
+differ only where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and windowed
+sinc in double), by at most about 1e-15 relative ([why](../findings/platform-math.md)). With
+correctly rounded maths preloaded into ANTs, all 158 are byte-identical. All 14 of fMRIPrep's
+`--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
+([stage record](../validation/fmriprep-stages.md)).
 
 ## Quick start
 
@@ -47,8 +51,15 @@ larmorx ants antsApplyTransforms -d 3 -i sub-01_desc-preproc_T1w.nii.gz \
 
 ## `lx.ants.apply_transforms(image, reference, transforms=(), *, ...)`
 
-Resamples `image` onto the grid of `reference`. Returns an `lx.Image`: float64 data on the
-reference grid, plus a time axis for a series.
+Resamples `image` onto the grid of `reference`. Returns an `lx.Image`: float64 data (float32
+with `precision="float32"`) on the reference grid, plus a time axis for a series.
+
+**Precision.** `precision="float64"` (the default) computes in double, as ANTs does by
+default; `precision="float32"` computes in single precision exactly as
+`antsApplyTransforms --float 1` does: the image is read as float32, transform files are read as
+ITK's float reader reads them (a text file's numbers rounded once to float), points, transform
+arithmetic and continuous indices are float, and the result is float32. What is float and what
+stays double, step by step: [ants-float.md](../findings/ants-float.md).
 
 **Transform order.** As with `-t`, for each point of the output grid the *first* transform
 acts first. So `[warp, affine]` maps an output point `x` to `affine(warp(x))`. Equivalently,
@@ -80,8 +91,8 @@ are placed by their affine.
 | `-e 0` / `-e 3` | `time_series=None/False/True` | 4D images are resampled volume by volume by default; `False` with 4D is an error, as `-e 0` is |
 | `--time-index t` | `image.data[..., t]` | |
 | `-f value` | `default_value=` | value outside the input |
-| `-u type` | `dtype=` | default float64. Integers truncate toward zero and saturate in Python; the CLI wraps out-of-range values as ANTs does on x86-64 ([finding](../findings/ants-cli.md)) |
-| `--float 1` | – | the CLI rounds input and output to float32 and computes in double |
+| `-u type` | `dtype=` | default: the computation type (float64, or float32 with `precision="float32"`). Integers truncate toward zero and saturate in Python; the CLI wraps out-of-range values as ANTs does on x86-64 ([finding](../findings/ants-cli.md)) |
+| `--float 1` | `precision="float32"` | single precision exactly as ANTs computes it ([finding](../findings/ants-float.md)); `--float 0` is `"float64"`, the default |
 | `-v 1` | – | |
 | (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
 
@@ -118,6 +129,7 @@ them, stay float32, so a 1 mm warp takes 100 MB instead of 200 MB.
 
 ```rust
 use larmorx_ants::{ApplyTransformsOptions, apply_transforms};
+use larmorx_core::Precision;
 use larmorx_interp::{Interpolation, Window};
 use larmorx_io::itk_transform::read_itk_transform;
 use larmorx_io::nifti::{self, itk::{ItkVoxels, itk_geometry, read_itk_image}};
@@ -132,13 +144,30 @@ let options = ApplyTransformsOptions {
     interpolation: Interpolation::WindowedSinc(Window::Lanczos),
     default_value: 0.0,
     n_threads: 0,
+    precision: Precision::Double, // Precision::Float is --float 1
 };
-// f64 values on the reference grid, x fastest (one block per volume for a series)
+// f64 values on the reference grid, x fastest (one block per volume for a series); with
+// Precision::Float they are the f32 values of ANTs' float output. Text transform files are
+// read for the precision with larmorx_io::itk_transform::read_itk_transform_with.
 let values = match &image.voxels {
     ItkVoxels::F32(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options)?,
     ItkVoxels::F64(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options)?,
 };
 ```
+
+## Deliberate and known differences
+
+- **ITK's defects are reproduced** for now, as the [register](../findings/upstream-defects.md)
+  lists them: unknown `-u` names and ignored interpolator parameters (ANTS-33), ITK's `floor` of
+  tiny negative indices (ITK-01, in the field and sinc lookups), and with `--float 1` the versor
+  transforms that ITK refuses to read in float (ITK-10: a valid axis of norm ≥ 1, rounded to
+  float, exceeds 1). D13 decides each of them.
+- **Not reproduced:** `Rigid3DTransform`'s orthogonality check (ITK refuses a non-orthogonal
+  matrix; larmorx reads it as an affine), and `GenericLabel`'s merging of `−0.0` and `+0.0` into
+  one label ([ants-float.md](../findings/ants-float.md), last section).
+- **GenericLabel** evaluates only the labels among the 8 neighbours (ANTS-34): ITK evaluates
+  every distinct value in the image and practically never finishes on an intensity image. The
+  result is the same.
 
 ## Performance
 

@@ -13,10 +13,11 @@
 //! **Arithmetic as ITK's.** Parameters are `f32`: `r = spans / ((size − 1)·spacing)`,
 //! `p = (point − origin)·r` (the point in `f32`, as ITK's `PointSet` stores it), pulled inside
 //! `[0, spans)` at the ends; kernel weights in `f64` multiplied into an `f32` product, axis 0
-//! first; sums in `f32`. One exception reproduces the binary ITK and ANTs are built into:
-//! gcc 11 (x86-64, `-O3`) vectorizes the first two axes in 2D and 3D and keeps their `r` in
-//! double precision, unrounded, for `p` and the end tolerance ([`GridFit::double_axes`],
-//! [`gcc_double_axes`], `docs/findings/ants-n4.md`).
+//! first; sums in `f32`. This is what the C++ source defines, and what ITK and ANTs compute
+//! when built by a correct compiler. GCC 11.1-11.4, 12.1-12.3 and 13.1 at `-O3` miscompile it
+//! (GCC bug 110182): they keep `r` of the first two axes of 2D and 3D fits in double
+//! precision. [`GridFit::double_axes`] reproduces that miscompile, only to compare with such
+//! a build ([`gcc11_double_axes`], `docs/findings/ants-n4.md`); it is 0 everywhere else.
 //!
 //! **Speed.** Within one fitting level the points, weights and lattice size do not change, so
 //! [`GridFitPlan`] computes the kernel weights, `Σ B²`, `ω` and (memory permitting) every
@@ -37,14 +38,22 @@ use crate::FilterError;
 use crate::itk_math::almost_equal_f32;
 use crate::volume::strides;
 
-/// How many leading axes ITK's x86-64 gcc 11 build (the ANTs 2.6.5 oracle, `-O3`) computes
-/// in double precision where the C++ source rounds to float: the first two in 2D and 3D, none
-/// in 4D. gcc vectorizes those two axes as a pair of doubles and drops the conversions to
-/// float in between, in `ThreadedGenerateDataForFitting` (`r[i]`, so `p` and `epsilon` use
-/// the unrounded quotient: `divpd` without `cvtpd2ps`) and in N4's `UpdateBiasFieldEstimate`
-/// (the points' coordinates, `TransformIndexToPhysicalPoint` into a float point: the origin
-/// is not rounded to float before the index term is added).
-pub fn gcc_double_axes(dim: usize) -> usize {
+/// **Not ITK's behaviour; for comparisons with a miscompiled build only.** How many leading
+/// axes ANTs 2.6.5 built by GCC 11.4 at `-O3` (x86-64; the repository's former oracle,
+/// `oracles/ants-2.6.5-gcc11-O3`) computes in double precision where the C++ source rounds
+/// to float: the first two in 2D and 3D, none in 4D.
+///
+/// GCC's SLP vectorizer computes those two axes as a pair of doubles, rounds them to a pair
+/// of floats and converts them back; GCC's folding of two conversions in a row then removes
+/// the round trip, because it compares `TYPE_PRECISION` of vector types (their number of
+/// lanes, equal for 2 × float and 2 × double) instead of the element precision (GCC bug
+/// 110182, wrong code; fixed in GCC 11.5, 12.4 and 13.2). This drops the rounding of `r[i]`
+/// in `ThreadedGenerateDataForFitting` (`divpd` without `cvtpd2ps`, so `p` and `epsilon`
+/// use the unrounded quotient) and, in N4's `UpdateBiasFieldEstimate`, the rounding of the
+/// origin in `TransformIndexToPhysicalPoint` into a float point. Pass it as
+/// [`GridFit::double_axes`] (and `N4Parameters::double_axes`) to reproduce such a build bit
+/// for bit; larmorx itself always uses 0 (`docs/findings/ants-n4.md`).
+pub fn gcc11_double_axes(dim: usize) -> usize {
     if dim == 2 || dim == 3 { 2 } else { 0 }
 }
 
@@ -61,8 +70,10 @@ pub struct GridFit<'a> {
     pub size: &'a [usize],
     pub control_points: &'a [usize],
     pub order: usize,
-    /// The number of leading axes whose `r` stays in double precision (ITK's source rounds it
-    /// to float; see [`gcc_double_axes`]). The caller computes `axis_points` to match.
+    /// 0: ITK's source, which rounds `r` to float on every axis. A non-zero value keeps `r`
+    /// of that many leading axes in double precision, reproducing a miscompiled ITK build
+    /// ([`gcc11_double_axes`]); for comparisons with such a build only. The caller computes
+    /// `axis_points` to match.
     pub double_axes: usize,
 }
 
@@ -617,7 +628,7 @@ mod tests {
         for dim in 2..=4 {
             let (size, spacing, origin, axis_points, cp) = case(dim);
             let total: usize = size.iter().product();
-            for unrounded in [0, gcc_double_axes(dim)] {
+            for unrounded in [0, gcc11_double_axes(dim)] {
                 let fit = GridFit {
                     axis_points: &axis_points,
                     origin: &origin,

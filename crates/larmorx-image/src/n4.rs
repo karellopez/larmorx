@@ -35,7 +35,7 @@
 use rayon::prelude::*;
 
 use crate::FilterError;
-use crate::bspline::fit::{GridFit, GridFitPlan, gcc_double_axes};
+use crate::bspline::fit::{GridFit, GridFitPlan};
 use crate::bspline::{Lattice, evaluate, refine};
 use crate::grid::{ItkGrid, vnl_floor_f32};
 use crate::vnl_fft::VnlFft1d;
@@ -60,9 +60,11 @@ pub struct N4Parameters {
     pub wiener_noise: f32,
     /// `SetNumberOfHistogramBins`.
     pub bins: u32,
-    /// How many leading axes the B-spline fit computes in double precision where ITK's source
-    /// says float (the parametric scale `r` and the points' coordinates), as ITK's x86-64
-    /// gcc 11 build does: 2 in 2D and 3D ([`gcc_double_axes`]); 0 follows the source.
+    /// 0 (the default): ITK's source. A non-zero value computes that many leading axes of the
+    /// B-spline fit in double precision where the source says float (the parametric scale
+    /// `r` and the points' coordinates), as ANTs built by GCC 11.4 at `-O3` does (GCC bug
+    /// 110182; [`gcc11_double_axes`](crate::bspline::fit::gcc11_double_axes)). For
+    /// comparisons with such a build only.
     pub double_axes: usize,
 }
 
@@ -79,7 +81,7 @@ impl N4Parameters {
             fwhm: 0.15,
             wiener_noise: 0.01,
             bins: 200,
-            double_axes: gcc_double_axes(dim),
+            double_axes: 0,
         }
     }
 }
@@ -345,7 +347,7 @@ pub fn n4_bias_field(
     // The fit's points: each axis's physical coordinates as float, identity direction
     // (`TransformIndexToPhysicalPoint` into a float point: the origin rounded to float, then
     // the index term added in double and rounded again; in double throughout on the
-    // `double_axes`).
+    // `double_axes`, which reproduce a miscompiled build only).
     let axis_points: Vec<Vec<f32>> = (0..d)
         .map(|a| {
             let o = if a < p.double_axes {

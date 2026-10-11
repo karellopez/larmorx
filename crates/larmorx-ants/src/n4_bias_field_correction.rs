@@ -336,7 +336,8 @@ pub fn n4_bias_field_correction(
         fwhm: options.fwhm,
         wiener_noise: options.wiener_noise,
         bins: options.bins,
-        double_axes: larmorx_image::bspline::fit::gcc_double_axes(d),
+        // ITK's source: `r` and the points' coordinates rounded to float on every axis.
+        double_axes: 0,
     };
     let result = n4_bias_field(
         &small_input,

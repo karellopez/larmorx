@@ -128,6 +128,13 @@ pub fn round_half_integer_up(x: f64) -> i64 {
     cvtsd2si64(2.0 * x + 0.5) >> 1
 }
 
+/// `itk::Math::Floor<int64>(double)` on x86-64 (SSE2): `round_half_to_even(2x − 0.5) >> 1`.
+/// It is the true floor except for negative values in `[−2⁻⁵⁵, 0)`, whose floor is 0 (as
+/// [`vnl_floor_f32`] for floats).
+pub fn itk_floor_f64(x: f64) -> i64 {
+    cvtsd2si64(2.0 * x - 0.5) >> 1
+}
+
 /// x86-64's `cvtsd2si` with a 64-bit destination: round to nearest (ties to even), with NaN
 /// and values out of range giving `i64::MIN`.
 fn cvtsd2si64(x: f64) -> i64 {
@@ -141,8 +148,11 @@ fn cvtsd2si64(x: f64) -> i64 {
 }
 
 /// `vnl_math::floor(float)` as ITK v5.4.5 is built on x86-64 (`VNL_CONFIG_ENABLE_SSE2_ROUNDING`):
-/// `_mm_cvtss_si32(2x − 0.5f) >> 1`, with the subtraction in float. It is the true floor for
-/// `|x| < 2^22` and gives `i32::MIN >> 1` for NaN and values out of range.
+/// `_mm_cvtss_si32(2x − 0.5f) >> 1`, with the subtraction in float (ITK's
+/// `Math::Floor<long>(float)` is the same with `_mm_cvtss_si64`). It is the true floor for
+/// `|x| < 2^22` **except for negative values in `[−2⁻²⁶, 0)`**, where `2x − 0.5f` rounds to
+/// `−0.5`, which rounds to 0: their floor is 0, not −1. It gives `i32::MIN >> 1` for NaN and
+/// values out of range.
 pub fn vnl_floor_f32(x: f32) -> i32 {
     let y = 2.0 * x - 0.5;
     let r = y.round_ties_even();
@@ -157,6 +167,20 @@ pub fn vnl_floor_f32(x: f32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vnl_floor_of_tiny_negative_floats_is_zero() {
+        assert_eq!(vnl_floor_f32(-1e-8), 0);
+        assert_eq!(vnl_floor_f32(-(2.0f32).powi(-26)), 0);
+        assert_eq!(vnl_floor_f32(-(2.0f32).powi(-25)), -1);
+        assert_eq!(vnl_floor_f32(-0.25), -1);
+        assert_eq!(vnl_floor_f32(4.999_999_5), 4);
+        assert_eq!(vnl_floor_f32(5.0), 5);
+        assert_eq!(itk_floor_f64(-1e-17), 0);
+        assert_eq!(itk_floor_f64(-1e-15), -1);
+        assert_eq!(itk_floor_f64(2.999_999_999_999), 2);
+        assert_eq!(itk_floor_f64(-3.5), -4);
+    }
 
     #[test]
     fn rounding_matches_itk() {

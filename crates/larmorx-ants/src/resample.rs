@@ -152,7 +152,8 @@ fn linear_unoptimized<T: RealElement>(
     let mut base = [0i64; 8];
     let mut distance = [0.0f64; 8];
     for k in 0..d {
-        base[k] = c[k].floor() as i64;
+        // `Math::Floor<long>(double)` (0, not −1, for negative values closer to 0 than 2⁻⁵⁵).
+        base[k] = larmorx_image::grid::itk_floor_f64(c[k]);
         distance[k] = c[k] - base[k] as f64;
     }
     let mut value = 0.0f64;
@@ -172,6 +173,47 @@ fn linear_unoptimized<T: RealElement>(
             upper >>= 1;
         }
         value += data[offset].to_f64() * overlap;
+    }
+    value
+}
+
+/// [`linear_unoptimized`] for an interpolator with `float` coordinates
+/// (`LinearInterpolateImageFunction<I, float>`): its `InternalComputationType` is `float`, so
+/// each distance is a float, `overlap *= distance` is a float product and
+/// `overlap *= 1.0 - distance` a double product stored as float; the sum stays in double.
+fn linear_unoptimized_f32<T: RealElement>(
+    data: &[T],
+    size: &[usize],
+    strides: &[usize],
+    c: &[f64],
+) -> f64 {
+    let d = size.len();
+    let mut base = [0i64; 8];
+    let mut distance = [0.0f32; 8];
+    for k in 0..d {
+        // `Math::Floor<long>(float)`: vnl's SSE2 floor, `(2x − 0.5f)` rounded to an integer
+        // and halved, which is 0 (not −1) for negative values closer to 0 than 2⁻²⁵ or so.
+        let x = c[k] as f32;
+        base[k] = i64::from(larmorx_image::grid::vnl_floor_f32(x));
+        distance[k] = x - base[k] as f32;
+    }
+    let mut value = 0.0f64;
+    for counter in 0..(1usize << d) {
+        let mut overlap = 1.0f32;
+        let mut upper = counter;
+        let mut offset = 0usize;
+        for k in 0..d {
+            let index = if upper & 1 == 1 {
+                overlap *= distance[k];
+                (base[k] + 1).min(size[k] as i64 - 1)
+            } else {
+                overlap = (f64::from(overlap) * (1.0 - f64::from(distance[k]))) as f32;
+                base[k].max(0)
+            };
+            offset += index as usize * strides[k];
+            upper >>= 1;
+        }
+        value += data[offset].to_f64() * f64::from(overlap);
     }
     value
 }
@@ -397,6 +439,9 @@ where
                 let value = match &self.evaluator {
                     Evaluator::Linear3(volume) => linear(volume, c3),
                     Evaluator::Nearest3(volume) => nearest(volume, c3),
+                    Evaluator::LinearN if self.float => {
+                        linear_unoptimized_f32(self.input, self.in_size, self.strides, &c)
+                    }
                     Evaluator::LinearN => {
                         linear_unoptimized(self.input, self.in_size, self.strides, &c)
                     }

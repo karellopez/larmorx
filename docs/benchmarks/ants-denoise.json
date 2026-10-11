@@ -1,0 +1,570 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "77bb3c657378-dirty",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "load_average_before": [
+   1.82958984375,
+   3.92822265625,
+   4.95947265625
+  ],
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "best": 215.91937737166882,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sMRIPrep: -n Rician -s 1, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 217.35315992869437,
+   "operation": "1",
+   "seconds": [
+    221.99427766166627,
+    215.91937737166882,
+    217.35315992869437
+   ],
+   "throughput_mb_s": 0.1085482815512786,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 45.046554800122976,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sMRIPrep: -n Rician -s 1, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 45.1929120644927,
+   "operation": "12",
+   "seconds": [
+    45.046554800122976,
+    45.1929120644927,
+    45.92896012030542
+   ],
+   "throughput_mb_s": 0.5220577945128007,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 12.981680523604155,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5522,
+    "threads": 1
+   },
+   "input": "sMRIPrep: -n Rician -s 1, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 13.009546276181936,
+   "operation": "1",
+   "seconds": [
+    13.10399136133492,
+    13.009546276181936,
+    12.981680523604155
+   ],
+   "throughput_mb_s": 1.8135384201057785,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.882985344156623,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5522,
+    "threads": 4
+   },
+   "input": "sMRIPrep: -n Rician -s 1, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 4.020406341180205,
+   "operation": "4",
+   "seconds": [
+    4.020406341180205,
+    4.0707256477326155,
+    3.882985344156623
+   ],
+   "throughput_mb_s": 5.868389908337996,
+   "tool": "larmorx"
+  },
+  {
+   "best": 2.8626203648746014,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5522,
+    "threads": 12
+   },
+   "input": "sMRIPrep: -n Rician -s 1, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 2.895369701087475,
+   "operation": "12",
+   "seconds": [
+    2.9528313856571913,
+    2.895369701087475,
+    2.8626203648746014
+   ],
+   "throughput_mb_s": 8.148635385366699,
+   "tool": "larmorx"
+  },
+  {
+   "best": 210.396918034181,
+   "data_bytes": 46137696,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sMRIPrep: -n Rician -s 1, T1w ds000210 (256\u00d7256\u00d7176)",
+   "median": 213.43607630766928,
+   "operation": "1",
+   "seconds": [
+    214.46541103348136,
+    210.396918034181,
+    213.43607630766928
+   ],
+   "throughput_mb_s": 0.21616634262659634,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 45.710553875193,
+   "data_bytes": 46137696,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sMRIPrep: -n Rician -s 1, T1w ds000210 (256\u00d7256\u00d7176)",
+   "median": 46.2509926520288,
+   "operation": "12",
+   "seconds": [
+    46.2509926520288,
+    46.51171729527414,
+    45.710553875193
+   ],
+   "throughput_mb_s": 0.9975503952340831,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 16.324749333783984,
+   "data_bytes": 46137696,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5389,
+    "threads": 1
+   },
+   "input": "sMRIPrep: -n Rician -s 1, T1w ds000210 (256\u00d7256\u00d7176)",
+   "median": 16.343626467511058,
+   "operation": "1",
+   "seconds": [
+    16.343626467511058,
+    16.324749333783984,
+    16.377195050939918
+   ],
+   "throughput_mb_s": 2.82297788019786,
+   "tool": "larmorx"
+  },
+  {
+   "best": 5.390065236017108,
+   "data_bytes": 46137696,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5389,
+    "threads": 4
+   },
+   "input": "sMRIPrep: -n Rician -s 1, T1w ds000210 (256\u00d7256\u00d7176)",
+   "median": 5.391374969854951,
+   "operation": "4",
+   "seconds": [
+    5.390065236017108,
+    5.41710102558136,
+    5.391374969854951
+   ],
+   "throughput_mb_s": 8.557686352363149,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.8174363262951374,
+   "data_bytes": 46137696,
+   "extra": {
+    "bit_identical": false,
+    "differing": 5389,
+    "threads": 12
+   },
+   "input": "sMRIPrep: -n Rician -s 1, T1w ds000210 (256\u00d7256\u00d7176)",
+   "median": 3.8196749836206436,
+   "operation": "12",
+   "seconds": [
+    3.8275383841246367,
+    3.8196749836206436,
+    3.8174363262951374
+   ],
+   "throughput_mb_s": 12.078958601934868,
+   "tool": "larmorx"
+  },
+  {
+   "best": 25.82204420492053,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 1
+   },
+   "input": "-n Rician, MNI152NLin2009cAsym T1w res-02 (97\u00d7115\u00d797)",
+   "median": 25.960046285763383,
+   "operation": "1",
+   "seconds": [
+    25.82204420492053,
+    25.960046285763383,
+    26.00325694307685
+   ],
+   "throughput_mb_s": 0.1667366826835654,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 5.517729019746184,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 12
+   },
+   "input": "-n Rician, MNI152NLin2009cAsym T1w res-02 (97\u00d7115\u00d797)",
+   "median": 5.694595329463482,
+   "operation": "12",
+   "seconds": [
+    5.517729019746184,
+    5.694595329463482,
+    5.839589286595583
+   ],
+   "throughput_mb_s": 0.7601052839706891,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 2.4282567873597145,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 766,
+    "threads": 1
+   },
+   "input": "-n Rician, MNI152NLin2009cAsym T1w res-02 (97\u00d7115\u00d797)",
+   "median": 2.4374600276350975,
+   "operation": "1",
+   "seconds": [
+    2.4282567873597145,
+    2.4374600276350975,
+    2.444418890401721
+   ],
+   "throughput_mb_s": 1.7758207112834759,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.7954306695610285,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 766,
+    "threads": 4
+   },
+   "input": "-n Rician, MNI152NLin2009cAsym T1w res-02 (97\u00d7115\u00d797)",
+   "median": 0.7966130450367928,
+   "operation": "4",
+   "seconds": [
+    0.7954306695610285,
+    0.8087288923561573,
+    0.7966130450367928
+   ],
+   "throughput_mb_s": 5.433619279734594,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.5458637904375792,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 766,
+    "threads": 12
+   },
+   "input": "-n Rician, MNI152NLin2009cAsym T1w res-02 (97\u00d7115\u00d797)",
+   "median": 0.5504430830478668,
+   "operation": "12",
+   "seconds": [
+    0.5792283844202757,
+    0.5458637904375792,
+    0.5504430830478668
+   ],
+   "throughput_mb_s": 7.863650454162564,
+   "tool": "larmorx"
+  },
+  {
+   "best": 212.1176745761186,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "-n Gaussian (ANTs' default model), raw T1w ds000005",
+   "median": 213.56991346925497,
+   "operation": "1",
+   "seconds": [
+    215.1740379370749,
+    213.56991346925497,
+    212.1176745761186
+   ],
+   "throughput_mb_s": 0.11047114088659515,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 45.16464948654175,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "-n Gaussian (ANTs' default model), raw T1w ds000005",
+   "median": 45.42795112170279,
+   "operation": "12",
+   "seconds": [
+    45.16464948654175,
+    45.42795112170279,
+    45.442277044057846
+   ],
+   "throughput_mb_s": 0.5193567268044478,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 12.57020096667111,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 4865,
+    "threads": 1
+   },
+   "input": "-n Gaussian (ANTs' default model), raw T1w ds000005",
+   "median": 12.572051826864481,
+   "operation": "1",
+   "seconds": [
+    12.654234699904919,
+    12.57020096667111,
+    12.572051826864481
+   ],
+   "throughput_mb_s": 1.876647688453275,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.5882051587104797,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 4865,
+    "threads": 4
+   },
+   "input": "-n Gaussian (ANTs' default model), raw T1w ds000005",
+   "median": 3.677744720131159,
+   "operation": "4",
+   "seconds": [
+    3.677744720131159,
+    3.5882051587104797,
+    3.695850443094969
+   ],
+   "throughput_mb_s": 6.4151576021183425,
+   "tool": "larmorx"
+  },
+  {
+   "best": 2.778443843126297,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 4865,
+    "threads": 12
+   },
+   "input": "-n Gaussian (ANTs' default model), raw T1w ds000005",
+   "median": 2.7972808610647917,
+   "operation": "12",
+   "seconds": [
+    2.778443843126297,
+    2.7972808610647917,
+    2.8106326684355736
+   ],
+   "throughput_mb_s": 8.43437365492829,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.3980464898049831,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 1
+   },
+   "input": "-n Rician, BOLD reference ds000005 (64\u00d764\u00d734)",
+   "median": 1.4101564157754183,
+   "operation": "1",
+   "seconds": [
+    1.4204855058342218,
+    1.4101564157754183,
+    1.3980464898049831
+   ],
+   "throughput_mb_s": 0.3952809729220655,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.2775959335267544,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 12
+   },
+   "input": "-n Rician, BOLD reference ds000005 (64\u00d764\u00d734)",
+   "median": 0.2822153829038143,
+   "operation": "12",
+   "seconds": [
+    0.2775959335267544,
+    0.29547455720603466,
+    0.2822153829038143
+   ],
+   "throughput_mb_s": 1.9751155811020331,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.20376894995570183,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 44,
+    "threads": 1
+   },
+   "input": "-n Rician, BOLD reference ds000005 (64\u00d764\u00d734)",
+   "median": 0.20602145977318287,
+   "operation": "1",
+   "seconds": [
+    0.20602145977318287,
+    0.21372964419424534,
+    0.20376894995570183
+   ],
+   "throughput_mb_s": 2.7055822272770635,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.05658897012472153,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 44,
+    "threads": 4
+   },
+   "input": "-n Rician, BOLD reference ds000005 (64\u00d764\u00d734)",
+   "median": 0.05772208794951439,
+   "operation": "4",
+   "seconds": [
+    0.0578690841794014,
+    0.05658897012472153,
+    0.05772208794951439
+   ],
+   "throughput_mb_s": 9.65675393598941,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.0413365513086319,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 44,
+    "threads": 12
+   },
+   "input": "-n Rician, BOLD reference ds000005 (64\u00d764\u00d734)",
+   "median": 0.04853137023746967,
+   "operation": "12",
+   "seconds": [
+    0.04973813332617283,
+    0.04853137023746967,
+    0.0413365513086319
+   ],
+   "throughput_mb_s": 11.485519515985999,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.6515549905598164,
+   "data_bytes": 590176,
+   "extra": {
+    "threads": 1
+   },
+   "input": "-n Rician, fieldmap magnitude ds003012 (64\u00d764\u00d736)",
+   "median": 3.707301776856184,
+   "operation": "1",
+   "seconds": [
+    3.707301776856184,
+    3.6515549905598164,
+    3.9167367462068796
+   ],
+   "throughput_mb_s": 0.15919286735283608,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.7550617437809706,
+   "data_bytes": 590176,
+   "extra": {
+    "threads": 12
+   },
+   "input": "-n Rician, fieldmap magnitude ds003012 (64\u00d764\u00d736)",
+   "median": 0.8009682428091764,
+   "operation": "12",
+   "seconds": [
+    0.7550617437809706,
+    0.8009682428091764,
+    0.8209061603993177
+   ],
+   "throughput_mb_s": 0.736828214224973,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.34376359544694424,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": false,
+    "differing": 112,
+    "threads": 1
+   },
+   "input": "-n Rician, fieldmap magnitude ds003012 (64\u00d764\u00d736)",
+   "median": 0.34500595182180405,
+   "operation": "1",
+   "seconds": [
+    0.355742821469903,
+    0.34500595182180405,
+    0.34376359544694424
+   ],
+   "throughput_mb_s": 1.710625561337639,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.09638982452452183,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": false,
+    "differing": 112,
+    "threads": 4
+   },
+   "input": "-n Rician, fieldmap magnitude ds003012 (64\u00d764\u00d736)",
+   "median": 0.09684940055012703,
+   "operation": "4",
+   "seconds": [
+    0.09638982452452183,
+    0.09901137091219425,
+    0.09684940055012703
+   ],
+   "throughput_mb_s": 6.093749642720178,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.07451535575091839,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": false,
+    "differing": 112,
+    "threads": 12
+   },
+   "input": "-n Rician, fieldmap magnitude ds003012 (64\u00d764\u00d736)",
+   "median": 0.0747541468590498,
+   "operation": "12",
+   "seconds": [
+    0.07451535575091839,
+    0.07554369233548641,
+    0.0747541468590498
+   ],
+   "throughput_mb_s": 7.89489312362546,
+   "tool": "larmorx"
+  }
+ ]
+}

@@ -42,8 +42,9 @@ DenoiseImage -i /data/sub-01/anat/sub-01_T1w.nii.gz -n Rician -o sub-01_T1w_nois
 ```
 
 No `-d` (the dimension is read from the file), patch radius 1, search radius 2 (ANTs'
-defaults), no noise image. nipype passes `num_threads` as `NSLOTS`, which ITK reads like
-`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`: 8 in that run. So fMRIPrep's denoised T1w carries the
+defaults), no noise image. nipype passes `num_threads` as `NSLOTS`
+(`nipype/interfaces/ants/base.py:21-26`), which ITK reads before
+`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (`itkMultiThreaderBase.cxx:288-300`): 8 in that run. So fMRIPrep's denoised T1w carries the
 8-thread result (see the thread band below), which is not even the same from run to run.
 *Verified:* fMRIPrep 25.2.6's output for ds000005 sub-01 (its image runs ANTs 2.6.2) differs
 from ANTs 2.6.5 at one thread in 4,900,198 of 5,898,240 voxels (max |diff| 271, 1 − NCC
@@ -129,15 +130,15 @@ offsets in ITK's neighbourhood order (first axis fastest). *Read; validated.* *l
   passes the first two tests (they are written as `<=`) and fails the ratios.
 - **The noise estimate `h`** is the smallest, over those neighbours, of the mean of
   `(input − mean)²` over the **neighbour's** patch (voxels inside the image only), taken with
-  `std::min(averageDistance, minimumDistance)`, which keeps the new value when the old one is
-  NaN. If it is `AlmostEquals` 0 (4 ulps, or 1.2e-8) it becomes 1.
+  `std::min(averageDistance, minimumDistance)`, i.e. `(min < d) ? min : d`, so a NaN on either
+  side gives the new value. If it is `AlmostEquals` 0 (4 ulps, or 1.2e-8) it becomes 1.
 - With the Rician model the centre **writes** `h` (or 0 if no neighbour took part, i.e. `h`
   is still `FLT_MAX`) into the bias image at every voxel of its patch, **overwriting** what
   earlier centres wrote.
 - Each neighbour's weight is `expf(−d/h)` if `d ≤ 3h`, else 0, with `d` the mean over the
-  patch offsets inside the image **at both ends** of `((v − m)_b+o − (v − m)_c+o)²`. The
-  weighted patch values (their **squares** with the Rician model) are added up per patch
-  offset, for offsets inside the image at the neighbour.
+  patch offsets inside the image **at both ends** of `((v − m)_b+o − (v − m)_c+o)²`. For a
+  weight above 0, the weighted patch values (their **squares** with the Rician model) are
+  added up per patch offset, for offsets inside the image at the neighbour.
 - The centre's own patch is added with the largest weight (1 if every weight was almost 0, or
   if the centre does not take part), and **`weighted[o] / Σ weights` is added to the output
   voxel `c + o`**, whose count goes up by one.

@@ -83,7 +83,7 @@ source (decided); – = nothing to do.
 | ANTS-38 | N4 (ITK) | histogram range `else if`: a first-voxel minimum is dropped | c | possible, every N4 | reproduces | **yes** |
 | ANTS-39 | N4 (ITK) | 256 bins give a 1024-point FFT | c | none | reproduces | **yes** |
 | ANTS-40 | N4 (ITK) | zero and negative values stay in the log image | c? | unmasked N4s | reproduces | decide |
-| ANTS-41 | ANTs oracle build (GCC 11) | two float roundings of N4's fit dropped | d | none (fMRIPrep's build follows the source) | reproduces the build | rule 8 |
+| ANTS-41 | ANTs built by GCC 11.4 / 12.3 (compiler bug, not ANTs) | two float roundings of N4's fit dropped (GCC bug 110182) | d | none (fMRIPrep's build follows the source) | follows the source | – (rule 8) |
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
 | ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | possible | reproduces | **yes** |
 | ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
@@ -305,10 +305,9 @@ The original proposals, for the record:
 
 ### Also pending, not D13
 
-- **ANTS-41, rule 8 (decided 2026-10-11):** N4 follows the C++ source, not the GCC 11 build
-  (`larmorx_image::bspline::fit::gcc_double_axes` returns 0); the ANTs oracle is rebuilt to
-  honour the source's roundings and every ANTs suite is re-run against it; the N4 record and
-  golden checksums change.
+- **ANTS-41, rule 8 (decided and done 2026-10-11):** N4 follows the C++ source, not the
+  GCC 11 build; the ANTs oracle is rebuilt by a fixed compiler and every ANTs suite is re-run
+  against it; the N4 record and golden checksums changed.
 - **`antsApplyTransforms --float 1` in single precision** (decided 2026-10-11, before A4):
   larmorx's own difference, not an upstream defect ([validation/fmriprep-stages.md](../validation/fmriprep-stages.md),
   stage A11).
@@ -734,17 +733,28 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** reproduces.
 - **D13 / gap:** **decide**; a fix would change every unmasked run.
 
-### ANTS-41 The ANTs oracle build drops two float roundings — (d)
-- **What:** not a source defect. The repository's ANTs 2.6.5 oracle (GCC 11.4, `-O3`, baseline
-  x86-64) computes the B-spline fit's `r[0]`, `r[1]` and the points' first two coordinates in
-  double precision in its 2D and 3D instantiations, where the source rounds them to float
-  (`itkImageBase.h:589-598`; `divpd` without `cvtpd2ps`).
-- **Evidence:** verified: the disassembly; fMRIPrep 25.2.6's ANTs (conda-forge 2.6.2) follows the
-  source, and a larmorx build with the source's roundings reproduces all six of fMRIPrep's N4
-  outputs ([fmriprep-oracle.md](fmriprep-oracle.md)).
+### ANTS-41 ANTs built by GCC 11.4 drops two float roundings (a compiler bug) — (d)
+- **What:** not a source defect: a GCC defect. ANTs 2.6.5 built by GCC 11.4 at `-O3` (the
+  repository's first oracle, kept as `oracles/ants-2.6.5-gcc11-O3`) computes the B-spline
+  fit's `r[0]`, `r[1]` and the points' first two coordinates in double precision in its 2D and
+  3D instantiations, where the source rounds them to float (`Scattered.hxx:433-439`,
+  `itkImageBase.h:589-598`). GCC's SLP vectorizer builds a `vector(2) double` →
+  `vector(2) float` → `vector(2) double` round trip and match.pd's rule for two conversions in
+  a row folds it away, comparing `TYPE_PRECISION` (a vector's lane count) instead of the
+  element precision: GCC bug 110182, wrong code, fixed in GCC 11.5, 12.4 and 13.2. ANTs built
+  at `-O3` by Ubuntu 22.04's GCC 11.4 has it (GCC 12.3 miscompiles the reproduction too).
+- **Evidence:** verified: GCC's dumps (the round trips present after `slp1`, gone after
+  `fre5`); a 40-line reproduction (GCC 11.4 and 12.3 miscompile it at `-O3`; `-O2`,
+  `-fno-tree-vectorize`, `-fno-tree-slp-vectorize`, GCC 8.4, 13.3 and 14.3 do not); N4
+  recompiled with each flag set; the disassembly; three other builds (fMRIPrep's ANTs 2.6.2 by
+  GCC 14.3, ANTsPy 0.6.3 by GCC 10.2, the new oracle by GCC 14.3) follow the source
+  ([ants-n4.md](ants-n4.md), "GCC 11 miscompiles the fit").
 - **fMRIPrep:** none; its build follows the source.
-- **larmorx:** reproduces the oracle build (`larmorx_image::bspline::fit::gcc_double_axes`).
-- **D13 / gap:** rule 8 (decided 2026-10-11): follow the source, rebuild the oracle. **Rule 8.**
+- **larmorx:** follows the source since 2026-10-11. `gcc11_double_axes` reproduces the
+  miscompiled build for comparisons only; the oracle is built by conda-forge's GCC 14.3 and
+  `scripts/build_ants_oracle.sh` refuses a compiler that fails its probe of the bug.
+- **D13 / gap:** none: a compiler artefact is not reproduced (rule 8), so there is no
+  compatibility switch.
 
 ### ANTS-42 DenoiseImage depends on threads and races — (b)
 - **What:** the filter splits the centres into slabs (4 work units per thread); each centre adds

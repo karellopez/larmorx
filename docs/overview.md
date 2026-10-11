@@ -229,10 +229,11 @@ from nipype's working directory) and compares their outputs with fMRIPrep's own 
   0.023 mm; fMRIPrep's own confound code on larmorx's matrices gives FD correlations of
   0.89–0.93 on these low-motion runs (largest FD 0.33 mm), within mcflirt's own band (0.79).
 - **Two findings about fMRIPrep** ([findings/fmriprep-oracle.md](findings/fmriprep-oracle.md)):
-  its N4 binary (conda-forge ANTs 2.6.2) follows the C++ source where the repository's GCC 11
-  oracle, and so larmorx, do not (larmorx with the source's roundings reproduces fMRIPrep's
-  N4 exactly; which one to follow is open); and its one-shot resampler corrupts random volumes
-  unless OpenBLAS runs one thread, which only its image's `OMP_NUM_THREADS=1` ensures.
+  its N4 binary (conda-forge ANTs 2.6.2) follows the C++ source where the repository's first
+  ANTs oracle, built by GCC 11.4, did not (GCC bug 110182); larmorx now follows the source and
+  reproduces fMRIPrep's N4 exactly (one thread, correctly rounded maths), and the oracle is
+  rebuilt by a fixed compiler; and its one-shot resampler corrupts random volumes unless
+  OpenBLAS runs one thread, which only its image's `OMP_NUM_THREADS=1` ensures.
 - **Times on this machine**, fMRIPrep's tools re-run at fMRIPrep's thread counts against
   larmorx at the same counts (sums over the three runs where there are three): one-shot
   resampling to MNI 215 s → 44 s on 8 threads, writing included; DenoiseImage 55 s → 3.2 s

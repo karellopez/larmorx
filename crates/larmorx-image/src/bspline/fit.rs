@@ -14,10 +14,11 @@
 //! `p = (point − origin)·r` (the point in `f32`, as ITK's `PointSet` stores it), pulled inside
 //! `[0, spans)` at the ends; kernel weights in `f64` multiplied into an `f32` product, axis 0
 //! first; sums in `f32`. This is what the C++ source defines, and what ITK and ANTs compute
-//! when built by a correct compiler. GCC 11.1-11.4, 12.1-12.3 and 13.1 at `-O3` miscompile it
-//! (GCC bug 110182): they keep `r` of the first two axes of 2D and 3D fits in double
-//! precision. [`GridFit::double_axes`] reproduces that miscompile, only to compare with such
-//! a build ([`gcc11_double_axes`], `docs/findings/ants-n4.md`); it is 0 everywhere else.
+//! when built by a correct compiler. GCC 11.4 and 12.3 at `-O3` miscompile it (GCC bug
+//! 110182, fixed in 11.5, 12.4 and 13.2): they keep `r` of the first two axes of 2D and 3D
+//! fits in double precision. [`GridFit::double_axes`] reproduces that miscompile, only to
+//! compare with such a build ([`gcc11_double_axes`], `docs/findings/ants-n4.md`); it is 0
+//! everywhere else.
 //!
 //! **Speed.** Within one fitting level the points, weights and lattice size do not change, so
 //! [`GridFitPlan`] computes the kernel weights, `Σ B²`, `ω` and (memory permitting) every

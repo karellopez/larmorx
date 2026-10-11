@@ -181,6 +181,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 | `crates-gpl/` | the GPL-3.0-or-later replica workspace (`docs/licensing.md`); it builds the Apache crates by path, so refresh `crates-gpl/Cargo.lock` whenever their dependencies change (CI checks it with `--locked`) |
 | `crates-nc/` (planned) | the FSL replica workspace |
 | `specs/` | behaviour specs, the input of clean-room originals |
+| `docs/upstream-reports/` | drafts of bug reports for the upstream projects (marked "draft, not yet filed" until the user files them) |
 | `pyproject.toml`, `python/larmorx/` | maturin package (abi3, CPython >= 3.12), including `pipelines/larmorprepx/` |
 | `tests/python/` | Python tests of the installed package |
 | `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |

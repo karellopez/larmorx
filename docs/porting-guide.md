@@ -190,6 +190,13 @@ least once.
   refuses; oblique, LAS and RAS storage, negative `pixdim`, qform-only and sform-only
   headers; constant, empty, one-volume and thin images; NaN and infinite values.
 - **Pipeline:** field-map kinds, slice timing, multi-echo, surfaces, every output space.
+- **Check that the pipeline will actually process the data,** not only that the files exist.
+  ds001600 was chosen for its three field-map kinds and slice timing, but its BOLD runs have
+  5 volumes each, and fMRIPrep skips series of 5 volumes or fewer ("Too short BOLD series"):
+  that oracle run processed only the anatomy. Check series length, the metadata the pipeline
+  needs (`SliceTiming`, `PhaseEncodingDirection`, `TotalReadoutTime` or `EffectiveEchoSpacing`,
+  `IntendedFor` or `B0FieldIdentifier` pointing at files that exist), and read the run's log
+  for skipped steps before treating a run as an oracle for a path.
 - **The pipeline's own command lines on real data**, as a category of the parity suite
   (`fmriprep/...` cases in the ANTs records).
 

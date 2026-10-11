@@ -555,6 +555,20 @@ Decided by the user on the questions the defect register raised
   so the old oracle was a superbuild against the system ITK; it now passes `ANTS_SUPERBUILD=OFF`
   and builds only the programs used.
 
+## 2026-10-11: FSL-02 stays opt-in; upstream reports kept in the repository
+- **FSL-02** (mcflirt's inflated weight count in its normalised correlation): measured, then
+  decided by the user. The corrected count moves the matrices by about mcflirt's own
+  variability and is not more accurate against the synthetic ground truth, so it stays opt-in
+  (`lx.mri.hmc(..., normcorr_count="weights")`); mcflirt's behaviour is the default
+  (`docs/validation/mri-hmc-normcorr-count.md`).
+- **Upstream reports:** drafts of bug reports for fMRIPrep are kept in `docs/upstream-reports/`
+  (user decision), marked "draft, not yet filed" until the user files them; then the issue's
+  URL is added. The first two: PIPE-02 (the resampler's race with multi-threaded OpenBLAS) and
+  PIPE-03 (the SDC Jacobian along the wrong axis).
+- **ds001600 was not a usable oracle for SDC:** its BOLD runs have 5 volumes and fMRIPrep
+  skipped them. ds005040 (PEPOLAR), ds005454 (`phasediff`) and ds005752 (direct `fieldmap`)
+  replace it; the porting guide now says to check series length and metadata first.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

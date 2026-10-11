@@ -285,7 +285,7 @@ task:
   moves the matrices by about mcflirt's own variability (0.014 to 0.033 mm at the 95th
   percentile on 19 real runs; band 0.016 to 0.10 mm; 24 of 28 band runs within the band) and
   is not more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3, by
-  0.001 to 0.16 mm). It stays opt-in; the user decides.
+  0.001 to 0.16 mm). **Decided by the user (2026-10-11): it stays opt-in** (`normcorr_count="weights"`); mcflirt's count remains the default.
 - Item 5, refusals: **a switch for these too.** Where the original's output is deterministic
   (e.g. a one-voxel image with infinite spacing), the switch reproduces it exactly. Where it
   depends on memory contents and changes from run to run (an unfilled buffer, an out-of-bounds

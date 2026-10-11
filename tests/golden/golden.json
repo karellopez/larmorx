@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "507be67b2db5fa509c18aa755a28e36341ecce24", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "1414ba561adb920c82a4dacb417df9bc24f859f8", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
@@ -173,6 +173,12 @@
    "out:data": {"dtype": "<f4", "sample": "df31b5400a71084230f6ab47dcb665421f534341d787ac470000bb42e9a22341", "sha256": "71a692efec03ccade9a30f23001dd622871ef6ea134598454a4d24ee5ef9c49d", "shape": [24, 20, 16], "sum": "122144762.23664793"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
+  "cli.ants.N4BiasFieldCorrection": {
+   "bias:data": {"dtype": "<f4", "sample": "1749003d3679833f8830833f6e48803fa1ef823f0887833f22287c3fb976803f", "sha256": "1273bedded66e8036959ea16ed7ecc5ff59de3349c7a0a5158692d1d01621708", "shape": [24, 20, 16], "sum": "7257.3853830471635"},
+   "bias:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "out:data": {"dtype": "<f4", "sample": "2549923fb76d6b419d01bc439224c9406edbb64086c7ba43000088414992a43f", "sha256": "db38c94ec766e1be1ac85dd7917472678c6d0f438e67ab01f364bfd00b93a058", "shape": [24, 20, 16], "sum": "761756.9948023856"},
+   "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
+  },
   "cli.ants.ResampleImage": {
    "out:data": {"dtype": "<f4", "sample": "2549923f5ff11e43ba0af8429d791141638eba4272ab0843587ccb420cc37040", "sha256": "4a7f7f8bdcf0bd79d794673cc5f85168e4064cdc3d78d5cfd76f075192a10a32", "shape": [22, 17, 18], "sum": "706189.7851183414"},
    "out:header": {"bytes": 352, "sha256": "6e3bebc920df24974be5503a515a72eb2d95e7ebbd247945e1f550025fa37dca"}
@@ -327,6 +333,26 @@
    "open": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4b3b5baafbf3bc167e80850e8d01547c36a9abaa029c2631e43dce5cf75a551b", "shape": [24, 20, 16], "sum": "81.0"},
    "pad": {"dtype": "<f4", "sample": "000030414912dc43922443434992de432549d54325494e436edbd44300000000", "sha256": "c7be5455b6cf5d097899de174406ed32ad5caac4884b45c535b9654be023d157", "shape": [19, 15, 11], "sum": "687982.7144222558"},
    "pad.affine": {"dtype": "<f8", "sample": "333333333333f33f00000000000000009ed8899dd889fdbf4fecc44eecc4ee3f9ed8899dd889ed3f766227766227064070a1177aa117f2bf000000000000f03f", "sha256": "c77bb131afc356d06ae0894c7e60224c55b96fa30ee5be44f0ce03e216ce78a1", "shape": [4, 4], "sum": "-39.55"}
+  },
+  "py.ants.n4": {
+   "bold.bias": {"dtype": "<f4", "sample": "4daa803fa809813f32b3803f0bae803f9b9b803f5ca07f3f3925803fa0357d3f", "sha256": "1269371aeba02c6ab2bb4d1f459be7b41ed585d12a7f44e0563a4d6588259b1f", "shape": [16, 14, 12, 4], "sum": "10646.425618767738"},
+   "bold.convergence": {"dtype": "<f4", "sample": "4447e93a26dcd43a8a2bc33a0c1c673b58de433b", "sha256": "07f672b3cd3622a2c1b1f69264a9f9e56537f07a46c27737d21067a34fa09765", "shape": [5], "sum": "0.011407963465899229"},
+   "bold.corrected": {"dtype": "<f4", "sample": "29ad7e40b874be41afcd5a4165bb6e405604cf40db3e2841a5e9ba417b8c9941", "sha256": "18f6b972710f7b3f72af1f14282b71b8c4ed657fab7661d6c82a9534a25b8a8d", "shape": [16, 14, 12, 4], "sum": "1853344.7363774776"},
+   "default.bias": {"dtype": "<f4", "sample": "faa87c3facb47e3f0def7d3fbb8f7d3f4dc5803fb086803f0536803f1940823f", "sha256": "35d5e596ed3ed55d4d37e7e2a78b303cc94705945dceeebf8658cd82b44cda9a", "shape": [24, 20, 16], "sum": "7668.57216745615"},
+   "default.convergence": {"dtype": "<f4", "sample": "b4c3083b2473fb3ac885e83abfa9d93a1853d33a", "sha256": "7efd67ce7f54ef9c17a2fb3cacd478e76347bb9af06faad26b181531e3794372", "shape": [5], "sum": "0.0090521922102198"},
+   "default.corrected": {"dtype": "<f4", "sample": "3038943ff79f6c41f271d643c913cb4042c3b540a00fd343b3c6874163baa13f", "sha256": "0ef394c253a493d14aa716c387875765b00892943fa940572e56db6b27dd630d", "shape": [24, 20, 16], "sum": "812279.2529638112"},
+   "plane.bias": {"dtype": "<f4", "sample": "691e743ff5cf773f39c78d3feb65753fb5de7f3f43bd763f1a40813f77d6743f", "sha256": "66d40dd34c2ab1eee6908ddbfbcf673abc28868cfee1d999c8885a5154b8fb16", "shape": [32, 24], "sum": "762.4865959882736"},
+   "plane.convergence": {"dtype": "<f4", "sample": "ef13303c6dd8023c27b9d33b2be3c23b06d0203c8e431f3cda5cd83bf1f5993b", "sha256": "b9086b0a755d691f543c33d1221c43be30ca9f87bb9cc9439c9b56089c273f90", "shape": [8], "sum": "0.061979173216968775"},
+   "plane.corrected": {"dtype": "<f4", "sample": "d03a864129d86a43e3d66c4337f70144e67b04447b12313fd24276432d0f5f40", "sha256": "1dd665b227aa3d1fec7aca33532c7d984e6f4e81ecff9620a3a47e3e526eb656", "shape": [32, 24], "sum": "185393.02615767717"},
+   "quintic.bias": {"dtype": "<f4", "sample": "28757d3f40107f3f6a0f7e3fd4687d3fdc5c7f3f98667e3f10ac7d3f858c7f3f", "sha256": "51ce3d4a48deeb25f2d7a42e78574eac749569d5ede6400ddf236f47e8caae1d", "shape": [24, 20, 16], "sum": "7630.519547581673"},
+   "quintic.convergence": {"dtype": "<f4", "sample": "8c0b943a75468e3a05ed883a", "sha256": "ead03bd3ea4f55aa47e8a371d433a599c581f2667dccb9f84e0bb017d3ab5a05", "shape": [3], "sum": "0.0032596297096461058"},
+   "quintic.corrected": {"dtype": "<f4", "sample": "c9c0933f024b6c41a056d643f632cb404050b740c542d5437f3f8941a7dca43f", "sha256": "ceb0e9ba75d7396a76d274462c89f8746686a484d1f724e9f75d395aeb16b5d7", "shape": [24, 20, 16], "sum": "816421.1257042587"},
+   "threshold.bias": {"dtype": "<f4", "sample": "a86c493eed75313f0486323ff5bb493fbc435a3f4ddb563f05b0603fe778763f", "sha256": "8188b862a51ec300c9f00ab6312fafc93898acf8d65b675420f8aeffd85f056e", "shape": [24, 20, 16], "sum": "5872.322189435363"},
+   "threshold.convergence": {"dtype": "<f4", "sample": "8565ff3cf50fde3c54a6c33ccf46b53cb166b73cef3caf3cc535a73cab07a13c", "sha256": "ab87f4fb874817de93700786423bb28ba9c1b3d3b9acffcb5bade6e9ecd06827", "shape": [8], "sum": "0.18814262188971043"},
+   "threshold.corrected": {"dtype": "<f4", "sample": "a38b9e40175d1440885329438c2e12412fba0840f58e0d430000b040a38bfe40", "sha256": "2fcf6ae5485a819498a3faa19ffc329394f4e7df15a4c13da8731f658c41a234", "shape": [24, 20, 16], "sum": "346118.1240108609"},
+   "weight_mesh.bias": {"dtype": "<f4", "sample": "1cb2743f7d64743f8f94623f21a4673f2af2783f94a8693f23c9693fc3607b3f", "sha256": "ba36942140359efa32851c9a6bc7671cb2eebcbb57a53f796311712bbc79f27e", "shape": [24, 20, 16], "sum": "7160.264792740345"},
+   "weight_mesh.convergence": {"dtype": "<f4", "sample": "c8c5bb3be460be3b4fa2a33be2f4833b9ec2d23ba333b23b31af903b", "sha256": "4674db12c0ab0537cf02cbc3e277b26958769b1e4395ab3c656c428060174bca", "shape": [7], "sum": "0.036846555303782225"},
+   "weight_mesh.corrected": {"dtype": "<f4", "sample": "310b993f3c9c76416555f0436a4bde40dd09bc403d31e84337ec9441ed98a73f", "sha256": "5108830d27dba9272c79b26b19e4efd6dc2f8c134d7e4a94fb5f4091445f08a7", "shape": [24, 20, 16], "sum": "890104.8797875494"}
   },
   "py.ants.resample": {
    "bspline": {"dtype": "<f4", "sample": "2549923f051d5b436761da4151856143a9b6ec3fff308941b721b44224f42341", "sha256": "2bf8b92e83b2da5e0f9d351abbf8eefa9ca0224f1f8df591ac99d0af3f333964", "shape": [18, 24, 17], "sum": "769383.481296856"},

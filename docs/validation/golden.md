@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 78 cases, 291 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 78 cases, 294 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |

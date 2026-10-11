@@ -69,7 +69,7 @@ larmorx ants N4BiasFieldCorrection -d 3 -b [ 200 ] -c [ 50x50x50x50x50, 1e-07 ] 
 | `-r 0/(1)` | `rescale_intensities=False` | **different default**: the command line rescales whenever a mask is given unless `-r 0`; Python rescales only when asked (as ANTsPy). Without a mask it never applies |
 | `-o out` / `-o [out,bias]` | `N4Result.corrected`, `N4Result.bias_field` | float32 images on the input's grid; the bias field is always returned |
 | `-v 1` | `N4Result.iterations` | ANTs' progress lines; Python returns every iteration as `N4Iteration(level, iteration, convergence)` |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
 
 ## Behaviour worth knowing
 

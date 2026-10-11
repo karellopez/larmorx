@@ -83,7 +83,7 @@ are placed by their affine.
 | `-u type` | `dtype=` | default float64. Integers truncate toward zero and saturate in Python; the CLI wraps out-of-range values as ANTs does on x86-64 ([finding](../findings/ants-cli.md)) |
 | `--float 1` | – | the CLI rounds input and output to float32 and computes in double |
 | `-v 1` | – | |
-| (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
+| (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
 
 Not supported yet (the CLI says so): vector, tensor, multichannel and 5D images (`-e 1, 2, 4,
 5, 6`); `-d 2` and `-d 4`; transform outputs (`-o Linear[...]`, `-o CompositeTransform[...]`,

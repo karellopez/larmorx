@@ -45,7 +45,7 @@ larmorx ants ResampleImage 3 t1w.nii.gz on_grid.nii.gz 128x128x96 1 4
 | `3 [window]` | `"sinc"`, `window="hamming"` | radius 3; outside the image the nearest edge voxel; 3D |
 | `4 [order]` | `"bspline"`, `order=3` | orders 0 to 5; 3D |
 | `pixeltype` 0 to 7 | `pixel_type="char"`, `"uchar"`, `"short"`, `"ushort"`, `"int"`, `"uint"`, `"float"` (default), `"double"` | the type the image is read as and written in |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | results do not depend on it |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | results do not depend on it |
 
 Values are clamped to the pixel type's range and truncated toward zero for integer types (ITK's
 `CastPixelWithBoundsChecking`); reading converts as a C++ `static_cast` on x86-64 (so negative

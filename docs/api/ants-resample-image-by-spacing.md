@@ -41,7 +41,7 @@ larmorx ants ResampleImageBySpacing 3 seg.nii.gz seg_1mm.nii.gz 1 1 1 0 0 1
 | `dosmooth` (default 1) | `smooth=True` | per axis, a recursive Gaussian of sigma `out/in − 1` (read by ITK in mm) where positive |
 | `addvox` (default 0) | `add_voxels=0` | added to every axis's size |
 | `nn-interp` (default 0) | `nearest=False` | nearest neighbour instead of linear |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | results do not depend on it |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | results do not depend on it |
 
 The output size on each axis is `int(size · old spacing / new spacing + add_voxels)`. Output
 voxels beyond the input take the input's value at index `(1, 1, …)` (before smoothing). The

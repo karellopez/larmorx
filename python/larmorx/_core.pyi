@@ -339,6 +339,24 @@ def ants_unsharp_mask(
 ) -> np.ndarray:
     """ImageMath ``UnsharpMask``: ``UnsharpMaskImageFilter`` in float."""
 
+def ants_denoise_image(
+    image: str | ImageTuple,
+    dim: int,
+    mask: str | ImageTuple | None = None,
+    rician: bool = True,
+    shrink_factor: int = 1,
+    patch_radius: list[int] = ...,
+    search_radius: list[int] = ...,
+    n_threads: int = 1,
+) -> tuple[
+    tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
+    tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
+]:
+    """``DenoiseImage`` (paths or in-memory images; the image read as a ``dim``-dimensional
+    float image, the mask as ``unsigned char``): ``(denoised, noise)``, each as ``(data,
+    ras_affine, descrip, spacing)``. ``patch_radius`` (default ``[1]``) and ``search_radius``
+    (default ``[2]``) hold one value for every axis or one per axis."""
+
 def ants_n4_bias_field_correction(
     image: str | ImageTuple,
     dim: int,

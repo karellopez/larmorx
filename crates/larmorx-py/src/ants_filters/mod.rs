@@ -17,6 +17,7 @@
 //! `python/larmorx/ants/`.
 
 mod components;
+mod denoise;
 mod gaussian;
 mod image_math;
 mod morphology;
@@ -253,6 +254,7 @@ fn ants_program<'py>(
         "MultiplyImages" => larmorx_ants::cli::multiply_images::run,
         "SmoothImage" => larmorx_ants::cli::smooth_image::run,
         "N4BiasFieldCorrection" => larmorx_ants::cli::n4_bias_field_correction::run,
+        "DenoiseImage" => larmorx_ants::cli::denoise_image::run,
         "ResampleImage" => larmorx_ants::cli::resample_image::run,
         "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         other => {
@@ -322,5 +324,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     morphology::register(m)?;
     components::register(m)?;
     n4::register(m)?;
+    denoise::register(m)?;
     Ok(())
 }

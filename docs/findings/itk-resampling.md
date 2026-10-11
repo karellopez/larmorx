@@ -31,6 +31,16 @@ through `CastPixelWithBoundsChecking`, a clamp to the output pixel range. For AN
 nothing, because the resampler's output type is the computation type and the `-u` cast
 happens later. *Read.*
 
+**Float coordinates** (`ResampleImageFilter<I, O, float>`, as `DenoiseImage` declares it): the
+identity transform and the interpolator take float points and indices, so the scan-line path
+rounds each output point to float before the transform, the continuous indices of a line's
+ends to float, and each voxel's index to float; and `LinearInterpolateImageFunction`'s
+`InternalComputationType` becomes float, which changes the 4D (`EvaluateUnoptimized`) weights.
+ITK's `Math::Floor` (`round_half_to_even(2x − 0.5) >> 1`) gives 0 for tiny negative values,
+which matters only in that 4D path. Details in
+[ants-denoise.md](ants-denoise.md#the-noise-resampling-float-coordinates). *Read; validated.*
+*larmorx:* `larmorx_ants::resample::Coordinates::Float`.
+
 ## Interpolators
 
 | ANTs `-n` | ITK class | Notes |

@@ -378,3 +378,74 @@ def test_command_line_errors_follow_ants(tmp_path):
     assert code == 1 and "does not exist" in err
     code, stdout, _ = run(["ThresholdImage", "9", "a", "b", "1", "2"])
     assert (code, stdout) == (1, "Unsupported dimension\n")
+
+
+# --- DenoiseImage --------------------------------------------------------------------------------
+
+
+def noisy_phantom(seed=1, shape=(24, 18, 14)):
+    """A bright blob with a gradient and Rician noise: (noisy image, clean values, the blob's
+    core)."""
+    rng = np.random.default_rng(seed)
+    i, j, k = np.meshgrid(*(np.arange(n, dtype=np.float64) for n in shape), indexing="ij")
+    r2 = ((i - 12) / 8) ** 2 + ((j - 9) / 6) ** 2 + ((k - 7) / 5) ** 2
+    clean = np.where(r2 < 1, 200.0 + 3 * i, 20.0)
+    noisy = np.abs(clean + rng.normal(0, 15, shape) + 1j * rng.normal(0, 15, shape))
+    return image(noisy), clean, r2 < 0.7
+
+
+def test_denoise_image_models_threads_and_noise():
+    img, clean, core = noisy_phantom()
+    r = lx.ants.denoise_image(img)
+    assert r.denoised.data.dtype == np.float32 and r.denoised.data.shape == img.data.shape
+    np.testing.assert_array_equal(r.denoised.affine, AFFINE)
+    # The output is input - noise, in float.
+    np.testing.assert_array_equal(r.denoised.data, img.data - r.noise.data)
+    error = lambda d: float(np.std((np.asarray(d, np.float64) - clean)[core]))  # noqa: E731
+    assert error(r.denoised.data) < 0.75 * error(img.data)
+    # The result does not depend on the number of threads.
+    r4 = lx.ants.denoise_image(img, n_threads=4)
+    assert r4.denoised.data.tobytes() == r.denoised.data.tobytes()
+    gaussian = lx.ants.denoise_image(img, "GAUSSIAN")
+    assert gaussian.denoised.data.tobytes() != r.denoised.data.tobytes()
+    # Per-axis radii equal the same radius given once.
+    a = lx.ants.denoise_image(img, patch_radius=(1, 1, 1), search_radius=[2, 2, 2])
+    assert a.denoised.data.tobytes() == r.denoised.data.tobytes()
+
+
+def test_denoise_image_mask_shrink_and_errors(tmp_path):
+    img, _, _ = noisy_phantom(2)
+    mask = np.zeros(img.data.shape, np.uint8)
+    mask[4:20, 3:15, 2:12] = 1
+    masked = lx.ants.denoise_image(img, mask=lx.Image(mask, AFFINE))
+    full = lx.ants.denoise_image(img)
+    # Far from the mask (beyond the patch radius) the image is averaged with itself only: it
+    # changes by rounding alone.
+    far = np.ones(mask.shape, bool)
+    far[2:22, 1:17, 0:14] = False
+    np.testing.assert_allclose(masked.denoised.data[far], img.data[far], rtol=1e-5)
+    assert masked.denoised.data.tobytes() != full.denoised.data.tobytes()
+    shrunk = lx.ants.denoise_image(img, shrink_factor=2)
+    assert shrunk.denoised.data.shape == img.data.shape
+    # With shrink 2 the mask must be on the shrunk grid.
+    with pytest.raises(ValueError, match="grid"):
+        lx.ants.denoise_image(img, mask=lx.Image(mask, AFFINE), shrink_factor=2)
+    with pytest.raises(ValueError, match="noise_model"):
+        lx.ants.denoise_image(img, "Poisson")
+    with pytest.raises(ValueError, match="patch_radius"):
+        lx.ants.denoise_image(img, patch_radius=(1, 1))
+
+
+def test_denoise_image_command_line(tmp_path):
+    img, _, _ = noisy_phantom(3)
+    src, out, noise = tmp_path / "in.nii.gz", tmp_path / "out.nii.gz", tmp_path / "noise.nii.gz"
+    lx.save(img, src)
+    code, _, err = run(["DenoiseImage", "-i", str(src), "-n", "Rician", "-o", f"[{out},{noise}]"])
+    assert code == 0, err
+    r = lx.ants.denoise_image(src)
+    assert lx.load(out).data.tobytes() == r.denoised.data.tobytes()
+    assert lx.load(noise).data.tobytes() == r.noise.data.tobytes()
+    code, _, _ = run(["DenoiseImage", "-d", "3", "-i", str(src), "-n", "Poisson", "-o", str(out)])
+    assert code == 1
+    code, _, _ = run(["DenoiseImage", "-d", "3", "-i", str(src), "-p", "1x1", "-o", str(out)])
+    assert code == 1

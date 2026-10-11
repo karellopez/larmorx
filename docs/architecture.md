@@ -25,12 +25,13 @@ How the code is organised and the conventions every tool follows. The plan behin
                      morphology with ITK's ball, connected components and relabelling, label
                      contours, Danielsson and signed Maurer distance maps, ITK's float
                      comparisons, ITK grids with start indices, ShrinkImageFilter, B-spline
-                     lattices (scattered-data fit, evaluation, refinement), vnl's FFT, N4
+                     lattices (scattered-data fit, evaluation, refinement), vnl's FFT, N4,
+                     box mean and variance, adaptive non-local means denoising
    larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages,
                      SmoothImage, ResampleImageBySpacing, ResampleImage,
-                     N4BiasFieldCorrection), images as ANTs
-                     programs read and write them, ITK's identity resampling in 2-4D, the
-                     original command lines
+                     N4BiasFieldCorrection, DenoiseImage), images as ANTs
+                     programs read and write them, ITK's identity resampling in 2-4D (double
+                     or float coordinates), the original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax), and
                      `replica`: running a tool's replica from another package as a separate

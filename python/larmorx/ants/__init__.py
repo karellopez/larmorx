@@ -15,6 +15,7 @@ from larmorx.ants.components import (
     replace_voxel_value,
     threshold_at_mean,
 )
+from larmorx.ants.denoise import DenoiseResult, denoise_image
 from larmorx.ants.image_math import (
     ImageMathError,
     add_to_zero,
@@ -52,6 +53,7 @@ from larmorx.ants.threshold import OtsuResult, multiply_images, otsu_threshold, 
 
 __all__ = [
     "PIXEL_TYPES",
+    "DenoiseResult",
     "ImageMathError",
     "N4Iteration",
     "N4Result",
@@ -59,6 +61,7 @@ __all__ = [
     "add_to_zero",
     "apply_transforms",
     "apply_transforms_to_points",
+    "denoise_image",
     "discrete_gaussian",
     "distance_map",
     "extract_contours",

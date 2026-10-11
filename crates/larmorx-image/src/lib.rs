@@ -25,6 +25,7 @@
 //!   the image shape).
 #![forbid(unsafe_code)]
 
+pub mod adaptive_denoising;
 pub mod bspline;
 pub mod components;
 pub mod discrete_gaussian;
@@ -38,6 +39,7 @@ mod lines;
 pub mod median;
 pub mod morphology;
 pub mod n4;
+pub mod neighborhood;
 pub mod shrink;
 pub mod statistics;
 pub mod threshold;

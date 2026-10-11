@@ -152,7 +152,8 @@ fn linear_unoptimized<T: RealElement>(
     let mut base = [0i64; 8];
     let mut distance = [0.0f64; 8];
     for k in 0..d {
-        base[k] = c[k].floor() as i64;
+        // `Math::Floor<long>(double)` (0, not −1, for negative values closer to 0 than 2⁻⁵⁵).
+        base[k] = larmorx_image::grid::itk_floor_f64(c[k]);
         distance[k] = c[k] - base[k] as f64;
     }
     let mut value = 0.0f64;
@@ -176,6 +177,47 @@ fn linear_unoptimized<T: RealElement>(
     value
 }
 
+/// [`linear_unoptimized`] for an interpolator with `float` coordinates
+/// (`LinearInterpolateImageFunction<I, float>`): its `InternalComputationType` is `float`, so
+/// each distance is a float, `overlap *= distance` is a float product and
+/// `overlap *= 1.0 - distance` a double product stored as float; the sum stays in double.
+fn linear_unoptimized_f32<T: RealElement>(
+    data: &[T],
+    size: &[usize],
+    strides: &[usize],
+    c: &[f64],
+) -> f64 {
+    let d = size.len();
+    let mut base = [0i64; 8];
+    let mut distance = [0.0f32; 8];
+    for k in 0..d {
+        // `Math::Floor<long>(float)`: vnl's SSE2 floor, `(2x − 0.5f)` rounded to an integer
+        // and halved, which is 0 (not −1) for negative values closer to 0 than 2⁻²⁵ or so.
+        let x = c[k] as f32;
+        base[k] = i64::from(larmorx_image::grid::vnl_floor_f32(x));
+        distance[k] = x - base[k] as f32;
+    }
+    let mut value = 0.0f64;
+    for counter in 0..(1usize << d) {
+        let mut overlap = 1.0f32;
+        let mut upper = counter;
+        let mut offset = 0usize;
+        for k in 0..d {
+            let index = if upper & 1 == 1 {
+                overlap *= distance[k];
+                (base[k] + 1).min(size[k] as i64 - 1)
+            } else {
+                overlap = (f64::from(overlap) * (1.0 - f64::from(distance[k]))) as f32;
+                base[k].max(0)
+            };
+            offset += index as usize * strides[k];
+            upper >>= 1;
+        }
+        value += data[offset].to_f64() * f64::from(overlap);
+    }
+    value
+}
+
 /// How the voxels of one resampling are interpolated.
 enum Evaluator<'a, T> {
     /// 2D (one slice) and 3D linear, ITK's optimised paths.
@@ -190,6 +232,20 @@ enum Evaluator<'a, T> {
     Other(Interpolator<'a, T>),
 }
 
+/// The coordinate type of a `ResampleImageFilter`: its `TInterpolatorPrecisionType` (and so
+/// the identity transform's and the interpolator's coordinate type).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Coordinates {
+    /// `double`, ITK's default (antsApplyTransforms, ResampleImage, ResampleImageBySpacing).
+    Double,
+    /// `float` (`ResampleImageFilter<I, O, float>`, as DenoiseImage declares it): each
+    /// output point is rounded to `float` before the `IdentityTransform<float>`, the
+    /// continuous indices of a scan line's ends are rounded to `float`, their difference is
+    /// taken in float, and each voxel's continuous index `start + alpha · vector` (computed in
+    /// double) is rounded to `float` before the interpolator sees it.
+    Float,
+}
+
 /// Resamples `input` (on `input_geometry`) onto `output` through the identity transform, as
 /// `ResampleImageFilter` does: points outside the input get `default_value`, the others the
 /// interpolated value (in double) passed through `cast`.
@@ -202,6 +258,34 @@ pub fn resample_identity<T, O>(
     interpolation: &Interpolation,
     default_value: O,
     cast: impl Fn(f64) -> O + Sync,
+    n_threads: usize,
+) -> Result<Vec<O>, ResampleError>
+where
+    T: RealElement,
+    O: Copy + Send + Sync,
+{
+    resample_identity_with(
+        input,
+        input_geometry,
+        output,
+        interpolation,
+        default_value,
+        cast,
+        Coordinates::Double,
+        n_threads,
+    )
+}
+
+/// [`resample_identity`] with the filter's coordinate type.
+#[allow(clippy::too_many_arguments)]
+pub fn resample_identity_with<T, O>(
+    input: &[T],
+    input_geometry: &ItkGeometry,
+    output: &ItkGeometry,
+    interpolation: &Interpolation,
+    default_value: O,
+    cast: impl Fn(f64) -> O + Sync,
+    coordinates: Coordinates,
     n_threads: usize,
 ) -> Result<Vec<O>, ResampleError>
 where
@@ -261,6 +345,7 @@ where
         evaluator,
         default_value,
         cast: &cast,
+        float: coordinates == Coordinates::Float,
     };
     parallel::with_threads(n_threads, || match d {
         1 => job.run::<1>(&mut out),
@@ -294,6 +379,8 @@ struct Rows<'a, T, O, C> {
     evaluator: Evaluator<'a, T>,
     default_value: O,
     cast: &'a C,
+    /// [`Coordinates::Float`].
+    float: bool,
 }
 
 impl<T, O, C> Rows<'_, T, O, C>
@@ -315,11 +402,19 @@ where
             }
             let (mut point, mut start, mut end) = ([0.0f64; D], [0.0f64; D], [0.0f64; D]);
             self.out_maps.voxel_to_point(&index, &mut point);
+            self.round(&mut point);
             self.in_maps.point_to_index(&point, &mut start);
+            self.round(&mut start);
             index[0] = nx as f64;
             self.out_maps.voxel_to_point(&index, &mut point);
+            self.round(&mut point);
             self.in_maps.point_to_index(&point, &mut end);
-            let vector: [f64; D] = std::array::from_fn(|k| end[k] - start[k]);
+            self.round(&mut end);
+            let vector: [f64; D] = if self.float {
+                std::array::from_fn(|k| f64::from(end[k] as f32 - start[k] as f32))
+            } else {
+                std::array::from_fn(|k| end[k] - start[k])
+            };
             if matches!(
                 self.evaluator,
                 Evaluator::Linear3(_) | Evaluator::Nearest3(_)
@@ -333,7 +428,8 @@ where
             }
             for (x, o) in line.iter_mut().enumerate() {
                 let alpha = x as f64 / nx as f64;
-                let c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
+                let mut c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
+                self.round(&mut c);
                 let inside = (0..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
                 if !inside {
                     *o = self.default_value;
@@ -343,6 +439,9 @@ where
                 let value = match &self.evaluator {
                     Evaluator::Linear3(volume) => linear(volume, c3),
                     Evaluator::Nearest3(volume) => nearest(volume, c3),
+                    Evaluator::LinearN if self.float => {
+                        linear_unoptimized_f32(self.input, self.in_size, self.strides, &c)
+                    }
                     Evaluator::LinearN => {
                         linear_unoptimized(self.input, self.in_size, self.strides, &c)
                     }
@@ -357,6 +456,15 @@ where
                 *o = (self.cast)(value);
             }
         });
+    }
+
+    /// Rounds coordinates to `float` in [`Coordinates::Float`] mode.
+    fn round<const D: usize>(&self, v: &mut [f64; D]) {
+        if self.float {
+            for x in v.iter_mut() {
+                *x = f64::from(*x as f32);
+            }
+        }
     }
 
     /// One output row whose points share every index but the first (`start[1..]`), in 2D or
@@ -384,7 +492,11 @@ where
             line.fill(self.default_value);
             return;
         }
-        let x_value = |x: usize| start[0] + (x as f64 / nx as f64) * vector[0];
+        let float = self.float;
+        let x_value = |x: usize| {
+            let v = start[0] + (x as f64 / nx as f64) * vector[0];
+            if float { f64::from(v as f32) } else { v }
+        };
         let x_inside = |cx: f64| cx >= -0.5 && cx < limit[0];
         match &self.evaluator {
             Evaluator::Linear3(volume) => {

@@ -14,6 +14,10 @@ Insight Toolkit (ITK) v5.4.5 - Apache License, Version 2.0
   Copyright 1999-2019 Insight Software Consortium
   Copyright 2020-present NumFOCUS
 
+ITK remote module AdaptiveDenoising, commit 24825c8d (the one ITK v5.4.5 builds) - Apache License,
+Version 2.0
+  Copyright NumFOCUS
+
 Advanced Normalization Tools (ANTs) v2.6.5 - Apache License, Version 2.0
   Copyright 2009-2023 ConsortiumOfANTS
 

@@ -19,7 +19,7 @@ use crate::lines::{LineFilter, filter_lines};
 use crate::volume::VolumeRef;
 
 /// `GaussianOperator::ModifiedBesselI0`.
-fn bessel_i0(y: f64) -> f64 {
+pub(crate) fn bessel_i0(y: f64) -> f64 {
     let d = y.abs();
     if d < 3.75 {
         let mut m = y / 3.75;
@@ -43,7 +43,7 @@ fn bessel_i0(y: f64) -> f64 {
 }
 
 /// `GaussianOperator::ModifiedBesselI1`.
-fn bessel_i1(y: f64) -> f64 {
+pub(crate) fn bessel_i1(y: f64) -> f64 {
     let d = y.abs();
     let accumulator = if d < 3.75 {
         let mut m = y / 3.75;

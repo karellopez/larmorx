@@ -972,6 +972,60 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out), "bias": Nifti(bias)}
 
 
+@case("cli.ants.DenoiseImage", covers=("cli:ants DenoiseImage",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sMRIPrep's Rician model with a mask and the noise image; the Gaussian model with
+    shrink 2 (the noise resampled with float coordinates) and per-axis radii; on the oblique
+    grid."""
+    out, noise = ctx.out("out.nii"), ctx.out("noise.nii")
+    cli(
+        "ants",
+        "DenoiseImage",
+        "-d", "3",
+        "-i", ctx.file("anat.nii"),
+        "-n", "Rician",
+        "-x", ctx.file("mask.nii"),
+        "-o", f"[{out},{noise}]",
+    )  # fmt: skip
+    shrunk, shrunk_noise = ctx.out("shrunk.nii"), ctx.out("shrunk_noise.nii")
+    cli(
+        "ants",
+        "DenoiseImage",
+        "-d", "3",
+        "-i", ctx.file("anat.nii"),
+        "-s", "2",
+        "-p", "1x2x1",
+        "-r", "2x1x1",
+        "-o", f"[{shrunk},{shrunk_noise}]",
+    )  # fmt: skip
+    return {
+        "out": Nifti(out),
+        "noise": Nifti(noise),
+        "shrunk": Nifti(shrunk),
+        "shrunk_noise": Nifti(shrunk_noise),
+    }
+
+
+@case("py.ants.denoise_image", covers=("lx.ants.denoise_image",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The Rician model (sMRIPrep's); the Gaussian model with a mask; shrink 2; 2D; 4D with
+    shrink 2 (4D patches, and the 4D interpolation with float coordinates)."""
+    dn = lx.ants.denoise_image
+    calls = {
+        "rician": lambda: dn(anat()),
+        "gaussian_mask": lambda: dn(anat2(), "Gaussian", mask=mask()),
+        "shrink": lambda: dn(anat(), shrink_factor=2),
+        "plane": lambda: dn(plane(), patch_radius=(1, 2)),
+        "bold": lambda: dn(bold(), shrink_factor=2, search_radius=1),
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    for name, call in calls.items():
+        r = call()
+        out[f"{name}.denoised"] = r.denoised.data
+        out[f"{name}.noise"] = r.noise.data
+    return out
+
+
 @case("py.ants.n4", covers=("lx.ants.n4_bias_field_correction",))
 def _(ctx: Context) -> dict[str, Any]:
     """ANTs' defaults with few iterations; a weight image with a mesh, quadratic splines and

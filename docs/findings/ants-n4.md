@@ -14,8 +14,10 @@ in [ants-image-programs.md](ants-image-programs.md), its argument parser in
 
 - **ANTs' N4 result depends on its thread count.** ITK's B-spline fit sums per-thread
   lattices. larmorx always computes ANTs' **single-thread** result, on any number of threads.
-- **The oracle's compiler (GCC 11, `-O3`) keeps two float quantities of the fit in double
-  precision** on the first two axes of 2D and 3D images. larmorx reproduces this.
+- **GCC 11.4 at `-O3` miscompiles the fit** (GCC bug 110182): ANTs built that way, as the
+  repository's first oracle was, keeps two float quantities in double precision on the first
+  two axes of 2D and 3D images. larmorx follows the C++ source, as fMRIPrep's and ANTsPy's
+  ANTs builds do, and the oracle is now built by a fixed compiler (below).
 - **ITK's `expf`, `logf`, `exp` and `sincos` come from glibc**, which is not always correctly
   rounded; larmorx's are (CLAUDE.md rule 5). That is the only difference left. Against the
   unmodified ANTs 2.6.5 binary (one thread), 27 of 45 compared cases (30 of 54 outputs) are
@@ -255,32 +257,84 @@ farther outside throws); the kernel weights `B` are products of
 `ω += w·t²` and `δ += v · (t³·w / ΣB²)` with `t` the weight `B`; finally `φ = δ / ω` where `ω`
 is not almost 0 (else 0), and NaN or infinity become 0. *Read; validated* (orders 1 to 5).
 
-### GCC 11's code generation on the oracle
+### GCC 11 miscompiles the fit (GCC bug 110182); larmorx follows the source
 
-**In the 2D and 3D builds, GCC 11 (`-O3`, baseline x86-64) vectorizes the first two axes of
-the fit in double precision and drops two roundings to float that the source requires**:
-- `r[0]` and `r[1]` are divided as a pair of doubles (`divpd`) and kept as doubles; the
-  source stores them in a `float` array. `epsilon` is rounded to float as written.
-- The points' first two coordinates are computed as `float(origin + spacing · index)` in
-  double; the source (`itkImageBase.h:589-598`) first stores `float(origin)` and then adds the
-  product, rounding twice.
+**ANTs built by GCC 11.4 at `-O3` does not compute what the source says in the 2D and 3D fit.**
+The repository's first ANTs oracle was built that way (now `oracles/ants-2.6.5-gcc11-O3`):
+- `r[0]` and `r[1]` are divided as a pair of doubles (`divpd`) and used unrounded; the source
+  assigns them to a `float` array (`Scattered.hxx:433-439`), so `p = (point - origin) · r`
+  (`:465`) must use the float. `epsilon` is rounded to float as written.
+- The points' first two coordinates come out as `float(origin + spacing · index)` computed in
+  double; the source (`TransformIndexToPhysicalPoint`, `itkImageBase.h:589-598`) assigns
+  `origin` to the float point first and then adds each index term, rounding after each step.
 
-The third axis of 3D images and all four axes of 4D images follow the source. *Verified*: the
-oracle's disassembly of `ThreadedGenerateDataForFitting` shows `divpd` with no `cvtpd2ps` for
-`r` in the 2D and 3D instantiations and a `cvtpd2ps` in 4D; without these two rules, larmorx
-differed from ANTs (with correctly rounded math) whenever an origin or an `r` is not exactly a
-float, and with them every case is bit-identical. *larmorx:* `GridFit::double_axes`
-(`larmorx_image::bspline::fit::gcc_double_axes`: 2 for 2D and 3D, 0 for 4D), used by the
-N4BiasFieldCorrection replica. A different compiler or flags would give ANTs other bits here;
-this is the oracle larmorx follows.
+The third axis of 3D images and all axes of 4D images are compiled correctly. larmorx
+reproduced this binary at first (`gcc_double_axes`); since 2026-10-11 it follows the source.
 
-*Added 2026-10-11:* **fMRIPrep 25.2.6's own ANTs (conda-forge 2.6.2) follows the source
-here.** On fMRIPrep's BOLD-reference N4 of run 03 (one thread, CORE-MATH preloaded into
-both), it differs from this oracle in 137,675 of 139,264 voxels (at most 0.152), and a scratch
-larmorx build with `gcc_double_axes` returning 0 reproduces it bit for bit, as it does all six
-N4 outputs of fMRIPrep's run
-([fmriprep-oracle.md](fmriprep-oracle.md)). *Verified.* Whether larmorx should follow the source
-(and fMRIPrep's binary) or this oracle by default is open.
+**The cause is a GCC bug, not behaviour the C++ standard allows.** GCC's SLP vectorizer
+computes the first two axes as a `vector(2) double`, converts it to a `vector(2) float` for
+the stores to `r` and back to `vector(2) double` for the use in `p`. The value-numbering pass
+after it (`fre5`) then folds `(vector(2) double)(vector(2) float) x` into `x`: match.pd's rule
+for two conversions in a row drops them when the intermediate type is at least as precise as
+the final one, and compares `TYPE_PRECISION`, which for a vector type is its number of lanes
+(2 for both), not its element precision (32 and 64). This is GCC bug 110182, "TYPE_PRECISION
+on VECTOR_TYPE causes wrong-code", fixed by comparing `element_precision` (GCC commit
+`3e12669a0eb`, 2023-06-09) and released in GCC 13.2, 12.4 and 11.5 (*verified*: `gcc/match.pd`
+of each release; 11.4, 12.1-12.3 and 13.1 still compare `TYPE_PRECISION`). Ubuntu 22.04's
+`g++-11` (11.4.0) and `gcc-12` (12.3.0) have it. The C++ standard lets a floating expression
+carry more precision than its type, but "the cast and assignment operators must still perform
+their specific conversions" (C++17 [expr]/13 and its footnote), and on x86-64 with SSE GCC
+uses no excess precision at all (`FLT_EVAL_METHOD` 0); no `-ffast-math`-like option is in the
+flags. *Verified:*
+- GCC's own dumps of `N4BiasFieldCorrection.cxx` compiled as the oracle was: the round trips
+  are present after `slp1` and gone after `fre5`, in `ThreadedGenerateDataForFitting` (2D,
+  3D: `r`), `UpdateBiasFieldEstimate` (2D, 3D: the origin and each index term),
+  `BSplineControlPointImageFilter::DynamicThreadedGenerateData` (2D, 3D: `epsilon` from an
+  unrounded `r`) and, not used by N4, `ThreadedGenerateDataForReconstruction` and
+  `ThreadedGenerateDataForUpdatingResidualValues` (3D). In the bias field evaluation only the
+  end tolerance changes, and `U = spans − epsilon` is rounded to float, so it changes no
+  output unless `spans − epsilon` lies within about 1e-11 of a rounding boundary.
+- A 40-line reproduction of the `r` computation (float array assigned from a double
+  quotient, then used in a double expression) gives values that differ from the source's
+  roundings with `g++-11` 11.4 at `-O3` (31 of 120 values, also with `-march=corei7
+  -mtune=native` and `-march=x86-64-v3`) and with `gcc-12` 12.3 (a C version); none at `-O0`
+  to `-O2`, with `-fno-tree-vectorize` or with `-fno-tree-slp-vectorize`, with gcc 8.4 (which
+  does not vectorize it) or with conda-forge's GCC 13.3 and 14.3.
+  `-fexcess-precision=standard` is not available for C++ in GCC 11 ("sorry, unimplemented")
+  and does not help in C, as expected for a folding bug.
+- The N4 translation unit recompiled with GCC 11.4 under several flag sets and relinked
+  against the oracle's libraries, run on the 38 smoke-tier cases at one thread with
+  CORE-MATH preloaded, against larmorx with the source's roundings: `-O2`, `-O3
+  -fno-tree-vectorize` and `-O3 -fno-tree-slp-vectorize` are bit-identical in 38 of 38; the
+  oracle's flags, `-O3 -fno-tree-loop-vectorize`, `-mtune=generic` instead of
+  `-mtune=native`, and conda-forge's `CXXFLAGS` (`-march=nocona -mtune=haswell -ftree-vectorize
+  ... -O2`, then CMake's `-O3`) in 5 of 38 (the cases whose origins and `r` happen to be
+  floats, and 4D).
+- The disassembly of the oracle's `ThreadedGenerateDataForFitting`: `divpd` and no
+  `cvtpd2ps` for `r` in 2D and 3D. fMRIPrep 25.2.6's N4 library (ANTs 2.6.2, built by
+  conda-forge's GCC 14.3.0; its ITK 5.4.4 by GCC 13.3.0, from the binaries' `.comment`
+  sections) has `divpd`, `cvtpd2ps`, `cvtps2pd`, as the source says.
+
+**Three independent builds agree with the source.** At one thread with CORE-MATH preloaded,
+larmorx with the source's roundings is bit-identical to fMRIPrep 25.2.6's N4 (all six N4
+outputs of the ds000005 oracle run, [fmriprep-oracle.md](fmriprep-oracle.md)), to ANTsPy
+0.6.3's (built by GCC 10.2.1; 5 of 5 cases tried, 3 of which the GCC 11 oracle gets
+differently) and to the new oracle (below). *Verified.*
+
+**The oracle is now built by a fixed compiler.** `scripts/build_ants_oracle.sh` builds ITK
+5.4.5 and ANTs 2.6.5 with conda-forge's GCC 14.3.0 (the compiler of fMRIPrep's ANTs), with
+ITK's and ANTs' own flags as before (`-O3`, `-march=corei7`, no FMA), static libstdc++; it
+records the compiler and the flags each build used in `BUILD_INFO.txt`, and it refuses a
+compiler that fails the reproduction above (`--allow-miscompile` overrides, to rebuild the old
+oracle as evidence). That build is `oracles/ants-2.6.5`; the GCC 11 build is kept as
+`oracles/ants-2.6.5-gcc11-O3`. The validation records compare with the new one.
+
+*larmorx:* follows the source: `r` and the points' coordinates are rounded to float on every
+axis. This is a compiler artefact, not an upstream defect, so there is no D13 compatibility
+switch; `larmorx_image::bspline::fit::gcc11_double_axes` stays as a documented hook
+(`GridFit::double_axes`, `N4Parameters::double_axes`, 0 by default and in every caller) that
+reproduces the GCC 11 build bit for bit, for comparisons with such builds (Ubuntu 22.04's own
+compilers produce them) and to keep the old records checkable.
 
 ### Control-point lattices (`BSplineControlPointImageFilter`)
 

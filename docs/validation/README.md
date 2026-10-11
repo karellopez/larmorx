@@ -5,7 +5,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | Record | larmorx | Reference | Status |
 |---|---|---|---|
 | [nifti-io](nifti-io.md) | `larmorx.io.load` / `save` | nibabel | `validated` |
-| [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTs 2.6.5, ITK 5.4.5) | `validated` |
+| [ants-apply-transforms](ants-apply-transforms.md) | `lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` | antsApplyTransforms (ANTs 2.6.5 binary; ANTsPy in-process if the binary is missing) | `validated` |
 | [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [resample-series](resample-series.md) | `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process) | `validated` |
@@ -31,6 +31,23 @@ larmorx does not have yet.
 These records compare larmorx with the original tools on Linux x86-64. That the other five
 platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:
 [golden.md](golden.md).
+
+**The ANTs oracle** is ITK 5.4.5 and ANTs 2.6.5 built from the pinned tags by
+`scripts/build_ants_oracle.sh` into `<workspace>/oracles/ants-2.6.5`. The records compare
+with what the C++ source defines (CLAUDE.md rule 8), so the build must not miscompile it:
+GCC 11.4 and 12.3, Ubuntu 22.04's compilers, drop float roundings at `-O3` (GCC bug 110182,
+[ants-n4 findings](../findings/ants-n4.md)), and the script stops when its compiler probe
+finds that. The oracle in use is built by conda-forge's GCC 14.3.0, installed in a user-level
+environment, with ITK's and ANTs' own flags; `BUILD_INFO.txt` records the compiler, the flags
+each build used and the probe's result, and the records quote it. The first oracle, built by
+GCC 11.4, is kept as `oracles/ants-2.6.5-gcc11-O3`; `LARMORX_ANTS_BIN=<dir>/bin` points any
+ANTs suite at another build.
+
+```bash
+conda create -p <workspace>/oracles/toolchains/gcc-14.3 -c conda-forge --override-channels gxx_linux-64=14.3.0 gcc_linux-64=14.3.0
+T=<workspace>/oracles/toolchains/gcc-14.3/bin
+scripts/build_ants_oracle.sh --jobs 4 --cc $T/x86_64-conda-linux-gnu-gcc --cxx $T/x86_64-conda-linux-gnu-g++ --ldflags "-static-libstdc++ -static-libgcc"
+```
 
 Reproduce a record:
 

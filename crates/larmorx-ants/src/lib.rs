@@ -4,6 +4,7 @@
 //!
 //! - `antsApplyTransforms` is [`apply_transforms`] (ITK's `ResampleImageFilter`).
 //! - `antsApplyTransformsToPoints` is [`transform_points`].
+//! - `DenoiseImage` is [`denoise_image()`] (ITK's adaptive non-local means filter).
 //! - `ThresholdImage` is [`threshold_image()`], `MultiplyImages` is [`multiply_images()`],
 //!   `SmoothImage` is [`smooth_image()`], `ResampleImageBySpacing` is
 //!   [`resample_image_by_spacing()`], `ResampleImage` is [`resample_image()`], and ImageMath's
@@ -16,6 +17,7 @@
 
 pub mod apply_transforms;
 pub mod cli;
+pub mod denoise_image;
 pub mod image;
 pub mod image_math;
 pub mod multiply_images;
@@ -29,6 +31,7 @@ pub mod threshold_image;
 pub use apply_transforms::{
     ApplyTransformsError, ApplyTransformsOptions, OutputType, apply_transforms, transform_points,
 };
+pub use denoise_image::{DenoiseError, DenoiseOptions, DenoiseOutput, NoiseModel, denoise_image};
 pub use image::{AntsImage, FileStore, ImageStore};
 /// The image view the spatial filters take (re-exported for the bindings).
 pub use larmorx_image::VolumeRef;

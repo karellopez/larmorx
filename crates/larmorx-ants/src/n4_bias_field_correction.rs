@@ -160,7 +160,7 @@ pub struct N4Output {
 
 /// `ImageBase::IsCongruentImageGeometry` with ITK's default tolerances: origin and spacing
 /// within `1e-6 · spacing[0]` (of `a`), direction within 1e-6, element by element.
-fn congruent(
+pub(crate) fn congruent(
     a: &larmorx_io::nifti::itk::ItkGeometry,
     b: &larmorx_io::nifti::itk::ItkGeometry,
 ) -> bool {

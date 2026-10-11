@@ -190,6 +190,20 @@ enum Evaluator<'a, T> {
     Other(Interpolator<'a, T>),
 }
 
+/// The coordinate type of a `ResampleImageFilter`: its `TInterpolatorPrecisionType` (and so
+/// the identity transform's and the interpolator's coordinate type).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Coordinates {
+    /// `double`, ITK's default (antsApplyTransforms, ResampleImage, ResampleImageBySpacing).
+    Double,
+    /// `float` (`ResampleImageFilter<I, O, float>`, as DenoiseImage declares it): each
+    /// output point is rounded to `float` before the `IdentityTransform<float>`, the
+    /// continuous indices of a scan line's ends are rounded to `float`, their difference is
+    /// taken in float, and each voxel's continuous index `start + alpha · vector` (computed in
+    /// double) is rounded to `float` before the interpolator sees it.
+    Float,
+}
+
 /// Resamples `input` (on `input_geometry`) onto `output` through the identity transform, as
 /// `ResampleImageFilter` does: points outside the input get `default_value`, the others the
 /// interpolated value (in double) passed through `cast`.
@@ -202,6 +216,34 @@ pub fn resample_identity<T, O>(
     interpolation: &Interpolation,
     default_value: O,
     cast: impl Fn(f64) -> O + Sync,
+    n_threads: usize,
+) -> Result<Vec<O>, ResampleError>
+where
+    T: RealElement,
+    O: Copy + Send + Sync,
+{
+    resample_identity_with(
+        input,
+        input_geometry,
+        output,
+        interpolation,
+        default_value,
+        cast,
+        Coordinates::Double,
+        n_threads,
+    )
+}
+
+/// [`resample_identity`] with the filter's coordinate type.
+#[allow(clippy::too_many_arguments)]
+pub fn resample_identity_with<T, O>(
+    input: &[T],
+    input_geometry: &ItkGeometry,
+    output: &ItkGeometry,
+    interpolation: &Interpolation,
+    default_value: O,
+    cast: impl Fn(f64) -> O + Sync,
+    coordinates: Coordinates,
     n_threads: usize,
 ) -> Result<Vec<O>, ResampleError>
 where
@@ -261,6 +303,7 @@ where
         evaluator,
         default_value,
         cast: &cast,
+        float: coordinates == Coordinates::Float,
     };
     parallel::with_threads(n_threads, || match d {
         1 => job.run::<1>(&mut out),
@@ -294,6 +337,8 @@ struct Rows<'a, T, O, C> {
     evaluator: Evaluator<'a, T>,
     default_value: O,
     cast: &'a C,
+    /// [`Coordinates::Float`].
+    float: bool,
 }
 
 impl<T, O, C> Rows<'_, T, O, C>
@@ -315,11 +360,19 @@ where
             }
             let (mut point, mut start, mut end) = ([0.0f64; D], [0.0f64; D], [0.0f64; D]);
             self.out_maps.voxel_to_point(&index, &mut point);
+            self.round(&mut point);
             self.in_maps.point_to_index(&point, &mut start);
+            self.round(&mut start);
             index[0] = nx as f64;
             self.out_maps.voxel_to_point(&index, &mut point);
+            self.round(&mut point);
             self.in_maps.point_to_index(&point, &mut end);
-            let vector: [f64; D] = std::array::from_fn(|k| end[k] - start[k]);
+            self.round(&mut end);
+            let vector: [f64; D] = if self.float {
+                std::array::from_fn(|k| f64::from(end[k] as f32 - start[k] as f32))
+            } else {
+                std::array::from_fn(|k| end[k] - start[k])
+            };
             if matches!(
                 self.evaluator,
                 Evaluator::Linear3(_) | Evaluator::Nearest3(_)
@@ -333,7 +386,8 @@ where
             }
             for (x, o) in line.iter_mut().enumerate() {
                 let alpha = x as f64 / nx as f64;
-                let c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
+                let mut c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
+                self.round(&mut c);
                 let inside = (0..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
                 if !inside {
                     *o = self.default_value;
@@ -357,6 +411,15 @@ where
                 *o = (self.cast)(value);
             }
         });
+    }
+
+    /// Rounds coordinates to `float` in [`Coordinates::Float`] mode.
+    fn round<const D: usize>(&self, v: &mut [f64; D]) {
+        if self.float {
+            for x in v.iter_mut() {
+                *x = f64::from(*x as f32);
+            }
+        }
     }
 
     /// One output row whose points share every index but the first (`start[1..]`), in 2D or
@@ -384,7 +447,11 @@ where
             line.fill(self.default_value);
             return;
         }
-        let x_value = |x: usize| start[0] + (x as f64 / nx as f64) * vector[0];
+        let float = self.float;
+        let x_value = |x: usize| {
+            let v = start[0] + (x as f64 / nx as f64) * vector[0];
+            if float { f64::from(v as f32) } else { v }
+        };
         let x_inside = |cx: f64| cx >= -0.5 && cx < limit[0];
         match &self.evaluator {
             Evaluator::Linear3(volume) => {

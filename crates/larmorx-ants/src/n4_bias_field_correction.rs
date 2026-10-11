@@ -336,7 +336,7 @@ pub fn n4_bias_field_correction(
         fwhm: options.fwhm,
         wiener_noise: options.wiener_noise,
         bins: options.bins,
-        unrounded_r_axes: larmorx_image::bspline::fit::gcc_unrounded_r_axes(d),
+        double_axes: larmorx_image::bspline::fit::gcc_double_axes(d),
     };
     let result = n4_bias_field(
         &small_input,

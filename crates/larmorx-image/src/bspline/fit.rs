@@ -14,9 +14,9 @@
 //! `p = (point − origin)·r` (the point in `f32`, as ITK's `PointSet` stores it), pulled inside
 //! `[0, spans)` at the ends; kernel weights in `f64` multiplied into an `f32` product, axis 0
 //! first; sums in `f32`. One exception reproduces the binary ITK and ANTs are built into:
-//! gcc 11 (x86-64, `-O3`) vectorizes the first two axes' `r` in 2D and 3D and keeps them in
-//! double precision, unrounded, for `p` and the end tolerance ([`GridFit::unrounded_r_axes`],
-//! [`gcc_unrounded_r_axes`], `docs/findings/ants-n4.md`).
+//! gcc 11 (x86-64, `-O3`) vectorizes the first two axes in 2D and 3D and keeps their `r` in
+//! double precision, unrounded, for `p` and the end tolerance ([`GridFit::double_axes`],
+//! [`gcc_double_axes`], `docs/findings/ants-n4.md`).
 //!
 //! **Speed.** Within one fitting level the points, weights and lattice size do not change, so
 //! [`GridFitPlan`] computes the kernel weights, `Σ B²`, `ω` and (memory permitting) every
@@ -37,10 +37,14 @@ use crate::FilterError;
 use crate::itk_math::almost_equal_f32;
 use crate::volume::strides;
 
-/// How many leading axes of a `dim`-dimensional fit keep `r` unrounded in ITK's x86-64 gcc 11
-/// build (`ThreadedGenerateDataForFitting` vectorized with `divpd`, the quotients stored
-/// without `cvtpd2ps`): the first two in 2D and 3D, none in 4D.
-pub fn gcc_unrounded_r_axes(dim: usize) -> usize {
+/// How many leading axes ITK's x86-64 gcc 11 build (the ANTs 2.6.5 oracle, `-O3`) computes
+/// in double precision where the C++ source rounds to float: the first two in 2D and 3D, none
+/// in 4D. gcc vectorizes those two axes as a pair of doubles and drops the conversions to
+/// float in between, in `ThreadedGenerateDataForFitting` (`r[i]`, so `p` and `epsilon` use
+/// the unrounded quotient: `divpd` without `cvtpd2ps`) and in N4's `UpdateBiasFieldEstimate`
+/// (the points' coordinates, `TransformIndexToPhysicalPoint` into a float point: the origin
+/// is not rounded to float before the index term is added).
+pub fn gcc_double_axes(dim: usize) -> usize {
     if dim == 2 || dim == 3 { 2 } else { 0 }
 }
 
@@ -58,8 +62,8 @@ pub struct GridFit<'a> {
     pub control_points: &'a [usize],
     pub order: usize,
     /// The number of leading axes whose `r` stays in double precision (ITK's source rounds it
-    /// to float; see [`gcc_unrounded_r_axes`]).
-    pub unrounded_r_axes: usize,
+    /// to float; see [`gcc_double_axes`]). The caller computes `axis_points` to match.
+    pub double_axes: usize,
 }
 
 /// Per axis and grid coordinate: the first control point and the `order + 1` kernel weights.
@@ -224,7 +228,7 @@ impl<'a> GridFitPlan<'a> {
                 fit.control_points[a] - order,
                 &kernel,
                 a,
-                a < fit.unrounded_r_axes,
+                a < fit.double_axes,
             )?);
         }
         let weights = weights.map_or_else(|| vec![1.0; voxels.len()], <[f32]>::to_vec);
@@ -543,7 +547,7 @@ mod tests {
                     fit.control_points[a] - order,
                     &kernel,
                     a,
-                    a < fit.unrounded_r_axes,
+                    a < fit.double_axes,
                 )
                 .unwrap()
             })
@@ -613,7 +617,7 @@ mod tests {
         for dim in 2..=4 {
             let (size, spacing, origin, axis_points, cp) = case(dim);
             let total: usize = size.iter().product();
-            for unrounded in [0, gcc_unrounded_r_axes(dim)] {
+            for unrounded in [0, gcc_double_axes(dim)] {
                 let fit = GridFit {
                     axis_points: &axis_points,
                     origin: &origin,
@@ -621,7 +625,7 @@ mod tests {
                     size: &size,
                     control_points: &cp,
                     order: 3,
-                    unrounded_r_axes: unrounded,
+                    double_axes: unrounded,
                 };
                 let voxels: Vec<usize> = (0..total).filter(|v| v % 3 != 1).collect();
                 let values: Vec<f32> = voxels
@@ -656,7 +660,7 @@ mod tests {
             size: &[4],
             control_points: &[4],
             order: 3,
-            unrounded_r_axes: 0,
+            double_axes: 0,
         };
         assert!(fit_on_grid(&fit, &[4], &[0, 1, 2, 3], &[1.0; 4], None, 1).is_err());
     }

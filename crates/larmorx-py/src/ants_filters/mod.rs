@@ -20,6 +20,7 @@ mod components;
 mod gaussian;
 mod image_math;
 mod morphology;
+mod n4;
 mod resample;
 mod threshold;
 
@@ -251,6 +252,7 @@ fn ants_program<'py>(
         "ThresholdImage" => larmorx_ants::cli::threshold_image::run,
         "MultiplyImages" => larmorx_ants::cli::multiply_images::run,
         "SmoothImage" => larmorx_ants::cli::smooth_image::run,
+        "N4BiasFieldCorrection" => larmorx_ants::cli::n4_bias_field_correction::run,
         "ResampleImage" => larmorx_ants::cli::resample_image::run,
         "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         other => {
@@ -319,5 +321,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     resample::register(m)?;
     morphology::register(m)?;
     components::register(m)?;
+    n4::register(m)?;
     Ok(())
 }

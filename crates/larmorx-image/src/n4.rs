@@ -35,7 +35,7 @@
 use rayon::prelude::*;
 
 use crate::FilterError;
-use crate::bspline::fit::{GridFit, GridFitPlan, gcc_unrounded_r_axes};
+use crate::bspline::fit::{GridFit, GridFitPlan, gcc_double_axes};
 use crate::bspline::{Lattice, evaluate, refine};
 use crate::grid::{ItkGrid, vnl_floor_f32};
 use crate::vnl_fft::VnlFft1d;
@@ -60,10 +60,10 @@ pub struct N4Parameters {
     pub wiener_noise: f32,
     /// `SetNumberOfHistogramBins`.
     pub bins: u32,
-    /// How many leading axes of the B-spline fit keep the parametric scale `r` in double
-    /// precision, as ITK's x86-64 gcc 11 build does (2 in 2D and 3D,
-    /// [`gcc_unrounded_r_axes`]); 0 follows ITK's source (`r` rounded to float).
-    pub unrounded_r_axes: usize,
+    /// How many leading axes the B-spline fit computes in double precision where ITK's source
+    /// says float (the parametric scale `r` and the points' coordinates), as ITK's x86-64
+    /// gcc 11 build does: 2 in 2D and 3D ([`gcc_double_axes`]); 0 follows the source.
+    pub double_axes: usize,
 }
 
 impl N4Parameters {
@@ -79,7 +79,7 @@ impl N4Parameters {
             fwhm: 0.15,
             wiener_noise: 0.01,
             bins: 200,
-            unrounded_r_axes: gcc_unrounded_r_axes(dim),
+            double_axes: gcc_double_axes(dim),
         }
     }
 }
@@ -342,10 +342,17 @@ pub fn n4_bias_field(
         }
     }
 
-    // The fit's points: each axis's physical coordinates as float, identity direction.
+    // The fit's points: each axis's physical coordinates as float, identity direction
+    // (`TransformIndexToPhysicalPoint` into a float point: the origin rounded to float, then
+    // the index term added in double and rounded again; in double throughout on the
+    // `double_axes`).
     let axis_points: Vec<Vec<f32>> = (0..d)
         .map(|a| {
-            let o = f64::from(grid.origin[a] as f32);
+            let o = if a < p.double_axes {
+                grid.origin[a]
+            } else {
+                f64::from(grid.origin[a] as f32)
+            };
             (0..grid.size[a])
                 .map(|x| (o + grid.spacing[a] * (grid.start[a] + x as i64) as f64) as f32)
                 .collect()
@@ -374,7 +381,7 @@ pub fn n4_bias_field(
             size: &grid.size,
             control_points: &control_points,
             order: p.spline_order,
-            unrounded_r_axes: p.unrounded_r_axes,
+            double_axes: p.double_axes,
         };
         let mut plan: Option<GridFitPlan<'_>> = None;
         loop {

@@ -78,6 +78,8 @@ Test data live in a separate repository, `larmorx-testdata` (next to this one in
 
 ## Adding a tool (the per-tool contract, PLAN.md §4)
 
+Read [porting-guide.md](porting-guide.md) first: which track the upstream's licence allows and who may read what, the source as the specification, measuring the original's own variability, oracle data that cover every path, the pipeline's real parameters, separating the causes of every difference, the validation record, what to do about upstream defects (D13; the register is [findings/upstream-defects.md](findings/upstream-defects.md)) and the checklist below with the models to copy. Then:
+
 1. Rust API in the family crate, on `Image`/`Affine` types, with an explicit `n_threads`.
 2. Binding in `larmorx-py` and an idiomatic wrapper in `python/larmorx/<family>/` (typed, dataclass results), with `.pyi` stubs.
 3. CLI parser for the original program's arguments (in the family crate's `cli` module, dispatched by `larmorx-cli`). ANTs image programs read and write through `larmorx_ants::image::ImageStore`, so the same command-line code also runs on in-memory images from Python (`lx.ants.image_math`).

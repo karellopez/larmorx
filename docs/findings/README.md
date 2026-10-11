@@ -16,9 +16,21 @@ New findings are added as they come up, during porting and while parity reports 
 Entries are not deleted; when one turns out to be wrong it is corrected and the correction is
 noted.
 
+**Defects** (crashes, races, deterministic bugs, imprecision, command-line quirks, wrong
+messages) also get an entry in [upstream-defects.md](upstream-defects.md), the register: one
+entry per defect with its class, evidence, effect on fMRIPrep users, what larmorx does, and
+what decision D13 (correct by default, faithful on request) requires. Its top lists the defects
+larmorx still reproduces by default. How to classify and handle a defect:
+[porting guide](../porting-guide.md) §8.
+
+**Clean-room implementers** must not read the files written from restricted source
+([afni-tshift.md](afni-tshift.md), [fsl-mcflirt.md](fsl-mcflirt.md)) nor the register's
+sections marked restricted ([porting guide](../porting-guide.md) §1).
+
 | File | Subject |
 |---|---|
-| [afni-tshift.md](afni-tshift.md) | AFNI 3dTshift: slice-timing correction as fMRIPrep runs it, AFNI's FFT |
+| [upstream-defects.md](upstream-defects.md) | the register of every defect found in the originals and pipelines, by class, with what larmorx does and the D13 gaps (its AFNI and FSL sections are **forbidden to clean-room implementers**) |
+| [afni-tshift.md](afni-tshift.md) | AFNI 3dTshift: slice-timing correction as fMRIPrep runs it, AFNI's FFT (source-derived; **forbidden to clean-room implementers**) |
 | [fsl-mcflirt.md](fsl-mcflirt.md) | FSL mcflirt: head-motion correction as fMRIPrep runs it (source-derived; **forbidden to clean-room implementers**) |
 | [ants-cli.md](ants-cli.md) | ANTs command lines: argument parser, `antsApplyTransforms` options and outputs |
 | [ants-image-programs.md](ants-image-programs.md) | ImageMath, ThresholdImage, MultiplyImages: dispatch, exit codes, operands, quirks of each operation |

@@ -163,9 +163,9 @@ def linalg_matmul4(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """``a[t] @ b[t]`` for two ``(n, 4, 4)`` float64 stacks, in the operation order of numpy's
     OpenBLAS Haswell ``dgemm``."""
 
-def linalg_inv4(a: np.ndarray) -> tuple[np.ndarray, bool]:
+def linalg_inv4(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """``np.linalg.inv`` of an ``(n, 4, 4)`` float64 stack as OpenBLAS's ``dgesv`` computes it;
-    NaN for singular matrices, and whether any was singular."""
+    NaN for singular matrices, and which were singular (bool, ``(n,)``)."""
 
 def linalg_closest_orthogonal(rs: np.ndarray) -> np.ndarray:
     """nibabel's ``io_orientation`` polar step for a 3×3 matrix (vnl's SVD)."""

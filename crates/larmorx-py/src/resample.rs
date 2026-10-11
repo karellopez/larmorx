@@ -12,7 +12,9 @@ use larmorx_transform::nitransforms::{self, DenseField, Step};
 use larmorx_transform::openblas;
 use larmorx_transform::resample_series::{PeInfo, ResampleError, ResampleOptions, SeriesResampler};
 use numpy::ndarray::{Array2, Array3, ArrayD, Axis, IxDyn, ShapeBuilder};
-use numpy::{PyArray, PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyReadonlyArrayDyn};
+use numpy::{
+    PyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyReadonlyArrayDyn,
+};
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -284,26 +286,23 @@ fn linalg_matmul4<'py>(
     Ok(to_stack(py, &out))
 }
 
+/// The inverses and the singular flags of [`linalg_inv4`].
+type Inverses<'py> = (Bound<'py, PyArray3<f64>>, Bound<'py, PyArray1<bool>>);
+
 /// `np.linalg.inv` of each matrix of an `(n, 4, 4)` float64 stack, as OpenBLAS computes it
 /// (`larmorx_transform::openblas::inv4`). Returns the inverses (NaN for a singular matrix, as
-/// numpy fills them) and whether any matrix was singular.
+/// numpy fills them) and which matrices were singular.
 #[pyfunction]
-fn linalg_inv4<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray3<'_, f64>,
-) -> PyResult<(Bound<'py, PyArray3<f64>>, bool)> {
+fn linalg_inv4<'py>(py: Python<'py>, a: PyReadonlyArray3<'_, f64>) -> PyResult<Inverses<'py>> {
     let a = stack4(&a)?;
-    let mut singular = false;
-    let out: Vec<Mat4> = a
+    let (out, singular): (Vec<Mat4>, Vec<bool>) = a
         .iter()
-        .map(|m| {
-            openblas::inv4(m).unwrap_or_else(|| {
-                singular = true;
-                [[f64::NAN; 4]; 4]
-            })
+        .map(|m| match openblas::inv4(m) {
+            Some(x) => (x, false),
+            None => ([[f64::NAN; 4]; 4], true),
         })
-        .collect();
-    Ok((to_stack(py, &out), singular))
+        .unzip();
+    Ok((to_stack(py, &out), PyArray1::from_vec(py, singular)))
 }
 
 /// nibabel's `io_orientation` polar step for a 3×3 matrix of unit columns

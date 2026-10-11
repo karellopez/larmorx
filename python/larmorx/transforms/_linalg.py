@@ -42,7 +42,7 @@ def inv(a: Any) -> np.ndarray:
     computes it. Raises ``numpy.linalg.LinAlgError`` for a singular matrix, as numpy does."""
     a = _stack(a)
     out, singular = _core.linalg_inv4(np.ascontiguousarray(a.reshape(-1, 4, 4)))
-    if singular:
+    if singular.any():
         raise np.linalg.LinAlgError("Singular matrix")
     return out.reshape(a.shape)
 

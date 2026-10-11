@@ -105,18 +105,37 @@ pub fn matmul4(a: &Mat4, b: &Mat4) -> Mat4 {
     })
 }
 
-/// `IAMAX_K` (`iamax_sse2.S`): the 0-based index of the first element of largest magnitude. The
-/// kernel takes the maximum with `maxsd` (the second operand when either is NaN) and then
-/// returns the first element equal to it; when none is (a NaN maximum), it returns the length,
-/// which `getf2_k` clamps to the last element.
+/// `IAMAX_K` (`iamax_sse2.S`, unit stride) for 1 to 4 elements: the 0-based index of the first
+/// element of largest magnitude, NaN included exactly as the kernel treats it.
+///
+/// The kernel broadcasts `|x0|` to four accumulators, folds the other elements into them with
+/// `maxpd` (x86 `MAX(d, s)`: `d` if `d > s`, else `s`, so a NaN in either gives `s`), reduces the
+/// lanes, and then searches from the start with `comisd`/`je`, which also matches when either
+/// value is NaN. For 2 and 3 elements it compares the first two and otherwise returns the next
+/// index without comparing; `getf2_k` clamps an index past the end to the last element.
 fn iamax(x: &[f64]) -> usize {
-    let mut max = x[0].abs();
-    for v in &x[1..] {
-        let v = v.abs();
-        // maxsd max, v: max > v ? max : v.
-        max = if max > v { max } else { v };
-    }
-    x.iter().position(|v| v.abs() == max).unwrap_or(x.len() - 1)
+    let m = |d: f64, s: f64| if d > s { d } else { s };
+    let a: Vec<f64> = x.iter().map(|v| v.abs()).collect();
+    let max = match a.len() {
+        1 => a[0],
+        2 => m(a[0], m(a[0], m(a[0], a[1]))),
+        3 => {
+            let lane = |k: usize| m(a[0], m(m(a[0], a[k]), a[0]));
+            m(lane(2), lane(1))
+        }
+        4 => {
+            let x3 = m(a[0], a[3]);
+            let lane = |k: usize| m(a[0], m(m(a[0], a[k]), x3));
+            m(lane(2), lane(1))
+        }
+        n => panic!("iamax is ported for 1 to 4 elements, not {n}"),
+    };
+    let hit = |v: f64| v == max || v.is_nan() || max.is_nan();
+    let compared = if a.len() == 4 { 4 } else { a.len() & 2 };
+    (0..compared)
+        .find(|&i| hit(a[i]))
+        .unwrap_or(compared)
+        .min(a.len() - 1)
 }
 
 /// `numpy.linalg.inv` of a 4×4 matrix as OpenBLAS 0.3.30 computes it (`dgesv` with B = I; module
@@ -307,7 +326,12 @@ mod tests {
     #[test]
     fn iamax_takes_the_first_maximum() {
         assert_eq!(iamax(&[1.0, -3.0, 3.0, 2.0]), 1);
+        assert_eq!(iamax(&[1.0, 2.0, -5.0]), 2);
         assert_eq!(iamax(&[0.0, -0.0]), 0);
         assert_eq!(iamax(&[2.0]), 0);
+        // NaN: the comparison matches unordered values, so the first NaN (or, with a NaN
+        // maximum, the first element) wins.
+        assert_eq!(iamax(&[1.0, f64::NAN, 3.0, 2.0]), 1);
+        assert_eq!(iamax(&[1.0, 4.0, 3.0, f64::NAN]), 0);
     }
 }

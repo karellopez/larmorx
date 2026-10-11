@@ -22,6 +22,7 @@ PARITY_MODULES = {
     "ants-apply-transforms": "ants_apply_transforms",
     "afni-tshift": "afni_tshift",
     "resample-series": "resample_series",
+    "numpy-linalg": "numpy_linalg",
     "mri-hmc": "mri_hmc",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",

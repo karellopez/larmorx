@@ -24,9 +24,10 @@ re-expressed in Rust; no code was copied verbatim.
 | `image::Pixel::from_f64_bounded` (`CastPixelWithBoundsChecking`), the `char`/`short`/`unsigned short`/`unsigned int` pixels | ITK v5.4.5: `Modules/Filtering/ImageGrid/include/itkResampleImageFilter.hxx` (`CastComponentWithBoundsChecking`); the conversions are x86-64's, as the oracle's GCC emits them | Apache-2.0 |
 | `threshold_image` | ANTs v2.6.5: `Examples/ThresholdImage.cxx` (`OtsuThreshold` with a mask, `BinaryThreshold_AltInsideOutside_threashold`) | Apache-2.0 |
 | `multiply_images` | ANTs v2.6.5: `Examples/MultiplyImages.cxx` | Apache-2.0 |
+| `n4_bias_field_correction` (the mask and its statistics, spline-distance padding, shrinking, the bias field at full resolution, `ExpImageFilter`, the division, restoring voxels outside the mask, rescaling, cropping), `cli::n4_bias_field_correction` (options, defaults, the bracket rules, verbose progress lines) | ANTs v2.6.5: `Examples/N4BiasFieldCorrection.cxx`; ITK v5.4.5: `Modules/Filtering/ImageGrid/include/itkConstantPadImageFilter.h`, `itkExtractImageFilter.hxx`, `Modules/Filtering/ImageIntensity/include/itkExpImageFilter.h`, `itkDivideImageFilter.h`, `Modules/Filtering/ImageStatistics/include/itkLabelStatisticsImageFilter.hxx`, `Modules/Core/Common/include/itkImageToImageFilter.hxx` (`VerifyInputInformation`) | Apache-2.0 |
 | `cli::image_math` (dispatch tables, usage, exit codes) | ANTs v2.6.5: `Examples/ImageMath.cxx`, `ImageMathHelper{2D,3D,4D}.cxx`, the `ImageMathHelper*` tables of `ImageMath_Templates.hxx` | Apache-2.0 |
 | `cli::threshold_image`, `cli::multiply_images` | ANTs v2.6.5: `Examples/ThresholdImage.cxx`, `Examples/MultiplyImages.cxx` (argument handling) | Apache-2.0 |
-| `cli::cstd` (`from_string<float>`, `ConvertVector<float>`, `std::stoi`, `std::stof`, `cout << float`) | ANTs v2.6.5: `Examples/ImageMath_Templates.hxx` (`from_string`), `Examples/antsUtilities.h` (`ConvertVector`); the standard-library semantics are libstdc++'s (`num_get`) and glibc's (`strtod`, `strtof`, `printf %g`), reimplemented from their specifications | Apache-2.0 |
+| `cli::cstd` (`from_string<float>`, `ConvertVector<float>`, `std::stoi`, `std::stof`, `cout << float`, the parser's strict `Convert<T>` and `ConvertVector<T>`) | ANTs v2.6.5: `Examples/ImageMath_Templates.hxx` (`from_string`), `Examples/antsUtilities.h` (`ConvertVector`), `Utilities/antsCommandLineParser.h` (`Convert`, `ConvertVector`); the standard-library semantics are libstdc++'s (`num_get`) and glibc's (`strtod`, `strtof`, `printf %g`), reimplemented from their specifications | Apache-2.0 |
 
 The behaviour found while porting is recorded in [docs/findings/](../../docs/findings/). The
 parity records are [ants-apply-transforms](../../docs/validation/ants-apply-transforms.md),
@@ -34,5 +35,6 @@ parity records are [ants-apply-transforms](../../docs/validation/ants-apply-tran
 [ants-threshold-image](../../docs/validation/ants-threshold-image.md),
 [ants-multiply-images](../../docs/validation/ants-multiply-images.md),
 [ants-smooth-image](../../docs/validation/ants-smooth-image.md),
-[ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md) and
-[ants-resample-image](../../docs/validation/ants-resample-image.md).
+[ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md),
+[ants-resample-image](../../docs/validation/ants-resample-image.md) and
+[ants-n4](../../docs/validation/ants-n4.md).

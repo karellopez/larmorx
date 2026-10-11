@@ -1,0 +1,570 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "1f345c61c340-dirty",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "load_average_before": [
+   0.50390625,
+   0.66943359375,
+   1.6328125
+  ],
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "best": 0.9923296328634024,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 1
+   },
+   "input": "fMRIPrep's BOLD reference: -b [200] -r -w premask, boldref ds000005 (64\u00d764\u00d734)",
+   "median": 1.0049491934478283,
+   "operation": "1",
+   "seconds": [
+    1.009468475356698,
+    1.0049491934478283,
+    0.9923296328634024
+   ],
+   "throughput_mb_s": 0.5546628661769634,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.5310018435120583,
+   "data_bytes": 557408,
+   "extra": {
+    "threads": 12
+   },
+   "input": "fMRIPrep's BOLD reference: -b [200] -r -w premask, boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.5564070697873831,
+   "operation": "12",
+   "seconds": [
+    0.5310018435120583,
+    0.5564070697873831,
+    0.5567579623311758
+   ],
+   "throughput_mb_s": 1.0017989171363322,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.1352055873721838,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 76748,
+    "threads": 1
+   },
+   "input": "fMRIPrep's BOLD reference: -b [200] -r -w premask, boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.13546534441411495,
+   "operation": "1",
+   "seconds": [
+    0.13546534441411495,
+    0.1352055873721838,
+    0.13622709549963474
+   ],
+   "throughput_mb_s": 4.11476457252428,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.08814475126564503,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 76748,
+    "threads": 4
+   },
+   "input": "fMRIPrep's BOLD reference: -b [200] -r -w premask, boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.08816193975508213,
+   "operation": "4",
+   "seconds": [
+    0.08816193975508213,
+    0.08814475126564503,
+    0.11070706695318222
+   ],
+   "throughput_mb_s": 6.322546912516952,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.09915119968354702,
+   "data_bytes": 557408,
+   "extra": {
+    "bit_identical": false,
+    "differing": 76748,
+    "threads": 12
+   },
+   "input": "fMRIPrep's BOLD reference: -b [200] -r -w premask, boldref ds000005 (64\u00d764\u00d734)",
+   "median": 0.09931965917348862,
+   "operation": "12",
+   "seconds": [
+    0.10316862538456917,
+    0.09915119968354702,
+    0.09931965917348862
+   ],
+   "throughput_mb_s": 5.612262513168076,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.8860388956964016,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 1
+   },
+   "input": "fMRIPrep's BOLD reference, MNI152NLin2009cAsym boldref res-02 (97\u00d7115\u00d797)",
+   "median": 3.8872900493443012,
+   "operation": "1",
+   "seconds": [
+    3.8860388956964016,
+    3.9433762580156326,
+    3.8872900493443012
+   ],
+   "throughput_mb_s": 1.1134985928642294,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.2207159250974655,
+   "data_bytes": 4328492,
+   "extra": {
+    "threads": 12
+   },
+   "input": "fMRIPrep's BOLD reference, MNI152NLin2009cAsym boldref res-02 (97\u00d7115\u00d797)",
+   "median": 1.2435397189110518,
+   "operation": "12",
+   "seconds": [
+    1.2207159250974655,
+    1.311721172183752,
+    1.2435397189110518
+   ],
+   "throughput_mb_s": 3.4807830696315776,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.5188172422349453,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 468307,
+    "threads": 1
+   },
+   "input": "fMRIPrep's BOLD reference, MNI152NLin2009cAsym boldref res-02 (97\u00d7115\u00d797)",
+   "median": 0.5344166830182076,
+   "operation": "1",
+   "seconds": [
+    0.5188172422349453,
+    0.5657606199383736,
+    0.5344166830182076
+   ],
+   "throughput_mb_s": 8.099470202827721,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.25015013478696346,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 468307,
+    "threads": 4
+   },
+   "input": "fMRIPrep's BOLD reference, MNI152NLin2009cAsym boldref res-02 (97\u00d7115\u00d797)",
+   "median": 0.25745469704270363,
+   "operation": "4",
+   "seconds": [
+    0.3123054690659046,
+    0.25745469704270363,
+    0.25015013478696346
+   ],
+   "throughput_mb_s": 16.81263558101657,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.24057133309543133,
+   "data_bytes": 4328492,
+   "extra": {
+    "bit_identical": false,
+    "differing": 468307,
+    "threads": 12
+   },
+   "input": "fMRIPrep's BOLD reference, MNI152NLin2009cAsym boldref res-02 (97\u00d7115\u00d797)",
+   "median": 0.2775106467306614,
+   "operation": "12",
+   "seconds": [
+    0.28863217681646347,
+    0.24057133309543133,
+    0.2775106467306614
+   ],
+   "throughput_mb_s": 15.597570943651139,
+   "tool": "larmorx"
+  },
+  {
+   "best": 54.70007149130106,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sMRIPrep before the template: ANTs' defaults, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 55.180508656427264,
+   "operation": "1",
+   "seconds": [
+    55.60313002951443,
+    55.180508656427264,
+    54.70007149130106
+   ],
+   "throughput_mb_s": 0.4275660477669758,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 10.460695996880531,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sMRIPrep before the template: ANTs' defaults, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 10.732513319700956,
+   "operation": "12",
+   "seconds": [
+    10.460695996880531,
+    10.811110634356737,
+    10.732513319700956
+   ],
+   "throughput_mb_s": 2.198302606034631,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 8.427852159366012,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "sMRIPrep before the template: ANTs' defaults, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 8.685536524280906,
+   "operation": "1",
+   "seconds": [
+    8.907344538718462,
+    8.427852159366012,
+    8.685536524280906
+   ],
+   "throughput_mb_s": 2.716390856689575,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.174024038016796,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "sMRIPrep before the template: ANTs' defaults, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 3.18425920791924,
+   "operation": "4",
+   "seconds": [
+    3.2675885912030935,
+    3.18425920791924,
+    3.174024038016796
+   ],
+   "throughput_mb_s": 7.409356606812513,
+   "tool": "larmorx"
+  },
+  {
+   "best": 2.388120925053954,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "sMRIPrep before the template: ANTs' defaults, raw T1w ds000005 (160\u00d7192\u00d7192)",
+   "median": 2.3969045970588923,
+   "operation": "12",
+   "seconds": [
+    2.388120925053954,
+    2.3969045970588923,
+    2.429154083132744
+   ],
+   "throughput_mb_s": 9.84324200009881,
+   "tool": "larmorx"
+  },
+  {
+   "best": 57.75118510052562,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sMRIPrep brain extraction, first N4: -b [200] -c [50x50x50x50,1e-7] -s 4, truncated T1w",
+   "median": 57.921860441565514,
+   "operation": "1",
+   "seconds": [
+    57.921860441565514,
+    58.07340641692281,
+    57.75118510052562
+   ],
+   "throughput_mb_s": 0.4073300101228986,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 11.325874462723732,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sMRIPrep brain extraction, first N4: -b [200] -c [50x50x50x50,1e-7] -s 4, truncated T1w",
+   "median": 11.333859827369452,
+   "operation": "12",
+   "seconds": [
+    11.325874462723732,
+    11.368018355220556,
+    11.333859827369452
+   ],
+   "throughput_mb_s": 2.0816661189885144,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 8.464730653911829,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "sMRIPrep brain extraction, first N4: -b [200] -c [50x50x50x50,1e-7] -s 4, truncated T1w",
+   "median": 8.589160021394491,
+   "operation": "1",
+   "seconds": [
+    9.082218009978533,
+    8.589160021394491,
+    8.464730653911829
+   ],
+   "throughput_mb_s": 2.7468706999557697,
+   "tool": "larmorx"
+  },
+  {
+   "best": 3.476380107924342,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "sMRIPrep brain extraction, first N4: -b [200] -c [50x50x50x50,1e-7] -s 4, truncated T1w",
+   "median": 3.5656873658299446,
+   "operation": "4",
+   "seconds": [
+    3.476380107924342,
+    3.575710728764534,
+    3.5656873658299446
+   ],
+   "throughput_mb_s": 6.61676405679735,
+   "tool": "larmorx"
+  },
+  {
+   "best": 2.6448658891022205,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "sMRIPrep brain extraction, first N4: -b [200] -c [50x50x50x50,1e-7] -s 4, truncated T1w",
+   "median": 2.6896943915635347,
+   "operation": "12",
+   "seconds": [
+    2.6448658891022205,
+    2.7393258921802044,
+    2.6896943915635347
+   ],
+   "throughput_mb_s": 8.771744505250306,
+   "tool": "larmorx"
+  },
+  {
+   "best": 12.26331146247685,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sMRIPrep brain extraction, final N4: -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r -w WM, raw T1w",
+   "median": 12.377437168732285,
+   "operation": "1",
+   "seconds": [
+    12.392447050660849,
+    12.377437168732285,
+    12.26331146247685
+   ],
+   "throughput_mb_s": 1.9061548589073922,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 4.304729346185923,
+   "data_bytes": 23593312,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sMRIPrep brain extraction, final N4: -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r -w WM, raw T1w",
+   "median": 4.332588907331228,
+   "operation": "12",
+   "seconds": [
+    4.332588907331228,
+    4.304729346185923,
+    4.333555459976196
+   ],
+   "throughput_mb_s": 5.445545955231862,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 1.7403217889368534,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 2037870,
+    "threads": 1
+   },
+   "input": "sMRIPrep brain extraction, final N4: -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r -w WM, raw T1w",
+   "median": 1.7873479425907135,
+   "operation": "1",
+   "seconds": [
+    1.7403217889368534,
+    1.7873479425907135,
+    1.8792413901537657
+   ],
+   "throughput_mb_s": 13.200178565009631,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.8058734368532896,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 2037870,
+    "threads": 4
+   },
+   "input": "sMRIPrep brain extraction, final N4: -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r -w WM, raw T1w",
+   "median": 0.8167854305356741,
+   "operation": "4",
+   "seconds": [
+    0.8359857741743326,
+    0.8167854305356741,
+    0.8058734368532896
+   ],
+   "throughput_mb_s": 28.88556910782156,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.6714964304119349,
+   "data_bytes": 23593312,
+   "extra": {
+    "bit_identical": false,
+    "differing": 2037870,
+    "threads": 12
+   },
+   "input": "sMRIPrep brain extraction, final N4: -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r -w WM, raw T1w",
+   "median": 0.6904286667704582,
+   "operation": "12",
+   "seconds": [
+    0.6904286667704582,
+    0.6714964304119349,
+    0.7211930267512798
+   ],
+   "throughput_mb_s": 34.17197624536627,
+   "tool": "larmorx"
+  },
+  {
+   "best": 1.954477971419692,
+   "data_bytes": 590176,
+   "extra": {
+    "threads": 1
+   },
+   "input": "sdcflows' magnitude: -c [50x50x50x50x50,1e-7] -s 4, ds003012 magnitude1",
+   "median": 1.9559287521988153,
+   "operation": "1",
+   "seconds": [
+    1.9712150041013956,
+    1.954477971419692,
+    1.9559287521988153
+   ],
+   "throughput_mb_s": 0.30173696221630575,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.895790783688426,
+   "data_bytes": 590176,
+   "extra": {
+    "threads": 12
+   },
+   "input": "sdcflows' magnitude: -c [50x50x50x50x50,1e-7] -s 4, ds003012 magnitude1",
+   "median": 0.9074930679053068,
+   "operation": "12",
+   "seconds": [
+    0.895790783688426,
+    0.913201155140996,
+    0.9074930679053068
+   ],
+   "throughput_mb_s": 0.6503366481490109,
+   "tool": "ANTs 2.6.5"
+  },
+  {
+   "best": 0.2665208000689745,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 1
+   },
+   "input": "sdcflows' magnitude: -c [50x50x50x50x50,1e-7] -s 4, ds003012 magnitude1",
+   "median": 0.2712112069129944,
+   "operation": "1",
+   "seconds": [
+    0.2712112069129944,
+    0.2665208000689745,
+    0.2785842064768076
+   ],
+   "throughput_mb_s": 2.176075268856168,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.14708968438208103,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 4
+   },
+   "input": "sdcflows' magnitude: -c [50x50x50x50x50,1e-7] -s 4, ds003012 magnitude1",
+   "median": 0.147292148321867,
+   "operation": "4",
+   "seconds": [
+    0.15022501535713673,
+    0.147292148321867,
+    0.14708968438208103
+   ],
+   "throughput_mb_s": 4.006839514013541,
+   "tool": "larmorx"
+  },
+  {
+   "best": 0.15853474475443363,
+   "data_bytes": 590176,
+   "extra": {
+    "bit_identical": true,
+    "differing": 0,
+    "threads": 12
+   },
+   "input": "sdcflows' magnitude: -c [50x50x50x50x50,1e-7] -s 4, ds003012 magnitude1",
+   "median": 0.1601101402193308,
+   "operation": "12",
+   "seconds": [
+    0.17657563090324402,
+    0.15853474475443363,
+    0.1601101402193308
+   ],
+   "throughput_mb_s": 3.6860626016037026,
+   "tool": "larmorx"
+  }
+ ]
+}

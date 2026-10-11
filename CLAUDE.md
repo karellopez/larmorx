@@ -51,7 +51,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   - the M1 "preview" milestone first
 - **D7 decided (2026-10-09): larmorx is not commercial.** FSL and MSM binaries may be run as validation oracles under their non-commercial licences.
 
-- **Next (user decision, 2026-10-11): more ANTs tools before the pipeline.** A3 (N4, DenoiseImage), then A4 (linear registration, antsAI, antsAffineInitializer, shrink, histogram matching), then A5 (SyN); larmorprepx after. The user is installing Docker for fMRIPrep oracle runs; until then, fMRIPrep 21.0.1's published ds000005 derivatives are the only fMRIPrep reference.
+- **A3 part 1 done** (2026-10-11): `N4BiasFieldCorrection` (`lx.ants.n4_bias_field_correction`), with ITK's shrink filter, B-spline fitting and vnl's FFT. Against the unmodified ANTs program at one thread: 27 of 45 cases bit-identical; the rest differ only through glibc's not-correctly-rounded `expf`/`logf`/`exp` (45 of 45 bit-identical when those are replaced by correctly rounded ones), NCC ≥ 0.9999999. 6.4-7.4x faster on one thread.
+- **Next (user decision, 2026-10-11): more ANTs tools before the pipeline.** A3 (N4 done; DenoiseImage next), then A4 (linear registration, antsAI, antsAffineInitializer, shrink, histogram matching), then A5 (SyN); larmorprepx after. The user is installing Docker for fMRIPrep oracle runs; until then, fMRIPrep 21.0.1's published ds000005 derivatives are the only fMRIPrep reference.
 
 ## The user's direction (settled; do not re-propose the alternatives)
 - **Not a fork of fMRIPrep.** No nipype, traits, niworkflows/smriprep/sdcflows runtime dependencies, or graph engines. Ops are plain typed functions; per-subject orchestration is readable Python.
@@ -155,6 +156,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).
 - **Run at most one or two agents at a time** (user, 2026-10-10): parallel agents exhaust the session limit and get killed mid-task. Brief every agent to commit as soon as its work passes the gates.
+- **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"` also matches its own command line, so it never ends (four such loops ran for a day, 2026-10-11). Use a bracket: `pgrep -f "[l]armorx_validation bench"`.
 - **Never delete work products** (code, drafts, ports, harnesses, reports). If something must leave the repo or the build, archive it in `<workspace>/archive/<date>-<topic>/` (not under `/tmp`) and tell the user. Ask before deleting anything that is not a temporary build artefact.
 - Verify the environment at session start: `uname -m`, `nproc`, free RAM, `docker --version`, `rustc --version`.
 

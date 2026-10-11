@@ -19,6 +19,7 @@ pub mod cli;
 pub mod image;
 pub mod image_math;
 pub mod multiply_images;
+pub mod n4_bias_field_correction;
 pub mod resample;
 pub mod resample_image;
 pub mod resample_image_by_spacing;

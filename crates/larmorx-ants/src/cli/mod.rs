@@ -12,6 +12,7 @@ pub mod apply_transforms;
 pub mod cstd;
 pub mod image_math;
 pub mod multiply_images;
+pub mod n4_bias_field_correction;
 pub mod parser;
 pub mod resample_image;
 pub mod resample_image_by_spacing;
@@ -46,6 +47,7 @@ pub const TOOLS: &[&str] = &[
     "antsApplyTransforms",
     "ImageMath",
     "MultiplyImages",
+    "N4BiasFieldCorrection",
     "ResampleImage",
     "ResampleImageBySpacing",
     "SmoothImage",
@@ -65,6 +67,7 @@ pub fn run(
         "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
         "ImageMath" => Some(image_math::main(args, out, err)),
         "MultiplyImages" => Some(multiply_images::main(args, out, err)),
+        "N4BiasFieldCorrection" => Some(n4_bias_field_correction::main(args, out, err)),
         "ResampleImage" => Some(resample_image::main(args, out, err)),
         "ResampleImageBySpacing" => Some(resample_image_by_spacing::main(args, out, err)),
         "SmoothImage" => Some(smooth_image::main(args, out, err)),

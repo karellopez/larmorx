@@ -25,19 +25,25 @@
 //!   the image shape).
 #![forbid(unsafe_code)]
 
+pub mod bspline;
 pub mod components;
 pub mod discrete_gaussian;
 pub mod distance;
 mod error;
 pub mod gaussian;
+pub mod grid;
 pub mod intensity;
 pub mod itk_math;
 mod lines;
 pub mod median;
 pub mod morphology;
+pub mod n4;
+pub mod shrink;
 pub mod statistics;
 pub mod threshold;
+pub mod vnl_fft;
 mod volume;
 
 pub use error::FilterError;
+pub use grid::ItkGrid;
 pub use volume::{Volume, VolumeRef, strides};

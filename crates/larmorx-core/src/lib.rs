@@ -7,7 +7,8 @@
 //! - [`Element`] / [`DataType`]: the supported voxel types.
 //! - [`Grid3`]: sampling grids in ITK's physical space (LPS), for tools ported from ITK.
 //! - [`parallel`]: running work on an explicit number of threads.
-//! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions.
+//! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions; [`vnl_svd`],
+//!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
 
@@ -21,6 +22,7 @@ pub mod math;
 pub mod parallel;
 pub mod rotation;
 pub mod vnl_svd;
+pub mod vnl_svd_f32;
 
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;

@@ -157,29 +157,54 @@ def _resolve(arg: str, tmp: Path, outdir: Path) -> str:
     return re.sub(r"\{([^{}]+)\}", sub, arg)
 
 
-def _env() -> dict[str, str]:
-    return {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(THREADS)}
+def _env(threads: int = THREADS) -> dict[str, str]:
+    return {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads)}
 
 
-def _run_ants(program: str, args: list[str]) -> tuple[int, str, str]:
+@functools.cache
+def crmath_preload() -> Path | None:
+    """``libcrmath.so``, glibc's ``expf``/``logf``/``exp``/``log``/``sin``/``cos``/``sincos``
+    replaced by CORE-MATH's correctly rounded functions (``scripts/build_crmath_preload.sh``):
+    ``LARMORX_CRMATH_PRELOAD``, else the workspace's ``oracles/core-math-preload``. ``None``
+    if neither exists."""
+    if env := os.environ.get("LARMORX_CRMATH_PRELOAD"):
+        return Path(env)
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "oracles/core-math-preload/libcrmath.so"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _run_ants(
+    program: str, args: list[str], threads: int = THREADS, *, correctly_rounded: bool = False
+) -> tuple[int, str, str]:
+    """Run an ANTs program; with ``correctly_rounded``, with :func:`crmath_preload` preloaded
+    (ITK then calls correctly rounded ``exp``, ``log``, ``sin``, ``cos`` as larmorx does)."""
+    env = _env(threads)
+    if correctly_rounded:
+        lib = crmath_preload()
+        if lib is None:
+            raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
+        env["LD_PRELOAD"] = str(lib)
     p = subprocess.run(
         [str(ants_bin() / program), *args],
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
-        env=_env(),
-        timeout=600,
+        env=env,
+        timeout=1800,
     )
     return p.returncode, p.stdout, p.stderr
 
 
-def _run_larmorx(program: str, args: list[str]) -> tuple[int, str, str]:
+def _run_larmorx(program: str, args: list[str], threads: int = THREADS) -> tuple[int, str, str]:
     from larmorx.cli import run
 
     out, err = io.StringIO(), io.StringIO()
     previous = os.environ.get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
-    os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(THREADS)
+    os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     try:
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = run(["larmorx", "ants", program, *args])
@@ -201,6 +226,12 @@ def _exit_text(code: int) -> str:
     if code < 0:
         return f"killed by signal {-code}"
     return f"exit {code}"
+
+
+#: Public names for other suites (``ants_n4`` runs ANTs at several thread counts).
+resolve_arg = _resolve
+run_ants = _run_ants
+run_larmorx = _run_larmorx
 
 
 # ------------------------------------------------------------------------------------------------
@@ -518,10 +549,14 @@ __all__ = [
     "ants_version",
     "cases_for",
     "compare_outputs",
+    "crmath_preload",
     "header_differences",
     "highlights",
     "make_suite",
     "raw_header",
+    "resolve_arg",
+    "run_ants",
     "run_case",
+    "run_larmorx",
     "ulps",
 ]

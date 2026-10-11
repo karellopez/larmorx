@@ -12,7 +12,8 @@ How the code is organised and the conventions every tool follows. The plan behin
         ▼
  Rust crates                                                                       crates/larmorx-*
    larmorx-core      Affine, Grid3, Image<T, D>, DynArray/DynImage, element types, thread pools,
-                     small linear algebra (incl. vnl's SVD inverse, bit-exact with ITK)
+                     small linear algebra (incl. vnl's SVD inverse, bit-exact with ITK, and
+                     vnl's float SVD solve), correctly rounded math (CORE-MATH ports)
    larmorx-io        file formats: NIfTI (nibabel and ITK semantics), ITK transform files
    larmorx-transform ITK transforms: matrix-offset family, displacement fields, composites, -t chains;
                      nitransforms chains (RAS) and fMRIPrep's one-shot BOLD resampler
@@ -23,9 +24,11 @@ How the code is organised and the conventions every tool follows. The plan behin
                      (smoothing, Laplacian, gradient magnitude), median, binary and grayscale
                      morphology with ITK's ball, connected components and relabelling, label
                      contours, Danielsson and signed Maurer distance maps, ITK's float
-                     comparisons
+                     comparisons, ITK grids with start indices, ShrinkImageFilter, B-spline
+                     lattices (scattered-data fit, evaluation, refinement), vnl's FFT, N4
    larmorx-ants      ANTs tools (antsApplyTransforms, ImageMath, ThresholdImage, MultiplyImages,
-                     SmoothImage, ResampleImageBySpacing, ResampleImage), images as ANTs
+                     SmoothImage, ResampleImageBySpacing, ResampleImage,
+                     N4BiasFieldCorrection), images as ANTs
                      programs read and write them, ITK's identity resampling in 2-4D, the
                      original command lines
    larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT

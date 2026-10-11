@@ -229,7 +229,7 @@ def ants_program(
     outputs: list[str],
     n_threads: int = 1,
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
-    """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``,
+    """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``, ``N4BiasFieldCorrection``,
     ``ResampleImageBySpacing`` or ``ResampleImage`` with ``args`` on in-memory ``inputs`` (by
     placeholder name);
     writes to ``outputs`` names are returned:
@@ -338,6 +338,32 @@ def ants_unsharp_mask(
     n_threads: int = 1,
 ) -> np.ndarray:
     """ImageMath ``UnsharpMask``: ``UnsharpMaskImageFilter`` in float."""
+
+def ants_n4_bias_field_correction(
+    image: str | ImageTuple,
+    dim: int,
+    mask: str | ImageTuple | None = None,
+    weight: str | ImageTuple | None = None,
+    shrink_factor: int = 4,
+    iterations: list[int] = ...,
+    convergence_threshold: float = 0.0,
+    spline_distance: float | None = None,
+    mesh: list[float] | None = None,
+    spline_order: int = 3,
+    fwhm: float = 0.15,
+    wiener_noise: float = 0.01,
+    bins: int = 200,
+    rescale_intensities: bool = False,
+    n_threads: int = 1,
+) -> tuple[
+    tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
+    tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
+    list[tuple[int, int, float]],
+]:
+    """``N4BiasFieldCorrection`` (paths or in-memory images, read as ``dim``-dimensional float
+    images): ``(corrected, bias_field, [(level, iteration, convergence)])``, the images as
+    ``(data, ras_affine, descrip, spacing)``. ``spline_distance`` (``-b [mm]``) and ``mesh``
+    (``-b [AxBxC]``) are exclusive; ``iterations`` defaults to ``[50, 50, 50, 50]``."""
 
 def ants_resample_image_by_spacing(
     image: str | ImageTuple,

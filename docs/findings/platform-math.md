@@ -141,3 +141,37 @@ calls the double `exp` (line 5701) and rounds to float (matched exactly on 262,1
 It is bit-identical to the C on 1.5 M random inputs and on all 460,475 cases of CORE-MATH's
 `powf.wc`. In the ImageMath suite the `^` cases differ from ANTs in at most 35 of 35,840
 voxels, by one ulp. *Validated.*
+
+## expf and logf
+
+**ITK's `std::exp(float)` and `std::log(float)` are glibc's `expf` and `logf`**, and neither is
+always correctly rounded. Compared with CORE-MATH's correctly rounded `cr_expf` and `cr_logf`
+on **every** float input (glibc 2.35, x86-64):
+
+| Function | glibc not correctly rounded |
+|---|---|
+| `logf` | 416,908 of 2,139,095,039 positive finite floats (0.019 %); 10 integers up to 65,536 (1579, 3100, 4935, 12014, 18627, 47539, 56198, 58259, 62326, 64341) and 158 up to 10⁶ |
+| `expf` | 170,648 of 4,278,190,080 finite floats (0.004 %); 97,052 of them in (−100, 0) |
+
+Each differs by one ulp. glibc picks an FMA or a non-FMA variant by CPU; the two give the same
+results except `expf` for |x| in [32, 48). *Verified* (2026-10-11).
+
+N4 calls `logf` on every voxel it uses and `expf` in its Gaussian kernel and convergence
+measure, so an integer-valued T1w often meets a misrounded value. One ulp there changes the
+whole run slightly, as ANTs' own thread count does
+([ants-n4.md](ants-n4.md#glibcs-math-in-n4)).
+
+*larmorx:* `larmorx_core::math::{expf, logf}`, ports of CORE-MATH's `src/binary32/exp/expf.c`
+and `src/binary32/log/logf.c`, bit-identical to the C on all 2^32 inputs.
+
+## Making ANTs correctly rounded: the preload library
+
+`scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin` and
+`cos` with a small wrapper (which also provides `sincos`) into
+`oracles/core-math-preload/libcrmath.so`. Run with `LD_PRELOAD` set to it, ANTs' dynamically
+linked calls to these functions go to the correctly rounded versions (checked with
+`LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 parity suite uses it as
+its exact reference: larmorx is bit-identical to N4BiasFieldCorrection run this way in all
+54 outputs of the standard tier ([ants-n4](../validation/ants-n4.md)); against the binary
+without the library, in 30 of 54. ANTs' own code is not changed. Calls that GCC inlines or
+evaluates at compile time are not affected. *Verified* (2026-10-11).

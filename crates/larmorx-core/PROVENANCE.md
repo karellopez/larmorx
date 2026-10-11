@@ -14,6 +14,8 @@ reproduces the original copyright and MIT notice.
 | `math/cos.rs` | `src/binary64/cos/cos.c` (`04bffbc8b483…`) | as for `sin` |
 | `math/powf.rs` | `src/binary32/pow/powf.c` | bit-identical to the C (built with gcc 11, `-ffp-contract=off`) on 1.5 M random inputs and on all 460,475 cases of `powf.wc` |
 | `math/log.rs`, `math/dint.rs` | `src/binary64/log/log.c` (`922af9ae4b4b…`), `src/binary64/log/dint.h` (`0da80a15d311…`) | 0 mismatches against mpmath on 1.36 M inputs (all of `log.wc`, plus every input forced through the accurate path); bit-identical to the C on every non-NaN result |
+| `math/expf.rs` | `src/binary32/exp/expf.c` (`598f2e509a12…`) | bit-identical to the C (gcc 11, `-ffp-contract=off`) on all 2^32 inputs; a unit test checks a checksum of every 4099th input, an ignored one of all inputs |
+| `math/logf.rs` | `src/binary32/log/logf.c` (`92c878fb172d…`) | as for `expf` |
 
 Differences from the C code, all without effect on the result in round-to-nearest:
 - `__builtin_fma` is `f64::mul_add`, which is correctly rounded on every target;
@@ -33,6 +35,17 @@ netlib):
 It is bit-exact with `itk::Matrix::GetInverse` on 2,000 random matrices
 (`docs/findings/itk-transforms.md`). `vnl_inverse` is the same inverse for any `n × n` matrix
 (2D and 4D image geometries); it equals `vnl_inverse3` bit for bit in 3D.
+
+## vnl's float SVD (`src/vnl_svd_f32.rs`)
+
+**Ported** from the same VXL files in single precision, as `vnl_svd<float>` runs them:
+`core/vnl/algo/vnl_svd.hxx` (`vnl_svd`, `solve`), `vnl_linpack` (`ssvdc`),
+`v3p/netlib/linpack/ssvdc.c`, `v3p/netlib/blas/{snrm2,sdot,saxpy,sscal,srot,srotg}.c`. As in
+the f2c code, `snrm2` and `srotg` take the square root in double (`sqrt` of a `doublereal`)
+and round to float. ITK's B-spline filters solve one small system with it, for the
+coefficients that refine a control-point lattice (`larmorx_image::bspline::kernel`); the
+coefficients are bit-identical to ITK's for orders 1 to 5 (probed against the ITK 5.4.5 build
+of the ANTs oracle).
 
 ## Integer powers (`src/math/powi.rs`)
 

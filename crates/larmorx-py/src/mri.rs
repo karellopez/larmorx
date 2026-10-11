@@ -20,7 +20,10 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::defects::{mode_from_py as defects_mode, notices_to_py};
 use crate::nifti::{header_from_dict, header_to_dict, to_py_err};
+use larmorx_core::defects::UpstreamDefects;
+use larmorx_mri::hmc::cost::NormCorrCount;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
     PyValueError::new_err(e.to_string())
@@ -43,6 +46,8 @@ struct Request {
     init: Option<Mat4>,
     resample: bool,
     n_threads: usize,
+    upstream_defects: UpstreamDefects,
+    normcorr_count: NormCorrCount,
 }
 
 impl Request {
@@ -88,6 +93,8 @@ impl Request {
                 fudge: self.fudge,
                 in_plane,
                 n_threads: self.n_threads,
+                upstream_defects: self.upstream_defects,
+                normcorr_count: self.normcorr_count,
             },
             interpolation,
             init: self.init,
@@ -138,6 +145,7 @@ fn result_to_py<'py>(
     d.set_item("fd", PyArray::from_owned_array(py, Array1::from(fd)))?;
     d.set_item("reference_index", out.estimate.reference_index)?;
     d.set_item("in_plane", out.estimate.in_plane)?;
+    d.set_item("notices", notices_to_py(out.estimate.notices.clone()))?;
     d.set_item("header", header_to_dict(py, &grid.header)?)?;
     if let Some(vols) = &out.corrected {
         let [nx, ny, nz] = vols[0].shape;
@@ -193,10 +201,24 @@ fn init_from_py(init: Option<PyReadonlyArray2<'_, f64>>) -> PyResult<Option<Mat4
     .transpose()
 }
 
+/// The D13 mode and the correlation count (FSL-02) as Python passes them.
+fn defects_from_py(
+    upstream_defects: &str,
+    normcorr_count: &str,
+) -> PyResult<(UpstreamDefects, NormCorrCount)> {
+    let mode = defects_mode(upstream_defects)?;
+    let count = NormCorrCount::from_name(normcorr_count).ok_or_else(|| {
+        value_err(format!(
+            "normcorr_count must be 'mcflirt' or 'weights', not {normcorr_count:?}"
+        ))
+    })?;
+    Ok((mode, count))
+}
+
 /// Head-motion correction of a NIfTI series (`lx.mri.hmc` on a path); the reference is a
 /// path or `None`.
 #[pyfunction]
-#[pyo3(signature = (path, reference=None, ref_index=None, mean=false, stages=3, final_interp="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=false, in_plane="auto", fov=20, init=None, resample=true, n_threads=1))]
+#[pyo3(signature = (path, reference=None, ref_index=None, mean=false, stages=3, final_interp="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=false, in_plane="auto", fov=20, init=None, resample=true, n_threads=1, upstream_defects="fix", normcorr_count="mcflirt"))]
 #[allow(clippy::too_many_arguments)]
 fn mri_hmc_file<'py>(
     py: Python<'py>,
@@ -217,7 +239,10 @@ fn mri_hmc_file<'py>(
     init: Option<PyReadonlyArray2<'py, f64>>,
     resample: bool,
     n_threads: usize,
+    upstream_defects: &str,
+    normcorr_count: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let (upstream_defects, normcorr_count) = defects_from_py(upstream_defects, normcorr_count)?;
     let request = Request {
         ref_index,
         mean,
@@ -234,6 +259,8 @@ fn mri_hmc_file<'py>(
         init: init_from_py(init)?,
         resample,
         n_threads,
+        upstream_defects,
+        normcorr_count,
     };
     let read_err = |e: image::ImageError| match e {
         image::ImageError::Nifti(e) => to_py_err(e),
@@ -279,7 +306,7 @@ fn series_from_py(
 /// Head-motion correction of a float32 `(x, y, z, t)` array placed by a header dict; the
 /// reference is `None` or a `(array, header)` pair.
 #[pyfunction]
-#[pyo3(signature = (data, header, reference=None, ref_index=None, mean=false, stages=3, final_interp="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=false, in_plane="auto", fov=20, init=None, resample=true, n_threads=1))]
+#[pyo3(signature = (data, header, reference=None, ref_index=None, mean=false, stages=3, final_interp="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=false, in_plane="auto", fov=20, init=None, resample=true, n_threads=1, upstream_defects="fix", normcorr_count="mcflirt"))]
 #[allow(clippy::too_many_arguments)]
 fn mri_hmc_array<'py>(
     py: Python<'py>,
@@ -301,7 +328,10 @@ fn mri_hmc_array<'py>(
     init: Option<PyReadonlyArray2<'py, f64>>,
     resample: bool,
     n_threads: usize,
+    upstream_defects: &str,
+    normcorr_count: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let (upstream_defects, normcorr_count) = defects_from_py(upstream_defects, normcorr_count)?;
     let request = Request {
         ref_index,
         mean,
@@ -318,6 +348,8 @@ fn mri_hmc_array<'py>(
         init: init_from_py(init)?,
         resample,
         n_threads,
+        upstream_defects,
+        normcorr_count,
     };
     let series = series_from_py(data, header)?;
     let reference = match reference {

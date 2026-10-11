@@ -56,17 +56,43 @@ impl Volume {
         it.fold(first, |m, &v| if v < m { v } else { m })
     }
 
+    /// Whether some voxel is NaN or infinite.
+    pub fn has_non_finite(&self) -> bool {
+        self.data.iter().any(|v| !v.is_finite())
+    }
+
     /// The intensity-weighted centre in FSL-mm (§6.1): `d ⊙ Σ (v − v_min)·idx / Σ (v − v_min)`,
     /// with `v − v_min` in float32 and the sums in double. A denominator below 1e−5 is
-    /// replaced by 1. One NaN voxel makes the centre NaN.
+    /// replaced by 1. One NaN voxel makes the centre NaN, as in mcflirt (FSL-14).
     pub fn centre_of_mass(&self) -> [f64; 3] {
+        self.centre(false)
+    }
+
+    /// [`Volume::centre_of_mass`] with NaN and infinite voxels left out (of the minimum and of
+    /// the sums): larmorx's correction of FSL-14. For a volume without such voxels it is the
+    /// same computation, so the same bits.
+    pub fn centre_of_mass_finite(&self) -> [f64; 3] {
+        self.centre(true)
+    }
+
+    fn centre(&self, finite_only: bool) -> [f64; 3] {
         let [nx, ny, nz] = self.shape;
-        let vmin = self.min();
+        let vmin = if finite_only {
+            let mut it = self.data.iter().copied().filter(|v| v.is_finite());
+            it.next().map_or(0.0, |first| {
+                it.fold(first, |m, v| if v < m { v } else { m })
+            })
+        } else {
+            self.min()
+        };
         let (mut total, mut sx, mut sy, mut sz) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
         for z in 0..nz {
             for y in 0..ny {
                 let row = &self.data[nx * (y + ny * z)..nx * (y + ny * z + 1)];
                 for (x, &v) in row.iter().enumerate() {
+                    if finite_only && !v.is_finite() {
+                        continue;
+                    }
                     let w = f64::from(v - vmin);
                     total += w;
                     sx += w * x as f64;
@@ -140,8 +166,24 @@ mod tests {
     fn nan_voxels_make_the_centre_nan() {
         let mut data = vec![1.0f32; 8];
         data[3] = f32::NAN;
-        let c = Volume::new([2, 2, 2], [1.0; 3], data).centre_of_mass();
-        assert!(c.iter().all(|v| v.is_nan()));
+        let v = Volume::new([2, 2, 2], [1.0; 3], data);
+        assert!(v.centre_of_mass().iter().all(|c| c.is_nan()));
+        assert!(v.has_non_finite());
+    }
+
+    /// FSL-14 corrected: non-finite voxels are left out; without them the two centres are the
+    /// same bits.
+    #[test]
+    fn the_finite_centre_leaves_non_finite_voxels_out() {
+        let mut data = vec![100.0f32; 4 * 3 * 2];
+        data[1 + 4 * (2 + 3)] = 300.0;
+        let clean = Volume::new([4, 3, 2], [2.0, 3.0, 4.0], data.clone());
+        assert_eq!(clean.centre_of_mass_finite(), clean.centre_of_mass());
+        assert!(!clean.has_non_finite());
+        data[0] = f32::NAN;
+        data[5] = f32::NEG_INFINITY;
+        let dirty = Volume::new([4, 3, 2], [2.0, 3.0, 4.0], data);
+        assert_eq!(dirty.centre_of_mass_finite(), [2.0, 6.0, 4.0]);
     }
 
     #[test]

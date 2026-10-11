@@ -5,6 +5,10 @@ Every volume of a 4D series is registered to a reference volume with a rigid-bod
 by the schedule of line searches ``mcflirt`` uses (8 mm, 4 mm, 4 mm with a tighter tolerance),
 and the series is resampled with those transforms. The numbers follow ``mcflirt`` (FSL 6.0.7)
 closely; see ``docs/api/mri-hmc.md`` and the validation record ``docs/validation/mri-hmc.md``.
+
+mcflirt's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
+the last volume's start (FSL-01), the in-plane mode's padding (FSL-03) and NaN voxels (FSL-14).
+``upstream_defects="reproduce"`` gives mcflirt's matrices.
 """
 
 from __future__ import annotations
@@ -16,19 +20,25 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 from larmorx.io.nifti import NiftiHeader
 
-__all__ = ["COSTS", "INTERPOLATIONS", "HmcResult", "hmc", "read_mats"]
+__all__ = ["COSTS", "INTERPOLATIONS", "NORMCORR_COUNTS", "HmcResult", "hmc", "read_mats"]
 
 #: Cost functions (``-cost``).
 COSTS = ("normcorr", "leastsquares", "corratio", "woods", "mutualinfo", "normmi")
 #: Final interpolations (``-sinc_final``, ``-spline_final``, ``-nn_final``; trilinear default).
 INTERPOLATIONS = ("trilinear", "sinc", "spline", "nearest")
 
+#: The count of the weighted normalised correlation (FSL-02): mcflirt's, or the sum of the
+#: weights.
+NORMCORR_COUNTS = ("mcflirt", "weights")
+
 Cost = Literal["normcorr", "leastsquares", "corratio", "woods", "mutualinfo", "normmi"]
 Final = Literal["trilinear", "sinc", "spline", "nearest"]
+NormCorrCount = Literal["mcflirt", "weights"]
 
 
 @dataclass(frozen=True, eq=False)
@@ -169,6 +179,8 @@ def hmc(
     init: np.ndarray | None = None,
     resample: bool = True,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+    normcorr_count: NormCorrCount = "mcflirt",
 ) -> HmcResult:
     """Correct head motion in a 4D series (``mcflirt``'s algorithm; clean-room).
 
@@ -216,6 +228,19 @@ def hmc(
         Resample the series (default). ``False`` estimates only, as fMRIPrep needs.
     n_threads
         Worker threads (0 = all logical CPUs). The result does not depend on it.
+    upstream_defects
+        ``"fix"`` (default) corrects mcflirt's defects: the last volume of the series starts
+        its first stage from its predecessor's result like every other volume (FSL-01), the
+        in-plane mode pads the first stage's grid once (FSL-03), and NaN or infinite voxels are
+        left out of the centre of mass and the cost instead of making the matrix NaN (FSL-14).
+        ``"reproduce"`` gives mcflirt's matrices. A :class:`~larmorx.UpstreamDefectWarning`
+        names each defect that changed the result (or would have been corrected).
+    normcorr_count
+        The count ``N`` of the weighted normalised correlation: ``"mcflirt"`` (default),
+        mcflirt's running sum of running sums of the weights, which makes the correlation
+        effectively uncentred (FSL-02), or ``"weights"``, the sum of the weights (a weighted
+        Pearson correlation). ``"weights"`` is not yet the default: its effect is being
+        measured (``docs/api/upstream-defects.md``). It needs ``upstream_defects="fix"``.
 
     Returns
     -------
@@ -228,6 +253,11 @@ def hmc(
         raise ValueError(f"unknown cost {cost!r}; use one of {', '.join(COSTS)}")
     if final not in INTERPOLATIONS:
         raise ValueError(f"unknown interpolation {final!r}; use one of {', '.join(INTERPOLATIONS)}")
+    _defects.check(upstream_defects)
+    if normcorr_count not in NORMCORR_COUNTS:
+        raise ValueError(f"normcorr_count must be 'mcflirt' or 'weights', not {normcorr_count!r}")
+    if normcorr_count != "mcflirt" and upstream_defects == "reproduce":
+        raise ValueError("normcorr_count='weights' cannot reproduce mcflirt (upstream_defects)")
     options = dict(
         ref_index=None if ref_index is None else int(ref_index),
         mean=bool(mean),
@@ -244,6 +274,8 @@ def hmc(
         init=None if init is None else np.ascontiguousarray(init, dtype=np.float64),
         resample=bool(resample),
         n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
+        normcorr_count=normcorr_count,
     )
     if isinstance(bold, (str, os.PathLike)) and (
         reference is None or isinstance(reference, (str, os.PathLike))
@@ -260,6 +292,7 @@ def hmc(
                 rfields = _header_fields(as_image((rdata, NiftiHeader.from_dict(rfields).affine)))
             ref = (rdata, rfields)
         out = _core.mri_hmc_array(data, fields, ref, **options)
+    _defects.warn(out["notices"])
     header = NiftiHeader.from_dict(out["header"])
     image = None
     if out["data"] is not None:

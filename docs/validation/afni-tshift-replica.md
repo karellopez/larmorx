@@ -1,21 +1,22 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 236 cases on the `standard` tier: 217 pass, 17 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 241 cases on the `standard` tier: 220 pass, 17 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 
-**Bit-identical: 217 of 217 passing cases** produce exactly the bytes of AFNI's output data.
-- Fourier: 97 of 97 bit-identical.
-- Lagrange and weighted-sinc methods and copies: 120 of 120 bit-identical.
+**Bit-identical: 220 of 220 passing cases** produce exactly the bytes of AFNI's output data.
+- Fourier: 98 of 98 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 122 of 122 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
-- Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 186 passing cases it can express; 186 give the command line's output bit for bit (data and header). From an image in memory: 143 of 143 give the same values.
+- Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 188 passing cases it can express; 188 give the command line's output bit for bit (data and header). From an image in memory: 143 of 143 give the same values.
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|
 | copy | 6 | 6 | 0.0e+00 | 0 | 0.0e+00 |
+| defects | 3 | 3 | 0.0e+00 | 0 | 0.0e+00 |
 | header-timing | 12 | 12 | 0.0e+00 | – | 0.0e+00 |
 | methods | 84 | 84 | 0.0e+00 | 0 | 0.0e+00 |
 | options | 42 | 42 | 0.0e+00 | 0 | 0.0e+00 |
@@ -38,6 +39,7 @@
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | copy | 6 | 6 | 0 | 0 | 0 |
+| defects | 5 | 3 | 0 | 2 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | errors | 17 | 0 | 17 | 0 | 0 |
 | header-timing | 12 | 12 | 0 | 0 | 0 |
@@ -51,6 +53,8 @@
 
 | Case | Reason |
 |---|---|
+| `defects/metre` | the replica writes the input's sform unchanged (still in metres or micrometres, with the units set to mm), where AFNI converts its linear part to millimetres (AFNI-07); the replica's qform matches AFNI's. Found by D13's unit cases (2026-10-11); a replica fix is pending |
+| `defects/micron-copy` | the replica writes the input's sform unchanged (still in metres or micrometres, with the units set to mm), where AFNI converts its linear part to millimetres (AFNI-07); the replica's qform matches AFNI's. Found by D13's unit cases (2026-10-11); a replica fix is pending |
 | `divergence/afni-format-output` | larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format. |
 | `divergence/voxshift` | -voxshift is not supported by larmorx (fMRIPrep does not use it). |
 
@@ -80,7 +84,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (08e75482f03e-dirty) |
+| larmorx | 0.0.1 (4a087a77882b-dirty) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -287,6 +291,11 @@ Both programs read the same files with the same arguments; outputs are read with
 | `header-timing/code3-no-slice-dim` | pass | 11/11 | no -tpattern, no slice axis in dim_info: no timing, a copy |
 | `header-timing/code3-zero-duration` | pass | 11/11 | no -tpattern, slice_duration 0: no timing, a copy |
 | `header-timing/tpattern-overrides` | pass | 13/13 | -tpattern overrides the header's timing |
+| `defects/f32-slope-inter` | pass | 12/12 | float32 with scl_slope 2 and scl_inter 10, shifted (AFNI-02) |
+| `defects/f32-slope-inter-copy` | pass | 11/11 | float32 with scl_slope 2 and scl_inter 10, a copy (AFNI-02) |
+| `defects/metre` | expected-divergence | 10/11 | units in metres with an origin (AFNI-07) |
+| `defects/micron-copy` | expected-divergence | 10/11 | units in micrometres with an origin, a copy (AFNI-07) |
+| `defects/negative-slope-zero` | pass | 12/12 | int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing |
 | `copy/no-timing-int16` | pass | 11/11 | no slice timing anywhere: the output is a copy of the input (int16) |
 | `copy/no-timing-int16-slope` | pass | 11/11 | no slice timing anywhere: the output is a copy of the input (int16 with a brick factor) |
 | `copy/no-timing-int16-slope-inter` | pass | 11/11 | no slice timing anywhere: the output is a copy of the input (int16 scaled to float32) |

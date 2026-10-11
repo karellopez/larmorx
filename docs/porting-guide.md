@@ -324,20 +324,26 @@ with the classes of the [defect register](findings/upstream-defects.md):
 - **The warning fires only where the result differs.** Detect the triggering condition (a
   negative `scl_slope` in the header; the first included voxel being the histogram's unique
   minimum) rather than warning on every call.
-- **The compatibility switch** restores the original's behaviour bit for bit. Its shape is
-  decided with the first switches (the next task); the proposal: one switch per tool,
-  restoring all of that tool's reproduced defects at once (parity needs all of them together),
-  available in the Python API and on the command line through an environment variable, as
-  `LARMORX_IMPLEMENTATION` is, so that it cannot clash with the original's arguments, and
-  documented in the tool's option-mapping table.
-- **Replicas and originals share the default.** `implementation="auto"` picks the replica
-  whenever it is installed, so a fix that only the original made would disappear on
-  installation. (This is how this guide reads D13; it is listed for the user's confirmation
-  in the register.)
+- **The compatibility switch** restores the original's behaviour bit for bit, one switch per
+  call restoring all of the tool's reproduced defects at once (parity needs all of them
+  together): `upstream_defects="fix" | "reproduce"` in Python (default `"fix"`),
+  `LARMORX_UPSTREAM_DEFECTS=fix|reproduce` on the command line (an environment variable, as
+  `LARMORX_IMPLEMENTATION` is, so that it cannot clash with the original's arguments), and
+  `larmorx_core::defects::UpstreamDefects` in each tool's Rust options. Tools return
+  `larmorx_core::defects::Notice`s; Python raises them as `lx.UpstreamDefectWarning`, the
+  command line prints `Notice::line()` on standard error. Document it in the tool's
+  option-mapping table and its "Upstream defects (D13)" section. How to wire a tool:
+  [api/upstream-defects.md](api/upstream-defects.md), "For tool authors".
+- **Replicas and originals share the default** (confirmed by the user, decision log, "D13's
+  details"). `implementation="auto"` picks the replica whenever it is installed, so a fix that
+  only the original made would disappear on installation. The replica program reads the same
+  `LARMORX_UPSTREAM_DEFECTS`, and with `reproduce` gives exactly the original program's
+  result.
 - **How parity uses the switch.** The bit-for-bit comparison runs larmorx with the switch.
   A second pass runs larmorx's default on the same cases, and the record reports, per defect,
   which cases the fix changes and by how much, next to the band. A test checks that the
-  warning fires exactly in the cases where the two passes differ. The stage comparison with
+  warning fires exactly in the cases where the two passes differ
+  (`larmorx_validation.parity.defects`: `mode`, `add_fix_check`, `summary`). The stage comparison with
   fMRIPrep uses the switch, since it compares with fMRIPrep as it ran. Golden cases cover the
   default and, where the code differs, the switch.
 - **Write every defect into the register** when you find it, with its evidence and what

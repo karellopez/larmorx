@@ -39,7 +39,8 @@ tags of `UPSTREAM.md`); the effect on fMRIPrep users; what larmorx does today; D
 
 Gap: **yes** = a class (c) or (e) defect larmorx reproduces by default today (or, for (a),
 reproduces at all); **decide** = needs a user decision first; **rule 8** = to follow the
-source (decided); – = nothing to do.
+source (decided); **replica** = corrected in the clean-room original, the replica's switch
+still to do; – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
 
 | ID | Tool | Defect | Class | fMRIPrep users | larmorx today | Gap |
 |---|---|---|---|---|---|---|
@@ -100,8 +101,8 @@ source (decided); – = nothing to do.
 | ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
-| PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | reproduces | **yes** |
-| PIPE-04 | nitransforms | `.h5` composites read in name order | c | latent | reproduces | **yes** |
+| PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| PIPE-04 | nitransforms | `.h5` composites read in name order | c | latent | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | PIPE-05 | nitransforms | no displacement beyond a field's last nodes | c? | 2.9 % of MNI points | reproduces | decide |
 | PIPE-06 | nitransforms, fMRIPrep | float32 roundings at every step | d | every run | reproduces | – (D11) |
 | PIPE-07 | nitransforms | a one-transform head-motion file applied in world space | c? | one-volume runs | reproduces | decide |
@@ -115,7 +116,7 @@ source (decided); – = nothing to do.
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | reproduces x86-64 | decide |
-| SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | reproduces | **yes** |
+| SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
@@ -130,14 +131,14 @@ source (decided); – = nothing to do.
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
-| AFNI-01 † | 3dTshift | negative `scl_slope`: output sign-flipped and scaled | c | rare | reproduces, warns | **yes** |
-| AFNI-02 † | 3dTshift | float32 with slope and intercept scaled twice | c | rare | replica reproduces; original scales once, silently | **yes** |
-| AFNI-03 † | 3dTshift | header slice code 2 (sequential decreasing): no shift | c | none | reproduces | **yes** |
+| AFNI-01 † | 3dTshift | negative `scl_slope`: output sign-flipped and scaled | c | rare | original: corrected by default; replica: reproduces | replica |
+| AFNI-02 † | 3dTshift | float32 with slope and intercept scaled twice | c | rare | original: corrected by default (scales once), switch and warning; replica: reproduces | replica |
+| AFNI-03 † | 3dTshift | header slice code 2 (sequential decreasing): no shift | c | none | original: corrected by default; replica: reproduces | replica |
 | AFNI-04 † | 3dTshift | can crash for a shift beyond the series on odd slices | a | none | defined (zeros) | – |
-| AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | reproduces, warns | **yes** |
+| AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | original: corrected by default; replica: reproduces | replica |
 | AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | c? | none | reproduces | decide |
-| AFNI-07 † | 3dTshift | metre or micron units: sform not converted, voxel sizes converted | c | rare | replica reproduces; original converts | **yes** |
-| AFNI-08 † | 3dTshift | an all-zero slice-time list writes `slice_end` 0 | c | none | reproduces | **yes** |
+| AFNI-07 † | 3dTshift | metre or micron units: sform not converted, voxel sizes converted | c | rare | original: corrected by default (converts), switch and warning; replica: reproduces | replica |
+| AFNI-08 † | 3dTshift | an all-zero slice-time list writes `slice_end` 0 | c | none | original: writes `nz − 1` always (no black-box run found the trigger); replica: reproduces | replica; original: spec |
 | AFNI-09 † | 3dTshift | slice-time files rounded two ways | d | none | replica reproduces | – |
 | AFNI-10 † | 3dTshift | AFNI's own header extension (7 digits) wins over the NIfTI header | d | AFNI-written inputs | replica reproduces; original ignores | – |
 | AFNI-11 † | 3dTshift | existing output: not written, exit 0 | e | none | error (exit 1) | decide |
@@ -145,20 +146,20 @@ source (decided); – = nothing to do.
 | AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | – | – |
 | AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | – | – |
 | AFNI-15 † | AFNI build | parallel make races | b | none | – | – |
-| FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | reproduces | **yes** |
-| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces | decide |
-| FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | reproduces | **yes** |
+| FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
+| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
+| FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-04 † | mcflirt `-gdt` | reference gradient unused; absolute `-out` aborts | c, a | none | not supported | – |
-| FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | reproduces | **yes** |
-| FSL-06 † | mcflirt | unknown `-cost` silently keeps normcorr | e | none | reproduces | **yes** |
-| FSL-07 † | mcflirt | numbers read with `atoi`/`atof`; `-help` alone exits 1 | e | none | reproduces | **yes** |
-| FSL-08 † | mcflirt `-stats` | end slices left 0; names with the extension inside | c, e | none | reproduces | **yes** |
-| FSL-09 † | mcflirt | output types: int8 → uint8, truncation, no clamping | c, a | none | reproduces, saturates | **yes** |
-| FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | reproduces | **yes** |
+| FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | ignored with a warning; `-edge` explained (2026-10-11) | – |
+| FSL-06 † | mcflirt | unknown `-cost` silently keeps normcorr | e | none | corrected by default (`upstream_defects`, 2026-10-11): an error | – |
+| FSL-07 † | mcflirt | numbers read with `atoi`/`atof`; `-help` alone exits 1 | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| FSL-08 † | mcflirt `-stats` | end slices left 0; names with the extension inside | c, e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| FSL-09 † | mcflirt | output types: int8 → uint8, truncation, no clamping | c, a | none | corrected by default (`upstream_defects`, 2026-10-11): int8 kept, rounded and clamped; `reproduce` truncates and wraps as x86-64 does | – |
+| FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-11 † | mcflirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz` | decide |
 | FSL-12 † | mcflirt | impossible inputs abort after the whole estimation | a | none | refuses first | – |
-| FSL-13 † | mcflirt | `.mat` directory quirks without `-mats` | e | none | reproduces | **yes** |
-| FSL-14 † | mcflirt | one NaN voxel makes the volume's matrix NaN | c | rare | reproduces | **yes** |
+| FSL-13 † | mcflirt | `.mat` directory quirks without `-mats` | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| FSL-14 † | mcflirt | one NaN voxel makes the volume's matrix NaN | c | rare | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-15 † | mcflirt `-init` | affects the final resampling only | c? | none | reproduces | decide |
 | FSL-16 † | mcflirt | rotations orthogonal only to about 1e-8 | d | every run | reproduces | – (D11) |
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
@@ -177,7 +178,8 @@ source (decided); – = nothing to do.
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
-column: 47 **yes**, 25 decide, 1 rule 8, 1 open.
+column (after the first D13 switches, 2026-10-11): 28 **yes**, 6 replica, 25 decide, 1 rule 8, 1
+open; 13 entries switched to corrected by default.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -189,6 +191,13 @@ today) and one with the default (the fix's effect reported), and re-recorded gol
 for the outputs that change ([validation/golden.md](../validation/golden.md), "Recording").
 The proposed fix is in each entry; "(to confirm)" marks a fix whose intended behaviour the
 upstream does not state.
+
+**Status (2026-10-11).** The shared switch is in place (`upstream_defects=`,
+`LARMORX_UPSTREAM_DEFECTS`, `larmorx_core::defects`; [api/upstream-defects.md](../api/upstream-defects.md)).
+Done: fMRIPrep's libraries and SciPy (PIPE-03, PIPE-04, SCI-03), head-motion correction (every
+FSL entry below; FSL-02 measured, opt-in), and the slice-timing original (AFNI-01, -02, -03,
+-05, -07; AFNI-08 needs its trigger, see below). Still to do: the ANTs and ITK entries, and the
+3dTshift replica's switch.
 
 **Main package (`crates/`, `python/larmorx/`), ANTs and ITK:**
 
@@ -221,7 +230,7 @@ upstream does not state.
 | ANTS-31 | ResampleImageBySpacing's arguments | `larmorx_ants::cli::resample_image_by_spacing` | none |
 | ANTS-33 | antsApplyTransforms: `-u`, ignored interpolator parameters | `larmorx_ants::cli::apply_transforms`, `OutputType::from_name` | none |
 
-**Main package, fMRIPrep's libraries and SciPy:**
+**Main package, fMRIPrep's libraries and SciPy** (done 2026-10-11):
 
 | ID | Defect | Code path | fMRIPrep |
 |---|---|---|---|
@@ -230,7 +239,9 @@ upstream does not state.
 | SCI-03 | `reflect`/`grid-mirror` splines do not interpolate | `larmorx_interp::ndimage::splines` (`lx.ndimage`) | none |
 
 **Head-motion correction, clean-room original (`crates/larmorx-mri`; fixes need only the
-spec, which describes each behaviour):**
+spec, which describes each behaviour)** (done 2026-10-11; FSL-09's reproduced conversion wraps
+around beyond the type's range, as mcflirt does on x86-64, observed and added to
+`specs/mcflirt.md` §9.4):
 
 | ID | Defect | Code path | fMRIPrep |
 |---|---|---|---|
@@ -245,7 +256,12 @@ spec, which describes each behaviour):**
 
 **Slice-timing correction, both implementations** (the clean-room original in
 `crates/larmorx-afni`, the replica in `crates-gpl/larmorx-gpl-afni`; the replica's defaults
-must change with the original's, see "Decisions" item 3):
+must change with the original's, see "Decisions" item 3). The original is done
+(2026-10-11): AFNI-02's and AFNI-07's observable behaviour was settled by black-box runs and
+added to `specs/3dTshift.md` §6; AFNI-08's was not found (no input tried, among more than 500
+black-box runs, made 3dTshift write `slice_end` 0), so the original writes `nz − 1` in every
+case and has no switch for it until the spec describes the trigger. The replica is a separate
+task:
 
 | ID | Defect | Code path | fMRIPrep |
 |---|---|---|---|
@@ -264,7 +280,12 @@ must change with the original's, see "Decisions" item 3):
 - Item 3, replicas: **the same corrected default as the originals**; the compatibility switch
   must give **exactly the original program's result**.
 - Item 4, FSL-02: **measure first** (against mcflirt's band and the synthetic ground truth),
-  then decide between fixing by default and keeping it opt-in.
+  then decide between fixing by default and keeping it opt-in. **Measured 2026-10-11**
+  ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)): the corrected count
+  moves the matrices by about mcflirt's own variability (0.014 to 0.033 mm at the 95th
+  percentile on 19 real runs; band 0.016 to 0.10 mm; 24 of 28 band runs within the band) and
+  is not more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3, by
+  0.001 to 0.16 mm). It stays opt-in; the user decides.
 - Item 5, refusals: **a switch for these too.** Where the original's output is deterministic
   (e.g. a one-voxel image with infinite spacing), the switch reproduces it exactly. Where it
   depends on memory contents and changes from run to run (an unfilled buffer, an out-of-bounds
@@ -922,23 +943,42 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   *source* grid on the *target* array. It is the right derivative only when the target's axes
   match the source's (the native boldref); in T1w or standard space it differentiates along
   whatever target axis has that index.
-- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`. Not yet exercised by an oracle run
-  (ds000005 has no field maps; ds001600 is planned).
+- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`. Not yet exercised by an oracle run:
+  ds000005 has no field maps, and the ds001600 run (2026-10-11) processed its field maps but
+  skipped its four BOLD runs ("Too short BOLD series (<= 5 timepoints)"); measured instead on
+  real geometry with a synthetic field map (below).
 - **fMRIPrep:** the Jacobian is on by default for PEPOLAR field maps
   (`fmriprep/workflows/base.py:878-887`); outputs in T1w and standard spaces whose axes are
   ordered differently from the BOLD grid's.
-- **larmorx:** reproduces (`larmorx_transform::resample_series`, `lx.transforms.resample_series`).
-- **D13 / gap:** differentiate along the phase-encoding direction mapped into the target grid
-  (to confirm); warn when the axes differ; switch. **Gap.**
+- **larmorx:** corrected by default (2026-10-11): the Jacobian is `1 + ∇_t vsm · ∂t/∂s_pe`,
+  the derivative along the phase-encoding direction mapped into the target grid (the Jacobian
+  determinant of the corrected mapping relative to the uncorrected one, by the matrix
+  determinant lemma; `∂t/∂s_pe` is column `pe` of the inverse Jacobian of the target-to-source
+  voxel map, exact for chains of affines, by central differences through a displacement field).
+  On the source's own grid it is fMRIPrep's float32 value bit for bit. A warning says when the
+  two differ; `upstream_defects="reproduce"` gives fMRIPrep's
+  (`larmorx_transform::resample_series`, `lx.transforms.resample_series`). The effect is in
+  [validation/resample-series.md](../validation/resample-series.md) ("D13 fix pass").
+- **Measured on real geometry** (2026-10-11,
+  [validation/resample-series-jacobian.md](../validation/resample-series-jacobian.md)): the
+  grids and transforms of fMRIPrep's ds000005 run with a synthetic 3 T-like field map (shifts up
+  to 3.6 voxels, exact factor 0.57 to 1.43). On the native grid the two factors are
+  bit-identical. In T1w space fMRIPrep's factor spans only 0.82 to 1.18; it is off the exact
+  factor by more than 0.01 (1 % of the signal) in 40 % of brain voxels, by more than 0.05 in
+  21 %, with a 99th-percentile error of 0.23. In MNI res-2: 33 % and 14 %, 99th percentile
+  0.16. larmorx's factor is within 0.002 (T1w) and 0.008 (MNI) of the exact one at the 99th
+  percentile.
+- **D13 / gap:** done.
 
 ### PIPE-04 `.h5` composites read in name order — (c), latent
 - **What:** nitransforms iterates `list(h5group.values())[1:]`, which is h5py's name order: for
   a composite of 11 or more transforms, `"10"` sorts before `"2"` and the chain is misordered.
 - **Evidence:** read: `nitransforms/io/itk.py:391`; not verified with such a file.
 - **fMRIPrep:** latent (its composites have 2 or 3 transforms).
-- **larmorx:** `lx.transforms.load_transforms` reproduces it (`python/larmorx/transforms/chain.py:348`);
-  `lx.transforms.read` sorts numerically.
-- **D13 / gap:** numeric order; switch. **Gap** (latent).
+- **larmorx:** numeric order by default (2026-10-11), with a warning when the two orders
+  differ; `upstream_defects="reproduce"` gives the name order (`lx.transforms.load_itk_composite`,
+  `load_transforms`, `resample_series`). `lx.transforms.read` sorts numerically.
+- **D13 / gap:** done.
 
 ### PIPE-05 No displacement beyond a field's last nodes — (c?)
 - **What:** `DenseFieldTransform.map` interpolates the field with `cval` NaN and replaces NaN
@@ -1068,8 +1108,14 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   2), 1.4e-4 (3), 2.1e-3 (4) and 1.0e-2 (5); every other mode returns the samples to 1e-14.
 - **Evidence:** verified in SciPy 1.15 ([scipy-ndimage.md](scipy-ndimage.md)).
 - **fMRIPrep:** none (`grid-constant`).
-- **larmorx:** reproduces (`larmorx_interp::ndimage::splines`, `lx.ndimage`).
-- **D13 / gap:** an exact boundary initialisation for these modes; switch. **Gap.**
+- **larmorx:** corrected by default (2026-10-11). The cause is SciPy's causal initialisation
+  for the reflect boundary (`ni_splines.c`, used for `reflect`, `grid-mirror` and `nearest`):
+  its last term reads `c[0]` after the loop has already updated it; with the original `c[0]`
+  the sum is the exact half-sample-symmetric initialisation and the splines pass through the
+  samples (to 1e-9 on the 6 × 5 × 4 array, order 5). A warning says when a coefficient changed;
+  `upstream_defects="reproduce"` gives SciPy's (`larmorx_interp::ndimage::splines`,
+  `lx.ndimage`, `lx.transforms.resample_series(mode=...)`).
+- **D13 / gap:** done.
 
 ### SCI-04 Fused multiply-adds on aarch64 — (d)
 - **What:** SciPy's x86-64 wheels target baseline x86-64 and cannot fuse; on aarch64 GCC

@@ -16,6 +16,13 @@ This spec describes behaviour: what goes in, what comes out, and the maths. Stat
 marked **(observed)** were confirmed by running the AFNI binary. The rest come from AFNI's
 documentation and help text, or from analysis of the program's behaviour.
 
+**Defects (D13).** Some of the behaviours below are defects that larmorx corrects by default
+and reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`;
+`docs/api/upstream-defects.md`): AFNI-01 (a negative `scl_slope`, §6), AFNI-02 (float32 with a
+slope and an intercept, §6), AFNI-03 (header slice code 2, §3.2), AFNI-05 (`-no_detrend`'s
+voxel pairs, §4) and AFNI-07 (metre and micron units, §6). This spec describes what AFNI does;
+the reproduced mode follows it exactly.
+
 ---
 
 ## 1. Purpose
@@ -100,7 +107,7 @@ duration `d`) in the order of the code; slices outside the range get 0:
 | 4 (`ALT_DEC`) | end, end−2, …, then end−1, end−3, … |
 | 5 (`ALT_INC2`) | start+1, start+3, …, then start, start+2, … |
 | 6 (`ALT_DEC2`) | end−1, end−3, …, then end, end−2, … |
-| 2 (`SEQ_DEC`) and 7–127 | every slice 0 (then "only 1 time offset", §3.4) |
+| 2 (`SEQ_DEC`) and 7–127 | every slice 0 (then "only 1 time offset", §3.4). For code 2 this is a defect (AFNI-03): NIfTI defines it as `end, end−1, …, start`, which larmorx uses by default |
 
 `-tpattern` overrides the header. When `-TR` is given in milliseconds (§7), the header's
 offsets (in seconds) are taken as milliseconds, unconverted.
@@ -180,7 +187,8 @@ default, so `-no_detrend` needs a non-Fourier method given *before* it on the co
 order (x fastest, then y, across rows): the **first** voxel of each pair has its mean
 removed and restored as described above; the **second** has nothing removed: its raw values
 are shifted (samples outside the series count as 0, so its edges fall toward 0), clipped to
-its own range, and nothing is added back. A last unpaired voxel (an odd number of voxels per
+its own range, and nothing is added back. (This is AFNI-05: by default larmorx removes and
+restores the mean of every voxel.) A last unpaired voxel (an odd number of voxels per
 slice) behaves as a first. This holds for every method. Designed inputs show the pattern
 exactly (two voxels at levels 1000 and 5000 with one impulse each, `-linear`, shifts
 ±0.25: the first's last point becomes 1000.15625, the second's stays 5000). The last float32
@@ -295,7 +303,22 @@ matches every value, for every stored type.)
 
 **(observed)** A negative `scl_slope` is applied on output but not on input, so the data
 come out sign-flipped and scaled. For example, int16 data with slope −0.5 went from a
-scaled mean of 942 in to −1884 out. Reproduce this, and warn.
+scaled mean of 942 in to −1884 out. Reproduce this, and warn. **(observed** by the clean-room
+implementer: only the slices that are shifted change; slices left as stored (`|s_k| < 0.001`,
+§4), `-tpattern zero` and the copies of §3.4 come out with their true values. A uint8 series
+with slope −0.5 comes out 0 in its shifted slices, the negative values clamped.**)** This is
+AFNI-01: larmorx applies the negative factor on input too by default.
+
+**(observed** by the clean-room implementer**)** **float32 data with a slope and an intercept**
+(both ≠ 0) are read as `slope·x + inter`, as the table says, but AFNI also keeps the slope as
+the brick factor (when it is finite and ∉ {0, 1}): the scaled values are multiplied by it again
+when extracted (if positive) and the output header carries it. A float32 series stored as 100
+with slope 2 and intercept 10 is written as 210 with `scl_slope` 2 (it reads back as 420), in
+the shifted and the copied outputs alike; with slope −2, the copy is −190 with slope −2 (reads
+380) and a shifted output 95 with slope −2 (reads −190: the negative factor is not applied on
+extraction but is divided out on storing, §6 *Storing back*). uint8, int16, float64 and int32
+with a slope and an intercept are written as float32 without a factor (scaled once). This is
+AFNI-02: larmorx scales once by default.
 
 **Writing:**
 - the same datum, dimensions and geometry (qform/sform);
@@ -307,12 +330,24 @@ scaled mean of 942 in to −1884 out. Reproduce this, and warn.
 **(observed)** Corrections and details:
 - `slice_end` is **nz − 1**, not 0, and `dim_info` is **48** (slice axis 3, no frequency or
   phase axis) whatever the input's; `slice_code`, `slice_start` and `slice_duration` are 0.
+  **(observed** by the clean-room implementer, for AFNI-08, "an all-zero slice-time list writes
+  `slice_end` 0": no input tried wrote `slice_end` 0. Tried: `-tpattern zero`, `@1D` lists of
+  zeros and of one repeated value, header codes 1, 2, 3 and 7 with `dim_info` 0, 16 and 48,
+  seconds and milliseconds, 1, 2 and 5 slices, `-tzero`, `-slice`, `-ignore`, `-rlt`,
+  `-no_detrend`, `-TR` in ms, int16 and float32, NIfTI-1 and NIfTI-2, and AFNI's own outputs
+  run again (their header extension); 500 runs in all. Every 4D output had `slice_end` = nz − 1.
+  The spec writer should describe the trigger before larmorx can reproduce it.**)**
 - The output is little-endian NIfTI-1 whatever the input (NIfTI-2 and big-endian inputs
   included). `descrip`, `intent_*`, `cal_min/max`, `aux_file` are empty, `pixdim[5..7]` are
   0, `regular` is `r`.
 - Geometry: AFNI takes **one** matrix from the input: the sform if `sform_code > 0`, else
   the qform if `qform_code > 0`, else the voxel sizes on the diagonal with a zero offset.
-  Metres and micrometres are converted to millimetres. Both output forms come from it: the
+  Metres and micrometres are converted to millimetres. **(observed** by the clean-room
+  implementer: only the matrix's linear part is converted; the origin keeps the file's units.
+  A metre sform with 0.003 m voxels and origin (−0.1, 0.05, 0.02) m is written with 3 mm voxels
+  and origin (−0.1, 0.05, 0.02) mm, in the sform and the qform, for shifted outputs and copies;
+  micrometres likewise. The units are written as mm. This is AFNI-07: larmorx converts the
+  whole matrix by default.**)** Both output forms come from it: the
   sform rows as the matrix, the qform as its nearest rotation (a sheared sform gave the
   orthogonal polar factor), `pixdim[1..3]` as its column lengths, with one code for both:
   1 for input codes 1, 2 or none, 3 for 3 and 5, 4 for 4. On every real BOLD header tried

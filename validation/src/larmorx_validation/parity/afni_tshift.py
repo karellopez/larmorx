@@ -47,6 +47,7 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
+from larmorx_validation.parity import defects
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -255,6 +256,31 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         "header-timing",
         "-tpattern overrides the header's timing",
         Scenario("gen:code3-alt-inc", ("-tpattern", "seq-z")),
+    )
+
+    # AFNI's defects that larmorx corrects by default (D13; the comparison runs
+    # LARMORX_UPSTREAM_DEFECTS=reproduce, the fix pass reports what the corrections change).
+    for name, args, desc in [
+        (
+            "f32-slope-inter",
+            ("-tpattern", "alt+z", "-linear"),
+            "float32 with scl_slope 2 and scl_inter 10, shifted (AFNI-02)",
+        ),
+        ("f32-slope-inter", (), "float32 with scl_slope 2 and scl_inter 10, a copy (AFNI-02)"),
+        ("metre", ("-tpattern", "alt+z"), "units in metres with an origin (AFNI-07)"),
+        ("micron", (), "units in micrometres with an origin, a copy (AFNI-07)"),
+    ]:
+        add(
+            f"defects/{name}{'-copy' if not args else ''}",
+            "defects",
+            desc,
+            Scenario(f"gen:d13-{name}", args),
+        )
+    add(
+        "defects/negative-slope-zero",
+        "defects",
+        "int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing",
+        Scenario(f"{S}/dtypes/int16-negative-slope.nii.gz", ("-tpattern", "zero")),
     )
 
     # Copies of the input.
@@ -486,6 +512,8 @@ def _generated(name: str) -> Path:
     if name == "voxshift":
         nib.Nifti1Image(np.full(data.shape[:3], 0.25, np.float32), src.affine).to_filename(path)
         return path
+    if name.startswith("d13-"):
+        return _generated_d13(name, data, src, path)
     img = nib.Nifti1Image(data, src.affine, src.header)
     h = img.header
     code = int(name[4])
@@ -505,6 +533,37 @@ def _generated(name: str) -> Path:
         h["dim_info"] = 0
     elif name.endswith("zero-duration"):
         h["slice_duration"] = 0.0
+    img.to_filename(path)
+    return path
+
+
+def _generated_d13(name: str, data: np.ndarray, src, path: Path) -> Path:  # type: ignore[no-untyped-def]
+    """Inputs for the D13 cases, from the float32 file: float32 with a slope and an
+    intercept (written raw), or the units changed to metres or micrometres with the affine
+    scaled to them."""
+    import nibabel as nib
+
+    if name == "d13-f32-slope-inter":
+        hdr = nib.Nifti1Header()
+        hdr.set_data_dtype(np.float32)
+        hdr.set_data_shape(data.shape)
+        hdr.set_sform(src.affine, 1)
+        hdr.set_qform(src.affine, 1)
+        hdr.set_xyzt_units("mm", "sec")
+        hdr["pixdim"][4] = src.header["pixdim"][4]
+        hdr["vox_offset"] = 352
+        hdr.set_slope_inter(2.0, 10.0)
+        with open(path, "wb") as f:
+            f.write(hdr.binaryblock + b"\0" * 4)
+            f.write(np.asfortranarray(data, dtype=np.float32).tobytes(order="F"))
+        return path
+    scale = {"d13-metre": 0.001, "d13-micron": 1000.0}[name]
+    affine = src.affine.copy()
+    affine[:3, 3] = (-100.0, 50.0, 20.0)  # an origin, in mm before the change of units
+    affine[:3] *= scale
+    img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
+    img.header.set_xyzt_units("meter" if scale < 1 else "micron", "sec")
+    img.header["pixdim"][4] = src.header["pixdim"][4]
     img.to_filename(path)
     return path
 
@@ -553,13 +612,20 @@ def _run_afni(args: list[str]) -> tuple[int, str]:
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
-def _run_larmorx(args: list[str], implementation: str = "original") -> tuple[int, str]:
+def _run_larmorx(
+    args: list[str], implementation: str = "original", mode: str = defects.REPRODUCE
+) -> tuple[int, str]:
     """``larmorx afni 3dTshift`` in process, with the implementation forced: the original, or
-    the replica's program, which larmorx runs as a separate process."""
+    the replica's program, which larmorx runs as a separate process. ``mode`` is D13's
+    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with AFNI."""
     from larmorx.cli import run
 
     err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+    with (
+        defects.mode(mode),
+        contextlib.redirect_stderr(err),
+        contextlib.redirect_stdout(io.StringIO()),
+    ):
         code = run(["larmorx", "afni", "3dTshift", *args], implementation=implementation)
     return code, err.getvalue().strip()
 
@@ -583,6 +649,20 @@ def _replica_program(implementation: str):
 
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
+
+#: Cases where the replica is known to differ from AFNI: the one check that differs, and why.
+#: Found by black-box runs of the replica's program on D13's cases (2026-10-11) and left to
+#: the replica's owner; once the replica matches, the case passes as usual.
+_REPLICA_UNITS = (
+    "the replica writes the input's sform unchanged (still in metres or micrometres, with the "
+    "units set to mm), where AFNI converts its linear part to millimetres (AFNI-07); the "
+    "replica's qform matches AFNI's. Found by D13's unit cases (2026-10-11); a replica fix is "
+    "pending"
+)
+REPLICA_DIVERGENCES = {
+    "defects/metre": ("geometry (sform)", _REPLICA_UNITS),
+    "defects/micron-copy": ("geometry (sform)", _REPLICA_UNITS),
+}
 
 
 @functools.cache
@@ -845,7 +925,9 @@ def _check_python(
         return
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        from_file = lx.afni.tshift(str(image), implementation=implementation, **kw)
+        from_file = lx.afni.tshift(
+            str(image), implementation=implementation, upstream_defects="reproduce", **kw
+        )
     expected = lx.load(cli_out)
     header = lx.io.read_header(cli_out)
     differing = _differing(from_file.data, expected.data)
@@ -867,7 +949,9 @@ def _check_python(
     if loaded.data.dtype in (np.uint8, np.int16, np.float32) and unscaled:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            in_memory = lx.afni.tshift(loaded, implementation=implementation, **kw)
+            in_memory = lx.afni.tshift(
+                loaded, implementation=implementation, upstream_defects="reproduce", **kw
+            )
         d = _differing(in_memory.data, from_file.data)
         checks(PY_MEMORY, d == 0, metric="differing values", value=d, threshold=0)
 
@@ -938,8 +1022,54 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
                 )
             )
             _compare(checks, outputs["afni"], outputs["larmorx"])
+            known = REPLICA_DIVERGENCES.get(case.id) if implementation == "replica" else None
+            failed = {c.name for c in checks.checks if not c.passed}
+            if known and failed == {known[0]}:
+                raise Outcome(EXPECTED, known[1])
             if s.expect == "pass" and not copy:
                 _check_python(checks, s, args, image, outputs["larmorx"], implementation)
+            if s.expect == "pass" and implementation == "original":
+                _fix_pass(checks, args, image, tmp, outputs["larmorx"], logs["larmorx"])
+
+
+def _fix_pass(
+    checks: CheckList, args: list[str], image: Path, tmp: Path, reproduced: Path, log: str
+) -> None:
+    """D13: larmorx's default (``fix``) on the same arguments, compared with its ``reproduce``
+    output: the defects named, and what the corrections change (values and header)."""
+    import nibabel as nib
+
+    target = tmp / f"fix{''.join(reproduced.suffixes)}"
+    code, fix_log = _run_larmorx([*args, "-prefix", str(target), str(image)], mode=defects.FIX)
+    if code != 0 or not target.exists():
+        checks(defects.FIX_PASS, False, detail=f"the fix pass failed (exit {code})")
+        return
+    a, b = nib.load(target), nib.load(reproduced)
+    change = defects.Change.of(
+        np.asanyarray(a.dataobj.get_unscaled()), np.asanyarray(b.dataobj.get_unscaled())
+    )
+    ha, hb = a.header, b.header
+    # nibabel moves the scaling from the header to the data proxy when it loads a file.
+    header = [
+        f
+        for f in ("qoffset_x", "srow_x", "slice_code", "slice_end")
+        if not np.array_equal(np.nan_to_num(ha[f]), np.nan_to_num(hb[f]))
+    ]
+    for f in ("slope", "inter"):
+        if not np.array_equal(
+            np.nan_to_num(float(getattr(a.dataobj, f))), np.nan_to_num(float(getattr(b.dataobj, f)))
+        ):
+            header.append(f"scl_{f}")
+    entries = defects.notices_in(fix_log)
+    reproduced_entries = defects.notices_in(log)
+    other = f"header {', '.join(header)}" if header else ""
+    defects.add_fix_check(checks, entries, change, other_changes=other)
+    if entries != reproduced_entries:
+        checks(
+            "D13 notices in both modes",
+            False,
+            detail=f"fix: {entries}; reproduce: {reproduced_entries}",
+        )
 
 
 def _differing_fraction(r: CaseResult) -> float:
@@ -1023,6 +1153,8 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
         f"for bit (data and header). From an image in memory: {memory_ok} of {memory_n} give "
         "the same values."
     )
+    if implementation == "original":
+        lines += defects.summary(results)
     rows = []
     for category in sorted({r.category for r in compared}):
         rs = [r for r in compared if r.category == category]

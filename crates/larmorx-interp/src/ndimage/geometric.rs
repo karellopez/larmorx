@@ -29,9 +29,12 @@
 //! STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //! USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use larmorx_core::defects::{Notice, UpstreamDefects};
+
 use super::splines::interpolation_weights;
 use super::{
-    Extend, Mode, NdimageError, Sample, c_cast_i64, check_shape, filter_axis, floor, map_coordinate,
+    Extend, Mode, NdimageError, Sample, c_cast_i64, check_shape, filter_axis, floor,
+    map_coordinate, reflect_notice,
 };
 
 /// An input prepared for interpolation at arbitrary coordinates: SciPy's prepadding and
@@ -48,6 +51,8 @@ pub struct Spline<const D: usize> {
     spline_mode: Extend,
     cval: f64,
     npad: f64,
+    /// The SCI-03 notice, when the prefilter's reflect boundary made a difference.
+    notice: Option<Notice>,
 }
 
 impl<const D: usize> Spline<D> {
@@ -55,6 +60,8 @@ impl<const D: usize> Spline<D> {
     /// interpolating: with `prefilter` and `order > 1`, `nearest` and `grid-constant` pad 12
     /// voxels (edge values or `cval`), then the float64 spline filter runs along every axis
     /// with `mode`'s boundary rule. `parallel` filters lines on the current rayon pool.
+    /// `defects` chooses the exact reflect boundary or SciPy's (SCI-03; [`Spline::notices`]).
+    #[allow(clippy::too_many_arguments)]
     pub fn new<T: Sample>(
         input: &[T],
         shape: [usize; D],
@@ -63,6 +70,7 @@ impl<const D: usize> Spline<D> {
         cval: f64,
         prefilter: bool,
         parallel: bool,
+        defects: UpstreamDefects,
     ) -> Result<Self, NdimageError> {
         if order > 5 {
             return Err(NdimageError::Order(order));
@@ -86,15 +94,17 @@ impl<const D: usize> Spline<D> {
         } else {
             pad(input, shape, npad, mode, cval)
         };
+        let mut changed = false;
         if filtered {
             for axis in 0..D {
-                filter_axis(
+                changed |= filter_axis(
                     &mut coefficients,
                     &padded,
                     axis,
                     order,
-                    mode.extend(),
+                    mode,
                     parallel,
+                    defects,
                 );
             }
         }
@@ -118,7 +128,14 @@ impl<const D: usize> Spline<D> {
             },
             cval,
             npad: npad as f64,
+            notice: reflect_notice(changed, mode, defects),
         })
+    }
+
+    /// The upstream defects that changed (or, reproduced, would have changed) the prepared
+    /// coefficients: SCI-03 for the reflect boundary.
+    pub fn notices(&self) -> Vec<Notice> {
+        self.notice.iter().cloned().collect()
     }
 
     /// The prepared coefficients (Fortran order) and their shape.

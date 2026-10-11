@@ -6,6 +6,7 @@
 //! `("field", deltas, affine, inverse)` with `deltas` of shape `(x, y, z, 3)` (RAS+ mm).
 //! Matrices are float64 4×4 arrays. The GIL is released while mapping and resampling.
 
+use larmorx_core::defects::Notice;
 use larmorx_core::linalg::Mat4;
 use larmorx_core::parallel;
 use larmorx_transform::nitransforms::{self, DenseField, Step};
@@ -19,6 +20,7 @@ use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
+use crate::defects::{PyNotice, mode_from_py as defects_mode, notices_to_py};
 use crate::ndimage::{fortran_values, mode_from_py};
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -143,9 +145,10 @@ fn nitransforms_map<'py>(
 /// to source RAS) and `ras2vox`, with per-volume voxel-to-voxel head-motion affines `hmc`
 /// (`(t, 4, 4)`), a field map in Hz on the target grid, and readout vectors `pe`
 /// (`[(axis, signed readout time)]`, one per volume or one for all). Returns a Fortran-ordered
-/// array: the target shape, plus the volumes for a 4D source.
+/// array: the target shape, plus the volumes for a 4D source; and the upstream-defect
+/// notices (PIPE-03, SCI-03; `larmorx._defects`).
 #[pyfunction]
-#[pyo3(signature = (source, target_shape, target_affine, steps, ras2vox, hmc = None, fieldmap = None, pe = None, order = 3, mode = "grid-constant", cval = 0.0, prefilter = true, jacobian = true, output = "float32", n_threads = 1))]
+#[pyo3(signature = (source, target_shape, target_affine, steps, ras2vox, hmc = None, fieldmap = None, pe = None, order = 3, mode = "grid-constant", cval = 0.0, prefilter = true, jacobian = true, output = "float32", n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn resample_series<'py>(
     py: Python<'py>,
@@ -164,8 +167,10 @@ fn resample_series<'py>(
     jacobian: bool,
     output: &str,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyAny>> {
+    upstream_defects: &str,
+) -> PyResult<(Bound<'py, PyAny>, Vec<PyNotice>)> {
     let mode = mode_from_py(mode)?;
+    let upstream_defects = defects_mode(upstream_defects)?;
     let steps = steps_from_py(steps)?;
     let target_affine = mat4(&target_affine)?;
     let ras2vox = mat4(&ras2vox)?;
@@ -211,6 +216,7 @@ fn resample_series<'py>(
         cval,
         prefilter,
         jacobian,
+        upstream_defects,
     };
     let n_out: usize = target_shape.iter().product::<usize>() * n_volumes;
     let mut shape = target_shape.to_vec();
@@ -220,22 +226,33 @@ fn resample_series<'py>(
     macro_rules! run {
         ($t:ty) => {{
             let mut out = vec![<$t>::default(); n_out];
-            py.detach(|| -> Result<(), ResampleError> {
-                let plan = SeriesResampler::new(
-                    target_shape,
-                    &target_affine,
-                    &steps,
-                    &ras2vox,
-                    source_shape,
-                    fmap,
-                    options,
-                    n_threads,
-                )?;
-                plan.resample_series(&values, n_volumes, hmc.as_deref(), &pe, &mut out, n_threads)
-            })
-            .map_err(resample_err)?;
+            let notices = py
+                .detach(|| -> Result<Vec<Notice>, ResampleError> {
+                    let plan = SeriesResampler::new(
+                        target_shape,
+                        &target_affine,
+                        &steps,
+                        &ras2vox,
+                        source_shape,
+                        fmap,
+                        options,
+                        n_threads,
+                    )?;
+                    plan.resample_series(
+                        &values,
+                        n_volumes,
+                        hmc.as_deref(),
+                        &pe,
+                        &mut out,
+                        n_threads,
+                    )
+                })
+                .map_err(resample_err)?;
             let a = ArrayD::from_shape_vec(IxDyn(&shape).f(), out).map_err(value_err)?;
-            Ok(PyArray::from_owned_array(py, a).into_any())
+            Ok((
+                PyArray::from_owned_array(py, a).into_any(),
+                notices_to_py(notices),
+            ))
         }};
     }
     match output {

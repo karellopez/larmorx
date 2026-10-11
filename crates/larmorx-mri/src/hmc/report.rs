@@ -44,9 +44,19 @@ pub fn rms_series(matrices: &[Mat4], reference: &Volume) -> (Vec<f64>, Vec<f64>)
 }
 
 /// The six motion parameters of every matrix, decomposed about the reference's
-/// intensity-weighted centre (§10.3): `rx ry rz` in radians, `tx ty tz` in mm.
-pub fn motion_parameters(matrices: &[Mat4], reference: &Volume) -> Vec<[f64; 6]> {
-    let c = reference.centre_of_mass();
+/// intensity-weighted centre (§10.3): `rx ry rz` in radians, `tx ty tz` in mm. With
+/// `finite_centre`, NaN and infinite voxels of the reference are left out of its centre
+/// (FSL-14 corrected); mcflirt's centre is then NaN.
+pub fn motion_parameters(
+    matrices: &[Mat4],
+    reference: &Volume,
+    finite_centre: bool,
+) -> Vec<[f64; 6]> {
+    let c = if finite_centre {
+        reference.centre_of_mass_finite()
+    } else {
+        reference.centre_of_mass()
+    };
     matrices
         .iter()
         .map(|m| {

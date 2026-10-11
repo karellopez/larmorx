@@ -16,7 +16,9 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
+use crate::defects::{PyNotice, mode_from_py as defects_mode, notices_to_py};
 use crate::nifti::{header_from_dict, header_to_dict, to_py_err};
+use larmorx_core::defects::{Notice, UpstreamDefects};
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
     PyValueError::new_err(e.to_string())
@@ -34,6 +36,7 @@ struct Request {
     restore: String,
     detrend: bool,
     n_threads: usize,
+    upstream_defects: UpstreamDefects,
 }
 
 impl Request {
@@ -108,6 +111,7 @@ impl Request {
             restore,
             detrend: self.detrend,
             n_threads: self.n_threads,
+            upstream_defects: self.upstream_defects,
         })
     }
 }
@@ -147,7 +151,8 @@ fn bricks_to_py<'py>(py: Python<'py>, bricks: Bricks) -> PyResult<Bound<'py, PyA
     }
 }
 
-/// Shifts, then returns `(data, header, warnings)` with the header `3dTshift` would write.
+/// Shifts, then returns `(data, header, warnings, notices)` with the header `3dTshift` would
+/// write; `notices` are the upstream defects that changed the result (`larmorx._defects`).
 fn finish<'py>(
     py: Python<'py>,
     mut bricks: Bricks,
@@ -155,31 +160,39 @@ fn finish<'py>(
     request: &Request,
     header_tr: f32,
     warnings: Vec<String>,
+    mut notices: Vec<Notice>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let params = request.params(bricks.shape, header_tr)?;
-    py.detach(|| tshift(&mut bricks, &params))
-        .map_err(value_err)?;
+    notices.extend(
+        py.detach(|| tshift(&mut bricks, &params))
+            .map_err(value_err)?,
+    );
     let timing = OutputTiming {
         tr: params.tr,
         toffset: params.tzero,
         slices: None,
     };
-    let header = dataset::output_header(input_header, &bricks, &timing).map_err(value_err)?;
+    let defects = request.upstream_defects;
+    notices.extend(dataset::units_notice(input_header, defects));
+    let header =
+        dataset::output_header(input_header, &bricks, &timing, defects).map_err(value_err)?;
+    let notices: Vec<PyNotice> = notices_to_py(notices);
     PyTuple::new(
         py,
         [
             bricks_to_py(py, bricks)?,
             header_to_dict(py, &header)?.into_any(),
             warnings.into_pyobject(py)?.into_any(),
+            notices.into_pyobject(py)?.into_any(),
         ],
     )
 }
 
 /// Reads a NIfTI file with AFNI's rules and shifts it (`3dTshift`). Returns the voxels in
 /// AFNI's storage type (`uint8`, `int16` or `float32`, before the brick factor, which is the
-/// header's `scl_slope`), the output header, and warnings.
+/// header's `scl_slope`), the output header, warnings and upstream-defect notices.
 #[pyfunction]
-#[pyo3(signature = (path, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1))]
+#[pyo3(signature = (path, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn afni_tshift_file<'py>(
     py: Python<'py>,
@@ -193,8 +206,10 @@ fn afni_tshift_file<'py>(
     restore: &str,
     detrend: bool,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let (pattern, times) = slice_spec(slice_times)?;
+    let upstream_defects = defects_mode(upstream_defects)?;
     let request = Request {
         pattern,
         times,
@@ -206,17 +221,19 @@ fn afni_tshift_file<'py>(
         restore: restore.to_owned(),
         detrend,
         n_threads,
+        upstream_defects,
     };
     let AfniImage {
         bricks,
         header,
         tr: header_tr,
         warnings,
+        notices,
         ..
     } = py
-        .detach(|| dataset::read(&path, n_threads))
+        .detach(|| dataset::read(&path, n_threads, upstream_defects))
         .map_err(read_err)?;
-    finish(py, bricks, &header, &request, header_tr, warnings)
+    finish(py, bricks, &header, &request, header_tr, warnings, notices)
 }
 
 /// Copies a 4D array (any memory layout) into Fortran order, zeroing non-finite floats as
@@ -235,10 +252,10 @@ fn fortran_vec<T: Copy + numpy::Element>(
 }
 
 /// Shifts a 4D array of `uint8`, `int16` or `float32` values placed by `header` (the header
-/// the image would be written with). Returns `(data, header, warnings)` as
+/// the image would be written with). Returns `(data, header, warnings, notices)` as
 /// [`afni_tshift_file`].
 #[pyfunction]
-#[pyo3(signature = (data, header, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1))]
+#[pyo3(signature = (data, header, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn afni_tshift_array<'py>(
     py: Python<'py>,
@@ -253,6 +270,7 @@ fn afni_tshift_array<'py>(
     restore: &str,
     detrend: bool,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let (pattern, times) = slice_spec(slice_times)?;
     let request = Request {
@@ -266,6 +284,7 @@ fn afni_tshift_array<'py>(
         restore: restore.to_owned(),
         detrend,
         n_threads,
+        upstream_defects: defects_mode(upstream_defects)?,
     };
     let header = header_from_dict(header)?;
     let (shape, data) = if let Ok(a) = data.cast::<PyArrayDyn<u8>>() {
@@ -284,7 +303,15 @@ fn afni_tshift_array<'py>(
     };
     let bricks = Bricks::new(shape, data, vec![0.0; shape[3]]).map_err(value_err)?;
     let header_tr = dataset::header_tr(&header);
-    finish(py, bricks, &header, &request, header_tr, Vec::new())
+    finish(
+        py,
+        bricks,
+        &header,
+        &request,
+        header_tr,
+        Vec::new(),
+        Vec::new(),
+    )
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

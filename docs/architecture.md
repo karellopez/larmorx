@@ -63,6 +63,7 @@ How the code is organised and the conventions every tool follows. The plan behin
 - **Errors:** typed in Rust (`thiserror`), mapped to Python exceptions: missing files → `FileNotFoundError`, other I/O → `OSError`, bad arguments → `ValueError`, malformed files → `larmorx.io.NiftiError` (a `ValueError`).
 - **Safety:** `#![forbid(unsafe_code)]` in every crate; pure-Rust dependencies only (CLAUDE.md rule 5).
 - **Compatibility:** a re-implementation reproduces its reference's results (nibabel for I/O; ANTs, AFNI, FreeSurfer for the tool families). Deliberate differences are listed in the tool's docs page and in its validation record, with the reason.
+- **Upstream defects (D13):** a deterministic defect of the original is corrected by default; `upstream_defects="reproduce"` (Python), `LARMORX_UPSTREAM_DEFECTS=reproduce` (command line) or `UpstreamDefects::Reproduce` (Rust options) gives the original's result bit for bit. Tools return `larmorx_core::defects::Notice`s for the defects that changed a result; Python raises them as `lx.UpstreamDefectWarning`, the command line prints them on standard error ([api/upstream-defects.md](api/upstream-defects.md)).
 
 ## Testing and validation
 
@@ -86,7 +87,8 @@ Read [porting-guide.md](porting-guide.md) first: which track the upstream's lice
 4. Docs page in `docs/api/` with the option-mapping table and the deliberate differences.
 5. A parity suite in `validation/` against the original tool, its report in `docs/validation/`, and the tool's status (`experimental` → `validated` → `stable`).
 6. `PROVENANCE.md` entries for ported code.
-7. A golden case for each new CLI tool, ImageMath operation and public function: a function in `tests/golden/registry.py` (or `CASES` in `crates-gpl/larmorx-gpl-cli/tests/golden.rs` for a replica), recorded on Linux x86-64 with `scripts/record_golden.py` ([validation/golden.md](validation/golden.md), "Adding a golden case").
+7. For each defect of the original that larmorx corrects (D13): an entry in `larmorx_core::defects`, the `upstream_defects` option and its notices, a parity fix pass and a `*.reproduce` golden case ([api/upstream-defects.md](api/upstream-defects.md), "For tool authors").
+8. A golden case for each new CLI tool, ImageMath operation and public function: a function in `tests/golden/registry.py` (or `CASES` in `crates-gpl/larmorx-gpl-cli/tests/golden.rs` for a replica), recorded on Linux x86-64 with `scripts/record_golden.py` ([validation/golden.md](validation/golden.md), "Adding a golden case").
 
 ## Adding a replica
 
@@ -97,7 +99,7 @@ A tool whose upstream licence keeps its bit-exact replica out of the main packag
 3. **The Python wrapper** takes `implementation: ImplementationName = "auto"` and asks `_replica.select(family, tool, implementation)`. `None` means: run the original and return `Image(..., implementation=_replica.ORIGINAL)`. Otherwise, in a temporary directory:
    - write in-memory inputs as the original would read them, and pass paths as absolute paths;
    - translate the keyword arguments into the tool's options (use relative file names in the temporary directory: some upstream programs refuse blanks in names);
-   - `_replica.run(selected, args, cwd=tmp, n_threads=n_threads)` (raises `ReplicaError` if the program fails; never fall back to the original);
+   - `_replica.run(selected, args, cwd=tmp, n_threads=n_threads, upstream_defects=...)` (raises `ReplicaError` if the program fails; never fall back to the original); the replica program reads D13's choice from `LARMORX_UPSTREAM_DEFECTS`, as the original's command line does, and writes its notices as `upstream defect ...` lines, which the wrapper turns into warnings (`larmorx._defects.parse_line`);
    - read the outputs, and return them with `implementation=selected.implementation()`.
    Validate the arguments that do not need the image before choosing, so both implementations raise the same `ValueError`s.
 4. **Tests that run in CI without the replica:** a stub program written by the test (`tests/python/test_replica.py` shows one), and the tool's other tests with the `no_replica` fixture, so that they test the original whatever is installed. Golden cases call the original explicitly (`implementation="original"`); the replica has its own golden cases in its workspace.

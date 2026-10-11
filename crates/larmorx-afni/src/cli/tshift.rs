@@ -6,13 +6,19 @@
 //! `.nii` or `.nii.gz`); an existing output file is an error (AFNI warns and exits 0 without
 //! writing); `-voxshift`, sub-brick selectors and AFNI's own formats are not supported; no
 //! history extension is written.
+//!
+//! AFNI's defects AFNI-01, -02, -03, -05 and -07 are corrected unless the environment variable
+//! `LARMORX_UPSTREAM_DEFECTS` is `reproduce` (D13, `docs/api/upstream-defects.md`); a warning
+//! names each one that changed (or would have changed) the output.
 
 use std::io::Write;
 use std::path::Path;
 
+use larmorx_core::defects::{EXIT_BAD_MODE, Notice, UpstreamDefects};
+
 use crate::dataset::{self, AfniImage, OutputTiming};
 use crate::oned;
-use crate::timing::{HeaderTiming, Pattern, mean_time};
+use crate::timing::{self, HeaderTiming, Pattern, mean_time};
 use crate::tshift::{Method, Restore, TshiftParams, slice_shifts, tshift};
 
 use super::{atof, atoi, leading_number, threads};
@@ -48,12 +54,25 @@ const IMPLEMENTATION: &str = concat!(
     ", Apache-2.0), clean-room 3dTshift"
 );
 
-/// The warning for `-no_detrend`, whose AFNI behaviour larmorx reproduces.
-const NO_DETREND_PAIRS: &str = "-no_detrend: as AFNI 25.2.09 does, only the first voxel of each pair \
-(in index order within a slice) has its mean removed and restored; the second is shifted as raw values";
-
-/// Runs `3dTshift` with `args`; returns the exit code.
+/// Runs `3dTshift` with `args`; returns the exit code. The D13 mode comes from
+/// `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    match UpstreamDefects::from_env() {
+        Ok(defects) => main_with(args, defects, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "** FATAL ERROR: {e}");
+            EXIT_BAD_MODE
+        }
+    }
+}
+
+/// [`main`] with the D13 mode given.
+pub fn main_with(
+    args: &[String],
+    defects: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     if args.is_empty() || matches!(args[0].as_str(), "-help" | "-h") {
         let _ = out.write_all(USAGE.as_bytes());
         return 0;
@@ -64,7 +83,7 @@ pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     };
     let result = parse(args, &mut log).and_then(|o| {
         log.verbose = o.verbose;
-        execute(&o, &mut log)
+        execute(&o, defects, &mut log)
     });
     match result {
         Ok(()) => 0,
@@ -89,6 +108,11 @@ impl Log<'_> {
 
     fn warn(&mut self, message: impl std::fmt::Display) {
         let _ = writeln!(self.err, "*+ WARNING: {message}");
+    }
+
+    /// An upstream-defect notice, as a warning line (`Notice::line`).
+    fn notice(&mut self, notice: &Notice) {
+        self.warn(notice.line());
     }
 }
 
@@ -209,7 +233,6 @@ fn parse(args: &[String], log: &mut Log<'_>) -> Result<Options, String> {
                     );
                 }
                 o.no_detrend = true;
-                log.warn(NO_DETREND_PAIRS);
                 i += 1;
                 continue;
             }
@@ -283,6 +306,7 @@ fn write_copy(
     path: &str,
     slices: Option<HeaderTiming>,
     n_threads: usize,
+    defects: UpstreamDefects,
     log: &mut Log<'_>,
 ) -> Result<(), String> {
     log.warn("==>> output dataset is just a copy of input dataset");
@@ -291,26 +315,48 @@ fn write_copy(
         toffset: image.toffset,
         slices,
     };
-    let header = dataset::output_header(&image.header, &image.bricks, &timing)?;
+    write_output(image, path, &timing, n_threads, defects, log)
+}
+
+/// Writes `image`'s bricks with the output header of `timing`.
+fn write_output(
+    image: &AfniImage,
+    path: &str,
+    timing: &OutputTiming,
+    n_threads: usize,
+    defects: UpstreamDefects,
+    log: &mut Log<'_>,
+) -> Result<(), String> {
+    if let Some(n) = dataset::units_notice(&image.header, defects) {
+        log.notice(&n);
+    }
+    let header = dataset::output_header(&image.header, &image.bricks, timing, defects)?;
     dataset::write(path, &header, &image.bricks, n_threads).map_err(|e| e.to_string())?;
     log.info(format!("Wrote output: {path}"));
     Ok(())
 }
 
-fn execute(o: &Options, log: &mut Log<'_>) -> Result<(), String> {
+fn execute(o: &Options, defects: UpstreamDefects, log: &mut Log<'_>) -> Result<(), String> {
     let path = output_path(o)?;
     let n_threads = threads();
     log.info(IMPLEMENTATION);
+    log.info(format!(
+        "upstream defects: {defects} ({})",
+        larmorx_core::defects::ENV
+    ));
     log.info("opening input dataset header");
-    let mut image = dataset::read(&o.dataset, n_threads)
+    let mut image = dataset::read(&o.dataset, n_threads, defects)
         .map_err(|e| format!("Can't open input dataset '{}': {e}", o.dataset))?;
     for w in std::mem::take(&mut image.warnings) {
         log.warn(w);
     }
+    for n in std::mem::take(&mut image.notices) {
+        log.notice(&n);
+    }
     let [_, _, nz, nt] = image.bricks.shape;
     if !image.has_time_axis || nt < 2 {
         log.warn("Input dataset has only 1 value per voxel!");
-        return write_copy(&image, path, None, n_threads, log);
+        return write_copy(&image, path, None, n_threads, defects, log);
     }
 
     // The TR, in milliseconds if -TR says so: then every time is taken in milliseconds.
@@ -337,13 +383,16 @@ fn execute(o: &Options, log: &mut Log<'_>) -> Result<(), String> {
                         "some value in tpattern is outside range 0..TR={tr}"
                     ));
                     let kept = image.slice_timing.clone();
-                    return write_copy(&image, path, kept, n_threads, log);
+                    return write_copy(&image, path, kept, n_threads, defects, log);
+                }
+                if let Some(n) = timing::seq_dec_notice(h, defects) {
+                    log.notice(&n);
                 }
                 h.times.clone()
             }
             None => {
                 log.warn("dataset is already aligned in time!");
-                return write_copy(&image, path, None, n_threads, log);
+                return write_copy(&image, path, None, n_threads, defects, log);
             }
         },
     };
@@ -383,6 +432,7 @@ fn execute(o: &Options, log: &mut Log<'_>) -> Result<(), String> {
         restore: o.restore,
         detrend: !o.no_detrend,
         n_threads,
+        upstream_defects: defects,
     };
     if log.verbose {
         if o.method == Method::Fourier {
@@ -395,7 +445,9 @@ fn execute(o: &Options, log: &mut Log<'_>) -> Result<(), String> {
             log.info(format!("slice {k}: fractional shift = {s}"));
         }
     }
-    tshift(&mut image.bricks, &params).map_err(|e| e.to_string())?;
+    for n in tshift(&mut image.bricks, &params).map_err(|e| e.to_string())? {
+        log.notice(&n);
+    }
 
     let seconds = |t: f32| {
         if ms {
@@ -409,10 +461,7 @@ fn execute(o: &Options, log: &mut Log<'_>) -> Result<(), String> {
         toffset: seconds(tzero),
         slices: None,
     };
-    let header = dataset::output_header(&image.header, &image.bricks, &timing)?;
-    dataset::write(path, &header, &image.bricks, n_threads).map_err(|e| e.to_string())?;
-    log.info(format!("Wrote output: {path}"));
-    Ok(())
+    write_output(&image, path, &timing, n_threads, defects, log)
 }
 
 #[cfg(test)]

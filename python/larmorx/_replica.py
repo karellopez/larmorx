@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from larmorx import _core
+from larmorx import _core, _defects
 
 __all__ = [
     "IMPLEMENTATIONS",
@@ -200,13 +200,16 @@ def run(
     *,
     cwd: str | os.PathLike[str],
     n_threads: int = 1,
+    upstream_defects: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``<program> <family> <tool> args...`` in ``cwd``; :class:`ReplicaError` unless it
     exits with 0.
 
     Replica programs take their thread count from ``OMP_NUM_THREADS`` (AFNI's variable): it is
     set to ``n_threads``, or removed for 0 (all logical CPUs). Their results do not depend on
-    it.
+    it. They take D13's choice (``"fix"`` or ``"reproduce"``, ``docs/api/upstream-defects.md``)
+    from ``LARMORX_UPSTREAM_DEFECTS``, as the original's command line does: it is set to
+    ``upstream_defects`` unless that is ``None``.
     """
     r = selected.replica
     command = [selected.program, r.family, r.tool, *args]
@@ -215,6 +218,8 @@ def run(
         env["OMP_NUM_THREADS"] = str(n_threads)
     else:
         env.pop("OMP_NUM_THREADS", None)
+    if upstream_defects is not None:
+        env[_defects.ENV] = upstream_defects
     process = _run(command, cwd=cwd, env=env)
     if process.returncode != 0:
         tail = "\n".join(process.stderr.strip().splitlines()[-20:])

@@ -30,6 +30,9 @@
 //! TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 //! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::math;
 
 use super::Extend;
@@ -134,7 +137,14 @@ fn init_for(mode: Extend) -> Init {
 
 /// The prefilter for lines of one length: poles, gain and the powers `pow(z, n - 1)` /
 /// `pow(z, n)` SciPy computes for every line (here once per length).
-#[derive(Clone, Debug)]
+///
+/// SciPy's causal initialisation for the reflect boundary (modes `reflect`, `grid-mirror` and
+/// `nearest`) reads `c[0]` in its last term after it has already updated it; the exact
+/// half-sample symmetric initialisation reads the original `c[0]` (SCI-03,
+/// `docs/findings/upstream-defects.md`). With [`UpstreamDefects::Fix`] the filter uses the
+/// original value, with [`UpstreamDefects::Reproduce`] SciPy's; either way it records whether
+/// the two differ for some line ([`LineFilter::changed`]).
+#[derive(Debug)]
 pub(crate) struct LineFilter {
     poles: &'static [f64],
     gain: f64,
@@ -142,10 +152,19 @@ pub(crate) struct LineFilter {
     len: usize,
     /// Per pole: `z^(n-1)` (mirror) or `z^n` (reflect); unused for wrap.
     powers: [f64; 2],
+    /// Correct SCI-03 (the reflect initialisation).
+    fix: bool,
+    /// Whether SCI-03 changed (or, reproduced, would have changed) a coefficient.
+    changed: AtomicBool,
 }
 
 impl LineFilter {
-    pub(crate) fn new(order: u32, mode: Extend, len: usize) -> Self {
+    /// Whether the reflect initialisation differed from SciPy's (SCI-03) for some line.
+    pub(crate) fn changed(&self) -> bool {
+        self.changed.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn new(order: u32, mode: Extend, len: usize, defects: UpstreamDefects) -> Self {
         let poles = filter_poles(order);
         let mut gain = 1.0;
         for &z in poles {
@@ -167,6 +186,8 @@ impl LineFilter {
             init,
             len,
             powers,
+            fix: defects.fix(),
+            changed: AtomicBool::new(false),
         }
     }
 
@@ -186,7 +207,11 @@ impl LineFilter {
             match self.init {
                 Init::Mirror => init_causal_mirror(c, z, self.powers[k]),
                 Init::Wrap => init_causal_wrap(c, z),
-                Init::Reflect => init_causal_reflect(c, z, self.powers[k]),
+                Init::Reflect => {
+                    if init_causal_reflect(c, z, self.powers[k], self.fix) {
+                        self.changed.store(true, Ordering::Relaxed);
+                    }
+                }
             }
             for i in 1..n {
                 c[i] += z * c[i - 1];
@@ -280,14 +305,22 @@ impl LineFilter {
                         }
                     }
                     let mut z_i = z;
+                    let f = z / (1.0 - zp * zp);
+                    let mut changed = false;
                     for t in 1..n {
                         let src = n - 1 - t;
                         let (first, rest) = data.split_at_mut(stride);
                         let first = &mut first[c0..c0 + w];
                         let x = &rest[(t - 1) * stride + c0..][..w];
                         if src == 0 {
-                            for (d, &x) in first.iter_mut().zip(x) {
-                                *d += z_i * (x + zp * *d);
+                            // The last term: SciPy reads the updated c[0] (SCI-03).
+                            for ((d, &x), &o) in first.iter_mut().zip(x).zip(orig.iter()) {
+                                let scipy = *d + z_i * (x + zp * *d);
+                                let exact = *d + z_i * (x + zp * o);
+                                if (scipy * f + o).to_bits() != (exact * f + o).to_bits() {
+                                    changed = true;
+                                }
+                                *d = if self.fix { exact } else { scipy };
                             }
                         } else {
                             let y = &rest[(src - 1) * stride + c0..][..w];
@@ -297,7 +330,9 @@ impl LineFilter {
                         }
                         z_i *= z;
                     }
-                    let f = z / (1.0 - zp * zp);
+                    if changed {
+                        self.changed.store(true, Ordering::Relaxed);
+                    }
                     for (d, &o) in data[row(0)].iter_mut().zip(orig.iter()) {
                         *d *= f;
                         *d += o;
@@ -395,17 +430,31 @@ fn init_anticausal_wrap(c: &mut [f64], z: f64) {
     c[n - 1] *= z / (z_i - 1.0); // z_i = pow(z, n)
 }
 
-fn init_causal_reflect(c: &mut [f64], z: f64, z_n: f64) {
+/// The causal initialisation for the reflect boundary: `c[0] + z·S/(1 − z^2n)` with
+/// `S = Σ z^i c[i] + z^n Σ z^i c[n−1−i]` (i < n), summed in SciPy's order. SciPy's last term
+/// (`i = n − 1`) reads the already updated `c[0]` instead of the original (SCI-03); `fix` uses
+/// the original. Returns whether the two give different coefficients.
+fn init_causal_reflect(c: &mut [f64], z: f64, z_n: f64, fix: bool) -> bool {
     let n = c.len();
     let mut z_i = z;
     let c0 = c[0];
+    let f = z / (1.0 - z_n * z_n);
+    let mut changed = false;
     c[0] += z_n * c[n - 1];
     for i in 1..n {
-        c[0] += z_i * (c[i] + z_n * c[n - 1 - i]);
+        if i == n - 1 {
+            let scipy = c[0] + z_i * (c[i] + z_n * c[0]);
+            let exact = c[0] + z_i * (c[i] + z_n * c0);
+            changed = (scipy * f + c0).to_bits() != (exact * f + c0).to_bits();
+            c[0] = if fix { exact } else { scipy };
+        } else {
+            c[0] += z_i * (c[i] + z_n * c[n - 1 - i]);
+        }
         z_i *= z;
     }
-    c[0] *= z / (1.0 - z_n * z_n);
+    c[0] *= f;
     c[0] += c0;
+    changed
 }
 
 fn init_anticausal_reflect(c: &mut [f64], z: f64) {

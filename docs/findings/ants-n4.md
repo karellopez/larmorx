@@ -340,10 +340,11 @@ N4 6 of 45. **Registration (A4, A5) must be validated against the new build only
 `<workspace>/oracles/ants-2.6.5-gcc11-O3/gcc-bug-110182/`.
 
 **Three independent builds agree with the source.** At one thread with CORE-MATH preloaded,
-larmorx with the source's roundings is bit-identical to fMRIPrep 25.2.6's N4 (all six N4
-outputs of the ds000005 oracle run, [fmriprep-oracle.md](fmriprep-oracle.md)), to ANTsPy
-0.6.3's (built by GCC 10.2.1; 5 of 5 cases tried, 3 of which the GCC 11 oracle gets
-differently) and to the new oracle (below). *Verified.*
+larmorx with the source's roundings is bit-identical to fMRIPrep 25.2.6's N4 (all 45 cases of
+the parity suite's standard tier and all six N4 outputs of the ds000005 oracle run,
+[fmriprep-oracle.md](fmriprep-oracle.md)), to ANTsPy 0.6.3's (built by GCC 10.2.1; 5 of 5
+cases tried, 3 of which the GCC 11 oracle gets differently) and to the new oracle (all 45
+cases, [ants-n4](../validation/ants-n4.md)). *Validated.*
 
 **The oracle is now built by a fixed compiler.** `scripts/build_ants_oracle.sh` builds ITK
 5.4.5 and ANTs 2.6.5 with conda-forge's GCC 14.3.0 (the compiler of fMRIPrep's ANTs), with

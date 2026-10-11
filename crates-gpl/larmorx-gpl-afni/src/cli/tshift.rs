@@ -17,7 +17,9 @@
 //! - an existing output file is an error (AFNI prints "dataset NOT written to disk" and exits
 //!   with status 0);
 //! - `-voxshift`, sub-brick selectors and AFNI's own formats are not supported;
-//! - AFNI's history extension is not written, and the version banner is not printed.
+//! - AFNI's history extension is not written, and the version banner is not printed;
+//! - with `-verbose`, a first line on standard error names the implementation that runs (the
+//!   replica), as `larmorx afni 3dTshift` names the clean-room original.
 
 use std::io::Write;
 use std::path::Path;
@@ -29,6 +31,13 @@ use crate::tpattern::{TpatternError, parse_tpattern};
 use crate::tshift::{Rlt, TshiftParams, fft_length, slice_shift, tshift};
 
 use super::threads;
+
+/// The first `-verbose` line: which implementation runs (larmorx's addition, not AFNI's).
+const IMPLEMENTATION: &str = concat!(
+    "implementation: replica (larmorx-gpl ",
+    env!("CARGO_PKG_VERSION"),
+    ", GPL-3.0-or-later), bit-exact translation of AFNI 25.2.09's 3dTshift"
+);
 
 const USAGE: &str = "\
 Usage: 3dTshift [options] dataset   (larmorx-gpl: replica of AFNI 25.2.09's 3dTshift)
@@ -362,6 +371,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
 
     // Open the dataset; extract values, check for errors.
     if o.verbose > 0 {
+        io.info(IMPLEMENTATION);
         io.print("++ opening input dataset header");
     }
     let mut warnings = Vec::new();

@@ -150,7 +150,8 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
                     os.environ["OMP_NUM_THREADS"] = str(t)
                     with contextlib.redirect_stderr(io.StringIO()):
                         code = run(
-                            ["larmorx", "afni", "3dTshift", *args, "-prefix", str(out), str(src)]
+                            ["larmorx", "afni", "3dTshift", *args, "-prefix", str(out), str(src)],
+                            implementation="original",
                         )
                     if code != 0:
                         raise RuntimeError(f"larmorx failed on {label}")
@@ -158,7 +159,14 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
                 def run_py(src=src, times=times, tzero=tzero, tr=tr, t=t):
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
-                        lx.afni.tshift(src, slice_times=times, tzero=tzero, tr=tr, n_threads=t)
+                        lx.afni.tshift(
+                            src,
+                            slice_times=times,
+                            tzero=tzero,
+                            tr=tr,
+                            n_threads=t,
+                            implementation="original",
+                        )
 
                 cli = measure(run_lx, repeats=repeats)
                 b = nib.load(lx_out).dataobj.get_unscaled()

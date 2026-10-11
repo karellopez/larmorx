@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
+    from larmorx._replica import Implementation
     from larmorx.io.nifti import NiftiHeader
 
 __all__ = ["Image", "as_image"]
@@ -25,11 +26,17 @@ class Image:
     is the NIfTI header the image was read with, if any; it carries metadata such as units,
     the repetition time, slice timing and extensions, and is reconciled with ``affine`` when
     the image is saved.
+
+    ``implementation`` records which implementation computed the image, for tools that have
+    both a clean-room original and a bit-exact replica (``lx.afni.tshift``; see
+    :class:`larmorx.Implementation`); ``None`` otherwise. Like the header, it is metadata:
+    :meth:`replace` and :meth:`with_data` keep it, and it is not saved.
     """
 
     data: np.ndarray
     affine: np.ndarray
     header: NiftiHeader | None = None
+    implementation: Implementation | None = None
 
     def __post_init__(self) -> None:
         data = np.asarray(self.data)
@@ -70,7 +77,8 @@ class Image:
         return None if self.header is None else self.header.tr
 
     def replace(self, **changes: Any) -> Image:
-        """A copy with some fields changed (``data``, ``affine`` or ``header``)."""
+        """A copy with some fields changed (``data``, ``affine``, ``header`` or
+        ``implementation``)."""
         return dataclasses.replace(self, **changes)
 
     def with_data(self, data: np.ndarray) -> Image:

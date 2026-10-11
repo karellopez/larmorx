@@ -20,3 +20,6 @@ larmorx-afni.workspace = true
 larmorx-ants.workspace = true
 larmorx-core.workspace = true
 larmorx-mri.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

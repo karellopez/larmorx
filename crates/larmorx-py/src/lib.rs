@@ -13,21 +13,38 @@ mod ants_filters;
 mod mri;
 mod ndimage;
 mod nifti;
+mod replica;
 mod resample;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
+/// Tools with a replica run it as a separate program when `implementation` (`"auto"`,
+/// `"replica"`, `"original"`; `None` reads `LARMORX_IMPLEMENTATION`) says so; its program is
+/// looked for through its environment variable, then in `replica_dirs`, then on `PATH`.
+///
 /// Returns `(exit_code, stdout, stderr)`; the Python caller writes the streams so that they go
 /// through `sys.stdout` and `sys.stderr`. The GIL is released while the command runs.
 #[pyfunction]
-fn cli_main(py: Python<'_>, argv: Vec<String>) -> (u8, String, String) {
+#[pyo3(signature = (argv, replica_dirs = Vec::new(), implementation = None))]
+fn cli_main(
+    py: Python<'_>,
+    argv: Vec<String>,
+    replica_dirs: Vec<std::path::PathBuf>,
+    implementation: Option<&str>,
+) -> PyResult<(u8, String, String)> {
+    let options = larmorx_cli::Options {
+        loader: &ants::PyLoader,
+        implementation: implementation.map(replica::implementation).transpose()?,
+        replica_dirs,
+        replica_output: larmorx_cli::replica::Output::Capture,
+    };
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = py.detach(|| larmorx_cli::run_with(&argv, &ants::PyLoader, &mut out, &mut err));
-    (
+    let code = py.detach(|| larmorx_cli::run_with(&argv, &options, &mut out, &mut err));
+    Ok((
         code,
         String::from_utf8_lossy(&out).into_owned(),
         String::from_utf8_lossy(&err).into_owned(),
-    )
+    ))
 }
 
 /// The command line's tool families and their tools: `[(family, [tool, ...]), ...]`
@@ -51,6 +68,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     afni::register(m)?;
     mri::register(m)?;
     ndimage::register(m)?;
+    replica::register(m)?;
     resample::register(m)?;
     Ok(())
 }

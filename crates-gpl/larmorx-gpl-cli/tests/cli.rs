@@ -83,6 +83,26 @@ fn tshift_copies_and_errors() {
     assert!(err.contains("just a copy of input"), "{err}");
     assert_eq!(common::read(&output).0, common::read(&input).0);
 
+    // -verbose names the implementation first.
+    let verbose = dir.path().join("verbose.nii");
+    let out = common::run(
+        EXE,
+        &[
+            "afni",
+            "3dTshift",
+            "-verbose",
+            "-prefix",
+            verbose.to_str().unwrap(),
+            input.to_str().unwrap(),
+        ],
+    );
+    assert!(out.status.success(), "{out:?}");
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.starts_with("++ implementation: replica (larmorx-gpl "),
+        "{err}"
+    );
+
     for (args, message) in [
         (
             vec!["-tpattern", "ALT+Z"],

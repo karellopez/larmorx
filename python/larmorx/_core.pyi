@@ -9,11 +9,27 @@ __version__: str
 
 class NiftiError(ValueError): ...
 
-def cli_main(argv: list[str]) -> tuple[int, str, str]:
-    """Run the ``larmorx`` command line; return ``(exit_code, stdout, stderr)``."""
+def cli_main(
+    argv: list[str], replica_dirs: list[str] = ..., implementation: str | None = None
+) -> tuple[int, str, str]:
+    """Run the ``larmorx`` command line; return ``(exit_code, stdout, stderr)``. Tools with a
+    replica run its program when ``implementation`` (``"auto"``, ``"replica"``,
+    ``"original"``; ``None`` reads ``LARMORX_IMPLEMENTATION``) says so; the program is looked
+    for through its environment variable, then in ``replica_dirs``, then on ``PATH``."""
 
 def cli_tools() -> list[tuple[str, list[str]]]:
     """The command line's tool families and their tools: ``[(family, [tool, ...]), ...]``."""
+
+# --- Replicas in other packages, run as separate programs (larmorx/_replica.py) ----------------
+
+def replica_registry() -> list[dict[str, str]]:
+    """Every tool with a replica: ``family``, ``tool``, ``package``, ``program``, ``env``,
+    ``licence``, ``install``."""
+
+def replica_find(family: str, tool: str, dirs: list[str]) -> str | None:
+    """The replica program of ``family tool`` (its environment variable, then ``dirs``, then
+    ``PATH``), or ``None``; ``ValueError`` if the variable names no file, ``KeyError`` if the
+    tool has no replica."""
 
 def nifti_read(
     path: str, scaling: str = "auto", n_threads: int = 1

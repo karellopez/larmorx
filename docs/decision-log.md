@@ -390,6 +390,22 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   (`ShrinkPlan`), and `larmorx_image::ItkGrid` carries ITK's start index and index ↔ point
   rules.
 
+## 2026-10-11: fMRIPrep oracles through Apptainer, not Docker
+- The user could not install Docker remotely, and Docker would need sudo for every run. The
+  user offered their password; it was declined, since a password typed into the conversation
+  is stored with it and sudo is not needed.
+- **Apptainer 1.4.5 is installed system-wide** and runs containers as the user. It runs the
+  official fMRIPrep images, so no Docker and no password are needed.
+- **The oracle is fMRIPrep 25.2.6** (latest stable on 2026-10-11), pinned by digest
+  `sha256:ccde6053b426…`, with the user's FreeSurfer licence (`/usr/local/freesurfer/license.txt`,
+  mounted read-only, never copied or committed).
+- **`scripts/run_fmriprep_oracle.sh`** records the image digest and checksum, the fMRIPrep
+  version, the arguments, the seeds (`--random-seed 0 --skull-strip-fixed-seed`), the threads
+  (8/8), the host and the times in `RUN_INFO.txt`, and keeps the working directory.
+- **First run:** ds000005 sub-01, `--fs-no-reconall`, output spaces MNI152NLin2009cAsym res-2,
+  T1w and func. Finished in 1 h 03 min with exit status 0 (on a shared machine, so the time is
+  not a benchmark).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

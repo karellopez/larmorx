@@ -91,6 +91,7 @@ def run_stages(s: Settings) -> dict:
         results.append(r)
     busy_after = _busy()
     return {
+        "select": list(s.select),
         "started": started,
         "finished": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "load_before": load_before,

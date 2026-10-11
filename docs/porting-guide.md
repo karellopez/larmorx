@@ -25,7 +25,7 @@ Each item links to its section.
    (§7).
 8. **Decide what larmorx does about each defect and possible improvement** (D11, D13; §8).
 9. **Make the result deterministic and the same on every platform** (§9).
-10. **Work safely**: commit early, one agent at a time, never delete (§10).
+10. **Work safely**: commit early, at most two agents at a time, never delete (§10).
 11. **Deliver the whole per-tool contract** (§11).
 
 ## 1. The two tracks, and who may read what
@@ -381,8 +381,9 @@ Each of these cost work at least once.
 - **Commit early and often.** Agents have been killed mid-task by usage limits; one lost its
   worktree, another had 24 uncommitted files. Commit as soon as something passes the gates,
   as "WIP checkpoint (...)" commits if needed.
-- **One agent at a time**, two at most (CLAUDE.md, "Working on this machine"). Four parallel
-  agents exhausted the session limit in 1.5 hours.
+- **At most two agents at a time** (CLAUDE.md, "Working on this machine"), and back to one if
+  a usage limit hits again: four parallel agents once exhausted the session limit in 1.5
+  hours.
 - **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"`
   matches its own command line and never ends; four such loops ran for a day. Write
   `pgrep -f "[l]armorx_validation bench"`.

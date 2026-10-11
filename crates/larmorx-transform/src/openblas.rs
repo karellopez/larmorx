@@ -230,12 +230,14 @@ pub fn inv4(m: &Mat4) -> Option<Mat4> {
     Some(std::array::from_fn(|r| std::array::from_fn(|c| b[c][r])))
 }
 
-/// `getf2_k` (OpenBLAS's left-looking LU with partial pivoting) on a column-major `N × N`
-/// matrix, in place: `a[c][r]`. Fills `ipiv` (0-based) and returns LAPACK's `info` (0, or one
-/// more than the first column with an exactly zero pivot).
+/// `getf2_k` (OpenBLAS's left-looking LU with partial pivoting) on a column-major 4×4 matrix,
+/// in place: `a[c][r]`. Fills `ipiv` (0-based) and returns LAPACK's `info` (0, or one more than
+/// the first column with an exactly zero pivot). Only for 4×4: then every `dgemv_n` call has at
+/// most 3 rows and runs the kernel's scalar tail, and `idamax` sees at most 4 elements.
 // The loops keep getf2_k's indices, so the port can be checked line by line.
 #[allow(clippy::needless_range_loop)]
-fn getf2<const N: usize>(a: &mut [[f64; N]; N], ipiv: &mut [usize; N]) -> usize {
+fn getf2(a: &mut [[f64; 4]; 4], ipiv: &mut [usize; 4]) -> usize {
+    const N: usize = 4;
     let mut info = 0;
     for j in 0..N {
         // Apply the earlier interchanges to column j.

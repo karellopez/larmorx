@@ -11,7 +11,9 @@
 mod cos;
 pub(crate) mod dint;
 mod exp;
+mod expf;
 mod log;
+mod logf;
 mod powf;
 mod powi;
 mod sin;
@@ -60,6 +62,14 @@ dispatch!(
 /// `x^y` for `f32`, correctly rounded (CORE-MATH's `cr_powf`). It has no FMA-compiled copy:
 /// it is only used where speed does not matter (ImageMath's `^`).
 pub use powf::powf;
+
+/// `e^x` for `f32`, correctly rounded (CORE-MATH's `cr_expf`; no fused multiply-adds, so no
+/// FMA-compiled copy). ITK's `std::exp(float)` (glibc's `expf`).
+pub use expf::expf;
+
+/// The natural logarithm for `f32`, correctly rounded (CORE-MATH's `cr_logf`; no fused
+/// multiply-adds). ITK's `std::log(float)` (glibc's `logf`).
+pub use logf::logf;
 
 /// The kernels compiled with FMA enabled. AUDIT (unsafe): each call is guarded by
 /// `is_x86_feature_detected!("fma")` in `dispatch!`. Calling a `#[target_feature]` function

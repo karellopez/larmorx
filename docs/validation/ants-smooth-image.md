@@ -3,9 +3,9 @@
 **All cases agree.** 38 cases on the `standard` tier: 31 pass, 7 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants SmoothImage` / `lx.ants.smooth_image` (crates larmorx-ants, larmorx-image)
-- **Reference:** SmoothImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity ants-smooth-image --tier standard`
+- **Reference:** SmoothImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-smooth-image --tier standard`
 
 **Bit-identical: 30 of 30 passing cases** produce exactly the values ANTs writes; 30 of 30 also write exactly its header bytes.
 
@@ -44,18 +44,18 @@
 |---|---|---|
 | `errors/too-few-arguments` | two arguments: the usage, exit 1 | ANTs exit 1: A separate sigma can be specified for each dimension, e.g., 1.5x1x2; larmorx exit 1: A separate sigma can be specified for each dimension, e.g., 1… |
 | `errors/dimension-5` | dimension 5: 'Unsupported dimension' | ANTs exit 1: Unsupported dimension; larmorx exit 1: Unsupported dimension |
-| `errors/sigma-0` | sigma 0: 'Sigma must be greater than zero' (ITK throws, ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5e7f42d74510): Sigma must be greater than zero.; larmorx exit 1: larmorx: SmoothImage: Sigma… |
-| `errors/thin` | Gaussian smoothing of an axis of 3 voxels (ITK throws, ANTs aborts) | ANTs killed by signal 6: ITK ERROR: SmoothingRecursiveGaussianImageFilter(0x57b04c35ddf0): The number of pixels along dimension 2 is less than 4. This filter r… |
+| `errors/sigma-0` | sigma 0: 'Sigma must be greater than zero' (ITK throws, ANTs aborts) | ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5b6757983590): Sigma must be greater than zero.; larmorx exit 1: larmorx: SmoothImage: Sigma… |
+| `errors/thin` | Gaussian smoothing of an axis of 3 voxels (ITK throws, ANTs aborts) | ANTs killed by signal 6: ITK ERROR: SmoothingRecursiveGaussianImageFilter(0x5aa6897360f0): The number of pixels along dimension 2 is less than 4. This filter r… |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: SmoothImage: cannot read image '<tmp>/none.nii.gz' (ANTs crashes he… |
-| `errors/no-output` | no output name: ANTs smooths, then std::string(nullptr) throws | ANTs killed by signal 6: what(): basic_string::_M_construct null not valid; larmorx exit 1: larmorx: SmoothImage: no output name (std::string(nullptr) throws) … |
+| `errors/no-output` | no output name: ANTs smooths, then std::string(nullptr) throws | ANTs killed by signal 6: what(): basic_string: construction from null is not valid; larmorx exit 1: larmorx: SmoothImage: no output name (std::string(nullptr) … |
 | `errors/bad-flag` | a fifth argument that is not a number: std::stoi throws | ANTs killed by signal 6: what(): stoi; larmorx exit 1: larmorx: SmoothImage: 'yes' is not a number (ANTs aborts: std::stoi throws) |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (54d3282e3bf5-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

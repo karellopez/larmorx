@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "54d3282e3bf5-dirty",
-  "larmorx_testdata_commit": "28167dea9be5",
+  "larmorx_commit": "38b2a0c97ecf",
+  "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -13,7 +13,7 @@
   "platform": "Linux x86_64",
   "python": "3.12.10"
  },
- "reference": "ResampleImageBySpacing from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`",
+ "reference": "ResampleImageBySpacing from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`",
  "results": [
   {
    "case": "spacing/down-2mm",
@@ -22,7 +22,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.149,
+   "seconds": 0.284,
    "status": "pass"
   },
   {
@@ -32,7 +32,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -62,7 +62,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -72,7 +72,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -82,7 +82,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -102,7 +102,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -112,7 +112,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.025,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.134,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -182,7 +182,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -202,7 +202,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -232,7 +232,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -252,7 +252,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -262,7 +262,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.676,
+   "seconds": 1.593,
    "status": "pass"
   },
   {
@@ -272,7 +272,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.956,
+   "seconds": 2.035,
    "status": "pass"
   },
   {
@@ -282,7 +282,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.532,
+   "seconds": 1.202,
    "status": "pass"
   },
   {
@@ -292,7 +292,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.917,
+   "seconds": 17.489,
    "status": "pass"
   },
   {
@@ -302,7 +302,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.014,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 1: addvox pads each dimension by addvox; larmorx exit 1: addvox pads each dimension by addvox",
-   "seconds": 0.014,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -322,7 +322,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs exit 0: ; larmorx exit 0: ",
-   "seconds": 0.015,
+   "seconds": 0.032,
    "status": "both-error"
   },
   {
@@ -332,7 +332,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: smoothing by : 0.666667 dir 1; larmorx exit 1: larmorx: ResampleImageBySpacing: smoothing needs all 3 spacings (ANTs calls atof on a null pointer) (ANTs crashes here)",
-   "seconds": 0.019,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -341,8 +341,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: what():  basic_string::_M_construct null not valid; larmorx exit 1: larmorx: ResampleImageBySpacing: no nn argument after addvox (std::stoi(argv[10]) on a null pointer) (ANTs crashes here)",
-   "seconds": 0.017,
+   "reason": "ANTs killed by signal 6: what():  basic_string: construction from null is not valid; larmorx exit 1: larmorx: ResampleImageBySpacing: no nn argument after addvox (std::stoi(argv[10]) on a null pointer) (ANTs crashes here)",
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -352,7 +352,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs prints 'Exception catched !' and goes on with the smoothing filter's output, a buffer that was allocated but never written: the result is uninitialised memory (values up to \u00b11e27 that change from run to run). larmorx stops with ITK's message instead (docs/findings/ants-gaussian-filters.md).",
-   "seconds": 0.019,
+   "seconds": 0.055,
    "status": "expected-divergence"
   },
   {
@@ -362,7 +362,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: ResampleImageBySpacing: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here)",
-   "seconds": 0.013,
+   "seconds": 0.038,
    "status": "both-error"
   }
  ],

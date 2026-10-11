@@ -177,7 +177,8 @@ comes from the bias smoothing); the border at z = 72 shows none in that run (its
 one after the other).
 
 Measured on ds000005's T1w (160 × 192 × 192) with sMRIPrep's command line, ANTs 2.6.5 as
-built, each thread count run three times (`oracles/ants-2.6.5/denoise-thread-band/`):
+built (the GCC 11.4 build; DenoiseImage gives the same bits in the GCC 14.3 build at one
+thread), each thread count run three times (`oracles/ants-2.6.5-gcc11-O3/denoise-thread-band/`):
 
 | ITK threads (work units) | Voxels differing from 1 thread | Max \|diff\| | 1 − NCC | Same result in every run |
 |---|---|---|---|---|

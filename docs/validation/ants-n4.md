@@ -3,39 +3,34 @@
 **All cases agree.** 51 cases on the `standard` tier: 46 pass, 5 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants N4BiasFieldCorrection` / `lx.ants.n4_bias_field_correction` (crates larmorx-image, larmorx-ants)
-- **Reference:** N4BiasFieldCorrection from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
+- **Reference:** N4BiasFieldCorrection from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity ants-n4 --tier standard`
 
-**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 27 of 45 compared cases.** The others differ where glibc's `expf`, `logf`, `exp` or `sincos` is not correctly rounded for a value the run meets; the table compares each difference with ANTs' own difference between one thread and 2, 3, 4, 8 and 12 threads (a ratio below 1 is inside ANTs' thread band).
+**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 29 of 45 compared cases.** The others differ where glibc's `expf`, `logf`, `exp` or `sincos` is not correctly rounded for a value the run meets; the table compares each difference with ANTs' own difference between one thread and 2, 3, 4, 8 and 12 threads (a ratio below 1 is inside ANTs' thread band).
 **The cause, confirmed: with those glibc functions replaced by correctly rounded ones (CORE-MATH preloaded into the same ANTs program, one thread), 45 of 45 are bit-identical.**
 
 | Case | Output | Difference from ANTs as built | max |diff| / band | (1 - NCC) / band |
 |---|---|---|---|---|
-| `fmriprep/boldref-coregistration` | corrected | 76748 of 139264 differ; max \|diff\| 0.00244, max rel 7.7e-06, 1 - NCC 1.5e-13 | 1.6 | 1.4 |
-| `fmriprep/boldref-template` | corrected | 468307 of 1082035 differ; max \|diff\| 0.021, max rel 6.7e-06, 1 - NCC 0 | 0.89 | 0 |
-| `fmriprep/brain-extraction-final` | corrected | 2037870 of 5898240 differ; max \|diff\| 0.019, max rel 1.4e-05, 1 - NCC 3.4e-12 | 0.21 | 0.19 |
-| `fmriprep/brain-extraction-final` | bias field | 2150772 of 5898240 differ; max \|diff\| 4.77e-06, max rel 1.4e-05, 1 - NCC 3.6e-12 | 0.32 | 0.073 |
-| `fmriprep/n4-only` | corrected | 694348 of 5898240 differ; max \|diff\| 0.166, max rel 0.00041, 1 - NCC 6.5e-09 | 0.29 | 0.076 |
-| `fmriprep/n4-only` | bias field | 5898090 of 5898240 differ; max \|diff\| 0.000425, max rel 0.00041, 1 - NCC 2.1e-06 | 0.29 | 0.075 |
+| `fmriprep/boldref-coregistration` | corrected | 69747 of 139264 differ; max \|diff\| 0.00061, max rel 5.6e-06, 1 - NCC 5.4e-14 | 0.43 | 0.45 |
+| `fmriprep/boldref-template` | corrected | 467120 of 1082035 differ; max \|diff\| 0.00439, max rel 1.7e-06, 1 - NCC 8.8e-15 | 0.25 | 0.16 |
+| `fmriprep/smriprep-pre-template` | corrected | 5413547 of 5898240 differ; max \|diff\| 0.241, max rel 0.00034, 1 - NCC 4.8e-10 | 1.3 | 0.24 |
+| `fmriprep/n4-only` | corrected | 694333 of 5898240 differ; max \|diff\| 0.0501, max rel 8.3e-05, 1 - NCC 1.3e-10 | 0.25 | 0.01 |
+| `fmriprep/n4-only` | bias field | 5898130 of 5898240 differ; max \|diff\| 7.86e-05, max rel 8.3e-05, 1 - NCC 2.1e-08 | 0.15 | 0.0053 |
 | `fmriprep/t1w-ds000210-final` | corrected | 6707886 of 11534336 differ; max \|diff\| 0.452, max rel 0.00017, 1 - NCC 6.9e-11 | 0.21 | 0.064 |
 | `fmriprep/t1w-ds000210-final` | bias field | 11508335 of 11534336 differ; max \|diff\| 0.000274, max rel 0.00017, 1 - NCC 4.8e-09 | 0.21 | 0.17 |
-| `fmriprep/boldref-mask` | corrected | 32328 of 139264 differ; max \|diff\| 0.617, max rel 0.0052, 1 - NCC 2.5e-08 | 0.57 | 0.56 |
-| `fmriprep/boldref-mask` | bias field | 139255 of 139264 differ; max \|diff\| 0.00186, max rel 0.0021, 1 - NCC 3.7e-06 | 0.49 | 0.34 |
-| `fmriprep/t1w-preproc-mask` | corrected | 694466 of 5898240 differ; max \|diff\| 0.00134, max rel 8.8e-07, 1 - NCC 3.3e-14 | 0.12 | 0.0079 |
-| `options/defaults` | corrected | 1910 of 35840 differ; max \|diff\| 6.1e-05, max rel 2.8e-07, 1 - NCC 8.9e-16 | 0.00012 | 2e-08 |
-| `options/weight` | corrected | 1336 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.4e-07, 1 - NCC 1.1e-16 | 8.8e-05 | 7.8e-10 |
-| `options/weight` | bias field | 1526 of 35840 differ; max \|diff\| 1.19e-07, max rel 1.6e-07, 1 - NCC 1.4e-14 | 7.7e-05 | 1.8e-09 |
-| `options/shrink-1` | corrected | 29672 of 35840 differ; max \|diff\| 9.16e-05, max rel 1.5e-06, 1 - NCC 1.4e-14 | 0.26 | 0.29 |
-| `options/shrink-3` | corrected | 35839 of 35840 differ; max \|diff\| 0.117, max rel 0.005, 1 - NCC 3.5e-09 | 1.4 | 2.6 |
-| `options/shrink-0` | corrected | 29672 of 35840 differ; max \|diff\| 9.16e-05, max rel 1.5e-06, 1 - NCC 1.4e-14 | 0.26 | 0.29 |
-| `options/distance-30` | corrected | 35830 of 35840 differ; max \|diff\| 0.0407, max rel 0.0058, 1 - NCC 2.7e-11 | 0.43 | 0.0064 |
-| `options/distance-30` | bias field | 35834 of 35840 differ; max \|diff\| 0.00629, max rel 0.0058, 1 - NCC 3.8e-07 | 0.43 | 0.14 |
-| `options/distance-order-2` | corrected | 35836 of 35840 differ; max \|diff\| 0.145, max rel 0.0056, 1 - NCC 1.9e-09 | 0.045 | 0.0013 |
-| `inputs/int16-scaled` | corrected | 35839 of 35840 differ; max \|diff\| 0.314, max rel 0.0032, 1 - NCC 3.3e-08 | 0.35 | 0.071 |
+| `fmriprep/t1w-preproc-mask` | corrected | 517729 of 5898240 differ; max \|diff\| 0.000244, max rel 3.4e-07, 1 - NCC 4.7e-14 | 0.023 | 0.012 |
+| `options/mask-and-weight` | corrected | 10838 of 35840 differ; max \|diff\| 0.0612, max rel 0.00056, 1 - NCC 1.6e-08 | 0.87 | 0.79 |
+| `options/shrink-1` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.8e-15 | 0.36 | 0.28 |
+| `options/shrink-3` | corrected | 35840 of 35840 differ; max \|diff\| 0.133, max rel 0.0063, 1 - NCC 3.5e-09 | 1.7 | 4.2 |
+| `options/shrink-0` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.8e-15 | 0.36 | 0.28 |
+| `options/distance-30` | corrected | 35824 of 35840 differ; max \|diff\| 0.0275, max rel 0.0039, 1 - NCC 3.8e-10 | 0.4 | 0.058 |
+| `options/distance-30` | bias field | 35827 of 35840 differ; max \|diff\| 0.00427, max rel 0.0039, 1 - NCC 2e-07 | 0.4 | 0.092 |
+| `options/distance-order-2` | corrected | 35838 of 35840 differ; max \|diff\| 1.49, max rel 0.072, 1 - NCC 5.4e-08 | 0.22 | 0.0028 |
+| `inputs/int16-scaled` | corrected | 35836 of 35840 differ; max \|diff\| 0.11, max rel 0.00096, 1 - NCC 5.5e-09 | 0.072 | 0.0031 |
 | `inputs/las-sform-only` | corrected | 35840 of 35840 differ; max \|diff\| 0.0402, max rel 0.00024, 1 - NCC 5.7e-11 | 0.46 | 0.31 |
-| `inputs/dim2-distance` | corrected | 1280 of 1280 differ; max \|diff\| 0.0479, max rel 0.00025, 1 - NCC 7.7e-10 | 0.092 | 0.05 |
-| `inputs/bold-first-volume` | corrected | 54001 of 94276 differ; max \|diff\| 0.00244, max rel 3.7e-06, 1 - NCC 3e-13 | 0.71 | 0.62 |
+| `inputs/dim2-distance` | corrected | 1280 of 1280 differ; max \|diff\| 0.2, max rel 0.0014, 1 - NCC 1.6e-08 | 0.33 | 0.56 |
+| `inputs/bold-first-volume` | corrected | 53416 of 94276 differ; max \|diff\| 0.00165, max rel 2.4e-06, 1 - NCC 2.4e-13 | 0.39 | 0.74 |
 
 ## Thresholds
 
@@ -61,7 +56,7 @@
 
 | Case | What it tests | Errors |
 |---|---|---|
-| `errors/shrink-not-integer` | -s 2.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x566d5aeddaa0): ERROR: Parse error occured during command line argument processing… |
+| `errors/shrink-not-integer` | -s 2.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x5688359d6da0): ERROR: Parse error occured during command line argument processing… |
 | `errors/dimension-5` | -d 5: 'Unsupported dimension' | ANTs exit 1: 'Unsupported dimension'; larmorx exit 1: 'Unsupported dimension' |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs exit -11: 'file <tmp>/none.nii.gz does not exist .'; larmorx exit 1: 'file <tmp>/none.nii.gz does not exist . \nlarmorx: N4BiasFieldCorrection: cannot rea… |
 | `errors/mesh-wrong-length` | -b [2x2] in 3D: 'Incorrect mesh resolution', exit 1 | ANTs exit 1: ''; larmorx exit 1: '' |
@@ -71,7 +66,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (49a43d1f991b) |
+| larmorx | 0.0.1 (38b2a0c97ecf) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -90,21 +85,21 @@ ANTs runs as its own binary, larmorx in-process through its Python console entry
 |---|---|---|---|
 | `fmriprep/boldref-coregistration` | pass | 11/11 | fMRIPrep's BOLD reference (niworkflows func/util.py:487): -d 3, b-spline distance 200, rescale (no effect without a mas… |
 | `fmriprep/boldref-template` | pass | 11/11 | the same command on MNI152NLin2009cAsym's fMRIPrep boldref (res-02), weight = the brain probability map resampled onto … |
-| `fmriprep/smriprep-pre-template` | pass | 8/8 | sMRIPrep's N4 before the anatomical template (anatomical.py:1502): -d 3, ANTs' defaults (4 levels of 50 iterations, thr… |
+| `fmriprep/smriprep-pre-template` | pass | 11/11 | sMRIPrep's N4 before the anatomical template (anatomical.py:1502): -d 3, ANTs' defaults (4 levels of 50 iterations, thr… |
 | `fmriprep/brain-extraction-pass1` | pass | 8/8 | sMRIPrep's brain extraction, first N4 (niworkflows anat/ants.py:243): -b [200] -c [50x50x50x50,1e-7] -s 4, on the trunc… |
-| `fmriprep/brain-extraction-final` | pass | 19/19 | sMRIPrep's final N4 (anat/ants.py:704): -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r, weight = the WM probability map, bia… |
+| `fmriprep/brain-extraction-final` | pass | 13/13 | sMRIPrep's final N4 (anat/ants.py:704): -b [200] -c [50x50x50x50x50,1e-7] -s 4 -r, weight = the WM probability map, bia… |
 | `fmriprep/n4-only` | pass | 19/19 | sMRIPrep's N4 for skull-stripped T1w images (anat/ants.py:927): the final N4's options without a weight image, on a bra… |
 | `fmriprep/sdcflows-magnitude` | pass | 8/8 | sdcflows' brain extraction of a fieldmap magnitude (workflows/ancillary.py:87): -c [50x50x50x50x50,1e-7] -s 4; ds003012… |
 | `fmriprep/sdcflows-magnitude-ds001600` | pass | 8/8 | the same command on ds001600's magnitude1 (acq-v4) |
 | `fmriprep/t1w-ds000210-final` | pass | 19/19 | the final N4's options (without weights) on ds000210's T1w |
-| `fmriprep/boldref-mask` | pass | 19/19 | ds000005's boldref with its brain mask: outside-mask voxels restored, the rest rescaled to the input's range in the mas… |
+| `fmriprep/boldref-mask` | pass | 13/13 | ds000005's boldref with its brain mask: outside-mask voxels restored, the rest rescaled to the input's range in the mas… |
 | `fmriprep/t1w-preproc-mask` | pass | 11/11 | fMRIPrep's preprocessed T1w with -x the brain mask, -r 0, shrink 2 |
-| `options/defaults` | pass | 11/11 | no option but input and output |
+| `options/defaults` | pass | 8/8 | no option but input and output |
 | `options/mask` | pass | 13/13 | a binary mask: restoration outside, rescaling inside; bias field |
 | `options/mask-no-rescale` | pass | 8/8 | a mask with -r 0 |
 | `options/fractional-mask` | pass | 8/8 | a float mask (0, 0.3, 0.6, 0.999, 1, 1.7, 2): N4 uses every non-zero voxel; only voxels within 4 ulps of 1 are rescaled |
-| `options/weight` | pass | 19/19 | a probability map as weight image (exact 0, 0.5 and 1) |
-| `options/mask-and-weight` | pass | 8/8 | mask and weight image together |
+| `options/weight` | pass | 13/13 | a probability map as weight image (exact 0, 0.5 and 1) |
+| `options/mask-and-weight` | pass | 11/11 | mask and weight image together |
 | `options/shrink-1` | pass | 11/11 | -s 1: no subsampling |
 | `options/shrink-3` | pass | 11/11 | -s 3 |
 | `options/shrink-0` | pass | 11/11 | -s 0: ITK makes it 1 |

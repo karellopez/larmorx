@@ -29,10 +29,11 @@ Paths below are under `work/fmriprep_25_2_wf/sub_01_wf/`; `<run>` is
 - **fMRIPrep's one-shot resampler corrupts random volumes unless OpenBLAS runs one thread**,
   which only the image's `ENV OMP_NUM_THREADS=1` ensures (below). The oracle run is not
   affected.
-- **fMRIPrep's ANTs computes N4 as the C++ source says; the repository's ANTs oracle (GCC 11)
-  does not, and larmorx follows the oracle.** With correctly rounded maths in both, a scratch
-  larmorx build that keeps the source's float roundings is bit-identical to fMRIPrep's N4
-  binary (below).
+- **fMRIPrep's ANTs computes N4 as the C++ source says; the repository's first ANTs oracle
+  (GCC 11.4) did not, because of a GCC bug.** larmorx now follows the source and, with
+  correctly rounded maths, is bit-identical to fMRIPrep's N4 binary in all 45 cases of the N4
+  parity suite and in all six N4 outputs of this run (below); the oracle is rebuilt by a fixed
+  compiler.
 - **61 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran**, on the steps'
   own inputs and parameters: every ImageMath, ThresholdImage and MultiplyImages step, the
   one-shot resampling in all three spaces, and the antsApplyTransforms calls with linear,
@@ -52,7 +53,7 @@ Paths below are under `work/fmriprep_25_2_wf/sub_01_wf/`; `<run>` is
 | Tool | In fMRIPrep 25.2.6's image | The repository's oracle |
 |---|---|---|
 | ANTs | 2.6.2.dev1-gff61a3d, conda-forge `ants` 2.6.2 build `h5f726e6_2`, compiled 2025-07-31 | ANTs v2.6.5 (`oracles/ants-2.6.5`, `scripts/build_ants_oracle.sh`) |
-| ITK | 5.4.4 (conda-forge `libitk` build `h8db0697_0`, shared libraries) | ITK v5.4.5, static, GCC 11.4 |
+| ITK | 5.4.4 (conda-forge `libitk` build `h8db0697_0`, shared libraries; GCC 13.3, ANTs' N4 library GCC 14.3) | ITK v5.4.5, static, conda-forge GCC 14.3 (GCC 11.4 until 2026-10-11) |
 | FSL `mcflirt` | `fsl-mcflirt` 2111.0 build `h982b8fd_8`, `fsl-newimage` 2501.4, `fsl-miscmaths` 2412.4 | FSL 6.0.7.17: `fsl-mcflirt` 2111.0 build `hb6de94e_6`, `newimage` 2203.12, `miscmaths` 2203.2 |
 | AFNI | 25.2.09 (`/usr/local/bin`) | 25.2.09 (`oracles/afni-25.2.09`) |
 | Python stack | Python 3.12.11, nipype 1.12.0, niworkflows 1.15.2, smriprep 0.19.2, sdcflows 2.15.1, nitransforms 25.1.0, nibabel 5.3.2, numpy 2.2.6, SciPy 1.15.2 | (larmorx replicates nitransforms 25.1.0 and SciPy 1.15.2) |
@@ -207,33 +208,40 @@ inputs:
   in all nine resamplings of the oracle run. The record's re-run of fMRIPrep's resampler sets
   `OMP_NUM_THREADS=1`, as fMRIPrep's image does.
 
-## fMRIPrep's ANTs computes N4 as the C++ source says; the repository's oracle does not
+## fMRIPrep's ANTs computes N4 as the C++ source says; the first repository oracle did not
 
-**fMRIPrep's N4 binary (ANTs 2.6.2, conda-forge) and the repository's ANTs 2.6.5 oracle (GCC
-11, `-O3`) give different N4 results on the same input at one thread, even with correctly
-rounded maths in both, and the whole difference is the oracle's code generation.**
-[ants-n4.md](ants-n4.md) ("GCC 11's code generation on the oracle") found that GCC 11
-vectorizes the first two axes of ITK's B-spline fit in double precision and drops two roundings
-to float that the source requires; larmorx reproduces that, to be bit-identical to the oracle
-(`larmorx_image::bspline::fit::gcc_double_axes`). fMRIPrep's build does not do it:
+**fMRIPrep's N4 binary (ANTs 2.6.2, conda-forge) and the repository's first ANTs 2.6.5 oracle
+(GCC 11.4, `-O3`) gave different N4 results on the same input at one thread, even with
+correctly rounded maths in both, and the whole difference was the oracle's: GCC 11.4
+miscompiles two float roundings of ITK's B-spline fit (GCC bug 110182,
+[ants-n4.md](ants-n4.md), "GCC 11 miscompiles the fit").** larmorx reproduced that build at
+first; since 2026-10-11 it follows the source, and the oracle is rebuilt by conda-forge's GCC
+14.3 (the compiler of fMRIPrep's ANTs).
 
 - *Verified* on the BOLD reference's N4 of run 03 (`<run>/.../n4_correct`, one thread):
-  fMRIPrep's binary in its image with CORE-MATH preloaded against the ANTs 2.6.5 oracle with
+  fMRIPrep's binary in its image with CORE-MATH preloaded against the GCC 11 oracle with
   CORE-MATH preloaded: 137,675 of 139,264 voxels differ, by at most 0.152 (1 − NCC 7.8e-10);
   as built (glibc's maths in both), 138,068 voxels, at most 1.44 (1 − NCC 7e-8).
-- *Verified:* a scratch build of larmorx with `gcc_double_axes` returning 0 (the source's
-  roundings), run on the same commands, is **bit-identical to fMRIPrep's binary with CORE-MATH
-  preloaded (one thread) in all six N4 outputs of the run**: the three BOLD references, the
-  brain extraction's first N4 and its final N4 (corrected image and bias field). (The scratch
-  change was reverted; it is not in the repository.)
-- So the "version" link of the record's chain for N4 is not a change between ANTs 2.6.2 and
-  2.6.5: it is one compiler's treatment of two `float` roundings. With one thread, correctly
-  rounded maths and the source's roundings, larmorx reproduces fMRIPrep's own N4 exactly.
-- **larmorx's N4 currently follows the oracle's GCC 11 build, not the source and not the
-  ANTs that fMRIPrep users run.** Which one larmorx should reproduce by default is a decision
-  for the project (the N4 validation record and golden checksums follow the oracle today).
-  DenoiseImage has no such difference: fMRIPrep's binary and the oracle agree bit for bit at
-  one thread.
+- *Verified:* larmorx with the source's roundings is **bit-identical to fMRIPrep's binary
+  with CORE-MATH preloaded (one thread) in all six N4 outputs of the run**: the three BOLD
+  references, the brain extraction's first N4 and its final N4 (corrected image and bias
+  field). (First found with a scratch build; it is larmorx's default now.)
+- *Validated* (2026-10-11) on every case of the N4 parity suite (standard tier), with
+  fMRIPrep's binary at one thread in place of the oracle: **45 of 45 cases (54 of 54 outputs)
+  bit-identical to larmorx with CORE-MATH preloaded**; as built, 29 of 45 (35 of 54), every
+  remaining difference the same, case by case, as the new oracle's as built (glibc's `expf`,
+  `logf`, `exp`; [ants-n4](../validation/ants-n4.md)). The binary ran through Apptainer
+  wrappers given to the suite's cases as `LARMORX_ANTS_BIN`, with the suite's
+  `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` passed in and `libcrmath.so` bound into the container
+  and preloaded there.
+- So the "version" link of the record's chain for N4 was not a change between ANTs 2.6.2 and
+  2.6.5: it was one compiler's bug. The [stage record](../validation/fmriprep-stages.md)
+  predates the change (its N4 rows compare the old larmorx and the GCC 11 oracle); it is to be
+  regenerated.
+- DenoiseImage has no such difference: on every case of the DenoiseImage suite (standard
+  tier), fMRIPrep's binary at one thread is bit-identical to larmorx in 40 of 40 cases (52 of
+  52 outputs) with CORE-MATH and in 7 of 40 as built, the same numbers as the oracle's
+  ([ants-denoise](../validation/ants-denoise.md)). *Validated* (2026-10-11).
 
 ## Reproducibility run to run
 

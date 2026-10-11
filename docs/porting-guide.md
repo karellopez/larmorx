@@ -121,7 +121,8 @@ at any cost".
 too: Ubuntu 22.04's GCC 11.4 and 12.3 drop float roundings in vectorized code at `-O3` (GCC
 bug 110182, fixed in 11.5, 12.4 and 13.2), so the ANTs oracle is built by conda-forge's GCC
 14.3 in a user-level environment, and `scripts/build_ants_oracle.sh` refuses a compiler that
-fails its probe of that bug ([validation/README.md](validation/README.md)).
+fails its probe of that bug ([validation/README.md](validation/README.md)). (The AFNI oracle
+and the CORE-MATH preload are built by GCC 11.4 at `-O2`, where GCC 11 does not vectorize.)
 
 **Record the oracle's exact build** next to every result: the upstream version and commit,
 compiler and version, flags and target, the C library and its version, the libraries it links

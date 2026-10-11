@@ -20,10 +20,12 @@ in [ants-image-programs.md](ants-image-programs.md), its argument parser in
   ANTs builds do, and the oracle is now built by a fixed compiler (below).
 - **ITK's `expf`, `logf`, `exp` and `sincos` come from glibc**, which is not always correctly
   rounded; larmorx's are (CLAUDE.md rule 5). That is the only difference left. Against the
-  unmodified ANTs 2.6.5 binary (one thread), 27 of 45 compared cases (30 of 54 outputs) are
+  unmodified ANTs 2.6.5 binary (one thread), 29 of 45 compared cases (35 of 54 outputs) are
   bit-identical, and the others differ by about as much as ANTs differs from itself between
   thread counts. Run with those glibc functions replaced by CORE-MATH's through `LD_PRELOAD`
   (ANTs' own code unchanged), the same binary gives larmorx's bits in all 54 outputs.
+  **fMRIPrep 25.2.6's own N4 (ANTs 2.6.2) gives the same: 29 of 45 cases as built, 45 of 45
+  with CORE-MATH preloaded.**
 
 ## How fMRIPrep, sMRIPrep and sdcflows call it
 
@@ -294,7 +296,7 @@ flags. *Verified:*
   `ThreadedGenerateDataForUpdatingResidualValues` (3D). In the bias field evaluation only the
   end tolerance changes, and `U = spans − epsilon` is rounded to float, so it changes no
   output unless `spans − epsilon` lies within about 1e-11 of a rounding boundary.
-- A 40-line reproduction of the `r` computation (float array assigned from a double
+- A 50-line reproduction of the `r` computation (float array assigned from a double
   quotient, then used in a double expression) gives values that differ from the source's
   roundings with `g++-11` 11.4 at `-O3` (31 of 120 values, also with `-march=corei7
   -mtune=native` and `-march=x86-64-v3`) and with `gcc-12` 12.3 (a C version); none at `-O0`
@@ -314,6 +316,28 @@ flags. *Verified:*
   `cvtpd2ps` for `r` in 2D and 3D. fMRIPrep 25.2.6's N4 library (ANTs 2.6.2, built by
   conda-forge's GCC 14.3.0; its ITK 5.4.4 by GCC 13.3.0, from the binaries' `.comment`
   sections) has `divpd`, `cvtpd2ps`, `cvtps2pd`, as the source says.
+
+**Elsewhere in the GCC 11 build.** The same scan of GCC's dumps, over every function of the
+translation units of the programs larmorx ports (ImageMath, ThresholdImage, MultiplyImages,
+SmoothImage, ResampleImage, ResampleImageBySpacing, antsApplyTransforms, DenoiseImage,
+N4BiasFieldCorrection), ANTs' `antsUtilities` library and 26 ITK libraries they link (about
+780 units, recompiled with the oracle's commands), finds the folded round trips only in:
+N4's fit and evaluation (above); `CenteredTransformInitializer` for float Euler transforms
+(the image centres; antsRegistration's `--initial-moving-transform [fixed,moving,0|1]` with
+`--float 1`, as fMRIPrep's normalization runs it); `ImageRegistrationMethodv4` and its
+`SetMetricSamplePoints` (the metric's sample points, in every 2D and 3D antsRegistration
+instantiation, double precision included), `DisplacementFieldToBSplineImageFilter`,
+`TimeVaryingVelocityFieldIntegrationImageFilter` and the vector-valued B-spline fit
+(registration's B-spline and velocity-field transforms); and ImageMath's `KinematicTensor`
+and metric operations (`NeighborhoodCorrelation`, `NormalizedCorrelation`, `Demons`,
+`Mattes`). None of the tools ported so far uses them except N4: run on every case of the other
+ANTs suites (standard tier), the GCC 11 and GCC 14.3 builds give byte-identical outputs and
+headers (antsApplyTransforms 79 of 79, ImageMath 302 of 302, ThresholdImage 36 of 36,
+MultiplyImages 12 of 12, SmoothImage 30 of 30, ResampleImage 48 of 48, ResampleImageBySpacing
+28 of 29, the other being the case that resamples uninitialised memory; DenoiseImage 40 of 40);
+N4 6 of 45. **Registration (A4, A5) must be validated against the new build only.**
+*Verified.* The scripts and their outputs are kept, outside the repository, in
+`<workspace>/oracles/ants-2.6.5-gcc11-O3/gcc-bug-110182/`.
 
 **Three independent builds agree with the source.** At one thread with CORE-MATH preloaded,
 larmorx with the source's roundings is bit-identical to fMRIPrep 25.2.6's N4 (all six N4
@@ -388,11 +412,14 @@ the same results except `expf` for |x| in [32, 48), which N4 does not reach.
 **One misrounded value changes the run.** A log value one ulp off moves a voxel's histogram
 contributions, the Wiener-sharpened mapping, the residual and so every later iteration; like
 the thread band, the difference spreads over most voxels but stays tiny. *Validated* (standard
-tier, 45 compared cases): larmorx is bit-identical to ANTs as built in 27. In the other 18, the
-difference is smaller than ANTs' own difference between one thread and 2 to 12 threads, except
-in two cases where it is up to 1.6 times larger in max |diff| and 2.6 times in 1 − NCC
-(fMRIPrep's BOLD reference on ds000005, and a phantom shrunk by 3). NCC is at least 0.9999999
-for every corrected image and 0.999996 for every bias field.
+tier, 45 compared cases, the oracle built by GCC 14.3): larmorx is bit-identical to ANTs as
+built in 29. In the other 16, the difference is smaller than ANTs' own difference between one
+thread and 2 to 12 threads, except in two cases where it is up to 1.7 times larger in max
+|diff| and 4.2 times in 1 − NCC (sMRIPrep's N4 before the template on ds000005's raw T1w, 1.3
+times in max |diff|, and a phantom shrunk by 3). NCC is at least 0.9999999 for every corrected
+image and 0.9999998 for every bias field. (Against the GCC 11 build, with larmorx reproducing
+its miscompile, it was 27 of 45, the exceptions fMRIPrep's BOLD reference on ds000005 and the
+same phantom.)
 
 **With CORE-MATH preloaded into ANTs, larmorx is bit-identical to it.**
 `scripts/build_crmath_preload.sh` builds `libcrmath.so`, which overrides `expf`, `logf`, `exp`,

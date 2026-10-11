@@ -382,27 +382,69 @@ impl LinearYz {
 /// (ITK's `ComputeInterpolationRegion` and `ComputeErrorFunctionArray`). The ends of the
 /// region, `c + 0.5 ∓ cutoff`, are computed in double and stored in the coordinate type `R`
 /// before `floor` and `ceil`.
-fn erf_weights<R: ItkReal>(c: f64, size: usize, scaling: f64, cutoff: f64) -> (usize, Vec<f64>) {
+fn erf_weights<R: ItkReal>(c: f64, size: usize, scaling: f64, cutoff: f64) -> Weights {
     let begin = R::from_f64(c + 0.5 - cutoff).to_f64().floor().max(0.0) as usize;
     let end = (R::from_f64(c + 0.5 + cutoff).to_f64().ceil().max(0.0) as usize).min(size);
     let n = end.saturating_sub(begin);
     let mut t = (-0.5 - c + begin as f64) * scaling;
     let mut e_last = vnl::erf(t);
-    let mut out = Vec::with_capacity(n);
-    for _ in 0..n {
+    let mut out = Weights::new(begin, n);
+    for slot in out.as_mut_slice() {
         t += scaling;
         let e_now = vnl::erf(t);
-        out.push(e_now - e_last);
+        *slot = e_now - e_last;
         e_last = e_now;
     }
-    (begin, out)
+    out
+}
+
+/// The weights of one axis of a Gaussian interpolator's region, from voxel `begin`: on the
+/// stack up to [`Weights::INLINE`] of them (no allocation per evaluation), else on the heap.
+struct Weights {
+    begin: usize,
+    len: usize,
+    inline: [f64; Weights::INLINE],
+    heap: Vec<f64>,
+}
+
+impl Weights {
+    const INLINE: usize = 32;
+
+    fn new(begin: usize, len: usize) -> Self {
+        Weights {
+            begin,
+            len,
+            inline: [0.0; Weights::INLINE],
+            heap: if len > Weights::INLINE {
+                vec![0.0; len]
+            } else {
+                Vec::new()
+            },
+        }
+    }
+
+    fn as_slice(&self) -> &[f64] {
+        if self.len > Weights::INLINE {
+            &self.heap
+        } else {
+            &self.inline[..self.len]
+        }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [f64] {
+        if self.len > Weights::INLINE {
+            &mut self.heap
+        } else {
+            &mut self.inline[..self.len]
+        }
+    }
 }
 
 fn gaussian_region<R: ItkReal>(
     size: [usize; 3],
     p: &GaussianParams,
     cidx: [f64; 3],
-) -> [(usize, Vec<f64>); 3] {
+) -> [Weights; 3] {
     std::array::from_fn(|d| erf_weights::<R>(cidx[d], size[d], p.scaling[d], p.cutoff[d]))
 }
 
@@ -412,13 +454,15 @@ fn gaussian<T: RealElement, R: ItkReal>(
     p: &GaussianParams,
     cidx: [f64; 3],
 ) -> f64 {
-    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region::<R>(v.size, p, cidx);
+    let [wx, wy, wz] = gaussian_region::<R>(v.size, p, cidx);
+    let (bx, by, bz) = (wx.begin, wy.begin, wz.begin);
     let (mut sum_me, mut sum_m) = (0.0f64, 0.0f64);
-    for (k, &w2) in wz.iter().enumerate() {
-        for (j, &w1) in wy.iter().enumerate() {
-            for (i, &w0) in wx.iter().enumerate() {
+    for (k, &w2) in wz.as_slice().iter().enumerate() {
+        for (j, &w1) in wy.as_slice().iter().enumerate() {
+            let row = &v.data[v.size[0] * (by + j + v.size[1] * (bz + k)) + bx..];
+            for (&w0, value) in wx.as_slice().iter().zip(row) {
                 let w = w0 * w1 * w2;
-                sum_me += v.at(bx + i, by + j, bz + k) * w;
+                sum_me += value.to_f64() * w;
                 sum_m += w;
             }
         }
@@ -434,14 +478,25 @@ fn multi_label<T: RealElement, R: ItkReal>(
     p: &GaussianParams,
     cidx: [f64; 3],
 ) -> f64 {
-    let [(bx, wx), (by, wy), (bz, wz)] = gaussian_region::<R>(v.size, p, cidx);
-    let mut weights: Vec<(f64, f64)> = Vec::new();
+    let [wx, wy, wz] = gaussian_region::<R>(v.size, p, cidx);
+    let (bx, by, bz) = (wx.begin, wy.begin, wz.begin);
+    // (label, summed weight) in order of appearance; a few labels on the stack.
+    const INLINE: usize = 16;
+    let mut inline = [(0.0f64, 0.0f64); INLINE];
+    let mut n_labels = 0usize;
+    let mut heap: Vec<(f64, f64)> = Vec::new();
     let (mut wmax, mut vmax) = (0.0f64, 0.0f64);
-    for (k, &w2) in wz.iter().enumerate() {
-        for (j, &w1) in wy.iter().enumerate() {
-            for (i, &w0) in wx.iter().enumerate() {
+    for (k, &w2) in wz.as_slice().iter().enumerate() {
+        for (j, &w1) in wy.as_slice().iter().enumerate() {
+            let row = &v.data[v.size[0] * (by + j + v.size[1] * (bz + k)) + bx..];
+            for (&w0, value) in wx.as_slice().iter().zip(row) {
                 let w = w0 * w1 * w2;
-                let value = v.at(bx + i, by + j, bz + k);
+                let value = value.to_f64();
+                let weights = if heap.is_empty() {
+                    &mut inline[..n_labels]
+                } else {
+                    &mut heap[..]
+                };
                 // Labels compare by value, like ITK's std::map key.
                 let total = match weights.iter_mut().find(|(k, _)| *k == value) {
                     Some((_, acc)) => {
@@ -449,7 +504,15 @@ fn multi_label<T: RealElement, R: ItkReal>(
                         *acc
                     }
                     None => {
-                        weights.push((value, w));
+                        if heap.is_empty() && n_labels < INLINE {
+                            inline[n_labels] = (value, w);
+                            n_labels += 1;
+                        } else {
+                            if heap.is_empty() {
+                                heap.extend_from_slice(&inline[..n_labels]);
+                            }
+                            heap.push((value, w));
+                        }
                         w
                     }
                 };

@@ -16,7 +16,13 @@ Cases cover:
 - awkward geometries: oblique, flipped, anisotropic, single-slice, qform-only, scaled
   integers, nearest-neighbour ties and voxels outside the input;
 - output types, time series and the errors both programs must raise;
-- real fMRIPrep derivatives.
+- real fMRIPrep derivatives;
+- all of the above again with ``--float 1``, ANTs' single-precision pipeline (category
+  ``float``), plus the parsing of float numbers in text transforms and ``-f``.
+
+ANTs runs twice: as built (glibc's maths), the headline, and with CORE-MATH's correctly
+rounded functions preloaded (``scripts/build_crmath_preload.sh``), which larmorx computes with
+(CLAUDE.md rule 5); the second run explains the differences of the first.
 """
 
 from __future__ import annotations
@@ -26,13 +32,13 @@ import io
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import larmorx_testdata as td
 import numpy as np
 
-from larmorx_validation.parity.ants_programs import ants_bin, ants_version
+from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     PASS,
@@ -82,6 +88,11 @@ T = {
 LINEAR_TRANSFORMS = [k for k in T if not k.startswith(("warp", "composite"))]
 
 F = "openneuro-derivatives/ds000005-fmriprep/sub-01"
+
+#: Just below the midpoint 26843547·2⁻²⁸ between two floats: read as double it lands on the
+#: midpoint, which a cast to float rounds to even (up); read as float (ANTs' ``>> float``) it
+#: rounds down.
+STRTOF_TRAP = "0.1000000052154064178466796874999999999999"
 FUNC = f"{F}/func/sub-01_task-mixedgamblestask_run-1"
 
 
@@ -311,7 +322,7 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         add(
             f"output/float-{interp}",
             "output",
-            f"--float 1 with {interp}: single-precision pipeline (larmorx computes in double)",
+            f"--float 1 with {interp}: ANTs' single-precision pipeline",
             Scenario(AXIAL, R_OBLIQUE, aff, interp, ("--float", "1")),
         )
 
@@ -447,6 +458,41 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     ]
     for cid, desc, scenario in real:
         add(f"fmriprep/{cid}", "fmriprep", desc, scenario)
+
+    # --float 1: every case above again in single precision.
+    twins = []
+    for cid, _category, desc, scenario in out:
+        if "--float" in scenario.extra:
+            continue
+        twins.append(
+            (
+                f"float/{cid}",
+                "float",
+                f"--float 1: {desc}",
+                replace(scenario, extra=(*scenario.extra, "--float", "1")),
+            )
+        )
+    out.extend(twins)
+    add(
+        "float/parse/text-transform",
+        "float",
+        "--float 1: a text affine whose numbers round differently read as float (strtof) and "
+        "as double then cast",
+        Scenario(AXIAL, R_OBLIQUE, (("gen:strtof-affine.txt", False),), "Linear", ("--float", "1")),
+    )
+    add(
+        "float/parse/default-value",
+        "float",
+        "--float 1 -f 0.1000000052154064178466796874999999999999: the default value read as float "
+        "(strtof), not as double then cast",
+        Scenario(
+            AXIAL,
+            R_WIDE,
+            aff,
+            "Linear",
+            ("-f", STRTOF_TRAP, "--float", "1"),
+        ),
+    )
     return out
 
 
@@ -469,6 +515,30 @@ def cases(tier: str) -> list[Case]:
 def _resolve(path: str, tmp: Path) -> str:
     if path in ("identity", "missing.mat"):
         return path if path == "identity" else str(tmp / path)
+    if path == "gen:strtof-affine.txt":
+        # A centred affine near the identity, each number the float-rounding trap scaled.
+        out = tmp / "strtof-affine.txt"
+        matrix = [
+            "1.0000001788139343261718749999999999",
+            STRTOF_TRAP,
+            "0",
+            "0",
+            "0.99999997019767761230468749999999999",
+            "0",
+            "0",
+            "0",
+            "1",
+        ]
+        translation = ["1.5000001788139343261718749999999999", "-2", "0.75"]
+        center = [STRTOF_TRAP, "-3.0000003576278686523437499999999999", "1"]
+        out.write_text(
+            "#Insight Transform File V1.0\n#Transform 0\n"
+            "Transform: AffineTransform_double_3_3\n"
+            f"Parameters: {' '.join(matrix + translation)}\n"
+            f"FixedParameters: {' '.join(center)}\n",
+            encoding="utf-8",
+        )
+        return str(out)
     if path.startswith("larmorx:"):
         import larmorx as lx
 
@@ -494,10 +564,17 @@ def _oracle() -> Path | None:
     return b / "antsApplyTransforms" if b and (b / "antsApplyTransforms").is_file() else None
 
 
-def _run_ants(args: list[str]) -> int:
+def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> int:
+    """Run antsApplyTransforms; with ``correctly_rounded``, with CORE-MATH's functions
+    preloaded (the oracle binary only)."""
     if (program := _oracle()) is not None:
         env = {**os.environ}
         env.setdefault("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "4")
+        if correctly_rounded:
+            lib = crmath_preload()
+            if lib is None:
+                raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
+            env["LD_PRELOAD"] = str(lib)
         return subprocess.run(
             [str(program), *args], capture_output=True, env=env, timeout=1800
         ).returncode
@@ -616,26 +693,77 @@ def run_case(case: Case, checks: CheckList) -> None:
                 detail="identical" if differing == 0 else f"{differing} voxels differ",
             )
         )
+        if _oracle() is None or crmath_preload() is None:
+            return
+        # ANTs with correctly rounded maths, as larmorx computes.
+        cr_out = tmp / "ants-cr.nii.gz"
+        cr_code = _run_ants(_args(s, tmp, cr_out), correctly_rounded=True)
+        if cr_code != 0 or not cr_out.exists():
+            checks("ANTs with CORE-MATH succeeds", False, detail=f"exit {cr_code}")
+            return
+        c = np.asanyarray(nib.load(cr_out).dataobj)
+        cr_differing = int(np.count_nonzero(c != b)) if c.shape == b.shape else b.size
+        checks.add(
+            Check(
+                "bit-identical with CORE-MATH",
+                True,
+                metric="differing voxels",
+                value=cr_differing,
+                threshold="reported",
+                detail="identical"
+                if cr_differing == 0
+                else f"{cr_differing} voxels differ; at most {_ulps(c, b)} ulp",
+            )
+        )
+
+
+def _identical(r: CaseResult, name: str) -> bool | None:
+    for c in r.checks:
+        if c.name == name:
+            return c.value == 0
+    return None
 
 
 def _highlights(results: list[CaseResult]) -> list[str]:
     compared = [r for r in results if r.status == PASS]
-    identical = [
-        r for r in compared if any(c.name == "bit-identical" and c.value == 0 for c in r.checks)
+    single = [
+        r for r in compared if r.case.startswith("float/") or r.case.startswith("output/float-")
     ]
-    differ = sorted({r.case for r in compared} - {r.case for r in identical})
-    lines = [
-        f"**Bit-identical: {len(identical)} of {len(compared)} passing cases** produce exactly the "
-        "bytes of antsApplyTransforms' output data."
-    ]
-    if differ:
-        lines.append(
-            "The others differ in the last bits only, where ITK calls the platform's `exp`, "
-            "`log`, `sin` or `cos` (Gaussian and windowed-sinc weights, Euler and versor "
-            "matrices) or where `--float` makes ANTs compute in single precision: "
-            + ", ".join(f"`{c}`" for c in differ)
-            + ". See `docs/findings/platform-math.md`."
+    lines = []
+    for label, group in (("all cases", compared), ("`--float 1` cases", single)):
+        identical = [r for r in group if _identical(r, "bit-identical")]
+        with_cr = [r for r in group if _identical(r, "bit-identical with CORE-MATH") is not None]
+        cr_identical = [r for r in with_cr if _identical(r, "bit-identical with CORE-MATH")]
+        line = (
+            f"**Bit-identical to the unmodified antsApplyTransforms, {label}: {len(identical)} "
+            f"of {len(group)}** passing cases produce exactly the bytes of its output data"
         )
+        if with_cr:
+            line += (
+                f"; with CORE-MATH's correctly rounded functions preloaded into ANTs, "
+                f"{len(cr_identical)} of {len(with_cr)}"
+            )
+        lines.append(line + ".")
+    differ = sorted(r.case for r in compared if not _identical(r, "bit-identical"))
+    if differ:
+        explained = [
+            c
+            for c in differ
+            if _identical(next(r for r in compared if r.case == c), "bit-identical with CORE-MATH")
+        ]
+        rest = [c for c in differ if c not in explained]
+        lines.append(
+            "Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, "
+            "`sincos`, `sinf`, `cosf` or `sincosf` (bit-identical with CORE-MATH preloaded; "
+            "Gaussian and windowed-sinc weights, Euler and versor matrices; "
+            "docs/findings/platform-math.md): "
+            + (", ".join(f"`{c}`" for c in explained) or "none")
+            + "."
+        )
+        if rest:
+            lines.append(
+                "**Not explained by the maths library**: " + ", ".join(f"`{c}`" for c in rest) + "."
+            )
     return lines
 
 
@@ -669,6 +797,11 @@ def suite() -> Suite:
                 f"max |diff| ≤ {RTOL:g} × max |ANTs output| (PLAN.md §11.3, interpolation vs ITK); bit-identity reported for every case",
             ),
             ("Other interpolators, integer output (-u)", "max |diff| ≤ 1"),
+            (
+                "Reported",
+                "bit-identity with ANTs as built, and with ANTs with CORE-MATH's correctly "
+                "rounded functions preloaded (`LD_PRELOAD`, the oracle binary only)",
+            ),
         ],
         cases=cases,
         run_case=run_case,
@@ -680,7 +813,7 @@ def suite() -> Suite:
             "read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses "
             "correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported "
             "yet), the same bits on every platform, which can differ from glibc in the last bit "
-            "(docs/findings/platform-math.md). With `--float 1` ANTs computes in single precision "
-            "and larmorx in double (to be changed before A4, decision log 2026-10-11)."
+            "(docs/findings/platform-math.md). With `--float 1` both compute in single precision "
+            "as ITK's float instantiation defines it (docs/findings/ants-float.md)."
         ),
     )

@@ -60,7 +60,8 @@ const MAX_ITS: usize = 100;
 const MAX_REL_ERROR: f64 = 3.0e-7;
 const VERY_SMALL: f64 = 1.0e-30;
 
-fn gamma_series(a: f64, x: f64) -> f64 {
+/// `vnl_gamma_series(a, x)`; `lg` is `vnl_log_gamma(a)`, which vnl evaluates on every call.
+fn gamma_series(a: f64, x: f64, lg: f64) -> f64 {
     if x <= 0.0 {
         return 0.0;
     }
@@ -75,10 +76,11 @@ fn gamma_series(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    sum * math::exp(-x + a * math::log(x) - log_gamma(a))
+    sum * math::exp(-x + a * math::log(x) - lg)
 }
 
-fn gamma_cont_frac(a: f64, x: f64) -> f64 {
+/// `vnl_gamma_cont_frac(a, x)`; `lg` is `vnl_log_gamma(a)`.
+fn gamma_cont_frac(a: f64, x: f64, lg: f64) -> f64 {
     let mut b_i = x + 1.0 - a;
     let mut c = 1.0 / VERY_SMALL;
     let mut d = 1.0 / b_i;
@@ -102,23 +104,32 @@ fn gamma_cont_frac(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    math::exp(-x + a * math::log(x) - log_gamma(a)) * cf
+    math::exp(-x + a * math::log(x) - lg) * cf
 }
 
-fn gamma_p(a: f64, x: f64) -> f64 {
+fn gamma_p(a: f64, x: f64, lg: f64) -> f64 {
     if x < a + 1.0 {
-        gamma_series(a, x)
+        gamma_series(a, x, lg)
     } else {
-        1.0 - gamma_cont_frac(a, x)
+        1.0 - gamma_cont_frac(a, x, lg)
     }
+}
+
+/// `vnl_log_gamma(0.5)`, the term `vnl_erf` recomputes (two logarithms) on every call through
+/// `vnl_gamma_p(0.5, x²)`. It is a pure function of its argument, so computing it once gives
+/// the same bits and saves half of `erf`'s logarithms.
+fn log_gamma_half() -> f64 {
+    static VALUE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| log_gamma(0.5))
 }
 
 /// `vnl_erf`.
 pub fn erf(x: f64) -> f64 {
+    let lg = log_gamma_half();
     if x < 0.0 {
-        -gamma_p(0.5, x * x)
+        -gamma_p(0.5, x * x, lg)
     } else {
-        gamma_p(0.5, x * x)
+        gamma_p(0.5, x * x, lg)
     }
 }
 
@@ -136,5 +147,6 @@ mod tests {
             );
         }
         assert_eq!(erf(0.0), 0.0);
+        assert_eq!(log_gamma_half().to_bits(), log_gamma(0.5).to_bits());
     }
 }

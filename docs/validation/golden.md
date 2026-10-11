@@ -193,8 +193,8 @@ evaluates nitransforms' expressions with these functions (`larmorx.transforms._l
 
 - every platform and CPU computes the same bits (`f64::mul_add` is a correctly rounded fused
   multiply-add everywhere);
-- on an x86-64 machine with FMA, larmorx stays bit-identical to fMRIPrep: 18,142,858 of
-  18,142,858 compared results against numpy
+- on an x86-64 machine with FMA, larmorx stays bit-identical to fMRIPrep: 18,143,058 of
+  18,143,058 compared results against numpy
   ([numpy-linalg.md](numpy-linalg.md)), and the resample-series parity is still 136 of 136
   bit-identical ([resample-series.md](resample-series.md));
 - the recorded checksums did not change: they were recorded on this machine, where numpy

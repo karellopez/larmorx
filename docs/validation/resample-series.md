@@ -4,8 +4,8 @@
 
 - **Validated:** `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` (crates larmorx-transform, -interp)
 - **Reference:** fMRIPrep 26.0.0.dev1+g21a490fb8 `ResampleSeries` (run through nipype), nitransforms 25.1.0, SciPy 1.15.3, in-process
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard`
 
 **Bit-identical: 136 of 136 passing cases** produce exactly the values of the reference (SciPy, nitransforms or fMRIPrep's ResampleSeries).
 
@@ -51,8 +51,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (46225a79652d-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (b4b2401c25ff) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

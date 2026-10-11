@@ -154,8 +154,8 @@ function. A `larmorx` subcommand can follow if a standalone use appears.
   ([scipy-ndimage.md](../findings/scipy-ndimage.md)). fMRIPrep never produces them.
 - **The same bits on every platform.** The 4×4 matrices (inverses, products, ITK-to-RAS,
   head motion, `ensure_positive_cosines`) and the per-voxel arithmetic are larmorx's, in a
-  fixed order: numpy's results on x86-64 with FMA (OpenBLAS's Haswell kernels; 18,142,858 of
-  18,142,858 compared results bit-identical, [numpy-linalg.md](../validation/numpy-linalg.md))
+  fixed order: numpy's results on x86-64 with FMA (OpenBLAS's Haswell kernels; 18,143,058 of
+  18,143,058 compared results bit-identical, [numpy-linalg.md](../validation/numpy-linalg.md))
   and SciPy's x86-64 interpolation (no contraction). fMRIPrep's own matrices depend on numpy's
   BLAS kernel, so on a CPU with AVX-512 or without FMA, or on macOS or ARM, fMRIPrep's last
   bits differ from larmorx's (and from its own on this machine)

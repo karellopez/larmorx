@@ -43,7 +43,7 @@ for head motion, the ITK-to-RAS conversion `LPS · C⁺ · M · C⁻ · LPS`, an
 expressions, but its products and inverses run in Rust (`larmorx_transform::openblas`), in the
 operation order of the OpenBLAS Haswell kernels numpy uses on x86-64 with FMA, and nibabel's
 `io_orientation` SVD is vnl's LINPACK SVD. So they carry fMRIPrep's bits on such a machine
-(18,142,858 of 18,142,858 compared results, [numpy-linalg.md](../validation/numpy-linalg.md))
+(18,143,058 of 18,143,058 compared results, [numpy-linalg.md](../validation/numpy-linalg.md))
 and the same bits on every platform. *Validated* (2026-10-11).
 
 **Those bits depend on the CPU's BLAS kernel in fMRIPrep, not in larmorx (2026-10-11).**

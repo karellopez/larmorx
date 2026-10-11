@@ -296,7 +296,7 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
 - **Done.** `larmorx_transform::openblas` (BSD-3-Clause replica in the main package):
   `matmul4` (`dgemm`: fused chains), `inv4` (`dgesv`: `getf2_k`, `getrs`, reciprocal pivots,
   `idamax` with its NaN rules), and the per-point orders (`dgemm`, and `dgemv` for a single
-  point); nibabel's `io_orientation` SVD uses vnl's LINPACK SVD. 18,142,858 of 18,142,858
+  point); nibabel's `io_orientation` SVD uses vnl's LINPACK SVD. 18,143,058 of 18,143,058
   results bit-identical to numpy on the Haswell kernels (`docs/validation/numpy-linalg.md`);
   resample-series parity still 136 of 136 bit-identical; the recorded golden checksums
   unchanged (three single-point outputs added); speed unchanged.

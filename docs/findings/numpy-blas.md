@@ -111,10 +111,12 @@ Haswell, Nehalem and Prescott but differ for about one in five under SandyBridge
 core in the build; no AVX-512 on the CPU); Atom and Barcelona map to Nehalem, Core2, Penryn,
 Dunnington and Opteron to Prescott, the Bulldozer family to SandyBridge. *Verified*.
 
-On the Haswell kernels larmorx is bit-identical to numpy for every one of 18,142,858 compared
+On the Haswell kernels larmorx is bit-identical to numpy for every one of 18,143,058 compared
 results of the `numpy-linalg` parity suite, standard tier: 1,000,000 matrices per family above
 plus the ITK-to-RAS chain and fMRIPrep's head-motion expression, single and multiple points
-through `Affine.map` and `DenseField.map`, `ensure_positive_cosines` on 20,000 grids, and every
+through `Affine.map` and `DenseField.map`, 200 runs of `resample_series` onto a one-voxel grid
+against fMRIPrep's `resample_image` (every product there is a single-point `dgemv`; the
+previous build differed in 47 of them), `ensure_positive_cosines` on 20,000 grids, and every
 transform file, source grid and head-motion series of the resample-series suite
 ([numpy-linalg.md](../validation/numpy-linalg.md)). *Validated*.
 

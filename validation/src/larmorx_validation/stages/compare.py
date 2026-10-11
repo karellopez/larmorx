@@ -46,6 +46,9 @@ class ImageDiff:
     changed: int | None = None
     #: 4D only: the PLAN.md §11.3 "preprocessed BOLD" measures.
     bold: dict[str, float] | None = None
+    #: 3D intensity images: the voxels whose ``|diff| / max |reference|`` exceeds each of
+    #: PLAN.md §11.3's relative thresholds (keys "1e-06", "1e-05", "0.0001").
+    over: dict[str, int] = field(default_factory=dict)
     note: str = ""
 
     @property
@@ -206,6 +209,10 @@ def compare_arrays(
         affine_diff=affine_diff,
         kind=kind,
     )
+    if kind == "intensity" and ref.ndim == 3 and diff.differing and acc.max_ref > 0:
+        d = np.abs(np.asarray(ref, dtype=np.float64) - np.asarray(test, dtype=np.float64))
+        d = np.where(np.isnan(d), 0.0, d) / acc.max_ref
+        diff.over = {f"{t:g}": int(np.count_nonzero(d > t)) for t in (1e-6, 1e-5, 1e-4)}
     if kind == "labels":
         a, b = np.asarray(ref), np.asarray(test)
         diff.changed = int(np.count_nonzero(a != b))

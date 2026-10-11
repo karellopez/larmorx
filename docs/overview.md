@@ -194,6 +194,31 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   own variability across versions, platforms, thread counts and seeds (PLAN.md G4, §11).
   Changes that move results further stay opt-in. Replicas always stay exact.
 
+## Against a real fMRIPrep run
+
+RESULTS-PLACEHOLDER
+
+## What is still needed
+
+The same comparison lists every step of the run that larmorx cannot do yet, with the time
+fMRIPrep spent on it (its own run of ds000005 sub-01, 8 jobs at once on a shared machine).
+These are the next tools to port, before larmorprepx:
+
+| Tool | What fMRIPrep uses it for | fMRIPrep's time | larmorx milestone |
+|---|---|---|---|
+| antsRegistration | MNI normalisation (SyN, 2,118 s), brain extraction (SyN, 520 s), the BOLD reference's affine premask | 2,639 s | A4 (rigid/affine), A5 (SyN) |
+| 3dUnifize | intensity unifying of the BOLD reference | 169 s | AFNI |
+| FLIRT-BBR | boundary-based BOLD-to-T1w registration | 139 s | FSL (clean-room and `larmorx-nc`) |
+| antsAI | affine initialisation (brain extraction, BOLD premask) | 117 s | A4 |
+| confounds | DVARS, CompCor, global signals, expansion, spikes (fMRIPrep's Python) | 53 s | larmorprepx (numpy) |
+| mri_coreg | BOLD-to-T1w initialisation | 48 s | FreeSurfer |
+| FAST | GM/WM/CSF segmentation and probability maps | 40 s | FSL |
+| 3dvolreg | aligning the volumes averaged into the HMC reference | 32 s | AFNI |
+| Atropos | K-means + MRF segmentation in brain extraction | 12 s | A6 |
+| BET, 3dAutomask, fslmaths, lta_convert | BOLD brain masks, transform formats | < 6 s together | FSL, AFNI, FreeSurfer (small) |
+
+Everything else fMRIPrep computes on this dataset, larmorx already does (above).
+
 ## Working on every platform
 
 - CI builds and tests the wheels on all six platforms for every push

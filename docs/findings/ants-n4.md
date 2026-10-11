@@ -274,6 +274,13 @@ float, and with them every case is bit-identical. *larmorx:* `GridFit::double_ax
 N4BiasFieldCorrection replica. A different compiler or flags would give ANTs other bits here;
 this is the oracle larmorx follows.
 
+*Added 2026-10-11:* **fMRIPrep 25.2.6's own ANTs (conda-forge 2.6.2) follows the source
+here.** On fMRIPrep's BOLD-reference N4 (one thread, CORE-MATH preloaded into both), it
+differs from this oracle in 137,675 of 139,264 voxels (at most 0.152), and a scratch larmorx
+build with `gcc_double_axes` returning 0 reproduces it bit for bit
+([fmriprep-oracle.md](fmriprep-oracle.md)). *Verified.* Whether larmorx should follow the source
+(and fMRIPrep's binary) or this oracle by default is open.
+
 ### Control-point lattices (`BSplineControlPointImageFilter`)
 
 **Evaluation** (`ControlPoint.hxx:178-272`): for each voxel, `U = spans · i / (n - 1)` per

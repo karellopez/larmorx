@@ -91,7 +91,11 @@ def assess_output(stage: Stage, d: ImageDiff) -> tuple[bool, str]:
     if name == "scipy-interpolation" and d.bold:
         ok, text = assess_output(Stage("", "", "", "", "", "", "bold"), d)
         return d.max_rel <= limit or ok, f"max rel {_g(d.max_rel)}; {text}"
-    return d.max_rel <= limit, f"max rel {_g(d.max_rel)}"
+    text = f"max rel {_g(d.max_rel)}"
+    over = (d.over or {}).get(f"{limit:g}")
+    if over:
+        text += f" ({over:,} of {d.voxels:,} voxels above {limit:g})"
+    return d.max_rel <= limit, text
 
 
 def assess_hmc(r: dict) -> tuple[bool, str]:
@@ -321,13 +325,7 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         f"(Apptainer), run `{run.name}`: "
         f"`{redact(run.arguments)}`. Input: ds000005 sub-01 (one T1w, three BOLD runs of 240 "
         "volumes, no field maps, no slice timing).",
-        f"- **Tools inside fMRIPrep's image:** {versions.get('ants_version', 'ANTs ?')} "
-        f"(conda-forge `ants` {versions.get('ants', '?')}, ITK {versions.get('libitk', '?')}); "
-        f"FSL `mcflirt` {versions.get('fsl-mcflirt', '?')} with `newimage` "
-        f"{versions.get('fsl-newimage', '?')}; {versions.get('afni', 'AFNI ?').lstrip('+ ')}; "
-        f"nitransforms {versions.get('nitransforms', '?')}, SciPy {versions.get('scipy', '?')}, "
-        f"numpy {versions.get('numpy', '?')} on OpenBLAS {versions.get('libopenblas', '?')}; "
-        f"{versions.get('glibc', '')}.",
+        f"- **Tools inside fMRIPrep's image:** {_tool_versions(versions)}.",
         f"- **larmorx:** {env['larmorx']} ({env['larmorx_commit']}), on {env['platform']}, "
         f"{env['cpu']}, {env['logical_cpus']} logical CPUs.",
         "- **References for the causes:** fMRIPrep's own tools re-run in its image, at its "
@@ -349,6 +347,13 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
     for st in present:
         rs = by_stage[st.id]
         sm = stage_summary(st, rs)
+        lx_key = "larmorx_seconds"
+        if st.kind == "resample":
+            # fMRIPrep's node also writes its output: compare like with like
+            lx_key = "larmorx_total_seconds"
+            for r in rs:
+                if r.get("larmorx_seconds") is not None:
+                    r[lx_key] = r["larmorx_seconds"] + (r.get("larmorx_write_seconds") or 0.0)
         rows.append(
             (
                 st.id,
@@ -360,7 +365,7 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
                 _threshold_text(st, sm),
                 _times(rs, "fmriprep_seconds", "fmriprep_threads"),
                 _times(rs, "container_seconds", "fmriprep_threads"),
-                _times(rs, "larmorx_seconds", "larmorx_threads"),
+                _times(rs, lx_key, "larmorx_threads"),
             )
         )
     lines += [
@@ -412,6 +417,26 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         "",
     ]
     return "\n".join(redact(x) for x in lines)
+
+
+def _version(versions: dict, key: str) -> str:
+    """``2.6.2 (build h5f726e6_2)`` -> ``2.6.2``."""
+    return str(versions.get(key, "?")).split(" (build")[0]
+
+
+def _tool_versions(v: dict) -> str:
+    import re
+
+    ants = re.sub(r"^ANTs Version:\s*", "", str(v.get("ants_version", "?")))
+    afni = re.search(r"AFNI_([\d.]+)", str(v.get("afni", "")))
+    glibc = re.search(r"GLIBC ([^)]+)\) ([\d.]+)", str(v.get("glibc", "")))
+    return (
+        f"ANTs {ants} (conda-forge `ants` {_version(v, 'ants')}) on ITK {_version(v, 'libitk')}; "
+        f"FSL `mcflirt` {_version(v, 'fsl-mcflirt')} (`newimage` {_version(v, 'fsl-newimage')}); "
+        f"AFNI {afni.group(1) if afni else '?'}; nitransforms {v.get('nitransforms', '?')}, "
+        f"SciPy {v.get('scipy', '?')}, numpy {v.get('numpy', '?')} on OpenBLAS "
+        f"{_version(v, 'libopenblas')}; glibc {glibc.group(2) if glibc else '?'}"
+    )
 
 
 def _headline(present: list[Stage], by_stage: dict[str, list[dict]], total: int) -> list[str]:
@@ -725,7 +750,7 @@ def _hmc_details(results: list[dict]) -> list[str]:
                     "Max FD (mm)",
                     "Mean FD fMRIPrep / larmorx (mm)",
                     "Max Δ RMSD (mm)",
-                    "Max Δ ITK matrix entry",
+                    "Max Δ ITK matrix entry (mm for translations)",
                     "Check: mcflirt's matrices",
                 ),
                 conf,
@@ -787,7 +812,11 @@ def _resample_details(st: Stage, results: list[dict]) -> list[str]:
         f"the raw BOLD, the target grid, the transforms (`{len(first.get('transforms') or [])}` "
         f"files), order {first.get('order')}, mode `{first.get('mode')}`, Jacobian "
         f"{first.get('jacobian')}, {first.get('output_dtype')} output. fMRIPrep's time includes "
-        "writing the compressed output; larmorx's is shown as compute + write.",
+        "writing the compressed output; larmorx's is shown as compute + write. fMRIPrep's "
+        "re-run has the node's `num_threads` and `OMP_NUM_THREADS=1`, as fMRIPrep's image sets "
+        "it: with more OpenBLAS threads, fMRIPrep's resampler corrupts some volumes "
+        "([fmriprep-oracle.md](../findings/fmriprep-oracle.md)); larmorx's result does not depend "
+        "on any thread count.",
         "",
         table(
             (
@@ -822,7 +851,7 @@ def write_record(s, payload: dict, out: Path, name: str) -> tuple[Path, Path]:
 
     out.mkdir(parents=True, exist_ok=True)
     versions = container_versions(s) if s.run.image is not None else {}
-    env = environment.describe(("nibabel", "scipy", "pandas"))
+    env = payload.get("environment") or environment.describe(("nibabel", "scipy", "pandas"))
     out_text = "docs/validation" if out.name == "validation" else redact(str(out))
     command = (
         f"python -m larmorx_validation pipeline-stages --oracle {workspace_path(s.run.root)} "
@@ -845,7 +874,6 @@ def write_record(s, payload: dict, out: Path, name: str) -> tuple[Path, Path]:
                         "arguments": s.run.arguments,
                         "tools": versions,
                     },
-                    "environment": env,
                     "stages": [
                         {
                             "id": st.id,

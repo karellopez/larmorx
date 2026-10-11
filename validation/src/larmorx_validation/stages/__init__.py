@@ -56,11 +56,13 @@ def _busy() -> list[str]:
     except OSError:
         return []
     own = str(os.getpid())
-    return [ln for ln in p.stdout.splitlines() if ln.split()[0] != own][:5]
+    return [ln[:200] for ln in p.stdout.splitlines() if ln.split()[0] != own][:5]
 
 
 def run_stages(s: Settings) -> dict:
     """Compare every node of every stage; returns the record's payload."""
+    from larmorx_validation import environment
+
     run = s.run
     selected = []
     missing: dict[str, list] = {}
@@ -76,6 +78,8 @@ def run_stages(s: Settings) -> dict:
             missing.setdefault(m.tool, []).append(node)
     order = {st.id: i for i, st in enumerate(STAGES)}
     selected.sort(key=lambda sn: (order[sn[0].id], sn[1].path))
+    # the environment as the run starts (the commit that produced the results)
+    env = environment.describe(("nibabel", "scipy", "pandas"))
     load_before = os.getloadavg()
     busy_before = _busy()
     started = time.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -92,6 +96,7 @@ def run_stages(s: Settings) -> dict:
         "load_before": load_before,
         "load_after": os.getloadavg(),
         "busy": sorted(set(busy_before + busy_after)),
+        "environment": env,
         "results": results,
         "missing": {
             tool: [
@@ -120,6 +125,11 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--no-container", action="store_true", help="do not re-run fMRIPrep's tools")
     p.add_argument("--no-ants-oracle", action="store_true", help="do not run ANTs 2.6.5")
     p.add_argument(
+        "--render",
+        action="store_true",
+        help="only write the Markdown record again from <out>/<name>.json (no runs)",
+    )
+    p.add_argument(
         "--bind",
         action="append",
         default=[],
@@ -145,13 +155,25 @@ def cmd(args: argparse.Namespace) -> int:
         select=tuple(args.stage),
         log=lambda text: print(text, file=sys.stderr, flush=True),
     )
-    payload = run_stages(s)
+    if args.render:
+        import json
+
+        if not args.out:
+            raise SystemExit("--render needs --out (where <name>.json is)")
+        payload = json.loads((Path(args.out) / f"{args.name}.json").read_text(encoding="utf-8"))
+        payload = {k: v for k, v in payload.items() if k not in _RECORD_KEYS}
+    else:
+        payload = run_stages(s)
     if args.out:
         md, js = write_record(s, payload, Path(args.out), args.name)
         print(f"report: {md}\n        {js}", file=sys.stderr)
     statuses = [r.get("status") for r in payload["results"]]
     bad = [st for st in statuses if st in ("unexplained", "larmorx-error", "harness-error")]
     return 1 if bad else 0
+
+
+#: Keys :func:`~larmorx_validation.stages.record.write_record` adds to the payload.
+_RECORD_KEYS = ("record", "generated", "command", "oracle", "stages")
 
 
 if __name__ == "__main__":

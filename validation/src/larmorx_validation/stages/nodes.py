@@ -619,9 +619,10 @@ def _rerun_resample(s: rn.Settings, node: Node, out_file: str) -> dict[str, Any]
         shutil.rmtree(directory)
     directory.mkdir(parents=True)
     inputs = {k: v for k, v in ((k, _value(v)) for k, v in node.inputs.items()) if v is not None}
-    p = rn.run_container_python(
-        s, directory, _RESAMPLE_SCRIPT, [json.dumps(inputs)], threads=node.threads
-    )
+    # The node's own num_threads (in ``inputs``), and OMP_NUM_THREADS=1 as fMRIPrep's image
+    # sets it: with more, the concurrent volumes' OpenBLAS calls race and corrupt the output
+    # (docs/findings/fmriprep-oracle.md).
+    p = rn.run_container_python(s, directory, _RESAMPLE_SCRIPT, [json.dumps(inputs)], threads=1)
     record = directory / "rerun.json"
     if p.returncode != 0 or not record.is_file():
         return {"container_error": p.stderr[-300:]}

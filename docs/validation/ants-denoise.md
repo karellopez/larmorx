@@ -18,43 +18,43 @@
 | `fmriprep/t1w-preproc-mask` | denoised | 495 of 5898240 differ; max \|diff\| 0.000122, max rel 7.1e-07, 1 - NCC 0 | 8.1e-07 | 0 |
 | `fmriprep/t1w-preproc-mask` | noise | 495 of 5898240 differ; max \|diff\| 0.000122, max rel 0.00056, 1 - NCC 0 | 8.1e-07 | 0 |
 | `fmriprep/mni-t1w` | denoised | 766 of 1082035 differ; max \|diff\| 0.000977, max rel 5.9e-07, 1 - NCC 0 | 9.7e-07 | 0 |
-| `fmriprep/boldref` | denoised | 44 of 139264 differ; max \|diff\| 0.000122, max rel 1.6e-06, 1 - NCC 0 | 6.9e-07 | 0 |
-| `fmriprep/boldref` | noise | 44 of 139264 differ; max \|diff\| 0.000122, max rel 3.7e-05, 1 - NCC 0 | 6.9e-07 | 0 |
-| `fmriprep/magnitude` | denoised | 112 of 147456 differ; max \|diff\| 0.00016, max rel 2e-06, 1 - NCC 3.3e-16 | 3.9e-07 | 8.8e-13 |
-| `options/defaults` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 4e-05 | 0 |
-| `options/rician` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 2.5e-14 |
-| `options/rician` | noise | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 0.00014, 1 - NCC 2.2e-16 | 4.2e-07 | 1.9e-15 |
-| `options/gaussian` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 2.4e-05 | 0 |
-| `options/gaussian` | noise | 45 of 35840 differ; max \|diff\| 3.05e-05, max rel 3.1e-05, 1 - NCC 4.4e-16 | 2.4e-05 | 1.3e-09 |
-| `options/model-case` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 3.4e-14 |
-| `options/mask-rician` | denoised | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 5.2e-07, 1 - NCC 2.2e-16 | 3.8e-07 | 1.6e-13 |
-| `options/mask-rician` | noise | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 7.2e-06, 1 - NCC 6.7e-16 | 3.8e-07 | 8e-15 |
-| `options/mask-gaussian` | denoised | 10 of 35840 differ; max \|diff\| 1.53e-05, max rel 1.4e-07, 1 - NCC 0 | 2.4e-06 | 0 |
-| `options/mask-fractional` | denoised | 2 of 35840 differ; max \|diff\| 7.63e-06, max rel 6.8e-08, 1 - NCC 0 | 1.6e-07 | 0 |
-| `options/mask-values` | denoised | 1 of 35840 differ; max \|diff\| 1.53e-05, max rel 9.6e-08, 1 - NCC 1.1e-16 | 2.8e-07 | 7.2e-14 |
-| `options/mask-larger` | denoised | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 5.2e-07, 1 - NCC 2.2e-16 | 4.4e-07 | 1.7e-13 |
-| `options/missing-mask` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 2.3e-14 |
-| `options/shrink-2` | denoised | 93 of 35840 differ; max \|diff\| 1.91e-05, max rel 2.7e-06, 1 - NCC 2.2e-16 | 2.9e-07 | 1.2e-14 |
+| `fmriprep/boldref` | denoised | 44 of 139264 differ; max \|diff\| 0.000122, max rel 1.6e-06, 1 - NCC 0 | 7.8e-07 | 0 |
+| `fmriprep/boldref` | noise | 44 of 139264 differ; max \|diff\| 0.000122, max rel 3.7e-05, 1 - NCC 0 | 7.8e-07 | 0 |
+| `fmriprep/magnitude` | denoised | 112 of 147456 differ; max \|diff\| 0.00016, max rel 2e-06, 1 - NCC 3.3e-16 | 3.9e-07 | 7.2e-13 |
+| `options/defaults` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 5e-06 | 0 |
+| `options/rician` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 2.6e-14 |
+| `options/rician` | noise | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 0.00014, 1 - NCC 2.2e-16 | 4.2e-07 | 2e-15 |
+| `options/gaussian` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 0.00011 | 0 |
+| `options/gaussian` | noise | 45 of 35840 differ; max \|diff\| 3.05e-05, max rel 3.1e-05, 1 - NCC 4.4e-16 | 0.00011 | 2.4e-08 |
+| `options/model-case` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 2.2e-14 |
+| `options/mask-rician` | denoised | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 5.2e-07, 1 - NCC 2.2e-16 | 3.6e-07 | 1.5e-13 |
+| `options/mask-rician` | noise | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 7.2e-06, 1 - NCC 6.7e-16 | 3.6e-07 | 7.6e-15 |
+| `options/mask-gaussian` | denoised | 10 of 35840 differ; max \|diff\| 1.53e-05, max rel 1.4e-07, 1 - NCC 0 | 2.2e-06 | 0 |
+| `options/mask-fractional` | denoised | 2 of 35840 differ; max \|diff\| 7.63e-06, max rel 6.8e-08, 1 - NCC 0 | 1.4e-07 | 0 |
+| `options/mask-values` | denoised | 1 of 35840 differ; max \|diff\| 1.53e-05, max rel 9.6e-08, 1 - NCC 1.1e-16 | 3e-07 | 1e-13 |
+| `options/mask-larger` | denoised | 10 of 35840 differ; max \|diff\| 2.29e-05, max rel 5.2e-07, 1 - NCC 2.2e-16 | 4.4e-07 | 1.8e-13 |
+| `options/missing-mask` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 3.1e-14 |
+| `options/shrink-2` | denoised | 93 of 35840 differ; max \|diff\| 1.91e-05, max rel 2.7e-06, 1 - NCC 2.2e-16 | 2.9e-07 | 1.5e-14 |
 | `options/shrink-2` | noise | 160 of 35840 differ; max \|diff\| 1.72e-05, max rel 4.4e-06, 1 - NCC 0 | 2.6e-07 | 0 |
-| `options/shrink-0` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 6.9e-06 | 0 |
-| `options/patch-2` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 8.2e-07, 1 - NCC 1.1e-16 | 4.1e-07 | 5.8e-15 |
+| `options/shrink-0` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 0.00014 | 0 |
+| `options/patch-2` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 8.2e-07, 1 - NCC 1.1e-16 | 3.9e-07 | 5.9e-15 |
 | `options/patch-0` | denoised | 11 of 35840 differ; max \|diff\| 3.05e-05, max rel 8.8e-07, 1 - NCC 7.8e-16 | inf | inf |
-| `options/search-1` | denoised | 27 of 35840 differ; max \|diff\| 2.29e-05, max rel 2.2e-07, 1 - NCC 1.1e-16 | 3.7e-06 | 1.5e-10 |
-| `options/search-3` | denoised | 23 of 35840 differ; max \|diff\| 7.44e-05, max rel 3e-06, 1 - NCC 2.2e-16 | 1e-06 | 2.4e-14 |
+| `options/search-1` | denoised | 27 of 35840 differ; max \|diff\| 2.29e-05, max rel 2.2e-07, 1 - NCC 1.1e-16 | 7e-07 | 2.3e-11 |
+| `options/search-3` | denoised | 23 of 35840 differ; max \|diff\| 7.44e-05, max rel 3e-06, 1 - NCC 2.2e-16 | 1e-06 | 2.2e-14 |
 | `options/radii-per-axis` | denoised | 29 of 35840 differ; max \|diff\| 4.2e-05, max rel 1.5e-06, 1 - NCC 0 | 5.5e-07 | 0 |
-| `options/output-one-parameter` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 0.00013 | 0 |
-| `options/verbose` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 4.1e-05 | 0 |
-| `inputs/int16-scaled` | denoised | 21 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.6e-07, 1 - NCC 0 | 4.2e-07 | 0 |
+| `options/output-one-parameter` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 6.5e-05 | 0 |
+| `options/verbose` | denoised | 44 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.2e-07, 1 - NCC 0 | 7.2e-06 | 0 |
+| `inputs/int16-scaled` | denoised | 21 of 35840 differ; max \|diff\| 3.05e-05, max rel 2.6e-07, 1 - NCC 0 | 4.1e-07 | 0 |
 | `inputs/outliers` | denoised | 21 of 35840 differ; max \|diff\| 0.0117, max rel 9.1e-07, 1 - NCC 0 | 1e-07 | 0 |
 | `inputs/outliers` | noise | 21 of 35840 differ; max \|diff\| 0.0117, max rel 4.6e-06, 1 - NCC 0 | 1e-07 | 0 |
-| `inputs/outliers-gaussian` | denoised | 37 of 35840 differ; max \|diff\| 0.000977, max rel 2.7e-07, 1 - NCC 0 | 0.00022 | 0 |
-| `inputs/negative-pixdim` | denoised | 22 of 35840 differ; max \|diff\| 9.16e-05, max rel 5.6e-06, 1 - NCC 2.2e-16 | 1.3e-06 | 2.4e-14 |
-| `inputs/dim2` | denoised | 1 of 1280 differ; max \|diff\| 1.53e-05, max rel 1.1e-07, 1 - NCC 0 | 2.3e-07 | 0 |
-| `inputs/dim2` | noise | 1 of 1280 differ; max \|diff\| 1.53e-05, max rel 8.8e-07, 1 - NCC 5.6e-16 | 2.3e-07 | 7.1e-15 |
-| `inputs/dim4` | denoised | 43 of 22400 differ; max \|diff\| 1.91e-05, max rel 7e-07, 1 - NCC 1.1e-15 | 1.1e-06 | 1.6e-13 |
-| `inputs/dim4` | noise | 46 of 22400 differ; max \|diff\| 1.91e-05, max rel 2.9e-06, 1 - NCC 4.4e-16 | 1.1e-06 | 6.8e-13 |
-| `inputs/dim3-of-4d` | denoised | 6 of 4480 differ; max \|diff\| 1.14e-05, max rel 3.3e-07, 1 - NCC 2.2e-16 | 5.9e-07 | 3.5e-14 |
-| `inputs/dimension-from-file` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4.2e-07 | 2.3e-14 |
+| `inputs/outliers-gaussian` | denoised | 37 of 35840 differ; max \|diff\| 0.000977, max rel 2.7e-07, 1 - NCC 0 | 5e-05 | 0 |
+| `inputs/negative-pixdim` | denoised | 22 of 35840 differ; max \|diff\| 9.16e-05, max rel 5.6e-06, 1 - NCC 2.2e-16 | 1.2e-06 | 2.6e-14 |
+| `inputs/dim2` | denoised | 1 of 1280 differ; max \|diff\| 1.53e-05, max rel 1.1e-07, 1 - NCC 0 | 3.1e-07 | 0 |
+| `inputs/dim2` | noise | 1 of 1280 differ; max \|diff\| 1.53e-05, max rel 8.8e-07, 1 - NCC 5.6e-16 | 3.1e-07 | 9.8e-15 |
+| `inputs/dim4` | denoised | 43 of 22400 differ; max \|diff\| 1.91e-05, max rel 7e-07, 1 - NCC 1.1e-15 | 1.1e-06 | 1.4e-13 |
+| `inputs/dim4` | noise | 46 of 22400 differ; max \|diff\| 1.91e-05, max rel 2.9e-06, 1 - NCC 4.4e-16 | 1.1e-06 | 6.4e-13 |
+| `inputs/dim3-of-4d` | denoised | 6 of 4480 differ; max \|diff\| 1.14e-05, max rel 3.3e-07, 1 - NCC 2.2e-16 | 5.9e-07 | 5.3e-14 |
+| `inputs/dimension-from-file` | denoised | 25 of 35840 differ; max \|diff\| 3.05e-05, max rel 6.6e-07, 1 - NCC 2.2e-16 | 4e-07 | 3.4e-14 |
 
 ## Thresholds
 
@@ -80,7 +80,7 @@
 
 | Case | What it tests | Errors |
 |---|---|---|
-| `errors/shrink-not-integer` | -s 1.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x647a03dc8ab0): ERROR: Parse error occured during command line argument processing… |
+| `errors/shrink-not-integer` | -s 1.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x59798f3deab0): ERROR: Parse error occured during command line argument processing… |
 | `errors/dimension-5` | -d 5: 'Unsupported dimension' | ANTs exit 1: 'Unsupported dimension'; larmorx exit 1: 'Unsupported dimension' |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs exit -11: 'file <tmp>/none.nii.gz does not exist .'; larmorx exit 1: 'file <tmp>/none.nii.gz does not exist . \nlarmorx: DenoiseImage: cannot read the inp… |
 | `errors/unknown-model` | -n Poisson: exit 1 | ANTs exit 1: ''; larmorx exit 1: '' |
@@ -94,7 +94,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (0c7c7a49882c-dirty) |
+| larmorx | 0.0.1 (1c405c826294) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

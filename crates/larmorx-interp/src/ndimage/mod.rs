@@ -19,6 +19,9 @@
 //! - Coordinates that are NaN or beyond ±2^63 make SciPy cast them to integers with undefined
 //!   behaviour; larmorx reproduces x86-64's result (the integer `i64::MIN`), and where SciPy
 //!   would then read outside the array (modes `nearest`, orders ≥ 1) it returns NaN.
+//!
+//! One SciPy defect is corrected by default (D13, `docs/api/upstream-defects.md`): the
+//! prefilter's reflect boundary (SCI-03). [`UpstreamDefects::Reproduce`] gives SciPy's result.
 #![allow(clippy::needless_range_loop)]
 
 mod geometric;
@@ -27,6 +30,7 @@ pub(crate) mod splines;
 pub use geometric::Spline;
 
 use larmorx_core::RealElement;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use rayon::prelude::*;
 
 /// How the input is extended beyond its edges (`mode` in `scipy.ndimage`).
@@ -384,7 +388,8 @@ fn check_shape(len: usize, shape: &[usize]) -> Result<(), NdimageError> {
 /// Fortran-ordered float64 array, in place. Orders 0 and 1 leave the data unchanged.
 ///
 /// Lines are filtered in parallel on the current rayon pool when `parallel` is set; the result
-/// does not depend on it.
+/// does not depend on it. `defects` chooses between the exact reflect boundary and SciPy's
+/// (SCI-03); the returned notices say whether that changed the result.
 pub fn spline_filter1d(
     data: &mut [f64],
     shape: &[usize],
@@ -392,7 +397,8 @@ pub fn spline_filter1d(
     order: u32,
     mode: Mode,
     parallel: bool,
-) -> Result<(), NdimageError> {
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, NdimageError> {
     if order > 5 {
         return Err(NdimageError::Order(order));
     }
@@ -403,47 +409,79 @@ pub fn spline_filter1d(
             ndim: shape.len(),
         });
     }
-    if order >= 2 {
-        filter_axis(data, shape, axis, order, mode.extend(), parallel);
-    }
-    Ok(())
+    let changed = order >= 2 && filter_axis(data, shape, axis, order, mode, parallel, defects);
+    Ok(reflect_notice(changed, mode, defects).into_iter().collect())
 }
 
 /// `scipy.ndimage.spline_filter(input, order, output=np.float64, mode)`: the 1D filter along
 /// every axis in turn, in place on a Fortran-ordered float64 array. `order` must be 2 to 5.
+/// `defects` as for [`spline_filter1d`].
 pub fn spline_filter(
     data: &mut [f64],
     shape: &[usize],
     order: u32,
     mode: Mode,
     parallel: bool,
-) -> Result<(), NdimageError> {
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, NdimageError> {
     if !(2..=5).contains(&order) {
         return Err(NdimageError::Order(order));
     }
     check_shape(data.len(), shape)?;
+    let mut changed = false;
     for axis in 0..shape.len() {
-        filter_axis(data, shape, axis, order, mode.extend(), parallel);
+        changed |= filter_axis(data, shape, axis, order, mode, parallel, defects);
     }
-    Ok(())
+    Ok(reflect_notice(changed, mode, defects).into_iter().collect())
+}
+
+/// The SCI-03 notice when the reflect boundary's initialisation changed (fixed) or would have
+/// changed (reproduced) the prefiltered coefficients.
+pub fn reflect_notice(changed: bool, mode: Mode, defects: UpstreamDefects) -> Option<Notice> {
+    changed.then(|| {
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "the spline prefilter's '{mode}' boundary uses the exact initialisation, so the \
+                 coefficients differ from SciPy's on short axes"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the spline prefilter's '{mode}' boundary is initialised as SciPy does, so the \
+                 splines do not pass through the samples on short axes"
+            ),
+        };
+        Notice::new(&defects::SCI_03, defects, detail)
+    })
 }
 
 /// Filters every line along `axis`. A line `(inner, outer)` has elements
 /// `inner + stride·(t + len·outer)` for `t < len`, with `stride` the product of the earlier
-/// axes' lengths.
+/// axes' lengths. Returns whether SCI-03 changed (or would have changed) a coefficient.
 pub(crate) fn filter_axis(
     data: &mut [f64],
     shape: &[usize],
     axis: usize,
     order: u32,
-    mode: Extend,
+    mode: Mode,
+    parallel: bool,
+    defects: UpstreamDefects,
+) -> bool {
+    let len = shape[axis];
+    if len <= 1 || data.is_empty() {
+        return false;
+    }
+    let filter = splines::LineFilter::new(order, mode.extend(), len, defects);
+    filter_lines(data, shape, axis, &filter, parallel);
+    filter.changed()
+}
+
+fn filter_lines(
+    data: &mut [f64],
+    shape: &[usize],
+    axis: usize,
+    filter: &splines::LineFilter,
     parallel: bool,
 ) {
     let len = shape[axis];
-    if len <= 1 || data.is_empty() {
-        return;
-    }
-    let filter = splines::LineFilter::new(order, mode, len);
     let stride: usize = shape[..axis].iter().product();
     let block = stride * len;
     if stride == 1 {
@@ -512,7 +550,7 @@ pub(crate) fn filter_axis(
 /// `D` dimensions in Fortran order. `coordinates[n]` is the point of output element `n`.
 ///
 /// The input is prefiltered once ([`Spline::new`]); points are evaluated in parallel on the
-/// current rayon pool.
+/// current rayon pool. `defects` as for [`spline_filter1d`].
 #[allow(clippy::too_many_arguments)]
 pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
     input: &[T],
@@ -523,11 +561,12 @@ pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
     mode: Mode,
     cval: f64,
     prefilter: bool,
-) -> Result<(), NdimageError> {
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, NdimageError> {
     if output.len() != coordinates.len() {
         return Err(NdimageError::Output);
     }
-    let spline = Spline::new(input, shape, order, mode, cval, prefilter, true)?;
+    let spline = Spline::new(input, shape, order, mode, cval, prefilter, true, defects)?;
     const CHUNK: usize = 4096;
     // 3D inputs take the batched path (the same values, faster).
     let spline3 = (&spline as &dyn std::any::Any).downcast_ref::<Spline<3>>();
@@ -550,7 +589,7 @@ pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
                 }
             }
         });
-    Ok(())
+    Ok(spline.notices())
 }
 
 #[cfg(test)]

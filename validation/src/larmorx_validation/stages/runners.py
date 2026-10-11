@@ -190,7 +190,12 @@ def run_larmorx(
     family = CLI_PROGRAMS.get(program, "mri" if program == "mcflirt" else "")
     name = "hmc" if program == "mcflirt" else program
     _fresh(directory)
-    env = {"ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads), "OMP_NUM_THREADS": str(threads)}
+    # D13: fMRIPrep's programs as they ran, so their defects reproduced.
+    env = {
+        "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads),
+        "OMP_NUM_THREADS": str(threads),
+        "LARMORX_UPSTREAM_DEFECTS": "reproduce",
+    }
     if program == "mcflirt":
         env["FSLOUTPUTTYPE"] = node.inputs.get("output_type", "NIFTI_GZ") or "NIFTI_GZ"
     saved = {k: os.environ.get(k) for k in env}

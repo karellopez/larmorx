@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 25.2.09, or its
-bit-exact replica from ``larmorx-gpl``, run as a separate program)."""
+bit-exact replica from ``larmorx-gpl``, run as a separate program).
+
+AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
+a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an intercept (AFNI-02), header
+slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel pairs (AFNI-05) and metre or
+micron units (AFNI-07). ``upstream_defects="reproduce"`` gives AFNI's output."""
 
 from __future__ import annotations
 
@@ -14,7 +19,8 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _core, _replica
+from larmorx import _core, _defects, _replica
+from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.image import Image, as_image
 from larmorx.io.nifti import NiftiHeader
@@ -69,11 +75,13 @@ def tshift(
     detrend: bool = True,
     n_threads: int = 1,
     implementation: ImplementationName = "auto",
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """Align every slice of a 4D image to one time origin (AFNI's ``3dTshift``).
 
     Each voxel's time series is detrended, shifted so that its slice refers to ``tzero``,
-    clipped to its own range and given its trend back, exactly as AFNI 25.2.09 does.
+    clipped to its own range and given its trend back, as AFNI 25.2.09 does, with AFNI's
+    defects corrected unless ``upstream_defects="reproduce"``.
 
     Parameters
     ----------
@@ -103,10 +111,10 @@ def tshift(
         its input range), ``none`` (``-rlt``) or ``intercept`` (``-rlt+``, the fitted
         trend's value at the first time point used).
     detrend
-        ``False`` is ``-no_detrend``: the mean instead of the trend is removed and restored,
-        with AFNI 25.2.09's behaviour reproduced (a warning says so): within each slice, voxels
-        are taken in pairs in index order, and only the first of each pair has its mean
-        removed; the second is shifted as raw values. Needs ``restore="trend"``.
+        ``False`` is ``-no_detrend``: the mean instead of the trend is removed and restored.
+        Needs ``restore="trend"``. AFNI 25.2.09 does that only to the first voxel of each
+        pair (in index order within a slice) and shifts the second as raw values (AFNI-05;
+        ``upstream_defects="reproduce"``).
     n_threads
         Worker threads (0 = all). The result does not depend on it.
     implementation
@@ -115,6 +123,11 @@ def tshift(
         ``"replica"`` or ``"original"`` force one. The replica runs as a separate program on
         temporary NIfTI files (``docs/licensing.md``). The two differ only in the last bits of
         some values (``docs/validation/afni-tshift.md``).
+    upstream_defects
+        ``"fix"`` (default) corrects AFNI's defects AFNI-01, -02, -05 and -07;
+        ``"reproduce"`` gives AFNI's output. A :class:`~larmorx.UpstreamDefectWarning` names
+        each defect that changed the result (or, reproduced, would have been corrected). The
+        replica receives the choice as ``LARMORX_UPSTREAM_DEFECTS``.
 
     Returns
     -------
@@ -137,16 +150,10 @@ def tshift(
         The replica was found but failed. larmorx does not fall back to the original then.
     """
     _check(slice_times, tr, tzero, slice, ignore, method, restore, detrend)
-    if not detrend:
+    _defects.check(upstream_defects)
+    if not detrend and method == "fourier":
         warnings.warn(
-            "detrend=False reproduces AFNI 25.2.09's -no_detrend: only the first voxel of each "
-            "pair (in index order within a slice) has its mean removed and restored; the second "
-            "is shifted as raw values"
-            + (
-                "; AFNI also calls it dangerous with Fourier interpolation"
-                if method == "fourier"
-                else ""
-            ),
+            "detrend=False (-no_detrend) with Fourier interpolation: AFNI calls it dangerous",
             stacklevel=2,
         )
     times: str | list[float] = (
@@ -161,20 +168,24 @@ def tshift(
         restore=restore,
         detrend=bool(detrend),
         n_threads=int(n_threads),
+        upstream_defects=upstream_defects,
     )
     selected = _replica.select("afni", "3dTshift", implementation)
     if selected is not None:
         return _tshift_replica(selected, image, times, options)
     if isinstance(image, (str, os.PathLike)):
-        data, fields, messages = _core.afni_tshift_file(os.fspath(image), times, **options)
+        data, fields, messages, notices = _core.afni_tshift_file(os.fspath(image), times, **options)
         header = NiftiHeader.from_dict(fields)
         data = _scaled(data, header)
     else:
         array, fields_in = _in_memory(image, tr)
-        data, fields, messages = _core.afni_tshift_array(array, fields_in, times, **options)
+        data, fields, messages, notices = _core.afni_tshift_array(
+            array, fields_in, times, **options
+        )
         header = NiftiHeader.from_dict(fields)
     for message in messages:
         warnings.warn(message, stacklevel=2)
+    _defects.warn(notices)
     return Image(data, header.affine, header, implementation=_replica.ORIGINAL)
 
 
@@ -258,14 +269,19 @@ def _tshift_replica(
                 "\t".join(repr(t) for t in times) + "\n", encoding="utf-8"
             )
         process = _replica.run(
-            selected, [*args, "-prefix", "out.nii", source], cwd=tmp, n_threads=n_threads
+            selected,
+            [*args, "-prefix", "out.nii", source],
+            cwd=tmp,
+            n_threads=n_threads,
+            upstream_defects=options["upstream_defects"],
         )
         out = os.path.join(tmp, "out.nii")
         data = _core.nifti_read(out, "raw", n_threads)[0]
         header = NiftiHeader.from_dict(_core.nifti_read_header(out, False))
     for line in process.stderr.splitlines():
         if line.startswith("*+ WARNING: "):
-            warnings.warn(line.removeprefix("*+ WARNING: "), stacklevel=3)
+            text = line.removeprefix("*+ WARNING: ")
+            warnings.warn(_defects.parse_line(text) or text, stacklevel=3)
     return Image(_scaled(data, header), header.affine, header, implementation=implementation)
 
 

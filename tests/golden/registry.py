@@ -323,6 +323,14 @@ def _write_scaled_series(path: Path) -> None:
     _core.nifti_write(os.fspath(path), data, fields, 2, 1)
 
 
+def _write_negative_series(path: Path) -> None:
+    """The 3dTshift series as int16 with a negative ``scl_slope`` (-0.25)."""
+    img = series()
+    data = np.asfortranarray(_series_values().astype(np.int16))
+    fields = img.header.replace(datatype=4, bitpix=16, scl_slope=-0.25, scl_inter=0.0).to_dict()
+    _core.nifti_write(os.fspath(path), data, fields, 2, 1)
+
+
 def _write_warp(path: Path) -> None:
     """``field_xfm()`` as ANTs writes a displacement field: a 5D NIfTI vector image."""
     t = field_xfm()
@@ -359,6 +367,7 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     ),
     "bold.nii": lambda p: lx.save(bold(), p),
     "series.nii": _write_scaled_series,
+    "series_negative.nii": _write_negative_series,
     "reference.nii": lambda p: lx.save(
         lx.Image(np.zeros(REFERENCE, np.uint8), affine(REFERENCE, (2.2, 2.2, 2.2), oblique=False)),
         p,
@@ -613,13 +622,29 @@ def case(case_id: str, covers: tuple[str, ...] | list[str] = ()) -> Callable:
     return register
 
 
-def cli(*argv: str) -> str:
+def cli(*argv: str, upstream_defects: str = "fix") -> str:
     """Run ``larmorx <argv...>`` in process (``larmorx.cli``); its standard output. Tools with a
-    replica run the original (the replica has its own golden cases, in ``crates-gpl``)."""
-    code, out, err = _core.cli_main(["larmorx", *argv], [], "original")
+    replica run the original (the replica has its own golden cases, in ``crates-gpl``).
+    ``upstream_defects`` is set as ``LARMORX_UPSTREAM_DEFECTS`` for the call (D13), so that the
+    environment of the test run cannot change it."""
+    previous = os.environ.get("LARMORX_UPSTREAM_DEFECTS")
+    os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
+    try:
+        code, out, err = _core.cli_main(["larmorx", *argv], [], "original")
+    finally:
+        if previous is None:
+            del os.environ["LARMORX_UPSTREAM_DEFECTS"]
+        else:
+            os.environ["LARMORX_UPSTREAM_DEFECTS"] = previous
     if code != 0:
         raise RuntimeError(f"larmorx {' '.join(argv)} exited with {code}:\n{err}{out}")
     return out
+
+
+#: D13: the cases below named ``*.reproduce`` run the original programs' defects reproduced
+#: (``upstream_defects="reproduce"``); the others run larmorx's default, with the defects
+#: corrected (``docs/api/upstream-defects.md``).
+REPRODUCE = "reproduce"
 
 
 def image_outputs(
@@ -1314,6 +1339,25 @@ def _(ctx: Context) -> dict[str, Any]:
     }  # fmt: skip
 
 
+@case("cli.afni.3dTshift.reproduce", covers=("cli:afni 3dTshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """AFNI's defects reproduced: -no_detrend's voxel pairs (AFNI-05) and a negative
+    scl_slope (AFNI-01)."""
+    out = ctx.out("out.nii")
+    cli("afni", "3dTshift", "-tpattern", "alt-z", "-cubic", "-no_detrend", "-prefix", out, ctx.file("series_negative.nii"), upstream_defects=REPRODUCE)  # fmt: skip
+    return {"out": Nifti(out)}
+
+
+@case("py.afni.tshift.reproduce", covers=("lx.afni.tshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.afni.tshift.options``' uint8 series without detrending, AFNI-05 reproduced."""
+    u8 = series().with_data(np.asfortranarray((_series_values() // 8 - 80).astype(np.uint8)))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        no_detrend = lx.afni.tshift(u8, slice_times="seq-z", slice=1, detrend=False, method="cubic", implementation=ORIGINAL, upstream_defects=REPRODUCE)  # fmt: skip
+    return {"uint8_no_detrend": no_detrend.data}
+
+
 @case("py.afni.fmriprep_slice_timing", covers=("lx.afni.fmriprep_slice_timing",))
 def _(ctx: Context) -> dict[str, Any]:
     times, t0 = lx.afni.fmriprep_slice_timing([0.0, 0.5125, 1.025, 0.25625, 0.76875], "k-")
@@ -1350,6 +1394,25 @@ def _(ctx: Context) -> dict[str, Any]:
     result: dict[str, Any] = {"out": Nifti(f"{out}.nii.gz"), "par": File(f"{out}.par")}
     for stat in ("meanvol", "sigma", "variance"):
         result[stat] = Nifti(f"{out}_{stat}.nii.gz")
+    for t in range(SHAPE4[3]):
+        result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
+    return result
+
+
+@case("cli.mri.hmc.reproduce", covers=("cli:mri hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.mri.hmc`` with mcflirt's defects reproduced (FSL-01, FSL-08)."""
+    out = ctx.out("out")
+    previous = os.environ.get("FSLOUTPUTTYPE")
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    try:
+        cli("mri", "hmc", "-in", ctx.file("bold.nii"), "-out", out, "-refvol", "1", "-mats", "-stats", upstream_defects=REPRODUCE)  # fmt: skip
+    finally:
+        if previous is None:
+            del os.environ["FSLOUTPUTTYPE"]
+        else:
+            os.environ["FSLOUTPUTTYPE"] = previous
+    result: dict[str, Any] = {"out": Nifti(f"{out}.nii.gz"), "meanvol": Nifti(f"{out}_meanvol.nii.gz")}  # fmt: skip
     for t in range(SHAPE4[3]):
         result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
     return result
@@ -1418,6 +1481,21 @@ def _(ctx: Context) -> dict[str, Any]:
         **_hmc_outputs("reference_spline", lx.mri.hmc(ctx.file("bold.nii"), reference=reference, final="spline", dof=12, smooth=0.0)),
         **_hmc_outputs("in_plane", lx.mri.hmc(bold(), in_plane="always", final="nearest", init=init, fudge=True, bins=64, rotation=2.0)),
     }  # fmt: skip
+
+
+@case("py.mri.hmc.reproduce", covers=("lx.mri.hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.mri.hmc.options``' separate reference and in-plane mode with mcflirt's defects
+    reproduced (FSL-01, FSL-03), and the corrected correlation count (FSL-02, opt-in)."""
+    reference = lx.Image(np.asfortranarray(bold().data[..., 2]), bold().affine)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rep = {"upstream_defects": REPRODUCE, "resample": False}
+        return {
+            "reference": lx.mri.hmc(ctx.file("bold.nii"), reference=reference, dof=12, smooth=0.0, **rep).matrices,
+            "in_plane": lx.mri.hmc(bold(), in_plane="always", fudge=True, bins=64, rotation=2.0, **rep).matrices,
+            "weights": lx.mri.hmc(bold(), reference=reference, normcorr_count="weights", resample=False).matrices,
+        }  # fmt: skip
 
 
 # --- transforms ---------------------------------------------------------------------------------
@@ -1490,6 +1568,31 @@ def _(ctx: Context) -> dict[str, Any]:
     }  # fmt: skip
 
 
+def _write_long_composite(path: Path) -> None:
+    """A composite of 11 affines: name order (1, 10, 11, 2, ...) is not numeric order."""
+    rows = [ItkTransform("CompositeTransform_double_3_3", np.zeros(0), np.zeros(0))]
+    for i in range(1, 12):
+        params = np.array([1, 0, 0, 0, 1, 0, 0, 0, 1, i / 4, -i / 8, 0.0])
+        rows.append(ItkTransform("AffineTransform_double_3_3", params, np.zeros(3)))
+    lx.transforms.write(path, rows)
+
+
+@case("py.transforms.composite_order", covers=("lx.transforms.load_itk_composite", "lx.transforms.load_transforms"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """A composite of 11 transforms read in numeric order (default) and in nitransforms' name
+    order (PIPE-04 reproduced)."""
+    path = ctx.out("long.h5")
+    _write_long_composite(Path(path))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fixed = lx.transforms.load_itk_composite(path)
+        named = lx.transforms.load_transforms([path], upstream_defects=REPRODUCE)
+    return {
+        "fix": np.stack([s.matrix for s in fixed]),
+        "reproduce": np.stack([s.matrix for s in named.steps()]),
+    }
+
+
 @case("py.transforms.ensure_positive_cosines", covers=("lx.transforms.ensure_positive_cosines",))
 def _(ctx: Context) -> dict[str, Any]:
     """Two axes against their world axes: the new affine's translation sums two rounded
@@ -1552,6 +1655,33 @@ def _(ctx: Context) -> dict[str, Any]:
     return image_outputs("out", img)  # fmt: skip
 
 
+@case("py.transforms.resample_series.reproduce", covers=("lx.transforms.resample_series",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.transforms.resample_series.sdc`` with fMRIPrep's Jacobian axis (PIPE-03
+    reproduced)."""
+    shape = (12, 10, 9)
+    target_affine = affine(shape, (3.0, 3.0, 3.0), oblique=False)
+    fieldmap = ints(40, shape, -64, 65) / 4
+    src = bold()
+    flipped = src.affine.copy()
+    flipped[:3, 1] = -flipped[:3, 1]
+    source = lx.Image(src.data, flipped, src.header)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        img = lx.transforms.resample_series(
+            source,
+            (np.array(shape), target_affine),
+            fieldmap=fieldmap,
+            pe_dir="j-",
+            ro_time=0.05,
+            order=1,
+            mode="nearest",
+            output_dtype="float64",
+            upstream_defects=REPRODUCE,
+        )
+    return image_outputs("out", img)
+
+
 # --- ndimage ------------------------------------------------------------------------------------
 
 
@@ -1580,6 +1710,25 @@ def _(ctx: Context) -> dict[str, Any]:
         data.astype(np.int16), coords, output=np.float32, order=2, prefilter=False
     )
     return out
+
+
+@case("py.ndimage.reproduce", covers=("lx.ndimage.map_coordinates", "lx.ndimage.spline_filter", "lx.ndimage.spline_filter1d"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """SciPy's reflect boundary reproduced (SCI-03): the reflect modes of
+    ``py.ndimage.map_coordinates`` and ``py.ndimage.spline_filter``."""
+    data = _ndimage_input()
+    coords = np.stack(
+        [ints(51 + d, (300,), -48, 16 * n + 48) / 16 for d, n in enumerate(data.shape)]
+    )
+    rep = {"upstream_defects": REPRODUCE}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return {
+            "mode.reflect": lx.ndimage.map_coordinates(data, coords, order=3, mode="reflect", cval=-5.0, **rep),
+            "mode.grid-mirror": lx.ndimage.map_coordinates(data, coords, order=3, mode="grid-mirror", cval=-5.0, **rep),
+            "spline_filter": lx.ndimage.spline_filter(data, order=4, mode="reflect", **rep),
+            "spline_filter1d": lx.ndimage.spline_filter1d(data, order=5, axis=1, mode="reflect", **rep),
+        }  # fmt: skip
 
 
 @case("py.ndimage.spline_filter", covers=("lx.ndimage.spline_filter", "lx.ndimage.spline_filter1d"))

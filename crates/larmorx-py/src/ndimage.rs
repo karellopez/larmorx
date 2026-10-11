@@ -4,11 +4,14 @@
 //! Arrays of any memory layout are accepted; they are read in Fortran order (copied when they
 //! are not Fortran-contiguous). The GIL is released while filtering and interpolating.
 
+use larmorx_core::defects::{Notice, UpstreamDefects};
 use larmorx_interp::ndimage::{self, Mode, Output, Sample, Spline};
 use numpy::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use numpy::{Element, PyArray, PyArrayDyn, PyReadonlyArray2, PyReadonlyArrayDyn};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+
+use crate::defects::{PyNotice, mode_from_py as defects_mode, notices_to_py};
 
 pub(crate) fn mode_from_py(name: &str) -> PyResult<Mode> {
     Mode::from_name(name).ok_or_else(|| PyRuntimeError::new_err("boundary mode not supported"))
@@ -40,7 +43,8 @@ fn interpolate<T: Sample + Element, O: Output + Element, const D: usize>(
     cval: f64,
     prefilter: bool,
     n_threads: usize,
-) -> PyResult<Vec<O>> {
+    defects: UpstreamDefects,
+) -> PyResult<(Vec<O>, Vec<Notice>)> {
     let view = input.as_array();
     let shape: [usize; D] = view
         .shape()
@@ -48,23 +52,25 @@ fn interpolate<T: Sample + Element, O: Output + Element, const D: usize>(
         .map_err(|_| PyRuntimeError::new_err("invalid shape for coordinate array"))?;
     let values = fortran_values(&view);
     let mut out = vec![O::default(); coordinates.len()];
-    py.detach(|| {
-        larmorx_core::parallel::with_threads(n_threads, || {
-            ndimage::map_coordinates(
-                &values,
-                shape,
-                coordinates,
-                &mut out,
-                order,
-                mode,
-                cval,
-                prefilter,
-            )
+    let notices = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                ndimage::map_coordinates(
+                    &values,
+                    shape,
+                    coordinates,
+                    &mut out,
+                    order,
+                    mode,
+                    cval,
+                    prefilter,
+                    defects,
+                )
+            })
         })
-    })
-    .map_err(|e| PyValueError::new_err(e.to_string()))?
-    .map_err(err)?;
-    Ok(out)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .map_err(err)?;
+    Ok((out, notices))
 }
 
 macro_rules! dispatch_input {
@@ -110,19 +116,20 @@ macro_rules! dispatch_rank {
     ($py:expr, $input:expr, $c:expr, $out:ty, $($rest:expr),*) => {{
         let c = $c;
         match c.nrows() {
-            1 => dispatch_input!($py, $input, &points::<1>(&c), $out, 1, $($rest),*).map(|v| to_py($py, v)),
-            2 => dispatch_input!($py, $input, &points::<2>(&c), $out, 2, $($rest),*).map(|v| to_py($py, v)),
-            3 => dispatch_input!($py, $input, &points::<3>(&c), $out, 3, $($rest),*).map(|v| to_py($py, v)),
-            4 => dispatch_input!($py, $input, &points::<4>(&c), $out, 4, $($rest),*).map(|v| to_py($py, v)),
+            1 => dispatch_input!($py, $input, &points::<1>(&c), $out, 1, $($rest),*).map(|(v, n)| (to_py($py, v), notices_to_py(n))),
+            2 => dispatch_input!($py, $input, &points::<2>(&c), $out, 2, $($rest),*).map(|(v, n)| (to_py($py, v), notices_to_py(n))),
+            3 => dispatch_input!($py, $input, &points::<3>(&c), $out, 3, $($rest),*).map(|(v, n)| (to_py($py, v), notices_to_py(n))),
+            4 => dispatch_input!($py, $input, &points::<4>(&c), $out, 4, $($rest),*).map(|(v, n)| (to_py($py, v), notices_to_py(n))),
             _ => Err(PyRuntimeError::new_err("larmorx interpolates arrays of 1 to 4 dimensions")),
         }
     }};
 }
 
 /// `scipy.ndimage.map_coordinates` for 1- to 4-dimensional `input` and `coordinates` of shape
-/// `(ndim, n)` (float64). Returns the `n` interpolated values in `output` dtype.
+/// `(ndim, n)` (float64). Returns the `n` interpolated values in `output` dtype and the
+/// upstream-defect notices (`larmorx._defects`).
 #[pyfunction]
-#[pyo3(signature = (input, coordinates, order = 3, mode = "constant", cval = 0.0, prefilter = true, output = "float64", n_threads = 1))]
+#[pyo3(signature = (input, coordinates, order = 3, mode = "constant", cval = 0.0, prefilter = true, output = "float64", n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn ndimage_map_coordinates<'py>(
     py: Python<'py>,
@@ -134,8 +141,10 @@ fn ndimage_map_coordinates<'py>(
     prefilter: bool,
     output: &str,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyAny>> {
+    upstream_defects: &str,
+) -> PyResult<(Bound<'py, PyAny>, Vec<PyNotice>)> {
     let mode = mode_from_py(mode)?;
+    let defects = defects_mode(upstream_defects)?;
     let ndim: usize = input.getattr("ndim")?.extract()?;
     let c = coordinates.as_array();
     if c.nrows() != ndim {
@@ -143,18 +152,18 @@ fn ndimage_map_coordinates<'py>(
             "invalid shape for coordinate array",
         ));
     }
-    let (o, m, cv, p, t) = (order, mode, cval, prefilter, n_threads);
+    let (o, m, cv, p, t, d) = (order, mode, cval, prefilter, n_threads, defects);
     match output {
-        "float64" => dispatch_rank!(py, input, c, f64, o, m, cv, p, t),
-        "float32" => dispatch_rank!(py, input, c, f32, o, m, cv, p, t),
-        "int16" => dispatch_rank!(py, input, c, i16, o, m, cv, p, t),
-        "uint8" => dispatch_rank!(py, input, c, u8, o, m, cv, p, t),
-        "int32" => dispatch_rank!(py, input, c, i32, o, m, cv, p, t),
-        "uint16" => dispatch_rank!(py, input, c, u16, o, m, cv, p, t),
-        "int8" => dispatch_rank!(py, input, c, i8, o, m, cv, p, t),
-        "uint32" => dispatch_rank!(py, input, c, u32, o, m, cv, p, t),
-        "int64" => dispatch_rank!(py, input, c, i64, o, m, cv, p, t),
-        "uint64" => dispatch_rank!(py, input, c, u64, o, m, cv, p, t),
+        "float64" => dispatch_rank!(py, input, c, f64, o, m, cv, p, t, d),
+        "float32" => dispatch_rank!(py, input, c, f32, o, m, cv, p, t, d),
+        "int16" => dispatch_rank!(py, input, c, i16, o, m, cv, p, t, d),
+        "uint8" => dispatch_rank!(py, input, c, u8, o, m, cv, p, t, d),
+        "int32" => dispatch_rank!(py, input, c, i32, o, m, cv, p, t, d),
+        "uint16" => dispatch_rank!(py, input, c, u16, o, m, cv, p, t, d),
+        "int8" => dispatch_rank!(py, input, c, i8, o, m, cv, p, t, d),
+        "uint32" => dispatch_rank!(py, input, c, u32, o, m, cv, p, t, d),
+        "int64" => dispatch_rank!(py, input, c, i64, o, m, cv, p, t, d),
+        "uint64" => dispatch_rank!(py, input, c, u64, o, m, cv, p, t, d),
         other => Err(PyRuntimeError::new_err(format!(
             "output type {other:?} not supported"
         ))),
@@ -162,9 +171,9 @@ fn ndimage_map_coordinates<'py>(
 }
 
 /// `scipy.ndimage.spline_filter1d(input, order, axis, output=float64, mode)` on a float64 array
-/// (any layout); returns a Fortran-ordered float64 array.
+/// (any layout); returns a Fortran-ordered float64 array and the upstream-defect notices.
 #[pyfunction]
-#[pyo3(signature = (input, order = 3, axis = -1, mode = "mirror", n_threads = 1))]
+#[pyo3(signature = (input, order = 3, axis = -1, mode = "mirror", n_threads = 1, upstream_defects = "fix"))]
 fn ndimage_spline_filter1d<'py>(
     py: Python<'py>,
     input: PyReadonlyArrayDyn<'py, f64>,
@@ -172,8 +181,10 @@ fn ndimage_spline_filter1d<'py>(
     axis: isize,
     mode: &str,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
+    upstream_defects: &str,
+) -> PyResult<(Bound<'py, PyArrayDyn<f64>>, Vec<PyNotice>)> {
     let mode = mode_from_py(mode)?;
+    let defects = defects_mode(upstream_defects)?;
     let view = input.as_array();
     let shape = view.shape().to_vec();
     let ndim = shape.len() as isize;
@@ -184,64 +195,79 @@ fn ndimage_spline_filter1d<'py>(
         )));
     }
     let mut data = fortran_values(&view).into_owned();
-    py.detach(|| {
-        larmorx_core::parallel::with_threads(n_threads, || {
-            ndimage::spline_filter1d(&mut data, &shape, axis as usize, order, mode, true)
+    let notices = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                ndimage::spline_filter1d(
+                    &mut data,
+                    &shape,
+                    axis as usize,
+                    order,
+                    mode,
+                    true,
+                    defects,
+                )
+            })
         })
-    })
-    .map_err(|e| PyValueError::new_err(e.to_string()))?
-    .map_err(err)?;
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .map_err(err)?;
     let a = ArrayD::from_shape_vec(IxDyn(&shape).f(), data)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok(PyArray::from_owned_array(py, a))
+    Ok((PyArray::from_owned_array(py, a), notices_to_py(notices)))
 }
 
 /// `scipy.ndimage.spline_filter(input, order, output=float64, mode)` on a float64 array (any
-/// layout); returns a Fortran-ordered float64 array.
+/// layout); returns a Fortran-ordered float64 array and the upstream-defect notices.
 #[pyfunction]
-#[pyo3(signature = (input, order = 3, mode = "mirror", n_threads = 1))]
+#[pyo3(signature = (input, order = 3, mode = "mirror", n_threads = 1, upstream_defects = "fix"))]
 fn ndimage_spline_filter<'py>(
     py: Python<'py>,
     input: PyReadonlyArrayDyn<'py, f64>,
     order: u32,
     mode: &str,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
+    upstream_defects: &str,
+) -> PyResult<(Bound<'py, PyArrayDyn<f64>>, Vec<PyNotice>)> {
     let mode = mode_from_py(mode)?;
+    let defects = defects_mode(upstream_defects)?;
     let view = input.as_array();
     let shape = view.shape().to_vec();
     let mut data = fortran_values(&view).into_owned();
-    py.detach(|| {
-        larmorx_core::parallel::with_threads(n_threads, || {
-            ndimage::spline_filter(&mut data, &shape, order, mode, true)
+    let notices = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                ndimage::spline_filter(&mut data, &shape, order, mode, true, defects)
+            })
         })
-    })
-    .map_err(|e| PyValueError::new_err(e.to_string()))?
-    .map_err(err)?;
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .map_err(err)?;
     let a = ArrayD::from_shape_vec(IxDyn(&shape).f(), data)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok(PyArray::from_owned_array(py, a))
+    Ok((PyArray::from_owned_array(py, a), notices_to_py(notices)))
 }
 
 /// The coefficients `map_coordinates` interpolates for a float32 3D volume (padded and
-/// prefiltered as SciPy does), for testing.
+/// prefiltered as SciPy does, or as `upstream_defects` says), for testing.
 #[pyfunction]
-#[pyo3(signature = (input, order = 3, mode = "grid-constant", cval = 0.0))]
+#[pyo3(signature = (input, order = 3, mode = "grid-constant", cval = 0.0, upstream_defects = "fix"))]
 fn ndimage_prepared_coefficients<'py>(
     py: Python<'py>,
     input: PyReadonlyArrayDyn<'py, f32>,
     order: u32,
     mode: &str,
     cval: f64,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
     let mode = mode_from_py(mode)?;
+    let defects = defects_mode(upstream_defects)?;
     let view = input.as_array();
     let shape: [usize; 3] = view
         .shape()
         .try_into()
         .map_err(|_| PyValueError::new_err("a 3D volume is needed"))?;
     let values = fortran_values(&view);
-    let spline = Spline::new(&values, shape, order, mode, cval, true, true).map_err(err)?;
+    let spline =
+        Spline::new(&values, shape, order, mode, cval, true, true, defects).map_err(err)?;
     let (c, dims) = spline.coefficients();
     let a = ArrayD::from_shape_vec(IxDyn(&dims).f(), c.to_vec())
         .map_err(|e| PyValueError::new_err(e.to_string()))?;

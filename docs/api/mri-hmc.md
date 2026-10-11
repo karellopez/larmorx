@@ -56,13 +56,15 @@ larmorx mri hmc -in sub-01_task-rest_bold.nii.gz -out bold_mcf.nii.gz \
     -reffile hmc_boldref.nii.gz -mats -plots -rmsrel -rmsabs
 ```
 
-## `lx.mri.hmc(bold, *, reference=None, ref_index=None, mean=False, stages=3, final="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=False, in_plane="auto", fov=20, init=None, resample=True, n_threads=1)`
+## `lx.mri.hmc(bold, *, reference=None, ref_index=None, mean=False, stages=3, final="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=False, in_plane="auto", fov=20, init=None, resample=True, n_threads=1, upstream_defects="fix", normcorr_count="mcflirt")`
 
 Every volume is registered to the reference with a rigid-body transform (or up to 12 degrees
 of freedom with `dof`) by mcflirt's schedule: one sweep of line searches on the reference
 sampled every 8 mm, then every 4 mm, then 4 mm with an eight times tighter tolerance; each
 volume's first search starts from its predecessor's result. The cost is mcflirt's normalised
-correlation. The series is then resampled with the transforms.
+correlation. The series is then resampled with the transforms. mcflirt's defects are corrected
+by default; `upstream_defects="reproduce"` gives mcflirt's matrices
+([below](#upstream-defects-d13)).
 
 `bold` is a path (read with mcflirt's rules, below) or an in-memory image (`lx.Image`,
 nibabel image, `(array, affine)`); `reference` likewise. Returns an `HmcResult`:
@@ -103,7 +105,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 | `-meanvol` | `mean=True` | ✓ |
 | `-stages n` | `stages` | ✓ (1–4; 4 adds the sinc stage) |
 | `-mats`, `-plots`, `-rmsrel`, `-rmsabs` | `matrices`, `params`, `rms_rel`, `rms_abs` (`save_mats`, `save_par`) | ✓ (same files and text formats) |
-| `-stats` | (CLI only) | ✓ (`_meanvol`, `_variance`, `_sigma`; end slices 0) |
+| `-stats` | (CLI only) | ✓ (`_meanvol`, `_variance`, `_sigma`; every slice, named after `-out` without its extension; mcflirt's end slices at 0 and names with `reproduce`, FSL-08) |
 | `-sinc_final`, `-spline_final`, `-nn_final` | `final="sinc"`, `"spline"`, `"nearest"` | ✓ |
 | `-dof n` | `dof` | ✓ (6–12; CLI clamps with mcflirt's message) |
 | `-cost c` | `cost` | ✓ `normcorr`; ~ `leastsquares`, `corratio`, `woods`, `mutualinfo`, `normmi` (described in the spec only in outline; not validated) |
@@ -113,9 +115,11 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 | `-fudge` | `fudge=True` | ✓ (also makes the first stage fully parallel) |
 | `-2d`, `-fov n` | `in_plane="always"`, `fov` | ✓ (`in_plane="never"` is larmorx's) |
 | `-init f` | `init` | ✓ (final resampling only, as mcflirt) |
-| `-scaling x`, `-hist`, `-v`, `-verbose n`, `-report` | – | accepted; `-report` prints progress messages (not mcflirt's exact text) |
+| `-scaling x`, `-hist`, `-v`, `-verbose n`, `-report` | – | accepted; `-scaling` and `-hist` have no effect (in mcflirt either; a warning says so, FSL-05); `-report` prints progress messages (not mcflirt's exact text) |
 | `-gdt` | – | ✗ not supported (exit 1) |
-| `-help` | – | ✓ (usage, exit 0; alone or without arguments: exit 1, as mcflirt) |
+| `-help` | – | ✓ (usage, exit 0; without arguments: exit 1. `-help` alone exits 0; mcflirt's exit 1 with `reproduce`, FSL-07) |
+| (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | mcflirt's defects corrected (default) or reproduced ([below](#upstream-defects-d13)) |
+| – | `normcorr_count="mcflirt"` | `"weights"`: the corrected correlation count (FSL-02), opt-in ([below](#the-correlation-count-fsl-02)) |
 
 `FSLOUTPUTTYPE` chooses the output format as for mcflirt (`NIFTI_GZ`, `NIFTI`, `NIFTI2_GZ`,
 `NIFTI2`, the pair types); the CLI's threads come from `OMP_NUM_THREADS` (default: all).
@@ -130,7 +134,61 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 - `-gdt` (registering gradient images; it fails with an absolute `-out` path) is not supported.
 - `descrip` in output headers is `larmorx mri hmc`, not FSL's build string.
 - The Python API returns the corrected series as float32 on the output grid; the CLI writes
-  mcflirt's output types (truncating to integers).
+  mcflirt's output types (int8 kept as int8, integers rounded to the nearest and clamped;
+  mcflirt's uint8 and truncation with `reproduce`, FSL-09).
+
+## Upstream defects (D13)
+
+larmorx corrects mcflirt's deterministic defects by default and reproduces them with
+`upstream_defects="reproduce"` (command line: `LARMORX_UPSTREAM_DEFECTS=reproduce`); a warning
+(Python) or a line on standard error (command line) names each one that changed the result,
+in both modes ([upstream-defects.md](upstream-defects.md); register entries in
+[findings/upstream-defects.md](../findings/upstream-defects.md)):
+
+| ID | mcflirt 6.0.7 | larmorx by default | Where |
+|---|---|---|---|
+| FSL-01 | the last volume of the series starts the first stage from the identity, not from its predecessor's result | it continues its chain like every other volume | every run where the last volume follows another in the first stage: fMRIPrep's command (a separate reference) on every run |
+| FSL-03 | the in-plane mode pads the first stage's reference grid twice | once, like the other stages | thin slabs, `-2d` |
+| FSL-14 | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN; the corrected volume is then the background value | non-finite voxels are left out of the centre of mass and of the cost (points whose reference or interpolated value is not finite do not count) | volumes or references with NaN or infinite voxels |
+| FSL-05 | `-scaling`, `-hist` accepted and ignored | still ignored, with a warning | command line |
+| FSL-06 | an unknown `-cost` silently uses normcorr | an error, exit 255 | command line |
+| FSL-07 | numbers read with C's `atoi`/`atof` (`-refvol abc` is 0, `-stages 1.5` is 1); `-help` alone exits 1 | anything but a number is an error (exit 255); `-help` alone exits 0 | command line |
+| FSL-08 | the `-stats` images leave the first and last slices at 0, and the `-stats` and `-meanvol` images are named after the `-out` string with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice; `x_meanvol.nii.gz`, `x_mean_reg.nii.gz` (the names nipype expects) | `-stats`, `-meanvol` |
+| FSL-09 | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; observed) | int8 kept; rounded to the nearest (half to even) and clamped | integer outputs of the command line |
+| FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
+| FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
+
+On fMRIPrep's command (`-reffile <boldref> -mats`) FSL-01 changes the last volume's matrix
+(the others are mcflirt's), and FSL-09 the rounding of the corrected series when the input is
+integer (fMRIPrep uses only the matrices). The parity record's "D13 fix pass" lists, run by
+run, what the corrections change.
+
+Where the last volume is close to its predecessor the two starts reach nearly the same matrix:
+on the 52 real parity runs a run's largest change is 0.024 mm (median), and on fMRIPrep's
+command for ds000005 the last volume moves by 0.06 mm, after which it is 0.021 mm from its
+predecessor instead of 0.055 mm (the other volumes' steps have a median of 0.038 mm). The
+largest real change, 72 mm, is a `-cost woods` run where mcflirt and larmorx both fail on every
+volume (rotations near 90°); corrected, the last volume stays 0.44 mm from its predecessor
+instead of 72 mm. Where the motion is large, mcflirt's start from the identity can fail on its
+own: on the synthetic `background` series (large translations over a non-zero background)
+mcflirt's last volume converges to a 180° rotation, 106 mm from the true motion, and the
+corrected one to 0.36 mm
+([validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md), ground
+truth).
+
+### The correlation count (FSL-02)
+
+mcflirt's normalised correlation divides by a count `N` that is a running sum of running sums
+of the edge weights (`specs/mcflirt.md` §6.4): many orders of magnitude larger than the number
+of points, which makes the correlation effectively uncentred. `normcorr_count="weights"` divides
+by the sum of the weights instead, the weighted Pearson correlation. It is opt-in until the
+user decides (D13 item 4): its measurement against mcflirt's variability band and the synthetic
+ground truth is in [validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md).
+In short, the corrected count moves the matrices by about mcflirt's own variability (0.014 to
+0.033 mm at the 95th percentile on 19 real runs, where mcflirt's band is 0.016 to 0.10 mm) and
+is not more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3).
+It cannot be combined with `upstream_defects="reproduce"`, and the command line has no option
+for it.
 
 ## Agreement with mcflirt
 

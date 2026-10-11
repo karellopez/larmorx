@@ -5,10 +5,16 @@
 //! for it), voxel sizes come from `pixdim` (absolute values, 0 replaced by 1), and images whose
 //! affine has a positive determinant have their x axis reversed in memory. Output images are
 //! reversed back, so files keep their storage order.
+//!
+//! Two of mcflirt's output rules are defects that larmorx corrects by default (D13,
+//! `docs/api/upstream-defects.md`): int8 input is written as uint8 and integer outputs are
+//! truncated (FSL-09, [`output_type`], [`convert_values`]), and the units are always
+//! millimetres and seconds (FSL-10, [`output_units`]).
 
 use std::path::Path;
 
 use larmorx_core::affine::Affine;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::{DataType, RealElement};
 use larmorx_core::linalg::det3;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
@@ -207,13 +213,15 @@ pub fn read_reference(path: &Path, n_threads: usize) -> Result<(Volume, Series, 
 }
 
 /// The output types (§10.1): the stored type of the input, except where noted, and float32
-/// for scaled input (float64 stays float64).
-pub fn output_type(stored: DataType, header: &NiftiHeader) -> DataType {
+/// for scaled input (float64 stays float64). mcflirt writes int8 input as uint8, which loses
+/// its negative values (FSL-09); [`UpstreamDefects::Fix`] keeps int8.
+pub fn output_type(stored: DataType, header: &NiftiHeader, defects: UpstreamDefects) -> DataType {
     let slope = header.scl_slope;
     let scaled = slope != 0.0 && (slope != 1.0 || header.scl_inter != 0.0);
     match stored {
         DataType::F64 => DataType::F64,
         _ if scaled => DataType::F32,
+        DataType::I8 if defects.fix() => DataType::I8,
         DataType::U8 | DataType::I8 => DataType::U8,
         DataType::I16 => DataType::I16,
         DataType::I32 | DataType::U16 => DataType::I32,
@@ -250,8 +258,6 @@ pub fn strip_image_extension(name: &str) -> &str {
     name
 }
 
-/// Converts float32 values to the output type by truncation toward zero (§9.4), saturating
-/// at the type's limits (NaN becomes 0).
 fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + Send) -> Vec<T> {
     values
         .par_iter()
@@ -260,11 +266,117 @@ fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + 
         .collect()
 }
 
+/// x86-64's conversion of a float to a 32-bit integer (`cvttss2si`): truncation toward zero,
+/// and `i32::MIN` for NaN and values outside the 32-bit range (C++ leaves those undefined).
+#[inline]
+fn x86_i32(v: f32) -> i32 {
+    if v.is_nan() || !(-2_147_483_648.0..2_147_483_648.0).contains(&v) {
+        i32::MIN
+    } else {
+        v as i32
+    }
+}
+
+/// How integer outputs are converted, and what that did.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Conversion {
+    /// Values that rounding and truncation convert differently.
+    pub rounded: usize,
+    /// Values beyond the type's range (clamped when corrected, wrapped as x86-64 does when
+    /// reproduced).
+    pub out_of_range: usize,
+}
+
+/// Converts float32 values to an integer output type (§9.4, FSL-09). mcflirt truncates toward
+/// zero and does not clamp: on x86-64 a value beyond the type's range wraps around (through a
+/// 32-bit integer), which [`UpstreamDefects::Reproduce`] reproduces. [`UpstreamDefects::Fix`]
+/// rounds to the nearest integer (half to even) and clamps to the type's range; NaN becomes 0.
+/// Returns the converted values and what the two conversions disagree on.
+pub fn convert_values<T>(
+    values: &[f32],
+    defects: UpstreamDefects,
+    lo: f64,
+    hi: f64,
+    from_i32: impl Fn(i32) -> T + Sync + Send,
+    from_f64: impl Fn(f64) -> T + Sync + Send,
+) -> (Vec<T>, Conversion)
+where
+    T: Copy + Send + Sync,
+{
+    let stats = values
+        .par_iter()
+        .with_min_len(1 << 16)
+        .map(|&v| {
+            let r = f64::from(v).round_ties_even();
+            let t = f64::from(v).trunc();
+            let out = !(lo..=hi).contains(&t) || v.is_nan();
+            (usize::from(r != t && !out), usize::from(out))
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let data = if defects.fix() {
+        convert(values, |v| {
+            if v.is_nan() {
+                from_f64(0.0)
+            } else {
+                from_f64(f64::from(v).round_ties_even().clamp(lo, hi))
+            }
+        })
+    } else {
+        convert(values, |v| from_i32(x86_i32(v)))
+    };
+    (
+        data,
+        Conversion {
+            rounded: stats.0,
+            out_of_range: stats.1,
+        },
+    )
+}
+
+/// The `xyzt_units` of an output written like an input with `units`: mcflirt always writes
+/// millimetres and seconds (FSL-10); [`UpstreamDefects::Fix`] keeps the input's spatial and
+/// temporal units, and uses millimetres or seconds only where the input gives none. Also
+/// returns the FSL-10 notice when the two differ.
+pub fn output_units(units: i32, defects: UpstreamDefects) -> (i32, Option<Notice>) {
+    let (space, time) = (units & 0x07, units & 0x38);
+    let corrected = (if space == 0 { 2 } else { space }) | (if time == 0 { 8 } else { time });
+    let mcflirt = 2 | 8;
+    let notice = (corrected != mcflirt).then(|| {
+        let name = |code: i32| match code {
+            1 => "metres",
+            2 => "millimetres",
+            3 => "micrometres",
+            8 => "seconds",
+            16 => "milliseconds",
+            24 => "microseconds",
+            32 => "hertz",
+            40 => "ppm",
+            48 => "radians per second",
+            _ => "unknown units",
+        };
+        let theirs = format!("{} and {}", name(corrected & 0x07), name(corrected & 0x38));
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "the output keeps the input's units ({theirs}); mcflirt labels them millimetres \
+                 and seconds without converting pixdim"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the output is labelled millimetres and seconds, as mcflirt labels it, although \
+                 the input's pixdim are in {theirs}"
+            ),
+        };
+        Notice::new(&defects::FSL_10, defects, detail)
+    });
+    let units = if defects.fix() { corrected } else { mcflirt };
+    (units, notice)
+}
+
 /// Writes a corrected series (or any float32 image on the input's grid) like the input
 /// (§10.1): the input's header with `scl_slope = 1`, `scl_inter = 0`, `cal_min`/`cal_max` from
-/// the float32 data (with `cal`; else the input's), the slice fields cleared, units mm and s,
-/// little-endian, 3D for a single volume (the other `pixdim` entries kept); the data flipped
-/// back to storage order and converted to `data_type`.
+/// the float32 data (with `cal`; else the input's), the slice fields cleared, the units of
+/// [`output_units`], little-endian, 3D for a single volume (the other `pixdim` entries kept);
+/// the data flipped back to storage order and converted to `data_type` ([`convert_values`]).
+/// Returns the upstream defects that changed the file (FSL-09, FSL-10), or would have.
 #[allow(clippy::too_many_arguments)]
 pub fn write_like(
     path: &Path,
@@ -276,7 +388,8 @@ pub fn write_like(
     descrip: &str,
     cal: bool,
     n_threads: usize,
-) -> Result<(), ImageError> {
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, ImageError> {
     let Some(first) = volumes.first() else {
         return Err(ImageError::Invalid("no volumes to write".into()));
     };
@@ -312,7 +425,9 @@ pub fn write_like(
     h.slice_start = 0;
     h.slice_end = 0;
     h.slice_duration = 0.0;
-    h.xyzt_units = 2 | 8; // mm and s
+    let (units, units_notice) = output_units(template.xyzt_units, defects);
+    h.xyzt_units = units;
+    let mut notices: Vec<Notice> = units_notice.into_iter().collect();
     h.descrip = [0; 80];
     let d = descrip.as_bytes();
     h.descrip[..d.len().min(79)].copy_from_slice(&d[..d.len().min(79)]);
@@ -349,26 +464,147 @@ pub fn write_like(
         n_threads,
     };
     let dims = IxDyn(&shape).f();
-    let array = parallel::with_threads(n_threads, || -> Result<DynArray, ImageError> {
-        match data_type {
-            DataType::U8 => {
-                ArrayD::from_shape_vec(dims, convert(&values, |v| v as u8)).map(Into::into)
-            }
-            DataType::I16 => {
-                ArrayD::from_shape_vec(dims, convert(&values, |v| v as i16)).map(Into::into)
-            }
-            DataType::I32 => {
-                ArrayD::from_shape_vec(dims, convert(&values, |v| v as i32)).map(Into::into)
-            }
-            DataType::F64 => {
-                ArrayD::from_shape_vec(dims, convert(&values, f64::from)).map(Into::into)
-            }
-            _ => ArrayD::from_shape_vec(dims, values).map(Into::into),
-        }
-        .map_err(|e| ImageError::Invalid(e.to_string()))
-    })
+    let (array, conversion) = parallel::with_threads(
+        n_threads,
+        || -> Result<(DynArray, Conversion), ImageError> {
+            let invalid = |e: larmorx_core::ndarray::ShapeError| ImageError::Invalid(e.to_string());
+            Ok(match data_type {
+                DataType::U8 => {
+                    let (v, c) =
+                        convert_values(&values, defects, 0.0, 255.0, |i| i as u8, |f| f as u8);
+                    (ArrayD::from_shape_vec(dims, v).map_err(invalid)?.into(), c)
+                }
+                DataType::I8 => {
+                    let (v, c) =
+                        convert_values(&values, defects, -128.0, 127.0, |i| i as i8, |f| f as i8);
+                    (ArrayD::from_shape_vec(dims, v).map_err(invalid)?.into(), c)
+                }
+                DataType::I16 => {
+                    let (v, c) = convert_values(
+                        &values,
+                        defects,
+                        -32768.0,
+                        32767.0,
+                        |i| i as i16,
+                        |f| f as i16,
+                    );
+                    (ArrayD::from_shape_vec(dims, v).map_err(invalid)?.into(), c)
+                }
+                DataType::I32 => {
+                    let (v, c) = convert_values(
+                        &values,
+                        defects,
+                        -2_147_483_648.0,
+                        2_147_483_647.0,
+                        |i| i,
+                        |f| f as i32,
+                    );
+                    (ArrayD::from_shape_vec(dims, v).map_err(invalid)?.into(), c)
+                }
+                DataType::F64 => (
+                    ArrayD::from_shape_vec(dims, convert(&values, f64::from))
+                        .map_err(invalid)?
+                        .into(),
+                    Conversion::default(),
+                ),
+                _ => (
+                    ArrayD::from_shape_vec(dims, values)
+                        .map_err(invalid)?
+                        .into(),
+                    Conversion::default(),
+                ),
+            })
+        },
+    )
     .map_err(|e| ImageError::Invalid(e.to_string()))??;
+    if conversion != Conversion::default() {
+        let what = format!(
+            "{} of its values convert differently when rounded than when truncated, {} lie \
+             outside the {data_type} range",
+            conversion.rounded, conversion.out_of_range
+        );
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
+                 wraps around ({what})",
+                path.display()
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "{}: integer output is truncated and wraps around beyond its range, as mcflirt \
+                 does on x86-64 ({what})",
+                path.display()
+            ),
+        };
+        defects::push_once(&mut notices, Notice::new(&defects::FSL_09, defects, detail));
+    }
     // Not inside the pool above: the writer runs its own parallel compression.
     nifti::write_dyn(path, &h, &array, &options)?;
-    Ok(())
+    Ok(notices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIX: UpstreamDefects = UpstreamDefects::Fix;
+    const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
+    /// FSL-09: integer outputs truncated and wrapped (mcflirt on x86-64), or rounded and
+    /// clamped (corrected).
+    #[test]
+    fn integer_conversion_both_modes() {
+        let values = [12.7f32, -0.5, 2.5, 3.5, 255.6, 300.2, -3.2, f32::NAN];
+        let (mcflirt, c) = convert_values(&values, REPRODUCE, 0.0, 255.0, |i| i as u8, |f| f as u8);
+        assert_eq!(mcflirt, [12, 0, 2, 3, 255, 44, 253, 0]);
+        assert_eq!(
+            c,
+            Conversion {
+                rounded: 3,
+                out_of_range: 3
+            }
+        );
+        let (fixed, c2) = convert_values(&values, FIX, 0.0, 255.0, |i| i as u8, |f| f as u8);
+        assert_eq!(fixed, [13, 0, 2, 4, 255, 255, 0, 0]);
+        assert_eq!(c, c2);
+        let (i16s, _) = convert_values(
+            &[32767.9f32, 32768.5, -40000.0],
+            REPRODUCE,
+            -32768.0,
+            32767.0,
+            |i| i as i16,
+            |f| f as i16,
+        );
+        assert_eq!(i16s, [32767, -32768, 25536]);
+        assert_eq!(x86_i32(3e9), i32::MIN);
+        assert_eq!(x86_i32(-2.9), -2);
+    }
+
+    /// FSL-09: int8 input stays int8 when corrected; mcflirt writes uint8.
+    #[test]
+    fn output_types_both_modes() {
+        let h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2, 2], DataType::I8).unwrap();
+        assert_eq!(output_type(DataType::I8, &h, FIX), DataType::I8);
+        assert_eq!(output_type(DataType::I8, &h, REPRODUCE), DataType::U8);
+        assert_eq!(output_type(DataType::I16, &h, FIX), DataType::I16);
+        assert_eq!(output_type(DataType::U16, &h, FIX), DataType::I32);
+    }
+
+    /// FSL-10: units kept (corrected) or millimetres and seconds (mcflirt).
+    #[test]
+    fn units_both_modes() {
+        // Millimetres and milliseconds.
+        let (u, n) = output_units(2 | 16, FIX);
+        assert_eq!(u, 2 | 16);
+        assert_eq!(n.unwrap().defect.id, "FSL-10");
+        let (u, n) = output_units(2 | 16, REPRODUCE);
+        assert_eq!(u, 10);
+        assert_eq!(n.unwrap().mode, REPRODUCE);
+        // Millimetres and seconds, or none given: the same in both modes, nothing said.
+        for units in [10, 0, 2, 8] {
+            assert_eq!(output_units(units, FIX), (10, None), "{units}");
+            assert_eq!(output_units(units, REPRODUCE), (10, None), "{units}");
+        }
+        // Metres.
+        assert_eq!(output_units(1 | 8, FIX).0, 9);
+    }
 }

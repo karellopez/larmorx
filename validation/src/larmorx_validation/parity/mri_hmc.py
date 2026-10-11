@@ -37,6 +37,7 @@ from typing import Any
 
 import numpy as np
 
+from larmorx_validation.parity import defects
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -163,7 +164,11 @@ def _resolve(arg: str) -> str:
     return arg
 
 
-def _run_larmorx(args: list[str], env: dict[str, str]) -> tuple[int, str, str]:
+def _run_larmorx(
+    args: list[str], env: dict[str, str], mode: str = defects.REPRODUCE
+) -> tuple[int, str, str]:
+    """``larmorx mri hmc`` in process with the run's ``FSLOUTPUTTYPE``; ``mode`` is D13's
+    ``LARMORX_UPSTREAM_DEFECTS`` (``reproduce`` for the comparison with mcflirt)."""
     from larmorx.cli import run
 
     saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE",)}
@@ -174,7 +179,11 @@ def _run_larmorx(args: list[str], env: dict[str, str]) -> tuple[int, str, str]:
                 os.environ[k] = env[k]
             else:
                 os.environ.pop(k, None)
-        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
+        with (
+            defects.mode(mode),
+            contextlib.redirect_stderr(err),
+            contextlib.redirect_stdout(out),
+        ):
             code = run(["larmorx", "mri", "hmc", *args])
     finally:
         for k, v in saved.items():
@@ -560,8 +569,7 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
         except Exception as e:  # test data not available here
             raise Outcome("skipped", f"input not available: {e}") from e
 
-    with tempfile.TemporaryDirectory(prefix="lx-hmc-") as tmp_name:
-        tmp = Path(tmp_name)
+    def replay(tmp: Path, mode: str) -> tuple[list[int], list[tuple[str, str]]]:
         codes, logs = [], []
         for step in run["steps"]:
             argv = step["argv"][1:]
@@ -569,9 +577,14 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
                 local(arg, tmp, i > 0 and argv[i - 1] in ("-out", "-o"))
                 for i, arg in enumerate(argv)
             ]
-            code, out, err = _run_larmorx(args, run["env"])
+            code, out, err = _run_larmorx(args, run["env"], mode)
             codes.append(code)
             logs.append((out, err))
+        return codes, logs
+
+    with tempfile.TemporaryDirectory(prefix="lx-hmc-") as tmp_name:
+        tmp = Path(tmp_name)
+        codes, logs = replay(tmp, defects.REPRODUCE)
         oracle_codes = [s["exit"] for s in run["steps"]]
         oracle_ok = all(c == 0 for c in oracle_codes)
         ours_ok = all(c == 0 for c in codes)
@@ -625,7 +638,91 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
                 refnum == ours_refnum,
                 detail=f"{refnum} vs {ours_refnum}",
             )
+        metrics.update(_fix_pass(checks, replay, ours, copied, reference, logs))
     return metrics
+
+
+#: Notices about a condition whose effect the comparison may not see: FSL-01 names a
+#: different starting point (the search can still end where mcflirt's does), FSL-05 an option
+#: that has no effect.
+_SILENT = ("FSL-01", "FSL-05")
+
+
+def _fix_pass(
+    checks: CheckList,
+    replay: Any,
+    reproduced: dict[str, Path],
+    copied: set[str],
+    reference: Path,
+    logs: list[tuple[str, str]],
+) -> dict[str, Any]:
+    """D13: the run replayed in larmorx's default (``fix``) mode, compared with the
+    ``reproduce`` outputs: the defects named, the files, matrices and images that change."""
+    import nibabel as nib
+
+    with tempfile.TemporaryDirectory(prefix="lx-hmc-fix-") as tmp_name:
+        tmp = Path(tmp_name)
+        codes, fix_logs = replay(tmp, defects.FIX)
+        entries = defects.notices_in(" ".join(e for _, e in fix_logs))
+        if any(c != 0 for c in codes):
+            # A correction can turn mcflirt's silent reading of the command line into an error
+            # (FSL-06, FSL-07): a change, which must be named.
+            defects.add_fix_check(
+                checks, entries, defects.Change(0, 0, 0.0), other_changes=f"exit {codes}"
+            )
+            return {"fix_entries": entries}
+        fixed = _outputs(tmp, copied)
+        others = []
+        renamed = sorted(set(fixed) ^ set(reproduced))
+        if renamed:
+            others.append(f"files {', '.join(renamed)}")
+        change = defects.Change(0, 0, 0.0)
+        centre = _fov_centre(reference)
+        mat_mm = 0.0
+        for key, path in reproduced.items():
+            if key not in fixed:
+                continue
+            if key.endswith(".mat") or ".mat+" in key:
+                a, _ = _read_mats(path)
+                b, _ = _read_mats(fixed[key])
+                if len(a) == len(b):
+                    devs = [
+                        0.0
+                        if np.array_equal(x, y, equal_nan=True)
+                        else (
+                            rms_deviation(x, y, centre)
+                            if np.isfinite(x).all() and np.isfinite(y).all()
+                            else float("inf")
+                        )
+                        for x, y in zip(a, b, strict=True)
+                    ]
+                    n = sum(d > 0 for d in devs)
+                    if n:
+                        mat_mm = max(mat_mm, max(devs))
+                        others.append(f"{n} of {len(a)} matrices, by up to {max(devs):.3g} mm")
+            elif key.endswith((".nii.gz", ".nii")) and path.is_file():
+                ia, ib = nib.load(path), nib.load(fixed[key])
+                change = change + defects.Change.of(
+                    np.asanyarray(ib.dataobj.get_unscaled()),
+                    np.asanyarray(ia.dataobj.get_unscaled()),
+                )
+                if ia.header.get_data_dtype() != ib.header.get_data_dtype() or (
+                    ia.header["xyzt_units"] != ib.header["xyzt_units"]
+                ):
+                    others.append(f"{key}: type or units")
+            elif path.is_file() and path.read_bytes() != fixed[key].read_bytes():
+                others.append(f"{key} text")
+        defects.add_fix_check(
+            checks, entries, change, other_changes="; ".join(others), silent_ok=_SILENT
+        )
+        reproduced_entries = defects.notices_in(" ".join(e for _, e in logs))
+        if sorted(entries) != sorted(reproduced_entries):
+            checks(
+                "D13 notices in both modes",
+                False,
+                detail=f"fix: {entries}; reproduce: {reproduced_entries}",
+            )
+        return {"fix_entries": entries, "fix_mat_mm": mat_mm}
 
 
 _METRICS: dict[str, dict[str, Any]] = {}
@@ -787,6 +884,27 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             f"mcflirt {np.mean([m['truth_mcflirt'] for m in truth]):.4f} mm.",
             "",
         ]
+    lines += defects.summary(results)
+    fixed = [
+        (r.case, _METRICS[r.case]) for r in results if _METRICS.get(r.case, {}).get("fix_mat_mm")
+    ]
+    if fixed:
+        # Each run's largest matrix change (RMS deviation, radius 80 mm).
+        finite = [(c, m["fix_mat_mm"]) for c, m in fixed if np.isfinite(m["fix_mat_mm"])]
+        real = sorted(v for c, v in finite if c.startswith("real/"))
+        text = f"  - Matrices (RMS deviation, radius 80 mm): the corrections change {len(fixed)} run(s)"
+        if real:
+            text += (
+                f"; on the {len(real)} real runs a run's largest change is {np.median(real):.3g} "
+                f"mm (median) and at most {real[-1]:.3g} mm"
+            )
+        if finite:
+            worst = max(finite, key=lambda x: x[1])
+            text += f"; the largest is {worst[1]:.3g} mm, in `{worst[0]}`"
+        nonfinite = [c for c, m in fixed if not np.isfinite(m["fix_mat_mm"])]
+        if nonfinite:
+            text += "; non-finite matrices on one side in " + ", ".join(f"`{c}`" for c in nonfinite)
+        lines += [text + ".", ""]
     return [*lines, *_band_lines()]
 
 

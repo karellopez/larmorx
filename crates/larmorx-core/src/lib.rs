@@ -7,6 +7,8 @@
 //! - [`Element`] / [`DataType`]: the supported voxel types.
 //! - [`Grid3`]: sampling grids in ITK's physical space (LPS), for tools ported from ITK.
 //! - [`parallel`]: running work on an explicit number of threads.
+//! - [`defects`]: D13's switch between correcting an upstream defect and reproducing it, and the
+//!   notices that say when one changed a result.
 //! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions; [`vnl_svd`],
 //!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
@@ -14,6 +16,7 @@
 
 pub mod affine;
 pub mod array;
+pub mod defects;
 pub mod element;
 pub mod grid;
 pub mod image;
@@ -26,6 +29,7 @@ pub mod vnl_svd_f32;
 
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;
+pub use defects::{Notice, UpstreamDefects};
 pub use element::{DataType, Element, RealElement};
 pub use grid::Grid3;
 pub use image::{DynImage, Image, Image3, Image4};

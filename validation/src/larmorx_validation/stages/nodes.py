@@ -406,13 +406,21 @@ def compare_hmc(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
 
     # What fMRIPrep needs, through the Python API: the matrices only, no resampling.
     t0 = time.perf_counter()
+    # D13: fMRIPrep as it ran, so mcflirt's defects reproduced.
+    rep = {"upstream_defects": "reproduce"}
     api = lx.mri.hmc(
-        s.run.host(source), reference=s.run.host(reference), resample=False, n_threads=threads
+        s.run.host(source),
+        reference=s.run.host(reference),
+        resample=False,
+        n_threads=threads,
+        **rep,
     )
     res["api_seconds"] = time.perf_counter() - t0
     res["api_threads"] = threads
     t0 = time.perf_counter()
-    lx.mri.hmc(s.run.host(source), reference=s.run.host(reference), resample=False, n_threads=0)
+    lx.mri.hmc(
+        s.run.host(source), reference=s.run.host(reference), resample=False, n_threads=0, **rep
+    )
     res["api_seconds_all"] = time.perf_counter() - t0
     res["api_threads_all"] = os.cpu_count()
 
@@ -554,8 +562,15 @@ def compare_resample(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]
         **{k: v for k, v in kwargs.items() if k != "fieldmap"},
     }
     t0 = time.perf_counter()
+    # D13: fMRIPrep as it ran, so its Jacobian axis (PIPE-03) and nitransforms' composite
+    # order (PIPE-04) reproduced.
     img = lx.transforms.resample_series(
-        s.run.host(i["in_file"]), s.run.host(i["ref_file"]), transforms, n_threads=threads, **kwargs
+        s.run.host(i["in_file"]),
+        s.run.host(i["ref_file"]),
+        transforms,
+        n_threads=threads,
+        upstream_defects="reproduce",
+        **kwargs,
     )
     res["larmorx_seconds"] = time.perf_counter() - t0
     res["larmorx_threads"] = threads

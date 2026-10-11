@@ -27,7 +27,8 @@ here = Path(__file__).parent
 config = json.loads((here / "config.json").read_text(encoding="utf-8"))
 args = sys.argv[1:]
 with open(here / "calls.jsonl", "a", encoding="utf-8") as f:
-    f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS")}) + "\\n")
+    f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS"),
+                        "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS")}) + "\\n")
 if args == ["--version"]:
     print("larmorx-gpl " + config["version"])
     sys.exit(0)
@@ -155,6 +156,7 @@ def test_the_replica_runs_as_a_separate_program(scripts, tmp_path):
     version, run = calls(program)
     assert version["args"] == ["--version"]
     assert run["threads"] == "3"
+    assert run["defects"] == "fix"  # D13's choice reaches the replica as its variable
     assert run["args"] == [
         "afni", "3dTshift", "-Fourier", "-rlt+", "-ignore", "1", "-TR", "2.0s",
         "-tzero", "0.5", "-tpattern", "@slice_times.1D", "-prefix", "out.nii", str(path),
@@ -170,6 +172,23 @@ def test_the_replica_runs_as_a_separate_program(scripts, tmp_path):
     args = calls(program)[-1]["args"]
     assert args[2:5] == ["-linear", "-no_detrend", "-Fourier"]  # AFNI's order rule
     assert args[-1].endswith("input.nii")
+
+
+def test_the_replica_receives_the_upstream_defects_choice(scripts, tmp_path):
+    """``upstream_defects`` reaches the replica as ``LARMORX_UPSTREAM_DEFECTS``, and its
+    notice lines come back as :class:`larmorx.UpstreamDefectWarning`."""
+    line = (
+        "*+ WARNING: upstream defect AFNI-01 (3dTshift) reproduced: the negative scale factor "
+        "-0.5 (scl_slope) is applied on output only [LARMORX_UPSTREAM_DEFECTS=fix corrects it]\n"
+    )
+    program = stub(scripts, stderr=line)
+    _, path = series(tmp_path)
+    with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-01") as record:
+        lx.afni.tshift(path, slice_times="alt+z", upstream_defects="reproduce")
+    w = next(r.message for r in record if isinstance(r.message, lx.UpstreamDefectWarning))
+    assert (w.entry, w.tool, w.mode) == ("AFNI-01", "3dTshift", "reproduce")
+    assert w.detail.endswith("is applied on output only")
+    assert calls(program)[-1]["defects"] == "reproduce"
 
 
 def test_a_failing_replica_raises_and_never_falls_back(scripts, tmp_path):

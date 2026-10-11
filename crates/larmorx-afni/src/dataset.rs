@@ -5,11 +5,18 @@
 //! AFNI keeps voxels as bytes, shorts or floats (its *datum*), each volume with an optional
 //! scale (*brick factor*). Reading a NIfTI file chooses the datum and factor from the stored
 //! type and `scl_slope`/`scl_inter`; writing stores the datum and the factor back.
+//!
+//! Three of AFNI's rules are defects that larmorx corrects by default (D13,
+//! `docs/api/upstream-defects.md`): a negative brick factor is applied on output only
+//! (AFNI-01, [`extract`]), float32 data with a slope and an intercept are scaled twice
+//! (AFNI-02, [`read`]), and metre and micron units leave the origin unconverted (AFNI-07,
+//! [`afni_geometry`]). `UpstreamDefects::Reproduce` follows AFNI.
 
 use std::path::Path;
 
 use larmorx_core::affine::Affine;
 use larmorx_core::array::DynArray;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 use larmorx_core::ndarray::{ArrayD, ArrayViewD, IxDyn, ShapeBuilder};
 use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, ReadOptions, Scaling, WriteOptions};
@@ -120,10 +127,13 @@ impl Datum for f32 {
     }
 }
 
-/// A stored value as a float: multiplied by the brick factor only when it is positive.
+/// A stored value as a float: multiplied by the brick factor. AFNI multiplies only when the
+/// factor is positive, so a negative factor (a negative `scl_slope`), which [`store`] does
+/// divide by, flips the sign of every value it processes (observed; AFNI-01). With
+/// [`UpstreamDefects::Fix`] any non-zero factor is applied.
 #[inline]
-pub fn extract<T: Datum>(x: T, factor: f32) -> f32 {
-    if factor > 0.0 {
+pub fn extract<T: Datum>(x: T, factor: f32, defects: UpstreamDefects) -> f32 {
+    if factor > 0.0 || (factor != 0.0 && defects.fix()) {
         x.to_f32() * factor
     } else {
         x.to_f32()
@@ -160,6 +170,8 @@ pub struct AfniImage {
     pub slice_timing: Option<HeaderTiming>,
     /// What AFNI would have warned about while reading.
     pub warnings: Vec<String>,
+    /// The upstream defects that changed how the file was read (AFNI-02).
+    pub notices: Vec<Notice>,
 }
 
 /// A NIfTI file could not be read as an AFNI dataset.
@@ -210,7 +222,17 @@ fn scaled_f32<T: Copy>(v: Vec<T>, to_f32: impl Fn(T) -> f32, slope: f32, inter: 
 /// Non-finite `scl_slope`/`scl_inter` count as 0; non-finite float values, and scaled values
 /// that overflow, become 0. Files with more than one volume beyond the fourth dimension, and
 /// 64-bit integer or complex data, are rejected.
-pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadError> {
+///
+/// AFNI-02 (observed): for float32 data with a slope and an intercept, AFNI also keeps the
+/// slope as the brick factor, so the scaled values are scaled once more when they are
+/// processed and written (`specs/3dTshift.md` §6). [`UpstreamDefects::Fix`] scales them once
+/// (no factor); [`UpstreamDefects::Reproduce`] keeps the factor. The header's slice timing
+/// follows `defects` too ([`timing::header_timing`], AFNI-03).
+pub fn read(
+    path: impl AsRef<Path>,
+    n_threads: usize,
+    defects: UpstreamDefects,
+) -> Result<AfniImage, ReadError> {
     let path = path.as_ref();
     let header = nifti::read_header(path)?;
     let image = nifti::read(
@@ -241,6 +263,7 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
         0.0
     };
     let mut warnings = Vec::new();
+    let mut notices = Vec::new();
     let (data, factor) = match image.data {
         DynArray::U8(a) if both => (
             BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
@@ -250,10 +273,29 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
             BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
             0.0,
         ),
-        DynArray::F32(a) if both => (
-            BrickData::Float(scaled_f32(into_vec(a), |x| x, slope, inter)),
-            0.0,
-        ),
+        DynArray::F32(a) if both => {
+            if factor != 0.0 {
+                let detail = match defects {
+                    UpstreamDefects::Fix => format!(
+                        "{}: float32 data with scl_slope {slope} and scl_inter {inter} are scaled \
+                         once; AFNI also keeps the slope as a scale factor, scaling them twice",
+                        path.display()
+                    ),
+                    UpstreamDefects::Reproduce => format!(
+                        "{}: float32 data with scl_slope {slope} and scl_inter {inter} are scaled, \
+                         and the slope is kept as a scale factor, as AFNI does: the output is \
+                         scaled twice",
+                        path.display()
+                    ),
+                };
+                notices.push(Notice::new(&defects::AFNI_02, defects, detail));
+            }
+            let kept = if defects.fix() { 0.0 } else { factor };
+            (
+                BrickData::Float(scaled_f32(into_vec(a), |x| x, slope, inter)),
+                kept,
+            )
+        }
         DynArray::U8(a) => (BrickData::Byte(into_vec(a)), factor),
         DynArray::I16(a) => (BrickData::Short(into_vec(a)), factor),
         DynArray::F32(a) => (
@@ -286,18 +328,11 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
             (BrickData::Float(v), 0.0)
         }
     };
-    if factor < 0.0 {
-        warnings.push(format!(
-            "{}: negative scl_slope {factor}: as AFNI does, it is not applied when the data are \
-             read but is stored in the output, so the output is sign-flipped",
-            path.display()
-        ));
-    }
     let has_time_axis = header.dim[0] >= 4;
     let tr = header_tr(&header);
     let per_second = timing::time_units_per_second(&header);
     let toffset = timing::to_seconds(finite_or_zero(header.toffset), per_second);
-    let slice_timing = timing::header_timing(&header, shape4[2]);
+    let slice_timing = timing::header_timing(&header, shape4[2], defects);
     let bricks = Bricks::new(shape4, data, vec![factor; shape4[3]]).map_err(unsupported)?;
     Ok(AfniImage {
         bricks,
@@ -307,6 +342,7 @@ pub fn read(path: impl AsRef<Path>, n_threads: usize) -> Result<AfniImage, ReadE
         toffset,
         slice_timing,
         warnings,
+        notices,
     })
 }
 
@@ -324,8 +360,71 @@ pub fn header_tr(header: &NiftiHeader) -> f32 {
 /// `sform_code > 0`, else the qform if `qform_code > 0`, else the voxel sizes on the
 /// diagonal; scaled to millimetres from metres or micrometres. Also returns the xform code
 /// AFNI writes back: 1 for codes 1 and 2 (or none), 3 for 3 and 5, 4 for 4.
-pub fn afni_geometry(hdr: &NiftiHeader) -> Result<(Affine, i32), String> {
-    let (matrix, code) = if hdr.sform_code > 0 {
+///
+/// AFNI-07 (observed): AFNI converts only the matrix's linear part (voxel sizes and
+/// directions) and leaves the origin in metres or micrometres. [`UpstreamDefects::Fix`]
+/// converts the whole matrix; [`UpstreamDefects::Reproduce`] leaves the origin
+/// ([`units_notice`] says when that matters).
+pub fn afni_geometry(hdr: &NiftiHeader, defects: UpstreamDefects) -> Result<(Affine, i32), String> {
+    let (matrix, code) = header_matrix(hdr)?;
+    let mm = millimetres_per_unit(hdr);
+    let matrix = if mm == 1.0 {
+        matrix
+    } else {
+        let rows = matrix.rows();
+        let scale = |row: [f64; 4]| {
+            let mut out = row.map(|v| v * mm);
+            if defects.reproduce() {
+                out[3] = row[3];
+            }
+            out
+        };
+        Affine::from_rows([scale(rows[0]), scale(rows[1]), scale(rows[2]), rows[3]])
+    };
+    let code = match code {
+        3 | 5 => 3,
+        4 => 4,
+        _ => 1,
+    };
+    Ok((matrix, code))
+}
+
+/// Millimetres per spatial unit of the header: 1000 for metres, 0.001 for micrometres, else 1.
+fn millimetres_per_unit(hdr: &NiftiHeader) -> f64 {
+    match hdr.xyzt_units & 0x07 {
+        1 => 1000.0,
+        3 => 0.001,
+        _ => 1.0,
+    }
+}
+
+/// The AFNI-07 notice for an output written with `hdr`'s geometry: when its units are metres
+/// or micrometres and its origin is not 0, AFNI's origin (left unconverted) differs from the
+/// converted one.
+pub fn units_notice(hdr: &NiftiHeader, defects: UpstreamDefects) -> Option<Notice> {
+    let mm = millimetres_per_unit(hdr);
+    let (matrix, _) = header_matrix(hdr).ok()?;
+    let origin = matrix.translation();
+    if mm == 1.0 || origin.iter().all(|&v| v == 0.0) {
+        return None;
+    }
+    let unit = if mm > 1.0 { "metres" } else { "micrometres" };
+    let detail = match defects {
+        UpstreamDefects::Fix => format!(
+            "the input's units are {unit}: its origin {origin:?} is converted to millimetres \
+             with its voxel sizes; AFNI converts only the voxel sizes"
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "the input's units are {unit}: its voxel sizes are converted to millimetres and its \
+             origin {origin:?} is not, as AFNI does"
+        ),
+    };
+    Some(Notice::new(&defects::AFNI_07, defects, detail))
+}
+
+/// The matrix AFNI takes from a header, before any unit conversion, and its code.
+fn header_matrix(hdr: &NiftiHeader) -> Result<(Affine, i32), String> {
+    Ok(if hdr.sform_code > 0 {
         (hdr.sform(), hdr.sform_code)
     } else if hdr.qform_code > 0 {
         (hdr.qform().map_err(|e| e.to_string())?, hdr.qform_code)
@@ -335,29 +434,7 @@ pub fn afni_geometry(hdr: &NiftiHeader) -> Result<(Affine, i32), String> {
             if p > 0.0 && p.is_finite() { p } else { 1.0 }
         };
         (Affine::from_zooms([size(1), size(2), size(3)], [0.0; 3]), 1)
-    };
-    let mm = match hdr.xyzt_units & 0x07 {
-        1 => 1000.0,
-        3 => 0.001,
-        _ => 1.0,
-    };
-    let matrix = if mm == 1.0 {
-        matrix
-    } else {
-        let rows = matrix.rows();
-        Affine::from_rows([
-            rows[0].map(|v| v * mm),
-            rows[1].map(|v| v * mm),
-            rows[2].map(|v| v * mm),
-            rows[3],
-        ])
-    };
-    let code = match code {
-        3 | 5 => 3,
-        4 => 4,
-        _ => 1,
-    };
-    Ok((matrix, code))
+    })
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -378,11 +455,12 @@ pub struct OutputTiming {
 /// qform and sform from AFNI's matrix with the same code, `scl_slope` = the brick factor,
 /// millimetres and seconds, the slice axis (`dim_info`) third, and the slice range
 /// `0..nz−1` unless slice timing is kept. A dataset with one volume is written as 3D, without
-/// time fields.
+/// time fields. The geometry follows `defects` ([`afni_geometry`], AFNI-07).
 pub fn output_header(
     input: &NiftiHeader,
     bricks: &Bricks,
     timing: &OutputTiming,
+    defects: UpstreamDefects,
 ) -> Result<NiftiHeader, String> {
     let [nx, ny, nz, nt] = bricks.shape;
     let shape: Vec<usize> = if nt > 1 {
@@ -392,7 +470,7 @@ pub fn output_header(
     };
     let mut hdr = NiftiHeader::new(NiftiVersion::V1, &shape, bricks.data.data_type())
         .map_err(|e| e.to_string())?;
-    let (matrix, code) = afni_geometry(input)?;
+    let (matrix, code) = afni_geometry(input, defects)?;
     hdr.set_sform(&matrix, code);
     hdr.set_qform(&matrix, code).map_err(|e| e.to_string())?;
     hdr.scl_slope = f64::from(bricks.factors.first().copied().unwrap_or(0.0));
@@ -450,6 +528,9 @@ pub fn write(
 mod tests {
     use super::*;
 
+    const FIX: UpstreamDefects = UpstreamDefects::Fix;
+    const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
     #[test]
     fn storing_rounds_half_to_even_and_clamps() {
         assert_eq!(store::<i16>(2.5, 0.0), 2);
@@ -459,11 +540,16 @@ mod tests {
         assert_eq!(store::<u8>(-3.0, 0.0), 0);
         assert_eq!(store::<u8>(255.7, 0.0), 255);
         assert_eq!(store::<u8>(0.5, 0.0), 0);
-        // Brick factors: divide on store, multiply on extract (positive factors only).
+        // Brick factors: divide on store, multiply on extract.
         assert_eq!(store::<i16>(10.0, 0.25), 40);
-        assert_eq!(extract(40i16, 0.25), 10.0);
-        assert_eq!(extract(40i16, -0.5), 40.0);
+        assert_eq!(extract(40i16, 0.25, FIX), 10.0);
+        assert_eq!(extract(40i16, 0.25, REPRODUCE), 10.0);
+        // AFNI-01: AFNI multiplies by positive factors only, but divides by negative ones.
+        assert_eq!(extract(40i16, -0.5, REPRODUCE), 40.0);
         assert_eq!(store::<i16>(40.0, -0.5), -80);
+        assert_eq!(extract(40i16, -0.5, FIX), -20.0);
+        assert_eq!(store::<i16>(-20.0, -0.5), 40);
+        assert_eq!(extract(40i16, 0.0, FIX), 40.0);
         // The division is a multiplication by 1/factor in double.
         let v = 1033.0437f32 * 0.3;
         assert_eq!(
@@ -484,16 +570,43 @@ mod tests {
 
     #[test]
     fn geometry_prefers_the_sform_and_maps_codes() {
-        let (m, code) = afni_geometry(&header_with(1, 2)).unwrap();
+        let (m, code) = afni_geometry(&header_with(1, 2), FIX).unwrap();
         assert_eq!(m.translation(), [-5.0, 7.0, 11.0]);
         assert_eq!(code, 1);
-        let (m, code) = afni_geometry(&header_with(4, 0)).unwrap();
+        let (m, code) = afni_geometry(&header_with(4, 0), FIX).unwrap();
         assert_eq!(m.translation(), [1.0, 2.0, 3.0]);
         assert_eq!(code, 4);
-        assert_eq!(afni_geometry(&header_with(0, 5)).unwrap().1, 3);
-        let (m, code) = afni_geometry(&header_with(0, 0)).unwrap();
+        assert_eq!(afni_geometry(&header_with(0, 5), FIX).unwrap().1, 3);
+        let (m, code) = afni_geometry(&header_with(0, 0), FIX).unwrap();
         assert_eq!(m.translation(), [0.0; 3]);
         assert_eq!(code, 1);
+        assert!(units_notice(&header_with(1, 2), FIX).is_none());
+    }
+
+    /// AFNI-07: metres and micrometres. The whole matrix is converted to millimetres; AFNI
+    /// (reproduced) converts the voxel sizes and leaves the origin (observed).
+    #[test]
+    fn metre_units_both_modes() {
+        let mut h = header_with(1, 2);
+        h.xyzt_units = 1 | 8;
+        let (fixed, _) = afni_geometry(&h, FIX).unwrap();
+        let (afni, _) = afni_geometry(&h, REPRODUCE).unwrap();
+        assert_eq!(fixed.translation(), [-5000.0, 7000.0, 11000.0]);
+        assert_eq!(afni.translation(), [-5.0, 7.0, 11.0]);
+        assert_eq!(fixed.linear(), afni.linear());
+        assert_eq!(fixed.linear()[0][0], -2000.0);
+        for mode in [FIX, REPRODUCE] {
+            let n = units_notice(&h, mode).unwrap();
+            assert_eq!((n.defect.id, n.mode), ("AFNI-07", mode));
+        }
+        h.xyzt_units = 3 | 8;
+        assert_eq!(
+            afni_geometry(&h, FIX).unwrap().0.translation(),
+            [-0.005, 0.007, 0.011]
+        );
+        // No origin: the two agree, and nothing is said.
+        h.set_sform(&Affine::from_zooms([2.0, 2.0, 3.0], [0.0; 3]), 2);
+        assert!(units_notice(&h, FIX).is_none());
     }
 
     #[test]
@@ -506,7 +619,7 @@ mod tests {
             toffset: 0.75,
             slices: None,
         };
-        let h = output_header(&input, &bricks, &timing).unwrap();
+        let h = output_header(&input, &bricks, &timing, FIX).unwrap();
         assert_eq!(h.dim[..5], [4, 2, 2, 2, 3]);
         assert_eq!((h.qform_code, h.sform_code), (1, 1));
         assert_eq!(h.sform().translation(), [-5.0, 7.0, 11.0]);

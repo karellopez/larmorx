@@ -461,6 +461,49 @@ Decided by the user on the questions the defect register raised
   be bugs; larmorprepx's pipeline choices are made with larmorprepx; ResampleImage's corrected
   command line is designed and reviewed.
 
+## 2026-10-11: D13's switch, and the first corrections
+- **The switch** (shared by every tool, [api/upstream-defects.md](api/upstream-defects.md)):
+  `upstream_defects="fix" | "reproduce"` on every affected Python function (default `"fix"`),
+  `LARMORX_UPSTREAM_DEFECTS=fix|reproduce` on the command line (an environment variable, like
+  `LARMORX_IMPLEMENTATION`, so that no flag clashes with an original's arguments; invalid
+  values exit 2), and `larmorx_core::defects::UpstreamDefects` in each tool's Rust options.
+  Tools return `Notice`s for the defects that changed a result (or, reproduced, would have);
+  Python raises them as `lx.UpstreamDefectWarning` (attributes `entry`, `tool`, `mode`,
+  `detail`), the command line prints one `upstream defect <ID> (<tool>) corrected|reproduced:
+  ...` line on standard error. Replica programs receive the same variable and write the same
+  lines. The register's entries with a switch are listed in `larmorx_core::defects::DEFECTS`.
+- **Corrected by default:** PIPE-03 (the Jacobian along the phase-encoding direction mapped
+  into the target grid), PIPE-04, SCI-03, and in the clean-room originals AFNI-01, -02, -03,
+  -05, -07 and FSL-01, -03, -05 to -10, -13, -14. FSL-02 is implemented as an opt-in
+  (`normcorr_count="weights"`) and measured, for the user to decide. AFNI-08's trigger was not
+  found by black-box runs. Left for the next tasks: the ANTs and ITK entries, and the 3dTshift
+  replica's switch.
+- **Parity** compares with the originals in `reproduce` mode (bit-identity as before D13) and
+  runs a fix pass that reports what the corrections change and checks that a defect is named
+  exactly when the two passes differ. Golden cases record the default, plus `*.reproduce`
+  cases whose checksums equal those recorded before D13.
+- **Measured:**
+  - **PIPE-03** on the grids and transforms of fMRIPrep's ds000005 run, with a synthetic 3 T-like
+    field map ([validation/resample-series-jacobian.md](validation/resample-series-jacobian.md)):
+    the native grid is unchanged (bit-identical); in T1w space fMRIPrep's factor is off the exact
+    one by more than 1 % of the signal in 40 % of brain voxels (99th percentile 0.23), in MNI
+    space in 33 % (0.16); larmorx's by at most 0.002 and 0.008.
+  - **FSL-01**: on mcflirt's band, the last volume's matrix changes; on the synthetic
+    `background` series mcflirt's last volume, started from the identity, converges to a 180°
+    rotation (106 mm from the true motion), the corrected one to 0.36 mm
+    ([validation/mri-hmc-normcorr-count.md](validation/mri-hmc-normcorr-count.md), ground
+    truth).
+  - **FSL-02** ([validation/mri-hmc-normcorr-count.md](validation/mri-hmc-normcorr-count.md)):
+    the corrected count moves larmorx's matrices by about mcflirt's own variability (0.014 to
+    0.033 mm at the 95th percentile on the 19 real runs, where the band is 0.016 to 0.10 mm;
+    24 of 28 band runs stay within the band, against 28 of 28 for `reproduce`), and it is not
+    more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3, by
+    0.001 to 0.16 mm). It stays opt-in until the user decides; the measurement gives no reason
+    to make it the default.
+- **Found while doing it:** the 3dTshift replica writes a metre or micrometre input's sform
+  unconverted (its qform matches AFNI's); the new unit cases are expected divergences in the
+  replica's record until its owner fixes it.
+
 ## 2026-10-11: The ANTs oracle is built by a fixed compiler; N4 follows the source
 - **The cause of the N4 artefact is a GCC bug.** GCC's SLP vectorizer computes the first two
   axes of ITK's B-spline fit as a `vector(2) double`, rounds it to a `vector(2) float` for the
@@ -511,6 +554,20 @@ Decided by the user on the questions the defect register raised
 - **Also fixed:** the build script passed `-DSUPERBUILD_ANTS=OFF`, a name ANTs does not have,
   so the old oracle was a superbuild against the system ITK; it now passes `ANTS_SUPERBUILD=OFF`
   and builds only the programs used.
+
+## 2026-10-11: FSL-02 stays opt-in; upstream reports kept in the repository
+- **FSL-02** (mcflirt's inflated weight count in its normalised correlation): measured, then
+  decided by the user. The corrected count moves the matrices by about mcflirt's own
+  variability and is not more accurate against the synthetic ground truth, so it stays opt-in
+  (`lx.mri.hmc(..., normcorr_count="weights")`); mcflirt's behaviour is the default
+  (`docs/validation/mri-hmc-normcorr-count.md`).
+- **Upstream reports:** drafts of bug reports for fMRIPrep are kept in `docs/upstream-reports/`
+  (user decision), marked "draft, not yet filed" until the user files them; then the issue's
+  URL is added. The first two: PIPE-02 (the resampler's race with multi-threaded OpenBLAS) and
+  PIPE-03 (the SDC Jacobian along the wrong axis).
+- **ds001600 was not a usable oracle for SDC:** its BOLD runs have 5 volumes and fMRIPrep
+  skipped them. ds005040 (PEPOLAR), ds005454 (`phasediff`) and ds005752 (direct `fieldmap`)
+  replace it; the porting guide now says to check series length and metadata first.
 
 ## Open decisions (PLAN.md §16)
 

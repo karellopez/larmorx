@@ -5,9 +5,16 @@
 //! origin `tzero`, clipped to its own range, and given its trend back. Voxels are independent,
 //! so the work runs in parallel on fixed blocks of voxels and the result does not depend on
 //! the thread count.
+//!
+//! Two of AFNI's behaviours here are defects that larmorx corrects by default (D13,
+//! `docs/api/upstream-defects.md`): a negative brick factor flips the sign of the shifted
+//! slices (AFNI-01, [`crate::dataset::extract`]), and `-no_detrend` removes the mean of only
+//! one voxel of each pair (AFNI-05). [`TshiftParams::upstream_defects`] chooses; [`tshift`]
+//! returns a notice for each defect that changed the result (or would have).
 
 pub mod series;
 
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::parallel::{self, ThreadPoolError};
 use rayon::prelude::*;
 
@@ -73,12 +80,15 @@ pub struct TshiftParams {
     pub method: Method,
     pub restore: Restore,
     /// Remove the linear trend before shifting (true, AFNI's default). `false` is
-    /// `-no_detrend`, reproduced as AFNI 25.2.09 behaves (observed): within each slice, voxels
-    /// are taken in pairs in index order; the first of each pair has its mean removed and
-    /// restored, the second is shifted as raw values. Needs `restore = Trend`.
+    /// `-no_detrend`: every voxel has its mean removed and restored. AFNI 25.2.09 does that to
+    /// the first voxel of each pair only (in index order within a slice) and shifts the second
+    /// as raw values (observed; AFNI-05), which [`UpstreamDefects::Reproduce`] reproduces.
+    /// Needs `restore = Trend`.
     pub detrend: bool,
     /// Worker threads (0 = all logical CPUs). The result does not depend on it.
     pub n_threads: usize,
+    /// D13: correct AFNI-01 and AFNI-05 (the default) or reproduce them.
+    pub upstream_defects: UpstreamDefects,
 }
 
 /// [`tshift`] was given impossible parameters.
@@ -111,8 +121,9 @@ pub fn slice_shifts(params: &TshiftParams) -> Vec<f32> {
 /// Shifts every voxel of `bricks` in place (`specs/3dTshift.md` §4–§5).
 ///
 /// Slices whose shift is below 0.001 samples are left exactly as stored when the default
-/// restore is in effect. A series of fewer than two time points is left unchanged.
-pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<(), TshiftError> {
+/// restore is in effect. A series of fewer than two time points is left unchanged. Returns a
+/// notice for each upstream defect that changed the result (or, reproduced, would have).
+pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<Vec<Notice>, TshiftError> {
     let [_, _, nz, nt] = bricks.shape;
     if params.slice_times.len() != nz {
         return Err(TshiftError::SliceTimes {
@@ -130,7 +141,7 @@ pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<(), TshiftEr
         return Err(TshiftError::RestoreWithoutDetrend);
     }
     if nt < 2 {
-        return Ok(());
+        return Ok(Vec::new());
     }
     if params.ignore + 5 > nt {
         return Err(TshiftError::Ignore {
@@ -147,7 +158,50 @@ pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<(), TshiftEr
         BrickData::Short(v) => run(v, shape, &factors, &kernels, params),
         BrickData::Float(v) => run(v, shape, &factors, &kernels, params),
     })?;
-    Ok(())
+    Ok(notices(shape, &factors, &kernels, params))
+}
+
+/// The notices of [`tshift`]: AFNI-01 when a shifted slice has a negative brick factor,
+/// AFNI-05 when `-no_detrend` pairs voxels.
+fn notices(
+    [nx, ny, _, _]: [usize; 4],
+    factors: &[f32],
+    kernels: &[Option<Kernel>],
+    params: &TshiftParams,
+) -> Vec<Notice> {
+    let mode = params.upstream_defects;
+    let shifted = kernels.iter().filter(|k| k.is_some()).count();
+    let mut out = Vec::new();
+    if shifted == 0 {
+        return out;
+    }
+    if let Some(&f) = factors.iter().find(|&&f| f < 0.0) {
+        let detail = match mode {
+            UpstreamDefects::Fix => format!(
+                "the negative scale factor {f} (scl_slope) is applied to the {shifted} shifted \
+                 slices; AFNI applies it on output only, flipping their sign"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the negative scale factor {f} (scl_slope) is applied on output only, as AFNI \
+                 does: the {shifted} shifted slices come out sign-flipped and scaled"
+            ),
+        };
+        out.push(Notice::new(&defects::AFNI_01, mode, detail));
+    }
+    if !params.detrend && nx * ny >= 2 {
+        let detail = match mode {
+            UpstreamDefects::Fix => "-no_detrend: every voxel has its mean removed and restored; \
+                 AFNI does that to the first voxel of each pair only and shifts the second as raw \
+                 values"
+                .to_owned(),
+            UpstreamDefects::Reproduce => "-no_detrend: as AFNI does, only the first voxel of \
+                 each pair (in index order within a slice) has its mean removed and restored; \
+                 the second is shifted as raw values"
+                .to_owned(),
+        };
+        out.push(Notice::new(&defects::AFNI_05, mode, detail));
+    }
+    out
 }
 
 /// What is done to the series of one slice.
@@ -232,19 +286,21 @@ fn process_block<T: Datum>(
     let voxels = chunks[0].len();
     // Gather each voxel's series contiguously.
     let mut buf = vec![0f32; voxels * nt];
+    let defects = params.upstream_defects;
     for (t, chunk) in chunks.iter().enumerate() {
         for (v, &x) in chunk.iter().enumerate() {
-            buf[v * nt + t] = extract(x, factors[t]);
+            buf[v * nt + t] = extract(x, factors[t], defects);
         }
     }
     let skip = params.ignore;
-    // Without detrending, AFNI removes the mean from the first voxel of each pair (in index
-    // order within the slice) and nothing from the second (observed). Blocks start at an even
-    // index within their slice, so the parity within the block is the parity in the slice.
+    // Without detrending, every voxel has its mean removed. AFNI removes it from the first
+    // voxel of each pair (in index order within the slice) and nothing from the second
+    // (observed; AFNI-05, reproduced on request). Blocks start at an even index within their
+    // slice, so the parity within the block is the parity in the slice.
     let removal = |voxel: usize| {
         if params.detrend {
             Removal::Trend
-        } else if voxel.is_multiple_of(2) {
+        } else if defects.fix() || voxel.is_multiple_of(2) {
             Removal::Mean
         } else {
             Removal::Nothing
@@ -312,6 +368,7 @@ fn process_block<T: Datum>(
 mod tests {
     use super::*;
     use crate::timing::{Pattern, mean_time};
+    use larmorx_core::defects::Notice;
 
     fn dataset(shape: [usize; 4]) -> Bricks {
         let n: usize = shape.iter().product();
@@ -338,6 +395,7 @@ mod tests {
             restore: Restore::Trend,
             detrend: true,
             n_threads,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 
@@ -412,13 +470,9 @@ mod tests {
         assert!(matches!(tshift(&mut d, &p), Err(TshiftError::Tr(_))));
     }
 
-    #[test]
-    fn no_detrend_reproduces_afni_pairs() {
-        // Two voxels per slice at levels 1000 and 5000 with one impulse each, -linear
-        // -no_detrend, slices at 0 and 1 s of a 2 s TR. The expected values are AFNI
-        // 25.2.09's output: the first voxel of the pair has its mean removed (its last point
-        // moves toward the mean), the second is shifted raw (zero beyond the end, then clipped
-        // to its range).
+    /// The pair of voxels of the -no_detrend test, shifted in `mode`; returns the four series
+    /// (voxel, slice) and the notices.
+    fn no_detrend_pairs(mode: UpstreamDefects) -> ([Vec<f32>; 4], Vec<Notice>) {
         let nt = 16;
         let mut data = vec![0f32; 2 * 2 * nt];
         for z in 0..2 {
@@ -438,14 +492,29 @@ mod tests {
             restore: Restore::Trend,
             detrend: false,
             n_threads: 1,
+            upstream_defects: mode,
         };
-        tshift(&mut b, &params).unwrap();
+        let notices = tshift(&mut b, &params).unwrap();
         let BrickData::Float(out) = &b.data else {
             unreachable!()
         };
         let series = |x: usize, z: usize| -> Vec<f32> {
             (0..nt).map(|t| out[x + 2 * (z + 2 * t)]).collect()
         };
+        (
+            [series(0, 0), series(1, 0), series(0, 1), series(1, 1)],
+            notices,
+        )
+    }
+
+    /// AFNI-05 reproduced: two voxels per slice at levels 1000 and 5000 with one impulse each,
+    /// -linear -no_detrend, slices at 0 and 1 s of a 2 s TR. The expected values are AFNI
+    /// 25.2.09's output: the first voxel of the pair has its mean removed (its last point moves
+    /// toward the mean), the second is shifted raw (zero beyond the end, then clipped to its
+    /// range). Corrected, the second behaves as the first.
+    #[test]
+    fn no_detrend_pairs_both_modes() {
+        let nt = 16;
         let mut a0 = vec![1000.0; nt];
         (a0[7], a0[8], a0[15]) = (1002.5, 1007.5, 1000.15625);
         let mut b0 = vec![5000.0; nt];
@@ -454,10 +523,73 @@ mod tests {
         (a1[0], a1[8], a1[9]) = (1000.15625, 1007.5, 1002.5);
         let mut b1 = vec![5000.0; nt];
         (b1[4], b1[5]) = (5007.5, 5002.5);
-        assert_eq!(series(0, 0), a0);
-        assert_eq!(series(1, 0), b0);
-        assert_eq!(series(0, 1), a1);
-        assert_eq!(series(1, 1), b1);
+        let (afni, notices) = no_detrend_pairs(UpstreamDefects::Reproduce);
+        assert_eq!(afni, [a0.clone(), b0.clone(), a1.clone(), b1.clone()]);
+        assert_eq!(notices.len(), 1);
+        assert_eq!(
+            (notices[0].defect.id, notices[0].mode),
+            ("AFNI-05", UpstreamDefects::Reproduce)
+        );
+        // Corrected: the second voxel's mean is removed and restored too, so its edges move
+        // toward its mean like the first voxel's.
+        (b0[15], b1[0]) = (5000.0 + 0.15625, 5000.0 + 0.15625);
+        let (fixed, notices) = no_detrend_pairs(UpstreamDefects::Fix);
+        assert_eq!(fixed, [a0, b0, a1, b1]);
+        assert_eq!(notices[0].mode, UpstreamDefects::Fix);
+    }
+
+    /// AFNI-01: a negative brick factor. AFNI multiplies by it only when storing, so the
+    /// shifted slices come out sign-flipped and scaled; corrected, they keep their sign.
+    /// Unshifted slices are stored as they were in both modes.
+    #[test]
+    fn negative_factor_both_modes() {
+        let shape = [2, 2, 2, 12];
+        let n: usize = shape.iter().product();
+        let data: Vec<i16> = (0..n).map(|i| 100 + (i * 37 % 50) as i16).collect();
+        let run = |mode| {
+            let mut b = Bricks::new(shape, BrickData::Short(data.clone()), vec![-0.5; 12]).unwrap();
+            let mut p = params(2, Method::Linear, 1);
+            p.slice_times = vec![0.0, 1.0];
+            p.tzero = 0.0;
+            p.upstream_defects = mode;
+            let notices = tshift(&mut b, &p).unwrap();
+            let BrickData::Short(out) = b.data else {
+                unreachable!()
+            };
+            (out, notices)
+        };
+        let (afni, na) = run(UpstreamDefects::Reproduce);
+        let (fixed, nf) = run(UpstreamDefects::Fix);
+        for t in 0..12 {
+            let (s0, s1) = (t * 8..t * 8 + 4, t * 8 + 4..t * 8 + 8);
+            // Slice 0 is not shifted: stored as it was.
+            assert_eq!(afni[s0.clone()], data[s0.clone()]);
+            assert_eq!(fixed[s0.clone()], data[s0]);
+            // Slice 1: AFNI's values are negative (sign-flipped, twice as large); corrected
+            // ones keep the stored sign.
+            assert!(
+                afni[s1.clone()].iter().all(|&v| v < 0),
+                "{:?}",
+                &afni[s1.clone()]
+            );
+            assert!(fixed[s1.clone()].iter().all(|&v| v > 0), "{:?}", &fixed[s1]);
+        }
+        assert_eq!(
+            (na[0].defect.id, na[0].mode),
+            ("AFNI-01", UpstreamDefects::Reproduce)
+        );
+        assert_eq!(
+            (nf[0].defect.id, nf[0].mode),
+            ("AFNI-01", UpstreamDefects::Fix)
+        );
+        // Positive factors: the same result and nothing said.
+        let mut b = Bricks::new(shape, BrickData::Short(data.clone()), vec![0.5; 12]).unwrap();
+        let mut p = params(2, Method::Linear, 1);
+        let mut c = b.clone();
+        assert!(tshift(&mut b, &p).unwrap().is_empty());
+        p.upstream_defects = UpstreamDefects::Reproduce;
+        assert!(tshift(&mut c, &p).unwrap().is_empty());
+        assert_eq!(b, c);
     }
 
     #[test]

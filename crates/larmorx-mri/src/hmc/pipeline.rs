@@ -133,7 +133,11 @@ pub fn run(
         }
     };
     let est = estimate(&series.volumes, &reference, &options.estimate)?;
-    let params = motion_parameters(&est.matrices, &est.reference);
+    let params = motion_parameters(
+        &est.matrices,
+        &est.reference,
+        options.estimate.upstream_defects.fix(),
+    );
     let (rms_abs, rms_rel) = rms_series(&est.matrices, &est.reference);
     let ras = est
         .matrices

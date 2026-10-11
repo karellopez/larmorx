@@ -31,7 +31,8 @@ from typing import Any, Union
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.transforms._linalg import inv, matmul
 
 __all__ = [
@@ -331,12 +332,21 @@ def load_itk_linear(path: PathLike) -> Affine | AffineSeries:
     return series[0] if len(series) == 1 else series
 
 
-def load_itk_composite(path: PathLike) -> TransformChain:
+def load_itk_composite(
+    path: PathLike, *, upstream_defects: UpstreamDefectsName = "fix"
+) -> TransformChain:
     """An ITK composite ``.h5`` file (affines and displacement fields) as
     ``nitransforms.manip.load(path, fmt="h5")`` reads it: the chain lists the transforms in
-    reverse file order, so that the last one ITK applies first comes first."""
+    reverse file order, so that the last one ITK applies first comes first.
+
+    nitransforms takes the file's transforms in the order h5py lists the groups, which is name
+    order: ``"10"`` comes before ``"2"``, so a composite of 10 or more transforms is read out
+    of order (PIPE-04, ``docs/findings/upstream-defects.md``). larmorx reads them in numeric
+    order; ``upstream_defects="reproduce"`` gives nitransforms' order. A
+    :class:`~larmorx.UpstreamDefectWarning` says when the two differ."""
     import h5py
 
+    _defects.check(upstream_defects)
     retval: list[Transform] = []
     with h5py.File(os.fspath(path), "r") as f:
         h5group = f["TransformGroup"]
@@ -345,7 +355,30 @@ def load_itk_composite(path: PathLike) -> TransformChain:
             h5group["1"][f"{typo}Parameters"]
         except KeyError:
             typo = "Tranform"
-        for xfm in list(h5group.values())[1:]:
+        # list(h5group.values())[1:]: every group but the first, in h5py's (name) order.
+        by_name = list(h5group.keys())[1:]
+        numeric = sorted(
+            (k for k in h5group if k != "0"),
+            key=lambda k: (0, int(k)) if k.isdigit() else (1, k),
+        )
+        if by_name != numeric:
+            _defects.warn(
+                [
+                    (
+                        "PIPE-04",
+                        "nitransforms",
+                        upstream_defects,
+                        f"{os.fspath(path)}: its {len(numeric)} transforms are read in "
+                        + (
+                            "numeric order; nitransforms reads them in name order"
+                            if upstream_defects == "fix"
+                            else "name order, as nitransforms does; their numeric order differs"
+                        ),
+                    )
+                ]
+            )
+        names = numeric if upstream_defects == "fix" else by_name
+        for xfm in (h5group[name] for name in names):
             kind = xfm["TransformType"][0]
             if kind.startswith(b"AffineTransform"):
                 params = np.asanyarray(xfm[f"{typo}Parameters"])
@@ -377,12 +410,19 @@ def load_itk_composite(path: PathLike) -> TransformChain:
     return TransformChain(tuple(retval))
 
 
-def load_transforms(paths: Sequence[PathLike], inverse: bool | Sequence[bool] = False) -> Transform:
+def load_transforms(
+    paths: Sequence[PathLike],
+    inverse: bool | Sequence[bool] = False,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Transform:
     """fMRIPrep's ``load_transforms``: transform files listed from the moving image to the
     reference (fMRIPrep's order: head motion first), loaded into one chain in nitransforms'
-    order (the last file first). ``.h5`` files are composites; anything else is read as an
-    ITK linear transform. ``inverse`` inverts files (one flag, or one per file). No files
+    order (the last file first). ``.h5`` files are composites (read as
+    :func:`load_itk_composite` reads them, with ``upstream_defects``); anything else is read as
+    an ITK linear transform. ``inverse`` inverts files (one flag, or one per file). No files
     gives the identity."""
+    _defects.check(upstream_defects)
     paths = list(paths)
     inv = [bool(inverse)] if isinstance(inverse, bool) else [bool(i) for i in inverse]
     if len(inv) == 1:
@@ -392,7 +432,11 @@ def load_transforms(paths: Sequence[PathLike], inverse: bool | Sequence[bool] = 
     chain: Transform | None = None
     for path, flag in zip(paths[::-1], inv[::-1], strict=False):
         p = Path(path)
-        xfm: Transform = load_itk_composite(p) if p.suffix == ".h5" else load_itk_linear(p)
+        xfm: Transform = (
+            load_itk_composite(p, upstream_defects=upstream_defects)
+            if p.suffix == ".h5"
+            else load_itk_linear(p)
+        )
         if flag:
             if isinstance(xfm, TransformChain):
                 raise TypeError("bad operand type for unary ~: 'TransformChain'")

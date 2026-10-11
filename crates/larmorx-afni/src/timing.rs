@@ -5,6 +5,7 @@
 //! All times are float32, built by adding the slice step repeatedly, as AFNI does (observed:
 //! the results match AFNI bit for bit).
 
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_io::nifti::NiftiHeader;
 
 /// A named slice-timing pattern (`-tpattern`).
@@ -122,9 +123,18 @@ pub fn to_seconds(value: f64, units_per_second: f64) -> f32 {
 /// Observed with AFNI 25.2.09: the slice axis (`dim_info` bits 4–5) must be the third; the
 /// code, read as a signed byte, must be positive; the duration must be positive; and
 /// `0 ≤ slice_start < slice_end < nz`. Codes 1, 3, 4, 5 and 6 order the slices as NIfTI
-/// defines (sequential and alternating, increasing and decreasing); code 2 (`SEQ_DEC`) and
-/// codes 7 to 127 give every slice time 0. Slices outside `[slice_start, slice_end]` get 0.
-pub fn header_timing(hdr: &NiftiHeader, nz: usize) -> Option<HeaderTiming> {
+/// defines (sequential and alternating, increasing and decreasing); codes 7 to 127 give every
+/// slice time 0. Slices outside `[slice_start, slice_end]` get 0.
+///
+/// Code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0 in AFNI, so nothing is shifted
+/// (AFNI-03). [`UpstreamDefects::Fix`] orders the slices as NIfTI defines it, `slice_end`
+/// first, down to `slice_start`; [`UpstreamDefects::Reproduce`] gives AFNI's zeros
+/// ([`seq_dec_notice`]).
+pub fn header_timing(
+    hdr: &NiftiHeader,
+    nz: usize,
+    defects: UpstreamDefects,
+) -> Option<HeaderTiming> {
     let slice_dim = (hdr.dim_info >> 4) & 3;
     let code = i32::from(hdr.slice_code as u8 as i8);
     let duration = to_seconds(hdr.slice_duration, time_units_per_second(hdr));
@@ -141,6 +151,7 @@ pub fn header_timing(hdr: &NiftiHeader, nz: usize) -> Option<HeaderTiming> {
     let down = |top: usize| (start..=top).rev().step_by(2);
     let order: Vec<usize> = match code {
         1 => (start..=end).collect(),
+        2 if defects.fix() => (start..=end).rev().collect(),
         3 => up(start).chain(up(start + 1)).collect(),
         4 => down(end).chain(down(end - 1)).collect(),
         5 => up(start + 1).chain(up(start)).collect(),
@@ -155,6 +166,24 @@ pub fn header_timing(hdr: &NiftiHeader, nz: usize) -> Option<HeaderTiming> {
         end,
         duration,
         times,
+    })
+}
+
+/// The AFNI-03 notice when header slice timing with code 2 is used: the times of
+/// [`header_timing`] in either mode.
+pub fn seq_dec_notice(timing: &HeaderTiming, defects: UpstreamDefects) -> Option<Notice> {
+    (timing.code == 2).then(|| {
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "header slice code 2 (sequential decreasing) orders slices {}..{} from the top; \
+                 AFNI gives every slice time 0 and shifts nothing",
+                timing.end, timing.start
+            ),
+            UpstreamDefects::Reproduce => "header slice code 2 (sequential decreasing) gives \
+                 every slice time 0, so nothing is shifted, as AFNI does"
+                .to_owned(),
+        };
+        Notice::new(&defects::AFNI_03, defects, detail)
     })
 }
 
@@ -214,10 +243,13 @@ mod tests {
         h
     }
 
+    const FIX: UpstreamDefects = UpstreamDefects::Fix;
+    const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
     #[test]
     fn header_timing_follows_observed_rules() {
         let times = |code| {
-            header_timing(&header(code, 0, 5, 0.25, 48), 6)
+            header_timing(&header(code, 0, 5, 0.25, 48), 6, REPRODUCE)
                 .unwrap()
                 .times
         };
@@ -228,19 +260,41 @@ mod tests {
         assert_eq!(times(5), [0.75, 0.0, 1.0, 0.25, 1.25, 0.5]);
         assert_eq!(times(6), [0.5, 1.25, 0.25, 1.0, 0.0, 0.75]);
         assert_eq!(times(9), [0.0; 6]);
-        let partial = header_timing(&header(3, 1, 4, 0.25, 48), 6).unwrap();
+        let partial = header_timing(&header(3, 1, 4, 0.25, 48), 6, FIX).unwrap();
         assert_eq!(partial.times, [0.0, 0.0, 0.5, 0.25, 0.75, 0.0]);
         // No timing: wrong slice axis, no duration, bad range, non-positive code.
-        assert!(header_timing(&header(3, 0, 5, 0.25, 16), 6).is_none());
-        assert!(header_timing(&header(3, 0, 5, 0.0, 48), 6).is_none());
-        assert!(header_timing(&header(3, 0, 0, 0.25, 48), 6).is_none());
-        assert!(header_timing(&header(3, 0, 6, 0.25, 48), 6).is_none());
-        assert!(header_timing(&header(200, 0, 5, 0.25, 48), 6).is_none());
-        assert!(header_timing(&header(0, 0, 5, 0.25, 48), 6).is_none());
+        for mode in [FIX, REPRODUCE] {
+            assert!(header_timing(&header(3, 0, 5, 0.25, 16), 6, mode).is_none());
+            assert!(header_timing(&header(3, 0, 5, 0.0, 48), 6, mode).is_none());
+            assert!(header_timing(&header(3, 0, 0, 0.25, 48), 6, mode).is_none());
+            assert!(header_timing(&header(3, 0, 6, 0.25, 48), 6, mode).is_none());
+            assert!(header_timing(&header(200, 0, 5, 0.25, 48), 6, mode).is_none());
+            assert!(header_timing(&header(0, 0, 5, 0.25, 48), 6, mode).is_none());
+        }
         // Milliseconds are converted.
         let mut ms = header(3, 0, 5, 250.0, 48);
         ms.xyzt_units = 2 | 16;
-        assert_eq!(header_timing(&ms, 6).unwrap().duration, 0.25);
+        assert_eq!(header_timing(&ms, 6, FIX).unwrap().duration, 0.25);
+    }
+
+    /// AFNI-03: header slice code 2 (sequential decreasing). AFNI gives every slice 0
+    /// (reproduced); corrected, the top slice of the range comes first.
+    #[test]
+    fn slice_code_2_both_modes() {
+        let fixed = header_timing(&header(2, 0, 5, 0.25, 48), 6, FIX).unwrap();
+        assert_eq!(fixed.times, [1.25, 1.0, 0.75, 0.5, 0.25, 0.0]);
+        let partial = header_timing(&header(2, 1, 4, 0.25, 48), 6, FIX).unwrap();
+        assert_eq!(partial.times, [0.0, 0.75, 0.5, 0.25, 0.0, 0.0]);
+        // The other codes do not depend on the mode.
+        for code in [1, 3, 4, 5, 6, 9] {
+            let h = header(code, 0, 5, 0.25, 48);
+            assert_eq!(header_timing(&h, 6, FIX), header_timing(&h, 6, REPRODUCE));
+            assert!(seq_dec_notice(&header_timing(&h, 6, FIX).unwrap(), FIX).is_none());
+        }
+        for mode in [FIX, REPRODUCE] {
+            let n = seq_dec_notice(&fixed, mode).unwrap();
+            assert_eq!((n.defect.id, n.mode), ("AFNI-03", mode));
+        }
     }
 
     #[test]

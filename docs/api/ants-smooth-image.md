@@ -44,16 +44,28 @@ larmorx ants SmoothImage 3 sub-01_T1w.nii.gz 1 median.nii.gz 0 1
 
 ## Behaviour worth knowing
 
-From ANTs, reproduced ([findings](../findings/ants-gaussian-filters.md#smoothimage-examplessmoothimagecxx)):
+From ANTs ([findings](../findings/ants-gaussian-filters.md#smoothimage-examplessmoothimagecxx)):
 - the recursive Gaussian smooths the **last axis first**, then the others, rounding to
   `float` after every axis; borders extend the edge values;
 - every axis needs at least 4 voxels (ITK throws; larmorx exits 1, Python `ValueError`);
   a sigma of 0 throws too;
-- a sigma list of the wrong length prints "Incorrect sigma vector size" and smooths with
-  1 mm (the filter's default); Python raises `ValueError` instead;
 - the median radius is truncated (`1.7` is 1);
 - reading follows ANTs (`dim 3` on a 4D file takes its first volume; non-finite values read
   as 0).
+
+## Upstream defects (D13)
+
+ANTs' deterministic defects are corrected by default and reproduced bit for bit on request:
+`upstream_defects="reproduce"` in Python, `LARMORX_UPSTREAM_DEFECTS=reproduce` on the command
+line. A warning (on the command line a line on standard error) names the entry wherever it
+changed the result ([upstream-defects.md](upstream-defects.md); each entry in the
+[register](../findings/upstream-defects.md)).
+
+| ID | ANTs (what `reproduce` gives) | larmorx's default |
+|---|---|---|
+| ANTS-15 | a sigma list of the wrong length prints "Incorrect sigma vector size" and smooths with 1 mm (the filter's default), exit 0 | an error (exit 1; Python `ValueError` in both modes) |
+| ANTS-28 | the median with a sigma list of the wrong length leaves its radius uninitialised (`reproduce` uses 0, the image unchanged, and warns) | an error (ANTS-15) |
+| ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
 ## Deliberate differences
 

@@ -26,7 +26,7 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
-use super::cstd::{StrictNumber, atof, stoi, strict_f32};
+use super::cstd::{atof, stoi, strtod_reads_all};
 use crate::image::{AntsImage, FileStore, ImageStore, read_with, write_with};
 use crate::threshold_image::{ThresholdMode, threshold_image};
 
@@ -190,8 +190,9 @@ fn threshold(
             );
         }
         _ => {
-            // ANTS-24: ANTs takes any other mode as the lower bound, read with atof.
-            if strict_f32(mode_name) == StrictNumber::NotANumber {
+            // ANTS-24: ANTs takes any other mode as the lower bound, read with atof;
+            // larmorx takes only text that is all a number.
+            if !strtod_reads_all(mode_name) {
                 if notices.fix() {
                     notices.add(
                         &defects::ANTS_24,

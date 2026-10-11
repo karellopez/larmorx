@@ -320,11 +320,14 @@ add(
     "FillHoles",
     HOLE_FIRST_SLICE,
     "0.5",
-    expect="divergence",
-    reason="For a hole on the first or last slice, ANTs reads the binary image at neighbour "
-    "indices outside the image (NeighborhoodIterator::GetIndex is not clamped), which land "
-    "before or after its buffer: the result depends on whatever memory lies there. larmorx "
-    "reproduces reads that land inside the buffer and refuses the others.",
+    undefined_values="For a hole on the first or last slice, ANTs reads the binary image at "
+    "neighbour indices outside the image (NeighborhoodIterator::GetIndex is not clamped), which "
+    "land before or after its buffer: whether the hole is filled depends on whatever memory "
+    "lies there. With the defects reproduced larmorx reads the neighbours inside the buffer as "
+    "ANTs does and takes those beyond it as background (ANTS-19); by default it counts only "
+    "the neighbours inside the image.",
+    # Named in both modes: ANTs' own decision depends on memory, whatever larmorx decides.
+    silent_ok=("ANTS-19",),
 )
 
 # PadImage.

@@ -263,12 +263,17 @@ fn resample(
             format_g(f64::from(sigma))
         );
         if thin.contains(&k) && notices.reproduce() {
-            // ANTs catches ITK's exception here and goes on (ANTS-28).
+            // ANTs catches ITK's exception here, prints it and goes on (ANTS-28). ITK's
+            // printout holds two addresses and its build directory, which larmorx cannot
+            // know: they are written as 0x0 and `<ITK source>`.
             let _ = writeln!(out, "Exception catched !");
-            let _ = writeln!(
+            let _ = write!(
                 out,
-                "Description: The number of pixels along direction {k} is less than 4. This \
-                 filter requires a minimum of four pixels along the dimension to be processed."
+                "\nitk::ExceptionObject (0x0)\nLocation: \"unknown\" \nFile: <ITK source>/\
+                 Modules/Filtering/ImageFilterBase/include/itkRecursiveSeparableImageFilter.hxx\n\
+                 Line: 223\nDescription: ITK ERROR: RecursiveGaussianImageFilter(0x0): The \
+                 number of pixels along direction {k} is less than 4. This filter requires a \
+                 minimum of four pixels along the dimension to be processed.\n\n\n"
             );
         }
     }

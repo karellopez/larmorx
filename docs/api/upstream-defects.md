@@ -93,6 +93,54 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-09 | mcflirt | `larmorx mri hmc` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped |
 | FSL-10 | mcflirt | `larmorx mri hmc` | the output's units are always millimetres and seconds, so a TR in milliseconds is labelled seconds | the input's units are kept |
 | FSL-13 | mcflirt | `larmorx mri hmc` | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` | no `.mat` directory without `-mats` |
+| SCI-02 | SciPy `ndimage` | `lx.ndimage.*` | NaN results written to a signed integer output, and a `cval` an integer input cannot hold, are converted as x86-64 converts them (C leaves it undefined) | NaN is 0, `cval` clamped |
+
+**ANTs and ITK** (2026-10-12; the tables of each tool's page say which apply to it:
+[ImageMath](ants-image-math.md#upstream-defects-d13),
+[ThresholdImage](ants-threshold-image.md#upstream-defects-d13),
+[MultiplyImages](ants-multiply-images.md#upstream-defects-d13),
+[SmoothImage](ants-smooth-image.md#upstream-defects-d13),
+[ResampleImageBySpacing](ants-resample-image-by-spacing.md#upstream-defects-d13),
+[ResampleImage](ants-resample-image.md#upstream-defects-d13),
+[N4BiasFieldCorrection](ants-n4.md#upstream-defects-d13),
+[DenoiseImage](ants-denoise.md#upstream-defects-d13),
+[antsApplyTransforms](ants-apply-transforms.md#upstream-defects-d13)):
+
+| ID | Original | The original's defect | larmorx's default |
+|---|---|---|---|
+| ANTS-03 | ANTs I/O | file names of fewer than 3 characters are neither read nor written, silently | read and written like any other |
+| ANTS-04 | ImageMath | exit 0 after an operation that failed and wrote nothing | exit 1 |
+| ANTS-05 | ImageMath | `1e` and `-` are the number 0, `1e40` is `FLT_MAX`, no operand is 1 | an error (no operand allowed where 1 means the image alone) |
+| ANTS-06 | ANTs programs | values out of an integer type's range, and NaN, wrap around (x86-64's answer; C++ leaves it undefined) | clamped, NaN to 0, with a warning |
+| ANTS-07 | ImageMath, MultiplyImages | a smaller second image is read past its voxels | an error (`reproduce`: read as ANTs where it stays inside the buffer, 0 beyond) |
+| ANTS-08 | ImageMath `/` | divides only where the divisor is positive; other voxels keep the previous result | divides wherever the divisor is not 0, 0 where it is |
+| ANTS-09 | ImageMath `total`, `mean` | the image holds running sums | every voxel holds the printed value |
+| ANTS-10 | ImageMath `vtotal` | an image of zeros | an error |
+| ANTS-11, ANTS-12, ANTS-13 | ImageMath `Neg`, `TruncateImageIntensity`, `Normalize` | ranges found with `else if` or from fixed starts | the true ranges |
+| ANTS-14 | ImageMath `G` | NaN everywhere above a variance of about 709 voxels² | a finite kernel (scaled Bessel functions) |
+| ANTS-15 | ImageMath `G`, SmoothImage | a sigma list of the wrong length is not an error | an error |
+| ANTS-16 | ImageMath `Laplacian` | the normalize flag read from the sigma's argument | from its own argument |
+| ANTS-19 | ImageMath `FillHoles` | `p ≤ 1` counts neighbours outside the image (memory beyond it on the end slices) | outside neighbours not counted |
+| ANTS-20 | ImageMath `GetLargestComponent` | nothing kept: every voxel 1 | every voxel 0 |
+| ANTS-24 | ThresholdImage | an unknown mode is the lower bound `atof(mode)` | an error |
+| ANTS-25 | ThresholdImage Otsu with a mask | range from `FLT_MIN` with `else if` | the true range |
+| ANTS-27 | MultiplyImages | an unreadable second file multiplies by 0 | an error |
+| ANTS-28 | ResampleImageBySpacing, SmoothImage | uninitialised memory reaches the output | ITK's error (`reproduce`: the buffer as zeros) |
+| ANTS-29 | ResampleImage | size 1: an image of zeros, infinite spacing, NaN origin | an error (`reproduce`: ANTs' file byte for byte) |
+| ANTS-30 | ResampleImage | the seventh argument is both the pixel type and the interpolator's parameter | parameters after the interpolator, the pixel type after them ([design](ants-resample-image.md#the-seventh-argument)) |
+| ANTS-31 | ResampleImageBySpacing | `nn` read from the `addvox` argument; other dimensions do nothing | each from its own argument; other dimensions an error |
+| ANTS-33 | antsApplyTransforms | unknown `-u` kept as default; `MultiLabel`'s alpha and `GenericLabel`'s interpolator ignored | an error; honoured |
+| ANTS-35 | N4BiasFieldCorrection | `-c`, `-b`, `-t` without brackets set nothing | the value is the first parameter |
+| ANTS-36 | N4BiasFieldCorrection | an unreadable mask becomes ones | an error |
+| ANTS-38 | N4 (ITK) | a first-voxel minimum is left out of the histogram | the true range |
+| ANTS-39 | N4 (ITK) | 64, 128 or 256 bins padded to twice the FFT size needed | the exact size |
+| ANTS-43 | DenoiseImage (ITK) | the Rician correction is NaN, and the bias 0, at a high SNR | a finite factor |
+| ANTS-47 | DenoiseImage | an unreadable mask is no mask | an error |
+| ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
+| ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
+| ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
+| ITK-08 | nifti_clib | asked for `x.nii.gz`, the voxels of `x.nii` | the named file (`reproduce`: nifti_clib's) |
+| ITK-10 | ITK `Versor<float>` | `--float 1` refuses some valid versors | they load |
 
 **Not the default yet:**
 
@@ -104,7 +152,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
 - **AFNI-08** (an all-zero slice-time list writes `slice_end` 0): no input tried in black-box
   runs of AFNI 25.2.09 made 3dTshift write `slice_end` 0, so the clean-room original writes
   `nz − 1` in every case and has no switch for it (`specs/3dTshift.md` §6).
-- The ANTs and ITK entries of the register's D13 gap list, done by the next task.
+- The 3dTshift replica's switch (a separate task): until it lands, the replica gives AFNI's
+  result in both modes.
 
 ## How the switch is validated
 
@@ -115,7 +164,10 @@ changed it (`reproduce`); nothing is said when the two would agree.
   reports, case by case, which defects were named and what the corrections changed. It also
   checks the rule above: a defect is named exactly when the two passes differ (`D13 fix pass`
   in the records: [afni-tshift.md](../validation/afni-tshift.md),
-  [mri-hmc.md](../validation/mri-hmc.md), [resample-series.md](../validation/resample-series.md)).
+  [mri-hmc.md](../validation/mri-hmc.md), [resample-series.md](../validation/resample-series.md),
+  and every ANTs record, such as [ants-image-math.md](../validation/ants-image-math.md)).
+  Where the original's output depends on memory it never wrote, the comparison covers
+  everything else (exit code, header, printed text) and the record says so.
 - **Golden cases** record the default outputs, and a small `*.reproduce` case per affected
   tool records the reproduced ones ([validation/golden.md](../validation/golden.md)). The
   reproduced outputs equal the checksums recorded before D13.

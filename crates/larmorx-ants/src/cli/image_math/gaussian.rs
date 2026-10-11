@@ -3,7 +3,7 @@
 //! `UnsharpMask` (`ImageMath_Templates.hxx`, ANTs v2.6.5: `SmoothImage<DIM>`,
 //! `LaplacianImage`, `GradientImage`, `UnsharpMaskImage`).
 
-use larmorx_core::defects;
+use larmorx_core::defects::{self, Notices};
 
 use super::{Context, OpError, Operation};
 use crate::cli::cstd::{atof, convert_vector_f32, stof, stoi};
@@ -133,6 +133,8 @@ fn run_laplacian(ctx: &mut Context<'_>) -> Result<(), OpError> {
         None => false,
         Some(s) => stoi_arg("Laplacian", s)? != 0,
     };
+    // Named only once the result exists (ITK refuses an axis of fewer than 4 voxels).
+    let mut pending = Notices::new(ctx.notices.mode());
     let normalize = if ctx.fix() {
         match ants_flag {
             Some(Some(f)) if f == own_flag => {}
@@ -142,7 +144,7 @@ fn run_laplacian(ctx: &mut Context<'_>) -> Result<(), OpError> {
                     Some(false) => "does not normalize",
                     None => "aborts (std::stoi throws)",
                 };
-                ctx.notices.add(
+                pending.add(
                     &defects::ANTS_16,
                     format!(
                         "the normalize flag is read from its own argument ({}); ANTs reads it \
@@ -163,7 +165,7 @@ fn run_laplacian(ctx: &mut Context<'_>) -> Result<(), OpError> {
             None => false,
             Some(Some(f)) => {
                 if f != own_flag {
-                    ctx.notices.add(
+                    pending.add(
                         &defects::ANTS_16,
                         format!(
                             "the normalize flag is read from the sigma's argument, as in ANTs: \
@@ -184,6 +186,7 @@ fn run_laplacian(ctx: &mut Context<'_>) -> Result<(), OpError> {
     };
     let image: AntsImage<f32> = ctx.read(&fn1)?;
     let data = laplacian(image.view(), sigma, normalize, ctx.n_threads)?;
+    ctx.notices.extend(pending.into_vec());
     ctx.write(&output, image.derived(data))?;
     Ok(())
 }

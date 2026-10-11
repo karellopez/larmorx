@@ -693,29 +693,31 @@ impl ImageStore for FileStore {
             message: e.to_string(),
         };
         let found = paths.nifti_clib_image_path();
-        match found.filter(|f| f != paths.image_path()) {
-            Some(other) => {
-                let other_name = other.display().to_string();
+        let Some(other) = found.filter(|f| f != paths.image_path()) else {
+            return read_itk_image(path, n_threads).map_err(failed);
+        };
+        // ITK-08: nifti_clib reads the voxels from `other`. Both are read, and the notice
+        // comes only when their voxels differ.
+        let named = read_itk_image(path, n_threads);
+        let clib = read_itk_image_with_data_from(path, &other, n_threads);
+        let differ = match (&named, &clib) {
+            (Ok(a), Ok(b)) => a.voxels != b.voxels,
+            _ => true,
+        };
+        if differ {
+            let other_name = other.display().to_string();
+            notices.add(
+                &defects::ITK_08,
                 if notices.reproduce() {
-                    notices.add(
-                        &defects::ITK_08,
-                        format!(
-                            "the voxels of '{name}' are read from '{other_name}', as ITK reads them"
-                        ),
-                    );
-                    read_itk_image_with_data_from(path, &other, n_threads).map_err(failed)
+                    format!(
+                        "the voxels of '{name}' are read from '{other_name}', as ITK reads them"
+                    )
                 } else {
-                    notices.add(
-                        &defects::ITK_08,
-                        format!(
-                            "'{name}' is read as named; ITK reads its voxels from '{other_name}'"
-                        ),
-                    );
-                    read_itk_image(path, n_threads).map_err(failed)
-                }
-            }
-            None => read_itk_image(path, n_threads).map_err(failed),
+                    format!("'{name}' is read as named; ITK reads its voxels from '{other_name}'")
+                },
+            );
         }
+        if notices.reproduce() { clib } else { named }.map_err(failed)
     }
 
     fn save(&mut self, name: &str, image: &OutputImage, n_threads: usize) -> Result<(), String> {

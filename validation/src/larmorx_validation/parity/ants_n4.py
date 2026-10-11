@@ -95,7 +95,9 @@ def _(t):
 
     ref = _td(TPL + "_res-02_desc-fMRIPrep_boldref.nii.gz")
     prob = _td(TPL + "_res-01_label-brain_probseg.nii.gz")
-    out = lx.ants.apply_transforms(prob, reference=ref, transforms=[], interpolation="linear")
+    out = lx.ants.apply_transforms(
+        prob, reference=ref, transforms=[], interpolation="linear", upstream_defects="reproduce"
+    )
     lx.save(out, t)
 
 
@@ -106,7 +108,11 @@ def _(t):
     import larmorx as lx
 
     out = lx.ants.truncate_image_intensity(
-        _td(T1_RAW[4:-1]), lower_quantile=0.01, upper_quantile=0.999, bins=256
+        _td(T1_RAW[4:-1]),
+        lower_quantile=0.01,
+        upper_quantile=0.999,
+        bins=256,
+        upstream_defects="reproduce",
     )
     lx.save(out, t)
 
@@ -178,6 +184,10 @@ OTHER_GRID = "{gen:n4-mask-other-grid}"
 
 
 def n4(cid, category, description, *args, outputs=("{out}",), **kw) -> AntsCase:
+    if "-r" in args and "-x" not in args and "--mask-image" not in args:
+        # ANTS-36: `-r` without a mask does nothing, in ANTs and larmorx alike; the notice
+        # says so in both modes without changing the output.
+        kw.setdefault("silent_ok", ("ANTS-36",))
     return AntsCase(
         f"{category}/{cid}", category, description, PROGRAM, tuple(args), outputs=outputs, **kw
     )

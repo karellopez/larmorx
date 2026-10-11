@@ -17,6 +17,9 @@ Two references:
   ``exp``, ``log``, ``sin``, ``cos`` and ``sincos`` preloaded (``scripts/build_crmath_preload.sh``),
   which is what larmorx computes with (CLAUDE.md rule 5). larmorx must be **bit-identical** to
   it: this explains any difference from the program as built.
+
+larmorx runs with ANTs' defects reproduced (``LARMORX_UPSTREAM_DEFECTS=reproduce``, D13), then
+once more in its default mode for the fix pass (:mod:`~larmorx_validation.parity.defects`).
 """
 
 from __future__ import annotations
@@ -27,10 +30,13 @@ from pathlib import Path
 
 import numpy as np
 
+from larmorx_validation.parity import defects
 from larmorx_validation.parity.ants_programs import (
     AntsCase,
+    affine_difference,
     ants_bin,
     crmath_preload,
+    fix_pass,
     header_differences,
     raw_header,
     resolve_arg,
@@ -123,13 +129,17 @@ def compare(
             f"ANTs exit {a_code}: {(a_err or a_out).strip()[-200:]!r}; "
             f"larmorx exit {l_code}: {(l_err or l_out).strip()[-200:]!r}"
         ).replace(str(tmp), "<tmp>")
+        reproduced = (l_code, l_out, l_err, l_outputs, l_ok)
         if not a_ok and not l_ok:
-            raise Outcome(BOTH_ERROR, summary)
+            if fix_pass(c, tmp, checks, reproduced, LX_THREADS):
+                raise Outcome(BOTH_ERROR, summary)
+            return
         checks("both succeed", a_ok and l_ok, detail=summary)
         if c.expect == "error":
             checks("both reject the arguments", False, detail="expected an error from both")
         if not (a_ok and l_ok) or not a_outputs:
             return
+        fix_pass(c, tmp, checks, reproduced, LX_THREADS)
         # larmorx's result does not depend on its thread count.
         *_, l1_outputs, l1_ok = run(run_larmorx, c, tmp, "larmorx-1", 1)
         same = l1_ok and all(
@@ -184,7 +194,7 @@ def compare(
                 a.dtype == b.dtype and a.shape == b.shape,
                 detail=f"ANTs {a.dtype} {a.shape}, larmorx {b.dtype} {b.shape}",
             )
-            aff = float(np.abs(a_aff - b_aff).max())
+            aff = affine_difference(a_aff, b_aff)
             checks(
                 f"{label}: affine",
                 aff <= AFFINE_ATOL,
@@ -287,6 +297,7 @@ def highlights(results: list[CaseResult], functions: str, band_threads: Sequence
                         _ratio(r, output, "1 - NCC"),
                     )
                 )
+    lines += defects.summary(results)
     if rows:
         lines += [
             "",

@@ -135,6 +135,36 @@ pub fn strict_f32(s: &str) -> StrictNumber {
     }
 }
 
+/// Whether `strtod` reads all of `s` (but blanks around it) as a number: a decimal number
+/// ([`strict_f32`]'s grammar, any magnitude), `inf`, `infinity` or `nan` in any case, or a
+/// hexadecimal float (`0x1.8p3`), each with an optional sign. ThresholdImage's lower bound
+/// must be one where ANTs would read a prefix with `atof` (ANTS-24).
+pub fn strtod_reads_all(s: &str) -> bool {
+    let t = s.trim_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']);
+    if strict_f32(t) != StrictNumber::NotANumber {
+        return true;
+    }
+    let body = t.strip_prefix(['+', '-']).unwrap_or(t);
+    let lower = body.to_ascii_lowercase();
+    if matches!(lower.as_str(), "inf" | "infinity" | "nan") {
+        return true;
+    }
+    let Some(hex) = lower.strip_prefix("0x") else {
+        return false;
+    };
+    let (mantissa, exponent) = match hex.split_once('p') {
+        Some((m, e)) => (m, Some(e)),
+        None => (hex, None),
+    };
+    let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let hex_digits = |x: &str| x.bytes().all(|c| c.is_ascii_hexdigit());
+    let exponent_ok = exponent.is_none_or(|e| {
+        let e = e.strip_prefix(['+', '-']).unwrap_or(e);
+        !e.is_empty() && e.bytes().all(|c| c.is_ascii_digit())
+    });
+    !(int.is_empty() && frac.is_empty()) && hex_digits(int) && hex_digits(frac) && exponent_ok
+}
+
 /// [`from_string_f32`] for `double` (`istringstream >> double`, converted as `strtod`):
 /// `(is_number, value)`, the value `None` when untouched.
 pub fn from_string_f64(s: &str) -> (bool, Option<f64>) {
@@ -683,6 +713,25 @@ mod tests {
             "", " ", "-", "1e", "1e+", ".", "1.5x", "abc", "inf", "nan", "0x10", "1 2",
         ] {
             assert_eq!(strict_f32(text), NotANumber, "{text:?}");
+        }
+        for text in [
+            "7",
+            "7 ",
+            " -2.5e1",
+            "1e40",
+            "inf",
+            "-Infinity",
+            "NaN",
+            "0x10",
+            "-0x1.8p3",
+            "0X.8P-1",
+        ] {
+            assert!(strtod_reads_all(text), "{text:?}");
+        }
+        for text in [
+            "", "otsu", "1.5x", "0x", "0xp3", "0x1p", "infinit", "1 2", "0x1g",
+        ] {
+            assert!(!strtod_reads_all(text), "{text:?}");
         }
     }
 }

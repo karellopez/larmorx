@@ -65,12 +65,18 @@ pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
 larmorprepx /data/bids /data/derivatives participant --participant-label 01
 ```
 
-- **One import for everything.** `lx.afni.tshift(img, tr=2.0)` uses
-  `implementation="auto"`: the replica when its package is installed, otherwise the
-  original. `"replica"` or `"original"` forces one. The result, and larmorprepx's report,
-  record which ran.
-- **The command line** works the same way: when a replica package is installed, its binary
-  runs as a separate process.
+- **One import for everything** (in place since 2026-10-11). `lx.afni.tshift(img, tr=2.0)`
+  uses `implementation="auto"`: the replica when its package is installed, otherwise the
+  original. `"replica"` or `"original"` forces one. The result (`img.implementation`), and
+  larmorprepx's report, record which ran.
+- **The command line** works the same way: when a replica package is installed, its program
+  runs as a separate process; `LARMORX_IMPLEMENTATION=original` (or `replica`) overrides.
+- **The replica is never imported.** Even from Python, larmorx runs the replica's program in
+  a separate process and exchanges files with it, so installing `larmorx[exact]` does not put
+  GPL code into your Python program ([licensing.md](licensing.md), "Choosing at run time").
+- **Until the packages are on PyPI,** both wheels can be built from the repository and
+  installed with `pip install --find-links dist "larmorx[exact]"` ([licensing.md](licensing.md),
+  "Packages").
 - **The first pipeline run downloads data:** templates (e.g. MNI152) from TemplateFlow, and,
   with surfaces, FreeSurfer's atlas files from FreeSurfer's official site after the user
   accepts its licence (decision D6).

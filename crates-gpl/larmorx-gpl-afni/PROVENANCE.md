@@ -97,8 +97,8 @@ Changes from the originals are listed below and in each module's documentation.
 - **Output** (the larmorx conventions shared with `larmorx afni 3dTshift`): NIfTI only, and
   an existing output file is an error. Any `-prefix` path is accepted (2026-10-11), so that
   paths with blanks or non-ASCII characters work on every platform whichever implementation
-  `larmorx afni 3dTshift` runs; AFNI refuses the names `THD_filename_ok` rejects, and
-  `-verbose` says so.
+  `larmorx afni 3dTshift` runs. AFNI refuses the names `THD_filename_ok` rejects unless
+  `AFNI_ALLOW_ARBITRARY_FILENAMES` is set; `-verbose` says when it would have.
 - **`-verbose`** starts with a line naming the implementation (the replica, with its version).
 
 ## Verification

@@ -239,7 +239,7 @@ fn usage(prog: &str) -> String {
     }
     let programs: String = packages
         .iter()
-        .map(|p| format!("  {:<22} path of the {} program\n", p.env, p.program))
+        .map(|p| format!("  {:<23} path of the {} program\n", p.env, p.program))
         .collect();
     format!(
         "larmorx {version}: neuroimaging tools in Rust with original-compatible command lines
@@ -256,8 +256,8 @@ Options:
 Bit-exact replicas, in separate packages, run as separate programs (docs/licensing.md):
 {replicas}
 Environment:
-  {env:<22} auto (default): a tool's replica if its program is found, else the
-  {pad:<22} original; replica: the replica or exit 127; original: the original
+  {env:<23} auto (default): a tool's replica if its program is found, else the
+  {pad:<23} original; replica: the replica or exit 127; original: the original
 {programs}",
         version = larmorx_core::VERSION,
         env = replica::IMPLEMENTATION_ENV,

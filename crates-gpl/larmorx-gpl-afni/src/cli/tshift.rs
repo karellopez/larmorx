@@ -152,7 +152,10 @@ struct Options {
     prefix_afni_ok: bool,
 }
 
-/// `THD_filename_ok`: no control characters, blanks, shell metacharacters or non-ASCII bytes.
+/// `THD_filename_ok`: no control characters, blanks, shell metacharacters or non-ASCII bytes
+/// (without its `AFNI_ALLOW_ARBITRARY_FILENAMES` escape, which accepts any name). larmorx-gpl
+/// accepts any `-prefix`, as AFNI does with that variable set; this only says when AFNI would
+/// not (`docs/findings/afni-tshift.md`, "Output names").
 fn filename_ok(name: &str) -> bool {
     if name.is_empty() {
         return false;

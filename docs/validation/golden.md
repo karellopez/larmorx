@@ -220,5 +220,9 @@ resampled series), so a regression would show in CI.
   `\n` everywhere, as the command line does.
 - The replica's Fourier case and the clean-room original's `3dTshift` command-line case use the
   same input and give the same data and header hashes.
+- The main package's `3dTshift` cases run the clean-room original explicitly
+  (`implementation="original"`, and the command line with it forced), so an installed
+  `larmorx-gpl` cannot change them (2026-10-11, `docs/licensing.md`, "Choosing at run time").
+  The replica's cases are in `crates-gpl/`.
 - `golden.json` records the numpy version it was made with; the golden tests use only
   elementwise numpy operations in their inputs, which do not change between numpy versions.

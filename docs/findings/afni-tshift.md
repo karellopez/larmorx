@@ -245,6 +245,22 @@ oracle build's compiled `csfft_cox` on 36,950,784 values and its radix-2 loop on
 `fftn`, AFNI's FFT for all other lengths, is not translated: 3dTshift reaches it only for
 series longer than 32764 points (the FFT length is `csfft_nextup_one35(ntt + 4)`).
 
+## Output names (`-prefix`)
+
+**3dTshift refuses some output names** (`src/3dTshift.c:391-392`, `src/thd_filestuff.c:638`,
+`THD_filename_ok`): `illegal value '...' after -prefix` when the name has control characters,
+white space, any of `; * ? & | " > < ' [ ] ( ) { } !`, or a byte above 127, unless the
+environment variable `AFNI_ALLOW_ARBITRARY_FILENAMES` is set (`thd_filestuff.c:647`). The check
+covers the whole path, directories included, so an output in `C:\Users\Jane Doe\` or in a
+directory with accented letters is refused. *Read.*
+
+What larmorx does (2026-10-11): both implementations accept any path, as AFNI does with
+`AFNI_ALLOW_ARBITRARY_FILENAMES` set. The replica keeps the translated check only to say, with
+`-verbose`, that AFNI would refuse the name. Before, the replica refused such names, so
+installing it would have broken outputs in paths with blanks once `larmorx afni 3dTshift` ran
+it by default (`implementation="auto"`). The Python wrapper also runs the replica in a
+temporary directory with a relative `-prefix`, so it never depended on this.
+
 ## Bugs worth knowing
 
 - **`-no_detrend` de-means the wrong voxel.** For the second voxel of each pair, the

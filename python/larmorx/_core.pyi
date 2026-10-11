@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Type stubs for the compiled extension module (crate ``larmorx-py``)."""
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -26,7 +27,7 @@ def replica_registry() -> list[dict[str, str]]:
     """Every tool with a replica: ``family``, ``tool``, ``package``, ``program``, ``env``,
     ``licence``, ``install``."""
 
-def replica_find(family: str, tool: str, dirs: list[str]) -> str | None:
+def replica_find(family: str, tool: str, dirs: list[str]) -> Path | None:
     """The replica program of ``family tool`` (its environment variable, then ``dirs``, then
     ``PATH``), or ``None``; ``ValueError`` if the variable names no file, ``KeyError`` if the
     tool has no replica."""

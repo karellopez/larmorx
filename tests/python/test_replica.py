@@ -50,7 +50,7 @@ def stub(directory: Path, version="9.9.9", exit=0, stdout="", stderr="") -> Path
     if os.name == "nt":
         program = directory / "larmorx-gpl.cmd"
         text = f'@echo off\r\n"{sys.executable}" "{script}" %*\r\nexit /b %ERRORLEVEL%\r\n'
-        program.write_text(text, encoding="utf-8")
+        program.write_bytes(text.encode("utf-8"))  # bytes: no newline translation
     else:
         program = directory / "larmorx-gpl"
         program.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', "utf-8")
@@ -183,7 +183,7 @@ def test_a_failing_replica_raises_and_never_falls_back(scripts, tmp_path):
 def test_the_command_line_passes_the_replica_through(scripts, monkeypatch):
     stub(scripts, exit=3, stdout="from the stub\n")
     code, out, _ = cli("-x", "in.nii")
-    assert (code, out) == (3, "from the stub\n")
+    assert (code, out.rstrip()) == (3, "from the stub")  # "\r\n" on Windows, passed through
     code, _, err = cli("-x", "in.nii", implementation="original")
     assert code == 1 and "Unknown option: -x" in err
     monkeypatch.setenv("LARMORX_IMPLEMENTATION", "original")

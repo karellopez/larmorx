@@ -111,7 +111,8 @@ errors of about 1e-4; a constant image has `min = max`, replaced by 1 and 0, so 
 
 **`Normalize`** (`NormalizeImage`, `ImageMath_Templates.hxx:9039`): the optional argument is
 first read as a **float** mask image; if that fails, it is a number (`atof`). Range mode
-starts from `max = 0`, `min = 1e9` (an image with no positive voxel keeps `max = 0`); the mean
+starts from `max = 0`, `min = 1e9` (an image with no positive voxel keeps `max = 0`, one whose
+values all exceed 1e9 keeps `min = 1e9`; `ImageMath_Templates.hxx:9099-9118`); the mean
 is a float sum in image order; the masked mean counts non-zero mask voxels in a float
 counter. *Read; validated.*
 

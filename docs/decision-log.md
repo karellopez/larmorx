@@ -406,6 +406,59 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   T1w and func. Finished in 1 h 03 min with exit status 0 (on a shared machine, so the time is
   not a benchmark).
 
+## 2026-10-11: The source is the specification; correct by default (D13)
+- **What happened:** the stage comparison with fMRIPrep found that larmorx's N4 reproduced a
+  code-generation artefact of the repository's ANTs oracle (GCC 11 at `-O3` drops two float
+  roundings the C++ source requires), because the agent was briefed to match the oracle bit for
+  bit. fMRIPrep's own ANTs build follows the source, and a larmorx build that follows the
+  source matched all six of fMRIPrep's N4 outputs bit for bit.
+- **User decisions:**
+  - The source is the specification and an oracle binary only a check (CLAUDE.md rule 8). N4
+    follows the source; the ANTs oracle is rebuilt to honour the source's roundings, and every
+    ANTs suite is re-run against it.
+  - `antsApplyTransforms --float 1` is implemented as single precision, as ANTs computes it,
+    before A4.
+  - **D13: correct by default.** A deterministic upstream bug that changes results is fixed by
+    default, with a warning when it would have changed the result and a documented
+    compatibility switch that reproduces it bit for bit (used by the parity tests). Crashes,
+    out-of-bounds reads, races and nondeterminism are never reproduced. The user: "if we find
+    problems or wrong things in the original sources, we also annotate all these findings. But
+    ours should also be correct."
+- **Records:** `docs/porting-guide.md` (the method and its lessons) and
+  `docs/findings/upstream-defects.md` (every defect found, its evidence, and what larmorx does).
+
+## 2026-10-11: Oracle datasets that exercise the whole pipeline
+- **User direction:** test against fMRIPrep on data that uses field maps and slice timing, "really
+  testing all our ports against the source fMRIPrep". ds000005 has neither, so 3dTshift and the
+  whole distortion-correction (SDC) path were not exercised by the first oracle run.
+- **The oracle runs, one at a time** (fMRIPrep 25.2.6, `--fs-no-reconall` until the surfaces
+  track):
+  1. ds001600 sub-1: reversed phase-encoding `epi`, `phasediff` and `phase1`/`phase2` field maps
+     plus slice timing, four BOLD runs (sdcflows' own test dataset);
+  2. ds005454 sub-16: `phasediff`, multiband 4, 280 volumes;
+  3. ds005752: a direct `fieldmap` (Hz) and sessions;
+  4. later: a multi-echo dataset (tedana) and a run with FreeSurfer recon-all (surfaces).
+- Each run is compared step by step with `python -m larmorx_validation pipeline-stages`.
+
+## 2026-10-11: D13's details
+Decided by the user on the questions the defect register raised
+(`docs/findings/upstream-defects.md`, "Decisions needed before switching"):
+- **Undefined float-to-integer conversions** (e.g. antsApplyTransforms `-u`): clamp and warn
+  by default; the compatibility switch reproduces x86-64's wraparound. This replaces the
+  2026-10-09 choice to reproduce x86-64 by default.
+- **Replicas share the corrected default.** "Yes, but remember the switch should give the same
+  result as the source one": with the switch, a replica gives exactly the original program's
+  result.
+- **mcflirt's inflated weight count (FSL-02):** measured first, against mcflirt's band and the
+  synthetic ground truth, then decided.
+- **Failures and garbage** get a switch too. It is exact where the original is deterministic.
+  Where the original's values depend on memory contents (unfilled buffers, out-of-bounds
+  reads), the defined parts are reproduced and the rest is filled deterministically, with a
+  warning; nothing can reproduce such values, not even the original.
+- **Defaults otherwise:** questionable behaviours stay faithful and documented until shown to
+  be bugs; larmorprepx's pipeline choices are made with larmorprepx; ResampleImage's corrected
+  command line is designed and reviewed.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |
@@ -421,4 +474,5 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
 | D9 | Minimum Python | 3.12 | open |
 | D10 | First milestone | M1 Preview (pipeline on x64 with interim ANTsPy) | open |
 | D11 | Default when an improved algorithm exists | the improvement, once its results stay within the upstream's own variability; opt-in otherwise | **decided 2026-10-10** |
+| D13 | Deterministic upstream bugs | fixed by default with a warning; a compatibility switch reproduces them; parity uses the switch | **decided 2026-10-11** |
 | D12 | How other platforms are checked | golden tests: every function reproduces larmorx's own Linux x64 output on every CI platform; light inputs, small CI budget (CLAUDE.md rule 10) | **decided 2026-10-10** |

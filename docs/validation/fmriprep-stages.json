@@ -218,22 +218,22 @@
    "absent": ""
   }
  ],
- "started": "2026-10-11T15:18:10+0200",
- "finished": "2026-10-11T15:41:29+0200",
+ "started": "2026-10-11T16:18:20+0200",
+ "finished": "2026-10-11T17:06:58+0200",
  "load_before": [
-  0.8330078125,
-  2.8837890625,
-  4.12060546875
+  1.75927734375,
+  1.556640625,
+  2.10205078125
  ],
  "load_after": [
-  1.875,
-  4.10107421875,
-  4.36767578125
+  5.38134765625,
+  5.7119140625,
+  4.6552734375
  ],
  "busy": [],
  "environment": {
   "larmorx": "0.0.1",
-  "larmorx_commit": "83caad2efd70",
+  "larmorx_commit": "45564252b1ee",
   "larmorx_testdata_commit": "00b862132e9c",
   "python": "3.12.10",
   "platform": "Linux x86_64",
@@ -261,7 +261,7 @@
    "fmriprep_seconds": 53.871056,
    "command": "DenoiseImage -i /data/sub-01/anat/sub-01_T1w.nii.gz -n Rician -o sub-01_T1w_noise_corrected.nii.gz -s 1",
    "larmorx_threads": 8,
-   "larmorx_seconds": 3.1569373942911625,
+   "larmorx_seconds": 3.2440027724951506,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected.nii.gz",
@@ -296,17 +296,17 @@
       "dtype_ref": "float32",
       "dtype_test": "float32",
       "voxels": 5898240,
-      "differing": 346866,
+      "differing": 163367,
       "max_abs": 72.64899444580078,
       "max_rel": 0.05114952791541677,
-      "max_rel_voxel": 1233811.875,
-      "ncc": 0.9999980805714759,
+      "max_rel_voxel": 650461.6153846154,
+      "ncc": 0.9999988748907018,
       "affine_diff": 0.0,
       "kind": "intensity",
       "over": {
-       "1e-06": 300697,
-       "1e-05": 194806,
-       "0.0001": 63073
+       "1e-06": 142275,
+       "1e-05": 95926,
+       "0.0001": 34732
       }
      },
      "vs_ants_as_built": {
@@ -438,9 +438,9 @@
      }
     }
    ],
-   "container_seconds": 55.26323127746582,
+   "container_seconds": 58.19416379928589,
    "status": "explained",
-   "harness_seconds": 63.404865400865674
+   "harness_seconds": 979.1984169576317
   },
   {
    "stage": "A03",
@@ -455,7 +455,7 @@
    "fmriprep_seconds": 3.102376,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths.nii.gz TruncateImageIntensity /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz 0.01 0.999 256",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.7635521832853556,
+   "larmorx_seconds": 0.8081461302936077,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths.nii.gz",
@@ -495,9 +495,9 @@
      }
     }
    ],
-   "container_seconds": 1.6654033660888672,
+   "container_seconds": 1.7010560035705566,
    "status": "identical",
-   "harness_seconds": 3.809869946911931
+   "harness_seconds": 4.017900101840496
   },
   {
    "stage": "A04",
@@ -512,7 +512,7 @@
    "fmriprep_seconds": 14.374535,
    "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-01_T1w_noise_corrected_maths.nii.gz --convergence [ 50x50x50x50, 1e-07 ] --output sub-01_T1w_noise_corrected_maths_corrected.nii.gz --shrink-factor 4",
    "larmorx_threads": 8,
-   "larmorx_seconds": 3.0414760503917933,
+   "larmorx_seconds": 3.0572872012853622,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected.nii.gz",
@@ -689,9 +689,9 @@
      }
     }
    ],
-   "container_seconds": 13.089163064956665,
+   "container_seconds": 13.135684967041016,
    "status": "explained",
-   "harness_seconds": 21.339507814496756
+   "harness_seconds": 246.87370928563178
   },
   {
    "stage": "A05",
@@ -705,7 +705,7 @@
    "fmriprep_seconds": 4.219546,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_maths.nii.gz Laplacian /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40/sub-01_T1w_noise_corrected_maths_corrected.nii.gz 1.5 1",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.9377370327711105,
+   "larmorx_seconds": 0.9667145516723394,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_maths.nii.gz",
@@ -745,9 +745,9 @@
      }
     }
    ],
-   "container_seconds": 3.451080083847046,
+   "container_seconds": 3.579078435897827,
    "status": "identical",
-   "harness_seconds": 5.961671888828278
+   "harness_seconds": 6.061603831127286
   },
   {
    "stage": "A05",
@@ -761,7 +761,7 @@
    "fmriprep_seconds": 8.58012,
    "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_T1w_maths.nii.gz Laplacian /templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz 1.5 1",
    "larmorx_threads": 1,
-   "larmorx_seconds": 2.009434323757887,
+   "larmorx_seconds": 2.566300457343459,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_T1w_maths.nii.gz",
@@ -801,9 +801,9 @@
      }
     }
    ],
-   "container_seconds": 6.284612417221069,
+   "container_seconds": 6.402469158172607,
    "status": "identical",
-   "harness_seconds": 10.96096608042717
+   "harness_seconds": 12.273671513423324
   },
   {
    "stage": "A06",
@@ -817,7 +817,7 @@
    "fmriprep_seconds": 10.28575,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_label-brain_probseg.nii.gz --interpolation Gaussian --output tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template0GenericAffine.mat, 1 ] --transform /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template1InverseWarp.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 10.43806928023696,
+   "larmorx_seconds": 10.224049428477883,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz",
@@ -982,9 +982,9 @@
      }
     }
    ],
-   "container_seconds": 8.048713445663452,
+   "container_seconds": 8.227492094039917,
    "status": "explained",
-   "harness_seconds": 22.586044071242213
+   "harness_seconds": 50.854882875457406
   },
   {
    "stage": "A06",
@@ -998,7 +998,7 @@
    "fmriprep_seconds": 10.394195,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/full_wm/summap.nii.gz --interpolation Gaussian --output summap_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template0GenericAffine.mat, 1 ] --transform /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template1InverseWarp.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 10.039487984031439,
+   "larmorx_seconds": 10.251475559547544,
    "outputs": [
     {
      "output": "summap_trans.nii.gz",
@@ -1163,9 +1163,9 @@
      }
     }
    ],
-   "container_seconds": 7.769395351409912,
+   "container_seconds": 7.772814989089966,
    "status": "explained",
-   "harness_seconds": 21.995317770168185
+   "harness_seconds": 50.58201597072184
   },
   {
    "stage": "A07",
@@ -1179,7 +1179,7 @@
    "fmriprep_seconds": 0.646124,
    "command": "ThresholdImage 3 /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/map_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 0.500000 1.000000 1.000000 0.000000",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.1347992829978466,
+   "larmorx_seconds": 0.13263961672782898,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz",
@@ -1223,9 +1223,9 @@
      }
     }
    ],
-   "container_seconds": 0.644942045211792,
+   "container_seconds": 0.6716809272766113,
    "status": "identical",
-   "harness_seconds": 1.9843452591449022
+   "harness_seconds": 2.1807792857289314
   },
   {
    "stage": "A08",
@@ -1239,7 +1239,7 @@
    "fmriprep_seconds": 0.489695,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/01_atropos/sub-01_T1w_noise_corrected_maths_corrected_labeled.nii.gz 10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.16776695661246777,
+   "larmorx_seconds": 0.1859389077872038,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths.nii.gz",
@@ -1293,9 +1293,9 @@
      }
     }
    ],
-   "container_seconds": 0.6948626041412354,
+   "container_seconds": 0.7116656303405762,
    "status": "identical",
-   "harness_seconds": 2.310081882402301
+   "harness_seconds": 2.4804055392742157
   },
   {
    "stage": "A08",
@@ -1309,7 +1309,7 @@
    "fmriprep_seconds": 0.45925,
    "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/thr_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.1324147004634142,
+   "larmorx_seconds": 0.13020790554583073,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
@@ -1353,9 +1353,9 @@
      }
     }
    ],
-   "container_seconds": 0.6607768535614014,
+   "container_seconds": 0.6019423007965088,
    "status": "identical",
-   "harness_seconds": 2.207491137087345
+   "harness_seconds": 2.3364507108926773
   },
   {
    "stage": "A08",
@@ -1369,7 +1369,7 @@
    "fmriprep_seconds": 0.869011,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-03.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.12023867294192314,
+   "larmorx_seconds": 0.12683428451418877,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz",
@@ -1413,9 +1413,9 @@
      }
     }
    ],
-   "container_seconds": 0.827282190322876,
+   "container_seconds": 0.8306317329406738,
    "status": "identical",
-   "harness_seconds": 2.3127944748848677
+   "harness_seconds": 2.433512579649687
   },
   {
    "stage": "A08",
@@ -1429,7 +1429,7 @@
    "fmriprep_seconds": 0.856938,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13645543344318867,
+   "larmorx_seconds": 0.13846100121736526,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz",
@@ -1473,9 +1473,9 @@
      }
     }
    ],
-   "container_seconds": 0.8112607002258301,
+   "container_seconds": 0.8749337196350098,
    "status": "identical",
-   "harness_seconds": 2.3674820363521576
+   "harness_seconds": 2.582080451771617
   },
   {
    "stage": "A08",
@@ -1489,7 +1489,7 @@
    "fmriprep_seconds": 5.05919,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz FillHoles /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/06_get_gm/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz 2",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.161310862749815,
+   "larmorx_seconds": 0.1668097209185362,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz",
@@ -1533,9 +1533,9 @@
      }
     }
    ],
-   "container_seconds": 4.714386463165283,
+   "container_seconds": 4.987409353256226,
    "status": "identical",
-   "harness_seconds": 6.298180481418967
+   "harness_seconds": 6.658203044906259
   },
   {
    "stage": "A08",
@@ -1549,7 +1549,7 @@
    "fmriprep_seconds": 0.478195,
    "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/06_get_gm/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/07_fill_gm/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz 08_mult_gm.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13200977072119713,
+   "larmorx_seconds": 0.16101198829710484,
    "outputs": [
     {
      "output": "08_mult_gm.nii.gz",
@@ -1593,9 +1593,9 @@
      }
     }
    ],
-   "container_seconds": 0.6058988571166992,
+   "container_seconds": 0.6483793258666992,
    "status": "identical",
-   "harness_seconds": 2.215355923399329
+   "harness_seconds": 2.407786201685667
   },
   {
    "stage": "A08",
@@ -1609,7 +1609,7 @@
    "fmriprep_seconds": 0.449719,
    "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/05_get_wm/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz 3.0 09_relabel_wm.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.09632722660899162,
+   "larmorx_seconds": 0.09698738157749176,
    "outputs": [
     {
      "output": "09_relabel_wm.nii.gz",
@@ -1653,9 +1653,9 @@
      }
     }
    ],
-   "container_seconds": 0.6458790302276611,
+   "container_seconds": 0.5274710655212402,
    "status": "identical",
-   "harness_seconds": 2.2291075475513935
+   "harness_seconds": 2.15851697511971
   },
   {
    "stage": "A08",
@@ -1669,7 +1669,7 @@
    "fmriprep_seconds": 2.081923,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01.nii.gz 10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.40628147311508656,
+   "larmorx_seconds": 0.42273886129260063,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
@@ -1713,9 +1713,9 @@
      }
     }
    ],
-   "container_seconds": 2.04732608795166,
+   "container_seconds": 2.0976531505584717,
    "status": "identical",
-   "harness_seconds": 3.7156413048505783
+   "harness_seconds": 3.905477285385132
   },
   {
    "stage": "A08",
@@ -1729,7 +1729,7 @@
    "fmriprep_seconds": 0.784196,
    "command": "ImageMath 3 08_mult_gm_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/08_mult_gm/08_mult_gm.nii.gz /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/10_me_csf/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13680920749902725,
+   "larmorx_seconds": 0.14476734772324562,
    "outputs": [
     {
      "output": "08_mult_gm_maths.nii.gz",
@@ -1773,9 +1773,9 @@
      }
     }
    ],
-   "container_seconds": 1.0942509174346924,
+   "container_seconds": 0.9822654724121094,
    "status": "identical",
-   "harness_seconds": 2.647567968815565
+   "harness_seconds": 2.6897814739495516
   },
   {
    "stage": "A08",
@@ -1789,7 +1789,7 @@
    "fmriprep_seconds": 0.387508,
    "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/11_add_gm/08_mult_gm_maths.nii.gz 2.0 12_relabel_gm.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.09870151057839394,
+   "larmorx_seconds": 0.1070816870778799,
    "outputs": [
     {
      "output": "12_relabel_gm.nii.gz",
@@ -1833,9 +1833,9 @@
      }
     }
    ],
-   "container_seconds": 0.5879502296447754,
+   "container_seconds": 0.574634313583374,
    "status": "identical",
-   "harness_seconds": 2.160124033689499
+   "harness_seconds": 2.280696803703904
   },
   {
    "stage": "A08",
@@ -1849,7 +1849,7 @@
    "fmriprep_seconds": 0.878856,
    "command": "ImageMath 3 09_relabel_wm_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/09_relabel_wm/09_relabel_wm.nii.gz /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/12_relabel_gm/12_relabel_gm.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14337735250592232,
+   "larmorx_seconds": 0.14516297169029713,
    "outputs": [
     {
      "output": "09_relabel_wm_maths.nii.gz",
@@ -1901,9 +1901,9 @@
      }
     }
    ],
-   "container_seconds": 0.9479186534881592,
+   "container_seconds": 0.9030420780181885,
    "status": "identical",
-   "harness_seconds": 2.460236966609955
+   "harness_seconds": 2.501030733808875
   },
   {
    "stage": "A08",
@@ -1917,7 +1917,7 @@
    "fmriprep_seconds": 0.654179,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/14_sel_labels2/09_relabel_wm_maths_class-03.nii.gz /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/14_sel_labels2/09_relabel_wm_maths_class-02.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13686863705515862,
+   "larmorx_seconds": 0.13616087473928928,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths.nii.gz",
@@ -1961,9 +1961,9 @@
      }
     }
    ],
-   "container_seconds": 0.8228898048400879,
+   "container_seconds": 0.7879452705383301,
    "status": "identical",
-   "harness_seconds": 2.3484002519398928
+   "harness_seconds": 2.5267819557338953
   },
   {
    "stage": "A08",
@@ -1977,7 +1977,7 @@
    "fmriprep_seconds": 1.325211,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/15_add_7/09_relabel_wm_maths_class-03_maths.nii.gz 2",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.4080260843038559,
+   "larmorx_seconds": 0.43539485335350037,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths.nii.gz",
@@ -2021,9 +2021,9 @@
      }
     }
    ],
-   "container_seconds": 1.475334644317627,
+   "container_seconds": 1.4627630710601807,
    "status": "identical",
-   "harness_seconds": 3.268133407458663
+   "harness_seconds": 3.3763163741678
   },
   {
    "stage": "A08",
@@ -2037,7 +2037,7 @@
    "fmriprep_seconds": 0.725956,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/16_me_7/09_relabel_wm_maths_class-03_maths_maths.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.12636125832796097,
+   "larmorx_seconds": 0.13293198309838772,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz",
@@ -2081,9 +2081,9 @@
      }
     }
    ],
-   "container_seconds": 0.8524148464202881,
+   "container_seconds": 0.8572914600372314,
    "status": "identical",
-   "harness_seconds": 2.345368877053261
+   "harness_seconds": 2.5084220953285694
   },
   {
    "stage": "A08",
@@ -2097,7 +2097,7 @@
    "fmriprep_seconds": 0.78917,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/17_comp_7/09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz 4",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.19793696142733097,
+   "larmorx_seconds": 0.1912397611886263,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz",
@@ -2141,9 +2141,9 @@
      }
     }
    ],
-   "container_seconds": 0.9199032783508301,
+   "container_seconds": 1.0409603118896484,
    "status": "identical",
-   "harness_seconds": 2.509897517040372
+   "harness_seconds": 2.7110482323914766
   },
   {
    "stage": "A08",
@@ -2157,7 +2157,7 @@
    "fmriprep_seconds": 4.535253,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz FillHoles /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/18_md_7/09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz 2",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.15398441068828106,
+   "larmorx_seconds": 0.17913580872118473,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz",
@@ -2201,9 +2201,9 @@
      }
     }
    ],
-   "container_seconds": 4.680743455886841,
+   "container_seconds": 4.597351789474487,
    "status": "identical",
-   "harness_seconds": 6.218493556603789
+   "harness_seconds": 6.136274334043264
   },
   {
    "stage": "A08",
@@ -2217,7 +2217,7 @@
    "fmriprep_seconds": 0.752401,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/19_fill_7/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/03_pad_mask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14201242476701736,
+   "larmorx_seconds": 0.1573299802839756,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz",
@@ -2261,9 +2261,9 @@
      }
     }
    ],
-   "container_seconds": 1.0023572444915771,
+   "container_seconds": 0.9500722885131836,
    "status": "identical",
-   "harness_seconds": 2.5389102958142757
+   "harness_seconds": 2.487992102280259
   },
   {
    "stage": "A08",
@@ -2277,7 +2277,7 @@
    "fmriprep_seconds": 0.836563,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/20_add_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz 5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.18700661323964596,
+   "larmorx_seconds": 0.19785962626338005,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz",
@@ -2321,9 +2321,9 @@
      }
     }
    ],
-   "container_seconds": 0.9264640808105469,
+   "container_seconds": 0.9450943470001221,
    "status": "identical",
-   "harness_seconds": 2.488905468955636
+   "harness_seconds": 2.5502596832811832
   },
   {
    "stage": "A08",
@@ -2337,7 +2337,7 @@
    "fmriprep_seconds": 1.467035,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/21_md_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz 5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.40123856626451015,
+   "larmorx_seconds": 0.41207113675773144,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz",
@@ -2381,9 +2381,9 @@
      }
     }
    ],
-   "container_seconds": 1.492166519165039,
+   "container_seconds": 1.5302209854125977,
    "status": "identical",
-   "harness_seconds": 3.2983682714402676
+   "harness_seconds": 3.338127141818404
   },
   {
    "stage": "A08",
@@ -2397,7 +2397,7 @@
    "fmriprep_seconds": 0.365091,
    "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/22_me_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz -10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.15595651231706142,
+   "larmorx_seconds": 0.15266910381615162,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz",
@@ -2441,9 +2441,9 @@
      }
     }
    ],
-   "container_seconds": 0.6542820930480957,
+   "container_seconds": 0.6723334789276123,
    "status": "identical",
-   "harness_seconds": 2.1641302965581417
+   "harness_seconds": 2.1327831223607063
   },
   {
    "stage": "A08",
@@ -2457,7 +2457,7 @@
    "fmriprep_seconds": 0.40981,
    "command": "ImageMath 3 09_relabel_wm_maths_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/13_add_gm_wm/09_relabel_wm_maths.nii.gz -10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14221974648535252,
+   "larmorx_seconds": 0.15155955962836742,
    "outputs": [
     {
      "output": "09_relabel_wm_maths_maths.nii.gz",
@@ -2509,9 +2509,9 @@
      }
     }
    ],
-   "container_seconds": 0.6429712772369385,
+   "container_seconds": 0.6884250640869141,
    "status": "identical",
-   "harness_seconds": 2.068253865465522
+   "harness_seconds": 2.111504318192601
   },
   {
    "stage": "A08",
@@ -2525,7 +2525,7 @@
    "fmriprep_seconds": 0.499912,
    "command": "ImageMath 3 12_relabel_gm_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/12_relabel_gm/12_relabel_gm.nii.gz -10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13884474150836468,
+   "larmorx_seconds": 0.1563857514411211,
    "outputs": [
     {
      "output": "12_relabel_gm_maths.nii.gz",
@@ -2569,9 +2569,9 @@
      }
     }
    ],
-   "container_seconds": 0.718095064163208,
+   "container_seconds": 0.7442789077758789,
    "status": "identical",
-   "harness_seconds": 2.1396970190107822
+   "harness_seconds": 2.214111478999257
   },
   {
    "stage": "A08",
@@ -2585,7 +2585,7 @@
    "fmriprep_seconds": 0.476618,
    "command": "ImageMath 3 09_relabel_wm_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/09_relabel_wm/09_relabel_wm.nii.gz -10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.1349456086754799,
+   "larmorx_seconds": 0.17028111219406128,
    "outputs": [
     {
      "output": "09_relabel_wm_maths.nii.gz",
@@ -2629,9 +2629,9 @@
      }
     }
    ],
-   "container_seconds": 0.6236686706542969,
+   "container_seconds": 0.7262670993804932,
    "status": "identical",
-   "harness_seconds": 2.0138822067528963
+   "harness_seconds": 2.2010707035660744
   },
   {
    "stage": "A08",
@@ -2645,7 +2645,7 @@
    "fmriprep_seconds": 0.398732,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01.nii.gz -10",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13688921928405762,
+   "larmorx_seconds": 0.15523623302578926,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
@@ -2689,9 +2689,9 @@
      }
     }
    ],
-   "container_seconds": 0.5843236446380615,
+   "container_seconds": 0.5973548889160156,
    "status": "identical",
-   "harness_seconds": 2.0192144699394703
+   "harness_seconds": 2.038571735844016
   },
   {
    "stage": "A08",
@@ -2705,7 +2705,7 @@
    "fmriprep_seconds": 0.778362,
    "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/thr_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 2",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14122669212520123,
+   "larmorx_seconds": 0.14848826453089714,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
@@ -2749,9 +2749,9 @@
      }
     }
    ],
-   "container_seconds": 0.8390915393829346,
+   "container_seconds": 0.7699944972991943,
    "status": "identical",
-   "harness_seconds": 2.230583870783448
+   "harness_seconds": 2.1965508330613375
   },
   {
    "stage": "A08",
@@ -2765,7 +2765,7 @@
    "fmriprep_seconds": 0.760673,
    "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/dil_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.09006888419389725,
+   "larmorx_seconds": 0.09051819331943989,
    "outputs": [
     {
      "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths_maths.nii.gz",
@@ -2809,9 +2809,9 @@
      }
     }
    ],
-   "container_seconds": 0.8322081565856934,
+   "container_seconds": 0.7540812492370605,
    "status": "identical",
-   "harness_seconds": 2.215103007853031
+   "harness_seconds": 2.100987035781145
   },
   {
    "stage": "A09",
@@ -2826,7 +2826,7 @@
    "fmriprep_seconds": 9.524453,
    "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz --convergence [ 50x50x50x50x50, 1e-07 ] --output [ sub-01_T1w_noise_corrected_corrected.nii.gz, sub-01_T1w_noise_corrected_bias.nii.gz ] -r --shrink-factor 4 --weight-image /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
    "larmorx_threads": 8,
-   "larmorx_seconds": 1.1734036467969418,
+   "larmorx_seconds": 1.134571997448802,
    "outputs": [
     {
      "output": "corrected",
@@ -3177,9 +3177,9 @@
      }
     }
    ],
-   "container_seconds": 7.288168430328369,
+   "container_seconds": 7.019000768661499,
    "status": "explained",
-   "harness_seconds": 21.71190577186644
+   "harness_seconds": 87.59472800046206
   },
   {
    "stage": "A10",
@@ -3194,7 +3194,7 @@
    "fmriprep_seconds": 2.605083,
    "command": "ImageMath 3 sub-01_T1w_noise_corrected_corrected_xform_maths.nii.gz TruncateImageIntensity /work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/copy_xform/sub-01_T1w_noise_corrected_corrected_xform.nii.gz 0.01 0.999 256",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.2115962021052837,
+   "larmorx_seconds": 0.8207809459418058,
    "outputs": [
     {
      "output": "sub-01_T1w_noise_corrected_corrected_xform_maths.nii.gz",
@@ -3234,9 +3234,9 @@
      }
     }
    ],
-   "container_seconds": 1.6929423809051514,
+   "container_seconds": 1.7162623405456543,
    "status": "identical",
-   "harness_seconds": 4.696307621896267
+   "harness_seconds": 3.967564908787608
   },
   {
    "stage": "A11",
@@ -3251,7 +3251,7 @@
    "fmriprep_seconds": 8.965839,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 7.563820524141192,
+   "larmorx_seconds": 7.611734852194786,
    "outputs": [
     {
      "output": "sub-01_desc-brain_mask_trans.nii.gz",
@@ -3295,9 +3295,9 @@
      }
     }
    ],
-   "container_seconds": 6.464292526245117,
+   "container_seconds": 6.919657468795776,
    "status": "identical",
-   "harness_seconds": 14.43472938798368
+   "harness_seconds": 14.952334525063634
   },
   {
    "stage": "A11",
@@ -3312,7 +3312,7 @@
    "fmriprep_seconds": 8.266204,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-01_desc-preproc_T1w_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.738876475021243,
+   "larmorx_seconds": 1.728107776492834,
    "outputs": [
     {
      "output": "sub-01_desc-preproc_T1w_trans.nii.gz",
@@ -3495,9 +3495,9 @@
      }
     }
    ],
-   "container_seconds": 3.7457377910614014,
+   "container_seconds": 3.8601839542388916,
    "status": "known-divergence",
-   "harness_seconds": 7.56681671179831
+   "harness_seconds": 24.142505165189505
   },
   {
    "stage": "A11",
@@ -3512,7 +3512,7 @@
    "fmriprep_seconds": 11.742332,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_dseg.nii.gz --interpolation MultiLabel --output sub-01_dseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 7.987679526209831,
+   "larmorx_seconds": 8.03065662831068,
    "outputs": [
     {
      "output": "sub-01_dseg_trans.nii.gz",
@@ -3591,9 +3591,9 @@
      }
     }
    ],
-   "container_seconds": 6.474430322647095,
+   "container_seconds": 6.622357130050659,
    "status": "identical",
-   "harness_seconds": 15.061202386394143
+   "harness_seconds": 15.251471044495702
   },
   {
    "stage": "A11",
@@ -3608,7 +3608,7 @@
    "fmriprep_seconds": 10.492022,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 7.447247372940183,
+   "larmorx_seconds": 7.4763036128133535,
    "outputs": [
     {
      "output": "sub-01_desc-brain_mask_trans.nii.gz",
@@ -3672,9 +3672,9 @@
      }
     }
    ],
-   "container_seconds": 5.911711692810059,
+   "container_seconds": 6.069573879241943,
    "status": "identical",
-   "harness_seconds": 13.95528400875628
+   "harness_seconds": 14.13240304030478
   },
   {
    "stage": "A11",
@@ -3689,7 +3689,7 @@
    "fmriprep_seconds": 7.314559,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /work/fmriprep_25_2_wf/sub_01_wf/ds_std_volumes_wf/mask_anat/sub-01_desc-preproc_T1w_masked.nii.gz --interpolation LanczosWindowedSinc --output sub-01_desc-preproc_T1w_masked_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.6380120776593685,
+   "larmorx_seconds": 1.6509626749902964,
    "outputs": [
     {
      "output": "sub-01_desc-preproc_T1w_masked_trans.nii.gz",
@@ -3895,9 +3895,9 @@
      }
     }
    ],
-   "container_seconds": 3.5925869941711426,
+   "container_seconds": 3.634532928466797,
    "status": "known-divergence",
-   "harness_seconds": 6.669359186664224
+   "harness_seconds": 23.10648214817047
   },
   {
    "stage": "A11",
@@ -3913,7 +3913,7 @@
    "fmriprep_seconds": 2.715796,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_label-GM_probseg.nii.gz --interpolation Gaussian --output sub-01_label-GM_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 2.2371908873319626,
+   "larmorx_seconds": 2.1783527191728354,
    "outputs": [
     {
      "output": "sub-01_label-GM_probseg_trans.nii.gz",
@@ -4119,9 +4119,9 @@
      }
     }
    ],
-   "container_seconds": 2.1814486980438232,
+   "container_seconds": 2.368032217025757,
    "status": "known-divergence",
-   "harness_seconds": 5.958576016128063
+   "harness_seconds": 14.983249897137284
   },
   {
    "stage": "A11",
@@ -4137,7 +4137,7 @@
    "fmriprep_seconds": 2.545653,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_label-WM_probseg.nii.gz --interpolation Gaussian --output sub-01_label-WM_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 2.2743084505200386,
+   "larmorx_seconds": 2.183062544092536,
    "outputs": [
     {
      "output": "sub-01_label-WM_probseg_trans.nii.gz",
@@ -4343,9 +4343,9 @@
      }
     }
    ],
-   "container_seconds": 2.0869596004486084,
+   "container_seconds": 2.1389453411102295,
    "status": "known-divergence",
-   "harness_seconds": 5.725688410922885
+   "harness_seconds": 14.667220138013363
   },
   {
    "stage": "A11",
@@ -4361,7 +4361,7 @@
    "fmriprep_seconds": 2.341863,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-01_label-CSF_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 2.2422673515975475,
+   "larmorx_seconds": 2.249963467940688,
    "outputs": [
     {
      "output": "sub-01_label-CSF_probseg_trans.nii.gz",
@@ -4567,9 +4567,9 @@
      }
     }
    ],
-   "container_seconds": 2.2732224464416504,
+   "container_seconds": 2.1232101917266846,
    "status": "known-divergence",
-   "harness_seconds": 5.87601593695581
+   "harness_seconds": 14.544665100052953
   },
   {
    "stage": "F01",
@@ -4584,7 +4584,7 @@
    "fmriprep_seconds": 30.704629,
    "command": "mcflirt -in /data/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz -out /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/bold_hmc_wf/mcflirt/sub-01_task-mixedgamblestask_run-01_bold_mcf.nii.gz -reffile /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref.nii.gz -mats",
    "larmorx_threads": 1,
-   "larmorx_seconds": 28.897653378546238,
+   "larmorx_seconds": 29.259428223595023,
    "matrices": {
     "volumes": 240,
     "rms_median_mm": 0.010141490023080367,
@@ -4596,9 +4596,9 @@
     "max_deg": 0.02927813772724931,
     "identical_volumes": 0
    },
-   "api_seconds": 26.131659070029855,
+   "api_seconds": 26.129412980750203,
    "api_threads": 1,
-   "api_seconds_all": 5.19116085767746,
+   "api_seconds_all": 5.077666647732258,
    "api_threads_all": 12,
    "confounds": {
     "tsv": "out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-confounds_timeseries.tsv",
@@ -4642,7 +4642,7 @@
     "larmorx_max_abs": 0.024744500000000003,
     "own_vs_nitransforms_max_abs": 0.00010227334047899217
    },
-   "container_seconds": 25.886127948760986,
+   "container_seconds": 26.500097036361694,
    "rerun": {
     "volumes": 240,
     "rms_median_mm": 8.310863329810284e-15,
@@ -4678,7 +4678,7 @@
     }
    },
    "status": "compared",
-   "harness_seconds": 113.71831115707755
+   "harness_seconds": 142.36465949192643
   },
   {
    "stage": "F01",
@@ -4693,7 +4693,7 @@
    "fmriprep_seconds": 33.410983,
    "command": "mcflirt -in /data/sub-01/func/sub-01_task-mixedgamblestask_run-02_bold.nii.gz -out /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/bold_hmc_wf/mcflirt/sub-01_task-mixedgamblestask_run-02_bold_mcf.nii.gz -reffile /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref.nii.gz -mats",
    "larmorx_threads": 1,
-   "larmorx_seconds": 28.59713294170797,
+   "larmorx_seconds": 26.473221706226468,
    "matrices": {
     "volumes": 240,
     "rms_median_mm": 0.012326823393299172,
@@ -4705,9 +4705,9 @@
     "max_deg": 0.03071053252064032,
     "identical_volumes": 0
    },
-   "api_seconds": 24.920534959062934,
+   "api_seconds": 22.79414556734264,
    "api_threads": 1,
-   "api_seconds_all": 5.007968734949827,
+   "api_seconds_all": 4.92926698923111,
    "api_threads_all": 12,
    "confounds": {
     "tsv": "out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-confounds_timeseries.tsv",
@@ -4751,7 +4751,7 @@
     "larmorx_max_abs": 0.0389946,
     "own_vs_nitransforms_max_abs": 0.00011516486192880357
    },
-   "container_seconds": 28.408260107040405,
+   "container_seconds": 29.621647119522095,
    "rerun": {
     "volumes": 240,
     "rms_median_mm": 8.326696470918576e-15,
@@ -4787,7 +4787,7 @@
     }
    },
    "status": "compared",
-   "harness_seconds": 113.60074685141444
+   "harness_seconds": 144.25011833943427
   },
   {
    "stage": "F01",
@@ -4802,7 +4802,7 @@
    "fmriprep_seconds": 33.828694,
    "command": "mcflirt -in /data/sub-01/func/sub-01_task-mixedgamblestask_run-03_bold.nii.gz -out /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/bold_hmc_wf/mcflirt/sub-01_task-mixedgamblestask_run-03_bold_mcf.nii.gz -reffile /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref.nii.gz -mats",
    "larmorx_threads": 1,
-   "larmorx_seconds": 27.93521948903799,
+   "larmorx_seconds": 28.666878489777446,
    "matrices": {
     "volumes": 240,
     "rms_median_mm": 0.013578522130859244,
@@ -4814,9 +4814,9 @@
     "max_deg": 0.027444676124614834,
     "identical_volumes": 0
    },
-   "api_seconds": 23.30248375982046,
+   "api_seconds": 25.441503131762147,
    "api_threads": 1,
-   "api_seconds_all": 5.149576948955655,
+   "api_seconds_all": 5.291570195928216,
    "api_threads_all": 12,
    "confounds": {
     "tsv": "out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-confounds_timeseries.tsv",
@@ -4860,7 +4860,7 @@
     "larmorx_max_abs": 0.027159909999999995,
     "own_vs_nitransforms_max_abs": 0.00012452621383412556
    },
-   "container_seconds": 29.216524124145508,
+   "container_seconds": 29.722168922424316,
    "rerun": {
     "volumes": 240,
     "rms_median_mm": 8.30835145114695e-15,
@@ -4896,7 +4896,7 @@
     }
    },
    "status": "compared",
-   "harness_seconds": 112.90358532778919
+   "harness_seconds": 149.54095087572932
   },
   {
    "stage": "F03",
@@ -4911,7 +4911,7 @@
    "fmriprep_seconds": 0.965002,
    "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref.nii.gz --output sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref_corrected.nii.gz -r --weight-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.09825729206204414,
+   "larmorx_seconds": 0.09526920132339001,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref_corrected.nii.gz",
@@ -5105,9 +5105,9 @@
      }
     }
    ],
-   "container_seconds": 0.9864099025726318,
+   "container_seconds": 0.913477897644043,
    "status": "explained",
-   "harness_seconds": 1.55452636256814
+   "harness_seconds": 3.7702263686805964
   },
   {
    "stage": "F03",
@@ -5122,7 +5122,7 @@
    "fmriprep_seconds": 1.142875,
    "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref.nii.gz --output sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref_corrected.nii.gz -r --weight-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.16417613998055458,
+   "larmorx_seconds": 0.18467174097895622,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref_corrected.nii.gz",
@@ -5316,9 +5316,9 @@
      }
     }
    ],
-   "container_seconds": 1.0688669681549072,
+   "container_seconds": 0.9632077217102051,
    "status": "explained",
-   "harness_seconds": 1.7672370672225952
+   "harness_seconds": 3.95733923278749
   },
   {
    "stage": "F03",
@@ -5333,7 +5333,7 @@
    "fmriprep_seconds": 1.049357,
    "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref.nii.gz --output sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref_corrected.nii.gz -r --weight-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.16032426245510578,
+   "larmorx_seconds": 0.16967187449336052,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref_corrected.nii.gz",
@@ -5527,9 +5527,9 @@
      }
     }
    ],
-   "container_seconds": 0.9438598155975342,
+   "container_seconds": 1.0887737274169922,
    "status": "explained",
-   "harness_seconds": 1.5988384503871202
+   "harness_seconds": 4.138584828004241
   },
   {
    "stage": "F04",
@@ -5544,7 +5544,7 @@
    "fmriprep_seconds": 0.438622,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg.nii.gz --interpolation Linear --output tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/norm/transform0GenericAffine.mat, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.13032536022365093,
+   "larmorx_seconds": 0.0990477092564106,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz",
@@ -5584,9 +5584,9 @@
      }
     }
    ],
-   "container_seconds": 0.7194650173187256,
+   "container_seconds": 0.6609838008880615,
    "status": "identical",
-   "harness_seconds": 1.1099857073277235
+   "harness_seconds": 1.0074258875101805
   },
   {
    "stage": "F04",
@@ -5601,7 +5601,7 @@
    "fmriprep_seconds": 0.47163,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg.nii.gz --interpolation Linear --output tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/norm/transform0GenericAffine.mat, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.123354597017169,
+   "larmorx_seconds": 0.1083783283829689,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz",
@@ -5641,9 +5641,9 @@
      }
     }
    ],
-   "container_seconds": 0.674541711807251,
+   "container_seconds": 0.6809899806976318,
    "status": "identical",
-   "harness_seconds": 1.0789299923926592
+   "harness_seconds": 1.0209734793752432
   },
   {
    "stage": "F04",
@@ -5658,7 +5658,7 @@
    "fmriprep_seconds": 0.464455,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg.nii.gz --interpolation Linear --output tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/norm/transform0GenericAffine.mat, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.1295460406690836,
+   "larmorx_seconds": 0.09422750398516655,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz",
@@ -5698,9 +5698,9 @@
      }
     }
    ],
-   "container_seconds": 0.6502177715301514,
+   "container_seconds": 0.578211784362793,
    "status": "identical",
-   "harness_seconds": 1.0125330723822117
+   "harness_seconds": 0.9403300117701292
   },
   {
    "stage": "F05",
@@ -5732,9 +5732,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.1987443901598454,
+   "larmorx_seconds": 1.1761958599090576,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.7775915022939444,
+   "larmorx_write_seconds": 2.150426249951124,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -5779,10 +5779,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 9.960066435858607,
+   "container_seconds": 9.691416455432773,
    "rerun_identical": true,
-   "harness_seconds": 28.031127870082855,
-   "larmorx_total_seconds": 1.9763358924537897
+   "harness_seconds": 29.347943119704723,
+   "larmorx_total_seconds": 3.326622109860182
   },
   {
    "stage": "F05",
@@ -5814,9 +5814,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.3521448876708746,
+   "larmorx_seconds": 1.2963770795613527,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.772304454818368,
+   "larmorx_write_seconds": 1.4912425838410854,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -5861,10 +5861,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 11.149776551872492,
+   "container_seconds": 11.022255267947912,
    "rerun_identical": true,
-   "harness_seconds": 29.551942765712738,
-   "larmorx_total_seconds": 2.1244493424892426
+   "harness_seconds": 30.333598472177982,
+   "larmorx_total_seconds": 2.787619663402438
   },
   {
    "stage": "F05",
@@ -5896,9 +5896,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.3630149513483047,
+   "larmorx_seconds": 1.287794103845954,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.7424185890704393,
+   "larmorx_write_seconds": 1.0419832225888968,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -5943,10 +5943,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 10.754697803407907,
+   "container_seconds": 11.003310278058052,
    "rerun_identical": true,
-   "harness_seconds": 29.358429923653603,
-   "larmorx_total_seconds": 2.105433540418744
+   "harness_seconds": 32.22181295789778,
+   "larmorx_total_seconds": 2.3297773264348507
   },
   {
    "stage": "F06",
@@ -5980,9 +5980,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.1088370494544506,
+   "larmorx_seconds": 1.1531808692961931,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.5610915049910545,
+   "larmorx_write_seconds": 0.6369428765028715,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6027,10 +6027,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 7.935979215428233,
+   "container_seconds": 8.121245548129082,
    "rerun_identical": true,
-   "harness_seconds": 23.62119177170098,
-   "larmorx_total_seconds": 1.6699285544455051
+   "harness_seconds": 27.266698259860277,
+   "larmorx_total_seconds": 1.7901237457990646
   },
   {
    "stage": "F06",
@@ -6064,9 +6064,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.2974095046520233,
+   "larmorx_seconds": 1.3176572173833847,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.6179324556142092,
+   "larmorx_write_seconds": 0.7627103738486767,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6111,10 +6111,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 8.71969280205667,
+   "container_seconds": 8.713702822104096,
    "rerun_identical": true,
-   "harness_seconds": 25.148169523105025,
-   "larmorx_total_seconds": 1.9153419602662325
+   "harness_seconds": 28.27751114964485,
+   "larmorx_total_seconds": 2.0803675912320614
   },
   {
    "stage": "F06",
@@ -6148,9 +6148,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 1.195210013538599,
+   "larmorx_seconds": 1.245330598205328,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 0.5935021229088306,
+   "larmorx_write_seconds": 0.6269321534782648,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6195,10 +6195,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 8.44155876711011,
+   "container_seconds": 8.747009145095944,
    "rerun_identical": true,
-   "harness_seconds": 24.633635574951768,
-   "larmorx_total_seconds": 1.7887121364474297
+   "harness_seconds": 25.997443052008748,
+   "larmorx_total_seconds": 1.8722627516835928
   },
   {
    "stage": "F07",
@@ -6235,9 +6235,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 7.746442306786776,
+   "larmorx_seconds": 7.551603129133582,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 6.071000564843416,
+   "larmorx_write_seconds": 6.085755648091435,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6282,10 +6282,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 67.30986203439534,
+   "container_seconds": 69.62814189121127,
    "rerun_identical": true,
-   "harness_seconds": 138.3019488248974,
-   "larmorx_total_seconds": 13.817442871630192
+   "harness_seconds": 140.2686542980373,
+   "larmorx_total_seconds": 13.637358777225018
   },
   {
    "stage": "F07",
@@ -6322,9 +6322,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 7.746686268597841,
+   "larmorx_seconds": 7.949477531015873,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 6.068517226725817,
+   "larmorx_write_seconds": 6.073169665411115,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6369,10 +6369,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 74.35752530023456,
+   "container_seconds": 77.36168651841581,
    "rerun_identical": true,
-   "harness_seconds": 146.17671869136393,
-   "larmorx_total_seconds": 13.815203495323658
+   "harness_seconds": 148.4965635854751,
+   "larmorx_total_seconds": 14.022647196426988
   },
   {
    "stage": "F07",
@@ -6409,9 +6409,9 @@
     "prefilter": true,
     "output_dtype": "float32"
    },
-   "larmorx_seconds": 7.870077006518841,
+   "larmorx_seconds": 7.839885553345084,
    "larmorx_threads": 8,
-   "larmorx_write_seconds": 7.970585705712438,
+   "larmorx_write_seconds": 6.080578960478306,
    "outputs": [
     {
      "output": "preprocessed BOLD",
@@ -6456,10 +6456,10 @@
     }
    ],
    "status": "identical",
-   "container_seconds": 73.46015530824661,
+   "container_seconds": 75.36218005605042,
    "rerun_identical": true,
-   "harness_seconds": 169.49089524894953,
-   "larmorx_total_seconds": 15.840662712231278
+   "harness_seconds": 148.98350296728313,
+   "larmorx_total_seconds": 13.92046451382339
   },
   {
    "stage": "F08",
@@ -6474,7 +6474,7 @@
    "fmriprep_seconds": 0.754388,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-01_desc-brain_mask_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.6193781960755587,
+   "larmorx_seconds": 0.6292669512331486,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-01_desc-brain_mask_trans.nii.gz",
@@ -6538,9 +6538,9 @@
      }
     }
    ],
-   "container_seconds": 0.9410269260406494,
+   "container_seconds": 0.8889350891113281,
    "status": "identical",
-   "harness_seconds": 1.8821413796395063
+   "harness_seconds": 1.7553812582045794
   },
   {
    "stage": "F08",
@@ -6555,7 +6555,7 @@
    "fmriprep_seconds": 0.549095,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.16194856353104115,
+   "larmorx_seconds": 0.14990808628499508,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref_trans.nii.gz",
@@ -6761,9 +6761,9 @@
      }
     }
    ],
-   "container_seconds": 0.7967696189880371,
+   "container_seconds": 0.753659725189209,
    "status": "known-divergence",
-   "harness_seconds": 1.4292046818882227
+   "harness_seconds": 3.5220869053155184
   },
   {
    "stage": "F08",
@@ -6778,7 +6778,7 @@
    "fmriprep_seconds": 0.713284,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-02_desc-brain_mask_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.6771041955798864,
+   "larmorx_seconds": 0.7176991514861584,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-02_desc-brain_mask_trans.nii.gz",
@@ -6842,9 +6842,9 @@
      }
     }
    ],
-   "container_seconds": 0.9805309772491455,
+   "container_seconds": 0.9329204559326172,
    "status": "identical",
-   "harness_seconds": 1.9195761680603027
+   "harness_seconds": 1.8943035826086998
   },
   {
    "stage": "F08",
@@ -6859,7 +6859,7 @@
    "fmriprep_seconds": 0.518151,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14060412347316742,
+   "larmorx_seconds": 0.14958328567445278,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref_trans.nii.gz",
@@ -7065,9 +7065,9 @@
      }
     }
    ],
-   "container_seconds": 0.7214813232421875,
+   "container_seconds": 0.7963213920593262,
    "status": "known-divergence",
-   "harness_seconds": 1.2568367086350918
+   "harness_seconds": 3.6345183197408915
   },
   {
    "stage": "F08",
@@ -7082,7 +7082,7 @@
    "fmriprep_seconds": 0.723671,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-03_desc-brain_mask_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.6870543397963047,
+   "larmorx_seconds": 0.6772798672318459,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-03_desc-brain_mask_trans.nii.gz",
@@ -7146,9 +7146,9 @@
      }
     }
    ],
-   "container_seconds": 0.9042990207672119,
+   "container_seconds": 0.9456133842468262,
    "status": "identical",
-   "harness_seconds": 1.8274597059935331
+   "harness_seconds": 1.8636737130582333
   },
   {
    "stage": "F08",
@@ -7163,7 +7163,7 @@
    "fmriprep_seconds": 0.774499,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_anat_wf/gen_ref/sub-01_desc-preproc_T1w_reference.nii.gz --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.14500722289085388,
+   "larmorx_seconds": 0.1474989652633667,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref_trans.nii.gz",
@@ -7369,9 +7369,9 @@
      }
     }
    ],
-   "container_seconds": 0.7016856670379639,
+   "container_seconds": 0.7114372253417969,
    "status": "known-divergence",
-   "harness_seconds": 1.2862293664366007
+   "harness_seconds": 3.532020105049014
   },
   {
    "stage": "F09",
@@ -7387,7 +7387,7 @@
    "fmriprep_seconds": 6.485713,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-01_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 6.809947332367301,
+   "larmorx_seconds": 6.846232460811734,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-01_desc-brain_mask_trans.nii.gz",
@@ -7451,9 +7451,9 @@
      }
     }
    ],
-   "container_seconds": 5.538045406341553,
+   "container_seconds": 5.816856861114502,
    "status": "identical",
-   "harness_seconds": 12.909747583791614
+   "harness_seconds": 13.212333787232637
   },
   {
    "stage": "F09",
@@ -7469,7 +7469,7 @@
    "fmriprep_seconds": 5.030996,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.6515087485313416,
+   "larmorx_seconds": 1.4610180631279945,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref_trans.nii.gz",
@@ -7675,9 +7675,9 @@
      }
     }
    ],
-   "container_seconds": 4.420417785644531,
+   "container_seconds": 4.3965253829956055,
    "status": "known-divergence",
-   "harness_seconds": 8.046012060716748
+   "harness_seconds": 26.429377049207687
   },
   {
    "stage": "F09",
@@ -7693,7 +7693,7 @@
    "fmriprep_seconds": 7.207941,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-02_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 7.106854783371091,
+   "larmorx_seconds": 6.762401783838868,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-02_desc-brain_mask_trans.nii.gz",
@@ -7757,9 +7757,9 @@
      }
     }
    ],
-   "container_seconds": 5.8025243282318115,
+   "container_seconds": 5.548434495925903,
    "status": "identical",
-   "harness_seconds": 13.52752318046987
+   "harness_seconds": 12.859111296012998
   },
   {
    "stage": "F09",
@@ -7775,7 +7775,7 @@
    "fmriprep_seconds": 5.790678,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.607687609270215,
+   "larmorx_seconds": 1.5835317522287369,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref_trans.nii.gz",
@@ -7981,9 +7981,9 @@
      }
     }
    ],
-   "container_seconds": 4.362639904022217,
+   "container_seconds": 4.547166585922241,
    "status": "known-divergence",
-   "harness_seconds": 8.00115306302905
+   "harness_seconds": 27.290769331157207
   },
   {
    "stage": "F09",
@@ -7999,7 +7999,7 @@
    "fmriprep_seconds": 6.201153,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_task-mixedgamblestask_run-03_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 7.1520740650594234,
+   "larmorx_seconds": 7.096233913674951,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-03_desc-brain_mask_trans.nii.gz",
@@ -8063,9 +8063,9 @@
      }
     }
    ],
-   "container_seconds": 5.671408653259277,
+   "container_seconds": 5.619498252868652,
    "status": "identical",
-   "harness_seconds": 13.375551780685782
+   "harness_seconds": 13.276484342291951
   },
   {
    "stage": "F09",
@@ -8081,7 +8081,7 @@
    "fmriprep_seconds": 5.024214,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-01/anat/sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.6273095570504665,
+   "larmorx_seconds": 1.5145618356764317,
    "outputs": [
     {
      "output": "sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref_trans.nii.gz",
@@ -8287,9 +8287,9 @@
      }
     }
    ],
-   "container_seconds": 4.391150712966919,
+   "container_seconds": 4.5218846797943115,
    "status": "known-divergence",
-   "harness_seconds": 8.112725215032697
+   "harness_seconds": 26.886630702763796
   },
   {
    "stage": "F10",
@@ -8305,7 +8305,7 @@
    "fmriprep_seconds": 0.445494,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-01_label-CSF_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.2635217718780041,
+   "larmorx_seconds": 0.25969170592725277,
    "outputs": [
     {
      "output": "sub-01_label-CSF_probseg_trans.nii.gz",
@@ -8470,9 +8470,9 @@
      }
     }
    ],
-   "container_seconds": 0.6802382469177246,
+   "container_seconds": 0.6561434268951416,
    "status": "explained",
-   "harness_seconds": 1.4668274465948343
+   "harness_seconds": 2.813981855288148
   },
   {
    "stage": "F10",
@@ -8488,7 +8488,7 @@
    "fmriprep_seconds": 0.432944,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_confounds_wf/acc_masks/acompcor_wm.nii.gz --interpolation Gaussian --output acompcor_wm_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.2865449860692024,
+   "larmorx_seconds": 0.23977253586053848,
    "outputs": [
     {
      "output": "acompcor_wm_trans.nii.gz",
@@ -8653,9 +8653,9 @@
      }
     }
    ],
-   "container_seconds": 0.688427209854126,
+   "container_seconds": 0.6156821250915527,
    "status": "explained",
-   "harness_seconds": 1.3577656038105488
+   "harness_seconds": 2.8152158316224813
   },
   {
    "stage": "F10",
@@ -8671,7 +8671,7 @@
    "fmriprep_seconds": 0.394329,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_confounds_wf/acc_masks/acompcor_wmcsf.nii.gz --interpolation Gaussian --output acompcor_wmcsf_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.2363196574151516,
+   "larmorx_seconds": 0.2785803619772196,
    "outputs": [
     {
      "output": "acompcor_wmcsf_trans.nii.gz",
@@ -8836,9 +8836,9 @@
      }
     }
    ],
-   "container_seconds": 0.6372339725494385,
+   "container_seconds": 0.6044280529022217,
    "status": "explained",
-   "harness_seconds": 1.2615474052727222
+   "harness_seconds": 2.7388319093734026
   },
   {
    "stage": "F10",
@@ -8853,7 +8853,7 @@
    "fmriprep_seconds": 0.962488,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_desc-brain_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.9417097996920347,
+   "larmorx_seconds": 0.936865471303463,
    "outputs": [
     {
      "output": "sub-01_desc-brain_mask_trans.nii.gz",
@@ -8897,9 +8897,9 @@
      }
     }
    ],
-   "container_seconds": 1.047530174255371,
+   "container_seconds": 1.0724191665649414,
    "status": "identical",
-   "harness_seconds": 2.246069621294737
+   "harness_seconds": 2.299229245632887
   },
   {
    "stage": "F10",
@@ -8915,7 +8915,7 @@
    "fmriprep_seconds": 0.472423,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-01_label-CSF_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.23547950387001038,
+   "larmorx_seconds": 0.2844094019383192,
    "outputs": [
     {
      "output": "sub-01_label-CSF_probseg_trans.nii.gz",
@@ -9080,9 +9080,9 @@
      }
     }
    ],
-   "container_seconds": 0.6793947219848633,
+   "container_seconds": 0.6688086986541748,
    "status": "explained",
-   "harness_seconds": 1.3838347345590591
+   "harness_seconds": 2.9396340753883123
   },
   {
    "stage": "F10",
@@ -9098,7 +9098,7 @@
    "fmriprep_seconds": 0.373714,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_confounds_wf/acc_masks/acompcor_wm.nii.gz --interpolation Gaussian --output acompcor_wm_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.24380983226001263,
+   "larmorx_seconds": 0.2784885764122009,
    "outputs": [
     {
      "output": "acompcor_wm_trans.nii.gz",
@@ -9263,9 +9263,9 @@
      }
     }
    ],
-   "container_seconds": 0.6376535892486572,
+   "container_seconds": 0.6651723384857178,
    "status": "explained",
-   "harness_seconds": 1.233512382954359
+   "harness_seconds": 2.9877656679600477
   },
   {
    "stage": "F10",
@@ -9281,7 +9281,7 @@
    "fmriprep_seconds": 0.405094,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_confounds_wf/acc_masks/acompcor_wmcsf.nii.gz --interpolation Gaussian --output acompcor_wmcsf_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.26166950911283493,
+   "larmorx_seconds": 0.2603503651916981,
    "outputs": [
     {
      "output": "acompcor_wmcsf_trans.nii.gz",
@@ -9446,9 +9446,9 @@
      }
     }
    ],
-   "container_seconds": 0.6855077743530273,
+   "container_seconds": 0.6528494358062744,
    "status": "explained",
-   "harness_seconds": 1.3495351485908031
+   "harness_seconds": 2.83098634891212
   },
   {
    "stage": "F10",
@@ -9463,7 +9463,7 @@
    "fmriprep_seconds": 0.8806,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_desc-brain_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.8890527207404375,
+   "larmorx_seconds": 1.0122472010552883,
    "outputs": [
     {
      "output": "sub-01_desc-brain_mask_trans.nii.gz",
@@ -9507,9 +9507,9 @@
      }
     }
    ],
-   "container_seconds": 1.0341689586639404,
+   "container_seconds": 1.0862903594970703,
    "status": "identical",
-   "harness_seconds": 2.185449754819274
+   "harness_seconds": 2.356470385566354
   },
   {
    "stage": "F10",
@@ -9525,7 +9525,7 @@
    "fmriprep_seconds": 0.434244,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-01_label-CSF_probseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.23041128367185593,
+   "larmorx_seconds": 0.2608665134757757,
    "outputs": [
     {
      "output": "sub-01_label-CSF_probseg_trans.nii.gz",
@@ -9690,9 +9690,9 @@
      }
     }
    ],
-   "container_seconds": 0.7069394588470459,
+   "container_seconds": 0.6542572975158691,
    "status": "explained",
-   "harness_seconds": 1.36296665109694
+   "harness_seconds": 3.191301940008998
   },
   {
    "stage": "F10",
@@ -9708,7 +9708,7 @@
    "fmriprep_seconds": 0.433772,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_confounds_wf/acc_masks/acompcor_wm.nii.gz --interpolation Gaussian --output acompcor_wm_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.2336037065833807,
+   "larmorx_seconds": 0.2762026283890009,
    "outputs": [
     {
      "output": "acompcor_wm_trans.nii.gz",
@@ -9873,9 +9873,9 @@
      }
     }
    ],
-   "container_seconds": 0.6252038478851318,
+   "container_seconds": 0.6426346302032471,
    "status": "explained",
-   "harness_seconds": 1.231671905145049
+   "harness_seconds": 2.669741813093424
   },
   {
    "stage": "F10",
@@ -9891,7 +9891,7 @@
    "fmriprep_seconds": 0.434301,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_confounds_wf/acc_masks/acompcor_wmcsf.nii.gz --interpolation Gaussian --output acompcor_wmcsf_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.24588564410805702,
+   "larmorx_seconds": 0.24751576781272888,
    "outputs": [
     {
      "output": "acompcor_wmcsf_trans.nii.gz",
@@ -10056,9 +10056,9 @@
      }
     }
    ],
-   "container_seconds": 0.6706786155700684,
+   "container_seconds": 0.6526308059692383,
    "status": "explained",
-   "harness_seconds": 1.3317745011299849
+   "harness_seconds": 2.741668462753296
   },
   {
    "stage": "F10",
@@ -10073,7 +10073,7 @@
    "fmriprep_seconds": 0.790108,
    "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-01/anat/sub-01_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-01_desc-brain_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.9170122724026442,
+   "larmorx_seconds": 1.0440725646913052,
    "outputs": [
     {
      "output": "sub-01_desc-brain_mask_trans.nii.gz",
@@ -10117,9 +10117,9 @@
      }
     }
    ],
-   "container_seconds": 1.1437268257141113,
+   "container_seconds": 1.1189055442810059,
    "status": "identical",
-   "harness_seconds": 2.286449324339628
+   "harness_seconds": 2.4122860059142113
   },
   {
    "stage": "F11",
@@ -10134,7 +10134,7 @@
    "fmriprep_seconds": 1.922133,
    "command": "antsApplyTransforms -u int --default-value 0 --dimensionality 3 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg.nii.gz --interpolation MultiLabel --output tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ] --transform /out/sub-01/anat/sub-01_from-MNI152NLin2009cAsym_to-T1w_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.8767035473138094,
+   "larmorx_seconds": 1.5757010038942099,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz",
@@ -10414,9 +10414,9 @@
      }
     }
    ],
-   "container_seconds": 1.9388914108276367,
+   "container_seconds": 2.0025227069854736,
    "status": "identical",
-   "harness_seconds": 4.0850222408771515
+   "harness_seconds": 3.8798959217965603
   },
   {
    "stage": "F11",
@@ -10431,7 +10431,7 @@
    "fmriprep_seconds": 2.421419,
    "command": "antsApplyTransforms -u int --default-value 0 --dimensionality 3 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg.nii.gz --interpolation MultiLabel --output tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ] --transform /out/sub-01/anat/sub-01_from-MNI152NLin2009cAsym_to-T1w_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.5923017840832472,
+   "larmorx_seconds": 1.6637948527932167,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz",
@@ -10711,9 +10711,9 @@
      }
     }
    ],
-   "container_seconds": 1.910414695739746,
+   "container_seconds": 2.0077295303344727,
    "status": "identical",
-   "harness_seconds": 3.749764174222946
+   "harness_seconds": 4.009210089221597
   },
   {
    "stage": "F11",
@@ -10728,7 +10728,7 @@
    "fmriprep_seconds": 2.173701,
    "command": "antsApplyTransforms -u int --default-value 0 --dimensionality 3 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg.nii.gz --interpolation MultiLabel --output tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-brain_mask.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ] --transform /out/sub-01/anat/sub-01_from-MNI152NLin2009cAsym_to-T1w_mode-image_xfm.h5",
    "larmorx_threads": 1,
-   "larmorx_seconds": 1.5593282263725996,
+   "larmorx_seconds": 1.7789014484733343,
    "outputs": [
     {
      "output": "tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz",
@@ -11008,9 +11008,9 @@
      }
     }
    ],
-   "container_seconds": 1.984647274017334,
+   "container_seconds": 2.588117837905884,
    "status": "identical",
-   "harness_seconds": 3.812872154638171
+   "harness_seconds": 4.777992310002446
   },
   {
    "stage": "F12",
@@ -11025,7 +11025,7 @@
    "fmriprep_seconds": 0.285396,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/func_fit_reports_wf/t1w_wm/sub-01_dseg_mask.nii.gz --interpolation NearestNeighbor --output sub-01_dseg_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.013139080256223679,
+   "larmorx_seconds": 0.0394515972584486,
    "outputs": [
     {
      "output": "sub-01_dseg_mask_trans.nii.gz",
@@ -11069,9 +11069,9 @@
      }
     }
    ],
-   "container_seconds": 0.4850881099700928,
+   "container_seconds": 0.6520028114318848,
    "status": "identical",
-   "harness_seconds": 0.747075755149126
+   "harness_seconds": 1.048273140564561
   },
   {
    "stage": "F12",
@@ -11086,7 +11086,7 @@
    "fmriprep_seconds": 0.817273,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-01_desc-preproc_T1w_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-01_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.25130591355264187,
+   "larmorx_seconds": 0.3180778305977583,
    "outputs": [
     {
      "output": "sub-01_desc-preproc_T1w_trans.nii.gz",
@@ -11269,9 +11269,9 @@
      }
     }
    ],
-   "container_seconds": 0.8527140617370605,
+   "container_seconds": 1.179734230041504,
    "status": "known-divergence",
-   "harness_seconds": 1.6143339425325394
+   "harness_seconds": 6.053632028400898
   },
   {
    "stage": "F12",
@@ -11286,7 +11286,7 @@
    "fmriprep_seconds": 0.235288,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/func_fit_reports_wf/t1w_wm/sub-01_dseg_mask.nii.gz --interpolation NearestNeighbor --output sub-01_dseg_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.026809856295585632,
+   "larmorx_seconds": 0.11750393360853195,
    "outputs": [
     {
      "output": "sub-01_dseg_mask_trans.nii.gz",
@@ -11330,9 +11330,9 @@
      }
     }
    ],
-   "container_seconds": 0.6029367446899414,
+   "container_seconds": 0.5982339382171631,
    "status": "identical",
-   "harness_seconds": 0.9122386090457439
+   "harness_seconds": 1.0565490517765284
   },
   {
    "stage": "F12",
@@ -11347,7 +11347,7 @@
    "fmriprep_seconds": 0.675979,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-01_desc-preproc_T1w_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-02_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.2341060247272253,
+   "larmorx_seconds": 0.35279334895312786,
    "outputs": [
     {
      "output": "sub-01_desc-preproc_T1w_trans.nii.gz",
@@ -11530,9 +11530,9 @@
      }
     }
    ],
-   "container_seconds": 0.886772632598877,
+   "container_seconds": 1.0756056308746338,
    "status": "known-divergence",
-   "harness_seconds": 1.632075721397996
+   "harness_seconds": 6.107775928452611
   },
   {
    "stage": "F12",
@@ -11547,7 +11547,7 @@
    "fmriprep_seconds": 0.250672,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 0 --input /work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/func_fit_reports_wf/t1w_wm/sub-01_dseg_mask.nii.gz --interpolation NearestNeighbor --output sub-01_dseg_mask_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.03287130035459995,
+   "larmorx_seconds": 0.06381233967840672,
    "outputs": [
     {
      "output": "sub-01_dseg_mask_trans.nii.gz",
@@ -11591,9 +11591,9 @@
      }
     }
    ],
-   "container_seconds": 0.5433971881866455,
+   "container_seconds": 0.6823935508728027,
    "status": "identical",
-   "harness_seconds": 0.8515340927988291
+   "harness_seconds": 1.1584435757249594
   },
   {
    "stage": "F12",
@@ -11608,7 +11608,7 @@
    "fmriprep_seconds": 0.626919,
    "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-01_desc-preproc_T1w_trans.nii.gz --reference-image /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-coreg_boldref.nii.gz --transform [ /out/sub-01/func/sub-01_task-mixedgamblestask_run-03_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
    "larmorx_threads": 1,
-   "larmorx_seconds": 0.24308217875659466,
+   "larmorx_seconds": 0.4355526901781559,
    "outputs": [
     {
      "output": "sub-01_desc-preproc_T1w_trans.nii.gz",
@@ -11791,9 +11791,9 @@
      }
     }
    ],
-   "container_seconds": 0.9272751808166504,
+   "container_seconds": 1.2254412174224854,
    "status": "known-divergence",
-   "harness_seconds": 1.721898663789034
+   "harness_seconds": 6.698172252625227
   }
  ],
  "missing": {

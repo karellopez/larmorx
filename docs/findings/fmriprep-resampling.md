@@ -99,6 +99,11 @@ undisplaced. *Verified* (ds000005 sub-01, fMRIPrep 21.0.1's warp).
 **Composite `.h5` files are read in reverse.** nitransforms inserts each transform of
 `TransformGroup` at the front of the chain (`manip.py:236-240`), so the last one ITK applies
 first comes first; it iterates the group in h5py's name order. *Read*.
+*Added 2026-10-11:* that order is `list(h5group.values())[1:]` (`io/itk.py:391`), in which
+`"10"` sorts before `"2"`, so a composite of 11 or more transforms would be misordered.
+*Read*, not verified with such a file; fMRIPrep's composites have 2 or 3 transforms.
+`lx.transforms.load_transforms` reproduces it (`chain.py:348`); `lx.transforms.read` sorts
+the groups numerically ([upstream-defects.md](upstream-defects.md), PIPE-04).
 
 **Threads.** `resample_series` runs one `resample_vol` per volume through asyncio with a
 semaphore of `nthreads` (`resampling.py:396-425`); SciPy releases the GIL, so volumes do run

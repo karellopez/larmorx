@@ -86,7 +86,9 @@ reversed, and it is consistent with the mapping `affine(warp(x))`. *Verified*
 
 **ITK's HDF5 writer stores object modification times**, so writing the same transform twice
 gives different bytes and only the datasets are reproducible. The test-data generator
-therefore compares `.h5` files by their datasets. *Verified.*
+therefore compares `.h5` files by their datasets. *Verified.* larmorx's writer
+(`lx.transforms.write`) gives the same bytes every time: two writes of one transform 1.5 s
+apart are identical (*verified* 2026-10-11).
 
 **ANTs reads `.h5` composites written by larmorx.** `lx.transforms.write` uses ITK's layout:
 - variable-length ASCII `TransformType` strings;

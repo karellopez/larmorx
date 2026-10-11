@@ -251,6 +251,7 @@ impl SeriesResampler {
             parallel,
         )?;
         let axis = d.pe.axis;
+        let single = n == 1;
         let run = |start: usize, chunk: &mut [O]| {
             // Small blocks: the moved coordinates and the interpolated doubles stay in cache.
             const BLOCK: usize = 256;
@@ -263,6 +264,7 @@ impl SeriesResampler {
                 let vals = &mut vals[..block.len()];
                 for ((p, c), v) in pts.iter_mut().zip(&self.coords[s..e]).zip(&d.vsm[s..e]) {
                     *p = match hmc {
+                        Some(h) if single => apply_affine_single(h, *c),
                         Some(h) => apply_affine(h, *c),
                         None => *c,
                     };
@@ -384,14 +386,25 @@ impl SeriesResampler {
 }
 
 /// nibabel's `apply_affine(h, p)` for one point, as numpy evaluates `pts @ rzs.T + trans`:
-/// the 3×3 product with fused multiply-adds (BLAS), then the translation.
+/// the 3×3 product with fused multiply-adds as OpenBLAS's Haswell `dgemm` computes it (stored
+/// as `acc + 0`, so an exact zero is +0; [`crate::openblas`]), then the translation.
 #[inline(always)]
 pub fn apply_affine(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|r| {
         let s = p[0] * h[r][0];
         let s = p[1].mul_add(h[r][1], s);
         let s = p[2].mul_add(h[r][2], s);
-        s + h[r][3]
+        (s + 0.0) + h[r][3]
+    })
+}
+
+/// [`apply_affine`] when the target grid has a single voxel: numpy's `matmul` then hands
+/// `(1, 3) @ (3, 3)` to `dgemv`, whose Haswell `dgemv_t` tail GCC compiled with contractions,
+/// `fma(h2, z, fma(h0, x, h1·y))`, added to a `y` cleared to +0; then the translation.
+#[inline(always)]
+pub fn apply_affine_single(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|r| {
+        (h[r][2].mul_add(p[2], h[r][0].mul_add(p[0], h[r][1] * p[1])) + 0.0) + h[r][3]
     })
 }
 

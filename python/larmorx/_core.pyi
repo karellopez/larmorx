@@ -159,6 +159,17 @@ def ndimage_prepared_coefficients(
 
 Step = tuple[Any, ...]  # ("affine", 4x4) or ("field", deltas (x, y, z, 3), affine, inverse)
 
+def linalg_matmul4(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """``a[t] @ b[t]`` for two ``(n, 4, 4)`` float64 stacks, in the operation order of numpy's
+    OpenBLAS Haswell ``dgemm``."""
+
+def linalg_inv4(a: np.ndarray) -> tuple[np.ndarray, bool]:
+    """``np.linalg.inv`` of an ``(n, 4, 4)`` float64 stack as OpenBLAS's ``dgesv`` computes it;
+    NaN for singular matrices, and whether any was singular."""
+
+def linalg_closest_orthogonal(rs: np.ndarray) -> np.ndarray:
+    """nibabel's ``io_orientation`` polar step for a 3×3 matrix (vnl's SVD)."""
+
 def nitransforms_ndcoords(shape: list[int], affine: np.ndarray) -> np.ndarray:
     """``ImageGrid.ndcoords``: ``(x, y, z, 3)`` float64 RAS+ coordinates of every voxel."""
 

@@ -12,15 +12,16 @@
 //!   (and before a displacement field's index lookup), so every step starts from float32
 //!   coordinates; outputs are float64.
 //! - **The product.** numpy evaluates `affine.dot(points)` with BLAS `dgemm`, which on x86-64
-//!   (OpenBLAS's Haswell kernel) and aarch64 accumulates with fused multiply-adds:
-//!   `fma(a3, 1, fma(a2, z, fma(a1, y, a0·x)))`. [`dot_row`] does exactly that.
+//!   with FMA (OpenBLAS's Haswell kernel) accumulates with fused multiply-adds from +0 and
+//!   stores `acc + 0`: `fma(a3, 1, fma(a2, z, fma(a1, y, a0·x))) + 0`. [`dot_row`] does exactly
+//!   that, on every platform ([`crate::openblas`]).
 //! - **Displacement fields.** A point is looked up when *every* point lies within 1e-3 voxel
 //!   of a grid node; otherwise each component is interpolated with SciPy's cubic
 //!   `map_coordinates` (mode `constant`, `cval` NaN) and NaN components (outside the field)
 //!   fall back to the input point (no displacement).
 //!
 //! The 4×4 matrices themselves (inverses, products, ITK-to-RAS conversions) are computed by
-//! the caller, e.g. with numpy as nitransforms does (`larmorx.transforms`).
+//! the caller with nitransforms' expressions, through [`crate::openblas`] (`larmorx.transforms`).
 //!
 //! nitransforms: Copyright (c) 2021 The NiPy developers (MIT License).
 //!
@@ -40,7 +41,8 @@
 //! OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //! DEALINGS IN THE SOFTWARE.
 
-use larmorx_core::linalg::Mat4;
+use larmorx_core::linalg::{Mat3, Mat4};
+use larmorx_core::vnl_svd::vnl_svd;
 use larmorx_interp::ndimage::{Mode, Spline};
 use rayon::prelude::*;
 
@@ -51,19 +53,39 @@ const CHUNK: usize = 8192;
 
 /// Row `r` of `m` times the homogeneous point `(p, 1)`, accumulated as numpy's BLAS does:
 /// `fma(m[r][2], p2, fma(m[r][1], p1, m[r][0]·p0)) + m[r][3]` (the last term's product with 1
-/// is exact, so the final fused step is a plain addition).
+/// is exact, so the final fused step is a plain addition), then `+ 0`: `dgemm` adds its result
+/// to a C cleared to +0, so an exact zero is +0 (starting the chain from +0 instead of the
+/// first product changes only the sign of a zero, which that addition settles).
 #[inline(always)]
 pub fn dot_row(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
     let s = m[r][0] * p[0];
     let s = m[r][1].mul_add(p[1], s);
     let s = m[r][2].mul_add(p[2], s);
-    s + m[r][3]
+    (s + m[r][3]) + 0.0
 }
 
-/// `_apply_affine(p, m, 3)` for one point that is already float32-valued.
+/// [`dot_row`] when only one point is mapped: numpy then multiplies the matrix by the point
+/// with `dgemv` instead of `dgemm`, and OpenBLAS's Haswell `dgemv_t` kernel multiplies the four
+/// terms in the lanes of one register and adds them pairwise, `(m0·x + m2·z) + (m1·y + m3)`,
+/// into a `y` cleared to +0 (`dgemv_t_microk_haswell-4.c`).
 #[inline(always)]
-fn apply(m: &Mat4, p: [f64; 3]) -> [f64; 3] {
-    [dot_row(m, 0, p), dot_row(m, 1, p), dot_row(m, 2, p)]
+pub fn dot_row_single(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
+    ((m[r][0] * p[0] + m[r][2] * p[2]) + (m[r][1] * p[1] + m[r][3])) + 0.0
+}
+
+/// `_apply_affine(p, m, 3)` for one point that is already float32-valued, out of `n` points
+/// mapped together (numpy's product differs for a single point: [`dot_row_single`]).
+#[inline(always)]
+fn apply(m: &Mat4, p: [f64; 3], n: usize) -> [f64; 3] {
+    if n == 1 {
+        [
+            dot_row_single(m, 0, p),
+            dot_row_single(m, 1, p),
+            dot_row_single(m, 2, p),
+        ]
+    } else {
+        [dot_row(m, 0, p), dot_row(m, 1, p), dot_row(m, 2, p)]
+    }
 }
 
 /// A point rounded to float32, as `_as_homogeneous` does.
@@ -78,7 +100,8 @@ pub fn to_f32(p: [f64; 3]) -> [f64; 3] {
 /// voxels per axis.
 pub fn ndcoords(shape: [usize; 3], affine: &Mat4) -> Vec<[f64; 3]> {
     let [nx, ny, nz] = shape;
-    let mut out = vec![[0.0f64; 3]; nx * ny * nz];
+    let n = nx * ny * nz;
+    let mut out = vec![[0.0f64; 3]; n];
     if out.is_empty() {
         return out;
     }
@@ -88,7 +111,7 @@ pub fn ndcoords(shape: [usize; 3], affine: &Mat4) -> Vec<[f64; 3]> {
             for j in 0..ny {
                 for i in 0..nx {
                     let p = to_f32([i as f64, j as f64, k as f64]);
-                    plane[i + nx * j] = apply(affine, p);
+                    plane[i + nx * j] = apply(affine, p, n);
                 }
             }
         });
@@ -97,9 +120,10 @@ pub fn ndcoords(shape: [usize; 3], affine: &Mat4) -> Vec<[f64; 3]> {
 
 /// `Affine(matrix).map(points)`: every point rounded to float32, then multiplied.
 pub fn affine_map(matrix: &Mat4, points: &mut [[f64; 3]]) {
+    let n = points.len();
     points.par_chunks_mut(CHUNK).for_each(|chunk| {
         for p in chunk {
-            *p = apply(matrix, to_f32(*p));
+            *p = apply(matrix, to_f32(*p), n);
         }
     });
 }
@@ -171,9 +195,10 @@ impl DenseField {
     /// `DenseFieldTransform.map(points)`, in place.
     pub fn map(&self, points: &mut [[f64; 3]]) -> Result<(), TransformError> {
         // ijk = self.reference.index(np.array(x, dtype="float32"))
+        let n = points.len();
         let ijk: Vec<[f64; 3]> = points
             .par_iter()
-            .map(|p| apply(&self.inverse, to_f32(*p)))
+            .map(|p| apply(&self.inverse, to_f32(*p), n))
             .collect();
         let on_grid = ijk.par_iter().all(|q| {
             let d = q.map(|v| v - v.round_ties_even());
@@ -246,6 +271,33 @@ impl DenseField {
     }
 }
 
+/// The orthogonal matrix closest to `rs`, as nibabel's `io_orientation` computes it
+/// (`nibabel/orientations.py`, nibabel 5.4.2, MIT): `P[:, keep] @ Qs[keep]` from the SVD
+/// `rs = P · diag(S) · Qs`, dropping singular values at or below `max(S) · 3 · eps`. nibabel
+/// takes the SVD from numpy (LAPACK `dgesdd`), whose last bits depend on the BLAS and the CPU;
+/// here it is vnl's LINPACK SVD ([`larmorx_core::vnl_svd::vnl_svd`]) and a fused product in
+/// index order, the same on every platform. Only the axis decisions of `io_orientation` (which
+/// world axis is closest to each voxel axis, and its sign) depend on the result, and they agree
+/// with numpy's whenever two candidate cosines are not within rounding of each other
+/// (`docs/findings/numpy-blas.md`). `None` if the SVD does not converge.
+pub fn closest_orthogonal(rs: &Mat3) -> Option<Mat3> {
+    let flat: Vec<f64> = rs.iter().flatten().copied().collect();
+    let (u, w, v) = vnl_svd(&flat, 3, 3)?;
+    let max = w.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let tol = max * 3.0 * f64::EPSILON;
+    let keep: Vec<usize> = (0..3).filter(|&k| w[k] > tol).collect();
+    // Column-major U and V: U(i, k) = u[i + 3k]; Qs = Vᵀ, so Qs(k, j) = v[j + 3k].
+    Some(std::array::from_fn(|i| {
+        std::array::from_fn(|j| {
+            let mut acc = 0.0f64;
+            for &k in &keep {
+                acc = u[i + 3 * k].mul_add(v[j + 3 * k], acc);
+            }
+            acc + 0.0
+        })
+    }))
+}
+
 /// One step of a nitransforms chain.
 #[derive(Clone, Debug)]
 pub enum Step {
@@ -289,6 +341,33 @@ mod tests {
             AFF[2][2].mul_add(4.0, AFF[2][1].mul_add(3.0, AFF[2][0] * 2.0)) + AFF[2][3],
         ];
         assert_eq!(p, expected);
+        // An exact zero is +0, as dgemm stores it, even from -0 terms.
+        let mut m = AFF;
+        m[0] = [-1.0, 0.0, 0.0, -0.0];
+        assert_eq!(dot_row(&m, 0, [0.0, -0.0, 0.0]).to_bits(), 0.0f64.to_bits());
+    }
+
+    #[test]
+    fn closest_orthogonal_is_the_polar_factor() {
+        // A rotation with rational cosines (3-4-5) and an axis flip is its own polar factor.
+        let rot: Mat3 = [[0.6, -0.8, 0.0], [0.8, 0.6, 0.0], [0.0, 0.0, -1.0]];
+        let r = closest_orthogonal(&rot).unwrap();
+        for (a, b) in r.iter().flatten().zip(rot.iter().flatten()) {
+            assert!((a - b).abs() < 1e-15, "{r:?}");
+        }
+        // A sheared matrix: the result is orthogonal.
+        let sheared: Mat3 = [[1.0, 0.3, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let r = closest_orthogonal(&sheared).unwrap();
+        for i in 0..3 {
+            for j in 0..3 {
+                let d: f64 = (0..3).map(|k| r[k][i] * r[k][j]).sum();
+                assert!((d - f64::from(u8::from(i == j))).abs() < 1e-14);
+            }
+        }
+        // Rank 2: the dropped singular value leaves a zero row and column.
+        let flat: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]];
+        let r = closest_orthogonal(&flat).unwrap();
+        assert!(r[2].iter().all(|v| v.abs() < 1e-15) && (r[0][0] - 1.0).abs() < 1e-15);
     }
 
     #[test]
@@ -296,7 +375,7 @@ mod tests {
         let mut pts = [[0.1f64, 0.2, 0.3]];
         affine_map(&AFF, &mut pts);
         let x = to_f32([0.1, 0.2, 0.3]);
-        assert_eq!(pts[0], apply(&AFF, x));
+        assert_eq!(pts[0], apply(&AFF, x, 1));
         assert_ne!(x, [0.1, 0.2, 0.3]);
     }
 

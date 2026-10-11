@@ -9,11 +9,14 @@
 //! Two modules follow other conventions: [`nitransforms`] maps **RAS** points as nitransforms
 //! does (fMRIPrep's transforms), and [`resample_series`] is fMRIPrep's one-shot BOLD resampler
 //! built on it and on SciPy-compatible interpolation (`larmorx_interp::ndimage`).
+//! [`openblas`] computes the 4×4 matrix products and inverses they need as numpy does with
+//! OpenBLAS's Haswell kernels, in a fixed order, so they are the same on every platform.
 #![forbid(unsafe_code)]
 
 pub mod field;
 pub mod linear;
 pub mod nitransforms;
+pub mod openblas;
 pub mod resample_series;
 
 pub use field::{DisplacementField, FieldData};

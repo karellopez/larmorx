@@ -349,6 +349,17 @@ Plain-language summary of these and the earlier decisions: [overview.md](overvie
   - Cost: `lx.afni.tshift` with the replica takes at most 15 ms longer than running its
     program by hand (`docs/api/afni-tshift.md`).
 
+## 2026-10-11: ANTs tools before the pipeline; Docker for fMRIPrep oracles
+- **User decision: port more ANTs tools before starting larmorprepx** (alternatives offered:
+  the M1 pipeline with ANTsPy as an interim backend, or the mcflirt replica). Order: A3
+  (N4BiasFieldCorrection, DenoiseImage), then A4 (linear registration, antsAI,
+  antsAffineInitializer, with the shrink filter and histogram matching left over from A2),
+  then A5 (SyN). The pipeline then needs less of ANTsPy.
+- **User decision: the user installs Docker** on the Linux machine, so that current fMRIPrep
+  can run as the pipeline-level oracle (PLAN.md §15 step 8, with exact image tags, seeds and
+  thread counts recorded). Until then, fMRIPrep 21.0.1's published ds000005 derivatives in
+  the test data are the only fMRIPrep reference.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -51,6 +51,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
   - the M1 "preview" milestone first
 - **D7 decided (2026-10-09): larmorx is not commercial.** FSL and MSM binaries may be run as validation oracles under their non-commercial licences.
 
+- **Next (user decision, 2026-10-11): more ANTs tools before the pipeline.** A3 (N4, DenoiseImage), then A4 (linear registration, antsAI, antsAffineInitializer, shrink, histogram matching), then A5 (SyN); larmorprepx after. The user is installing Docker for fMRIPrep oracle runs; until then, fMRIPrep 21.0.1's published ds000005 derivatives are the only fMRIPrep reference.
+
 ## The user's direction (settled; do not re-propose the alternatives)
 - **Not a fork of fMRIPrep.** No nipype, traits, niworkflows/smriprep/sdcflows runtime dependencies, or graph engines. Ops are plain typed functions; per-subject orchestration is readable Python.
 - **Port to Rust** where existing Python packages are limited, **including ANTs**: ANTsPy has no Linux-aarch64, Windows-arm64 or Python-3.14 wheels. Also **FreeSurfer recon-all**: the goal is the same results, several times faster.

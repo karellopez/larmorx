@@ -95,49 +95,24 @@ pub struct MaskRef<'a> {
     pub size: &'a [usize],
 }
 
-/// What [`adaptive_non_local_means`] returns besides the image (for inspection and tests).
+/// What [`adaptive_non_local_means`] returns.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AdaptiveNlmOutput {
     /// The denoised image.
     pub denoised: Vec<f32>,
-    /// The local mean and variance.
-    pub mean: Vec<f32>,
-    pub variance: Vec<f32>,
     /// The bias image after the correction (Rician model; empty otherwise).
     pub rician_bias: Vec<f32>,
 }
 
 /// The largest dimension handled.
 const MAXD: usize = 4;
+/// Centres computed side by side (the first axis): the lanes of [`Context::group`].
+const LANES: usize = 8;
 /// Flags of a centre.
 const CONTRIBUTES: u8 = 1;
 const WRITES_BIAS: u8 = 2;
 
-/// Everything the centres read.
-struct Context<'a> {
-    d: usize,
-    size: [usize; MAXD],
-    strides: [usize; MAXD],
-    input: &'a [f32],
-    mean: &'a [f32],
-    variance: &'a [f32],
-    /// `input − mean`.
-    diff: Vec<f32>,
-    /// The values averaged: `input²` (Rician) or `input`.
-    values: Vec<f32>,
-    /// Per voxel, the mean of `(input − mean)²` over its patch (step 2's distance).
-    patch_distance: Vec<f32>,
-    mask: Option<MaskRef<'a>>,
-    mask_strides: [usize; MAXD],
-    maximum: f32,
-    p: &'a AdaptiveNlmParameters,
-    search: Offsets,
-    patch: Offsets,
-    /// The search offset of the centre itself (`static_cast<unsigned>(0.5 · size)`).
-    search_centre: usize,
-}
-
-/// Neighbourhood offsets padded to [`MAXD`] axes.
+/// Neighbourhood offsets padded to [`MAXD`] axes, with their steps in memory for one layout.
 struct Offsets {
     steps: Vec<[isize; MAXD]>,
     linear: Vec<isize>,
@@ -164,257 +139,425 @@ impl Offsets {
     }
 }
 
-/// Per-thread scratch space of a centre.
+/// Everything the centres read.
+///
+/// The images are held **padded**: each axis gets the search and patch radii on both sides
+/// (and [`LANES`] more voxels at the end of the first axis), where `valid` is 0 and the values
+/// are 0. A centre then never needs coordinates: ITK's "is this voxel inside the image" tests
+/// become reads of `valid`, and groups of [`LANES`] centres can run past the end of a row.
+struct Context<'a> {
+    d: usize,
+    /// The image's size and strides.
+    size: [usize; MAXD],
+    /// The padding below each axis.
+    pad: [usize; MAXD],
+    /// The padded image's size and strides.
+    psize: [usize; MAXD],
+    pstrides: [usize; MAXD],
+    valid: Vec<u8>,
+    input: Vec<f32>,
+    mean: Vec<f32>,
+    variance: Vec<f32>,
+    /// `input − mean`.
+    diff: Vec<f32>,
+    /// The values averaged: `input²` (Rician) or `input`.
+    values: Vec<f32>,
+    /// Per voxel, the mean of `(input − mean)²` over its patch (step 2's distance).
+    patch_distance: Vec<f32>,
+    mask: Option<MaskRef<'a>>,
+    mask_strides: [usize; MAXD],
+    maximum: f32,
+    p: &'a AdaptiveNlmParameters,
+    /// The search and patch offsets in the padded layout.
+    search: Offsets,
+    patch: Offsets,
+    /// The patch offsets in the image's layout (for summing the outputs).
+    image_patch: Offsets,
+    /// The search offset of the centre itself (`static_cast<unsigned>(0.5 · size)`).
+    search_centre: usize,
+}
+
+/// The [`LANES`] values of `data` from `at`.
+#[inline(always)]
+fn lanes<T>(data: &[T], at: usize) -> &[T; LANES] {
+    data[at..at + LANES].try_into().expect("LANES values")
+}
+
+/// Per-thread scratch space of a group of centres.
 struct Scratch {
-    weighted: Vec<f32>,
-    neighbours: Vec<usize>,
+    /// Per search offset, the lanes whose neighbour takes part (bit `l`).
+    masks: Vec<u8>,
+    /// Per patch offset, the lanes' weighted sums.
+    weighted: Vec<[f32; LANES]>,
+    /// Per patch offset, the lanes' `input − mean`.
+    centre: Vec<[f32; LANES]>,
+    /// Per patch offset, whether the lanes' patch voxels are inside the image.
+    centre_valid: Vec<[bool; LANES]>,
+}
+
+impl Scratch {
+    fn new(patch: usize, search: usize) -> Self {
+        Scratch {
+            masks: Vec::with_capacity(search),
+            weighted: Vec::with_capacity(patch),
+            centre: Vec::with_capacity(patch),
+            centre_valid: Vec::with_capacity(patch),
+        }
+    }
 }
 
 impl Context<'_> {
-    fn inside(&self, c: &[isize; MAXD]) -> bool {
-        (0..self.d).all(|k| c[k] >= 0 && (c[k] as usize) < self.size[k])
+    /// The padded index of the first voxel of image row `row` (every axis but the first).
+    fn padded_row(&self, row: usize) -> usize {
+        let mut rest = row;
+        let mut at = self.pad[0];
+        for k in 1..self.d {
+            let c = rest % self.size[k];
+            rest /= self.size[k];
+            at += (c + self.pad[k]) * self.pstrides[k];
+        }
+        at
     }
 
-    fn linear(&self, c: &[isize; MAXD]) -> usize {
-        (0..self.d).map(|k| c[k] as usize * self.strides[k]).sum()
+    /// `src` (on the image's grid) in the padded layout, 0 in the padding.
+    fn padded<T: Copy + Default>(&self, src: &[T]) -> Vec<T> {
+        let mut out = vec![T::default(); self.psize.iter().product()];
+        let nx = self.size[0];
+        for (row, line) in src.chunks(nx).enumerate() {
+            let at = self.padded_row(row);
+            out[at..at + nx].copy_from_slice(line);
+        }
+        out
     }
 
-    fn mask_allows(&self, c: &[usize; MAXD]) -> bool {
+    fn mask_allows(&self, row_coords: &[usize; MAXD], x: usize) -> bool {
         match self.mask {
             None => true,
             Some(m) => {
-                let i: usize = (0..self.d).map(|k| c[k] * self.mask_strides[k]).sum();
+                let i: usize = x * self.mask_strides[0]
+                    + (1..self.d)
+                        .map(|k| row_coords[k] * self.mask_strides[k])
+                        .sum::<usize>();
                 m.data[i] != 0
             }
         }
     }
 
-    /// Step 1's test of a neighbour against the centre's mean `mc` and variance `vc`.
-    #[inline(always)]
-    fn similar(&self, b: usize, mc: f32, vc: f32) -> bool {
-        let p = self.p;
-        if self.input[b] <= 0.0 {
-            return false;
-        }
-        let mb = self.mean[b];
-        let vb = self.variance[b];
-        if mb <= p.epsilon || vb <= p.epsilon {
-            return false;
-        }
-        let mean_ratio = mc / mb;
-        let mean_ratio_inverse = (self.maximum - mc) / (self.maximum - mb);
-        let variance_ratio = vc / vb;
-        let mt = p.mean_threshold;
-        let vt = p.variance_threshold;
-        ((mean_ratio > mt && mean_ratio < 1.0 / mt)
-            || (mean_ratio_inverse > mt && mean_ratio_inverse < 1.0 / mt))
-            && variance_ratio > vt
-            && variance_ratio < 1.0 / vt
-    }
-
-    /// Is the whole search box, with every patch around it, inside the image?
-    fn interior(&self, c: &[usize; MAXD]) -> bool {
-        (0..self.d).all(|k| {
-            let r = self.search.radius[k] + self.patch.radius[k];
-            c[k] >= r && c[k] + r < self.size[k]
-        })
-    }
-
-    /// One centre: its contribution `weighted[o] / Σ weights` to each patch voxel (written
-    /// to `contribution`), its flags and the bias it writes.
-    fn centre(
+    /// A group of [`LANES`] centres of one row: image columns `x0 ..` (those past the end of
+    /// the row are left out), padded index `at` for the first. For each centre, the
+    /// operations of ITK's loop body in its order; the lanes run side by side. `MASKED` is
+    /// false when every search box and patch of the group is inside the image (no `valid`
+    /// test is needed).
+    #[allow(clippy::too_many_arguments)]
+    fn group<const MASKED: bool>(
         &self,
-        c: &[usize; MAXD],
-        lin: usize,
+        row_coords: &[usize; MAXD],
+        x0: usize,
+        at: usize,
         contribution: &mut [f32],
+        flags: &mut [u8],
+        bias: &mut [f32],
         scratch: &mut Scratch,
-    ) -> (u8, f32) {
+    ) {
         let p = self.p;
         let np = self.patch.len();
-        let interior = self.interior(c);
-        let ci: [isize; MAXD] = std::array::from_fn(|k| c[k] as isize);
-        let weighted = &mut scratch.weighted;
-        weighted.clear();
-        weighted.resize(np, 0.0);
-        let mc = self.mean[lin];
-        let vc = self.variance[lin];
-        let mut maximum_weight = 0.0f32;
-        let mut sum_of_weights = 0.0f32;
-        let mut flags = 0u8;
-        let mut bias = 0.0f32;
-        let takes_part =
-            self.input[lin] > 0.0 && mc > p.epsilon && vc > p.epsilon && self.mask_allows(c);
-        if takes_part {
-            // The neighbours that take part, and the smallest patch distance among them.
-            let neighbours = &mut scratch.neighbours;
-            neighbours.clear();
-            let mut minimum_distance = f32::MAX;
-            for m in 0..self.search.len() {
+        let nx = self.size[0];
+        let active = (nx - x0).min(LANES);
+        let mc = *lanes(&self.mean, at);
+        let vc = *lanes(&self.variance, at);
+        let xc = lanes(&self.input, at);
+        let mut takes_part = [false; LANES];
+        for l in 0..active {
+            takes_part[l] = xc[l] > 0.0
+                && mc[l] > p.epsilon
+                && vc[l] > p.epsilon
+                && self.mask_allows(row_coords, x0 + l);
+        }
+        // Step 1: the neighbours that take part, per lane, and the smallest patch distance.
+        // Every lane computes every test (they have no side effects), so the lanes run side by
+        // side; the outcome is what ITK's early `continue`s give.
+        let masks = &mut scratch.masks;
+        masks.clear();
+        masks.resize(self.search.len(), 0);
+        let mut minimum_distance = [f32::MAX; LANES];
+        let (eps, mt, vt, maximum) = (
+            p.epsilon,
+            p.mean_threshold,
+            p.variance_threshold,
+            self.maximum,
+        );
+        let (inv_mt, inv_vt) = (1.0f32 / mt, 1.0f32 / vt);
+        if takes_part.iter().any(|&t| t) {
+            for (m, mask) in masks.iter_mut().enumerate() {
                 if m == self.search_centre {
                     continue;
                 }
-                let b = if interior {
-                    (lin as isize + self.search.linear[m]) as usize
-                } else {
-                    let bc: [isize; MAXD] =
-                        std::array::from_fn(|k| ci[k] + self.search.steps[m][k]);
-                    if !self.inside(&bc) {
-                        continue;
-                    }
-                    self.linear(&bc)
-                };
-                if !self.similar(b, mc, vc) {
-                    continue;
+                let b0 = (at as isize + self.search.linear[m]) as usize;
+                let xb = lanes(&self.input, b0);
+                let mb = lanes(&self.mean, b0);
+                let vb = lanes(&self.variance, b0);
+                let pd = lanes(&self.patch_distance, b0);
+                let inside = lanes(&self.valid, b0);
+                let mut bits = 0u8;
+                for l in 0..LANES {
+                    let r = mc[l] / mb[l];
+                    let ri = (maximum - mc[l]) / (maximum - mb[l]);
+                    let rv = vc[l] / vb[l];
+                    // `input <= 0` and `mean <= ε || variance <= ε` skip the neighbour (NaN
+                    // does not).
+                    let skip_value = xb[l] <= 0.0;
+                    let skip_statistics = mb[l] <= eps || vb[l] <= eps;
+                    let pass = takes_part[l]
+                        & (!MASKED || inside[l] != 0)
+                        & !skip_value
+                        & !skip_statistics
+                        & (((r > mt) & (r < inv_mt)) | ((ri > mt) & (ri < inv_mt)))
+                        & (rv > vt)
+                        & (rv < inv_vt);
+                    // std::min(averageDistance, minimumDistance)
+                    let a = pd[l];
+                    let smaller = if minimum_distance[l] < a {
+                        minimum_distance[l]
+                    } else {
+                        a
+                    };
+                    minimum_distance[l] = if pass { smaller } else { minimum_distance[l] };
+                    bits |= u8::from(pass) << l;
                 }
-                neighbours.push(m);
-                // std::min(averageDistance, minimumDistance)
-                let a = self.patch_distance[b];
-                minimum_distance = if minimum_distance < a {
-                    minimum_distance
-                } else {
-                    a
-                };
+                *mask = bits;
             }
-            if almost_equal_f32(minimum_distance, 0.0) {
-                minimum_distance = 1.0;
+        }
+        let mut three_h = [0.0f32; LANES];
+        for l in 0..LANES {
+            if l < active {
+                flags[l] = 0;
+                bias[l] = 0.0;
+            }
+            if !takes_part[l] {
+                continue;
+            }
+            if almost_equal_f32(minimum_distance[l], 0.0) {
+                minimum_distance[l] = 1.0;
             }
             if p.rician {
-                flags |= WRITES_BIAS;
-                bias = if almost_equal_f32(minimum_distance, f32::MAX) {
+                flags[l] |= WRITES_BIAS;
+                bias[l] = if almost_equal_f32(minimum_distance[l], f32::MAX) {
                     0.0
                 } else {
-                    minimum_distance
+                    minimum_distance[l]
                 };
             }
-            let three_h = 3.0f32 * minimum_distance;
-            for &m in neighbours.iter() {
-                let (b, average_distance) = if interior {
-                    let b = (lin as isize + self.search.linear[m]) as usize;
-                    let mut sum = 0.0f32;
-                    let mut count = 0.0f32;
-                    for &o in &self.patch.linear {
-                        let t = self.diff[(b as isize + o) as usize]
-                            - self.diff[(lin as isize + o) as usize];
-                        sum += t * t;
-                        count += 1.0;
+            three_h[l] = 3.0f32 * minimum_distance[l];
+        }
+        // The centres' patches, once.
+        let centre = &mut scratch.centre;
+        centre.clear();
+        centre.extend(
+            self.patch
+                .linear
+                .iter()
+                .map(|&o| *lanes(&self.diff, (at as isize + o) as usize)),
+        );
+        let centre_valid = &mut scratch.centre_valid;
+        centre_valid.clear();
+        if MASKED {
+            centre_valid.extend(
+                self.patch
+                    .linear
+                    .iter()
+                    .map(|&o| lanes(&self.valid, (at as isize + o) as usize).map(|v| v != 0)),
+            );
+        }
+        // Step 3: the weights, and the weighted sums of the neighbours' patches.
+        let weighted = &mut scratch.weighted;
+        weighted.clear();
+        weighted.resize(np, [0.0; LANES]);
+        let mut maximum_weight = [0.0f32; LANES];
+        let mut sum_of_weights = [0.0f32; LANES];
+        for (m, &mask) in masks.iter().enumerate() {
+            if mask == 0 {
+                continue;
+            }
+            let b0 = (at as isize + self.search.linear[m]) as usize;
+            let mut sum = [0.0f32; LANES];
+            let mut count = [0.0f32; LANES];
+            for (n, (&o, y)) in self.patch.linear.iter().zip(centre.iter()).enumerate() {
+                let x = lanes(&self.diff, (b0 as isize + o) as usize);
+                if MASKED {
+                    let xv = lanes(&self.valid, (b0 as isize + o) as usize);
+                    let yv = &centre_valid[n];
+                    for l in 0..LANES {
+                        let both = (xv[l] != 0) & yv[l];
+                        let t = x[l] - y[l];
+                        let s = sum[l] + t * t;
+                        sum[l] = if both { s } else { sum[l] };
+                        let c = count[l] + 1.0;
+                        count[l] = if both { c } else { count[l] };
                     }
-                    (b, sum / count)
                 } else {
-                    let bc: [isize; MAXD] =
-                        std::array::from_fn(|k| ci[k] + self.search.steps[m][k]);
-                    let b = self.linear(&bc);
-                    let mut sum = 0.0f32;
-                    let mut count = 0.0f32;
-                    for (n, s) in self.patch.steps.iter().enumerate() {
-                        let x: [isize; MAXD] = std::array::from_fn(|k| bc[k] + s[k]);
-                        let y: [isize; MAXD] = std::array::from_fn(|k| ci[k] + s[k]);
-                        if !self.inside(&x) || !self.inside(&y) {
-                            continue;
-                        }
-                        let o = self.patch.linear[n];
-                        let t = self.diff[(b as isize + o) as usize]
-                            - self.diff[(lin as isize + o) as usize];
-                        sum += t * t;
-                        count += 1.0;
+                    for l in 0..LANES {
+                        let t = x[l] - y[l];
+                        sum[l] += t * t;
                     }
-                    (b, sum / count)
-                };
-                let weight = if average_distance <= three_h {
-                    math::expf(-average_distance / minimum_distance)
+                }
+            }
+            if !MASKED {
+                count = [np as f32; LANES];
+            }
+            let mut argument = [0.0f32; LANES];
+            let mut candidate = [false; LANES];
+            for l in 0..LANES {
+                let average_distance = sum[l] / count[l];
+                argument[l] = -average_distance / minimum_distance[l];
+                candidate[l] = (mask >> l) & 1 == 1 && average_distance <= three_h[l];
+            }
+            let mut weight = [0.0f32; LANES];
+            let mut any = false;
+            for l in 0..LANES {
+                if candidate[l] {
+                    weight[l] = math::expf(argument[l]);
+                    any |= weight[l] > 0.0;
+                }
+            }
+            for l in 0..LANES {
+                // Lanes without a weight have 0 here, and `0 > maximum` is false.
+                if weight[l] > maximum_weight[l] {
+                    maximum_weight[l] = weight[l];
+                }
+                let added = sum_of_weights[l] + weight[l];
+                sum_of_weights[l] = if weight[l] > 0.0 {
+                    added
                 } else {
-                    0.0
+                    sum_of_weights[l]
                 };
-                if weight > maximum_weight {
-                    maximum_weight = weight;
-                }
-                if weight > 0.0 {
-                    if interior {
-                        for (w, &o) in weighted.iter_mut().zip(&self.patch.linear) {
-                            *w += weight * self.values[(b as isize + o) as usize];
-                        }
-                    } else {
-                        let bc: [isize; MAXD] =
-                            std::array::from_fn(|k| ci[k] + self.search.steps[m][k]);
-                        for (n, s) in self.patch.steps.iter().enumerate() {
-                            let x: [isize; MAXD] = std::array::from_fn(|k| bc[k] + s[k]);
-                            if self.inside(&x) {
-                                weighted[n] += weight
-                                    * self.values[(b as isize + self.patch.linear[n]) as usize];
-                            }
-                        }
+            }
+            if !any {
+                continue;
+            }
+            for (acc, &o) in weighted.iter_mut().zip(&self.patch.linear) {
+                let v = lanes(&self.values, (b0 as isize + o) as usize);
+                if MASKED {
+                    let xv = lanes(&self.valid, (b0 as isize + o) as usize);
+                    for l in 0..LANES {
+                        let added = acc[l] + weight[l] * v[l];
+                        acc[l] = if (weight[l] > 0.0) & (xv[l] != 0) {
+                            added
+                        } else {
+                            acc[l]
+                        };
                     }
-                    sum_of_weights += weight;
+                } else {
+                    for l in 0..LANES {
+                        let added = acc[l] + weight[l] * v[l];
+                        acc[l] = if weight[l] > 0.0 { added } else { acc[l] };
+                    }
                 }
             }
-            if almost_equal_f32(maximum_weight, 0.0) {
-                maximum_weight = 1.0;
-            }
-        } else {
-            maximum_weight = 1.0;
         }
-        // The centre's own patch, with the largest weight.
-        for (n, s) in self.patch.steps.iter().enumerate() {
-            if !interior {
-                let x: [isize; MAXD] = std::array::from_fn(|k| ci[k] + s[k]);
-                if !self.inside(&x) {
-                    continue;
+        // The centres' own patches, with their largest weights.
+        for l in 0..LANES {
+            if !takes_part[l] || almost_equal_f32(maximum_weight[l], 0.0) {
+                maximum_weight[l] = 1.0;
+            }
+        }
+        for (n, (acc, &o)) in weighted.iter_mut().zip(&self.patch.linear).enumerate() {
+            let v = lanes(&self.values, (at as isize + o) as usize);
+            for l in 0..LANES {
+                let added = acc[l] + maximum_weight[l] * v[l];
+                acc[l] = if !MASKED || centre_valid[n][l] {
+                    added
+                } else {
+                    acc[l]
+                };
+            }
+        }
+        for l in 0..active {
+            sum_of_weights[l] += maximum_weight[l];
+            if sum_of_weights[l] > 0.0 {
+                flags[l] |= CONTRIBUTES;
+                for (n, acc) in weighted.iter().enumerate() {
+                    contribution[l * np + n] = acc[l] / sum_of_weights[l];
                 }
             }
-            weighted[n] +=
-                maximum_weight * self.values[(lin as isize + self.patch.linear[n]) as usize];
         }
-        sum_of_weights += maximum_weight;
-        if sum_of_weights > 0.0 {
-            flags |= CONTRIBUTES;
-            for (out, &w) in contribution.iter_mut().zip(weighted.iter()) {
-                *out = w / sum_of_weights;
+    }
+
+    /// Computes the centres of image row `row`, [`LANES`] at a time.
+    fn row(
+        &self,
+        row: usize,
+        contribution: &mut [f32],
+        flags: &mut [u8],
+        bias: &mut [f32],
+        scratch: &mut Scratch,
+    ) {
+        let np = self.patch.len();
+        let nx = self.size[0];
+        let mut row_coords = [0usize; MAXD];
+        let mut rest = row;
+        for (c, &n) in row_coords.iter_mut().zip(&self.size).take(self.d).skip(1) {
+            *c = rest % n;
+            rest /= n;
+        }
+        let at = self.padded_row(row);
+        // The groups whose search boxes and patches are all inside the image.
+        let r0 = self.search.radius[0] + self.patch.radius[0];
+        let row_interior = (1..self.d).all(|k| {
+            let r = self.search.radius[k] + self.patch.radius[k];
+            row_coords[k] >= r && row_coords[k] + r < self.size[k]
+        });
+        for x0 in (0..nx).step_by(LANES) {
+            let end = (x0 + LANES).min(nx);
+            let contribution = &mut contribution[x0 * np..end * np];
+            let flags = &mut flags[x0..end];
+            let bias = &mut bias[x0..end];
+            if row_interior && x0 >= r0 && x0 + LANES - 1 + r0 < nx {
+                self.group::<false>(&row_coords, x0, at + x0, contribution, flags, bias, scratch);
+            } else {
+                self.group::<true>(&row_coords, x0, at + x0, contribution, flags, bias, scratch);
             }
         }
-        (flags, bias)
     }
 }
 
-/// The mean of `(input − mean)²` over each voxel's patch, the patch clipped to the image.
+/// The mean of `(input − mean)²` over each voxel's patch, the patch clipped to the image (in
+/// the padded layout; 0 in the padding).
 fn patch_distances(ctx: &Context<'_>, n_threads: usize) -> Result<Vec<f32>, FilterError> {
-    let len = ctx.input.len();
     let nx = ctx.size[0];
-    let mut out = vec![0.0f32; len];
-    larmorx_core::parallel::with_threads(n_threads, || {
-        out.par_chunks_mut(nx).enumerate().for_each(|(row, line)| {
-            let mut c = row_coordinates(ctx, row);
-            for (x, o) in line.iter_mut().enumerate() {
-                c[0] = x as isize;
-                let lin = row * nx + x;
-                let mut sum = 0.0f32;
-                let mut count = 0.0f32;
-                for (n, s) in ctx.patch.steps.iter().enumerate() {
-                    let y: [isize; MAXD] = std::array::from_fn(|k| c[k] + s[k]);
-                    if !ctx.inside(&y) {
-                        continue;
-                    }
-                    let t = ctx.diff[(lin as isize + ctx.patch.linear[n]) as usize];
-                    sum += t * t;
-                    count += 1.0;
-                }
-                *o = sum / count;
-            }
-        });
+    let rows: usize = ctx.size[1..].iter().product();
+    let lines: Vec<Vec<f32>> = larmorx_core::parallel::with_threads(n_threads, || {
+        (0..rows)
+            .into_par_iter()
+            .map(|row| {
+                let at = ctx.padded_row(row);
+                (0..nx)
+                    .map(|x| {
+                        let v = at + x;
+                        let mut sum = 0.0f32;
+                        let mut count = 0.0f32;
+                        for &o in &ctx.patch.linear {
+                            let u = (v as isize + o) as usize;
+                            if ctx.valid[u] != 0 {
+                                let t = ctx.diff[u];
+                                sum += t * t;
+                                count += 1.0;
+                            }
+                        }
+                        sum / count
+                    })
+                    .collect()
+            })
+            .collect()
     })?;
+    let mut out = vec![0.0f32; ctx.valid.len()];
+    for (row, line) in lines.iter().enumerate() {
+        let at = ctx.padded_row(row);
+        out[at..at + nx].copy_from_slice(line);
+    }
     Ok(out)
 }
 
-/// The coordinates of the first voxel of row `row` (every axis but the first).
-fn row_coordinates(ctx: &Context<'_>, row: usize) -> [isize; MAXD] {
-    let mut c = [0isize; MAXD];
-    let mut rest = row;
-    for (ck, &n) in c.iter_mut().zip(&ctx.size).take(ctx.d).skip(1) {
-        *ck = (rest % n) as isize;
-        rest /= n;
-    }
-    c
-}
-
-/// The coordinates of voxel `lin`.
+/// The coordinates of image voxel `lin`.
 fn coordinates(ctx: &Context<'_>, lin: usize) -> [isize; MAXD] {
     let mut c = [0isize; MAXD];
     let mut rest = lin;
@@ -491,8 +634,6 @@ fn run(
     if len == 0 {
         return Ok(AdaptiveNlmOutput {
             denoised: Vec::new(),
-            mean: Vec::new(),
-            variance: Vec::new(),
             rician_bias: Vec::new(),
         });
     }
@@ -516,19 +657,35 @@ fn run(
                 .map(|(&v, &m)| (v - m, if rician { v * v } else { v }))
                 .unzip()
         })?;
-    let st = strides(input.size);
-    let search = Offsets::new(&parameters.search_radius, input.size);
-    let patch = Offsets::new(&parameters.patch_radius, input.size);
+
+    // The padded layout.
+    let size: [usize; MAXD] = std::array::from_fn(|k| input.size.get(k).copied().unwrap_or(1));
+    let pad: [usize; MAXD] = std::array::from_fn(|k| {
+        if k < d {
+            parameters.search_radius[k] + parameters.patch_radius[k]
+        } else {
+            0
+        }
+    });
+    let psize: [usize; MAXD] =
+        std::array::from_fn(|k| size[k] + 2 * pad[k] + if k == 0 { LANES } else { 0 });
+    let ps = strides(&psize);
+    let pstrides: [usize; MAXD] = std::array::from_fn(|k| ps[k]);
+    let search = Offsets::new(&parameters.search_radius, &psize[..d]);
+    let patch = Offsets::new(&parameters.patch_radius, &psize[..d]);
     let search_centre = (0.5 * search.len() as f64) as usize;
     let mut ctx = Context {
         d,
-        size: std::array::from_fn(|k| input.size.get(k).copied().unwrap_or(1)),
-        strides: std::array::from_fn(|k| st.get(k).copied().unwrap_or(0)),
-        input: input.data,
-        mean: &mean,
-        variance: &variance,
-        diff,
-        values,
+        size,
+        pad,
+        psize,
+        pstrides,
+        valid: Vec::new(),
+        input: Vec::new(),
+        mean: Vec::new(),
+        variance: Vec::new(),
+        diff: Vec::new(),
+        values: Vec::new(),
         patch_distance: Vec::new(),
         mask,
         mask_strides: match mask {
@@ -542,8 +699,18 @@ fn run(
         p: parameters,
         search,
         patch,
+        image_patch: Offsets::new(&parameters.patch_radius, input.size),
         search_centre,
     };
+    ctx.valid = ctx.padded(&vec![1u8; len]);
+    ctx.input = ctx.padded(input.data);
+    ctx.mean = ctx.padded(&mean);
+    ctx.variance = ctx.padded(&variance);
+    drop(variance);
+    ctx.diff = ctx.padded(&diff);
+    drop(diff);
+    ctx.values = ctx.padded(&values);
+    drop(values);
     ctx.patch_distance = patch_distances(&ctx, n_threads)?;
     let ctx = ctx;
 
@@ -552,7 +719,14 @@ fn run(
     let np = ctx.patch.len();
     let nx = ctx.size[0];
     let rows = len / nx;
-    let reach = ctx.patch.linear.iter().copied().max().unwrap_or(0).max(0) as usize;
+    let reach = ctx
+        .image_patch
+        .linear
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0)
+        .max(0) as usize;
     let block_rows = (block_voxels / nx).clamp(1, rows);
     let mut sums = vec![0.0f32; len];
     let mut counts = vec![0.0f32; len];
@@ -583,25 +757,9 @@ fn run(
                 .zip(bias.par_chunks_mut(nx))
                 .enumerate()
                 .for_each_init(
-                    || Scratch {
-                        weighted: Vec::with_capacity(np),
-                        neighbours: Vec::with_capacity(ctx.search.len()),
-                    },
+                    || Scratch::new(np, ctx.search.len()),
                     |scratch, (i, ((contribution, flags), bias))| {
-                        let r = row + i;
-                        let rc = row_coordinates(&ctx, r);
-                        let mut c: [usize; MAXD] = std::array::from_fn(|k| rc[k] as usize);
-                        for x in 0..nx {
-                            c[0] = x;
-                            let (f, b) = ctx.centre(
-                                &c,
-                                r * nx + x,
-                                &mut contribution[x * np..(x + 1) * np],
-                                scratch,
-                            );
-                            flags[x] = f;
-                            bias[x] = b;
-                        }
+                        ctx.row(row + i, contribution, flags, bias, scratch);
                     },
                 );
             row = block_end_row;
@@ -633,6 +791,7 @@ fn run(
             }
         }
     })?;
+    drop(window);
 
     // AfterThreadedGenerateData.
     let mut bias_image = Vec::new();
@@ -658,8 +817,8 @@ fn run(
                     }
                     if ctx.mask.is_some() {
                         let c = coordinates(&ctx, lin);
-                        let c: [usize; MAXD] = std::array::from_fn(|k| c[k] as usize);
-                        if !ctx.mask_allows(&c) {
+                        let rc: [usize; MAXD] = std::array::from_fn(|k| c[k] as usize);
+                        if !ctx.mask_allows(&rc, rc[0]) {
                             return;
                         }
                     }
@@ -695,15 +854,14 @@ fn run(
     })?;
     Ok(AdaptiveNlmOutput {
         denoised,
-        mean,
-        variance,
         rician_bias: bias_image,
     })
 }
 
-/// Sums the contributions to output voxels `[from, to)` in the single thread's order: the
-/// centres in raster order, which for a fixed output voxel is the patch offsets in reverse.
-/// The bias is the one written last (the first offset whose centre wrote one).
+/// Sums the contributions to output voxels `[from, from + sums.len())` in the single
+/// thread's order: the centres in raster order, which for a fixed output voxel is the patch
+/// offsets in reverse. The bias is the one written last (the first offset whose centre wrote
+/// one).
 fn gather(
     ctx: &Context<'_>,
     window: &Window,
@@ -713,7 +871,8 @@ fn gather(
     bias: &mut [f32],
 ) {
     const CHUNK: usize = 1 << 12;
-    let np = ctx.patch.len();
+    let patch = &ctx.image_patch;
+    let np = patch.len();
     sums.par_chunks_mut(CHUNK)
         .zip(counts.par_chunks_mut(CHUNK))
         .zip(bias.par_chunks_mut(CHUNK))
@@ -734,7 +893,7 @@ fn gather(
                     }
                 }
                 let interior = (0..ctx.d).all(|k| {
-                    let r = ctx.patch.radius[k] as isize;
+                    let r = patch.radius[k] as isize;
                     c[k] >= r && c[k] + r < ctx.size[k] as isize
                 });
                 let mut sum = 0.0f32;
@@ -742,13 +901,15 @@ fn gather(
                 let mut last_bias: Option<f32> = None;
                 for n in (0..np).rev() {
                     if !interior {
-                        let centre: [isize; MAXD] =
-                            std::array::from_fn(|k| c[k] - ctx.patch.steps[n][k]);
-                        if !ctx.inside(&centre) {
+                        let inside = (0..ctx.d).all(|k| {
+                            let x = c[k] - patch.steps[n][k];
+                            x >= 0 && (x as usize) < ctx.size[k]
+                        });
+                        if !inside {
                             continue;
                         }
                     }
-                    let centre = (p as isize - ctx.patch.linear[n]) as usize;
+                    let centre = (p as isize - patch.linear[n]) as usize;
                     let w = centre - window.start;
                     let f = window.flags[w];
                     if f & CONTRIBUTES != 0 {
@@ -1038,6 +1199,43 @@ mod tests {
                             m.is_some()
                         );
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn lanes_match_the_single_thread_loops() {
+        // Rows long enough for the lanes (interior runs of 8 centres and more), with a mask
+        // that switches centres off inside a lane group, NaN, infinity and zeros.
+        let size = [30usize, 9, 8];
+        let spacing = [1.0, 1.1, 0.9];
+        let mut data = phantom(size, 11);
+        data[30 * 4 + 13] = f32::NAN;
+        data[30 * 9 * 3 + 30 * 5 + 17] = f32::INFINITY;
+        data[30 * 9 * 4 + 30 * 4 + 12] = 0.0;
+        let mask: Vec<u8> = (0..data.len()).map(|i| u8::from(i % 5 != 2)).collect();
+        for rician in [true, false] {
+            for (patch, search) in [(1usize, 2usize), (2, 1), (1, 3)] {
+                let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
+                p.patch_radius = vec![patch; 3];
+                p.search_radius = vec![search; 3];
+                for m in [None, Some(&mask[..])] {
+                    let expected = reference(&data, size, spacing, m, &p);
+                    let v = VolumeRef::new(&data, &size, &spacing);
+                    let mref = m.map(|d| MaskRef {
+                        data: d,
+                        size: &size,
+                    });
+                    let got = adaptive_non_local_means(v, mref, &p, 2).unwrap();
+                    assert!(
+                        got.denoised
+                            .iter()
+                            .zip(&expected)
+                            .all(|(a, b)| a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())),
+                        "rician {rician}, patch {patch}, search {search}, mask {}",
+                        m.is_some()
+                    );
                 }
             }
         }

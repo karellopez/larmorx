@@ -11,6 +11,9 @@
 //! an x86-64 machine with FMA. `f64::mul_add` is a correctly rounded fused multiply-add on every
 //! target, so it reproduces the hardware's `vfmadd` exactly.
 //!
+//! - [`point_row`], [`point_row_single`], [`rows3`], [`rows3_single`]: the per-point products of
+//!   nitransforms (`affine.dot(points)`) and nibabel's `apply_affine` (`pts @ rzs.T`), through
+//!   `dgemm`, or `dgemv` for a single point (`dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`).
 //! - [`gemm`] / [`matmul4`]: `numpy.matmul` and `numpy.dot` of float64 matrices, which call
 //!   `cblas_dgemm` (`numpy/_core/src/umath/matmul.c.src`, `common/cblasfuncs.c`). OpenBLAS's
 //!   `dgemm_kernel_4x8_haswell.S` keeps one accumulator per output, cleared to +0 (`vxorpd`),
@@ -30,7 +33,8 @@
 //!   (`trsm_ltcopy_4.c`, `trsm_utcopy_4.c`). The C kernels on that path (`ddot.c`,
 //!   `dgemv_n_4.c`, `dscal.c`, the solves) were compiled with GCC 10 and `-mavx2` but not
 //!   `-mfma`, so their multiplications and additions are rounded separately (checked in the
-//!   disassembly of numpy's `libscipy_openblas64_`).
+//!   disassembly of numpy's `libscipy_openblas64_`; `dgemv_t_4.c` is the exception, with fused
+//!   multiply-adds).
 //!
 //! Upstream files (OpenBLAS 0.3.30 release tarball, SHA-256 `27342cff5186…`):
 //! `interface/gemm.c`, `driver/level3/level3.c`, `kernel/x86_64/dgemm_kernel_4x8_haswell.S`,
@@ -38,8 +42,9 @@
 //! `lapack/getrf/getrf_single.c`, `lapack/getf2/getf2_k.c`, `lapack/getrs/getrs_single.c`,
 //! `lapack/laswp/generic/laswp_k_4.c`, `driver/level3/trsm_L.c`,
 //! `kernel/generic/trsm_kernel_LT.c`, `trsm_kernel_LN.c`, `trsm_ltcopy_4.c`,
-//! `trsm_utcopy_4.c`, `kernel/x86_64/ddot.c`, `dgemv_n_4.c`, `dscal.c`, `iamax_sse2.S`
-//! (`KERNEL.HASWELL` selects them). The logic is re-expressed in Rust; no code was copied.
+//! `trsm_utcopy_4.c`, `kernel/x86_64/ddot.c`, `dgemv_n_4.c`, `dscal.c`, `iamax_sse2.S`,
+//! `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c` (`KERNEL.HASWELL` selects them). The logic is
+//! re-expressed in Rust; no code was copied.
 //!
 //! OpenBLAS: Copyright (c) 2011-2014, The OpenBLAS Project. All rights reserved.
 //!
@@ -103,6 +108,48 @@ pub fn matmul4(a: &Mat4, b: &Mat4) -> Mat4 {
     std::array::from_fn(|i| {
         std::array::from_fn(|j| dot_fused(a[i].iter().copied(), b.iter().map(|r| r[j])))
     })
+}
+
+/// Row `r` of `m · (p, 1)` as numpy computes `affine.dot(points)` for two or more homogeneous
+/// points (`dgemm`, K = 4): `fma(m[r][2], z, fma(m[r][1], y, m[r][0]·x)) + m[r][3]`, then `+ 0`.
+/// (The kernel's last fused step multiplies by the homogeneous 1, exactly, so it is a plain
+/// addition; starting the chain from +0 instead of the first product changes only the sign of
+/// a zero, which the final `+ 0` settles.)
+#[inline(always)]
+pub fn point_row(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
+    let s = m[r][0] * p[0];
+    let s = m[r][1].mul_add(p[1], s);
+    let s = m[r][2].mul_add(p[2], s);
+    (s + m[r][3]) + 0.0
+}
+
+/// [`point_row`] for a single point: numpy then calls `dgemv` (`cblasfuncs.c`, a column
+/// operand), and OpenBLAS's Haswell `dgemv_t` kernel (`dgemv_t_microk_haswell-4.c`) multiplies
+/// the four terms in the lanes of one register and adds them pairwise into a `y` cleared to +0:
+/// `((m0·x + m2·z) + (m1·y + m3)) + 0`.
+#[inline(always)]
+pub fn point_row_single(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
+    ((m[r][0] * p[0] + m[r][2] * p[2]) + (m[r][1] * p[1] + m[r][3])) + 0.0
+}
+
+/// `p @ h[:3, :3].T` for one of two or more points, as nibabel's `apply_affine` computes it
+/// (`pts @ rzs.T`, `dgemm` with K = 3): a fused chain in index order, then `+ 0`.
+#[inline(always)]
+pub fn rows3(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|r| {
+        let s = p[0] * h[r][0];
+        let s = p[1].mul_add(h[r][1], s);
+        let s = p[2].mul_add(h[r][2], s);
+        s + 0.0
+    })
+}
+
+/// [`rows3`] for a single point: numpy's `matmul` hands `(1, 3) @ (3, 3)` to `dgemv`, whose
+/// Haswell `dgemv_t` tail for three rows (`dgemv_t_4.c`) GCC compiled with contractions,
+/// `fma(h2, z, fma(h0, x, h1·y))`, added to a `y` cleared to +0.
+#[inline(always)]
+pub fn rows3_single(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|r| h[r][2].mul_add(p[2], h[r][0].mul_add(p[0], h[r][1] * p[1])) + 0.0)
 }
 
 /// `IAMAX_K` (`iamax_sse2.S`, unit stride) for 1 to 4 elements: the 0-based index of the first

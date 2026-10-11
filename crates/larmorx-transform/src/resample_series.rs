@@ -28,6 +28,7 @@ use rayon::prelude::*;
 
 use crate::TransformError;
 use crate::nitransforms::{self, Step};
+use crate::openblas;
 
 /// Output voxels per parallel task within one volume.
 const CHUNK: usize = 4096;
@@ -386,26 +387,20 @@ impl SeriesResampler {
 }
 
 /// nibabel's `apply_affine(h, p)` for one point, as numpy evaluates `pts @ rzs.T + trans`:
-/// the 3×3 product with fused multiply-adds as OpenBLAS's Haswell `dgemm` computes it (stored
-/// as `acc + 0`, so an exact zero is +0; [`crate::openblas`]), then the translation.
+/// the 3×3 product as OpenBLAS's Haswell `dgemm` computes it ([`openblas::rows3`]), then the
+/// translation.
 #[inline(always)]
 pub fn apply_affine(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
-    std::array::from_fn(|r| {
-        let s = p[0] * h[r][0];
-        let s = p[1].mul_add(h[r][1], s);
-        let s = p[2].mul_add(h[r][2], s);
-        (s + 0.0) + h[r][3]
-    })
+    let q = openblas::rows3(h, p);
+    std::array::from_fn(|r| q[r] + h[r][3])
 }
 
-/// [`apply_affine`] when the target grid has a single voxel: numpy's `matmul` then hands
-/// `(1, 3) @ (3, 3)` to `dgemv`, whose Haswell `dgemv_t` tail GCC compiled with contractions,
-/// `fma(h2, z, fma(h0, x, h1·y))`, added to a `y` cleared to +0; then the translation.
+/// [`apply_affine`] when the target grid has a single voxel: numpy's `matmul` then uses
+/// `dgemv` ([`openblas::rows3_single`]).
 #[inline(always)]
 pub fn apply_affine_single(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
-    std::array::from_fn(|r| {
-        (h[r][2].mul_add(p[2], h[r][0].mul_add(p[0], h[r][1] * p[1])) + 0.0) + h[r][3]
-    })
+    let q = openblas::rows3_single(h, p);
+    std::array::from_fn(|r| q[r] + h[r][3])
 }
 
 /// `1 + np.gradient(vsm, axis=axis)` in float32 (unit spacing, first-order edges).

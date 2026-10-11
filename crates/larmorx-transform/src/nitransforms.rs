@@ -11,10 +11,10 @@
 //! - **float32 inputs.** `_as_homogeneous` converts every point to float32 before each affine
 //!   (and before a displacement field's index lookup), so every step starts from float32
 //!   coordinates; outputs are float64.
-//! - **The product.** numpy evaluates `affine.dot(points)` with BLAS `dgemm`, which on x86-64
-//!   with FMA (OpenBLAS's Haswell kernel) accumulates with fused multiply-adds from +0 and
-//!   stores `acc + 0`: `fma(a3, 1, fma(a2, z, fma(a1, y, a0·x))) + 0`. [`dot_row`] does exactly
-//!   that, on every platform ([`crate::openblas`]).
+//! - **The product.** numpy evaluates `affine.dot(points)` with BLAS `dgemm` (`dgemv` for a
+//!   single point), which on x86-64 with FMA (OpenBLAS's Haswell kernels) accumulates with
+//!   fused multiply-adds from +0 and stores `acc + 0`: `fma(a3, 1, fma(a2, z, fma(a1, y,
+//!   a0·x))) + 0`. [`crate::openblas::point_row`] does exactly that, on every platform.
 //! - **Displacement fields.** A point is looked up when *every* point lies within 1e-3 voxel
 //!   of a grid node; otherwise each component is interpolated with SciPy's cubic
 //!   `map_coordinates` (mode `constant`, `cval` NaN) and NaN components (outside the field)
@@ -47,44 +47,20 @@ use larmorx_interp::ndimage::{Mode, Spline};
 use rayon::prelude::*;
 
 use crate::TransformError;
+use crate::openblas;
 
 /// Points per parallel task.
 const CHUNK: usize = 8192;
 
-/// Row `r` of `m` times the homogeneous point `(p, 1)`, accumulated as numpy's BLAS does:
-/// `fma(m[r][2], p2, fma(m[r][1], p1, m[r][0]·p0)) + m[r][3]` (the last term's product with 1
-/// is exact, so the final fused step is a plain addition), then `+ 0`: `dgemm` adds its result
-/// to a C cleared to +0, so an exact zero is +0 (starting the chain from +0 instead of the
-/// first product changes only the sign of a zero, which that addition settles).
-#[inline(always)]
-pub fn dot_row(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
-    let s = m[r][0] * p[0];
-    let s = m[r][1].mul_add(p[1], s);
-    let s = m[r][2].mul_add(p[2], s);
-    (s + m[r][3]) + 0.0
-}
-
-/// [`dot_row`] when only one point is mapped: numpy then multiplies the matrix by the point
-/// with `dgemv` instead of `dgemm`, and OpenBLAS's Haswell `dgemv_t` kernel multiplies the four
-/// terms in the lanes of one register and adds them pairwise, `(m0·x + m2·z) + (m1·y + m3)`,
-/// into a `y` cleared to +0 (`dgemv_t_microk_haswell-4.c`).
-#[inline(always)]
-pub fn dot_row_single(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
-    ((m[r][0] * p[0] + m[r][2] * p[2]) + (m[r][1] * p[1] + m[r][3])) + 0.0
-}
-
 /// `_apply_affine(p, m, 3)` for one point that is already float32-valued, out of `n` points
-/// mapped together (numpy's product differs for a single point: [`dot_row_single`]).
+/// mapped together: `affine.dot(points)` is `dgemm` for two or more points
+/// ([`openblas::point_row`]) and `dgemv` for one ([`openblas::point_row_single`]).
 #[inline(always)]
 fn apply(m: &Mat4, p: [f64; 3], n: usize) -> [f64; 3] {
     if n == 1 {
-        [
-            dot_row_single(m, 0, p),
-            dot_row_single(m, 1, p),
-            dot_row_single(m, 2, p),
-        ]
+        std::array::from_fn(|r| openblas::point_row_single(m, r, p))
     } else {
-        [dot_row(m, 0, p), dot_row(m, 1, p), dot_row(m, 2, p)]
+        std::array::from_fn(|r| openblas::point_row(m, r, p))
     }
 }
 
@@ -344,7 +320,8 @@ mod tests {
         // An exact zero is +0, as dgemm stores it, even from -0 terms.
         let mut m = AFF;
         m[0] = [-1.0, 0.0, 0.0, -0.0];
-        assert_eq!(dot_row(&m, 0, [0.0, -0.0, 0.0]).to_bits(), 0.0f64.to_bits());
+        let zero = apply(&m, [0.0, -0.0, 0.0], 2)[0];
+        assert_eq!(zero.to_bits(), 0.0f64.to_bits());
     }
 
     #[test]

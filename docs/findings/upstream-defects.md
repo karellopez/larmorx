@@ -146,8 +146,8 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | – | – |
 | AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | – | – |
 | AFNI-15 † | AFNI build | parallel make races | b | none | – | – |
-| FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md) | decide |
+| FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
+| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-04 † | mcflirt `-gdt` | reference gradient unused; absolute `-out` aborts | c, a | none | not supported | – |
 | FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | ignored with a warning; `-edge` explained (2026-10-11) | – |
@@ -280,7 +280,12 @@ task:
 - Item 3, replicas: **the same corrected default as the originals**; the compatibility switch
   must give **exactly the original program's result**.
 - Item 4, FSL-02: **measure first** (against mcflirt's band and the synthetic ground truth),
-  then decide between fixing by default and keeping it opt-in.
+  then decide between fixing by default and keeping it opt-in. **Measured 2026-10-11**
+  ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)): the corrected count
+  moves the matrices by about mcflirt's own variability (0.014 to 0.033 mm at the 95th
+  percentile on 19 real runs; band 0.016 to 0.10 mm; 24 of 28 band runs within the band) and
+  is not more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3, by
+  0.001 to 0.16 mm). It stays opt-in; the user decides.
 - Item 5, refusals: **a switch for these too.** Where the original's output is deterministic
   (e.g. a one-voxel image with infinite spacing), the switch reproduces it exactly. Where it
   depends on memory contents and changes from run to run (an unfilled buffer, an out-of-bounds
@@ -928,8 +933,10 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   *source* grid on the *target* array. It is the right derivative only when the target's axes
   match the source's (the native boldref); in T1w or standard space it differentiates along
   whatever target axis has that index.
-- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`. Not yet exercised by an oracle run
-  (ds000005 has no field maps; ds001600 is planned).
+- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`. Not yet exercised by an oracle run:
+  ds000005 has no field maps, and the ds001600 run (2026-10-11) processed its field maps but
+  skipped its four BOLD runs ("Too short BOLD series (<= 5 timepoints)"); measured instead on
+  real geometry with a synthetic field map (below).
 - **fMRIPrep:** the Jacobian is on by default for PEPOLAR field maps
   (`fmriprep/workflows/base.py:878-887`); outputs in T1w and standard spaces whose axes are
   ordered differently from the BOLD grid's.
@@ -942,6 +949,15 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   two differ; `upstream_defects="reproduce"` gives fMRIPrep's
   (`larmorx_transform::resample_series`, `lx.transforms.resample_series`). The effect is in
   [validation/resample-series.md](../validation/resample-series.md) ("D13 fix pass").
+- **Measured on real geometry** (2026-10-11,
+  [validation/resample-series-jacobian.md](../validation/resample-series-jacobian.md)): the
+  grids and transforms of fMRIPrep's ds000005 run with a synthetic 3 T-like field map (shifts up
+  to 3.6 voxels, exact factor 0.57 to 1.43). On the native grid the two factors are
+  bit-identical. In T1w space fMRIPrep's factor spans only 0.82 to 1.18; it is off the exact
+  factor by more than 0.01 (1 % of the signal) in 40 % of brain voxels, by more than 0.05 in
+  21 %, with a 99th-percentile error of 0.23. In MNI res-2: 33 % and 14 %, 99th percentile
+  0.16. larmorx's factor is within 0.002 (T1w) and 0.008 (MNI) of the exact one at the 99th
+  percentile.
 - **D13 / gap:** done.
 
 ### PIPE-04 `.h5` composites read in name order — (c), latent

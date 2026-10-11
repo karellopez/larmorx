@@ -168,9 +168,18 @@ def summary(results: list[CaseResult]) -> list[str]:
             ),
             default=0.0,
         )
+        # Differences beyond the values (headers, file names): "...; <what> changed".
+        others = [
+            rest.split("; ", 1)[1].removesuffix(" changed") for _, _, rest in cases if "; " in rest
+        ]
+        beyond = (
+            f", {len(others)} with other changes ({'; '.join(sorted(set(others)))})"
+            if others
+            else ""
+        )
         lines.append(
             f"  - {entry}: {len(cases)} case(s) named it, {len(changed)} with changed values "
-            f"(largest difference {worst:.3g}): "
+            f"(largest difference {worst:.3g}){beyond}: "
             + ", ".join(f"`{c}`" for c, _, _ in cases[:8])
             + (" …" if len(cases) > 8 else "")
         )

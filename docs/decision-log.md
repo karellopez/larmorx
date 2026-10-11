@@ -480,6 +480,27 @@ Decided by the user on the questions the defect register raised
   runs a fix pass that reports what the corrections change and checks that a defect is named
   exactly when the two passes differ. Golden cases record the default, plus `*.reproduce`
   cases whose checksums equal those recorded before D13.
+- **Measured:**
+  - **PIPE-03** on the grids and transforms of fMRIPrep's ds000005 run, with a synthetic 3 T-like
+    field map ([validation/resample-series-jacobian.md](validation/resample-series-jacobian.md)):
+    the native grid is unchanged (bit-identical); in T1w space fMRIPrep's factor is off the exact
+    one by more than 1 % of the signal in 40 % of brain voxels (99th percentile 0.23), in MNI
+    space in 33 % (0.16); larmorx's by at most 0.002 and 0.008.
+  - **FSL-01**: on mcflirt's band, the last volume's matrix changes; on the synthetic
+    `background` series mcflirt's last volume, started from the identity, converges to a 180°
+    rotation (106 mm from the true motion), the corrected one to 0.36 mm
+    ([validation/mri-hmc-normcorr-count.md](validation/mri-hmc-normcorr-count.md), ground
+    truth).
+  - **FSL-02** ([validation/mri-hmc-normcorr-count.md](validation/mri-hmc-normcorr-count.md)):
+    the corrected count moves larmorx's matrices by about mcflirt's own variability (0.014 to
+    0.033 mm at the 95th percentile on the 19 real runs, where the band is 0.016 to 0.10 mm;
+    24 of 28 band runs stay within the band, against 28 of 28 for `reproduce`), and it is not
+    more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3, by
+    0.001 to 0.16 mm). It stays opt-in until the user decides; the measurement gives no reason
+    to make it the default.
+- **Found while doing it:** the 3dTshift replica writes a metre or micrometre input's sform
+  unconverted (its qform matches AFNI's); the new unit cases are expected divergences in the
+  replica's record until its owner fixes it.
 
 ## Open decisions (PLAN.md §16)
 

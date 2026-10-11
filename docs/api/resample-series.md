@@ -137,7 +137,11 @@ the result, in both modes ([upstream-defects.md](upstream-defects.md); register 
 
 fMRIPrep's own calls (`grid-constant`, composites of two or three transforms) meet only PIPE-03,
 with field maps in T1w and standard spaces (PEPOLAR field maps apply the Jacobian by default).
-The parity record's "D13 fix pass" lists what the corrections change, case by case.
+The parity record's "D13 fix pass" lists what the corrections change, case by case. On the
+grids and transforms of a real fMRIPrep run, with a 3 T-like field map, fMRIPrep's factor is
+off the exact one by more than 1 % of the signal in 40 % of T1w-space brain voxels and 33 % of
+MNI-space ones (99th-percentile error 0.23 and 0.16), larmorx's by at most 0.002 and 0.008
+([validation/resample-series-jacobian.md](../validation/resample-series-jacobian.md)).
 
 ## Rust API
 

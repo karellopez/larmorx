@@ -4,8 +4,8 @@
 
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
 - **Reference:** mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7/mcflirt/`
-- **Test data:** larmorx-testdata `28167dea9be5`, tier `standard`
-- **Generated:** 2026-10-10 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
 
 **fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band: the worst of three noise realisations and the reverse order):
 
@@ -35,6 +35,18 @@
 | synthetic/orientation | 6 | 0.0293 | 0.0713 | 0.0027 / 0.0164 | 0.019 / 0.080 | 0.9971 | 3/72 |
 
 **Against the synthetic ground truth** (mean RMS deviation from the true motion, 27 runs): larmorx 0.4090 mm, mcflirt 0.4143 mm.
+
+- **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
+  - FSL-01: 111 case(s) named it, 110 with changed values (largest difference 1.54e+03), 111 with other changes (1 of 113 matrices, by up to 0.0057 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 113 matrices, by up to 0.00872 mm; 1 of 113 matrices, by up to 0.00872 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.016 mm; 1 of 12 matrices, by up to 0.016 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.016 mm; small_mcf.par text; 1 of 12 matrices, by up to 0.0199 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0222 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0232 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0274 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0364 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.041 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0427 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0872 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; plain.par text; plain_abs.rms text; plain_abs_mean.rms text; plain_rel.rms text; plain_rel_mean.rms text; 1 of 12 matrices, by up to 0.167 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.395 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.835 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 2 matrices, by up to 0.0539 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 204 matrices, by up to 0.0102 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 204 matrices, by up to 0.0116 mm; 1 of 204 matrices, by up to 0.0116 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 208 matrices, by up to 0.0101 mm; 1 of 208 matrices, by up to 0.0101 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 208 matrices, by up to 0.0163 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 239 matrices, by up to 0.0138 mm; 1 of 239 matrices, by up to 0.0138 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 239 matrices, by up to 0.0148 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.00801 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0105 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.014 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0196 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0239 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0258 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.026 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0316 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0319 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0502 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0603 mm; 1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0955 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.103 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.131 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.137 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 72.1 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 258 matrices, by up to 0.0236 mm; 1 of 258 matrices, by up to 0.0236 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 258 matrices, by up to 0.0238 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 5 matrices, by up to 10.2 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 5 matrices, by up to 4.62 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 0.0524 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 102 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 106 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 2.13 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 63 matrices, by up to 0.0166 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 63 matrices, by up to 0.0169 mm; 1 of 63 matrices, by up to 0.0169 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 69 matrices, by up to 0.015 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 69 matrices, by up to 0.0247 mm; 1 of 69 matrices, by up to 0.0247 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 12 of 12 matrices, by up to 0.301 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 240 of 240 matrices, by up to 0.0288 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 5 of 12 matrices, by up to inf mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0251 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0262 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 9 of 12 matrices, by up to inf mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz.mat; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 12 of 12 matrices, by up to 0.46 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0303 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0387 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; out_mcf.nii.gz.par text; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0217 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/default`, `real/ds000005/fmriprep`, `real/ds000005/fmriprep-repeat2`, `real/ds000005/fmriprep-repeat3`, `real/ds000005/fmriprep-reports`, `real/ds000005/opt-2d`, `real/ds000005/opt-bins64`, `real/ds000005/opt-cost-corratio` …
+  - FSL-03: 5 case(s) named it, 5 with changed values (largest difference 35), 5 with other changes (12 of 12 matrices, by up to 0.301 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 240 of 240 matrices, by up to 0.0288 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0251 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0262 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-2d`, `syn/geometry/thin-slab/default`, `syn/geometry/thin-slab/fov10`, `syn/geometry/thin-slab/rotation2`, `syn/motion/small/2d`
+  - FSL-05: 1 case(s) named it, 1 with changed values (largest difference 20), 1 with other changes (1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-scaling3`
+  - FSL-06: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit [255]): `syn/motion/small/unknown-cost`
+  - FSL-08: 5 case(s) named it, 5 with changed values (largest difference 43), 5 with other changes (files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 12 of 12 matrices, by up to 0.46 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0303 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0387 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-meanvol`, `real/ds000005/opt-meanvol-noref`, `real/ds000005/opt-stats`, `syn/motion/small/meanvol`, `syn/motion/small/stats`
+  - FSL-09: 102 case(s) named it, 102 with changed values (largest difference 987), 95 with other changes (1 of 113 matrices, by up to 0.0057 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 113 matrices, by up to 0.00872 mm; 1 of 113 matrices, by up to 0.00872 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.016 mm; 1 of 12 matrices, by up to 0.016 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.016 mm; small_mcf.par text; 1 of 12 matrices, by up to 0.0199 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0222 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0232 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0274 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0364 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.041 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0427 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0872 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.0962 mm; plain.par text; plain_abs.rms text; plain_abs_mean.rms text; plain_rel.rms text; plain_rel_mean.rms text; 1 of 12 matrices, by up to 0.167 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.395 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 12 matrices, by up to 0.835 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 2 matrices, by up to 0.0539 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 204 matrices, by up to 0.0102 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 204 matrices, by up to 0.0116 mm; 1 of 204 matrices, by up to 0.0116 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 208 matrices, by up to 0.0101 mm; 1 of 208 matrices, by up to 0.0101 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 208 matrices, by up to 0.0163 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 239 matrices, by up to 0.0138 mm; 1 of 239 matrices, by up to 0.0138 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 239 matrices, by up to 0.0148 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.00801 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0105 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.014 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0196 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0239 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0258 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.026 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0316 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0319 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0502 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0603 mm; 1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.0955 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.103 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.131 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 0.137 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 240 matrices, by up to 72.1 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 258 matrices, by up to 0.0236 mm; 1 of 258 matrices, by up to 0.0236 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 258 matrices, by up to 0.0238 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 0.0524 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 102 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 6 matrices, by up to 106 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 69 matrices, by up to 0.015 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 1 of 69 matrices, by up to 0.0247 mm; 1 of 69 matrices, by up to 0.0247 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 12 of 12 matrices, by up to 0.301 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 240 of 240 matrices, by up to 0.0288 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0251 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 7 of 8 matrices, by up to 0.0262 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz.mat; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 12 of 12 matrices, by up to 0.46 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0303 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; 240 of 240 matrices, by up to 0.0387 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 12 matrices, by up to 0.0962 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; 1 of 240 matrices, by up to 0.0603 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; out_mcf.nii.gz.par text; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0217 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/default`, `real/ds000005/fmriprep`, `real/ds000005/fmriprep-repeat2`, `real/ds000005/fmriprep-repeat3`, `real/ds000005/fmriprep-reports`, `real/ds000005/opt-2d`, `real/ds000005/opt-bins64`, `real/ds000005/opt-cost-corratio` …
+  - FSL-10: 3 case(s) named it, 3 with changed values (largest difference 44), 3 with other changes (out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0217 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz: type or units; 1 of 216 matrices, by up to 0.0221 mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds003345/default`, `real/ds003345/fmriprep`, `real/ds003345/fmriprep-reports`
+  - FSL-13: 1 case(s) named it, 1 with changed values (largest difference 3), 1 with other changes (files out_mcf.nii.gz.mat; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `syn/cli/rmsrel-only`
+  - FSL-14: 2 case(s) named it, 2 with changed values (largest difference 1.54e+03), 2 with other changes (5 of 12 matrices, by up to inf mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; 9 of 12 matrices, by up to inf mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `syn/content/nan/default`, `syn/content/nan/reffile`
+  - Matrices (RMS deviation, radius 80 mm): the corrections change 109 run(s); on the 52 real runs a run's largest change is 0.0239 mm (median) and at most 72.1 mm; the largest is 106 mm, in `syn/content/background/default`; non-finite matrices on one side in `syn/content/nan/default`, `syn/content/nan/reffile`.
 
 ## mcflirt's own variability band
 
@@ -217,7 +229,7 @@ mcflirt's defaults (middle volume as reference)
 |---|---|---|
 | `real/ds000005/opt-gdt` | option sweep: -gdt (writes grefvol_<out>, impossible with an absolute -out) | mcflirt exit [-6]: terminate called after throwing an instance of 'NiftiIO::NiftiException' what(): Error: cant open file grefvol_~/VScode_projects/super_fmrip… |
 | `real/ds003763-truncated/default` | a .nii.gz truncated as published (65,536 bytes) | mcflirt exit [-6]: Image Exception : #22 :: Failed to read volume <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz Erro; lar… |
-| `syn/cli/help` | -help alone | mcflirt exit [1]: ; larmorx exit [1]: |
+| `syn/cli/help` | -help alone | mcflirt exit [1]: ; larmorx exit [1]: larmorx: upstream defect FSL-07 (mcflirt) reproduced: -help alone exits 1, as in mcflirt [LARMORX_UPSTREAM_DEFECTS=fix co… |
 | `syn/cli/no-arguments` | no arguments | mcflirt exit [1]: ; larmorx exit [1]: |
 | `syn/cli/refvol-minus2` | -refvol -2 | mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid … |
 | `syn/cli/stages0` | -stages 0 with -reffile: the reference is never read | mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtim… |
@@ -231,8 +243,8 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5e7fb83f1fa2-dirty) |
-| larmorx-testdata | 28167dea9be5 |
+| larmorx | 0.0.1 (4a087a77882b-dirty) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -247,137 +259,137 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 
 | Case | Status | Checks passed | What it tests |
 |---|---|---|---|
-| `real/ds000005/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds000005/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds000005/fmriprep-repeat2` | pass | 10/10 | repeat of real/ds000005/fmriprep (run-to-run determinism) |
-| `real/ds000005/fmriprep-repeat3` | pass | 10/10 | repeat of real/ds000005/fmriprep (run-to-run determinism) |
-| `real/ds000005/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds000005/opt-2d` | pass | 15/15 | option sweep: -2d |
-| `real/ds000005/opt-bins64` | pass | 15/15 | option sweep: -bins 64 |
-| `real/ds000005/opt-cost-corratio` | pass | 15/15 | option sweep: -cost corratio |
-| `real/ds000005/opt-cost-leastsquares` | pass | 15/15 | option sweep: -cost leastsquares |
-| `real/ds000005/opt-cost-mutualinfo` | pass | 15/15 | option sweep: -cost mutualinfo |
-| `real/ds000005/opt-cost-normcorr` | pass | 15/15 | option sweep: -cost normcorr |
-| `real/ds000005/opt-cost-normmi` | pass | 15/15 | option sweep: -cost normmi |
-| `real/ds000005/opt-cost-woods` | pass | 4/4 | option sweep: -cost woods |
-| `real/ds000005/opt-dof12` | pass | 15/15 | option sweep: -dof 12 |
-| `real/ds000005/opt-dof7` | pass | 15/15 | option sweep: -dof 7 |
-| `real/ds000005/opt-dof9` | pass | 15/15 | option sweep: -dof 9 |
-| `real/ds000005/opt-fudge` | pass | 15/15 | option sweep: -fudge |
+| `real/ds000005/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds000005/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds000005/fmriprep-repeat2` | pass | 11/11 | repeat of real/ds000005/fmriprep (run-to-run determinism) |
+| `real/ds000005/fmriprep-repeat3` | pass | 11/11 | repeat of real/ds000005/fmriprep (run-to-run determinism) |
+| `real/ds000005/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds000005/opt-2d` | pass | 16/16 | option sweep: -2d |
+| `real/ds000005/opt-bins64` | pass | 16/16 | option sweep: -bins 64 |
+| `real/ds000005/opt-cost-corratio` | pass | 16/16 | option sweep: -cost corratio |
+| `real/ds000005/opt-cost-leastsquares` | pass | 16/16 | option sweep: -cost leastsquares |
+| `real/ds000005/opt-cost-mutualinfo` | pass | 16/16 | option sweep: -cost mutualinfo |
+| `real/ds000005/opt-cost-normcorr` | pass | 16/16 | option sweep: -cost normcorr |
+| `real/ds000005/opt-cost-normmi` | pass | 16/16 | option sweep: -cost normmi |
+| `real/ds000005/opt-cost-woods` | pass | 5/5 | option sweep: -cost woods |
+| `real/ds000005/opt-dof12` | pass | 16/16 | option sweep: -dof 12 |
+| `real/ds000005/opt-dof7` | pass | 16/16 | option sweep: -dof 7 |
+| `real/ds000005/opt-dof9` | pass | 16/16 | option sweep: -dof 9 |
+| `real/ds000005/opt-fudge` | pass | 16/16 | option sweep: -fudge |
 | `real/ds000005/opt-gdt` | both-error | – | option sweep: -gdt (writes grefvol_<out>, impossible with an absolute -out) |
-| `real/ds000005/opt-meanvol` | pass | 17/17 | option sweep: -meanvol |
-| `real/ds000005/opt-meanvol-noref` | pass | 17/17 | -meanvol without -reffile |
-| `real/ds000005/opt-nn_final` | pass | 15/15 | option sweep: -nn_final |
-| `real/ds000005/opt-refvol0` | pass | 15/15 | default with -refvol 0 |
-| `real/ds000005/opt-rotation2` | pass | 15/15 | option sweep: -rotation 2 |
-| `real/ds000005/opt-scaling3` | pass | 15/15 | option sweep: -scaling 3 |
-| `real/ds000005/opt-smooth0` | pass | 15/15 | option sweep: -smooth 0 |
-| `real/ds000005/opt-smooth2` | pass | 15/15 | option sweep: -smooth 2 |
-| `real/ds000005/opt-spline_final` | pass | 15/15 | option sweep: -spline_final |
-| `real/ds000005/opt-stages1` | pass | 15/15 | option sweep: -stages 1 |
-| `real/ds000005/opt-stages2` | pass | 15/15 | option sweep: -stages 2 |
-| `real/ds000005/opt-stats` | pass | 21/21 | option sweep: -stats |
-| `real/ds000117/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds000117/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds000117/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds000122/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds000122/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds000122/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds000210-rest-echo2/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds000210-rest-echo2/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds000210-rest-echo2/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds000258-bigendian/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds000258-bigendian/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds000258-bigendian/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds003345/default` | fail | 14/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds003345/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds003345/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds000005/opt-meanvol` | pass | 18/18 | option sweep: -meanvol |
+| `real/ds000005/opt-meanvol-noref` | pass | 18/18 | -meanvol without -reffile |
+| `real/ds000005/opt-nn_final` | pass | 16/16 | option sweep: -nn_final |
+| `real/ds000005/opt-refvol0` | pass | 16/16 | default with -refvol 0 |
+| `real/ds000005/opt-rotation2` | pass | 16/16 | option sweep: -rotation 2 |
+| `real/ds000005/opt-scaling3` | pass | 16/16 | option sweep: -scaling 3 |
+| `real/ds000005/opt-smooth0` | pass | 16/16 | option sweep: -smooth 0 |
+| `real/ds000005/opt-smooth2` | pass | 16/16 | option sweep: -smooth 2 |
+| `real/ds000005/opt-spline_final` | pass | 16/16 | option sweep: -spline_final |
+| `real/ds000005/opt-stages1` | pass | 16/16 | option sweep: -stages 1 |
+| `real/ds000005/opt-stages2` | pass | 16/16 | option sweep: -stages 2 |
+| `real/ds000005/opt-stats` | pass | 22/22 | option sweep: -stats |
+| `real/ds000117/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds000117/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds000117/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds000122/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds000122/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds000122/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds000210-rest-echo2/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds000210-rest-echo2/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds000210-rest-echo2/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds000258-bigendian/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds000258-bigendian/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds000258-bigendian/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds003345/default` | fail | 15/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds003345/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds003345/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
 | `real/ds003763-truncated/default` | both-error | – | a .nii.gz truncated as published (65,536 bytes) |
-| `real/ds005040/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds005040/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds005040/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds006010/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds006010/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds006010/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `real/ds006736/default` | pass | 15/15 | mcflirt's defaults (middle volume as reference) |
-| `real/ds006736/fmriprep` | pass | 10/10 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
-| `real/ds006736/fmriprep-reports` | pass | 15/15 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
-| `syn/cli/bare-input` | pass | 10/10 | input given without -in |
-| `syn/cli/dof5` | pass | 16/16 | -dof 5 (below 6) |
+| `real/ds005040/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds005040/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds005040/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds006010/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds006010/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds006010/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `real/ds006736/default` | pass | 16/16 | mcflirt's defaults (middle volume as reference) |
+| `real/ds006736/fmriprep` | pass | 11/11 | fMRIPrep's command (nipype MCFLIRT(save_mats=True), ref_file) |
+| `real/ds006736/fmriprep-reports` | pass | 16/16 | fMRIPrep's command plus -plots -rmsrel -rmsabs |
+| `syn/cli/bare-input` | pass | 11/11 | input given without -in |
+| `syn/cli/dof5` | pass | 17/17 | -dof 5 (below 6) |
 | `syn/cli/help` | both-error | – | -help alone |
-| `syn/cli/help-with-input` | pass | 2/2 | -help after -in |
+| `syn/cli/help-with-input` | pass | 3/3 | -help after -in |
 | `syn/cli/no-arguments` | both-error | – | no arguments |
-| `syn/cli/plots-only` | pass | 5/5 | -plots without -mats: is a .mat directory created |
-| `syn/cli/refvol-minus1` | pass | 15/15 | -refvol -1 |
+| `syn/cli/plots-only` | pass | 6/6 | -plots without -mats: is a .mat directory created |
+| `syn/cli/refvol-minus1` | pass | 16/16 | -refvol -1 |
 | `syn/cli/refvol-minus2` | both-error | – | -refvol -2 |
-| `syn/cli/rmsrel-only` | pass | 11/11 | -rmsrel without -mats: which files appear in the .mat directory |
+| `syn/cli/rmsrel-only` | pass | 12/12 | -rmsrel without -mats: which files appear in the .mat directory |
 | `syn/cli/stages0` | both-error | – | -stages 0 with -reffile: the reference is never read |
 | `syn/cli/unknown-option-middle` | both-error | – | an unknown option followed by others |
-| `syn/content/background/default` | pass | 15/15 | defaults |
-| `syn/content/background/reffile` | pass | 16/16 | -reffile phantom/ref |
-| `syn/content/nan/default` | pass | 15/15 | defaults |
-| `syn/content/nan/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/content/ramp/reffile` | pass | 4/4 | ramp moved along x: the default cost finds the shifts |
-| `syn/content/ramp/reffile-smooth0` | pass | 4/4 | ramp with -smooth 0 (the unweighted cost) |
-| `syn/dtypes/float32/default` | pass | 15/15 | defaults |
-| `syn/dtypes/float32/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/dtypes/float64/default` | pass | 15/15 | defaults |
-| `syn/dtypes/float64/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/dtypes/int16-scaled/default` | pass | 15/15 | defaults |
-| `syn/dtypes/int16-scaled/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/dtypes/uint16/default` | pass | 15/15 | defaults |
-| `syn/dtypes/uint16/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/dtypes/uint8/default` | pass | 15/15 | defaults |
-| `syn/dtypes/uint8/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/geometry/single-volume-3d/default` | pass | 14/14 | defaults |
-| `syn/geometry/single-volume-3d/reffile` | pass | 14/14 | -reffile phantom/ref |
-| `syn/geometry/single-volume/default` | pass | 14/14 | defaults |
-| `syn/geometry/single-volume/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/geometry/thin-slab/default` | pass | 16/16 | 16 mm slab: in-plane registration |
-| `syn/geometry/thin-slab/fov10` | pass | 15/15 | -fov 10: the 8 mm reference grid still has fewer than 3 slices |
-| `syn/geometry/thin-slab/rotation2` | pass | 15/15 | in-plane mode prints the tolerances |
-| `syn/geometry/tiny/default` | pass | 15/15 | syn/geometry/tiny/default |
-| `syn/geometry/two-volumes/default` | pass | 14/14 | defaults |
-| `syn/geometry/two-volumes/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/motion/identical-copies/default` | pass | 15/15 | defaults |
-| `syn/motion/identical-copies/reffile` | pass | 16/16 | -reffile phantom/ref |
-| `syn/motion/identical-copies/reffile-fudge` | pass | 16/16 | -fudge on identical copies: every volume starts from the identity |
-| `syn/motion/large/default` | pass | 15/15 | defaults |
-| `syn/motion/large/reffile` | pass | 16/16 | -reffile phantom/ref |
-| `syn/motion/small/2d` | pass | 16/16 | -2d forces in-plane registration |
-| `syn/motion/small/default` | pass | 15/15 | defaults |
-| `syn/motion/small/default-report` | pass | 16/16 | progress messages, middle-volume reference |
-| `syn/motion/small/dof12` | pass | 16/16 | syn/motion/small/dof12 |
-| `syn/motion/small/dof7` | pass | 16/16 | syn/motion/small/dof7 |
-| `syn/motion/small/fsloutputtype-nifti` | pass | 16/16 | FSLOUTPUTTYPE=NIFTI with -out ending in .nii.gz |
-| `syn/motion/small/fudge` | pass | 16/16 | -fudge: no initialisation from the previous volume |
-| `syn/motion/small/init` | pass | 16/16 | -init with a 5 mm x translation |
-| `syn/motion/small/meanvol` | pass | 17/17 | syn/motion/small/meanvol |
-| `syn/motion/small/nifti2` | pass | 16/16 | FSLOUTPUTTYPE=NIFTI2_GZ |
-| `syn/motion/small/nn_final` | pass | 16/16 | syn/motion/small/nn_final |
+| `syn/content/background/default` | pass | 16/16 | defaults |
+| `syn/content/background/reffile` | pass | 17/17 | -reffile phantom/ref |
+| `syn/content/nan/default` | pass | 16/16 | defaults |
+| `syn/content/nan/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/content/ramp/reffile` | pass | 5/5 | ramp moved along x: the default cost finds the shifts |
+| `syn/content/ramp/reffile-smooth0` | pass | 5/5 | ramp with -smooth 0 (the unweighted cost) |
+| `syn/dtypes/float32/default` | pass | 16/16 | defaults |
+| `syn/dtypes/float32/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/dtypes/float64/default` | pass | 16/16 | defaults |
+| `syn/dtypes/float64/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/dtypes/int16-scaled/default` | pass | 16/16 | defaults |
+| `syn/dtypes/int16-scaled/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/dtypes/uint16/default` | pass | 16/16 | defaults |
+| `syn/dtypes/uint16/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/dtypes/uint8/default` | pass | 16/16 | defaults |
+| `syn/dtypes/uint8/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/geometry/single-volume-3d/default` | pass | 15/15 | defaults |
+| `syn/geometry/single-volume-3d/reffile` | pass | 15/15 | -reffile phantom/ref |
+| `syn/geometry/single-volume/default` | pass | 15/15 | defaults |
+| `syn/geometry/single-volume/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/geometry/thin-slab/default` | pass | 17/17 | 16 mm slab: in-plane registration |
+| `syn/geometry/thin-slab/fov10` | pass | 16/16 | -fov 10: the 8 mm reference grid still has fewer than 3 slices |
+| `syn/geometry/thin-slab/rotation2` | pass | 16/16 | in-plane mode prints the tolerances |
+| `syn/geometry/tiny/default` | pass | 16/16 | syn/geometry/tiny/default |
+| `syn/geometry/two-volumes/default` | pass | 15/15 | defaults |
+| `syn/geometry/two-volumes/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/motion/identical-copies/default` | pass | 16/16 | defaults |
+| `syn/motion/identical-copies/reffile` | pass | 17/17 | -reffile phantom/ref |
+| `syn/motion/identical-copies/reffile-fudge` | pass | 17/17 | -fudge on identical copies: every volume starts from the identity |
+| `syn/motion/large/default` | pass | 16/16 | defaults |
+| `syn/motion/large/reffile` | pass | 17/17 | -reffile phantom/ref |
+| `syn/motion/small/2d` | pass | 17/17 | -2d forces in-plane registration |
+| `syn/motion/small/default` | pass | 16/16 | defaults |
+| `syn/motion/small/default-report` | pass | 17/17 | progress messages, middle-volume reference |
+| `syn/motion/small/dof12` | pass | 17/17 | syn/motion/small/dof12 |
+| `syn/motion/small/dof7` | pass | 17/17 | syn/motion/small/dof7 |
+| `syn/motion/small/fsloutputtype-nifti` | pass | 17/17 | FSLOUTPUTTYPE=NIFTI with -out ending in .nii.gz |
+| `syn/motion/small/fudge` | pass | 17/17 | -fudge: no initialisation from the previous volume |
+| `syn/motion/small/init` | pass | 17/17 | -init with a 5 mm x translation |
+| `syn/motion/small/meanvol` | pass | 18/18 | syn/motion/small/meanvol |
+| `syn/motion/small/nifti2` | pass | 17/17 | FSLOUTPUTTYPE=NIFTI2_GZ |
+| `syn/motion/small/nn_final` | pass | 17/17 | syn/motion/small/nn_final |
 | `syn/motion/small/no-fsloutputtype` | expected-divergence | 1/1 | FSLOUTPUTTYPE unset |
 | `syn/motion/small/no-input` | both-error | – | no -in |
-| `syn/motion/small/no-out` | pass | 11/11 | no -out: the output name is <input>_mcf |
-| `syn/motion/small/out-no-ext` | pass | 16/16 | -out without an extension |
-| `syn/motion/small/out-twice` | pass | 23/23 | the same -out twice: the second .mat directory gets a '+' |
-| `syn/motion/small/reffile` | pass | 16/16 | -reffile phantom/ref |
-| `syn/motion/small/reffile-4d` | pass | 15/15 | a 4D file as -reffile (its first volume is used) |
+| `syn/motion/small/no-out` | pass | 12/12 | no -out: the output name is <input>_mcf |
+| `syn/motion/small/out-no-ext` | pass | 17/17 | -out without an extension |
+| `syn/motion/small/out-twice` | pass | 24/24 | the same -out twice: the second .mat directory gets a '+' |
+| `syn/motion/small/reffile` | pass | 17/17 | -reffile phantom/ref |
+| `syn/motion/small/reffile-4d` | pass | 16/16 | a 4D file as -reffile (its first volume is used) |
 | `syn/motion/small/reffile-grid2` | both-error | – | reference on a different grid |
-| `syn/motion/small/reffile-ras` | pass | 15/15 | reference stored RAS (x-flipped data): same physical image as phantom/ref |
-| `syn/motion/small/refvol-0` | pass | 15/15 | syn/motion/small/refvol-0 |
+| `syn/motion/small/reffile-ras` | pass | 16/16 | reference stored RAS (x-flipped data): same physical image as phantom/ref |
+| `syn/motion/small/refvol-0` | pass | 16/16 | syn/motion/small/refvol-0 |
 | `syn/motion/small/refvol-out-of-range` | both-error | – | -refvol 12 with 12 volumes |
-| `syn/motion/small/report` | pass | 16/16 | progress messages |
-| `syn/motion/small/sinc_final` | pass | 16/16 | syn/motion/small/sinc_final |
-| `syn/motion/small/smooth0` | pass | 16/16 | syn/motion/small/smooth0 |
-| `syn/motion/small/spline_final` | pass | 16/16 | syn/motion/small/spline_final |
-| `syn/motion/small/stages1` | pass | 16/16 | syn/motion/small/stages1 |
-| `syn/motion/small/stages4` | pass | 16/16 | syn/motion/small/stages4 |
-| `syn/motion/small/stats` | pass | 22/22 | syn/motion/small/stats |
-| `syn/motion/small/unknown-cost` | pass | 16/16 | an unknown cost name |
+| `syn/motion/small/report` | pass | 17/17 | progress messages |
+| `syn/motion/small/sinc_final` | pass | 17/17 | syn/motion/small/sinc_final |
+| `syn/motion/small/smooth0` | pass | 17/17 | syn/motion/small/smooth0 |
+| `syn/motion/small/spline_final` | pass | 17/17 | syn/motion/small/spline_final |
+| `syn/motion/small/stages1` | pass | 17/17 | syn/motion/small/stages1 |
+| `syn/motion/small/stages4` | pass | 17/17 | syn/motion/small/stages4 |
+| `syn/motion/small/stats` | pass | 23/23 | syn/motion/small/stats |
+| `syn/motion/small/unknown-cost` | pass | 17/17 | an unknown cost name |
 | `syn/motion/small/unknown-option` | both-error | – | -edge (offered by nipype) is not an mcflirt option |
-| `syn/orientation/oblique/default` | pass | 15/15 | defaults |
-| `syn/orientation/oblique/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/orientation/ras-unflipped/default` | pass | 15/15 | defaults |
-| `syn/orientation/ras-unflipped/reffile` | pass | 15/15 | -reffile phantom/ref |
-| `syn/orientation/ras/default` | pass | 15/15 | defaults |
-| `syn/orientation/ras/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/orientation/oblique/default` | pass | 16/16 | defaults |
+| `syn/orientation/oblique/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/orientation/ras-unflipped/default` | pass | 16/16 | defaults |
+| `syn/orientation/ras-unflipped/reffile` | pass | 16/16 | -reffile phantom/ref |
+| `syn/orientation/ras/default` | pass | 16/16 | defaults |
+| `syn/orientation/ras/reffile` | pass | 17/17 | -reffile phantom/ref |

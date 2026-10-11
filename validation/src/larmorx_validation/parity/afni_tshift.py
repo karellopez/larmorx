@@ -559,6 +559,7 @@ def _generated_d13(name: str, data: np.ndarray, src, path: Path) -> Path:  # typ
         return path
     scale = {"d13-metre": 0.001, "d13-micron": 1000.0}[name]
     affine = src.affine.copy()
+    affine[:3, 3] = (-100.0, 50.0, 20.0)  # an origin, in mm before the change of units
     affine[:3] *= scale
     img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
     img.header.set_xyzt_units("meter" if scale < 1 else "micron", "sec")
@@ -648,6 +649,20 @@ def _replica_program(implementation: str):
 
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
+
+#: Cases where the replica is known to differ from AFNI: the one check that differs, and why.
+#: Found by black-box runs of the replica's program on D13's cases (2026-10-11) and left to
+#: the replica's owner; once the replica matches, the case passes as usual.
+_REPLICA_UNITS = (
+    "the replica writes the input's sform unchanged (still in metres or micrometres, with the "
+    "units set to mm), where AFNI converts its linear part to millimetres (AFNI-07); the "
+    "replica's qform matches AFNI's. Found by D13's unit cases (2026-10-11); a replica fix is "
+    "pending"
+)
+REPLICA_DIVERGENCES = {
+    "defects/metre": ("geometry (sform)", _REPLICA_UNITS),
+    "defects/micron-copy": ("geometry (sform)", _REPLICA_UNITS),
+}
 
 
 @functools.cache
@@ -1007,6 +1022,10 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
                 )
             )
             _compare(checks, outputs["afni"], outputs["larmorx"])
+            known = REPLICA_DIVERGENCES.get(case.id) if implementation == "replica" else None
+            failed = {c.name for c in checks.checks if not c.passed}
+            if known and failed == {known[0]}:
+                raise Outcome(EXPECTED, known[1])
             if s.expect == "pass" and not copy:
                 _check_python(checks, s, args, image, outputs["larmorx"], implementation)
             if s.expect == "pass" and implementation == "original":

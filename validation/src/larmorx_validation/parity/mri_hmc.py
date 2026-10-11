@@ -889,12 +889,22 @@ def _highlights(results: list[CaseResult]) -> list[str]:
         (r.case, _METRICS[r.case]) for r in results if _METRICS.get(r.case, {}).get("fix_mat_mm")
     ]
     if fixed:
-        worst = max(fixed, key=lambda x: x[1]["fix_mat_mm"])
-        lines += [
-            f"  - Matrices: the corrections change {len(fixed)} run(s); the largest change is "
-            f"{worst[1]['fix_mat_mm']:.3g} mm (RMS deviation, radius 80 mm) in `{worst[0]}`.",
-            "",
-        ]
+        # Each run's largest matrix change (RMS deviation, radius 80 mm).
+        finite = [(c, m["fix_mat_mm"]) for c, m in fixed if np.isfinite(m["fix_mat_mm"])]
+        real = sorted(v for c, v in finite if c.startswith("real/"))
+        text = f"  - Matrices (RMS deviation, radius 80 mm): the corrections change {len(fixed)} run(s)"
+        if real:
+            text += (
+                f"; on the {len(real)} real runs a run's largest change is {np.median(real):.3g} "
+                f"mm (median) and at most {real[-1]:.3g} mm"
+            )
+        if finite:
+            worst = max(finite, key=lambda x: x[1])
+            text += f"; the largest is {worst[1]:.3g} mm, in `{worst[0]}`"
+        nonfinite = [c for c, m in fixed if not np.isfinite(m["fix_mat_mm"])]
+        if nonfinite:
+            text += "; non-finite matrices on one side in " + ", ".join(f"`{c}`" for c in nonfinite)
+        lines += [text + ".", ""]
     return [*lines, *_band_lines()]
 
 

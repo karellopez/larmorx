@@ -14,7 +14,8 @@ default is decided with the user (D13 item 4); this module measures it:
   other defects corrected, mcflirt's count) and the corrected count, next to mcflirt's own
   deviation under small perturbations of its input (the band);
 - against the synthetic ground truth (``larmorx-testdata`` ``synthetic/hmc``), where the runs
-  register to the phantom at rest: the mean RMS deviation from the true motion.
+  register to the phantom at rest or to their own middle volume: the mean RMS deviation from
+  the true motion.
 
 ``python -m larmorx_validation.parity.mri_hmc_count --out docs/validation`` writes
 ``mri-hmc-normcorr-count.md`` and its JSON.
@@ -110,6 +111,27 @@ def _compare(ours: np.ndarray, theirs: list[np.ndarray], centre: np.ndarray) -> 
     }
 
 
+def _truth_in_series(kw: dict[str, Any]) -> list | None:
+    """The ground truth of a synthetic series registered to one of its own volumes (mcflirt's
+    default, the middle one, or ``-refvol``): ``inv(E_r) E_v``, from the sidecar's matrices to
+    the phantom at rest."""
+    bold = str(kw["bold"])
+    if "reference" in kw or kw.get("mean") or "synthetic/hmc/" not in bold:
+        return None
+    import larmorx_testdata as td
+
+    rel = "synthetic/hmc/" + bold.split("synthetic/hmc/", 1)[1].replace(".nii.gz", ".json")
+    try:
+        sidecar = json.loads(Path(td.get(rel)).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    e = [np.array(m, dtype=np.float64) for m in sidecar.get("expected_fsl_mat") or []]
+    if not e:
+        return None
+    to_ref = np.linalg.inv(e[kw.get("ref_index", len(e) // 2)])
+    return [(to_ref @ m).tolist() for m in e]
+
+
 def measure() -> dict[str, Any]:
     import larmorx as lx
 
@@ -131,6 +153,8 @@ def measure() -> dict[str, Any]:
         reference = Path(kw.get("reference", kw["bold"]))
         centre = _fov_centre(reference)
         truth, _ = _truth(run)
+        if truth is None:
+            truth = _truth_in_series(kw)
         row: dict[str, Any] = {"band": band_for(case) or {}}
         mats = {}
         for name, extra in CONFIGS.items():
@@ -246,13 +270,19 @@ def report(data: dict[str, Any]) -> str:
         f"{within['reproduce']} of {n}, default {within['default']} of {n}, weights "
         f"{within['weights']} of {n}.",
         "",
+        "`default` differs from `reproduce` only where another correction applies: the last "
+        "volume (FSL-01) and in-plane runs (FSL-03). Where it leaves the band (the synthetic "
+        "`background` and `tiny` series) the difference is the last volume, and the ground truth "
+        "below shows which is closer: on `background` mcflirt's last volume, started from the "
+        "identity, converges to a 180° rotation.",
+        "",
     ]
     if truth_rows:
         lines += [
             "## Against the synthetic ground truth",
             "",
             "Mean RMS deviation from the true motion (mm), on the synthetic series registered to "
-            "the phantom at rest.",
+            "the phantom at rest (`-reffile`) or to their own middle volume (mcflirt's default).",
             "",
             table(("Run", "mcflirt", "reproduce", "default", "weights"), truth_rows),
             "",

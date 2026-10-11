@@ -160,7 +160,12 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 
 On fMRIPrep's command (`-reffile <boldref> -mats`) only FSL-01 applies: the last volume's
 matrix changes, the others are mcflirt's. The parity record's "D13 fix pass" lists, run by run,
-what the corrections change.
+what the corrections change. Where the last volume is close to its predecessor the two starts
+reach nearly the same matrix; where it is not, mcflirt's start from the identity can fail: on
+the synthetic `background` series (large translations over a non-zero background) mcflirt's
+last volume converges to a 180° rotation, 106 mm from the true motion, and the corrected one
+to 0.36 mm ([validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md),
+ground truth).
 
 ### The correlation count (FSL-02)
 
@@ -170,6 +175,9 @@ of points, which makes the correlation effectively uncentred. `normcorr_count="w
 by the sum of the weights instead, the weighted Pearson correlation. It is opt-in until the
 user decides (D13 item 4): its measurement against mcflirt's variability band and the synthetic
 ground truth is in [validation/mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md).
+In short, the corrected count moves the matrices by about mcflirt's own variability (0.014 to
+0.033 mm at the 95th percentile on 19 real runs, where mcflirt's band is 0.016 to 0.10 mm) and
+is not more accurate on the synthetic ground truth (better on 5 of 8 series, worse on 3).
 It cannot be combined with `upstream_defects="reproduce"`, and the command line has no option
 for it.
 

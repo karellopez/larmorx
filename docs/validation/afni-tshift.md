@@ -1,11 +1,11 @@
 # Parity: 3dTshift
 
-**All cases agree.** 241 cases on the `standard` tier: 222 pass, 17 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 245 cases on the `standard` tier: 222 pass, 17 rejected by both, 6 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
+- **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
 
 **Bit-identical: 162 of 222 passing cases** produce exactly the bytes of AFNI's output data.
 - Lagrange and weighted-sinc methods and copies: 120 of 123 bit-identical.
@@ -46,9 +46,10 @@
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | copy | 6 | 6 | 0 | 0 | 0 |
-| defects | 5 | 5 | 0 | 0 | 0 |
+| defects | 7 | 5 | 0 | 2 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
-| errors | 17 | 0 | 17 | 0 | 0 |
+| errors | 18 | 0 | 17 | 1 | 0 |
+| geometry | 1 | 0 | 0 | 1 | 0 |
 | header-timing | 12 | 12 | 0 | 0 | 0 |
 | methods | 84 | 84 | 0 | 0 | 0 |
 | options | 42 | 42 | 0 | 0 | 0 |
@@ -60,6 +61,10 @@
 
 | Case | Reason |
 |---|---|
+| `defects/oblique-metre` | AFNI writes an oblique sform in metres as it is (only the voxel sizes are converted); the original converts its linear part to millimetres in reproduce mode too (AFNI-07). Its default, which converts the whole matrix, is the replica's |
+| `defects/tiny-offsets-copy` | AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the kept slice times, all within 3 ms of 0: none; the original keeps the header's code 1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08 |
+| `geometry/slightly-oblique` | AFNI writes the plumb matrix of a grid less than about 0.014° from plumb (its 0.01° test, in float); the original keeps the input's matrix (4e-4 mm apart here) |
+| `errors/prefix-with-blank` | AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too (no switch for AFNI-12) |
 | `divergence/afni-format-output` | larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format. |
 | `divergence/voxshift` | -voxshift is not supported by larmorx (fMRIPrep does not use it). |
 
@@ -83,13 +88,13 @@
 | `errors/file-negative` | a negative -tpattern value | AFNI: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D |
 | `errors/file-text` | a -tpattern file with text | AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D: 1D text <tmp>/st.1D: 'abc' is not a … |
 | `errors/missing-dataset` | an input file that does not exist | AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.… |
-| `errors/existing-output` | an output that exists already (AFNI exits 0 without writing; larmorx exits 1) | AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** FATAL ERROR: output dataset name '<tmp>/out.nii' conflicts with existing file |
+| `errors/existing-output` | an output that exists already (AFNI exits 0 without writing; larmorx exits 1, AFNI-11) | AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** FATAL ERROR: output dataset name '<tmp>/out.nii' conflicts with existing file |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (2ef5e9cc3613-dirty) |
+| larmorx | 0.0.1 (15b7d73271ba) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -301,6 +306,9 @@ Both programs read the same files with the same arguments; outputs are read with
 | `defects/metre` | pass | 14/14 | units in metres with an origin (AFNI-07) |
 | `defects/micron-copy` | pass | 12/12 | units in micrometres with an origin, a copy (AFNI-07) |
 | `defects/negative-slope-zero` | pass | 13/13 | int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing |
+| `defects/oblique-metre` | expected-divergence | 10/11 | units in metres, an oblique sform with an origin (AFNI-07) |
+| `defects/tiny-offsets-copy` | expected-divergence | 10/11 | header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input that keeps them, all within 3 ms of 0 (AFNI-08) |
+| `geometry/slightly-oblique` | expected-divergence | 9/11 | an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°) |
 | `copy/no-timing-int16` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16) |
 | `copy/no-timing-int16-slope` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 with a brick factor) |
 | `copy/no-timing-int16-slope-inter` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 scaled to float32) |
@@ -323,7 +331,8 @@ Both programs read the same files with the same arguments; outputs are read with
 | `errors/file-negative` | both-error | – | a negative -tpattern value |
 | `errors/file-text` | both-error | – | a -tpattern file with text |
 | `errors/missing-dataset` | both-error | – | an input file that does not exist |
-| `errors/existing-output` | both-error | – | an output that exists already (AFNI exits 0 without writing; larmorx exits 1) |
+| `errors/existing-output` | both-error | – | an output that exists already (AFNI exits 0 without writing; larmorx exits 1, AFNI-11) |
+| `errors/prefix-with-blank` | expected-divergence | 0/2 | a -prefix with a blank (AFNI refuses it; larmorx writes it, AFNI-12) |
 | `divergence/afni-format-output` | expected-divergence | 1/1 | -prefix without .nii: AFNI writes its own BRIK/HEAD format |
 | `divergence/voxshift` | expected-divergence | 1/1 | -voxshift: per-voxel shifts from a dataset |
 | `real/ds001600-acq-v4` | pass | 14/14 | fMRIPrep's call (-ignore 0 -tzero -TR -tpattern @file) on sub-1_task-rest_acq-v4_bold |

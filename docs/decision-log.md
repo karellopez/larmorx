@@ -662,7 +662,7 @@ Decided by the user on the questions the defect register raised
   an expected divergence in its record (new cases `defects/oblique-metre`,
   `defects/tiny-offsets-copy`, `geometry/slightly-oblique`, `errors/prefix-with-blank`), and
   `specs/3dTshift.md` §6 needs the observed behaviours before the original can follow.
-- **Records:** standard tier, against the AFNI 25.2.09 oracle, from the commit before
+- **Records:** standard tier, against the AFNI 25.2.09 oracle, from `15b7d73271ba`
   them ([afni-tshift-replica.md](validation/afni-tshift-replica.md),
   [afni-tshift.md](validation/afni-tshift.md); 245 cases each, 4 of them new).
   - Replica, `reproduce`: 225 of 225 compared cases bit-identical to AFNI (Fourier 101 of 101),

@@ -278,26 +278,17 @@ def test_afni_settings_are_checked(no_replica, tmp_path):
             lx.afni.tshift(path, slice_times="alt+z", afni_settings=settings)
 
 
-def test_the_original_refuses_settings_it_does_not_read_yet(no_replica, monkeypatch, tmp_path):
-    """The clean-room original reads none of AFNI's variables yet (part 2b): the ones that would
-    change the result raise ``NotImplementedError`` naming them, never silently ignored; the ones
-    that change nothing a call returns are accepted; the environment changes nothing."""
+def test_the_original_applies_afni_settings(no_replica, monkeypatch, tmp_path):
+    """The clean-room original reads AFNI's variables from ``afni_settings`` (completing
+    3dTshift, part 2b), never from the environment: NIfTI-2 output, the tlrc view's xform code,
+    and ``AFNI_NIFTI_SCALE=NO`` keeping int16 data with their intercept in the header (AFNI-23
+    corrected); the variables that change nothing a call returns are accepted."""
     _, path = series(tmp_path)
     reference = lx.afni.tshift(path, slice_times="alt+z", method="linear")
-    with pytest.raises(NotImplementedError, match="AFNI_NIFTI_PRIORITY, AFNI_NIFTI_SCALE yet"):
-        lx.afni.tshift(
-            path,
-            slice_times="alt+z",
-            afni_settings={"AFNI_NIFTI_SCALE": "NO", "AFNI_NIFTI_PRIORITY": "Q"},
-        )
-    with pytest.raises(NotImplementedError, match=r"implementation='replica'"):
-        lx.afni.tshift(
-            path,
-            slice_times="alt+z",
-            implementation="original",
-            afni_settings={"AFNI_NIFTI_WRITE_TYPE": "2"},
-        )
+    assert reference.header.version == 1
+    # AFNI variables in the environment change nothing.
     monkeypatch.setenv("AFNI_NIFTI_WRITE_TYPE", "2")
+    monkeypatch.setenv("AFNI_NIFTI_VIEW", "tlrc")
     monkeypatch.setenv("AFNI_NIFTI_SCALE", "NO")
     img = lx.afni.tshift(
         path,
@@ -307,6 +298,51 @@ def test_the_original_refuses_settings_it_does_not_read_yet(no_replica, monkeypa
     )
     np.testing.assert_array_equal(img.data, reference.data)
     assert img.header.to_bytes() == reference.header.to_bytes()
+    # NIfTI-2: the same values in the wider fields.
+    two = lx.afni.tshift(
+        path,
+        slice_times="alt+z",
+        method="linear",
+        implementation="original",
+        afni_settings={"AFNI_NIFTI_WRITE_TYPE": "2"},
+    )
+    assert two.header.version == 2
+    np.testing.assert_array_equal(two.data, reference.data)
+    np.testing.assert_array_equal(two.affine, reference.affine)
+    # The tlrc view: sform code 2 is written as code 3 (TLRC).
+    aligned = tmp_path / "aligned.nii"
+    img = nib.Nifti1Image(np.asarray(nib.load(path).dataobj), AFFINE)
+    img.header.set_sform(AFFINE, 2)
+    img.header.set_qform(AFFINE, 0)
+    img.to_filename(aligned)
+    codes = lx.afni.tshift(aligned, slice_times="alt+z", afni_settings={"AFNI_NIFTI_VIEW": "tlrc"})
+    assert (codes.header.qform_code, codes.header.sform_code) == (3, 3)
+    # AFNI_NIFTI_SCALE=NO: int16 kept, the intercept in the header (AFNI-23 corrected); AFNI's
+    # output, off by the intercept, with upstream_defects="reproduce".
+    values = np.asfortranarray(np.arange(2 * 2 * 3 * 8, dtype=np.int16).reshape(2, 2, 3, 8))
+    values = values * 7 + 1000
+    hdr = nib.Nifti1Image(values, AFFINE).header
+    hdr.set_data_dtype(np.int16)
+    hdr["vox_offset"] = 352
+    hdr["pixdim"][4] = 2.0
+    hdr.set_slope_inter(0.25, 100.0)
+    scaled = tmp_path / "scaled.nii"
+    scaled.write_bytes(hdr.binaryblock + b"\0" * 4 + values.tobytes(order="F"))
+    plain = lx.afni.tshift(scaled, slice_times="alt+z", method="linear")
+    settings = {"AFNI_NIFTI_SCALE": "NO"}
+    with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-23"):
+        kept = lx.afni.tshift(scaled, slice_times="alt+z", method="linear", afni_settings=settings)
+    assert (kept.header.scl_slope, kept.header.scl_inter) == (0.25, 100.0)
+    np.testing.assert_allclose(kept.data, plain.data, atol=0.125)
+    with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-23"):
+        afni = lx.afni.tshift(
+            scaled,
+            slice_times="alt+z",
+            method="linear",
+            afni_settings=settings,
+            upstream_defects="reproduce",
+        )
+    np.testing.assert_allclose(afni.data, plain.data - 100.0, atol=0.125)
 
 
 def test_a_replica_output_with_an_intercept_is_scaled(scripts, tmp_path):

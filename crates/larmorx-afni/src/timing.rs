@@ -187,10 +187,157 @@ pub fn seq_dec_notice(timing: &HeaderTiming, defects: UpstreamDefects) -> Option
     })
 }
 
+/// The slice-timing fields of an output header (`slice_code`, `slice_start`, `slice_end`,
+/// `slice_duration` in seconds).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SliceFields {
+    pub code: i32,
+    pub start: usize,
+    pub end: usize,
+    pub duration: f32,
+}
+
+/// AFNI's "equal" slice times: their difference, computed in float32, is less than 0.003 in
+/// absolute value (the float32 0.003, compared in double).
+fn equal(a: f32, b: f32) -> bool {
+    f64::from(a - b).abs() < f64::from(0.003f32)
+}
+
+/// The NIfTI pattern of the times of consecutive slices (spec §6.2, step 3): the code and the
+/// duration, if any.
+fn pattern(t: &[f32]) -> Option<(i32, f32)> {
+    let n = t.len();
+    match n {
+        0 | 1 => None,
+        2 => Some((if t[1] > t[0] { 1 } else { 2 }, (t[1] - t[0]).abs())),
+        _ => {
+            let mut order: Vec<usize> = (0..n).collect();
+            // Stable: equal times keep their slice order.
+            order.sort_by(|&a, &b| t[a].partial_cmp(&t[b]).unwrap_or(std::cmp::Ordering::Equal));
+            let d = t[order[1]] - t[order[0]];
+            if order
+                .windows(2)
+                .skip(1)
+                .any(|w| !equal(t[w[1]] - t[w[0]], d))
+            {
+                return None;
+            }
+            let up = |first: usize| (first..n).step_by(2);
+            let down = |top: usize| (0..=top).rev().step_by(2);
+            let candidates: [(i32, Vec<usize>); 6] = [
+                (1, (0..n).collect()),
+                (2, (0..n).rev().collect()),
+                (3, up(0).chain(up(1)).collect()),
+                (4, down(n - 1).chain(down(n - 2)).collect()),
+                (5, up(1).chain(up(0)).collect()),
+                (6, down(n - 2).chain(down(n - 1)).collect()),
+            ];
+            candidates
+                .into_iter()
+                .find(|(_, o)| *o == order)
+                .map(|(code, _)| (code, d))
+        }
+    }
+}
+
+/// The slice fields AFNI writes for a copy of the input that keeps its slice times `times`
+/// (header times beyond the TR; spec §6.2, observed), and whether every time is zero (within
+/// 0.003 of 0). Then AFNI writes `slice_end` 0, which is AFNI-08: corrected, it is `nz − 1`.
+pub fn copy_slice_fields(times: &[f32], defects: UpstreamDefects) -> (SliceFields, bool) {
+    let nz = times.len();
+    let none = SliceFields {
+        code: 0,
+        start: 0,
+        end: 0,
+        duration: 0.0,
+    };
+    let nonzero: Vec<usize> = (0..nz).filter(|&k| !equal(times[k], 0.0)).collect();
+    let (Some(&f), Some(&l)) = (nonzero.first(), nonzero.last()) else {
+        let end = if defects.fix() {
+            nz.saturating_sub(1)
+        } else {
+            0
+        };
+        return (SliceFields { end, ..none }, true);
+    };
+    let range = |s: usize, e: usize| {
+        pattern(&times[s..=e]).map(|(code, duration)| SliceFields {
+            code,
+            start: s,
+            end: e,
+            duration,
+        })
+    };
+    let fields = (f > 0)
+        .then(|| range(f - 1, l))
+        .flatten()
+        .or_else(|| (l + 1 < nz).then(|| range(f, l + 1)).flatten())
+        .or_else(|| range(f, l))
+        .unwrap_or(none);
+    (fields, false)
+}
+
+/// The AFNI-08 notice for a copy whose kept slice times are all zero.
+pub fn zero_times_notice(nz: usize, defects: UpstreamDefects) -> Notice {
+    let detail = match defects {
+        UpstreamDefects::Fix => format!(
+            "the copy's slice times are all within 3 ms of 0: written with slice_end {}; AFNI \
+             writes slice_end 0",
+            nz.saturating_sub(1)
+        ),
+        UpstreamDefects::Reproduce => "the copy's slice times are all within 3 ms of 0: written \
+             with slice_end 0, as AFNI does"
+            .to_owned(),
+    };
+    Notice::new(&defects::AFNI_08, defects, detail)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use larmorx_core::element::DataType;
+
+    /// Spec §6.2's examples (observed).
+    #[test]
+    fn slice_fields_of_copies() {
+        let f = |code, start, end, duration| SliceFields {
+            code,
+            start,
+            end,
+            duration,
+        };
+        let header = |code: u8, start, end, duration: f64, nz| {
+            let mut h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, nz, 10], DataType::F32).unwrap();
+            h.slice_code = i32::from(code);
+            h.slice_start = start;
+            h.slice_end = end;
+            h.slice_duration = duration;
+            h.dim_info = 48;
+            h.xyzt_units = 10;
+            header_timing(&h, nz, FIX).unwrap().times
+        };
+        // Times all within 3 ms of 0 (AFNI-08).
+        let t = header(1, 0, 3, 0.0005, 4);
+        assert_eq!(copy_slice_fields(&t, REPRODUCE), (f(0, 0, 0, 0.0), true));
+        assert_eq!(copy_slice_fields(&t, FIX), (f(0, 0, 3, 0.0), true));
+        // Slices 2 ms apart: the time-0 slice drops out of the range.
+        let t = header(1, 0, 4, 0.002, 5);
+        assert_eq!(copy_slice_fields(&t, REPRODUCE), (f(1, 1, 4, 0.002), false));
+        // Two slices: code 1.
+        let t = header(3, 1, 2, 2.5, 4);
+        assert_eq!(copy_slice_fields(&t, FIX), (f(1, 1, 2, 2.5), false));
+        // Most headers give their own fields back.
+        for code in [1u8, 3, 4, 5, 6] {
+            let t = header(code, 0, 5, 0.7, 6);
+            assert_eq!(
+                copy_slice_fields(&t, FIX),
+                (f(i32::from(code), 0, 5, 0.7), false),
+                "code {code}"
+            );
+        }
+        let t = header(2, 0, 3, 0.7, 4); // corrected code 2 (§6.4)
+        assert_eq!(copy_slice_fields(&t, FIX), (f(2, 0, 3, 0.7), false));
+    }
     use larmorx_io::nifti::NiftiVersion;
 
     #[test]

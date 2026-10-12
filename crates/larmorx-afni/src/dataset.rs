@@ -1,27 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Datasets held as AFNI holds them, and AFNI's rules for reading and writing NIfTI
-//! (`specs/3dTshift.md` §6).
+//! (`specs/3dTshift.md` §6, §6.1 and §7.1).
 //!
 //! AFNI keeps voxels as bytes, shorts or floats (its *datum*), each volume with an optional
 //! scale (*brick factor*). Reading a NIfTI file chooses the datum and factor from the stored
 //! type and `scl_slope`/`scl_inter`; writing stores the datum and the factor back.
 //!
-//! Three of AFNI's rules are defects that larmorx corrects by default (D13,
+//! Several of AFNI's rules are defects that larmorx corrects by default (D13,
 //! `docs/api/upstream-defects.md`): a negative brick factor is applied on output only
 //! (AFNI-01, [`extract`]), float32 data with a slope and an intercept are scaled twice
-//! (AFNI-02, [`read`]), and metre and micron units leave the origin unconverted (AFNI-07,
-//! [`afni_geometry`]). `UpstreamDefects::Reproduce` follows AFNI.
+//! (AFNI-02, [`read`]), metre and micron units leave the origin or an oblique matrix
+//! unconverted (AFNI-07) and nearly plumb grids are written plumb (AFNI-16; both in
+//! [`crate::geometry`]), and `AFNI_NIFTI_SCALE=NO` drops the intercept of integer data
+//! (AFNI-23, [`intercept_plan`]). `UpstreamDefects::Reproduce` follows AFNI.
 
 use std::path::Path;
 
-use larmorx_core::affine::Affine;
 use larmorx_core::array::DynArray;
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 use larmorx_core::ndarray::{ArrayD, ArrayViewD, IxDyn, ShapeBuilder};
 use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, ReadOptions, Scaling, WriteOptions};
 
-use crate::timing::{self, HeaderTiming};
+use crate::cfmt::g32;
+use crate::geometry::{self, InputGeometry};
+use crate::msg::Message;
+use crate::settings::{AfniSettings, write_type};
+use crate::timing::{self, HeaderTiming, SliceFields};
+use crate::tshift::Restore;
 
 /// The voxels of a dataset in one of AFNI's storage types, in Fortran order (x fastest).
 #[derive(Clone, Debug, PartialEq)]
@@ -153,6 +159,16 @@ pub fn store<T: Datum>(v: f32, factor: f32) -> T {
 // ------------------------------------------------------------------------------------------------
 // Reading
 
+/// Data that `AFNI_NIFTI_SCALE=NO` kept as stored (uint8 or int16 with both a slope and an
+/// intercept): the slope became the brick factor and the intercept was dropped (AFNI-23).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct KeptIntercept {
+    pub slope: f32,
+    pub inter: f32,
+    /// The stored type.
+    pub stored: DataType,
+}
+
 /// A NIfTI file read with AFNI's rules.
 #[derive(Clone, Debug)]
 pub struct AfniImage {
@@ -168,10 +184,14 @@ pub struct AfniImage {
     pub toffset: f32,
     /// The slice timing the header gives, if any.
     pub slice_timing: Option<HeaderTiming>,
-    /// What AFNI would have warned about while reading.
-    pub warnings: Vec<String>,
+    /// The matrix AFNI took from the header, and the code it writes.
+    pub geometry: InputGeometry,
+    /// AFNI's messages while reading, in its order.
+    pub messages: Vec<Message>,
     /// The upstream defects that changed how the file was read (AFNI-02).
     pub notices: Vec<Notice>,
+    /// Set when `AFNI_NIFTI_SCALE=NO` kept integer data and dropped their intercept.
+    pub kept_intercept: Option<KeptIntercept>,
 }
 
 /// A NIfTI file could not be read as an AFNI dataset.
@@ -211,7 +231,25 @@ fn scaled_f32<T: Copy>(v: Vec<T>, to_f32: impl Fn(T) -> f32, slope: f32, inter: 
         .collect()
 }
 
-/// Reads a NIfTI file as AFNI 25.2.09 does (`specs/3dTshift.md` §6):
+/// AFNI's name of a NIfTI data type in its conversion message.
+fn type_name(code: i16) -> &'static str {
+    match code {
+        2 => "UINT8",
+        4 => "INT16",
+        8 => "INT32",
+        16 => "FLOAT32",
+        64 => "FLOAT64",
+        256 => "INT8",
+        512 => "UINT16",
+        768 => "UINT32",
+        _ => "UNKNOWN",
+    }
+}
+
+/// Reads a NIfTI file as AFNI 25.2.09 does (`specs/3dTshift.md` §6), with AFNI's variables
+/// `settings` (§7.1: `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_SCALE`, `AFNI_NIFTI_TYPE_WARN`,
+/// `AFNI_NIFTI_VIEW`, `AFNI_DEFAULT_STD_SPACE`, `AFNI_NO_OBLIQUE_WARNING`). `shown` is the
+/// input's name in messages.
 ///
 /// | Stored type | Header scaling | Kept as | Values |
 /// |---|---|---|---|
@@ -221,17 +259,21 @@ fn scaled_f32<T: Copy>(v: Vec<T>, to_f32: impl Fn(T) -> f32, slope: f32, inter: 
 ///
 /// Non-finite `scl_slope`/`scl_inter` count as 0; non-finite float values, and scaled values
 /// that overflow, become 0. Files with more than one volume beyond the fourth dimension, and
-/// 64-bit integer or complex data, are rejected.
+/// 64-bit integer or complex data, are rejected. With `AFNI_NIFTI_SCALE` no, uint8 and int16
+/// data with both a slope and an intercept are kept as stored, the intercept dropped
+/// ([`AfniImage::kept_intercept`], AFNI-23).
 ///
 /// AFNI-02 (observed): for float32 data with a slope and an intercept, AFNI also keeps the
 /// slope as the brick factor, so the scaled values are scaled once more when they are
-/// processed and written (`specs/3dTshift.md` §6). [`UpstreamDefects::Fix`] scales them once
-/// (no factor); [`UpstreamDefects::Reproduce`] keeps the factor. The header's slice timing
-/// follows `defects` too ([`timing::header_timing`], AFNI-03).
+/// processed and written. [`UpstreamDefects::Fix`] scales them once (no factor);
+/// [`UpstreamDefects::Reproduce`] keeps the factor. The header's slice timing follows
+/// `defects` too ([`timing::header_timing`], AFNI-03).
 pub fn read(
     path: impl AsRef<Path>,
+    shown: &str,
     n_threads: usize,
     defects: UpstreamDefects,
+    settings: &AfniSettings,
 ) -> Result<AfniImage, ReadError> {
     let path = path.as_ref();
     let header = nifti::read_header(path)?;
@@ -262,17 +304,41 @@ pub fn read(
     } else {
         0.0
     };
-    let mut warnings = Vec::new();
+    let scale_no = settings.no("AFNI_NIFTI_SCALE");
     let mut notices = Vec::new();
+    let mut kept_intercept = None;
+    let mut converted = false;
     let (data, factor) = match image.data {
-        DynArray::U8(a) if both => (
-            BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
-            0.0,
-        ),
-        DynArray::I16(a) if both => (
-            BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
-            0.0,
-        ),
+        DynArray::U8(a) if both && scale_no => {
+            kept_intercept = Some(KeptIntercept {
+                slope,
+                inter,
+                stored: DataType::U8,
+            });
+            (BrickData::Byte(into_vec(a)), factor)
+        }
+        DynArray::I16(a) if both && scale_no => {
+            kept_intercept = Some(KeptIntercept {
+                slope,
+                inter,
+                stored: DataType::I16,
+            });
+            (BrickData::Short(into_vec(a)), factor)
+        }
+        DynArray::U8(a) if both => {
+            converted = true;
+            (
+                BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
+                0.0,
+            )
+        }
+        DynArray::I16(a) if both => {
+            converted = true;
+            (
+                BrickData::Float(scaled_f32(into_vec(a), f32::from, slope, inter)),
+                0.0,
+            )
+        }
         DynArray::F32(a) if both => {
             if factor != 0.0 {
                 let detail = match defects {
@@ -321,13 +387,28 @@ pub fn read(
                     )));
                 }
             };
-            warnings.push(format!(
-                "{}: {stored} data are converted to float32, as AFNI does",
-                path.display()
-            ));
+            converted = true;
             (BrickData::Float(v), 0.0)
         }
     };
+    let mut messages = Vec::new();
+    // AFNI's conversion message comes first (observed), without a label.
+    if converted && !settings.no("AFNI_NIFTI_TYPE_WARN") {
+        let mut text = format!(
+            "** AFNI converts NIFTI_datatype={} ({}) in file {shown} to FLOAT32\n",
+            header.datatype,
+            type_name(header.datatype)
+        );
+        if !settings.yes("AFNI_NIFTI_TYPE_WARN") {
+            text.push_str(
+                "     Warnings of this type will be muted for this session.\n     Set \
+                 AFNI_NIFTI_TYPE_WARN to YES to see them all, NO to see none.\n",
+            );
+        }
+        messages.push(Message::Raw(text));
+    }
+    let (geometry, geometry_messages) = geometry::read_geometry(&header, settings, shown);
+    messages.extend(geometry_messages);
     let has_time_axis = header.dim[0] >= 4;
     let tr = header_tr(&header);
     let per_second = timing::time_units_per_second(&header);
@@ -341,8 +422,10 @@ pub fn read(
         tr,
         toffset,
         slice_timing,
-        warnings,
+        geometry,
+        messages,
         notices,
+        kept_intercept,
     })
 }
 
@@ -354,87 +437,94 @@ pub fn header_tr(header: &NiftiHeader) -> f32 {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Geometry
+// AFNI_NIFTI_SCALE=NO (AFNI-23)
 
-/// The voxel-to-world matrix AFNI takes from a header (observed): the sform if
-/// `sform_code > 0`, else the qform if `qform_code > 0`, else the voxel sizes on the
-/// diagonal; scaled to millimetres from metres or micrometres. Also returns the xform code
-/// AFNI writes back: 1 for codes 1 and 2 (or none), 3 for 3 and 5, 4 for 4.
-///
-/// AFNI-07 (observed): AFNI converts only the matrix's linear part (voxel sizes and
-/// directions) and leaves the origin in metres or micrometres. [`UpstreamDefects::Fix`]
-/// converts the whole matrix; [`UpstreamDefects::Reproduce`] leaves the origin
-/// ([`units_notice`] says when that matters).
-pub fn afni_geometry(hdr: &NiftiHeader, defects: UpstreamDefects) -> Result<(Affine, i32), String> {
-    let (matrix, code) = header_matrix(hdr)?;
-    let mm = millimetres_per_unit(hdr);
-    let matrix = if mm == 1.0 {
-        matrix
-    } else {
-        let rows = matrix.rows();
-        let scale = |row: [f64; 4]| {
-            let mut out = row.map(|v| v * mm);
-            if defects.reproduce() {
-                out[3] = row[3];
-            }
-            out
-        };
-        Affine::from_rows([scale(rows[0]), scale(rows[1]), scale(rows[2]), rows[3]])
-    };
-    let code = match code {
-        3 | 5 => 3,
-        4 => 4,
-        _ => 1,
-    };
-    Ok((matrix, code))
+/// What the output does with the intercept that `AFNI_NIFTI_SCALE=NO` dropped (spec §7.1).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum InterceptPlan {
+    /// AFNI's output: the integers and the factor, the intercept dropped.
+    Afni,
+    /// AFNI's integers, with `scl_slope` (1 where AFNI writes 0) and the intercept as
+    /// `scl_inter` (the default where the output carries the intercept in every volume).
+    InHeader(OutputScaling),
+    /// The data read as without the variable (float32, `slope·x + inter`): the default for
+    /// `-rlt` with `-ignore`, whose ignored volumes need the intercept and the others do not.
+    ReadScaled,
 }
 
-/// Millimetres per spatial unit of the header: 1000 for metres, 0.001 for micrometres, else 1.
-fn millimetres_per_unit(hdr: &NiftiHeader) -> f64 {
-    match hdr.xyzt_units & 0x07 {
-        1 => 1000.0,
-        3 => 0.001,
-        _ => 1.0,
+/// The plan for data kept by `AFNI_NIFTI_SCALE=NO` (AFNI-23), and its notice: an output that
+/// carries the intercept in every volume (anything but a shifted `-rlt` output) keeps it in
+/// the header by default; a shifted `-rlt` output with `-ignore` is read as without the
+/// variable; a shifted `-rlt` output without `-ignore` is AFNI's, which is right.
+pub fn intercept_plan(
+    kept: &KeptIntercept,
+    factor: f32,
+    copy: bool,
+    restore: Restore,
+    ignore: usize,
+    defects: UpstreamDefects,
+) -> (InterceptPlan, Option<Notice>) {
+    let name = type_name(match kept.stored {
+        DataType::U8 => 2,
+        _ => 4,
+    });
+    let (slope, inter) = (g32(kept.slope), g32(kept.inter));
+    let rlt = !copy && restore == Restore::None;
+    if rlt && ignore == 0 {
+        return (InterceptPlan::Afni, None);
     }
-}
-
-/// The AFNI-07 notice for an output written with `hdr`'s geometry: when its units are metres
-/// or micrometres and its origin is not 0, AFNI's origin (left unconverted) differs from the
-/// converted one.
-pub fn units_notice(hdr: &NiftiHeader, defects: UpstreamDefects) -> Option<Notice> {
-    let mm = millimetres_per_unit(hdr);
-    let (matrix, _) = header_matrix(hdr).ok()?;
-    let origin = matrix.translation();
-    if mm == 1.0 || origin.iter().all(|&v| v == 0.0) {
-        return None;
-    }
-    let unit = if mm > 1.0 { "metres" } else { "micrometres" };
-    let detail = match defects {
-        UpstreamDefects::Fix => format!(
-            "the input's units are {unit}: its origin {origin:?} is converted to millimetres \
-             with its voxel sizes; AFNI converts only the voxel sizes"
+    let (plan, detail) = match (rlt, defects) {
+        (false, UpstreamDefects::Fix) => (
+            InterceptPlan::InHeader(OutputScaling {
+                slope: if factor == 0.0 { 1.0 } else { factor },
+                inter: kept.inter,
+            }),
+            format!(
+                "AFNI_NIFTI_SCALE=NO keeps the {name} data as stored, with scl_slope {slope} as \
+                 their scale factor: the output keeps scl_inter {inter} too, so its values are \
+                 right; AFNI drops the intercept and its values are off by {inter}"
+            ),
         ),
-        UpstreamDefects::Reproduce => format!(
-            "the input's units are {unit}: its voxel sizes are converted to millimetres and its \
-             origin {origin:?} is not, as AFNI does"
+        (false, UpstreamDefects::Reproduce) => (
+            InterceptPlan::Afni,
+            format!(
+                "AFNI_NIFTI_SCALE=NO keeps the {name} data as stored, with scl_slope {slope} as \
+                 their scale factor, and drops scl_inter {inter}, as AFNI does: the values \
+                 written are off by {inter}"
+            ),
+        ),
+        (true, UpstreamDefects::Fix) => (
+            InterceptPlan::ReadScaled,
+            format!(
+                "AFNI_NIFTI_SCALE=NO with -rlt and -ignore {ignore}: the ignored volumes keep \
+                 scl_inter {inter} and the detrended ones lose it, which one scl_inter cannot \
+                 describe, so the {name} data are read as float32 with scl_slope {slope} and \
+                 scl_inter {inter} applied, as without the variable; AFNI keeps them as {name} \
+                 and drops the intercept, so its {ignore} ignored volumes are off by {inter}"
+            ),
+        ),
+        (true, UpstreamDefects::Reproduce) => (
+            InterceptPlan::Afni,
+            format!(
+                "AFNI_NIFTI_SCALE=NO with -rlt and -ignore {ignore}: the {name} data are kept as \
+                 stored and scl_inter {inter} is dropped, as AFNI does: the {ignore} ignored \
+                 volumes are off by {inter}"
+            ),
         ),
     };
-    Some(Notice::new(&defects::AFNI_07, defects, detail))
+    (plan, Some(Notice::new(&defects::AFNI_23, defects, detail)))
 }
 
-/// The matrix AFNI takes from a header, before any unit conversion, and its code.
-fn header_matrix(hdr: &NiftiHeader) -> Result<(Affine, i32), String> {
-    Ok(if hdr.sform_code > 0 {
-        (hdr.sform(), hdr.sform_code)
-    } else if hdr.qform_code > 0 {
-        (hdr.qform().map_err(|e| e.to_string())?, hdr.qform_code)
-    } else {
-        let size = |i: usize| {
-            let p = hdr.pixdim[i].abs();
-            if p > 0.0 && p.is_finite() { p } else { 1.0 }
-        };
-        (Affine::from_zooms([size(1), size(2), size(3)], [0.0; 3]), 1)
-    })
+/// `bricks` (kept as stored by `AFNI_NIFTI_SCALE=NO`) read as without the variable: float32
+/// `slope·x + inter`, no factor.
+pub fn read_scaled(bricks: &mut Bricks, kept: &KeptIntercept) {
+    let data = match &bricks.data {
+        BrickData::Byte(v) => scaled_f32(v.clone(), f32::from, kept.slope, kept.inter),
+        BrickData::Short(v) => scaled_f32(v.clone(), f32::from, kept.slope, kept.inter),
+        BrickData::Float(_) => return,
+    };
+    bricks.data = BrickData::Float(data);
+    bricks.factors.iter_mut().for_each(|f| *f = 0.0);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -447,37 +537,83 @@ pub struct OutputTiming {
     pub tr: f32,
     /// `toffset` (seconds).
     pub toffset: f32,
-    /// Slice timing kept in the header (the "copy of the input" cases), or `None` for none.
-    pub slices: Option<HeaderTiming>,
+    /// The slice fields of a copy that keeps the header's slice times (spec §6.2), or `None`
+    /// for AFNI's defaults (no slice code, `slice_end` = nz − 1).
+    pub slices: Option<SliceFields>,
 }
 
-/// The header AFNI writes for `bricks` with the geometry of `input` (observed): NIfTI-1, both
-/// qform and sform from AFNI's matrix with the same code, `scl_slope` = the brick factor,
-/// millimetres and seconds, the slice axis (`dim_info`) third, and the slice range
-/// `0..nz−1` unless slice timing is kept. A dataset with one volume is written as 3D, without
-/// time fields. The geometry follows `defects` ([`afni_geometry`], AFNI-07).
+/// `scl_slope` and `scl_inter` of an output, when they are not the brick factor and 0.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OutputScaling {
+    pub slope: f32,
+    pub inter: f32,
+}
+
+/// The header AFNI writes for `bricks` read with `geometry` (spec §6 and §6.1, observed):
+/// NIfTI-1 (NIfTI-2 with `AFNI_NIFTI_WRITE_TYPE` 2, or for a dimension above 32767), both
+/// forms from AFNI's matrix with one code, `scl_slope` = the brick factor, millimetres and
+/// seconds, the slice axis (`dim_info`) third, and the slice range `0..nz−1` unless a copy
+/// keeps slice timing. A dataset with one volume is written as 3D, without time fields. The
+/// geometry follows `defects` (AFNI-07, AFNI-16), whose notices are returned, with AFNI's
+/// messages.
 pub fn output_header(
-    input: &NiftiHeader,
+    geometry: &InputGeometry,
     bricks: &Bricks,
     timing: &OutputTiming,
+    scaling: Option<OutputScaling>,
     defects: UpstreamDefects,
-) -> Result<NiftiHeader, String> {
+    settings: &AfniSettings,
+) -> Result<(NiftiHeader, Vec<Notice>, Vec<Message>), String> {
     let [nx, ny, nz, nt] = bricks.shape;
     let shape: Vec<usize> = if nt > 1 {
         vec![nx, ny, nz, nt]
     } else {
         vec![nx, ny, nz]
     };
-    let mut hdr = NiftiHeader::new(NiftiVersion::V1, &shape, bricks.data.data_type())
-        .map_err(|e| e.to_string())?;
-    let (matrix, code) = afni_geometry(input, defects)?;
-    hdr.set_sform(&matrix, code);
-    hdr.set_qform(&matrix, code).map_err(|e| e.to_string())?;
-    hdr.scl_slope = f64::from(bricks.factors.first().copied().unwrap_or(0.0));
-    hdr.scl_inter = 0.0;
-    for p in &mut hdr.pixdim[4..] {
-        *p = 0.0;
+    let mut messages = Vec::new();
+    let large = shape.iter().any(|&d| d > 32767);
+    let version = match write_type(settings.get("AFNI_NIFTI_WRITE_TYPE")) {
+        2 => NiftiVersion::V2,
+        1 if large => {
+            messages.push(Message::Warning(
+                "will try to write as NIFTI-1, though NIFTI-2 seems necessary".into(),
+            ));
+            return Err(
+                "larmorx: a dimension above 32767 needs NIfTI-2 (AFNI_NIFTI_WRITE_TYPE \
+                        is 1)"
+                    .into(),
+            );
+        }
+        _ if large => NiftiVersion::V2,
+        _ => NiftiVersion::V1,
+    };
+    let mut hdr =
+        NiftiHeader::new(version, &shape, bricks.data.data_type()).map_err(|e| e.to_string())?;
+    let (g, notices) = geometry::output_geometry(geometry, defects);
+    for (row, srow) in g
+        .srow
+        .iter()
+        .zip([&mut hdr.srow_x, &mut hdr.srow_y, &mut hdr.srow_z])
+    {
+        *srow = row.map(f64::from);
     }
+    hdr.sform_code = geometry.out_code;
+    hdr.qform_code = geometry.out_code;
+    // NIfTI-1 stores the quaternion as float32 (the header rounds it when written).
+    [hdr.quatern_b, hdr.quatern_c, hdr.quatern_d] = g.quatern;
+    [hdr.qoffset_x, hdr.qoffset_y, hdr.qoffset_z] = g.qoffset.map(f64::from);
+    hdr.pixdim = [0.0; 8];
+    hdr.pixdim[0] = g.qfac;
+    for j in 0..3 {
+        hdr.pixdim[j + 1] = f64::from(g.pixdim[j]);
+    }
+    let (slope, inter) = match scaling {
+        Some(s) => (s.slope, s.inter),
+        None => (bricks.factors.first().copied().unwrap_or(0.0), 0.0),
+    };
+    hdr.scl_slope = f64::from(slope);
+    hdr.scl_inter = f64::from(inter);
+    hdr.analyze.regular = b'r';
     if nt > 1 {
         hdr.pixdim[4] = f64::from(timing.tr);
         hdr.toffset = f64::from(timing.toffset);
@@ -494,7 +630,7 @@ pub fn output_header(
     } else {
         hdr.xyzt_units = 2;
     }
-    Ok(hdr)
+    Ok((hdr, notices, messages))
 }
 
 /// Writes `bricks` to `path` (`.nii` or `.nii.gz`) with `header` (see [`output_header`]).
@@ -527,6 +663,7 @@ pub fn write(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_core::affine::Affine;
 
     const FIX: UpstreamDefects = UpstreamDefects::Fix;
     const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
@@ -565,48 +702,12 @@ mod tests {
         h.set_qform(&a, qcode).unwrap();
         h.set_sform(&b, scode);
         h.qform_code = qcode;
+        h.xyzt_units = 10;
         h
     }
 
-    #[test]
-    fn geometry_prefers_the_sform_and_maps_codes() {
-        let (m, code) = afni_geometry(&header_with(1, 2), FIX).unwrap();
-        assert_eq!(m.translation(), [-5.0, 7.0, 11.0]);
-        assert_eq!(code, 1);
-        let (m, code) = afni_geometry(&header_with(4, 0), FIX).unwrap();
-        assert_eq!(m.translation(), [1.0, 2.0, 3.0]);
-        assert_eq!(code, 4);
-        assert_eq!(afni_geometry(&header_with(0, 5), FIX).unwrap().1, 3);
-        let (m, code) = afni_geometry(&header_with(0, 0), FIX).unwrap();
-        assert_eq!(m.translation(), [0.0; 3]);
-        assert_eq!(code, 1);
-        assert!(units_notice(&header_with(1, 2), FIX).is_none());
-    }
-
-    /// AFNI-07: metres and micrometres. The whole matrix is converted to millimetres; AFNI
-    /// (reproduced) converts the voxel sizes and leaves the origin (observed).
-    #[test]
-    fn metre_units_both_modes() {
-        let mut h = header_with(1, 2);
-        h.xyzt_units = 1 | 8;
-        let (fixed, _) = afni_geometry(&h, FIX).unwrap();
-        let (afni, _) = afni_geometry(&h, REPRODUCE).unwrap();
-        assert_eq!(fixed.translation(), [-5000.0, 7000.0, 11000.0]);
-        assert_eq!(afni.translation(), [-5.0, 7.0, 11.0]);
-        assert_eq!(fixed.linear(), afni.linear());
-        assert_eq!(fixed.linear()[0][0], -2000.0);
-        for mode in [FIX, REPRODUCE] {
-            let n = units_notice(&h, mode).unwrap();
-            assert_eq!((n.defect.id, n.mode), ("AFNI-07", mode));
-        }
-        h.xyzt_units = 3 | 8;
-        assert_eq!(
-            afni_geometry(&h, FIX).unwrap().0.translation(),
-            [-0.005, 0.007, 0.011]
-        );
-        // No origin: the two agree, and nothing is said.
-        h.set_sform(&Affine::from_zooms([2.0, 2.0, 3.0], [0.0; 3]), 2);
-        assert!(units_notice(&h, FIX).is_none());
+    fn geometry_of(h: &NiftiHeader) -> InputGeometry {
+        geometry::read_geometry(h, &AfniSettings::new(), "in.nii").0
     }
 
     #[test]
@@ -619,7 +720,10 @@ mod tests {
             toffset: 0.75,
             slices: None,
         };
-        let h = output_header(&input, &bricks, &timing, FIX).unwrap();
+        let s = AfniSettings::new();
+        let (h, notices, messages) =
+            output_header(&geometry_of(&input), &bricks, &timing, None, FIX, &s).unwrap();
+        assert!(notices.is_empty() && messages.is_empty());
         assert_eq!(h.dim[..5], [4, 2, 2, 2, 3]);
         assert_eq!((h.qform_code, h.sform_code), (1, 1));
         assert_eq!(h.sform().translation(), [-5.0, 7.0, 11.0]);
@@ -627,5 +731,69 @@ mod tests {
         assert_eq!((h.pixdim[4], h.toffset), (2.0, 0.75));
         assert_eq!((h.xyzt_units, h.dim_info), (10, 48));
         assert_eq!((h.slice_code, h.slice_start, h.slice_end), (0, 0, 1));
+        assert_eq!(h.analyze.regular, b'r');
+        // The qform of the cardinal matrix: x flipped.
+        assert_eq!(h.pixdim[..4], [-1.0, 2.0, 2.0, 3.0]);
+        // NIfTI-2 with AFNI_NIFTI_WRITE_TYPE=2; NIfTI-1 otherwise.
+        let two = AfniSettings::from_pairs([("AFNI_NIFTI_WRITE_TYPE", "2")]);
+        let (h, _, _) =
+            output_header(&geometry_of(&input), &bricks, &timing, None, FIX, &two).unwrap();
+        assert_eq!(h.version, NiftiVersion::V2);
+    }
+
+    /// AFNI-23: the plan for data `AFNI_NIFTI_SCALE=NO` kept as stored.
+    #[test]
+    fn intercept_plans() {
+        let kept = KeptIntercept {
+            slope: 0.37,
+            inter: 12.5,
+            stored: DataType::I16,
+        };
+        let plan = |copy, restore, ignore, mode| {
+            let (p, n) = intercept_plan(&kept, 0.37, copy, restore, ignore, mode);
+            (p, n.map(|n| n.defect.id))
+        };
+        let header = InterceptPlan::InHeader(OutputScaling {
+            slope: 0.37,
+            inter: 12.5,
+        });
+        assert_eq!(
+            plan(false, Restore::Trend, 0, FIX),
+            (header, Some("AFNI-23"))
+        );
+        assert_eq!(plan(true, Restore::None, 2, FIX), (header, Some("AFNI-23")));
+        assert_eq!(
+            plan(false, Restore::Trend, 0, REPRODUCE),
+            (InterceptPlan::Afni, Some("AFNI-23"))
+        );
+        assert_eq!(
+            plan(false, Restore::None, 0, FIX),
+            (InterceptPlan::Afni, None)
+        );
+        assert_eq!(
+            plan(false, Restore::None, 2, FIX),
+            (InterceptPlan::ReadScaled, Some("AFNI-23"))
+        );
+        assert_eq!(
+            plan(false, Restore::None, 2, REPRODUCE),
+            (InterceptPlan::Afni, Some("AFNI-23"))
+        );
+        // Slope 1: no factor; the default writes scl_slope 1.
+        let (p, _) = intercept_plan(&kept, 0.0, false, Restore::Trend, 0, FIX);
+        assert_eq!(
+            p,
+            InterceptPlan::InHeader(OutputScaling {
+                slope: 1.0,
+                inter: 12.5
+            })
+        );
+        let mut b =
+            Bricks::new([1, 1, 1, 2], BrickData::Short(vec![10, -4]), vec![0.37; 2]).unwrap();
+        read_scaled(&mut b, &kept);
+        assert_eq!(b.factors, [0.0, 0.0]);
+        let BrickData::Float(v) = &b.data else {
+            panic!()
+        };
+        assert_eq!(v[0], (0.37f64 * 10.0 + 12.5) as f32);
     }
 }

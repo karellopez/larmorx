@@ -6,10 +6,16 @@
 
 use std::path::PathBuf;
 
-use larmorx_afni::dataset::{self, AfniImage, BrickData, Bricks, OutputTiming, ReadError};
+use larmorx_afni::cfmt::g32;
+use larmorx_afni::dataset::{
+    self, AfniImage, BrickData, Bricks, InterceptPlan, KeptIntercept, OutputTiming, ReadError,
+};
+use larmorx_afni::geometry::{self, InputGeometry};
+use larmorx_afni::input;
+use larmorx_afni::msg::Message;
+use larmorx_afni::settings::AfniSettings;
 use larmorx_afni::timing::{Pattern, mean_time};
 use larmorx_afni::tshift::{Method, Restore, TshiftParams, tshift};
-use larmorx_io::nifti::NiftiHeader;
 use numpy::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use numpy::{PyArray, PyArrayDyn, PyArrayMethods};
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -37,6 +43,31 @@ struct Request {
     detrend: bool,
     n_threads: usize,
     upstream_defects: UpstreamDefects,
+    /// AFNI's variables (`afni_settings`), with the ones `lx.afni.tshift` sets itself.
+    settings: AfniSettings,
+}
+
+/// AFNI's settings of a Python call: `afni_settings` (checked by the Python wrapper) and the
+/// ones the wrapper fixes for its own use (a path is one file; plain messages; no report on
+/// oblique inputs), as the replica program receives them (`larmorx/afni/tshift.py`).
+fn settings_of(afni_settings: Option<Vec<(String, String)>>) -> AfniSettings {
+    let mut settings = AfniSettings::from_pairs(afni_settings.unwrap_or_default());
+    for (name, value) in [
+        ("AFNI_PATH_SPACES_OK", "YES"),
+        ("AFNI_MESSAGE_COLORIZE", "NO"),
+        ("AFNI_NO_OBLIQUE_WARNING", "YES"),
+    ] {
+        settings.set(name, value);
+    }
+    settings
+}
+
+/// The texts of AFNI's warnings among `messages` (the Python wrapper raises them).
+fn warning_texts(messages: Vec<Message>) -> impl Iterator<Item = String> {
+    messages.into_iter().filter_map(|m| match m {
+        Message::Warning(t) => Some(t),
+        _ => None,
+    })
 }
 
 impl Request {
@@ -153,16 +184,42 @@ fn bricks_to_py<'py>(py: Python<'py>, bricks: Bricks) -> PyResult<Bound<'py, PyA
 
 /// Shifts, then returns `(data, header, warnings, notices)` with the header `3dTshift` would
 /// write; `notices` are the upstream defects that changed the result (`larmorx._defects`).
+#[allow(clippy::too_many_arguments)]
 fn finish<'py>(
     py: Python<'py>,
     mut bricks: Bricks,
-    input_header: &NiftiHeader,
+    geometry: &InputGeometry,
+    kept: Option<KeptIntercept>,
     request: &Request,
     header_tr: f32,
-    warnings: Vec<String>,
+    mut warnings: Vec<String>,
     mut notices: Vec<Notice>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let params = request.params(bricks.shape, header_tr)?;
+    let defects = request.upstream_defects;
+    if params
+        .slice_times
+        .iter()
+        .all(|&t| t == params.slice_times[0])
+    {
+        warnings.push(format!(
+            "input has only 1 time offset, {}",
+            g32(params.slice_times[0])
+        ));
+    }
+    // AFNI_NIFTI_SCALE=NO (AFNI-23).
+    let mut scaling = None;
+    if let Some(kept) = kept {
+        let factor = bricks.factors.first().copied().unwrap_or(0.0);
+        let (plan, notice) =
+            dataset::intercept_plan(&kept, factor, false, params.restore, params.ignore, defects);
+        notices.extend(notice);
+        match plan {
+            InterceptPlan::ReadScaled => dataset::read_scaled(&mut bricks, &kept),
+            InterceptPlan::InHeader(s) => scaling = Some(s),
+            InterceptPlan::Afni => {}
+        }
+    }
     notices.extend(
         py.detach(|| tshift(&mut bricks, &params))
             .map_err(value_err)?,
@@ -172,10 +229,17 @@ fn finish<'py>(
         toffset: params.tzero,
         slices: None,
     };
-    let defects = request.upstream_defects;
-    notices.extend(dataset::units_notice(input_header, defects));
-    let header =
-        dataset::output_header(input_header, &bricks, &timing, defects).map_err(value_err)?;
+    let (header, geometry_notices, messages) = dataset::output_header(
+        geometry,
+        &bricks,
+        &timing,
+        scaling,
+        defects,
+        &request.settings,
+    )
+    .map_err(value_err)?;
+    notices.extend(geometry_notices);
+    warnings.extend(warning_texts(messages));
     let notices: Vec<PyNotice> = notices_to_py(notices);
     PyTuple::new(
         py,
@@ -192,7 +256,7 @@ fn finish<'py>(
 /// AFNI's storage type (`uint8`, `int16` or `float32`, before the brick factor, which is the
 /// header's `scl_slope`), the output header, warnings and upstream-defect notices.
 #[pyfunction]
-#[pyo3(signature = (path, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix"))]
+#[pyo3(signature = (path, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
 #[allow(clippy::too_many_arguments)]
 fn afni_tshift_file<'py>(
     py: Python<'py>,
@@ -207,6 +271,7 @@ fn afni_tshift_file<'py>(
     detrend: bool,
     n_threads: usize,
     upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let (pattern, times) = slice_spec(slice_times)?;
     let upstream_defects = defects_mode(upstream_defects)?;
@@ -222,18 +287,47 @@ fn afni_tshift_file<'py>(
         detrend,
         n_threads,
         upstream_defects,
+        settings: settings_of(afni_settings),
+    };
+    let settings = &request.settings;
+    let name = path.to_string_lossy().into_owned();
+    // The name AFNI shows (its real path, unless AFNI_NOREALPATH) and the file it reads (x.nii
+    // from x.nii.gz); a file that cannot be found is read as given, for the reader's error.
+    let (mut messages, mut notices) = (Vec::new(), Vec::new());
+    let (file, shown) = match input::resolve(
+        &name,
+        settings,
+        upstream_defects,
+        &mut messages,
+        &mut notices,
+    ) {
+        Ok(found) => (found.path, found.shown),
+        Err(_) => (path.clone(), name.clone()),
     };
     let AfniImage {
         bricks,
-        header,
         tr: header_tr,
-        warnings,
-        notices,
+        geometry,
+        messages: read_messages,
+        notices: read_notices,
+        kept_intercept,
         ..
     } = py
-        .detach(|| dataset::read(&path, n_threads, upstream_defects))
+        .detach(|| dataset::read(&file, &shown, n_threads, upstream_defects, settings))
         .map_err(read_err)?;
-    finish(py, bricks, &header, &request, header_tr, warnings, notices)
+    messages.extend(read_messages);
+    notices.extend(read_notices);
+    let warnings = warning_texts(messages).collect();
+    finish(
+        py,
+        bricks,
+        &geometry,
+        kept_intercept,
+        &request,
+        header_tr,
+        warnings,
+        notices,
+    )
 }
 
 /// Copies a 4D array (any memory layout) into Fortran order, zeroing non-finite floats as
@@ -255,7 +349,7 @@ fn fortran_vec<T: Copy + numpy::Element>(
 /// the image would be written with). Returns `(data, header, warnings, notices)` as
 /// [`afni_tshift_file`].
 #[pyfunction]
-#[pyo3(signature = (data, header, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix"))]
+#[pyo3(signature = (data, header, slice_times, tr = None, tzero = None, slice = None, ignore = 0, method = "fourier", restore = "trend", detrend = true, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
 #[allow(clippy::too_many_arguments)]
 fn afni_tshift_array<'py>(
     py: Python<'py>,
@@ -271,6 +365,7 @@ fn afni_tshift_array<'py>(
     detrend: bool,
     n_threads: usize,
     upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let (pattern, times) = slice_spec(slice_times)?;
     let request = Request {
@@ -285,6 +380,7 @@ fn afni_tshift_array<'py>(
         detrend,
         n_threads,
         upstream_defects: defects_mode(upstream_defects)?,
+        settings: settings_of(afni_settings),
     };
     let header = header_from_dict(header)?;
     let (shape, data) = if let Ok(a) = data.cast::<PyArrayDyn<u8>>() {
@@ -303,13 +399,16 @@ fn afni_tshift_array<'py>(
     };
     let bricks = Bricks::new(shape, data, vec![0.0; shape[3]]).map_err(value_err)?;
     let header_tr = dataset::header_tr(&header);
+    let (geometry, messages) = geometry::read_geometry(&header, &request.settings, "<memory>");
+    let warnings = warning_texts(messages).collect();
     finish(
         py,
         bricks,
-        &header,
+        &geometry,
+        None,
         &request,
         header_tr,
-        Vec::new(),
+        warnings,
         Vec::new(),
     )
 }

@@ -148,6 +148,7 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
+ "libm",
  "rayon",
  "tempfile",
  "thiserror",

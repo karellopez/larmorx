@@ -226,6 +226,8 @@ defects! {
         "an output file that exists already is not written, and the program exits with status 0";
     AFNI_12 = "AFNI-12", "3dTshift", true,
         "a -prefix with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused";
+    AFNI_16 = "AFNI-16", "3dTshift", true,
+        "a voxel-to-world matrix within about 0.01 to 0.024 degrees of plumb (a single-precision test; the angle depends on the voxel size) is written as the exactly plumb matrix of its axes, its tilt discarded";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

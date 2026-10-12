@@ -694,6 +694,21 @@ Decided by the user on the questions the defect register raised
      the spec additions the original needs (AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12,
      AFNI-16 in reproduce mode, and AFNI-03's notice when the output is a copy);
   2. a clean-room implementer adds them to the original from the spec.
+- **Part 1 done** (2026-10-12): the replica keeps a nearly plumb matrix by default and
+  reproduces AFNI's plumb matrix byte for byte with the switch; it now also reproduces AFNI's
+  second name check, made when the file is written (AFNI-12); `specs/3dTshift.md` §6.1 to §6.5
+  describe, from black-box runs, the geometry AFNI writes (its plumb test is single precision:
+  0.0099° to 0.0242° depending on the voxel size, not 0.014°), the slice fields of a copy,
+  AFNI-11, AFNI-12 and AFNI-03 when the output becomes a copy. Found: AFNI-17 (an
+  imprecision), and that AFNI takes global options anywhere on the command line
+  (`-overwrite`, `-Dname=value`), which neither implementation accepts (a known difference).
+  Records from `966bd98`, standard tier, 251 cases each (6 new): the replica 231 of 231
+  compared cases bit-identical to AFNI in `reproduce`; its default agrees with the original's
+  on all 24 cases where a correction applies, `geometry/slightly-oblique` now included, but
+  AFNI-08's copy, where the original does not follow AFNI yet. The original is unchanged where
+  compared (222 pass, 162 bit-identical); its 12 expected divergences are the spec additions'
+  behaviours. GPL golden: two new cases (`3dTshift.linear.float32-nearly-plumb` and
+  `.reproduce`), no checksum changed.
 
 ## Open decisions (PLAN.md §16)
 

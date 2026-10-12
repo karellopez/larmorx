@@ -50,6 +50,8 @@ enum Input {
     /// float32 with header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input
     /// that keeps them (AFNI-08).
     Float32TinyOffsets,
+    /// float32 with an sform 1e-4 rad (0.006°) from plumb, which AFNI writes plumb (AFNI-16).
+    Float32NearlyPlumb,
 }
 
 struct Case {
@@ -163,6 +165,14 @@ const CASES: &[Case] = &[
         args: &[],
     },
     Case {
+        id: "3dTshift.linear.float32-nearly-plumb",
+        tool: "afni 3dTshift",
+        named: &["AFNI-16"],
+        mode: "fix",
+        input: Input::Float32NearlyPlumb,
+        args: &["-tpattern", "seq+z", "-linear"],
+    },
+    Case {
         id: "3dTshift.heptic.uint8.no_detrend.reproduce",
         tool: "afni 3dTshift",
         named: &["AFNI-05"],
@@ -193,6 +203,14 @@ const CASES: &[Case] = &[
         mode: "reproduce",
         input: Input::Float32TinyOffsets,
         args: &[],
+    },
+    Case {
+        id: "3dTshift.linear.float32-nearly-plumb.reproduce",
+        tool: "afni 3dTshift",
+        named: &["AFNI-16"],
+        mode: "reproduce",
+        input: Input::Float32NearlyPlumb,
+        args: &["-tpattern", "seq+z", "-linear"],
     },
 ];
 
@@ -282,6 +300,20 @@ fn tiny_offsets_header() -> NiftiHeader {
     h
 }
 
+/// The float32 input of AFNI-16: the 2 × 2 × 3 mm grid turned by 1e-4 rad about y (the
+/// entries of the rotation rounded to 4 decimals: plain arithmetic), which AFNI's test calls
+/// plumb.
+fn nearly_plumb_header() -> NiftiHeader {
+    let mut h = input_header(DataType::F32, 0.0);
+    let affine = Affine::from_linear(
+        [[2.0, 0.0, -3.0e-4], [0.0, 2.0, 0.0], [2.0e-4, 0.0, 3.0]],
+        [-7.0, -5.0, -6.0],
+    );
+    h.set_sform(&affine, 1);
+    h.set_qform(&affine, 1).unwrap();
+    h
+}
+
 fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let values = series_values();
     let paths = BTreeMap::from([
@@ -291,6 +323,7 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         ("int16-negative", dir.join("int16-negative.nii")),
         ("float32-defects", dir.join("float32-defects.nii")),
         ("float32-tiny-offsets", dir.join("float32-tiny-offsets.nii")),
+        ("float32-nearly-plumb", dir.join("float32-nearly-plumb.nii")),
     ]);
     let f32s: Vec<f32> = values.iter().map(|&v| v as f32 / 4.0).collect();
     write_input(&paths["float32"], &f32s, DataType::F32, 0.0);
@@ -303,6 +336,11 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     write_with(
         &paths["float32-tiny-offsets"],
         &tiny_offsets_header(),
+        &f32s,
+    );
+    write_with(
+        &paths["float32-nearly-plumb"],
+        &nearly_plumb_header(),
         &f32s,
     );
     paths
@@ -565,6 +603,7 @@ fn golden() {
             Input::Int16Negative => &inputs["int16-negative"],
             Input::Float32Defects => &inputs["float32-defects"],
             Input::Float32TinyOffsets => &inputs["float32-tiny-offsets"],
+            Input::Float32NearlyPlumb => &inputs["float32-nearly-plumb"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];

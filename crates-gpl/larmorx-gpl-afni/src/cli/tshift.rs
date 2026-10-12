@@ -29,9 +29,13 @@
 //!   and exits with status 0);
 //! - any `-prefix` path is accepted, so paths with blanks or non-ASCII characters work on every
 //!   platform (AFNI-12; AFNI refuses names that `THD_filename_ok` rejects: blanks, shell
-//!   metacharacters, non-ASCII bytes).
+//!   metacharacters, non-ASCII bytes; at the option scan, and again when it writes the file,
+//!   where a name that passed the scan through `THD_filename_ok`'s `3dcalc` exception, or a
+//!   directory starting with `-`, is not written and the exit status is 0).
 //!
 //! AFNI's environment variables are not read: `reproduce` gives AFNI's result with them unset.
+//! Neither are AFNI's global options, which AFNI takes out of the command line before
+//! 3dTshift's own scan (`-overwrite`, `-Dname=value`, ...): here they are unknown options.
 
 use std::io::Write;
 use std::path::Path;
@@ -206,6 +210,26 @@ fn filename_ok(name: &str) -> bool {
     !name.bytes().any(|c| {
         c.is_ascii_control() || c == b' ' || b";*?&|\"><'[](){}!".contains(&c) || c & 128 != 0
     })
+}
+
+/// The name `THD_write_3dim_dataset` gives `THD_write_nifti` for `prefix`: the dataset's
+/// directory (`./` when the prefix names none) and its prefix.
+fn afni_output_name(prefix: &str) -> String {
+    if prefix.contains('/') {
+        prefix.to_owned()
+    } else {
+        format!("./{prefix}")
+    }
+}
+
+/// `THD_write_nifti`'s own check of the name it writes ([`afni_output_name`]): what
+/// [`filename_ok`] accepts, not starting with `-`. A `-prefix` that passes the option scan only
+/// through `filename_ok`'s `3dcalc` exception (`3dcalc a b.nii`, written as `./3dcalc a b.nii`),
+/// or whose directory starts with `-`, fails here: AFNI then writes nothing, prints "Illegal
+/// filename for NIfTI output", and 3dTshift exits with status 0 (AFNI-12).
+fn output_name_ok(prefix: &str) -> bool {
+    let name = afni_output_name(prefix);
+    filename_ok(&name) && !name.starts_with('-')
 }
 
 /// A method option: `strncmp(arg, name, 4)` against two spellings, or for weighted sinc
@@ -411,7 +435,8 @@ fn check_absent(path: &Path, notices: &Notices, io: &mut Io<'_>) -> Result<(), F
 
 /// Writes the output (`DSET_write`), then names the upstream defects collected in `notices`.
 /// With AFNI-11 reproduced, an existing output is not written and the run ends with status 0,
-/// as AFNI's `THD_write_3dim_dataset` does.
+/// as AFNI's `THD_write_3dim_dataset` does; with AFNI-12 reproduced, neither is a name that
+/// `THD_write_nifti` refuses ([`output_name_ok`]).
 fn write(
     path: &Path,
     ds: &Dataset,
@@ -420,6 +445,7 @@ fn write(
     io: &mut Io<'_>,
 ) -> Result<(), Fail> {
     check_absent(path, notices, io)?;
+    let prefix = path.to_string_lossy();
     if path.exists() {
         let name = path.file_name().map_or_else(
             || path.display().to_string(),
@@ -432,6 +458,17 @@ fn write(
         notices.add(
             &defects::AFNI_11,
             "the output exists: nothing is written and the exit status is 0, as AFNI does",
+        );
+    } else if notices.reproduce() && !output_name_ok(&prefix) {
+        let name = afni_output_name(&prefix);
+        io.error(format!("Illegal filename for NIfTI output: {name}"));
+        notices.add(
+            &defects::AFNI_12,
+            format!(
+                "the output name '{name}' has blanks, shell metacharacters or non-ASCII \
+                 characters, or starts with '-': nothing is written and the exit status is 0, \
+                 as AFNI does"
+            ),
         );
     } else {
         dataset::write(path, ds, n_threads, notices)
@@ -472,6 +509,16 @@ fn run(args: &[String], mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), Fa
                 "the -prefix '{}' has blanks, shell metacharacters or non-ASCII characters: \
                  accepted; AFNI refuses it",
                 o.prefix
+            ),
+        );
+    } else if mode.fix() && !output_name_ok(&o.prefix) {
+        notices.add(
+            &defects::AFNI_12,
+            format!(
+                "the output name '{}' has blanks, shell metacharacters or non-ASCII characters, \
+                 or starts with '-': written; AFNI accepts the -prefix but writes nothing (exit \
+                 status 0)",
+                afni_output_name(&o.prefix)
             ),
         );
     }
@@ -551,18 +598,25 @@ fn run(args: &[String], mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), Fa
                 return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
             }
             if let Some((start, end)) = ds.seq_dec {
+                // Corrected, the times can exceed the TR: then the output is a copy (below).
+                let copy = offsets.iter().any(|&t| t < 0.0 || t > o.tr);
                 notices.add(
                     &defects::AFNI_03,
-                    if mode.fix() {
-                        format!(
+                    match (mode.fix(), copy) {
+                        (true, false) => format!(
                             "header slice code 2 (sequential decreasing) orders slices \
                              {end}..{start} from the top; AFNI gives every slice time 0 and \
                              shifts nothing"
-                        )
-                    } else {
-                        "header slice code 2 (sequential decreasing) gives every slice time 0, \
-                         so nothing is shifted, as AFNI does"
-                            .to_owned()
+                        ),
+                        (true, true) => format!(
+                            "header slice code 2 (sequential decreasing) orders slices \
+                             {end}..{start} from the top, and their times exceed the TR: the \
+                             output is a copy of the input that keeps them; AFNI gives every \
+                             slice time 0, shifts nothing and writes no slice timing"
+                        ),
+                        (false, _) => "header slice code 2 (sequential decreasing) gives every \
+                                       slice time 0, so nothing is shifted, as AFNI does"
+                            .to_owned(),
                     },
                 );
             }
@@ -736,6 +790,13 @@ mod tests {
                 .unwrap()
                 .prefix_afni_ok
         );
+        // Names that pass the option scan only through the `3dcalc` exception, or with a
+        // directory starting with '-', are refused when AFNI writes them.
+        assert!(filename_ok("3dcalc a b.nii") && !output_name_ok("3dcalc a b.nii"));
+        assert!(output_name_ok("3dcalc/x y.nii") && output_name_ok("3dcalcok.nii"));
+        assert!(filename_ok("-d/out.nii") && !output_name_ok("-d/out.nii"));
+        assert_eq!(afni_output_name("a.nii"), "./a.nii");
+        assert!(output_name_ok("a.nii") && output_name_ok("/tmp/x/a.nii"));
         assert!(parse_args(&["-bogus", "x"]).is_err());
         assert!(parse_args(&["-TR"]).is_err());
         assert!(parse_args(&["-linear"]).is_err());

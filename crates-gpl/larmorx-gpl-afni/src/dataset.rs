@@ -39,13 +39,14 @@
 //! space, as AFNI applies it ([`crate::afni_ext`]); its other attributes are ignored, and no
 //! extension is written. The `AFNI_NIFTI_*` environment variables are not read.
 //!
-//! **Upstream defects (D13).** Four of AFNI's reading and writing rules are defects that
+//! **Upstream defects (D13).** Five of AFNI's reading and writing rules are defects that
 //! larmorx-gpl corrects by default and reproduces with [`UpstreamDefects::Reproduce`]
 //! (`docs/findings/upstream-defects.md`): float32 data with a slope and an intercept scaled
 //! twice (AFNI-02, [`read`]); header slice code 2 giving every slice time 0 (AFNI-03,
 //! [`slice_offsets`]); metre and micrometre units leaving the origin, and an oblique matrix,
-//! unconverted (AFNI-07, [`geometry`]); and slice times all within 0.003 of 0 written with
-//! `slice_end` 0 (AFNI-08, [`slice_fields`]).
+//! unconverted (AFNI-07, [`geometry`]); slice times all within 0.003 of 0 written with
+//! `slice_end` 0 (AFNI-08, [`slice_fields`]); and a matrix within about 0.01° to 0.024° of plumb
+//! written plumb (AFNI-16, [`write`], [`axes::snaps`]).
 
 use std::path::{Path, PathBuf};
 
@@ -823,7 +824,13 @@ fn units_detail(
     other: &Geometry,
     mode: UpstreamDefects,
 ) -> Option<String> {
-    if axes::written(&geometry.axes) == axes::written(&other.axes) {
+    // Only the units differ between the two. Whether that changes the output can depend on
+    // AFNI-16 (a nearly plumb grid at the origin: written plumb, its steps converted either
+    // way; kept, its matrix in metres or in millimetres), so the conversion is named when it
+    // matters in either AFNI-16 mode: the same notices in both modes.
+    let same =
+        |m: UpstreamDefects| axes::written(&geometry.axes, m) == axes::written(&other.axes, m);
+    if same(UpstreamDefects::Fix) && same(UpstreamDefects::Reproduce) {
         return None;
     }
     let unit = if nim.xyz_units == UNITS_METER {
@@ -1088,7 +1095,8 @@ pub fn slice_fields(tlist: &[f32], defects: UpstreamDefects) -> (i32, i64, i64, 
 /// (after `DSET_UNMSEC`) and the slice timing it keeps.
 ///
 /// The geometry is what `THD_set_dataset_attributes` and `populate_nifti_image` make of the
-/// dataset's axes ([`axes::written`]). The slice fields follow `notices`' mode ([`slice_fields`],
+/// dataset's axes ([`axes::written`]), and the slice fields what `populate_nifti_image` derives
+/// from the slice times it keeps ([`slice_fields`]); both follow `notices`' mode (AFNI-16 and
 /// AFNI-08), which is noted when the two modes write different fields.
 pub fn write(
     path: &Path,
@@ -1144,8 +1152,15 @@ pub fn write(
     // `nifti_convert_nim2n1hdr`.
     h.analyze.regular = b'r';
     // The sform is the matrix AFNI carries (or the axes' cardinal one), the qform its
-    // quaternion with the axes' origins, the voxel sizes the axes' steps.
-    let w = axes::written(&ds.geometry.axes);
+    // quaternion with the axes' origins, the voxel sizes the axes' steps. AFNI-16: a matrix
+    // whose obliquity AFNI discards is kept by default.
+    let w = axes::written(&ds.geometry.axes, notices.mode());
+    if axes::snaps(&ds.geometry.axes) {
+        notices.add(
+            &defects::AFNI_16,
+            plumb_detail(&ds.geometry.axes, notices.mode()),
+        );
+    }
     let code = ds.geometry.code;
     [h.srow_x, h.srow_y, h.srow_z] = w.sform;
     h.sform_code = code;
@@ -1226,6 +1241,32 @@ pub fn write(
         BrickData::Byte(v) => nifti::write(path, &h, view(v, &shape), &options),
         BrickData::Short(v) => nifti::write(path, &h, view(v, &shape), &options),
         BrickData::Float(v) => nifti::write(path, &h, view(v, &shape), &options),
+    }
+}
+
+/// The AFNI-16 notice's detail for a matrix whose obliquity AFNI discards ([`axes::snaps`]):
+/// how far from plumb it is, and how far the plumb matrix's entries are from it.
+fn plumb_detail(geometry: &Axes, mode: UpstreamDefects) -> String {
+    let degrees = fmt_g(axes::obliquity_degrees(&geometry.real));
+    let kept = axes::written(geometry, UpstreamDefects::Fix).sform;
+    let plumb = axes::written(geometry, UpstreamDefects::Reproduce).sform;
+    let apart = kept
+        .iter()
+        .flatten()
+        .zip(plumb.iter().flatten())
+        .fold(0.0f64, |m, (a, b)| m.max((a - b).abs()));
+    let apart = fmt_g(apart);
+    if mode.fix() {
+        format!(
+            "the input's matrix is {degrees} degrees from plumb: kept, in the sform and the \
+             qform; AFNI writes the plumb matrix of its axes instead (entries up to {apart} \
+             apart)"
+        )
+    } else {
+        format!(
+            "the input's matrix is {degrees} degrees from plumb: written as the plumb matrix \
+             of its axes, as AFNI does (entries up to {apart} from the input's)"
+        )
     }
 }
 

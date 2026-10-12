@@ -1,34 +1,34 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 245 cases on the `standard` tier: 225 pass, 18 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 251 cases on the `standard` tier: 231 pass, 18 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 
-**Bit-identical: 225 of 225 passing cases** produce exactly the bytes of AFNI's output data.
-- Fourier: 101 of 101 bit-identical.
-- Lagrange and weighted-sinc methods and copies: 124 of 124 bit-identical.
+**Bit-identical: 231 of 231 passing cases** produce exactly the bytes of AFNI's output data.
+- Fourier: 104 of 104 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 127 of 127 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
-- Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 191 passing cases it can express; 191 give the command line's output bit for bit (data and header). From an image in memory: 146 of 146 give the same values.
+- Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
-  - AFNI-03: 1 case(s) named it, 1 with changed values (largest difference 27.8): `header-timing/code2-seq-dec`
+  - AFNI-03: 2 case(s) named it, 1 with changed values (largest difference 27.8), 1 with other changes (header slice_code): `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`
   - AFNI-05: 4 case(s) named it, 4 with changed values (largest difference 122): `options/float32-no-detrend`, `options/float32-no-detrend-fourier`, `options/int16-no-detrend`, `options/int16-no-detrend-fourier`
-  - AFNI-07: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (header qoffset_x, srow_x): `defects/metre`, `defects/micron-copy`, `defects/oblique-metre`
+  - AFNI-07: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (header qoffset_x, srow_x; header srow_x): `defects/metre`, `defects/micron-copy`, `defects/oblique-metre`, `geometry/slightly-oblique-metre`, `defects/oblique-metre-zero-origin`
   - AFNI-08: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (header slice_end): `defects/tiny-offsets-copy`
-- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 20 cases where a correction applies or that test one): 15 bit-identical, 3 within the original's thresholds (Fourier and other last bits, as in the original's own record), 2 where the original is known to diverge from AFNI, 0 disagreeing.
+  - AFNI-16: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (header qoffset_x, srow_x; header srow_x): `geometry/slightly-oblique`, `geometry/slightly-oblique-qform`, `geometry/slightly-oblique-metre`
+- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 24 cases where a correction applies or that test one): 16 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 1 where the original is known to diverge from AFNI, 0 disagreeing.
   - `defects/tiny-offsets-copy`: known (the original diverges from AFNI here): differ: header fields (scaling, timing, slice fields, units, xform codes): slice_code: replica 0, original 1; slice_duration: replica 0.0, original 0.0005000000237487257
-  - `geometry/slightly-oblique`: known (the original diverges from AFNI here): differ: geometry (sform): 4.0e-04; geometry (qform): 4.0e-04
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|
-| copy | 6 | 6 | 0.0e+00 | 0 | 0.0e+00 |
-| defects | 7 | 7 | 0.0e+00 | 0 | 0.0e+00 |
-| geometry | 1 | 1 | 0.0e+00 | – | 0.0e+00 |
-| header-timing | 12 | 12 | 0.0e+00 | – | 0.0e+00 |
+| copy | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
+| defects | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
+| geometry | 3 | 3 | 0.0e+00 | – | 0.0e+00 |
+| header-timing | 13 | 13 | 0.0e+00 | – | 0.0e+00 |
 | methods | 84 | 84 | 0.0e+00 | 0 | 0.0e+00 |
 | options | 42 | 42 | 0.0e+00 | 0 | 0.0e+00 |
 | real | 20 | 20 | 0.0e+00 | 0 | 0.0e+00 |
@@ -49,12 +49,12 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| copy | 6 | 6 | 0 | 0 | 0 |
-| defects | 7 | 7 | 0 | 0 | 0 |
+| copy | 8 | 8 | 0 | 0 | 0 |
+| defects | 8 | 8 | 0 | 0 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | errors | 18 | 0 | 18 | 0 | 0 |
-| geometry | 1 | 1 | 0 | 0 | 0 |
-| header-timing | 12 | 12 | 0 | 0 | 0 |
+| geometry | 3 | 3 | 0 | 0 | 0 |
+| header-timing | 13 | 13 | 0 | 0 | 0 |
 | methods | 84 | 84 | 0 | 0 | 0 |
 | options | 42 | 42 | 0 | 0 | 0 |
 | real | 20 | 20 | 0 | 0 | 0 |
@@ -95,7 +95,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (15b7d73271ba) |
+| larmorx | 0.0.1 (966bd9874476) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -299,6 +299,7 @@ Both programs read the same files with the same arguments; outputs are read with
 | `header-timing/code3-partial` | pass | 12/12 | no -tpattern, slice_code 3 over slices 1..2 only |
 | `header-timing/code3-ms` | pass | 12/12 | no -tpattern, slice_code 3 with the TR and duration in milliseconds |
 | `header-timing/code3-beyond-tr` | pass | 12/12 | no -tpattern, times beyond the TR: a copy of the input, timing kept |
+| `header-timing/code2-beyond-tr` | pass | 13/13 | no -tpattern, slice_code 2: AFNI gives every slice time 0 and shifts nothing; corrected, the times exceed the TR and th… |
 | `header-timing/code3-no-slice-dim` | pass | 12/12 | no -tpattern, no slice axis in dim_info: no timing, a copy |
 | `header-timing/code3-zero-duration` | pass | 12/12 | no -tpattern, slice_duration 0: no timing, a copy |
 | `header-timing/tpattern-overrides` | pass | 14/14 | -tpattern overrides the header's timing |
@@ -309,7 +310,12 @@ Both programs read the same files with the same arguments; outputs are read with
 | `defects/negative-slope-zero` | pass | 14/14 | int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing |
 | `defects/oblique-metre` | pass | 15/15 | units in metres, an oblique sform with an origin (AFNI-07) |
 | `defects/tiny-offsets-copy` | pass | 13/13 | header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input that keeps them, all within 3 ms of 0 (AFNI-08) |
-| `geometry/slightly-oblique` | pass | 15/15 | an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°) |
+| `geometry/slightly-oblique` | pass | 15/15 | an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°, AFNI-16) |
+| `geometry/slightly-oblique-qform` | pass | 15/15 | a qform only, 0.006° from plumb: AFNI writes the plumb matrix with the header's voxel sizes as steps (AFNI-16) |
+| `geometry/slightly-oblique-metre` | pass | 15/15 | an sform in metres 0.006° from plumb: AFNI writes the plumb matrix, its steps in millimetres and its origin in metres (… |
+| `defects/oblique-metre-zero-origin` | pass | 15/15 | units in metres, an oblique sform at the origin: AFNI keeps the whole sform in metres (AFNI-07) |
+| `copy/short-slice-spacing` | pass | 12/12 | header slice times 2 ms apart beyond a 5 ms TR: a copy, whose slice fields AFNI derives from the times within 3 ms (sli… |
+| `copy/alt-two-slices` | pass | 12/12 | header slice code 3 over slices 1..2, beyond the TR: a copy, written with slice code 1 |
 | `copy/no-timing-int16` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16) |
 | `copy/no-timing-int16-slope` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 with a brick factor) |
 | `copy/no-timing-int16-slope-inter` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 scaled to float32) |

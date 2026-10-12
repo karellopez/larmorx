@@ -1,6 +1,6 @@
 # Parity: 3dTshift
 
-**All cases agree.** 245 cases on the `standard` tier: 222 pass, 17 rejected by both, 6 expected divergences, 0 failures.
+**All cases agree.** 251 cases on the `standard` tier: 222 pass, 17 rejected by both, 12 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
@@ -45,12 +45,12 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| copy | 6 | 6 | 0 | 0 | 0 |
-| defects | 7 | 5 | 0 | 2 | 0 |
+| copy | 8 | 6 | 0 | 2 | 0 |
+| defects | 8 | 5 | 0 | 3 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | errors | 18 | 0 | 17 | 1 | 0 |
-| geometry | 1 | 0 | 0 | 1 | 0 |
-| header-timing | 12 | 12 | 0 | 0 | 0 |
+| geometry | 3 | 0 | 0 | 3 | 0 |
+| header-timing | 13 | 12 | 0 | 1 | 0 |
 | methods | 84 | 84 | 0 | 0 | 0 |
 | options | 42 | 42 | 0 | 0 | 0 |
 | real | 20 | 20 | 0 | 0 | 0 |
@@ -61,9 +61,15 @@
 
 | Case | Reason |
 |---|---|
+| `header-timing/code2-beyond-tr` | the original's default writes the corrected copy but does not name AFNI-03 when the corrected slice times exceed the TR (its reproduce output is AFNI's) |
 | `defects/oblique-metre` | AFNI writes an oblique sform in metres as it is (only the voxel sizes are converted); the original converts its linear part to millimetres in reproduce mode too (AFNI-07). Its default, which converts the whole matrix, is the replica's |
 | `defects/tiny-offsets-copy` | AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the kept slice times, all within 3 ms of 0: none; the original keeps the header's code 1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08 |
 | `geometry/slightly-oblique` | AFNI writes the plumb matrix of a grid less than about 0.014° from plumb (its 0.01° test, in float); the original keeps the input's matrix (4e-4 mm apart here) |
+| `geometry/slightly-oblique-qform` | AFNI writes the plumb matrix of a qform less than about 0.014° from plumb (AFNI-16); the original keeps the input's matrix |
+| `geometry/slightly-oblique-metre` | AFNI writes the plumb matrix (AFNI-16), its steps in millimetres and its origin in metres (AFNI-07); the original keeps the tilt |
+| `defects/oblique-metre-zero-origin` | AFNI writes an oblique sform in metres as it is (AFNI-07); the original converts its linear part to millimetres in reproduce mode too |
+| `copy/short-slice-spacing` | AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 here; the original writes the header's fields back (slice_start 0) |
+| `copy/alt-two-slices` | AFNI derives the slice fields of a copy from the times: two slices are slice code 1; the original writes the header's code 3 back |
 | `errors/prefix-with-blank` | AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too (no switch for AFNI-12) |
 | `divergence/afni-format-output` | larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format. |
 | `divergence/voxshift` | -voxshift is not supported by larmorx (fMRIPrep does not use it). |
@@ -94,7 +100,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (15b7d73271ba) |
+| larmorx | 0.0.1 (966bd9874476) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -298,6 +304,7 @@ Both programs read the same files with the same arguments; outputs are read with
 | `header-timing/code3-partial` | pass | 12/12 | no -tpattern, slice_code 3 over slices 1..2 only |
 | `header-timing/code3-ms` | pass | 12/12 | no -tpattern, slice_code 3 with the TR and duration in milliseconds |
 | `header-timing/code3-beyond-tr` | pass | 12/12 | no -tpattern, times beyond the TR: a copy of the input, timing kept |
+| `header-timing/code2-beyond-tr` | expected-divergence | 11/13 | no -tpattern, slice_code 2: AFNI gives every slice time 0 and shifts nothing; corrected, the times exceed the TR and th… |
 | `header-timing/code3-no-slice-dim` | pass | 12/12 | no -tpattern, no slice axis in dim_info: no timing, a copy |
 | `header-timing/code3-zero-duration` | pass | 12/12 | no -tpattern, slice_duration 0: no timing, a copy |
 | `header-timing/tpattern-overrides` | pass | 14/14 | -tpattern overrides the header's timing |
@@ -308,7 +315,12 @@ Both programs read the same files with the same arguments; outputs are read with
 | `defects/negative-slope-zero` | pass | 13/13 | int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing |
 | `defects/oblique-metre` | expected-divergence | 10/11 | units in metres, an oblique sform with an origin (AFNI-07) |
 | `defects/tiny-offsets-copy` | expected-divergence | 10/11 | header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input that keeps them, all within 3 ms of 0 (AFNI-08) |
-| `geometry/slightly-oblique` | expected-divergence | 9/11 | an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°) |
+| `geometry/slightly-oblique` | expected-divergence | 9/11 | an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°, AFNI-16) |
+| `geometry/slightly-oblique-qform` | expected-divergence | 9/11 | a qform only, 0.006° from plumb: AFNI writes the plumb matrix with the header's voxel sizes as steps (AFNI-16) |
+| `geometry/slightly-oblique-metre` | expected-divergence | 9/11 | an sform in metres 0.006° from plumb: AFNI writes the plumb matrix, its steps in millimetres and its origin in metres (… |
+| `defects/oblique-metre-zero-origin` | expected-divergence | 10/11 | units in metres, an oblique sform at the origin: AFNI keeps the whole sform in metres (AFNI-07) |
+| `copy/short-slice-spacing` | expected-divergence | 10/11 | header slice times 2 ms apart beyond a 5 ms TR: a copy, whose slice fields AFNI derives from the times within 3 ms (sli… |
+| `copy/alt-two-slices` | expected-divergence | 10/11 | header slice code 3 over slices 1..2, beyond the TR: a copy, written with slice code 1 |
 | `copy/no-timing-int16` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16) |
 | `copy/no-timing-int16-slope` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 with a brick factor) |
 | `copy/no-timing-int16-slope-inter` | pass | 12/12 | no slice timing anywhere: the output is a copy of the input (int16 scaled to float32) |

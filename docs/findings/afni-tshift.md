@@ -14,9 +14,11 @@
 >
 > **D13 (2026-10-12).** The replica corrects AFNI's deterministic defects by default, as the
 > original does, and gives AFNI's output bytes with `LARMORX_UPSTREAM_DEFECTS=reproduce`
-> (register entries AFNI-01, -02, -03, -05, -07, -08, -11 and -12 in
-> [upstream-defects.md](upstream-defects.md)). "The replica reproduces" below means: with the
-> switch.
+> (register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12 and, since the user's decision
+> of 2026-10-12, -16 in [upstream-defects.md](upstream-defects.md); AFNI-06 is kept, its help
+> text being the error). "The replica reproduces" below means: with the switch. The
+> behaviours the clean-room original needs are described, in behaviour terms only, in
+> `specs/3dTshift.md` §6.1 to §6.5 (2026-10-12).
 
 Slice-timing correction in fMRIPrep (`fmriprep/workflows/bold/stc.py`), run as
 `3dTshift -ignore <dummies> -tzero <t0> -TR <TR>s -tpattern @<slice times> -prefix out in`
@@ -147,7 +149,15 @@ the writer only in a copy of the input whose times lie beyond the TR: header sli
 a 0.5 ms duration and a 1 ms TR over 4 slices (times 0 to 1.5 ms) is copied with slice code 0,
 duration 0 and `slice_end` 0. *Verified* (2026-10-12). larmorx-gpl translates the function;
 by default it makes the test what it meant (no time away from 0), which gives the defaults
-(no code, no duration, `slice_end = nz − 1`).
+(no code, no duration, `slice_end = nz − 1`). The same 3 ms tolerance decides the range the
+fields describe (`:529-576`: the first and last times away from 0, widened by one slice), so
+with slices less than 3 ms apart a time-0 slice can drop out of the range: header code 1
+over 5 slices 2 ms apart with a 5 ms TR is copied with `slice_start` 1 (AFNI-17, an
+imprecision; both modes keep it). A two-slice range comes out as code 1 or 2 whatever the
+header's code (code 3 over slices 1…2 is written as code 1). *Verified* (2026-10-12): the
+rule written in `specs/3dTshift.md` §6.2 gives AFNI's four fields on 150 random header
+timings (codes 1, 3, 4, 5, 6, full and partial ranges, durations 0.5 ms to 0.7 s), 30 of them
+AFNI-08 and 28 others that differ from the header's fields.
 
 **Milliseconds become seconds when the dataset is written** (`DSET_UNMSEC`,
 `thd_writedset.c:134`): the TR and the time origin are multiplied by 0.001 in double and
@@ -170,9 +180,17 @@ the axes' steps as `pixdim`; and `regular = 'r'`. Consequences, each *verified* 
 (2026-10-12):
 
 - **A grid nearly plumb comes out plumb.** The angle test is 0.01°, but on a float cosine: a
-  matrix whose cosine rounds to 1 in float (about 0.014° or less) is written as the plumb
-  matrix of its axes (AFNI-16). An sform 0.006° from plumb came out plumb (its entries up
-  to 4e-4 from the input's), one 0.017° from plumb as it was.
+  matrix whose cosine rounds to 1 in float is written as the plumb matrix of its axes
+  (AFNI-16). An sform 0.006° from plumb came out plumb (its entries up to 4e-4 from the
+  input's), one 0.017° from plumb as it was. The cosine of each column is its largest entry
+  over its length, the length `sqrt` of a float sum of float squares stored as float
+  (`thd_coords.c:724-746`), so the effective threshold depends on where the length lies
+  between powers of 2: from 0.0099° (just below a power of 2) to 0.0242° (a power of 2), about
+  0.014° for most lengths. *Verified* (2026-10-12): the float rule predicts AFNI's choice on
+  240 random matrices 0.004° to 0.03° from plumb and on 16 matrices at the float32 boundary
+  (steps 0.8 to 4 mm). Since 2026-10-12 (the user's decision) larmorx-gpl keeps such a
+  matrix by default when it has a non-zero entry off its axes' rows (`axes::snaps`), writing
+  it as AFNI writes an oblique one, and names AFNI-16; `reproduce` writes the plumb matrix.
 - **Plumb outputs carry signed zeros:** the cardinal matrix's zeros are +0 in DICOM, so the
   sform's x and y rows hold −0 (`srow_x = [3, -0, -0, …]`), and the quaternion of such a matrix
   has `quatern_c = −0`.
@@ -300,6 +318,25 @@ environment variable `AFNI_ALLOW_ARBITRARY_FILENAMES` is set (`thd_filestuff.c:6
 covers the whole path, directories included, so an output in `C:\Users\Jane Doe\` or in a
 directory with accented letters is refused. *Read.*
 
+**The name is checked a second time, when it is written.** `THD_filename_ok` accepts any
+name of more than 6 characters that begins with `3dcalc` (`thd_filestuff.c:643-645`), so
+`-prefix '3dcalc a b.nii'` passes the option scan. `THD_write_3dim_dataset` then hands
+`THD_write_nifti` the dataset's directory and prefix (`thd_writedset.c:186-189`; `./` when the
+prefix names no directory), which checks `THD_filename_ok` again and refuses a name that begins
+with `-` (`thd_niftiwrite.c:49-53`): `./3dcalc a b.nii` and `-d/out.nii` (a directory `-d`)
+are not written, "** ERROR: Illegal filename for NIfTI output: ./3dcalc a b.nii", and 3dTshift
+exits 0. The existing-file check comes first. `3dcalc/x y.nii` passes both. *Verified*
+(2026-10-12), with every ASCII character and a non-ASCII one: the refused set is exactly
+`THD_filename_ok`'s.
+
+**AFNI's global options.** `mainENTRY` runs `AFNI_prefilter_args` (`afni_environ.c:477`,
+`debugtrace.h:338`), which takes AFNI's global options out of the command line before
+3dTshift's own scan, wherever they stand: `-Dname=value` sets an environment variable (`:515`,
+so `-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES` lets any name through), `-overwrite` sets
+`AFNI_DECONFLICT=OVERWRITE` (`:535`), and others print or exit. *Verified* (2026-10-12) for
+`-D...` and `-overwrite`, also after the other options. Neither larmorx implementation accepts
+them (an unknown option, exit 1); a known difference, recorded in `specs/3dTshift.md` §7.
+
 What larmorx does (2026-10-11): both implementations accept any path, as AFNI does with
 `AFNI_ALLOW_ARBITRARY_FILENAMES` set. Before, the replica refused such names, so installing it
 would have broken outputs in paths with blanks once `larmorx afni 3dTshift` ran it by default
@@ -307,8 +344,9 @@ would have broken outputs in paths with blanks once `larmorx afni 3dTshift` ran 
 with a relative `-prefix`, so it never depended on this. Since 2026-10-12 (D13, AFNI-12) the
 replica names the defect when it accepts a name AFNI refuses, and with
 `LARMORX_UPSTREAM_DEFECTS=reproduce` refuses it as AFNI does ("illegal value '...' after
--prefix", exit 1). AFNI's environment variables are not read: `reproduce` is AFNI with them
-unset.
+-prefix", exit 1), and since 2026-10-12 also at the second check (nothing written, exit 0;
+`cli::tshift::output_name_ok`, tested against the oracle in `tests/oracle.rs`). AFNI's
+environment variables are not read: `reproduce` is AFNI with them unset.
 
 **An existing output** (AFNI-11): AFNI finds out when it writes (`thd_writedset.c:149-162`),
 after all the work: "output dataset name '...' conflicts with existing file" (the name without

@@ -768,15 +768,13 @@ Decided by the user on the questions the defect register raised
   2. **The Python API never reads the process environment** (CLAUDE.md rule 6). AFNI's
      variables are explicit settings of the call; the command line keeps reading the
      environment, as AFNI does.
-- **What `AFNI_NIFTI_SCALE=NO` is for** (replica author, from AFNI's source and history;
-  register AFNI-23). It is undocumented and read in one place, where it turns off the
-  conversion of uint8 and int16 data with a slope and an intercept to scaled float32. Until
-  AFNI 20.3 no scale factor was set when a file was opened, so it meant "do not scale": the
-  stored integers, slope and intercept ignored. In 2021 AFNI began keeping scaled integers as
-  integers wherever a scale factor can carry the scaling (a slope alone), set when the file is
-  opened; since then the variable no longer stops the slope, and its only effect is to keep
-  data with an intercept as integers, losing the intercept. The defect is the interaction of
-  the two changes.
+- **What `AFNI_NIFTI_SCALE=NO` is for** (replica author; the details are in the restricted
+  register entry AFNI-23). The variable is not documented. AFNI's change history explains it:
+  until 2021 it meant "do not scale" (uint8 and int16 data read as stored, slope and intercept
+  ignored); in 2021 AFNI began keeping scaled integers as integers wherever a scale factor can
+  carry the scaling (a slope alone). Since then the variable no longer stops the slope, and
+  its only effect is to keep data with an intercept as integers, losing the intercept. The
+  defect is the interaction of the two changes.
 - **The choice:** keep what the variable still does (integers stay integers), and keep both
   scalings in the header: the output has AFNI's stored integers and `scl_slope` (1 where AFNI
   writes none), with the input's intercept as `scl_inter`. 3dTshift's operations carry a

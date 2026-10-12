@@ -9,24 +9,24 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
 **Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 311 cases:
+[validation record](../validation/afni-tshift.md)). The record covers 314 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
-  input" cases, AFNI's defects (D13) and 18 error cases;
+  input" cases, AFNI's defects (D13) and 21 error cases (3 of them failed writes, AFNI-26);
 - 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
   with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift;
 - AFNI's global options and environment variables (60 cases), where exit statuses and
   messages are compared byte for byte too.
 
-All 311 agree: 279 compared, 29 rejected by both, and 3 documented divergences (AFNI's own
+All 314 agree: 279 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
 output format and `-voxshift`, which larmorx does not support, and a dataset of one row,
 which AFNI writes as a text file with a random identifier, AFNI-20). 176 of the 279 compared
 are byte-identical in their data; in every compared case the header fields are AFNI's and the
 geometry agrees to 1e-6 mm (the whole header byte for byte where the record compares it), and
-in the 60 cases of the global options and variables, where exit statuses and both output
-streams are compared byte for byte too, all 60 are identical (2026-10-12, completing
-3dTshift, part 2b). The Lagrange and weighted-sinc methods and the
+in the 60 cases of the global options and variables and the 3 failed writes, where exit
+statuses and both output streams are compared byte for byte too, all 63 are identical
+(2026-10-12, completing 3dTshift, part 2b, and AFNI-26's switch). The Lagrange and weighted-sinc methods and the
 copies give **the same bytes** as AFNI (129 of 132). The Fourier method (the default) differs
 in the last float32 bits, at most 4.3e-7 of the largest value, because AFNI's FFT is float32
 and larmorx's is double; integer outputs then differ by at most 1, in a few values per million
@@ -216,7 +216,7 @@ warning names each one that changed the output, in both modes
 | AFNI-20 | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes (AFNI's file holds a random identifier, so `reproduce` does not reproduce it; the warning says so) | the command line |
 | AFNI-22 | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written | the command line |
 | AFNI-23 | with `AFNI_NIFTI_SCALE=NO`, uint8 and int16 data with both a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the output's values are off by it (12.5 lower for an intercept of 12.5) | the integers and `scl_slope` kept, the intercept written as `scl_inter` (`scl_slope` 1 where AFNI writes 0), so the output reads back as without the variable, to within half a stored unit; with `-rlt` and `-ignore`, the data read as without the variable (below) | with that variable (the command line, or `afni_settings`) |
-| AFNI-26 | an output that cannot be written (its directory is missing or cannot be written) is not written, and the exit status is 0 | an error (exit 1); `reproduce` prints AFNI's message, writes nothing and exits 0 (the replica since 2026-10-12; the clean-room original to follow) | the command line |
+| AFNI-26 | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error (exit 1); `reproduce` prints AFNI's message, writes nothing and exits 0 (both implementations, since 2026-10-12) | the command line |
 
 On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
 `-no_detrend`, fresh output names) none of them applies but AFNI-16, so the default output is
@@ -388,8 +388,10 @@ Found while completing 3dTshift, part 2b (2026-10-12; spec §3.1, §6.1, §7 and
   names are case-sensitive, `AFNI_NIFTI_VIEW` is a whole word in any case.
 - **AFNI crashes on `-ignore` without a value** (AFNI-25; larmorx: an error, exit 1, as AFNI's
   crash handler), and **exits 0 after a failed write** (AFNI-26: an output in a directory that
-  does not exist or cannot be written; larmorx: exit 1 by default, AFNI's result with the
-  switch).
+  does not exist or cannot be written, a read-only file, a directory of the output's name;
+  larmorx: exit 1 by default, AFNI's result with the switch). A directory of the output's name
+  is not an existing output for `AFNI_DECONFLICT` (no conflict, no renaming), and renaming
+  chooses a directory of the new name; AFNI then cannot open it.
 
 ## Deliberate differences
 

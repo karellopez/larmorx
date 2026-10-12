@@ -269,6 +269,21 @@ fn afni_11(mode: UpstreamDefects) -> Notice {
     Notice::new(&defects::AFNI_11, mode, detail)
 }
 
+/// The AFNI-26 notice: AFNI's NIfTI writer cannot open the output.
+fn afni_26(mode: UpstreamDefects) -> Notice {
+    let detail = match mode {
+        UpstreamDefects::Fix => {
+            "the output cannot be opened for writing: an error (exit status 1); AFNI writes \
+             nothing and exits with status 0"
+        }
+        UpstreamDefects::Reproduce => {
+            "the output cannot be opened for writing: nothing is written and the exit status is \
+             0, as AFNI does"
+        }
+    };
+    Notice::new(&defects::AFNI_26, mode, detail)
+}
+
 fn parse(
     args: &[String],
     log: &mut Log<'_>,
@@ -456,7 +471,7 @@ fn execute(
     }
     let deconflict = Deconflict::from_settings(settings);
     // AFNI-11 corrected: an existing output is an error before the work.
-    if mode.fix() && Path::new(prefix).exists() && deconflict == Deconflict::Unset {
+    if mode.fix() && output::exists(prefix) && deconflict == Deconflict::Unset {
         log.notice(&afni_11(mode));
         return Err(Failure::Fatal(format!(
             "output dataset name '{}' conflicts with existing file",
@@ -563,7 +578,7 @@ fn execute(
     };
     log.progress(&format!("++ common time point set to {}", g32(tzero)));
     log.progress("++ copying input dataset bricks");
-    if deconflict == Deconflict::Stop && Path::new(prefix).exists() {
+    if deconflict == Deconflict::Stop && output::exists(prefix) {
         return Err(Failure::Fatal(format!(
             "output dataset already exists '{}'",
             afni_name(prefix)
@@ -690,7 +705,8 @@ fn wrote(log: &mut Log<'_>, copy: bool, name: &str) {
 }
 
 /// Writes `image`'s bricks with the output header of `timing`, as AFNI does with an existing
-/// output (`AFNI_DECONFLICT`, AFNI-11) and a name it refuses when writing (AFNI-12).
+/// output (`AFNI_DECONFLICT`, AFNI-11), a name it refuses when writing (AFNI-12) and an output
+/// its writer cannot open (AFNI-26).
 #[allow(clippy::too_many_arguments)]
 fn write_output(
     image: &AfniImage,
@@ -705,7 +721,7 @@ fn write_output(
     let prefix = target.prefix;
     let mut path = prefix.to_owned();
     let mut name = afni_name(prefix);
-    if Path::new(prefix).exists() {
+    if output::exists(prefix) {
         match target.deconflict {
             Deconflict::OverwriteExact => {
                 if !settings.overwrite_option() {
@@ -754,7 +770,9 @@ fn write_output(
         }
     }
     let [nx, ny, nz, _] = image.bricks.shape;
-    if ny == 1 && nz == 1 && !settings.yes("AFNI_WRITE_1D_AS_PREFIX") {
+    // AFNI writes a dataset of one row as 1D text (AFNI-20).
+    let one_row_text = ny == 1 && nz == 1 && !settings.yes("AFNI_WRITE_1D_AS_PREFIX");
+    if one_row_text {
         log.notice(&Notice::new(
             &defects::AFNI_20,
             UpstreamDefects::Fix,
@@ -779,6 +797,26 @@ fn write_output(
     }
     for n in &notices {
         log.notice(n);
+    }
+    // AFNI-26: AFNI's writer cannot open the output (a missing or read-only directory, a
+    // read-only file, a directory of that name). AFNI prints the NIfTI library's message
+    // (plain, whatever AFNI_MESSAGE_PREFIX and AFNI_MESSAGE_COLORIZE say), writes nothing and
+    // exits with status 0; its 1D text writer (AFNI-20) says nothing (observed). A write that
+    // fails later stays an error in both modes.
+    if let Some(e) = output::cannot_open(Path::new(&path)) {
+        log.notice(&afni_26(mode));
+        if mode.fix() {
+            return Err(Failure::Fatal(format!(
+                "cannot open output file '{name}' ({e}): nothing was written"
+            )));
+        }
+        if !one_row_text {
+            log.raw(&format!(
+                "** ERROR (nifti_image_write_engine): cannot open output file '{name}'"
+            ));
+        }
+        wrote(log, copy, &name);
+        return Ok(0);
     }
     output::write_replacing(Path::new(&path), |tmp| {
         dataset::write(tmp, &header, &image.bricks, target.n_threads).map_err(|e| e.to_string())

@@ -4,11 +4,14 @@
 //! - AFNI's name rule ([`refused`]), applied at the option scan and when the file is written
 //!   (AFNI-12 refuses names that larmorx writes by default);
 //! - `AFNI_DECONFLICT`'s renaming ([`renamed`]: `out_AA1.nii`, ...);
+//! - whether AFNI's NIfTI writer could open the output ([`cannot_open`]; AFNI writes nothing
+//!   and exits with status 0 when it cannot, AFNI-26);
 //! - the cross-platform write ([`write_replacing`]): a temporary file in the output's
 //!   directory, renamed over the output when complete, so an existing output is replaced
 //!   whole or left as it was. On Windows a rename fails while another program holds the
 //!   target open without allowing its deletion; it is tried again for about 2 s.
 
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -67,18 +70,98 @@ fn split_suffix(prefix: &str) -> (&str, &str) {
     prefix.split_at(prefix.len() - n)
 }
 
+/// Whether the output exists for AFNI (spec §7.1, `AFNI_DECONFLICT`): a file of that name. A
+/// directory of that name does not count (observed): AFNI then tries to write the output and
+/// cannot open it (AFNI-26, [`cannot_open`]).
+pub fn exists(path: impl AsRef<Path>) -> bool {
+    path.as_ref().is_file()
+}
+
 /// `AFNI_DECONFLICT`'s new name for an existing output (spec §7.1): the first of
-/// `out_AA1.nii`, ..., `out_AA9.nii`, `out_AB1.nii`, ..., `out_ZZ9.nii` that is not a file.
+/// `out_AA1.nii`, ..., `out_AA9.nii`, `out_AB1.nii`, ..., `out_ZZ9.nii` that is not a file (a
+/// directory of that name is chosen, observed).
 pub fn renamed(prefix: &str) -> Option<String> {
     let (stem, suffix) = split_suffix(prefix);
     for a in b'A'..=b'Z' {
         for b in b'A'..=b'Z' {
             for d in 1..=9 {
                 let name = format!("{stem}_{}{}{d}{suffix}", a as char, b as char);
-                if !Path::new(&name).exists() {
+                if !exists(&name) {
                     return Some(name);
                 }
             }
+        }
+    }
+    None
+}
+
+/// The failures that mean the output cannot be opened for writing: a missing directory, a
+/// path through a file, a directory of the output's name, no permission, a read-only file
+/// system.
+fn refuses(e: &std::io::Error) -> bool {
+    // On Windows, ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33) mean that another
+    // program holds the file open, not that it may not be written: the write waits for it.
+    if cfg!(windows) && matches!(e.raw_os_error(), Some(32 | 33)) {
+        return false;
+    }
+    matches!(
+        e.kind(),
+        ErrorKind::NotFound
+            | ErrorKind::NotADirectory
+            | ErrorKind::IsADirectory
+            | ErrorKind::PermissionDenied
+            | ErrorKind::ReadOnlyFilesystem
+    )
+}
+
+/// Why AFNI's NIfTI writer could not open `path` for writing, if it could not (spec §7.1, "A
+/// failed write", AFNI-26): `path` is a directory, an existing file that may not be written,
+/// or a new file that cannot be created in its directory (missing, not a directory, or not
+/// writable). Nothing on disk changes: an existing file is opened for writing without
+/// truncation (and closed), and the probe file created in the directory of a new one is
+/// removed again. Other failures (on Windows, a file another program holds open) are left to
+/// the write, which waits for them or fails.
+pub fn cannot_open(path: &Path) -> Option<std::io::Error> {
+    if path.is_dir() {
+        return Some(std::io::Error::new(
+            ErrorKind::IsADirectory,
+            "a directory of that name exists",
+        ));
+    }
+    if path.is_file() {
+        return std::fs::OpenOptions::new()
+            .write(true)
+            .open(path)
+            .err()
+            .filter(refuses);
+    }
+    if path.symlink_metadata().is_ok() {
+        // Something else of that name (a dangling link, a device): left to the write.
+        return None;
+    }
+    let dir = match path.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => Path::new("."),
+    };
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy())
+        .unwrap_or_default();
+    let pid = std::process::id();
+    for k in 0..1000u32 {
+        let probe = dir.join(format!(".{name}.larmorx-probe-{pid}-{k}"));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&probe)
+        {
+            Ok(file) => {
+                drop(file);
+                let _ = std::fs::remove_file(&probe);
+                return None;
+            }
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+            Err(e) => return Some(e).filter(refuses),
         }
     }
     None
@@ -201,6 +284,75 @@ mod tests {
             std::fs::write(p(&format!("out_AA{d}.nii.gz")), b"").unwrap();
         }
         assert_eq!(renamed(&p("out.nii.gz")).unwrap(), p("out_AB1.nii.gz"));
+    }
+
+    /// AFNI-26: what AFNI's writer cannot open, found without changing anything on disk.
+    #[test]
+    fn outputs_that_cannot_be_opened() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("dir with blank é");
+        std::fs::create_dir(&dir).unwrap();
+        let listing = || {
+            let mut v: Vec<_> = std::fs::read_dir(&dir)
+                .unwrap()
+                .map(|e| e.unwrap().file_name())
+                .collect();
+            v.sort();
+            v
+        };
+        // A new file in a directory that exists: it can be opened; no probe file is left.
+        assert!(cannot_open(&dir.join("out.nii.gz")).is_none());
+        assert!(listing().is_empty());
+        // An existing file: opened without truncation.
+        let file = dir.join("out.nii");
+        std::fs::write(&file, b"taken").unwrap();
+        assert!(cannot_open(&file).is_none());
+        assert_eq!(std::fs::read(&file).unwrap(), b"taken");
+        // A missing directory, a path through a file, a directory of the output's name.
+        let missing = cannot_open(&dir.join("nodir").join("out.nii")).unwrap();
+        assert_eq!(missing.kind(), ErrorKind::NotFound, "{missing}");
+        assert!(cannot_open(&file.join("out.nii")).is_some());
+        std::fs::create_dir(dir.join("sub.nii")).unwrap();
+        let is_dir = cannot_open(&dir.join("sub.nii")).unwrap();
+        assert_eq!(is_dir.kind(), ErrorKind::IsADirectory);
+        assert_eq!(
+            listing(),
+            ["out.nii", "sub.nii"].map(std::ffi::OsString::from)
+        );
+        // Existence for AFNI_DECONFLICT: a file, not a directory.
+        assert!(exists(&file) && !exists(dir.join("sub.nii")));
+        let p = |n: &str| dir.join(n).to_string_lossy().into_owned();
+        std::fs::create_dir(dir.join("out_AA1.nii")).unwrap();
+        assert_eq!(renamed(&p("out.nii")).unwrap(), p("out_AA1.nii"));
+        // A file that may not be written (unless this runs with the rights to write it anyway).
+        let mut permissions = std::fs::metadata(&file).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&file, permissions.clone()).unwrap();
+        let writable = std::fs::OpenOptions::new().write(true).open(&file).is_ok();
+        assert_eq!(cannot_open(&file).is_some(), !writable);
+        assert_eq!(std::fs::read(&file).unwrap(), b"taken");
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        std::fs::set_permissions(&file, permissions).unwrap();
+    }
+
+    /// A directory that may not be written (Unix permissions; unless this runs with the rights
+    /// to write it anyway).
+    #[cfg(unix)]
+    #[test]
+    fn a_directory_that_cannot_be_written() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("ro");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let writable = std::fs::File::create(dir.join("x")).is_ok();
+        let e = cannot_open(&dir.join("out.nii"));
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(e.is_some(), !writable, "{e:?}");
+        if !writable {
+            assert_eq!(e.unwrap().kind(), ErrorKind::PermissionDenied);
+        }
     }
 
     #[test]

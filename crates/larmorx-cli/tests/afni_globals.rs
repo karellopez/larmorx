@@ -217,6 +217,71 @@ fn overwrite_and_defines_on_every_platform() {
     );
 }
 
+/// AFNI-26: an output in a missing directory, which AFNI's NIfTI writer cannot open. By default
+/// an error (exit status 1) naming AFNI-26; `reproduce` prints AFNI's message (plain, whatever
+/// AFNI_MESSAGE_COLORIZE says) and `-verbose`'s line, writes nothing and exits with status 0.
+/// Shifts and copies alike. No assumption about the temporary directory's name (on GitHub's
+/// Windows runners an 8.3 short path with a `~`).
+#[test]
+fn a_failed_write_on_every_platform() {
+    let c = case();
+    let missing = c.dir.join("no such dir").join("out.nii");
+    let text = |b: &[u8]| String::from_utf8_lossy(b).into_owned();
+    let tz: [&OsStr; 2] = ["-tpattern".as_ref(), "alt+z".as_ref()];
+    // AFNI's name for an output with a directory: the -prefix as given.
+    let name = missing.to_string_lossy().into_owned();
+    let message = format!("** ERROR (nifti_image_write_engine): cannot open output file '{name}'");
+    for copy in [false, true] {
+        let mut args: Vec<&OsStr> = vec!["-verbose".as_ref()];
+        if !copy {
+            args.extend(tz);
+        }
+        args.extend(["-prefix".as_ref(), missing.as_os_str(), c.input.as_os_str()]);
+
+        let o = tshift(&[], &args);
+        assert_eq!(o.status.code(), Some(1), "{o:?}");
+        let err = text(&o.stderr);
+        assert!(
+            err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+            "{o:?}"
+        );
+        assert!(
+            err.contains(&format!("cannot open output file '{name}'")),
+            "{o:?}"
+        );
+        assert!(!err.contains("Wrote output"), "{o:?}");
+
+        let o = tshift(
+            &[
+                ("LARMORX_UPSTREAM_DEFECTS", "reproduce"),
+                ("AFNI_PATH_SPACES_OK", "YES"),
+                ("AFNI_MESSAGE_PREFIX", "run1"),
+            ],
+            &[
+                &["-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES".as_ref()],
+                &args[..],
+            ]
+            .concat(),
+        );
+        assert_eq!(o.status.code(), Some(0), "{o:?}");
+        let err = text(&o.stderr);
+        assert!(
+            err.contains("upstream defect AFNI-26 (3dTshift) reproduced"),
+            "{o:?}"
+        );
+        // AFNI's message, plain, then -verbose's line: a labelled message after a copy, plain
+        // text after a shift.
+        let wrote = if copy {
+            format!("run1::++ Wrote output: {name}\n")
+        } else {
+            format!("++ Wrote output: {name}\n")
+        };
+        assert!(err.ends_with(&format!("{message}\n{wrote}")), "{o:?}");
+    }
+    assert!(!missing.parent().unwrap().exists());
+    assert_eq!(names(&c.dir), ["in.nii", "out put é.nii"]);
+}
+
 /// On Windows, renaming over a file that another program holds open without allowing its
 /// deletion fails; the rename is tried again for about 2 s. Here the output is held for
 /// 0.5 s: the run waits, then replaces it.

@@ -86,7 +86,7 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | ANTS-40 | N4 (ITK) | zero and negative values stay in the log image | c? | unmasked N4s | reproduces | decide |
 | ANTS-41 | ANTs built by GCC 11.4 / 12.3 (compiler bug, not ANTs) | two float roundings of N4's fit dropped (GCC bug 110182) | d | none (fMRIPrep's build follows the source) | follows the source | – (rule 8) |
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
-| ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | sMRIPrep's T1w (7-8 % of voxels) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
 | ANTS-45 | N4, DenoiseImage | errors explained only with `-v` | f | none | always explained | – |
 | ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | c? | every run | not ported (A4) | open |
@@ -783,7 +783,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   memory order, the minimum is never set at all.
 - **Evidence:** read: `itkN4BiasFieldCorrectionImageFilter.hxx:285-294`; validated (`inputs/ramp`).
 - **fMRIPrep:** every N4 run, when the first included voxel of the log image is its unique
-  minimum (with a mask: the first voxel of the mask in memory order).
+  minimum (with a mask: the first voxel of the mask in memory order). None of the fMRIPrep,
+  sMRIPrep and sdcflows command lines of the parity suite meets it (2026-10-12); 3 masked
+  cases on a generated phantom and the `inputs/ramp` case do, by up to 3.9e3.
 - **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range (`larmorx_image::n4::sharpen`,
   `N4Parameters::upstream_defects`); the warning comes when ITK's range differs.
 - **D13 / gap:** done. No gap.
@@ -851,8 +853,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **What:** for a high SNR, the correction factor's `float(I₀)` overflows while `expf`
   underflows; `0 · ∞` is NaN, which passes both range comparisons, and the bias, NaN, becomes 0.
 - **Evidence:** read: `itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx:397-494` (`:482`).
-- **fMRIPrep:** sMRIPrep's denoising runs with the Rician model; the effect on a T1w has not
-  been measured.
+- **fMRIPrep:** sMRIPrep's denoising runs with the Rician model, and meets it. Measured
+  2026-10-12 on sMRIPrep's command (one thread's result): on ds000005's and ds000210's raw
+  T1w the factor is NaN in 7.4 % and 8.4 % of the voxels, and the corrected bias lowers them
+  by a median of 0.58 and 2.9, at most 2.8 and 17.7 (0.7 % of each image's 99th percentile);
+  ANTs' own result moves by up to 271 between thread counts on such an image (ANTS-42). In the
+  parity suite the correction changes 25 of 40 compared cases.
 - **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the factor computed in double with exponentially scaled Bessel
   functions, then ITK's range checks (`larmorx_image::adaptive_denoising`,
   `AdaptiveNlmParameters::upstream_defects`); the warning counts the voxels whose factor ITK

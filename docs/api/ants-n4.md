@@ -108,7 +108,6 @@ wherever it changed the result ([upstream-defects.md](upstream-defects.md); each
 | ANTS-36 | a mask that cannot be read is replaced by ones and still counts as given (restoration and rescaling run) | an error (exit 1). `-r` without a mask does nothing, in both modes; a warning says so |
 | ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `-d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
-
 ## Deliberate differences
 
 - **Threads**: the result does not depend on `n_threads` and equals ANTs' single-thread

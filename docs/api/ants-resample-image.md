@@ -6,11 +6,13 @@
 grid with a new spacing or size, in any of ANTs' eight pixel types, without smoothing.
 
 **Status: `validated`** against ResampleImage itself (see the
-[validation record](../validation/ants-resample-image.md)): 57 cases, 46 outputs compared,
+[validation record](../validation/ants-resample-image.md)): 57 cases, 47 outputs compared,
 all bit-identical with ANTs' exact header bytes: the eight pixel types, every interpolator (B-spline
 orders 0 to 5, Gaussian, windowed sinc), by spacing and by size, in 2, 3 and 4 dimensions,
 and a size of 1 (ANTS-29 below). One expected divergence: B-spline, Gaussian and windowed-sinc
-interpolation of 2D and 4D images are not supported yet.
+interpolation of 2D and 4D images are not supported yet. Compared with ANTs' defects reproduced
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
+default changes.
 
 **Speed** ([benchmark](../benchmarks/ants-gaussian.md)): the 1 mm MNI template to 2 mm (linear)
 takes 91 ms against 431 ms for ANTs; a raw T1w to 1 mm by B-spline as `unsigned short` 1.49 s

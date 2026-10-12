@@ -6,7 +6,9 @@
 
 **Status: `validated`** against ThresholdImage itself (see the
 [validation record](../validation/ants-threshold-image.md)): 41 cases, every compared case
-bit-identical, with ANTs' exact header bytes. `Kmeans` is not supported yet.
+bit-identical, with ANTs' exact header bytes. `Kmeans` is not supported yet. Compared with
+ANTs' defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass"
+lists what larmorx's default changes.
 
 **Speed** ([benchmark](../benchmarks/ants-programs.md)): `0.5 1` on the 1 mm MNI probability
 map 100 ms on one thread, 49 ms on 12 (ANTs: 115 ms and 103 ms); `Otsu 3` with a mask on

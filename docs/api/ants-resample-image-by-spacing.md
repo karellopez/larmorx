@@ -9,7 +9,9 @@ on ITK 5.4.5 (Apache-2.0): optional recursive Gaussian smoothing, then ITK's
 [validation record](../validation/ants-resample-image-by-spacing.md)): 35 cases, 28 outputs
 compared, all bit-identical with ANTs' exact header bytes and printed text, in 2, 3 and 4
 dimensions. Where ANTs resamples uninitialised memory, larmorx reproduces the rest (exit
-code, header, printed text) and fills that memory with zeros (ANTS-28 below).
+code, header, printed text) and fills that memory with zeros (ANTS-28 below). Compared with
+ANTs' defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass"
+lists what larmorx's default changes.
 
 **Speed** ([benchmark](../benchmarks/ants-gaussian.md)): a raw T1w to 2 mm takes 149 ms on
 one thread and 80 ms on 12, against 496 ms and 151 ms for ANTs; the 1 mm MNI template to

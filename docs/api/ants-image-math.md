@@ -26,7 +26,10 @@ is bit-identical, and so is every other morphology case (95 compared: `MD`, `ME`
 `MD 2/5`, `ME 2/10`, `FillHoles 2` and `PadImage ±10` on real masks included), and
 every component and distance-map case (59 compared: `GetLargestComponent`, `D`,
 `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`, in 2, 3 and
-4 dimensions, on real masks and probability maps too).
+4 dimensions, on real masks and probability maps too). Compared with ANTs' defects reproduced
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
+default changes. One more case, `FillHoles 0.5` with a hole on the first slice, compares
+everything but the values, which ANTs takes from memory outside the image (ANTS-19).
 
 **Speed** ([benchmark](../benchmarks/ants-programs.md)): fMRIPrep's
 `TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on

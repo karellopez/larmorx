@@ -101,6 +101,10 @@ wherever it changed the result ([upstream-defects.md](upstream-defects.md); each
 | ITK-01 | with `-s` above 1, the noise is resampled with ITK's floor, 0 instead of −1 for an index just below 0 (x86-64), in 4D linear interpolation | the exact floor; the warning counts the output voxels this changed |
 | ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `-d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
+On sMRIPrep's command (`-n Rician`) ANTS-43 is common: on two real T1w images (ds000005,
+ds000210) ITK's factor is NaN in 7.4 % and 8.4 % of the voxels, and the corrected bias lowers
+them by a median of 0.58 and 2.9, at most 2.8 and 17.7 (0.7 % of each image's 99th
+percentile); ANTs' own result moves far more between thread counts (ANTS-42).
 
 ## Deliberate differences
 

@@ -18,7 +18,9 @@ differ only where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussia
 sinc in double), by at most about 1e-15 relative ([why](../findings/platform-math.md)). With
 correctly rounded maths preloaded into ANTs, all 158 are byte-identical. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
-([stage record](../validation/fmriprep-stages.md)).
+([stage record](../validation/fmriprep-stages.md)). Compared with ANTs' defects reproduced
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
+default changes.
 
 ## Quick start
 

@@ -7,7 +7,9 @@ ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0): Gaussian smoothing with
 
 **Status: `validated`** against SmoothImage itself (see the
 [validation record](../validation/ants-smooth-image.md)): 38 cases, 30 outputs compared, all
-bit-identical with ANTs' exact header bytes, in 2, 3 and 4 dimensions.
+bit-identical with ANTs' exact header bytes, in 2, 3 and 4 dimensions. Compared with ANTs'
+defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists
+what larmorx's default changes.
 
 **Speed** ([benchmark](../benchmarks/ants-gaussian.md)): sigma 1 voxel on a raw T1w
 (160×192×192) takes 119 ms on one thread and 63 ms on 12, against 442 ms and 134 ms for

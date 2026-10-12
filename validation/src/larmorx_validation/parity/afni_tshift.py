@@ -1307,21 +1307,13 @@ _ONE_ROW = (
 #: The replica's two unit cases were expected divergences until 2026-10-12. The clean-room
 #: original had 10 more and the 59 cases of AFNI's global options and environment variables
 #: until 2026-10-12 (completing 3dTshift, part 2b), when it implemented spec §6.1-6.5 and §7.1;
-#: the old list is kept in ``_ORIGINAL_BEFORE_PART_2B`` for the record.
+#: the old list is kept in ``_ORIGINAL_BEFORE_PART_2B`` for the record. The original's three
+#: ``errors/missing-directory*`` cases (AFNI-26: AFNI writes nothing and exits 0 after its NIfTI
+#: writer fails to open the output) were expected divergences until it had AFNI-26's switch
+#: (2026-10-12, spec §7.1, "A failed write"); they are both-error cases since, as the replica's.
 DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
     "replica": {"environment/one-row-dataset": _ONE_ROW},
-    "original": {
-        "environment/one-row-dataset": _ONE_ROW,
-        **{
-            f"errors/missing-directory{v}": (
-                frozenset({"exit status", "messages: AFNI's, byte for byte"}),
-                "AFNI writes nothing and exits 0 after its NIfTI writer fails to open the "
-                "output (AFNI-26); the original exits 1 in reproduce mode too, until it has the "
-                'switch (spec §7.1, "A failed write")',
-            )
-            for v in ("", "-copy", "-verbose")
-        },
-    },
+    "original": {"environment/one-row-dataset": _ONE_ROW},
 }
 
 #: The clean-room original's expected divergences before part 2b (2026-10-12), which it has met

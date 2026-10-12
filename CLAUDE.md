@@ -65,7 +65,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 One agent at a time. The queue, in order:
 1. **Done: `antsApplyTransforms --float 1`** (see the status above; worktree branch `worktree-agent-a689dd2fa349688de`). D13 defaults unchanged (ANTS-33, ITK-01, ITK-10 reproduced).
 2. **Done: D13 part 1** (agent branch `worktree-agent-a448db6a134de1e65`, see the status above). For the user: review ResampleImage's corrected command line (ANTS-30).
-3. **D13 part 2b:** the same fixes in the GPL 3dTshift replica (replica author, may read AFNI source), plus its bug: it writes a metre or micrometre input's sform unconverted (the two expected divergences in `REPLICA_DIVERGENCES`).
+3. **Running: D13 part 2b** (agent branch `worktree-agent-a79c06fc44bc6b3ec`): the same fixes in the GPL 3dTshift replica (replica author, may read AFNI source), plus its bug: it writes a metre or micrometre input's sform unconverted (the two expected divergences in `REPLICA_DIVERGENCES`).
 4. **Stage comparisons on the new oracle runs:** `python -m larmorx_validation pipeline-stages --oracle <run>` for each run below, once finished. Confirm PIPE-03 on real PEPOLAR data (ds005040). Regenerate `docs/validation/fmriprep-stages.md` for ds000005 too: its N4 rows predate the source-faithful N4, and D13 changed defaults.
 5. **Pending measurements on a quiet machine:** `docs/benchmarks/ants-n4.md` against the new oracle; antsApplyTransforms after `--float`.
 6. **A4** (linear registration, antsAI, antsAffineInitializer, histogram matching), validated against the GCC 14.3 oracle only. Then A5, A6, AFNI's 3dvolreg/3dUnifize/3dAutomask, FSL's BET/FAST/FLIRT-BBR, FreeSurfer's mri_coreg/lta_convert, the confounds, larmorprepx.
@@ -73,8 +73,10 @@ One agent at a time. The queue, in order:
 **fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`; done when its `RUN_INFO.txt` has `finished:`):
 - `ds000005-sub-01-noreconall`: done; no field maps, no slice timing.
 - `ds001600-sub-1-noreconall`: done, anatomy only; its BOLD runs have 5 volumes, which fMRIPrep skips.
-- `ds005040-sub-002-noreconall` (PEPOLAR plus slice timing): running since 20:43 on 2026-10-11.
-- Then `ds005454-sub-16-noreconall` (`phasediff`, multiband) and `ds005752-sub-ON01016-noreconall` (direct `fieldmap`), started one after another by the chain in `oracles/logs/fmriprep-25.2.6-sdc-chain.log`.
+- `ds005040-sub-002-noreconall` (PEPOLAR plus slice timing): done, 58 min; its BOLD was processed (10 functional outputs, a PEPOLAR field-map report).
+- `ds005454-sub-16-noreconall` (`phasediff`, multiband 4, 280 volumes): done, 1 h 25 min.
+- `ds005752-sub-ON01016-noreconall` (direct `fieldmap`): done, 55 min.
+All three finished on 2026-10-11 with exit status 0 (`oracles/logs/fmriprep-25.2.6-sdc-chain.log`); their stage comparisons are queue item 3.
 
 ## The user's direction (settled; do not re-propose the alternatives)
 - **Not a fork of fMRIPrep.** No nipype, traits, niworkflows/smriprep/sdcflows runtime dependencies, or graph engines. Ops are plain typed functions; per-subject orchestration is readable Python.

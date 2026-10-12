@@ -88,6 +88,10 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | AFNI-11 | 3dTshift | `larmorx afni 3dTshift` | an existing output is not written, exit 0 | an error, exit 1 (the replica's `reproduce` writes nothing and exits 0; the original has no switch yet) |
 | AFNI-12 | 3dTshift | `larmorx afni 3dTshift` | a `-prefix` with blanks, shell metacharacters or non-ASCII characters is refused; one that passes only through AFNI's exception for names beginning with `3dcalc` is refused when written (nothing written, exit 0) | any name is written, with a warning when AFNI would refuse it (the replica's `reproduce` refuses it at both checks; the original has no switch yet) |
 | AFNI-16 | 3dTshift | both | a grid within about 0.01° to 0.024° of plumb (a single-precision test) is written exactly plumb, its tilt discarded | the input's matrix is kept, sform and qform (decided 2026-10-12; the replica's `reproduce` writes AFNI's plumb matrix; the original has no switch yet) |
+| AFNI-18 | 3dTshift | `larmorx afni 3dTshift` (replica) | an input name with a blank is read as a list of datasets to join in time (unless `AFNI_PATH_SPACES_OK` is yes), so an input in a directory whose name has a blank cannot be opened | the name is one file (the replica's `reproduce` reads AFNI's list; the original has no switch yet) |
+| AFNI-19 | 3dTshift | `larmorx afni 3dTshift` (replica) | with `AFNI_ALLOW_MILLISECONDS` yes and `-TR` in milliseconds, `toffset` is written in milliseconds, labelled seconds | `toffset` in seconds, with the TR |
+| AFNI-20 | 3dTshift | `larmorx afni 3dTshift` (replica) | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes: AFNI's file holds a random identifier, so it is not reproduced; the warning says what AFNI would do |
+| AFNI-22 | 3dTshift | `larmorx afni 3dTshift` (replica) | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written, after the first `=` |
 | FSL-01 | mcflirt | `lx.mri.hmc`, `larmorx mri hmc` | the last volume of the series starts the first stage from the identity instead of its predecessor's result (every fMRIPrep run's last volume) | it continues its chain like every other volume |
 | FSL-03 | mcflirt | both | the in-plane mode pads the first stage's reference grid twice | once, like the other stages |
 | FSL-14 | mcflirt | both | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN | non-finite voxels are left out of the centre of mass and the cost |
@@ -159,7 +163,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
   AFNI's result there yet. The replica, translated from AFNI's source, does; since 2026-10-12
   `specs/3dTshift.md` §6.1 to §6.5 describes each behaviour, confirmed by black-box runs, for
   the original to follow (AFNI-08's trigger: slice times all within 3 ms of 0, kept in a copy
-  of the input because they lie beyond the TR).
+  of the input because they lie beyond the TR). Likewise AFNI's global options and environment
+  variables, with AFNI-18, AFNI-19 and AFNI-22 (the replica since 2026-10-12; spec §7.1).
 
 ## How the switch is validated
 

@@ -23,6 +23,8 @@ larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
 larmorx-io = { path = "../crates/larmorx-io", version = "0.0.1" }
 larmorx-gpl-afni = { path = "larmorx-gpl-afni", version = "0.0.1" }
 rayon = "1.12.0"
+# The arc cosine of an AFNI message (axes::oblique_angle); larmorx_core::math has none yet.
+libm = "0.2.16"
 thiserror = "2.0.21"
 tempfile = "3.27.0"
 # Test-only: SHA-256 for the golden tests (larmorx-gpl-cli/tests/golden.rs).

@@ -40,6 +40,7 @@
 //! AFNI does. A matrix with no obliquity at all (every entry off its axis zero) is written from
 //! its axes in both modes, as AFNI writes it.
 
+use crate::x87;
 use larmorx_core::defects::UpstreamDefects;
 
 /// AFNI's orientation codes (`ORI_*_TYPE`): the direction an axis points to, in DICOM
@@ -299,6 +300,13 @@ fn max3<T: PartialOrd + Copy>(a: T, b: T, c: T) -> T {
 /// length just below a power of 2) to 0.0242° (a power of 2), about 0.014° (`√(2⁻²⁴)` radians)
 /// for most lengths (`specs/3dTshift.md` §6.1, observed at the float32 boundary).
 pub fn is_plumb(real: &[[f32; 4]; 3]) -> bool {
+    // Not below 1: 1 or more, or NaN.
+    fig_merit(real).partial_cmp(&1.0) != Some(std::cmp::Ordering::Less)
+}
+
+/// `THD_compute_oblique_angle`'s `fig_merit`: the smallest, over the columns, of the largest
+/// absolute entry over the column's length, in float.
+fn fig_merit(real: &[[f32; 4]; 3]) -> f32 {
     let column = |j: usize| {
         let (a, b, c) = (real[0][j], real[1][j], real[2][j]);
         // `sqrt(m0*m0 + m1*m1 + m2*m2)`: float products and sums, a double root, stored as float.
@@ -306,9 +314,21 @@ pub fn is_plumb(real: &[[f32; 4]; 3]) -> bool {
         let largest = max3(f64::from(a).abs(), f64::from(b).abs(), f64::from(c).abs());
         (largest / f64::from(len)) as f32
     };
-    let fig_merit = min3(column(0), column(1), column(2));
-    // Not below 1: 1 or more, or NaN.
-    fig_merit.partial_cmp(&1.0) != Some(std::cmp::Ordering::Less)
+    min3(column(0), column(1), column(2))
+}
+
+/// `THD_compute_oblique_angle(real)`: `acos(fig_merit)` in degrees (`* 180.0 / 3.141592653`, in
+/// double, stored as float), or 0 when that is not above 0.01. AFNI reports it, when it is not
+/// 0, as `Oblique dataset: ... is %f degrees from plumb.` The arc cosine is the `libm` crate's
+/// (`larmorx_core::math` has none yet); the angle is only printed, with 6 decimals.
+#[allow(clippy::approx_constant)] // AFNI's own value of pi
+pub fn oblique_angle(real: &[[f32; 4]; 3]) -> f32 {
+    let angle = (libm::acos(f64::from(fig_merit(real))) * 180.0 / 3.141592653) as f32;
+    if f64::from(angle).abs() > 0.01 {
+        angle
+    } else {
+        0.0
+    }
 }
 
 /// `THD_dicom_card_xform`: the cardinal (non-oblique) voxel-to-DICOM matrix of the axes, each
@@ -420,14 +440,13 @@ pub fn written(axes: &Axes, mode: UpstreamDefects) -> Written {
     }
 }
 
-/// `nifti_dmat33_inverse`. AFNI computes `1/det` in x87 extended precision (`1.0l / deti`)
-/// and rounds it to double; here it is a double division, which can differ in the last bit
-/// of the double (it never did for a plumb matrix, where the values are exact).
+/// `nifti_dmat33_inverse`, with AFNI's `1.0l / deti` in x87 extended precision
+/// ([`x87::div`]).
 fn inverse(r: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
     let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = *r;
     let mut deti = nifti_det(r);
     if deti != 0.0 {
-        deti = 1.0 / deti;
+        deti = x87::div(1.0, deti);
     }
     [
         [
@@ -521,10 +540,12 @@ fn polar(a: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
 /// `nifti_dmat44_to_quatern(R)`: the quaternion parameters `(b, c, d)` and `qfac` of the
 /// rotation nearest to `R`'s upper 3×3 corner.
 ///
-/// AFNI forms some quotients in x87 extended precision (`0.25l * (r32-r23) / a`) and rounds
-/// them to double; here they are double divisions. The two can differ in the last bit of the
-/// double for an oblique matrix (never for a plumb one, whose quotients are exact), which the
-/// NIfTI-1 header, storing the parameters as float, almost never shows.
+/// AFNI forms the quotients (`0.25l * (r32-r23) / a`) and the sum `r11 + r22 + r33 + 1.0l` in
+/// x87 extended precision and rounds them to double: [`x87::div`], [`x87::add`]. (A double
+/// division can differ in the last bit of the double for an oblique matrix, never for a plumb
+/// one, whose quotients are exact; NIfTI-2's double fields show it, NIfTI-1's float ones almost
+/// never. The sum can differ only when the trace `r11 + r22 + r33` is within about 2^-11 of
+/// 0.)
 pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
     let [mut r11, mut r12, mut r13] = [r[0][0], r[0][1], r[0][2]];
     let [mut r21, mut r22, mut r23] = [r[1][0], r[1][1], r[1][2]];
@@ -555,13 +576,13 @@ pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
         (r13, r23, r33) = (-r13, -r23, -r33);
         -1.0
     };
-    let mut a = r11 + r22 + r33 + 1.0;
+    let mut a = x87::add(r11 + r22 + r33, 1.0);
     let (b, c, d);
     if a > 0.5 {
         a = 0.5 * a.sqrt();
-        b = 0.25 * (r32 - r23) / a;
-        c = 0.25 * (r13 - r31) / a;
-        d = 0.25 * (r21 - r12) / a;
+        b = x87::div(0.25 * (r32 - r23), a);
+        c = x87::div(0.25 * (r13 - r31), a);
+        d = x87::div(0.25 * (r21 - r12), a);
     } else {
         let xd = 1.0 + r11 - (r22 + r33);
         let yd = 1.0 + r22 - (r11 + r33);
@@ -569,19 +590,19 @@ pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
         let (mut bb, mut cc, mut dd);
         if xd > 1.0 {
             bb = 0.5 * xd.sqrt();
-            cc = 0.25 * (r12 + r21) / bb;
-            dd = 0.25 * (r13 + r31) / bb;
-            a = 0.25 * (r32 - r23) / bb;
+            cc = x87::div(0.25 * (r12 + r21), bb);
+            dd = x87::div(0.25 * (r13 + r31), bb);
+            a = x87::div(0.25 * (r32 - r23), bb);
         } else if yd > 1.0 {
             cc = 0.5 * yd.sqrt();
-            bb = 0.25 * (r12 + r21) / cc;
-            dd = 0.25 * (r23 + r32) / cc;
-            a = 0.25 * (r13 - r31) / cc;
+            bb = x87::div(0.25 * (r12 + r21), cc);
+            dd = x87::div(0.25 * (r23 + r32), cc);
+            a = x87::div(0.25 * (r13 - r31), cc);
         } else {
             dd = 0.5 * zd.sqrt();
-            bb = 0.25 * (r13 + r31) / dd;
-            cc = 0.25 * (r23 + r32) / dd;
-            a = 0.25 * (r21 - r12) / dd;
+            bb = x87::div(0.25 * (r13 + r31), dd);
+            cc = x87::div(0.25 * (r23 + r32), dd);
+            a = x87::div(0.25 * (r21 - r12), dd);
         }
         if a < 0.0 {
             (bb, cc, dd) = (-bb, -cc, -dd);

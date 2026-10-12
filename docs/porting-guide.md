@@ -24,7 +24,9 @@ Each item links to its section.
 7. **Write the validation record** with the result against the unmodified original first
    (§7).
 8. **Decide what larmorx does about each defect and possible improvement** (D11, D13; §8).
-9. **Make the result deterministic and the same on every platform** (§9).
+9. **Make the result deterministic and the same on every platform** (§9); read environment
+   variables and global options into a table of settings, never the process environment
+   (§9.1).
 10. **Work safely**: commit early, at most two agents at a time, never delete (§10).
 11. **Deliver the whole per-tool contract** (§11).
 
@@ -62,8 +64,8 @@ learns from black-box runs goes back into the spec, marked (observed). The model
 record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../crates/larmorx-afni/PROVENANCE.md).
 
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
-(3dTshift: 231 of 231 cases); the original keeps the main package Apache-2.0 at the cost of
-last bits wherever the upstream's own numerics decide them (3dTshift: 162 of 222
+(3dTshift: 276 of 276 cases); the original keeps the main package Apache-2.0 at the cost of
+last bits wherever the upstream's own numerics decide them (3dTshift: 163 of 223
 bit-identical, all within thresholds). `implementation="auto"` runs the replica when it is
 installed, as a separate program, never imported ([architecture.md](architecture.md),
 "Adding a replica").
@@ -404,6 +406,47 @@ rule 10).
 - **The CI budget is small** (rule 10): parity, benchmarks and real data never run in CI; the
   golden suite stays under a minute per platform; estimate minutes × 13 jobs before adding
   CI work; docs-only changes skip CI.
+- **`long double` is three different types.** C's `long double` is x87's 80-bit format on
+  x86-64 Linux, a 128-bit format on aarch64 Linux and plain double on Apple silicon and with
+  Microsoft's compiler, so an original that mixes it into double formulas (`0.25l * x / a`) gives
+  platform-dependent bits. A replica reproduces the oracle's platform (x86-64): an operation
+  rounded to 64 bits, then to 53, emulated with integer arithmetic (the 3dTshift replica's
+  `x87` module, checked against GCC on millions of random operands).
+
+### 9.1 Environment variables and global options: a table of settings
+
+Many originals read environment variables (AFNI reads dozens, FSL reads `FSLOUTPUTTYPE`), and
+some take *global options* that set them from the command line (AFNI's `-Dname=value`,
+`-overwrite`, which AFNI takes out wherever they stand). larmorx reproduces them without ever
+changing its own process environment: `std::env::set_var` is `unsafe` in multithreaded Rust,
+and a changed environment leaks into everything else the process runs. The pattern (the
+3dTshift replica's `environ` module, spec `specs/3dTshift.md` §7.1):
+
+1. **Read the process environment once**, at the start, into a table of settings (on Windows,
+   match names whatever their case, as the system does).
+2. **Apply the global options to the table** in command-line order, so a `-D` wins over the
+   environment and a later setting over an earlier one; take them out of the arguments
+   wherever they stand, as the original does, before the tool's own option scan.
+3. **Pass the table explicitly** to every routine that reads a variable, with the original's
+   own test for each (AFNI looks at the first character only; some routines test an
+   upper-case letter or an exact value).
+4. **List every variable the original consults** on the paths larmorx supports: read the
+   source of every routine on the path, then confirm with a trace of the oracle's `getenv`
+   calls (an `LD_PRELOAD` library) over representative runs. For each, either reproduce its
+   effect (output, exit status, messages) or say why it has none (it concerns a format larmorx
+   does not write, a debugging trace, a banner). A setting the original would not consult is
+   accepted with a short notice that it has no effect.
+5. **Compare in a clean environment.** Run the oracle and larmorx with `HOME` an empty
+   directory (no rc files such as `~/.afnirc`) and the original's variables cleared, then set
+   each variable in the environment and as a global option; compare exit status, messages and
+   files. A quirk of the original's parsing (AFNI reads a `-D` value with a blank as two
+   words joined by `=`) is a D13 defect like any other: the default reads the value as written and names the defect where
+   the readings differ.
+
+Outputs that may replace a file are written to a temporary file in the target's directory
+and renamed over it: a rename within a directory replaces a file atomically on Linux, macOS
+and Windows (on Windows, retry briefly while another program holds the target), so a failure
+never leaves a partial output.
 
 ## 10. Working safely
 

@@ -28,7 +28,9 @@ config = json.loads((here / "config.json").read_text(encoding="utf-8"))
 args = sys.argv[1:]
 with open(here / "calls.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS"),
-                        "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS")}) + "\\n")
+                        "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS"),
+                        "afni": {k: v for k, v in os.environ.items()
+                                 if k.upper().startswith("AFNI_")}}) + "\\n")
 if args == ["--version"]:
     print("larmorx-gpl " + config["version"])
     sys.exit(0)
@@ -189,6 +191,42 @@ def test_the_replica_receives_the_upstream_defects_choice(scripts, tmp_path):
     assert (w.entry, w.tool, w.mode) == ("AFNI-01", "3dTshift", "reproduce")
     assert w.detail.endswith("is applied on output only")
     assert calls(program)[-1]["defects"] == "reproduce"
+
+
+def test_afni_global_options_and_variables_reach_the_replica(scripts, monkeypatch, tmp_path):
+    """AFNI's global options (``-overwrite``, ``-Dname=value``) pass through larmorx's dispatch
+    unchanged and in place, wherever they stand, and AFNI's environment variables reach the
+    replica, which takes them out and applies them itself; ``lx.afni.tshift`` sets the ones its
+    own use of the replica needs."""
+    program = stub(scripts)
+    _, path = series(tmp_path)
+    out = tmp_path / "out.nii"
+    out.write_text("taken")
+    monkeypatch.setenv("AFNI_NIFTI_VIEW", "tlrc")
+    monkeypatch.setenv("AFNI_MESSAGE_PREFIX", "run1")
+    args = [
+        "-DAFNI_NIFTI_PRIORITY=Q",
+        "-tpattern",
+        "-overwrite",
+        "alt+z",
+        "-prefix",
+        str(out),
+        str(path),
+    ]
+    code, _, err = cli(*args)
+    assert code == 0, err
+    run = calls(program)[-1]
+    assert run["args"] == ["afni", "3dTshift", *args]
+    assert run["afni"]["AFNI_NIFTI_VIEW"] == "tlrc"
+    assert run["afni"]["AFNI_MESSAGE_PREFIX"] == "run1"
+
+    lx.afni.tshift(path, slice_times="alt+z")
+    env = calls(program)[-1]["afni"]
+    assert env["AFNI_NIFTI_VIEW"] == "tlrc"  # passed on
+    assert env["AFNI_PATH_SPACES_OK"] == "YES"  # a path is one file
+    assert env["AFNI_MESSAGE_COLORIZE"] == "NO"  # plain messages, read as warnings
+    assert "AFNI_MESSAGE_PREFIX" not in env
+    assert env["AFNI_NO_OBLIQUE_WARNING"] == "YES"  # AFNI's advice, not a warning here
 
 
 def test_a_failing_replica_raises_and_never_falls_back(scripts, tmp_path):

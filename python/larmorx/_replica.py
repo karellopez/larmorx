@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sysconfig
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -201,26 +201,33 @@ def run(
     cwd: str | os.PathLike[str],
     n_threads: int = 1,
     upstream_defects: str | None = None,
+    env: Mapping[str, str | None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``<program> <family> <tool> args...`` in ``cwd``; :class:`ReplicaError` unless it
     exits with 0.
 
-    Replica programs take their thread count from ``OMP_NUM_THREADS`` (AFNI's variable): it is
-    set to ``n_threads``, or removed for 0 (all logical CPUs). Their results do not depend on
-    it. They take D13's choice (``"fix"`` or ``"reproduce"``, ``docs/api/upstream-defects.md``)
-    from ``LARMORX_UPSTREAM_DEFECTS``, as the original's command line does: it is set to
-    ``upstream_defects`` unless that is ``None``.
+    The program gets this process's environment, with the changes in ``env`` (a value of
+    ``None`` removes the variable). Replica programs take their thread count from
+    ``OMP_NUM_THREADS`` (AFNI's variable): it is set to ``n_threads``, or removed for 0 (all
+    logical CPUs). Their results do not depend on it. They take D13's choice (``"fix"`` or
+    ``"reproduce"``, ``docs/api/upstream-defects.md``) from ``LARMORX_UPSTREAM_DEFECTS``, as the
+    original's command line does: it is set to ``upstream_defects`` unless that is ``None``.
     """
     r = selected.replica
     command = [selected.program, r.family, r.tool, *args]
-    env = dict(os.environ)
+    child_env = dict(os.environ)
+    for name, value in (env or {}).items():
+        if value is None:
+            child_env.pop(name, None)
+        else:
+            child_env[name] = value
     if n_threads > 0:
-        env["OMP_NUM_THREADS"] = str(n_threads)
+        child_env["OMP_NUM_THREADS"] = str(n_threads)
     else:
-        env.pop("OMP_NUM_THREADS", None)
+        child_env.pop("OMP_NUM_THREADS", None)
     if upstream_defects is not None:
-        env[_defects.ENV] = upstream_defects
-    process = _run(command, cwd=cwd, env=env)
+        child_env[_defects.ENV] = upstream_defects
+    process = _run(command, cwd=cwd, env=child_env)
     if process.returncode != 0:
         tail = "\n".join(process.stderr.strip().splitlines()[-20:])
         raise ReplicaError(

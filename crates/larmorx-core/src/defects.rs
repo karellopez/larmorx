@@ -228,6 +228,14 @@ defects! {
         "a -prefix with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused";
     AFNI_16 = "AFNI-16", "3dTshift", true,
         "a voxel-to-world matrix within about 0.01 to 0.024 degrees of plumb (a single-precision test; the angle depends on the voxel size) is written as the exactly plumb matrix of its axes, its tilt discarded";
+    AFNI_18 = "AFNI-18", "3dTshift", true,
+        "an input name with a blank is read as a list of datasets to join in time (unless AFNI_PATH_SPACES_OK is YES), so an input in a directory whose name has a blank cannot be opened";
+    AFNI_19 = "AFNI-19", "3dTshift", true,
+        "with AFNI_ALLOW_MILLISECONDS set and -TR in milliseconds, the time offset (toffset) is written in milliseconds while the TR is written in seconds, both labelled seconds";
+    AFNI_20 = "AFNI-20", "3dTshift", true,
+        "a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI output name (unless AFNI_WRITE_1D_AS_PREFIX is YES)";
+    AFNI_22 = "AFNI-22", "3dTshift", true,
+        "a -Dname=value global option whose value has blanks, or a blank around its '=', sets another value (-DX=a b sets X to 'a=b'), and one longer than 255 or 1023 characters is cut";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

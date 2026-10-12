@@ -9,17 +9,19 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
 **Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 251 cases:
+[validation record](../validation/afni-tshift.md)). The record covers 308 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
   input" cases, AFNI's defects (D13) and 18 error cases;
 - 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
-  with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift.
+  with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift;
+- AFNI's global options and environment variables (57 cases, 2026-10-12), which the replica
+  implements and the original does not yet (expected divergences until it does).
 
-All 251 agree, 12 of them as documented divergences, and 162 of the 222 compared are
-byte-identical. The Lagrange and weighted-sinc methods and the copies give **the same bytes**
-as AFNI (120 of 123). The
+All 308 agree, 68 of them as documented divergences (56 of those the global options and
+variables), and 163 of the 223 compared are byte-identical. The Lagrange and weighted-sinc
+methods and the copies give **the same bytes** as AFNI (121 of 124). The
 Fourier method (the default) differs in the last float32 bits, at most 4.3e-7 of the largest
 value, because AFNI's FFT is float32 and larmorx's is double; integer outputs then differ by
 at most 1, in a few values per million on the real runs (up to 0.2 % on a synthetic series
@@ -196,6 +198,10 @@ warning names each one that changed the output, in both modes
 | AFNI-11 | an existing output is not written, and the exit status is 0 | an error (exit 1) | the command line |
 | AFNI-12 | a `-prefix` with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused (exit 1); one that passes only through AFNI's exception for names beginning with `3dcalc`, or whose directory begins with `-`, is refused when written (nothing written, exit 0) | written | the command line |
 | AFNI-16 | a grid within about 0.01° to 0.024° of plumb is written exactly plumb, its tilt discarded | the input's matrix is kept | slightly oblique inputs (headers with tiny rotations) |
+| AFNI-18 | an input name with a blank is read as a list of datasets to join in time, unless `AFNI_PATH_SPACES_OK` is yes: an input in a directory whose name has a blank cannot be opened | the name is one file | the replica's command line (the Python API always passes one file) |
+| AFNI-19 | with `AFNI_ALLOW_MILLISECONDS` yes and `-TR` in milliseconds, `toffset` is written in milliseconds, labelled seconds | `toffset` in seconds | the replica, with that variable |
+| AFNI-20 | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes (AFNI's file holds a random identifier, so `reproduce` does not reproduce it; the warning says so) | the replica |
+| AFNI-22 | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written | the replica's command line |
 
 On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
 `-no_detrend`, fresh output names) none of them applies but AFNI-16, so the default output is
@@ -218,9 +224,62 @@ AFNI-08, AFNI-11, AFNI-12 and AFNI-16, which it has no switch for, AFNI-07 on an
 where it converts the sform's linear part, the slice fields of some copies (it writes the
 header's back; AFNI derives them from the times), and AFNI-03's notice when the corrected
 times make the output a copy (expected divergences in [its record](../validation/afni-tshift.md);
-the spec describes each since 2026-10-12, `specs/3dTshift.md` §6.1 to §6.5). AFNI's
-environment variables (`AFNI_DECONFLICT`, `AFNI_ALLOW_ARBITRARY_FILENAMES`, ...) are not read:
-`reproduce` is AFNI with them unset.
+the spec describes each since 2026-10-12, `specs/3dTshift.md` §6.1 to §6.5). Since
+2026-10-12 the replica also takes AFNI's global options and reads its environment variables
+(below), with AFNI-18, -19, -20 and -22; the original does not yet, so with it `reproduce` is
+AFNI with its variables unset. Warning and error labels: AFNI writes them in terminal colour
+codes, also into files and pipes (AFNI-21, messages only); the replica does so in `reproduce`
+mode only.
+
+## AFNI's global options and environment variables
+
+AFNI programs take *global options* out of the command line before reading their own, wherever
+they stand, and read many environment variables. `larmorx-gpl afni 3dTshift` (the replica, and
+so `larmorx afni 3dTshift` when it runs the replica) does the same since 2026-10-12, on
+Linux, macOS and Windows alike (decided 2026-10-12; behaviour in `specs/3dTshift.md` §7.1). The
+clean-room original follows next.
+
+```
+larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii -overwrite
+larmorx afni 3dTshift -DAFNI_NIFTI_WRITE_TYPE=2 -tpattern alt+z -prefix out.nii in.nii
+AFNI_DECONFLICT=YES larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii   # out_AA1.nii
+```
+
+- **`-overwrite`** replaces an existing output (as `AFNI_DECONFLICT=OVERWRITE`, quietly).
+  **`-Dname=value`** sets a variable for the run; it wins over the environment, and a later
+  setting over an earlier one. **`-ok_1D_text`** reads text in a `-tpattern @file` as 0;
+  **`-skip_afnirc`** is accepted (larmorx never reads `~/.afnirc`). A `-D` of a variable
+  3dTshift does not read is applied with a warning that it has no effect; one that sets
+  nothing (`-DX=`) is dropped. By default the value is the text after the first `=`, as
+  written; with `LARMORX_UPSTREAM_DEFECTS=reproduce` it is read as AFNI does (AFNI-22).
+- **The process environment is never changed.** It is read once into a table of settings,
+  the global options are applied to it, and every part of the program that reads a variable
+  reads the table. (On Windows, environment variable names match whatever their case.)
+- **The variables that change something:** `AFNI_DECONFLICT` (an existing output: replaced,
+  renamed to `out_AA1.nii` ..., or an error), `AFNI_ALLOW_ARBITRARY_FILENAMES`,
+  `AFNI_PATH_SPACES_OK`, `AFNI_NOREALPATH`, `HOME`, `AFNI_NIFTI_PRIORITY`,
+  `AFNI_NIFTI_SCALE`, `AFNI_NIFTI_TYPE_WARN`, `AFNI_NIFTI_VIEW`, `AFNI_DEFAULT_STD_SPACE`,
+  `AFNI_NO_OBLIQUE_WARNING`, `AFNI_1D_ZERO_TEXT`, `AFNI_USE_FGETS`, `AFNI_NIFTI_WRITE_TYPE`
+  (2 writes NIfTI-2), `AFNI_ALLOW_MILLISECONDS`, `AFNI_WRITE_1D_AS_PREFIX`,
+  `AFNI_MESSAGE_PREFIX`, `AFNI_MESSAGE_COLORIZE`, `AFNI_ECHO_COMMANDLINE` and
+  `AFNI_DONT_LOGFILE`. Each does what it does in AFNI, with AFNI's messages; the defaults
+  differ only where a defect is named (AFNI-11, -12, -18, -19, -20, -21, -22). The other
+  variables AFNI 25.2.09's 3dTshift reads change nothing larmorx writes or prints (AFNI's
+  header extension, its debugging output, its own dataset format, its version banner): they
+  are accepted and ignored. The full list, with each variable's values and effect, is in the
+  spec, §7.1.
+- **Writing the output** goes through a temporary file in the output's directory, renamed
+  over the output when complete, so an existing output is replaced whole or not at all. On
+  Windows, while another program holds the output open (an antivirus scan, a viewer), the
+  rename is retried for about 2 s; then the run fails with a message that names the file and
+  says that nothing was written. Paths with blanks and non-ASCII characters work on every
+  system.
+- **`lx.afni.tshift`** passes the process environment's AFNI variables on to the replica, so
+  that it reads the input and writes the output as the command line would, except that its
+  temporary paths are always one file each (`AFNI_PATH_SPACES_OK=YES`), its messages are
+  plain text (no prefix, no colour, no echoed command line) and an oblique input is not
+  reported (AFNI's advice to run `3dWarp -deoblique` is not a warning about the result). It
+  takes no global options.
 
 ## Behaviour found by black-box runs
 
@@ -261,9 +320,11 @@ The spec left these open; each was settled by running AFNI 25.2.09 (details in
   `LARMORX_UPSTREAM_DEFECTS=reproduce`.
 - `-voxshift`, AFNI's own formats, sub-brick selectors and 1D selectors (`file[2]`,
   `file'`) are not supported; hexadecimal numbers in 1D files are rejected.
-- AFNI's global options, which AFNI accepts anywhere on the command line (`-overwrite` to
-  overwrite an existing output, `-Dname=value` to set an environment variable), are unknown
-  options here (exit 1), in both implementations.
+- AFNI's global options other than `-overwrite`, `-Dname=value`, `-ok_1D_text` and
+  `-skip_afnirc` (`-Vname=`, `-echo_edu`, `-np`, `-all_opts`, `-h_view`, `<<` inclusions,
+  ...) are unknown options (exit 1). The replica takes those four and AFNI's variables since
+  2026-10-12 (below); the clean-room original does not yet (unknown options, variables not
+  read).
 - The Fourier method uses larmorx's own FFT in double precision (AFNI uses float32): float32
   outputs differ in the last bits, integer outputs occasionally round the other way.
 - No history extension; messages differ from AFNI's, exit codes do not.

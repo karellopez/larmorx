@@ -1,18 +1,19 @@
 # Parity: 3dTshift
 
-**All cases agree.** 251 cases on the `standard` tier: 222 pass, 17 rejected by both, 12 expected divergences, 0 failures.
+**All cases agree.** 308 cases on the `standard` tier: 223 pass, 17 rejected by both, 68 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
 
-**Bit-identical: 162 of 222 passing cases** produce exactly the bytes of AFNI's output data.
-- Lagrange and weighted-sinc methods and copies: 120 of 123 bit-identical.
+**Bit-identical: 163 of 223 passing cases** produce exactly the bytes of AFNI's output data.
+- Lagrange and weighted-sinc methods and copies: 121 of 124 bit-identical.
 - Fourier: 42 of 99 bit-identical. AFNI computes the FFT in float32 with its own kernels; larmorx computes it in double precision with its own FFT, so float32 outputs differ in the last bits and integer outputs occasionally round the other way (by 1).
 - Not bit-identical outside Fourier: `options/float32-no-detrend`, `real/ds003345-quintic`, `real/ds003345-heptic`. Known causes, in the last float32 bit only: `-no_detrend` (its rounding is not reproduced yet); quintic and heptic weights for some fractions (unresolved); weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not correctly rounded, and larmorx uses correctly rounded functions (`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`.
 - The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md).
 - Python API (`lx.afni.tshift(..., implementation="original")`): run on the 189 passing cases it can express; 189 give the command line's output bit for bit (data and header). From an image in memory: 144 of 144 give the same values.
+- **AFNI's global options and environment variables** (categories `global` and `environment`, 57 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 1 of 57 identical.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
@@ -24,6 +25,7 @@
 |---|---|---|---|---|---|
 | copy | 6 | 6 | 0.0e+00 | 0 | 0.0e+00 |
 | defects | 5 | 4 | 8.5e-08 | 0 | 4.7e-02 |
+| environment | 1 | 1 | 0.0e+00 | – | 0.0e+00 |
 | header-timing | 12 | 11 | 8.5e-08 | – | 4.2e-02 |
 | methods | 84 | 84 | 0.0e+00 | 0 | 0.0e+00 |
 | options | 42 | 26 | 4.3e-07 | 0 | 8.2e-01 |
@@ -48,8 +50,10 @@
 | copy | 8 | 6 | 0 | 2 | 0 |
 | defects | 8 | 5 | 0 | 3 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
+| environment | 31 | 1 | 0 | 30 | 0 |
 | errors | 18 | 0 | 17 | 1 | 0 |
 | geometry | 3 | 0 | 0 | 3 | 0 |
+| global | 26 | 0 | 0 | 26 | 0 |
 | header-timing | 13 | 12 | 0 | 1 | 0 |
 | methods | 84 | 84 | 0 | 0 | 0 |
 | options | 42 | 42 | 0 | 0 | 0 |
@@ -71,6 +75,62 @@
 | `copy/short-slice-spacing` | AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 here; the original writes the header's fields back (slice_start 0) |
 | `copy/alt-two-slices` | AFNI derives the slice fields of a copy from the times: two slices are slice code 1; the original writes the header's code 3 back |
 | `errors/prefix-with-blank` | AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too (no switch for AFNI-12) |
+| `global/overwrite-after-dataset` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/overwrite-as-option-value` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/overwrite-copy` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/overwrite-no-existing-file` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/overwrite-then-D` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-deconflict-yes` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-deconflict-no` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-wins-over-environment` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-arbitrary-filenames` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-after-dataset` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-as-option-value` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-value-with-blank` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-blank-before-value` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-empty-value` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-empty-name` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-without-equals` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-alone` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-lowercase` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-message-prefix-with-blank` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-unknown-variable` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/ok-1D-text` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/skip-afnirc` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/deconflict-overwrite` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/deconflict-yes` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/deconflict-no-copy` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/arbitrary-filenames` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/input-with-blank` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/path-spaces-ok` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-priority-Q` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-priority-illegal` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-scale-no` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/type-warn-default` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/type-warn-yes` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-view-tlrc` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/default-std-space` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/sform-code-7` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/write-type-2` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/allow-milliseconds` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/1D-zero-text` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/1D-text-error` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/use-fgets` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/cr-line-ends` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/realpath` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/norealpath` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/oblique-warning` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/no-oblique-warning` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/message-prefix` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/echo-commandline` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/quiet-startup` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-noext` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/one-row-dataset` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/write-1D-as-prefix` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-nifti-priority-Q` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-nifti-view-tlrc` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-write-type-2` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `global/D-nifti-scale-no` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `divergence/afni-format-output` | larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format. |
 | `divergence/voxshift` | -voxshift is not supported by larmorx (fMRIPrep does not use it). |
 
@@ -100,7 +160,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (966bd9874476) |
+| larmorx | 0.0.1 (4aaad72f285c) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -110,7 +170,7 @@
 
 ## Notes
 
-Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. larmorx uses all logical CPUs (`OMP_NUM_THREADS` unset) on the command line and 1 thread through the Python API (its default); its results do not depend on the thread count. The Python API runs every passing case it can express (a `-tpattern` name or fMRIPrep's slice timing, options in seconds; not the header's timing, AFNI 1D files or copies of the input) and must give the command line's output: the same values and the same header bytes (`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs on the image loaded in memory.
+Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. larmorx uses all logical CPUs (`OMP_NUM_THREADS` unset) on the command line and 1 thread through the Python API (its default); its results do not depend on the thread count. The Python API runs every passing case it can express (a `-tpattern` name or fMRIPrep's slice timing, options in seconds; not the header's timing, AFNI 1D files or copies of the input) and must give the command line's output: the same values and the same header bytes (`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs on the image loaded in memory. Both programs run without AFNI's environment variables of this process and with `HOME` an empty directory (no `.afnirc`), `AFNI_DONT_LOGFILE=YES` and `AFNI_NIFTI_TYPE_WARN=NO`, plus each case's variables. The cases of AFNI's global options and environment variables run each program in a directory of its own and compare exit statuses and messages too.
 
 ## All cases
 
@@ -345,6 +405,63 @@ Both programs read the same files with the same arguments; outputs are read with
 | `errors/missing-dataset` | both-error | – | an input file that does not exist |
 | `errors/existing-output` | both-error | – | an output that exists already (AFNI exits 0 without writing; larmorx exits 1, AFNI-11) |
 | `errors/prefix-with-blank` | expected-divergence | 0/2 | a -prefix with a blank (AFNI refuses it; larmorx writes it, AFNI-12) |
+| `global/overwrite-after-dataset` | expected-divergence | 0/3 | -overwrite after the dataset replaces an existing output |
+| `global/overwrite-as-option-value` | expected-divergence | 0/3 | -overwrite where -tpattern's value stands: taken out first, -tpattern reads alt+z |
+| `global/overwrite-copy` | expected-divergence | 0/3 | -overwrite on a copy of the input (no slice timing) |
+| `global/overwrite-no-existing-file` | expected-divergence | 0/3 | -overwrite with no output to replace |
+| `global/overwrite-then-D` | expected-divergence | 0/3 | -overwrite, then -DAFNI_DECONFLICT=YES: the later one wins (out_AA1.nii) |
+| `global/D-deconflict-yes` | expected-divergence | 0/3 | -DAFNI_DECONFLICT=YES: an existing output makes the run write out_AA1.nii |
+| `global/D-deconflict-no` | expected-divergence | 1/2 | -DAFNI_DECONFLICT=NO: an existing output stops the shift before the work (exit 1) |
+| `global/D-wins-over-environment` | expected-divergence | 0/3 | -DAFNI_DECONFLICT=OVERWRITE over AFNI_DECONFLICT=YES in the environment |
+| `global/D-arbitrary-filenames` | expected-divergence | 0/3 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
+| `global/D-after-dataset` | expected-divergence | 2/3 | -D after the dataset applies too |
+| `global/D-as-option-value` | expected-divergence | 0/3 | -D where -tpattern's value stands: taken out first |
+| `global/D-value-with-blank` | expected-divergence | 0/3 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES: AFNI sets 'Y=ES', still YES |
+| `global/D-blank-before-value` | expected-divergence | 1/2 | -DAFNI_ALLOW_ARBITRARY_FILENAMES= YES: AFNI sets '=YES', not YES: refused |
+| `global/D-empty-value` | expected-divergence | 1/2 | -DAFNI_ALLOW_ARBITRARY_FILENAMES= (no value) sets nothing: refused |
+| `global/D-empty-name` | expected-divergence | 1/2 | -D=YES (no name) sets nothing |
+| `global/D-without-equals` | expected-divergence | 1/2 | -DAFNI_ALLOW_ARBITRARY_FILENAMES (no '='): an unknown option |
+| `global/D-alone` | expected-divergence | 1/2 | -D alone: an unknown option |
+| `global/D-lowercase` | expected-divergence | 1/2 | -d...=YES: not a global option, an unknown option |
+| `global/D-message-prefix-with-blank` | expected-divergence | 0/3 | -DAFNI_MESSAGE_PREFIX=a b: AFNI's messages start with 'a=b::' (AFNI-22) |
+| `global/D-unknown-variable` | expected-divergence | 0/3 | -D of a variable 3dTshift does not read: no effect |
+| `global/ok-1D-text` | expected-divergence | 0/3 | -ok_1D_text: text in the -tpattern file is read as 0 |
+| `global/skip-afnirc` | expected-divergence | 0/3 | -skip_afnirc: accepted |
+| `environment/deconflict-overwrite` | expected-divergence | 0/3 | AFNI_DECONFLICT=OVERWRITE: an existing output is replaced, with AFNI's warning |
+| `environment/deconflict-yes` | expected-divergence | 0/3 | AFNI_DECONFLICT=YES: the output goes to out_AA1.nii |
+| `environment/deconflict-no-copy` | expected-divergence | 0/2 | AFNI_DECONFLICT=NO on a copy: AFNI finds the output after the work, exit 0 (AFNI-11) |
+| `environment/arbitrary-filenames` | expected-divergence | 2/3 | AFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
+| `environment/input-with-blank` | expected-divergence | 0/4 | an input in a directory with a blank: AFNI reads a list of datasets and fails (AFNI-18) |
+| `environment/path-spaces-ok` | expected-divergence | 2/3 | AFNI_PATH_SPACES_OK=YES: an input in a directory with a blank is one file |
+| `environment/nifti-priority-Q` | expected-divergence | 2/3 | AFNI_NIFTI_PRIORITY=Q: the qform rather than the sform (they differ) |
+| `environment/nifti-priority-illegal` | expected-divergence | 2/3 | AFNI_NIFTI_PRIORITY=X: AFNI's warning, the sform |
+| `environment/nifti-scale-no` | expected-divergence | 2/3 | AFNI_NIFTI_SCALE=NO: int16 with a slope and an intercept stays int16 (slope kept) |
+| `environment/type-warn-default` | expected-divergence | 2/3 | AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines |
+| `environment/type-warn-yes` | expected-divergence | 2/3 | AFNI_NIFTI_TYPE_WARN=YES: the conversion message alone |
+| `environment/nifti-view-tlrc` | expected-divergence | 2/3 | AFNI_NIFTI_VIEW=TLRC: sform code 2 is the tlrc view, so code 3 |
+| `environment/default-std-space` | expected-divergence | 2/3 | AFNI_DEFAULT_STD_SPACE=MNI: sform code 5 gives code 4 |
+| `environment/sform-code-7` | expected-divergence | 2/3 | sform code 7: AFNI's warning; AFNI_NIFTI_VIEW=tlrc makes it code 3 |
+| `environment/write-type-2` | expected-divergence | 2/3 | AFNI_NIFTI_WRITE_TYPE=2: a NIfTI-2 output |
+| `environment/allow-milliseconds` | expected-divergence | 2/3 | AFNI_ALLOW_MILLISECONDS=YES with -TR 2000ms: toffset written in ms (AFNI-19) |
+| `environment/1D-zero-text` | expected-divergence | 0/3 | AFNI_1D_ZERO_TEXT=YES: text in the -tpattern file is read as 0 |
+| `environment/1D-text-error` | expected-divergence | 1/2 | text in the -tpattern file: AFNI's parse error |
+| `environment/use-fgets` | expected-divergence | 1/2 | AFNI_USE_FGETS=YES: a file with CR line ends is one row, of 8 values (9 > TR) |
+| `environment/cr-line-ends` | expected-divergence | 0/3 | a file with CR line ends: four rows of two columns, read column by column |
+| `environment/realpath` | expected-divergence | 2/3 | a conversion message names the input by its real path ('..' resolved) |
+| `environment/norealpath` | expected-divergence | 2/3 | AFNI_NOREALPATH=YES: the message names the input as given |
+| `environment/oblique-warning` | expected-divergence | 2/3 | an oblique input: AFNI's obliquity report |
+| `environment/no-oblique-warning` | expected-divergence | 2/3 | AFNI_NO_OBLIQUE_WARNING=YES: no obliquity report |
+| `environment/message-prefix` | expected-divergence | 2/3 | AFNI_MESSAGE_PREFIX: on every labelled message |
+| `environment/message-colorize-no` | pass | 15/15 | AFNI_MESSAGE_COLORIZE=NO: labels without terminal escape codes |
+| `environment/echo-commandline` | expected-divergence | 2/3 | AFNI_ECHO_COMMANDLINE=YES (and a log file): the command line is echoed |
+| `environment/quiet-startup` | expected-divergence | 2/3 | AFNI_QUIET_STARTUP=YES: no version banner (larmorx prints none) |
+| `environment/nifti-noext` | expected-divergence | 2/3 | AFNI_NIFTI_NOEXT=YES: AFNI writes no header extension, as larmorx: the whole file |
+| `environment/one-row-dataset` | expected-divergence | 2/3 | a dataset of one row: AFNI writes a 1D text file under the NIfTI name (AFNI-20) |
+| `environment/write-1D-as-prefix` | expected-divergence | 2/3 | AFNI_WRITE_1D_AS_PREFIX=YES: a dataset of one row is written as NIfTI |
+| `global/D-nifti-priority-Q` | expected-divergence | 0/3 | -DAFNI_NIFTI_PRIORITY=Q: as the environment variable |
+| `global/D-nifti-view-tlrc` | expected-divergence | 0/3 | -DAFNI_NIFTI_VIEW=TLRC: as the environment variable |
+| `global/D-write-type-2` | expected-divergence | 0/3 | -DAFNI_NIFTI_WRITE_TYPE=2: as the environment variable |
+| `global/D-nifti-scale-no` | expected-divergence | 0/3 | -DAFNI_NIFTI_SCALE=NO: as the environment variable |
 | `divergence/afni-format-output` | expected-divergence | 1/1 | -prefix without .nii: AFNI writes its own BRIK/HEAD format |
 | `divergence/voxshift` | expected-divergence | 1/1 | -voxshift: per-voxel shifts from a dataset |
 | `real/ds001600-acq-v4` | pass | 14/14 | fMRIPrep's call (-ignore 0 -tzero -TR -tpattern @file) on sub-1_task-rest_acq-v4_bold |

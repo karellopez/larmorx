@@ -727,6 +727,38 @@ Decided by the user on the questions the defect register raised
 - **Order:** the replica and the spec (replica author), then the clean-room original from the
   spec, together with spec §6.1-6.5.
 
+## 2026-10-12: Completing 3dTshift, part 2a: AFNI's global options and variables in the replica
+- **Part 2a done** (2026-10-12, replica author): the replica takes `-overwrite`,
+  `-Dname=value`, `-ok_1D_text` and `-skip_afnirc`, and reads every variable 3dTshift
+  consults (found in the source, confirmed by tracing the oracle's `getenv` calls; each one
+  that changes something run against the oracle in the environment and as `-D`). In
+  `reproduce` mode its exit status, files and messages are AFNI's, byte for byte (AFNI's
+  version banner and compile date aside); the messages include AFNI's terminal colour codes,
+  which it writes into files and pipes too. The behaviour is in `specs/3dTshift.md` §7.1 for
+  the clean-room original (part 2b). Found and registered: AFNI-18 (an input name with a blank
+  is read as a list of datasets, so an input in a directory with a blank cannot be opened),
+  AFNI-19 (`AFNI_ALLOW_MILLISECONDS` writes `toffset` in milliseconds), AFNI-20 (a one-row
+  dataset is written as a 1D text file under the NIfTI name), AFNI-21 (colour codes, messages
+  only), AFNI-22 (`-D` values with blanks), AFNI-23 (`AFNI_NIFTI_SCALE=NO` drops the
+  intercept; questionable, to decide) and AFNI-24 (the NIfTI library's `long double`
+  arithmetic, which the replica now emulates on every platform so that NIfTI-2 headers are
+  AFNI's byte for byte); AFNI-11 and AFNI-12 corrected for `AFNI_DECONFLICT` and
+  `AFNI_ALLOW_ARBITRARY_FILENAMES`. Defaults: the corrections are named as usual; the
+  questionable AFNI-23 stays AFNI's until decided. Records from `4aaad72`, standard tier, 308
+  cases each (57 new, categories `global` and `environment`, messages compared byte for
+  byte): the replica 276 of 276 compared cases bit-identical to AFNI in `reproduce` (3
+  expected divergences: AFNI's own format, `-voxshift`, and AFNI-20's one-row text file), all
+  57 new cases with AFNI's exit status and messages; the original unchanged where compared
+  (223 pass, 163 bit-identical), its 56 new expected divergences the global options and
+  variables of part 2b. GPL golden: five new cases (`-overwrite`, NIfTI-2 by `-D` and by the
+  environment, `AFNI_ALLOW_MILLISECONDS` in both modes), no checksum changed.
+- **`lx.afni.tshift`** passes the process environment's AFNI variables on to the replica (so
+  the replica reads the input and writes the output as the command line would), but sets
+  `AFNI_PATH_SPACES_OK=YES` for its temporary paths and keeps AFNI's message prefix, colours,
+  echoed command line and oblique report out of its warnings. To review: whether the Python
+  API should read AFNI's variables at all (rule 6, no global configuration); the original
+  should do whatever is decided.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

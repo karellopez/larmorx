@@ -22,9 +22,13 @@ and reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=re
 slope and an intercept, §6), AFNI-03 (header slice code 2, §3.2 and §6.4), AFNI-05
 (`-no_detrend`'s voxel pairs, §4), AFNI-07 (metre and micron units, §6 and §6.1), AFNI-08 (the
 slice fields of a copy, §6.2), AFNI-11 and AFNI-12 (an existing output and refused output
-names, §6.3) and AFNI-16 (a nearly plumb matrix written plumb, §6.1). This spec describes what
-AFNI does; the reproduced mode follows it exactly. §6.5 lists, for each, what the default
-does instead and when larmorx names it.
+names, §6.3), AFNI-16 (a nearly plumb matrix written plumb, §6.1), and, with AFNI's global
+options and environment variables (§7.1), AFNI-18 (an input name with a blank), AFNI-19
+(`AFNI_ALLOW_MILLISECONDS`), AFNI-20 (a one-row dataset written as text, not reproduced) and
+AFNI-22 (`-D` values with blanks). This spec describes what AFNI does; the reproduced mode
+follows it exactly. §6.5 and the end of §7.1 list, for each, what the default does instead
+and when larmorx names it. AFNI-21 (warning labels in terminal colours, §7.1) concerns
+messages only: `reproduce` writes AFNI's, the default plain ones, and nothing is named.
 
 ---
 
@@ -455,8 +459,9 @@ For the matrix written (`C` or `M`):
   `d = 0.25·(r21 − r12)/a` when `1 + r11 + r22 + r33 > 0.5`; otherwise from
   `1 + r11 − r22 − r33` if it exceeds 1, else from `1 + r22 − r11 − r33` if it exceeds 1, else
   from `1 + r33 − r11 − r22`, with `(b, c, d)` negated when the `a` so found is negative.
-  (AFNI forms the quotients in extended precision; this changes the last bit of a double at
-  most, which the float32 fields practically never show.) For `C` the components are exact
+  (AFNI forms the quotients, and the sum of 1 and `r11 + r22 + r33`, in extended precision,
+  §7.1; this changes the last bit of a double at most, which the float32 fields practically
+  never show.) For `C` the components are exact
   (0, ±½, ±√½ or ±1), and the signs of their zeros follow IEEE arithmetic on `C`'s signed
   zeros: a diagonal `C` with positive entries gives (0, −0, 0);
 - `qoffset_x`, `qoffset_y`, `qoffset_z` are `M`'s offsets (the same as the sform's),
@@ -554,11 +559,12 @@ on standard error
 with the name without its directory (`-prefix sub/out.nii` prints `'out.nii'`), leaves the
 file as it was and exits with status 0; the same in a copy of the input. Only the exact name
 counts: `out.nii` does not conflict with an existing `out.nii.gz`, nor the reverse. With
-`AFNI_DECONFLICT` set, or AFNI's global option `-overwrite` (§7), AFNI overwrites or renames;
-`reproduce` is AFNI with neither.
+`AFNI_DECONFLICT` set, or AFNI's global option `-overwrite`, AFNI overwrites, renames or
+stops; §7.1 describes each value, and `reproduce` follows it. Without either, as above.
 
-larmorx's default: an existing output is an error, found before the work (exit status 1).
-AFNI-11 is named in both modes when the output exists.
+larmorx's default: an existing output is an error, found before the work (exit status 1),
+wherever AFNI-11 applies (with `AFNI_DECONFLICT`, see §7.1). AFNI-11 is named in both modes
+when it applies.
 
 **Refused names (AFNI-12).** AFNI checks the output's name twice, with one rule. A name is
 *refused* when it is empty or contains, anywhere (directories included):
@@ -581,9 +587,11 @@ Letters, digits and ``# $ % + , - . / : = @ \ ^ _ ` ~`` are accepted.
    `** ERROR: Illegal filename for NIfTI output: ./3dcalc a b.nii` and exits with status 0.
    The existing-file check comes first. `3dcalc/x y.nii` passes both checks and is written.
 
-With `AFNI_ALLOW_ARBITRARY_FILENAMES` set AFNI refuses no name; `reproduce` is AFNI without
-it. larmorx's default writes any name. AFNI-12 is named in both modes when AFNI would refuse
-the name at either check.
+With `AFNI_ALLOW_ARBITRARY_FILENAMES` yes (§7.1) AFNI refuses only an empty name at the
+first check, and at the second an empty name or one that begins with `-`; `reproduce` follows
+it. larmorx's default
+writes any name. AFNI-12 is named in both modes when AFNI would refuse the name at either
+check.
 
 ### 6.4 Header slice code 2 whose times exceed the TR (AFNI-03)
 
@@ -617,7 +625,7 @@ when the warning is raised (in both modes, wherever the two modes give different
 
 ## 7. The command line (`larmorx afni 3dTshift [options] dataset`)
 
-Options must come before the dataset.
+Options must come before the dataset (AFNI's global options may stand anywhere, §7.1).
 
 | Option | Behaviour |
 |---|---|
@@ -628,12 +636,13 @@ Options must come before the dataset.
 | `-Fourier`/`-fourier`, `-linear`/`-Linear`, `-cubic`/`-Cubic`, `-quintic`/`-Quintic`, `-heptic`/`-Heptic` | only the first 4 characters are compared, so `-cub` works |
 | `-wsinc5`, `-wsinc9` | the first 7 characters are compared, case-insensitively |
 | `-tpattern p` | §3.1 |
-| `-prefix name` | output file. larmorx requires `.nii` or `.nii.gz`, since AFNI would otherwise write its own format; an existing output is an error (AFNI writes nothing and exits 0, AFNI-11), and any name is accepted (AFNI refuses some, AFNI-12): §6.3 |
+| `-prefix name` | output file. larmorx requires `.nii` or `.nii.gz`, since AFNI would otherwise write its own format; an existing output is an error (AFNI writes nothing and exits 0, AFNI-11) unless `-overwrite` or `AFNI_DECONFLICT` allows replacing or renaming it (§7.1), and any name is accepted (AFNI refuses some, AFNI-12): §6.3 |
 | `-voxshift dset` | per-voxel shifts. Not supported (error) |
 | anything else starting with `-` | error "Unknown option" |
 
 Messages may differ from AFNI's, but errors must exit with a non-zero code, and the
-"copy of input" cases must produce the copy.
+"copy of input" cases must produce the copy. The exception is §7.1: there `reproduce` gives
+AFNI's messages too.
 
 **(observed)** Option details:
 - Option names are matched **exactly** (`-tz`, `-tpat`, `-pref`, `-ign`, `-rltx`, `-TRx` are
@@ -658,11 +667,305 @@ Messages may differ from AFNI's, but errors must exit with a non-zero code, and 
 - Arguments after the dataset are ignored. `3dTshift` with no arguments prints the help and
   exits 0; `-help` is recognised only as the first argument (elsewhere it is unknown).
 - AFNI takes its *global options* out of the command line before 3dTshift reads it, wherever
-  they stand (after the other options too): `-overwrite` overwrites an existing output
-  (§6.3), and `-Dname=value` sets the environment variable `name` (with
-  `-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES`, `-prefix 'a b.nii'` is written). larmorx does not
-  take them: they are unknown options (exit 1), in both implementations and both modes (a
-  known difference, not a defect of AFNI's). AFNI's other global options were not tried.
+  they stand, and AFNI's environment variables change what it does. Both larmorx
+  implementations take `-overwrite`, `-Dname=value`, `-ok_1D_text` and `-skip_afnirc`, and
+  read the variables 3dTshift consults (decided 2026-10-12): §7.1.
+
+### 7.1 AFNI's global options and environment variables
+
+AFNI programs change what they do according to environment variables, and take *global
+options*, which set some of those variables, out of the command line before reading their own
+options. Both larmorx implementations accept `-overwrite`, `-Dname=value`, `-ok_1D_text` and
+`-skip_afnirc`, and read every variable 3dTshift consults (decided 2026-10-12), identically
+on Linux, macOS and Windows. Everything in this section marked (observed) was confirmed with
+the AFNI 25.2.09 binary, each variable both in the environment and as `-D`, in a clean
+environment (no `.afnirc`); `reproduce` must give AFNI's exit status, files and messages, and
+the parity suite compares all three (categories `global` and `environment`, §9).
+
+**Reading the settings.**
+- **Never change the process environment** (in Rust, `std::env::set_var` is unsafe in a
+  multithreaded program). Read the process environment once, at the start, into a table of
+  settings, apply the global options to it in command-line order, and pass the table to every
+  part that reads a variable. So a `-D` wins over the environment, and a later setting over an
+  earlier one, as in AFNI (observed: `AFNI_DECONFLICT=YES` in the environment and
+  `-DAFNI_DECONFLICT=NO` on the command line behave as `NO`; two `-D` of one variable, the
+  last).
+- Names are case-sensitive. On Windows the system does not tell `afni_nifti_view` from
+  `AFNI_NIFTI_VIEW`: an environment variable is found whatever the case of its name there
+  (`-D` names are taken as written, on every system).
+- A value is *yes* when it starts with `Y` or `y`, *no* when it starts with `N` or `n`; other
+  values, an empty value and an unset variable are neither (observed: `yes`, `Yes` and `Y=ES`
+  are yes; `1` and `=YES` are not).
+- AFNI also reads `~/.afnirc` (or the file `AFNI_SYSTEM_AFNIRC` names) for variables not set
+  otherwise. larmorx reads no such file: `reproduce` is AFNI without one.
+
+**The global options (observed).**
+- They are taken out wherever they stand: before the options, between them, after the
+  dataset, and even in the place of another option's value (`-tpattern -overwrite alt+z`:
+  `-overwrite` is taken out and `-tpattern` reads `alt+z`; `-tpattern -DX=1 alt+z` likewise).
+  The rest is read as §7 says.
+- `3dTshift` alone or with `-help` first prints the help before global options are taken out;
+  `3dTshift -overwrite` alone fails with `Need a dataset input?!`, and `3dTshift -overwrite
+  -help` with `Unknown option: -help` (exit 1).
+- `-overwrite` sets `AFNI_DECONFLICT` to `OVERWRITE`, and AFNI then replaces an existing output
+  without its "Over-writing dataset" warning (below).
+- `-ok_1D_text` sets `AFNI_1D_ZERO_TEXT` to `YES`. `-skip_afnirc` changes nothing in larmorx.
+- `-Dname=value` is any argument that starts with `-D` (upper case) and contains `=`. AFNI reads
+  the text after `-D` as follows:
+  1. If it has fewer than 3 characters, nothing is set.
+  2. It is read as two words separated by blanks, the first at most 255 characters long, the
+     second at most 1023 (a longer first word continues as the second). If either word is
+     missing, the first `=` is made a blank and the text is read again; a second word still
+     missing is empty.
+  3. If either word is empty, nothing is set, and nothing is said.
+  4. Otherwise the variable is set from the two words joined by `=`: the name is the text up to
+     the first `=`, the value the rest.
+
+  | Argument | AFNI sets |
+  |---|---|
+  | `-DX=YES` | `X` to `YES` |
+  | `-DX=YES=1` | `X` to `YES=1` |
+  | `-DX=a b` (one argument) | `X` to `a=b` |
+  | `-DX= YES` | `X` to `=YES` |
+  | `-DX =YES` | `X` to `=YES` |
+  | `-DX=`, `-D=YES` | nothing |
+  | `-DX` (no `=`), `-D`, `-dX=YES` | not global options: `Unknown option` (exit 1) |
+
+  larmorx's default reads the name before the first `=` and the value after it as written
+  (`-DX=a b` sets `X` to `a b`), and names AFNI-22 when AFNI's reading would change what a
+  variable of the table below does: for the variables read as yes or no, a different answer;
+  for the others, a different value (so `-DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES`, yes either
+  way, names nothing). `reproduce` reads as AFNI does. A `-D` that sets nothing is dropped in
+  both modes; by default with a warning. A `-D` of a variable 3dTshift does not consult is
+  applied, with a warning that it has no effect (larmorx's).
+- AFNI's other global options are not supported; larmorx reports them as unknown options
+  (exit 1). What AFNI does with them (observed): `-Vname=` prints the variable's value and
+  exits 0 without running; `-echo_edu` prints the command
+  line, then runs; `-pif x`, `-pad_to_node n`, `-np n`, `-npq n` and `-npb n` take a value and
+  change nothing 3dTshift writes (`-np` prints `++ -np set to n`); a value is the next
+  argument whatever it is (`-pif -tpattern alt+z` takes `-tpattern`, and `alt+z` becomes the
+  dataset); `-max_port_bloc`, `-max_port_bloc_quiet`, `-num_assigned_ports` and
+  `-num_assigned_ports_quiet` print a number about AFNI's network ports and exit 0;
+  `-all_opts` and `-h_find word` print parts of the help and exit 0; `-h_view` opens the help
+  in a text editor (`-hview`, `-h_web`, `-hweb` and `-h_aspx`, which open the help in an editor
+  or a web browser, were not run); an argument that starts with `<<` is replaced by the
+  contents of files or by the names of files matching a pattern.
+
+**The variables 3dTshift consults.** Each changes 3dTshift's output, exit status or messages
+as described (observed), in both modes unless a defect is named.
+
+| Variable | Values | Effect |
+|---|---|---|
+| `AFNI_DECONFLICT` | see below | what happens to an existing output |
+| `AFNI_ALLOW_ARBITRARY_FILENAMES` | yes | the output names of §6.3 are all accepted at both checks, except an empty one and, at the second, a name that begins with `-` (`-d/out.nii`: `Illegal filename for NIfTI output: -d/out.nii`, exit 0) |
+| `AFNI_PATH_SPACES_OK` | yes | an input name with a blank is one file name (AFNI-18, below) |
+| `HOME` | a directory | an input name that starts with `~/` starts there; with `AFNI_ECHO_COMMANDLINE` (below) |
+| `AFNI_NOREALPATH` | yes | the input's name in messages, below |
+| `AFNI_NIFTI_PRIORITY` | `S`, `Q` (first character, any case) | with both a qform and an sform (codes > 0), `Q` takes the qform; `S`, the default, the sform. Any other value (an empty one included): `*+ WARNING: Illegal AFNI_NIFTI_PRIORITY='X'`, and the sform. When the two 3×3 parts' determinants (in float) have opposite signs: `*+ WARNING: NIfTI('<input>'): Qform/Sform handedness differ; S wins!` (`Q wins!` with `Q`) |
+| `AFNI_NIFTI_SCALE` | no | uint8 and int16 data with both a slope and an intercept stay uint8 and int16 (§6's table): the slope becomes the scale factor and the intercept is dropped. Other types are unchanged |
+| `AFNI_NIFTI_TYPE_WARN` | unset, yes, no | when the input is converted to float32 (§6: int8, uint16, int32, uint32 and float64; uint8 and int16 with a slope and an intercept), AFNI prints, without a label: `** AFNI converts NIFTI_datatype=64 (FLOAT64) in file <input> to FLOAT32`, then, unless yes, `     Warnings of this type will be muted for this session.` and `     Set AFNI_NIFTI_TYPE_WARN to YES to see them all, NO to see none.`; with no, nothing. The type names: `INT8` (256), `UINT16` (512), `INT32` (8), `UINT32` (768), `FLOAT64` (64), `UINT8` (2), `INT16` (4) |
+| `AFNI_NIFTI_VIEW` | `tlrc`, `orig`, `acpc` (any case) | the output's xform codes, below; default orig |
+| `AFNI_DEFAULT_STD_SPACE` | a template space | the output's xform codes, below; default `TLRC` |
+| `AFNI_NO_OBLIQUE_WARNING` | yes | no report of an oblique input (below) |
+| `AFNI_1D_ZERO_TEXT` | yes | text in a `-tpattern @file` is read as 0 (below); `-ok_1D_text` sets it |
+| `AFNI_USE_FGETS` | yes | lines of a `-tpattern @file` end at LF only: a CR is white space, so a file with CR line ends is one row |
+| `AFNI_NIFTI_WRITE_TYPE` | a number | below |
+| `AFNI_ALLOW_MILLISECONDS` | yes | with `-TR` in milliseconds, the output's TR is still written in seconds, but its `toffset` in milliseconds, labelled seconds (AFNI-19: by default larmorx writes it in seconds) |
+| `AFNI_WRITE_1D_AS_PREFIX` | yes | a dataset of one row (one voxel along y and z) is written as NIfTI; otherwise AFNI writes it as a 1D text file under the output's name (AFNI-20, below) |
+| `AFNI_MESSAGE_PREFIX` | any text | messages, below |
+| `AFNI_MESSAGE_COLORIZE` | no | messages, below |
+| `AFNI_ECHO_COMMANDLINE` | yes | messages, below |
+| `AFNI_DONT_LOGFILE` | yes | AFNI writes its command line into `~/.afni.log` unless yes (larmorx writes no log); it decides `AFNI_ECHO_COMMANDLINE` |
+
+They change nothing larmorx writes or prints, so both implementations accept and ignore them
+(observed where it shows, e.g. with `AFNI_NIFTI_NOEXT=YES` AFNI's whole output file is
+larmorx's, byte for byte): `AFNI_NIFTI_NOEXT`, `AFNI_HISTDB_SCRIPT`, `AFNI_HISTORY_NAME`,
+`AFNI_HISTORY_USERNAME`, `AFNI_INCLUDE_HISTORY`, `IDCODE_PREFIX` and `AFNI_INDEX_PREFIX` (AFNI's
+header extension, which larmorx never writes); `AFNI_TRACE`, `AFNI_TRACE_FILE`,
+`AFNI_NIFTI_DEBUG`, `NIML_DEBUG`, `AFNI_WAMI_DEBUG` and `AFNI_DEBUG` (AFNI's own debugging
+output, which larmorx does not reproduce; AFNI reads the last only from a `-D`); `AFNI_QUIET_STARTUP` (AFNI's version banner, which larmorx does
+not print); `AFNI_SYSTEM_AFNIRC`, `AFNI_ENVIRON_RESET`, `AFNI_ENVIRON_WARNINGS` (`.afnirc`
+files); `AFNI_RANDOM_SEEDVAL` (AFNI's random identifiers); `AFNI_NOMMAP`, `AFNI_FLOATSCAN`,
+`AFNI_BYTEORDER`, `AFNI_NIML_BUFSIZE`, `NIML_BUFSIZE`, `BUFSIZE` (no effect on NIfTI files:
+non-finite floats are set to 0 whatever `AFNI_FLOATSCAN` says, and NIfTI output is in the
+machine's byte order whatever `AFNI_BYTEORDER` says); `AFNI_ATLAS_PATH`, `AFNI_PLUGINPATH`,
+`AFNI_PLUGIN_PATH`, `AFNI_SUPP_ATLAS`, `AFNI_SUPP_ATLAS_DIR`, `AFNI_LOCAL_ATLAS`, `PATH` (where
+AFNI looks for its table of template spaces; below); `AFNI_USE_THD_open_dataset`,
+`AFNI_TCAT_SELECTORS`, `AFNI_TCAT_SELECTORS_VERB` (sub-brick selectors and lists of datasets,
+not supported); `AFNI_1D_TRANOUT`, `AFNI_3D_BINARY` (1D text output, not written);
+`AFNI_AUTOGZIP`, `AFNI_COMPRESSOR`, `AFNI_DONT_USE_PIGZ`, `AFNI_WRITE_NIML`,
+`AFNI_GLOB_DEBUG`, `AFNI_GLOB_SELECTORS`, `AFNI_SHELL_GLOB`, `SKIP_COMPRESS_SETUP` (AFNI's own
+dataset format, not written).
+
+**In larmorx's default** the variables act as in AFNI, except where a correction makes one
+moot: `AFNI_ALLOW_ARBITRARY_FILENAMES` changes nothing that is written (any name is written
+anyway; it decides only whether AFNI-12 is named), nor do `AFNI_PATH_SPACES_OK` (an input name
+is one file anyway; AFNI-18), `AFNI_ALLOW_MILLISECONDS` (`toffset` is in seconds anyway;
+AFNI-19), `AFNI_WRITE_1D_AS_PREFIX` (NIfTI either way; AFNI-20) and `AFNI_MESSAGE_COLORIZE`
+(plain labels; AFNI-21). `AFNI_DECONFLICT` replaces, renames or stops as in AFNI; where AFNI
+would write nothing and exit 0 (AFNI-11), the default is an error before the work.
+
+**`AFNI_DECONFLICT`: an existing output** (a regular file of the output's name; observed for
+shifts and copies, with and without `-verbose`):
+
+| Value | AFNI |
+|---|---|
+| unset, or not starting with `O`, `o`, `Y`, `y` or upper-case `N` | AFNI-11 (§6.3): two errors after the work, nothing written, exit 0 |
+| starting with upper-case `N` | a shift stops before the work (after `-verbose`'s `++ copying input dataset bricks`): `** FATAL ERROR: output dataset already exists './out.nii'`, exit 1. A copy of the input: as unset. Lower-case `n` is as unset |
+| `OVERWRITE` exactly (what `-overwrite` sets) | replaced, after `*+ WARNING: Over-writing dataset ./out.nii` unless `-overwrite` was given |
+| other values starting with `O` or `o` (`overwrite`, `O`) | replaced, without a warning |
+| starting with `Y` or `y` | written to the first of `out_AA1.nii`, `out_AA2.nii`, ..., `out_AA9.nii`, `out_AB1.nii`, ..., `out_ZZ9.nii` (inserted before `.nii` or `.nii.gz`) that is not a file, with `*+ WARNING: changed output dataset name from 'out.nii' to 'out_AA1.nii'` |
+
+The names in these messages are AFNI's for the output: `./` and the `-prefix` when it names no
+directory, else the `-prefix` (`sub/out.nii`); the conflict and rename messages name the file
+without its directory. `-verbose`'s `++ Wrote output:` names the file renamed as above, also
+when nothing was written (AFNI-11 with `-verbose` prints `++ Wrote output: ./out_AA1.nii`).
+larmorx's default differs only where AFNI-11 applies: an error before the work, exit 1.
+
+**An input name with a blank** (AFNI-18; observed). Unless `AFNI_PATH_SPACES_OK` is yes, AFNI
+reads the input name as a list of datasets separated by blanks (and `~`), to join in time:
+each is opened as an input, and for each that cannot be, `*+ WARNING: THD_open_tcat: can't open
+dataset <part>` (no extra line); then, if any could not be opened, `** FATAL ERROR: Can't open
+input dataset '<name>'`, exit 1. So an input in a directory whose name has a blank cannot be
+opened. A list of one dataset is that dataset; a list of several is joined in time, which
+larmorx does not support (an error). larmorx's default reads the name as one file, and names
+AFNI-18 when it has a blank and `AFNI_PATH_SPACES_OK` is not yes.
+
+**The input's name in messages** (observed). AFNI names the input in its messages by its real
+path: absolute, with `.`, `..` and symbolic links resolved (`<dir>/sub/../in.nii` is shown as
+`<dir>/in.nii`), unless `AFNI_NOREALPATH` is yes or the input file itself is a symbolic link;
+then as given. When only `x.nii.gz` exists for an input `x.nii`, AFNI reads it, and only when
+the name is shown as given it says ` + reading x.nii.gz instead of non-existing x.nii` (`+` with
+a blank before it). The messages concerned: the conversion message above, the handedness
+warning, `NO spatial transform`, the oblique report.
+
+**The output's xform codes** (`qform_code` = `sform_code`; observed with sform codes 0 to 5
+and 7, and qform-only inputs). The code of the transform used (§6.1; 0 without one) gives a
+*view* and a *template space*: 3 is TLRC and 4 is MNI; 0 and 1 the orig view and space ORIG; 5
+the tlrc view; 2 the view `AFNI_NIFTI_VIEW` names; any other code, the same after `*+ WARNING:
+I don't think this sform code '7' is allowed!` (the word sform also for a qform). The orig
+view's space is ORIG, the acpc view's ACPC, the tlrc view's `AFNI_DEFAULT_STD_SPACE` (TLRC by
+default). The output's code is then 3 for the space TLRC, 4 for MNI, 1 for ORIG and ACPC, 5
+for any other (an empty `AFNI_DEFAULT_STD_SPACE` included), after AFNI's table of template
+spaces names their generic space: TT_N27, TT_avg and TLRC are TLRC; MNI_152, MNI, MNI_SPM2,
+MNI_FSL, MNI_OTHER, MNI_2009c_asym and MNI_N27 are MNI; MNIa and MNI_ANAT are MNI_ANAT (so 5).
+(AFNI reads that table from its file `AFNI_atlas_spaces.niml`, which an AFNI installation finds
+beside its programs; larmorx uses the table of AFNI 25.2.09's file. An AFNI that finds no file
+knows only TLRC, MNI and MNI_ANAT: then TT_N27 gives 5. The repository's oracle finds none; the
+parity cases use TLRC, MNI and MNI_ANAT only.) Examples (observed): sform code 2 with
+`AFNI_NIFTI_VIEW=TLRC` gives 3, with `acpc` 1; sform code 5 with `AFNI_DEFAULT_STD_SPACE=MNI`
+gives 4, with `MNI_ANAT` 5; code 7 with `AFNI_NIFTI_VIEW=tlrc` gives 3. The AFNI extension's
+`TEMPLATE_SPACE`, when the input has one, replaces the space.
+
+**An oblique input** (observed). When the matrix AFNI reads (§6.1, in the file's units) is
+oblique by its test, i.e. when `acos(m)·180/3.141592653` is above 0.01°, with `m` the smallest
+cosine of §6.1's plumb test, computed in double from the float `m` and stored as a float, AFNI
+prints after reading the header, unless `AFNI_NO_OBLIQUE_WARNING` is yes:
+
+    *+ WARNING:   If you are performing spatial transformations on an oblique dset,
+      such as <input>,
+      or viewing/combining it with volumes of differing obliquity,
+      you should consider running: 
+         3dWarp -deoblique 
+      on this and  other oblique datasets in the same session.
+     See 3dWarp -help for details.
+    ++ Oblique dataset:<input> is 36.869896 degrees from plumb.
+
+(Two lines end with a blank; the angle with 6 decimals.)
+
+**`AFNI_NIFTI_WRITE_TYPE`** (observed). Its value is read as a number with an optional
+multiplier (`k`, `m`, `g`: 1024, 1024², 1024³) and cut to an integer: 2 (also `2.9`) writes
+NIfTI-2; 1 NIfTI-1, with `*+ WARNING: will try to write as NIFTI-1, though NIFTI-2 seems
+necessary` when a dimension exceeds 32767; anything else (`2k` is 2048) NIfTI-1 unless a
+dimension exceeds 32767. A NIfTI-2 output holds the same values as §6 and §6.1 give NIfTI-1,
+in its wider fields: `pixdim`, `toffset`, `slice_duration`, `scl_slope`, the sform and
+`qoffset` are the float values widened to double, and the quaternion parameters are the
+doubles §6.1 computes, not rounded to float. There the operations AFNI carries out in
+extended precision show: each quotient `0.25·(…)/a` and the sum of 1 and `r11 + r22 + r33`
+(computed in double) is rounded first to 64 significant bits (x87 extended precision on
+AFNI's x86-64 build), then to double, both to nearest with ties to even. This differs from a
+direct double operation in the last bit of about one quotient in 4,000, and of the sum only
+when `r11 + r22 + r33` is within 2^-11 of 0. (AFNI reads a qform with extended precision too:
+`1 − (b² + c² + d²)`, the reciprocal of the length of `(b, c, d)`, and the products of the
+off-diagonal entries `2(bc − ad)` etc. with the voxel sizes; the float32 matrix it keeps
+practically never shows it.) The header is AFNI's byte for byte, `vox_offset` aside (observed
+on plumb, metre and oblique inputs, and on 120 random oblique ones).
+
+**`-tpattern @file` messages** (observed). Without `AFNI_1D_ZERO_TEXT`, a row with a value that
+starts with a character other than a digit, `+`, `-`, `.`, `e`, `,`, `@`, `*` or a `#` (which
+ends the row) is an error; AFNI prints, without a label,
+
+    (an empty line)
+    ** Error: Failed parsing data row 0 of 1D file 'st.1D'
+              Check for illegal non-numeric characters in:
+              '0  1  abc 1.5'
+              You can have text entries set to 0 with -ok_1D_text or by 
+              setting environment variable AFNI_1D_ZERO_TEXT to YES.
+
+then `** FATAL ERROR: Can't read tpattern file st.1D` (exit 1): the row number counts the rows
+read before, the file name is cut at 44 bytes, and the row is shown with its commas and colons
+made blanks (the separators AFNI reads as blanks), cut at 64 characters, the last four ` ...`.
+With `AFNI_1D_ZERO_TEXT` yes such values are 0 (a word or `*` is 0; anything else the number it
+starts with, or 0), and a row of text counts as a row (its values set the number of columns
+when it is the first). A file that cannot be opened: `** ERROR: mri_read_ascii: couldn't open
+file st.1D` before the fatal error; one with no row: `** ERROR: mri_read_ascii: can't read any
+valid data from file st.1D`. A `-tpattern '@1D: 0 1 abc'` with a value that is not a number:
+`** ERROR: Illegal 1D: value 'abc'` and `** ERROR: mri_read_1D: can't read from string '1D: 0 1
+abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
+
+**Messages** (observed).
+- AFNI's labelled messages are `++ ` (information), ` + ` (more information), `*+ WARNING: `,
+  `** ERROR: ` and `** FATAL ERROR: `; each ends with a newline, added unless the text ends with
+  one. Some text AFNI prints as it is, without a label (the conversion message, the 1D error
+  above, `-verbose`'s `++ Wrote output:` after a shift, the echoed command line), and standard
+  output (`++ updating time offset to ...` and `-verbose`'s lines) has no label either.
+- `AFNI_MESSAGE_PREFIX`: its value and `::` start every labelled message (`run1::*+ WARNING:
+  ...`; an empty value gives `::*+ WARNING: ...`), not the others.
+- Labels in colour: AFNI writes the labels of warnings and errors in inverse video, the
+  terminal escape codes ESC `[7m` before the label and ESC `[0m` and a blank after it (in place
+  of the label's last blank): `ESC[7m*+ WARNING:ESC[0m text`, also when standard error is a
+  file or a pipe, unless `AFNI_MESSAGE_COLORIZE` is no. This is AFNI-21 (a message-only
+  defect): larmorx's default writes plain labels whatever the variable says; `reproduce` writes
+  AFNI's.
+- `AFNI_ECHO_COMMANDLINE` yes, with `HOME` a directory and `AFNI_DONT_LOGFILE` not yes: the
+  first line on standard error is `+++++===== 3dTshift <arguments>`, the arguments after the
+  global options were taken out, each one the output-name rule of §6.3 refuses (with
+  `AFNI_ALLOW_ARBITRARY_FILENAMES` applied) written between `'` with its blanks, control
+  characters and non-ASCII bytes made blanks (`-prefix 'a b.nii'`). (AFNI echoes the line
+  after appending it to its log file `~/.afni.log`, which larmorx does not write: with a
+  `HOME` it cannot write in, AFNI echoes nothing, and with a log over 100 MB it also warns
+  about the log's size. larmorx reproduces neither.)
+- After a fatal error AFNI also prints `** Program compile date = <the date it was compiled>`,
+  and every run starts with the banner `++ 3dTshift: AFNI version=AFNI_25.2.09 (<date>)
+  [64-bit]` unless `AFNI_QUIET_STARTUP` is yes. They name AFNI's build, not what it does;
+  larmorx prints neither, in either mode.
+- larmorx adds lines of its own, in both modes: the upstream-defect notices, `-verbose`'s first
+  two lines (the implementation and the mode), and its warnings about global options (ending in
+  `(larmorx)`). Everything else is AFNI's, in AFNI's order.
+
+**The defaults and the notices** (as §6.5, for this section; AFNI-11 and AFNI-12 are in §6.5):
+
+| Entry | `reproduce` (AFNI) | `fix` (default) | Named when |
+|---|---|---|---|
+| AFNI-18 | an input name with a blank is a list of datasets: it fails unless every part opens (above) | one file name | the name has a blank and `AFNI_PATH_SPACES_OK` is not yes |
+| AFNI-19 | `AFNI_ALLOW_MILLISECONDS` yes, `-TR` in milliseconds: `toffset` in milliseconds | `toffset` in seconds | the two `toffset` values differ (a non-zero one) |
+| AFNI-20 | a one-row dataset: a 1D text file under the output's name | NIfTI, in both modes: AFNI's text file holds a random identifier, so `reproduce` does not reproduce it | one voxel along y and z, and `AFNI_WRITE_1D_AS_PREFIX` not yes; named as corrected in both modes |
+| AFNI-21 | labels in terminal colours (above) | plain labels | never (messages only) |
+| AFNI-22 | `-D` read as above | the name before the first `=`, the value after it, as written | AFNI's reading would change what a variable of the table does (above) |
+
+**Writing the output: the cross-platform design** (decided 2026-10-12).
+- The output is written to a temporary file in its own directory (a hidden name ending with
+  the output's `.nii` or `.nii.gz`), then renamed over the output's name. A rename within a
+  directory replaces an existing file atomically on Linux, macOS and Windows, so an existing
+  output is replaced whole or left as it was, never partly written; a failed write removes the
+  temporary file.
+- On Windows a rename fails while another program holds the target open without allowing its
+  deletion (an antivirus scan, a viewer). The rename is tried again for about 2 s, with growing
+  pauses; then the temporary file is removed and the run fails with a message that names the
+  file and says that nothing was written.
+- Names with blanks and non-ASCII characters work on every system: they are handled as the
+  system's own path type, never through a shell. (The name rules of §6.3 apply only in
+  `reproduce` mode.)
 
 ## 8. larmorx interfaces
 
@@ -674,7 +977,11 @@ Messages may differ from AFNI's, but errors must exit with a non-zero code, and 
   - `image` is a path (read with §6) or an `lx.Image`/nibabel image.
   - `slice_times` is a sequence of floats or a pattern name.
   - `restore` is `"trend"`, `"none"` (`-rlt`) or `"intercept"` (`-rlt+`).
-- **CLI:** §7.
+  - It reads AFNI's environment variables (§7.1) from the process environment, as the command
+    line does, except that a path is always one file name (as with `AFNI_PATH_SPACES_OK`
+    yes) and an oblique input is not reported. It takes no global options. AFNI's warnings
+    and larmorx's notices become Python warnings.
+- **CLI:** §7 and §7.1.
 - **Docs:** `docs/api/afni-tshift.md`, with the option-mapping table.
 
 ## 9. Validation
@@ -689,7 +996,15 @@ The parity suite runs the AFNI binary and larmorx with the same arguments on:
   metres), `copy/short-slice-spacing`, `copy/alt-two-slices`, `header-timing/code2-*`,
   `errors/existing-output`, `errors/prefix-with-blank`. It compares in `reproduce` mode, then
   checks the default: a defect must be named, in both modes, exactly when the two outputs
-  differ (§6.5).
+  differ (§6.5);
+- AFNI's global options and environment variables (§7.1): categories `global` (`-overwrite`
+  onto an existing output, in odd places, each `-D` form, malformed `-D`) and `environment`
+  (each variable that changes something, in the environment, and the main ones as `-D` too).
+  Each program runs in a directory of its own with the same files, `HOME` an empty directory,
+  AFNI's variables cleared, `AFNI_DONT_LOGFILE` yes and `AFNI_NIFTI_TYPE_WARN` no, then the
+  case's variables; exit status, standard output and standard
+  error are compared byte for byte (AFNI's banner and compile date set aside, and larmorx's own
+  lines), as well as the output files.
 
 Thresholds (PLAN.md §11.3, slice timing as deterministic arithmetic):
 - float32 outputs: max |diff| ≤ 1e-5 × max |AFNI output|;

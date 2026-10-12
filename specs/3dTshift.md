@@ -797,6 +797,14 @@ not supported); `AFNI_1D_TRANOUT`, `AFNI_3D_BINARY` (1D text output, not written
 `AFNI_GLOB_DEBUG`, `AFNI_GLOB_SELECTORS`, `AFNI_SHELL_GLOB`, `SKIP_COMPRESS_SETUP` (AFNI's own
 dataset format, not written).
 
+**In larmorx's default** the variables act as in AFNI, except where a correction makes one
+moot: `AFNI_ALLOW_ARBITRARY_FILENAMES` changes nothing that is written (any name is written
+anyway; it decides only whether AFNI-12 is named), nor do `AFNI_PATH_SPACES_OK` (an input name
+is one file anyway; AFNI-18), `AFNI_ALLOW_MILLISECONDS` (`toffset` is in seconds anyway;
+AFNI-19), `AFNI_WRITE_1D_AS_PREFIX` (NIfTI either way; AFNI-20) and `AFNI_MESSAGE_COLORIZE`
+(plain labels; AFNI-21). `AFNI_DECONFLICT` replaces, renames or stops as in AFNI; where AFNI
+would write nothing and exit 0 (AFNI-11), the default is an error before the work.
+
 **`AFNI_DECONFLICT`: an existing output** (a regular file of the output's name; observed for
 shifts and copies, with and without `-verbose`):
 

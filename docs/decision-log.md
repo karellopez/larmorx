@@ -744,7 +744,14 @@ Decided by the user on the questions the defect register raised
   arithmetic, which the replica now emulates on every platform so that NIfTI-2 headers are
   AFNI's byte for byte); AFNI-11 and AFNI-12 corrected for `AFNI_DECONFLICT` and
   `AFNI_ALLOW_ARBITRARY_FILENAMES`. Defaults: the corrections are named as usual; the
-  questionable AFNI-23 stays AFNI's until decided.
+  questionable AFNI-23 stays AFNI's until decided. Records from `4aaad72`, standard tier, 308
+  cases each (57 new, categories `global` and `environment`, messages compared byte for
+  byte): the replica 276 of 276 compared cases bit-identical to AFNI in `reproduce` (3
+  expected divergences: AFNI's own format, `-voxshift`, and AFNI-20's one-row text file), all
+  57 new cases with AFNI's exit status and messages; the original unchanged where compared
+  (223 pass, 163 bit-identical), its 56 new expected divergences the global options and
+  variables of part 2b. GPL golden: five new cases (`-overwrite`, NIfTI-2 by `-D` and by the
+  environment, `AFNI_ALLOW_MILLISECONDS` in both modes), no checksum changed.
 - **`lx.afni.tshift`** passes the process environment's AFNI variables on to the replica (so
   the replica reads the input and writes the output as the command line would), but sets
   `AFNI_PATH_SPACES_OK=YES` for its temporary paths and keeps AFNI's message prefix, colours,

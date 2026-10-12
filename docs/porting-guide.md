@@ -64,8 +64,8 @@ learns from black-box runs goes back into the spec, marked (observed). The model
 record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../crates/larmorx-afni/PROVENANCE.md).
 
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
-(3dTshift: 231 of 231 cases); the original keeps the main package Apache-2.0 at the cost of
-last bits wherever the upstream's own numerics decide them (3dTshift: 162 of 222
+(3dTshift: 276 of 276 cases); the original keeps the main package Apache-2.0 at the cost of
+last bits wherever the upstream's own numerics decide them (3dTshift: 163 of 223
 bit-identical, all within thresholds). `implementation="auto"` runs the replica when it is
 installed, as a separate program, never imported ([architecture.md](architecture.md),
 "Adding a replica").

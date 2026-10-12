@@ -260,7 +260,8 @@ def stored_diff(ref_path: str | Path, test_path: str | Path) -> dict[str, Any]:
         "scl_slope": [float(ha["scl_slope"]), float(hb["scl_slope"])],
         "scl_inter": [float(ha["scl_inter"]), float(hb["scl_inter"])],
     }
-    if ra.get_data_dtype().kind in "iu" and ra.shape == rb.shape:
+    same = ra.get_data_dtype() == rb.get_data_dtype()
+    if same and ra.get_data_dtype().kind in "iu" and ra.shape == rb.shape:
         a = np.asanyarray(ra.dataobj.get_unscaled())
         b = np.asanyarray(rb.dataobj.get_unscaled())
         d = np.abs(a.astype(np.int64) - b.astype(np.int64))

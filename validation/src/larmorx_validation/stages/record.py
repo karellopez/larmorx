@@ -784,6 +784,29 @@ def _details(st: Stage, results: list[dict]) -> list[str]:
         ),
         "",
     ]
+    copied = [r for r in results if r.get("nipype_copy_header")]
+    if copied:
+        raw = [
+            (_node_label(r), o["output"], _diff(o["raw_vs_fmriprep"]).summary())
+            for r in copied
+            for o in _outputs(r)
+            if o.get("raw_vs_fmriprep")
+        ]
+        dtypes = sorted({r["nipype_copy_header"]["input_dtype"] for r in copied})
+        lines += [
+            "**nipype re-quantizes these outputs** (PIPE-16, "
+            "[register](../findings/upstream-defects.md)): its `N4BiasFieldCorrection` interface "
+            "with `copy_header=True` writes the corrected image with the input's data type "
+            f"({', '.join(dtypes)}), so fMRIPrep's node output is N4's float32 result rounded to "
+            "that type with a scale factor chosen by nibabel. Every run above (larmorx, "
+            "fMRIPrep's program re-run, the ANTs references) is compared after the same step, "
+            "nipype's own `copy_header` run in fMRIPrep's image on a copy of its output "
+            "(`nipype-<name>`). larmorx's own float32 output against fMRIPrep's node output, "
+            "i.e. the rounding itself plus any other difference:",
+            "",
+            table(("Node", "Output", "larmorx (float32) vs fMRIPrep (re-quantized)"), raw),
+            "",
+        ]
     if chains:
         lines += [
             "Where larmorx and fMRIPrep differ, each step of the chain changes one thing: "

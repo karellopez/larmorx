@@ -100,11 +100,21 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     if not lx.ok:
         res.update(status="larmorx-error", note=lx.stderr.strip()[-300:])
         return res
+    # what nipype did to the program's outputs (N4's header copy), done to every run's
+    post = _NipypePost(s, node, argv, names)
+    if post.active:
+        res["nipype_copy_header"] = post.describe()
+    lx_out = post(lx)
+    assert lx_out is not None
     derivatives = s.run.derivatives()
     outputs = []
-    for i, (ref, out) in enumerate(zip(refs, lx.outputs, strict=True)):
+    for i, (ref, out) in enumerate(zip(refs, lx_out, strict=True)):
         d = cmp.compare_files(ref, out)
         entry: dict[str, Any] = {"output": _label(node.program, names, i), "vs_fmriprep": d}
+        if post.active:
+            # larmorx's own output (float32) against fMRIPrep's re-quantized one: nipype's share
+            entry["raw_vs_fmriprep"] = cmp.compare_files(ref, lx.outputs[i])
+            entry["raw_stored"] = cmp.stored_diff(ref, lx.outputs[i])
         if (deriv := derivatives.get(str(ref))) and Path(deriv).is_file():
             entry["derivative"] = os.path.relpath(deriv, s.run.root)
             entry["vs_derivative"] = cmp.compare_files(deriv, out)
@@ -125,8 +135,9 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
             files=files,
         )
         res["container_seconds"] = cn.seconds
-        if cn.ok:
-            for entry, ref, out in zip(outputs, refs, cn.outputs, strict=True):
+        cn_out = post(cn)
+        if cn_out is not None:
+            for entry, ref, out in zip(outputs, refs, cn_out, strict=True):
                 entry["rerun_vs_fmriprep"] = cmp.compare_files(ref, out)
     if all(e["vs_fmriprep"].identical for e in outputs):
         res["status"] = "identical"
@@ -140,25 +151,25 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
             if node.threads == 1
             else rn.run_container(s, node, argv, base / "container-1t", 1, files=files)
         )
-        chain.append(("container-1t", c1.outputs if c1 and c1.ok else None))
+        chain.append(("container-1t", post(c1)))
         cr = rn.run_container(
             s, node, argv, base / "container-1t-cr", 1, correctly_rounded=True, files=files
         )
-        chain.append(("container-1t-cr", cr.outputs if cr and cr.ok else None))
+        chain.append(("container-1t-cr", post(cr)))
     if s.ants_oracle and node.program in ANTS_PROGRAMS:
         r = rn.run_ants_oracle(s, argv, base / "ants-2.6.5-1t-cr", correctly_rounded=True)
-        chain.append(("ants-2.6.5-1t-cr", r.outputs if r and r.ok else None))
+        chain.append(("ants-2.6.5-1t-cr", post(r)))
         # ANTs 2.6.5 as built (glibc's maths), as the tool's own records compare
         a = rn.run_ants_oracle(s, argv, base / "ants-2.6.5-1t", correctly_rounded=False)
         if a is not None and a.ok:
             for entry, ants_out, out in zip(outputs, a.outputs, lx.outputs, strict=True):
                 entry["vs_ants_as_built"] = cmp.compare_files(ants_out, out)
-    chain.append(("larmorx", lx.outputs))
+    chain.append(("larmorx", lx_out))
     for i, entry in enumerate(outputs):
         links = []
         previous = chain[0]
-        for name, files in chain[1:]:
-            if files is None:
+        for name, produced in chain[1:]:
+            if produced is None:
                 links.append({"from": previous[0], "to": name, "diff": None})
                 continue
             prev_files = previous[1]
@@ -167,10 +178,10 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
                 {
                     "from": previous[0],
                     "to": name,
-                    "diff": cmp.compare_files(prev_files[i], files[i]),
+                    "diff": cmp.compare_files(prev_files[i], produced[i]),
                 }
             )
-            previous = (name, files)
+            previous = (name, produced)
         entry["chain"] = links
         entry["cause"] = explain(links, node.threads, entry.get("rerun_vs_fmriprep"))
     _check_float_pipeline(s, node, argv, base, outputs, lx.outputs)
@@ -184,6 +195,70 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     else:
         res["status"] = "unexplained"
     return res
+
+
+_COPY_HEADER_SCRIPT = r'''
+"""nipype 1.12.0's header copy after a program (CopyHeaderInterface._post_run_hook with the
+interface's _copy_header_map), done on copies of a run's outputs, in fMRIPrep's image."""
+import shutil
+import sys
+
+from nipype.utils.imagemanip import copy_header
+
+source = sys.argv[1]
+for spec in sys.argv[2:]:
+    name, target, keep = spec.split(":")
+    shutil.copyfile(name, target)
+    copy_header(source, target, keep_dtype=keep == "1")
+'''
+
+
+class _NipypePost:
+    """What nipype does to a program's outputs after the run, done again to every run's
+    outputs, so that they compare with fMRIPrep's node output.
+
+    nipype's ``N4BiasFieldCorrection`` with ``copy_header=True`` (niworkflows' brain
+    extraction, sdcflows' field-map reference) copies the input's header onto the outputs
+    (``nipype/interfaces/ants/segmentation.py``, ``_copy_header_map``): the corrected image
+    **with the input's data type** (``keep_dtype=False``), the bias field with its own. When the
+    input is an integer image (sdcflows' clipped field-map reference is int16), nibabel
+    re-quantizes N4's float32 output to that type with a scale factor (PIPE-16). The copy runs
+    nipype's own function in fMRIPrep's image on a copy of each output (``nipype-<name>``);
+    runs whose input is float32 are left as they are (their data do not change)."""
+
+    def __init__(self, s: rn.Settings, node: Node, argv: list[str], names: list[str]):
+        self.s = s
+        self.names = [os.path.basename(n) for n in names]
+        self.source = rn._option(argv, ("-i", "--input-image")) or ""
+        self.dtype = ""
+        self.active = False
+        if node.program == "N4BiasFieldCorrection" and node.inputs.get("copy_header") == "True":
+            import nibabel as nib
+
+            try:
+                self.dtype = str(nib.load(s.run.host(self.source)).get_data_dtype())
+            except (OSError, ValueError):
+                self.dtype = ""
+            self.active = bool(self.dtype) and self.dtype != "float32" and s.run.image is not None
+
+    def describe(self) -> dict[str, Any]:
+        return {"input": self.source, "input_dtype": self.dtype, "outputs": self.names}
+
+    def __call__(self, run: rn.RunResult | None) -> list[Path] | None:
+        if run is None or not run.ok:
+            return None
+        if not self.active:
+            return run.outputs
+        targets = [run.directory / f"nipype-{n}" for n in self.names]
+        specs = [
+            f"/cmp/{n}:/cmp/nipype-{n}:{'0' if i == 0 else '1'}" for i, n in enumerate(self.names)
+        ]
+        p = rn.run_container_python(
+            self.s, run.directory, _COPY_HEADER_SCRIPT, [self.source, *specs]
+        )
+        if p.returncode != 0 or not all(t.is_file() for t in targets):
+            raise RuntimeError(f"nipype's copy_header failed: {p.stderr[-300:]}")
+        return targets
 
 
 #: larmorx's documented divergences, by the cause :func:`_check_float_pipeline` confirms.
@@ -297,6 +372,8 @@ def tshift_within(d: cmp.ImageDiff, stored: dict[str, Any] | None = None) -> tup
         return True, "bit-identical"
     if d.note:
         return False, d.note
+    if stored and stored["dtype"][0] != stored["dtype"][1]:
+        return False, f"stored types differ: {stored['dtype'][0]}, {stored['dtype'][1]}"
     if stored and "max_abs" in stored:
         same = stored["dtype"][0] == stored["dtype"][1] and np.array_equal(
             np.array(stored["scl_slope"]), np.array(stored["scl_slope"][::-1]), equal_nan=True

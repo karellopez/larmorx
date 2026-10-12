@@ -710,6 +710,23 @@ Decided by the user on the questions the defect register raised
   behaviours. GPL golden: two new cases (`3dTshift.linear.float32-nearly-plumb` and
   `.reproduce`), no checksum changed.
 
+## 2026-10-12: AFNI's global options, the same on every platform
+- **User decision:** both larmorx 3dTshift implementations accept AFNI's global options
+  `-overwrite` and `-Dname=value` anywhere on the command line, working identically on Linux,
+  macOS and Windows. The user asked how to make that portable; the design:
+  - **`-overwrite`:** write to a temporary file in the output's directory, then rename it over
+    the target (`std::fs::rename` replaces on all three systems). On Windows, retry briefly while
+    another program holds the file (antivirus, viewers), then fail clearly. Never leave a
+    partial file.
+  - **`-Dname=value`:** never modify the process environment (unsafe in multithreaded Rust).
+    Parse the options into an explicit settings table passed to the tool. Read the real
+    environment into the same table, with `-D` winning as in AFNI. Implement each AFNI variable
+    that 3dTshift's path consults explicitly; any other variable gets a notice that it has no
+    effect.
+  - Tiny tests in CI prove both work on all six platforms.
+- **Order:** the replica and the spec (replica author), then the clean-room original from the
+  spec, together with spec §6.1-6.5.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

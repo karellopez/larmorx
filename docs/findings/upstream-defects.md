@@ -141,7 +141,7 @@ the behaviour); – = nothing to do. How the switch works: [api/upstream-defects
 | AFNI-03 † | 3dTshift | header slice code 2 (sequential decreasing): no shift | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
 | AFNI-04 † | 3dTshift | can crash for a shift beyond the series on odd slices | a | none | defined (zeros) | – |
 | AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
-| AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | c? | none | reproduces | decide |
+| AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | f | none | reproduces | decided 2026-10-12: AFNI's behaviour is kept; the help text is the error |
 | AFNI-07 † | 3dTshift | metre or micron units: voxel sizes converted; the origin not (plumb grid) or the whole sform not (oblique grid) | c | rare | corrected by default in both implementations (converts; replica 2026-10-12); the original's `reproduce` converts an oblique sform's linear part | original |
 | AFNI-08 † | 3dTshift | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | c | none | corrected by default in both implementations (replica 2026-10-12, with a switch; the original writes `nz − 1` always, without one) | original |
 | AFNI-09 † | 3dTshift | slice-time files rounded two ways | d | none | replica reproduces | – |
@@ -151,7 +151,7 @@ the behaviour); – = nothing to do. How the switch works: [api/upstream-defects
 | AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | – | – |
 | AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | – | – |
 | AFNI-15 † | AFNI build | parallel make races | b | none | – | – |
-| AFNI-16 † | 3dTshift | an sform less than about 0.014° from plumb is written plumb | c? | slightly oblique inputs | replica reproduces (both modes); the original keeps the matrix | decide |
+| AFNI-16 † | 3dTshift | an sform less than about 0.014° from plumb is written plumb | c | slightly oblique inputs | the original keeps the matrix; the replica still snaps in both modes | decided 2026-10-12: keep the input's matrix by default, warn, reproduce the snapping on request (the replica's default to change) |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |

@@ -681,6 +681,20 @@ Decided by the user on the questions the defect register raised
   four of them `*.reproduce`; `3dTshift.heptic.uint8.no_detrend.reproduce` has the data
   checksum the default case had before.
 
+## 2026-10-12: AFNI-06 and AFNI-16 decided; completing 3dTshift
+- **AFNI-06** (`-rlt+` restores the fitted intercept; AFNI's help says the mean): **AFNI's
+  behaviour is kept**; the help text is treated as the error (class f), and larmorx's docs say
+  what `-rlt+` really does. fMRIPrep never uses `-rlt+`.
+- **AFNI-16** (AFNI writes a grid less than about 0.014° from plumb as exactly plumb): **keep the
+  input's matrix by default**, warn when AFNI would have snapped it, and reproduce the snapping
+  with the switch. The clean-room original already keeps the matrix; the replica's default
+  changes.
+- **Completing 3dTshift**, in two tasks because the roles differ:
+  1. a replica author changes the replica's AFNI-16 default and writes, in behaviour terms only,
+     the spec additions the original needs (AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12,
+     AFNI-16 in reproduce mode, and AFNI-03's notice when the output is a copy);
+  2. a clean-room implementer adds them to the original from the spec.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -131,7 +131,9 @@ mod tests {
     #[test]
     fn names() {
         let dir = tempfile::tempdir().unwrap();
-        let d = dir.path().to_string_lossy().into_owned();
+        // The real path: GitHub's Windows runners give the temporary directory as an 8.3 short
+        // path (`C:\Users\RUNNER~1\...`), and a `~` in a name with a blank splits AFNI-18's list.
+        let d = real_path(&dir.path().to_string_lossy()).unwrap();
         std::fs::write(dir.path().join("x.nii.gz"), b"").unwrap();
         std::fs::create_dir(dir.path().join("a b")).unwrap();
         std::fs::write(dir.path().join("a b").join("in.nii"), b"").unwrap();

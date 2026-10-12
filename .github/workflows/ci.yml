@@ -80,8 +80,13 @@ jobs:
       - name: clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # Includes the golden tests (larmorx-gpl-cli/tests/golden.rs, docs/validation/golden.md).
+      # Failures are also printed as annotations, which GitHub shows without a login.
       - name: cargo test
-        run: cargo test --workspace --locked
+        run: |
+          cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
+            "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
         env:
           LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
       - name: Upload golden-test mismatches
@@ -117,8 +122,13 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # Failures are also printed as annotations, which GitHub shows without a login.
       - name: cargo test
-        run: cargo test --workspace --locked
+        run: |
+          cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
+            python scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:

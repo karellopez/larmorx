@@ -1,6 +1,6 @@
 # Parity: 3dTshift
 
-**All cases agree.** 308 cases on the `standard` tier: 223 pass, 17 rejected by both, 68 expected divergences, 0 failures.
+**All cases agree.** 311 cases on the `standard` tier: 223 pass, 17 rejected by both, 71 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
@@ -13,7 +13,7 @@
 - Not bit-identical outside Fourier: `options/float32-no-detrend`, `real/ds003345-quintic`, `real/ds003345-heptic`. Known causes, in the last float32 bit only: `-no_detrend` (its rounding is not reproduced yet); quintic and heptic weights for some fractions (unresolved); weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not correctly rounded, and larmorx uses correctly rounded functions (`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`.
 - The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md).
 - Python API (`lx.afni.tshift(..., implementation="original")`): run on the 189 passing cases it can express; 189 give the command line's output bit for bit (data and header). From an image in memory: 144 of 144 give the same values.
-- **AFNI's global options and environment variables** (categories `global` and `environment`, 57 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 1 of 57 identical.
+- **AFNI's global options and environment variables** (categories `global` and `environment`, 60 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 1 of 60 identical.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
@@ -50,7 +50,7 @@
 | copy | 8 | 6 | 0 | 2 | 0 |
 | defects | 8 | 5 | 0 | 3 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
-| environment | 31 | 1 | 0 | 30 | 0 |
+| environment | 34 | 1 | 0 | 33 | 0 |
 | errors | 18 | 0 | 17 | 1 | 0 |
 | geometry | 3 | 0 | 0 | 3 | 0 |
 | global | 26 | 0 | 0 | 26 | 0 |
@@ -106,6 +106,9 @@
 | `environment/nifti-priority-Q` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `environment/nifti-priority-illegal` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `environment/nifti-scale-no` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-scale-no-copy` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-scale-no-rlt` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
+| `environment/nifti-scale-no-rlt-ignore` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `environment/type-warn-default` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `environment/type-warn-yes` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
 | `environment/nifti-view-tlrc` | the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it (completing 3dTshift, part 2b) |
@@ -160,7 +163,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4aaad72f285c) |
+| larmorx | 0.0.1 (c479c1ae933e) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -436,6 +439,9 @@ Both programs read the same files with the same arguments; outputs are read with
 | `environment/nifti-priority-Q` | expected-divergence | 2/3 | AFNI_NIFTI_PRIORITY=Q: the qform rather than the sform (they differ) |
 | `environment/nifti-priority-illegal` | expected-divergence | 2/3 | AFNI_NIFTI_PRIORITY=X: AFNI's warning, the sform |
 | `environment/nifti-scale-no` | expected-divergence | 2/3 | AFNI_NIFTI_SCALE=NO: int16 with a slope and an intercept stays int16 (slope kept) |
+| `environment/nifti-scale-no-copy` | expected-divergence | 2/3 | AFNI_NIFTI_SCALE=NO on a copy of the input: the intercept dropped (AFNI-23) |
+| `environment/nifti-scale-no-rlt` | expected-divergence | 2/3 | AFNI_NIFTI_SCALE=NO with -rlt: the trend takes the intercept away, nothing to correct |
+| `environment/nifti-scale-no-rlt-ignore` | expected-divergence | 2/3 | AFNI_NIFTI_SCALE=NO with -rlt -ignore 2: the ignored volumes lose the intercept (AFNI-23; corrected, read as without th… |
 | `environment/type-warn-default` | expected-divergence | 2/3 | AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines |
 | `environment/type-warn-yes` | expected-divergence | 2/3 | AFNI_NIFTI_TYPE_WARN=YES: the conversion message alone |
 | `environment/nifti-view-tlrc` | expected-divergence | 2/3 | AFNI_NIFTI_VIEW=TLRC: sform code 2 is the tlrc view, so code 3 |

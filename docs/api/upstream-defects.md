@@ -92,6 +92,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | AFNI-19 | 3dTshift | `larmorx afni 3dTshift` (replica) | with `AFNI_ALLOW_MILLISECONDS` yes and `-TR` in milliseconds, `toffset` is written in milliseconds, labelled seconds | `toffset` in seconds, with the TR |
 | AFNI-20 | 3dTshift | `larmorx afni 3dTshift` (replica) | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes: AFNI's file holds a random identifier, so it is not reproduced; the warning says what AFNI would do |
 | AFNI-22 | 3dTshift | `larmorx afni 3dTshift` (replica) | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written, after the first `=` |
+| AFNI-23 | 3dTshift | the replica, with `AFNI_NIFTI_SCALE=NO` (command line, or `lx.afni.tshift(afni_settings=...)`) | uint8 and int16 data with a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the values are off by it | AFNI's integers and `scl_slope` kept, the intercept written as `scl_inter`; with `-rlt -ignore`, the data read as without the variable (decided 2026-10-12) |
 | FSL-01 | mcflirt | `lx.mri.hmc`, `larmorx mri hmc` | the last volume of the series starts the first stage from the identity instead of its predecessor's result (every fMRIPrep run's last volume) | it continues its chain like every other volume |
 | FSL-03 | mcflirt | both | the in-plane mode pads the first stage's reference grid twice | once, like the other stages |
 | FSL-14 | mcflirt | both | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN | non-finite voxels are left out of the centre of mass and the cost |
@@ -164,7 +165,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
   `specs/3dTshift.md` §6.1 to §6.5 describes each behaviour, confirmed by black-box runs, for
   the original to follow (AFNI-08's trigger: slice times all within 3 ms of 0, kept in a copy
   of the input because they lie beyond the TR). Likewise AFNI's global options and environment
-  variables, with AFNI-18, AFNI-19 and AFNI-22 (the replica since 2026-10-12; spec §7.1).
+  variables, with AFNI-18, AFNI-19, AFNI-22 and AFNI-23 (the replica since 2026-10-12; spec
+  §7.1).
 
 ## How the switch is validated
 

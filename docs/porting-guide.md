@@ -25,8 +25,9 @@ Each item links to its section.
    (§7).
 8. **Decide what larmorx does about each defect and possible improvement** (D11, D13; §8).
 9. **Make the result deterministic and the same on every platform** (§9); read environment
-   variables and global options into a table of settings, never the process environment
-   (§9.1).
+   variables and global options into a table of settings, never changing the process
+   environment; the command line fills it from the environment, the Python API only from an
+   explicit argument (§9.1).
 10. **Work safely**: commit early, at most two agents at a time, never delete (§10).
 11. **Deliver the whole per-tool contract** (§11).
 
@@ -442,6 +443,36 @@ and a changed environment leaks into everything else the process runs. The patte
    files. A quirk of the original's parsing (AFNI reads a `-D` value with a blank as two
    words joined by `=`) is a D13 defect like any other: the default reads the value as written and names the defect where
    the readings differ.
+
+**The command line reads the environment; the Python API never does** (user decision
+2026-10-12; CLAUDE.md rule 6, no global configuration). The settings table is filled from two
+sources, one per interface:
+
+- **The command line** (`larmorx <family> <tool>`, and a replica's program) reads the process
+  environment into the table, as the original reads its own: a user of the original's
+  command line gets the original's behaviour.
+- **The Python wrapper** takes the variables as a typed keyword argument
+  (`lx.afni.tshift(..., afni_settings={"AFNI_NIFTI_PRIORITY": "Q"})`, a
+  `Mapping[str, str] | None`) and never reads `os.environ`, so a call gives the same result
+  whatever the shell has set. A wrapper that runs a replica program builds the program's
+  environment from the settings: every variable of the upstream's family is removed from the
+  inherited environment (`_replica.run(exclude=...)`; match names whatever their case, for
+  Windows) and the settings added, as environment variables rather than global options, so
+  that their values are taken as written. Settings the wrapper needs for its own use of the
+  program (temporary paths with blanks, plain messages to read as warnings) are fixed by the
+  wrapper, documented, and refused as arguments.
+- **Check the names**: a name the original does not read, or an empty value, is a
+  `ValueError` (a typo is caught; an empty value would differ between systems). Split the
+  accepted names into those that change what a call returns and those that do not (they
+  concern files the wrapper names itself, or output larmorx never writes), and document both.
+- **An implementation that does not read a variable yet** (a clean-room original whose spec
+  part is still to do) raises `NotImplementedError` naming it, for the variables that would
+  change the result; it never ignores one silently.
+- **Tests on every platform**: with a stand-in for the replica program that records its
+  environment, a variable set in `os.environ` must not reach it and the explicit settings
+  must; in the parity suite, the Python call with the case's variables as settings, and
+  variables in its own environment that would change the output, must give the command
+  line's output (`tests/python/test_replica.py`, `validation/.../parity/afni_tshift.py`).
 
 Outputs that may replace a file are written to a temporary file in the target's directory
 and renamed over it: a rename within a directory replaces a file atomically on Linux, macOS

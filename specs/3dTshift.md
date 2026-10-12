@@ -24,8 +24,9 @@ slope and an intercept, §6), AFNI-03 (header slice code 2, §3.2 and §6.4), AF
 slice fields of a copy, §6.2), AFNI-11 and AFNI-12 (an existing output and refused output
 names, §6.3), AFNI-16 (a nearly plumb matrix written plumb, §6.1), and, with AFNI's global
 options and environment variables (§7.1), AFNI-18 (an input name with a blank), AFNI-19
-(`AFNI_ALLOW_MILLISECONDS`), AFNI-20 (a one-row dataset written as text, not reproduced) and
-AFNI-22 (`-D` values with blanks). This spec describes what AFNI does; the reproduced mode
+(`AFNI_ALLOW_MILLISECONDS`), AFNI-20 (a one-row dataset written as text, not reproduced),
+AFNI-22 (`-D` values with blanks) and AFNI-23 (`AFNI_NIFTI_SCALE=NO` drops the intercept of
+integer data). This spec describes what AFNI does; the reproduced mode
 follows it exactly. §6.5 and the end of §7.1 list, for each, what the default does instead
 and when larmorx names it. AFNI-21 (warning labels in terminal colours, §7.1) concerns
 messages only: `reproduce` writes AFNI's, the default plain ones, and nothing is named.
@@ -762,7 +763,7 @@ as described (observed), in both modes unless a defect is named.
 | `HOME` | a directory | an input name that starts with `~/` starts there; with `AFNI_ECHO_COMMANDLINE` (below) |
 | `AFNI_NOREALPATH` | yes | the input's name in messages, below |
 | `AFNI_NIFTI_PRIORITY` | `S`, `Q` (first character, any case) | with both a qform and an sform (codes > 0), `Q` takes the qform; `S`, the default, the sform. Any other value (an empty one included): `*+ WARNING: Illegal AFNI_NIFTI_PRIORITY='X'`, and the sform. When the two 3×3 parts' determinants (in float) have opposite signs: `*+ WARNING: NIfTI('<input>'): Qform/Sform handedness differ; S wins!` (`Q wins!` with `Q`) |
-| `AFNI_NIFTI_SCALE` | no | uint8 and int16 data with both a slope and an intercept stay uint8 and int16 (§6's table): the slope becomes the scale factor and the intercept is dropped. Other types are unchanged |
+| `AFNI_NIFTI_SCALE` | no | uint8 and int16 data with both a slope and an intercept stay uint8 and int16 (§6's table): the slope becomes the scale factor and the intercept is dropped (AFNI-23, below). Other types are unchanged |
 | `AFNI_NIFTI_TYPE_WARN` | unset, yes, no | when the input is converted to float32 (§6: int8, uint16, int32, uint32 and float64; uint8 and int16 with a slope and an intercept), AFNI prints, without a label: `** AFNI converts NIFTI_datatype=64 (FLOAT64) in file <input> to FLOAT32`, then, unless yes, `     Warnings of this type will be muted for this session.` and `     Set AFNI_NIFTI_TYPE_WARN to YES to see them all, NO to see none.`; with no, nothing. The type names: `INT8` (256), `UINT16` (512), `INT32` (8), `UINT32` (768), `FLOAT64` (64), `UINT8` (2), `INT16` (4) |
 | `AFNI_NIFTI_VIEW` | `tlrc`, `orig`, `acpc` (any case) | the output's xform codes, below; default orig |
 | `AFNI_DEFAULT_STD_SPACE` | a template space | the output's xform codes, below; default `TLRC` |
@@ -804,6 +805,8 @@ is one file anyway; AFNI-18), `AFNI_ALLOW_MILLISECONDS` (`toffset` is in seconds
 AFNI-19), `AFNI_WRITE_1D_AS_PREFIX` (NIfTI either way; AFNI-20) and `AFNI_MESSAGE_COLORIZE`
 (plain labels; AFNI-21). `AFNI_DECONFLICT` replaces, renames or stops as in AFNI; where AFNI
 would write nothing and exit 0 (AFNI-11), the default is an error before the work.
+`AFNI_NIFTI_SCALE` keeps integer data as integers as in AFNI, but the output keeps their
+intercept (AFNI-23, below).
 
 **`AFNI_DECONFLICT`: an existing output** (a regular file of the output's name; observed for
 shifts and copies, with and without `-verbose`):
@@ -830,6 +833,43 @@ input dataset '<name>'`, exit 1. So an input in a directory whose name has a bla
 opened. A list of one dataset is that dataset; a list of several is joined in time, which
 larmorx does not support (an error). larmorx's default reads the name as one file, and names
 AFNI-18 when it has a blank and `AFNI_PATH_SPACES_OK` is not yes.
+
+**`AFNI_NIFTI_SCALE=NO`: the intercept** (AFNI-23; observed 2026-10-12 on int16 and uint8
+inputs with a slope and an intercept, a slope of 1 included, with every restore mode,
+`-ignore`, `-no_detrend`, `-tpattern zero` and a copy of the input; int32 and float32 inputs
+with a slope and an intercept came out unchanged). With the variable no, uint8 and int16 data
+with both a slope and an intercept are kept as stored, as data with a slope alone are (§6's
+table): the slope is their scale factor (none when it is 1) and the intercept is dropped. The
+values 3dTshift works on are the true values minus the intercept, and the output keeps the
+input's type with `scl_slope` the factor (0 when there is none) and `scl_inter` 0. Compared
+with the same run without the variable:
+- a shifted output with the trend restored (the default) or `-rlt+`, slices left unshifted,
+  `-tpattern zero`, and a copy of the input (§3.4): every value, the `-ignore` volumes
+  included, is lower by the intercept, to within half a stored unit (the rounding to
+  integers). Int16 with slope 0.37 and intercept 12.5: 12.5 lower, ±0.185; uint8 with slope
+  0.5 and intercept −20: 20 higher, ±0.25; int16 with slope 1 and intercept 100: no scale
+  factor (`scl_slope` 0), 100 lower, ±0.5. With `-no_detrend` likewise, except near the ends
+  of the second voxel of each pair, which AFNI shifts as raw values with zeros beyond the ends
+  (AFNI-05, §4): there the difference depends on the values too (7.9 to 13.9 lower for the
+  int16 input above, heptic);
+- `-rlt`, which removes the trend, the intercept with it, from every volume after the
+  `-ignore` ones: those come out as without the variable (to within half a stored unit), and
+  the `-ignore` volumes lower by the intercept.
+
+larmorx's default (AFNI-23 corrected, decided 2026-10-12) keeps the integer type the variable
+asks for, and the values right:
+- an output that carries the intercept in every volume (all of the first case above): the
+  stored values and `scl_slope` are AFNI's, except that `scl_slope` is 1 where AFNI writes 0,
+  and `scl_inter` is the input's intercept. It reads back as the run without the variable, to
+  within half a stored unit (measured with the replica on the inputs above: at most 0.185,
+  0.25 and 0.5);
+- `-rlt` without `-ignore` (a shifted output): AFNI's output, which is right as it is;
+- `-rlt` with `-ignore` n > 0 (a shifted output): the `-ignore` volumes need the intercept and
+  the others do not, which one `scl_inter` cannot describe, so the data are read as without
+  the variable (float32, `slope·x + inter`, §6): the output is the run's without the variable.
+
+AFNI-23 is named, in both modes, in the first and the third case: wherever the two modes'
+outputs differ.
 
 **The input's name in messages** (observed). AFNI names the input in its messages by its real
 path: absolute, with `.`, `..` and symbolic links resolved (`<dir>/sub/../in.nii` is shown as
@@ -952,6 +992,7 @@ abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
 | AFNI-20 | a one-row dataset: a 1D text file under the output's name | NIfTI, in both modes: AFNI's text file holds a random identifier, so `reproduce` does not reproduce it | one voxel along y and z, and `AFNI_WRITE_1D_AS_PREFIX` not yes; named as corrected in both modes |
 | AFNI-21 | labels in terminal colours (above) | plain labels | never (messages only) |
 | AFNI-22 | `-D` read as above | the name before the first `=`, the value after it, as written | AFNI's reading would change what a variable of the table does (above) |
+| AFNI-23 | `AFNI_NIFTI_SCALE` no: uint8 and int16 data with a slope and an intercept kept as stored, the intercept dropped (above) | the intercept kept as the output's `scl_inter` (`scl_slope` 1 where AFNI writes 0); with `-rlt` and `-ignore`, the data read as without the variable | the output carries the intercept (anything but a shifted `-rlt` output), or `-rlt` with `-ignore` shifts |
 
 **Writing the output: the cross-platform design** (decided 2026-10-12).
 - The output is written to a temporary file in its own directory (a hidden name ending with
@@ -973,14 +1014,28 @@ abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
   types (byte / short / float32 plus brick factors) in place, with explicit `n_threads`. A
   reader and writer implement §6.
 - **Python:** `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None,
-  ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1) -> lx.Image`.
+  ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1,
+  implementation="auto", upstream_defects="fix", afni_settings=None) -> lx.Image`.
   - `image` is a path (read with §6) or an `lx.Image`/nibabel image.
   - `slice_times` is a sequence of floats or a pattern name.
   - `restore` is `"trend"`, `"none"` (`-rlt`) or `"intercept"` (`-rlt+`).
-  - It reads AFNI's environment variables (§7.1) from the process environment, as the command
-    line does, except that a path is always one file name (as with `AFNI_PATH_SPACES_OK`
-    yes) and an oblique input is not reported. It takes no global options. AFNI's warnings
-    and larmorx's notices become Python warnings.
+  - **It never reads the process environment** (decided 2026-10-12; CLAUDE.md rule 6): the
+    same call gives the same result whatever the shell has set. AFNI's variables (§7.1) are
+    given explicitly, `afni_settings={"AFNI_NIFTI_PRIORITY": "Q", ...}`, and act as they do in
+    the environment of the command line (values as written, never read as `-D` is). A path is
+    always one file name (as with `AFNI_PATH_SPACES_OK` yes), messages are plain and an
+    oblique input is not reported: the variables for these (`AFNI_PATH_SPACES_OK`,
+    `AFNI_MESSAGE_COLORIZE`, `AFNI_MESSAGE_PREFIX`, `AFNI_ECHO_COMMANDLINE`,
+    `AFNI_NO_OBLIQUE_WARNING`) cannot be given. Names are case-sensitive; a name 3dTshift does
+    not read, or an empty value, is a `ValueError`. The variables that change what a call
+    returns are `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_SCALE`, `AFNI_NIFTI_VIEW`,
+    `AFNI_DEFAULT_STD_SPACE`, `AFNI_NIFTI_WRITE_TYPE` (NIfTI-2 header fields) and
+    `AFNI_NOREALPATH` (the input's name in warnings); the others change nothing a call
+    returns (it writes a fresh output and its own slice-time file, and passes `-TR` in
+    seconds) and are accepted. Until the original reads the first six, it raises
+    `NotImplementedError` naming them. It takes no global options. AFNI's warnings and
+    larmorx's notices become Python warnings.
+  - The command line reads the process environment, as AFNI does (§7.1).
 - **CLI:** §7 and §7.1.
 - **Docs:** `docs/api/afni-tshift.md`, with the option-mapping table.
 
@@ -1004,7 +1059,11 @@ The parity suite runs the AFNI binary and larmorx with the same arguments on:
   AFNI's variables cleared, `AFNI_DONT_LOGFILE` yes and `AFNI_NIFTI_TYPE_WARN` no, then the
   case's variables; exit status, standard output and standard
   error are compared byte for byte (AFNI's banner and compile date set aside, and larmorx's own
-  lines), as well as the output files.
+  lines), as well as the output files. AFNI-23 has its cases there:
+  `environment/nifti-scale-no`, `-copy`, `-rlt` and `-rlt-ignore`, and
+  `global/D-nifti-scale-no`. Where the Python API can express a case, it runs with the case's
+  variables as `afni_settings` and AFNI variables in the process environment that would change
+  the output, and must give the command line's output.
 
 Thresholds (PLAN.md §11.3, slice timing as deterministic arithmetic):
 - float32 outputs: max |diff| ≤ 1e-5 × max |AFNI output|;

@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-gpl replicas (tests/golden.rs): SHA-256 of the NIfTI
 # header and data that larmorx-gpl writes on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 4aaad72f285c479407e1273d17ae5fcfd3fc78ad on 2026-10-12 (Linux x86_64)
+# Recorded from c479c1ae933e2bc6641cfb0c49d1ec6d51acf3c8 on 2026-10-12 (Linux x86_64)
 # case	output	sha256	type	sample
 3dTshift.copy.float32-tiny-offsets	data	eac749bd5feff21e9e34a9fc7c793601f6e67e1ccef7a901b131f2e2008c172a	float32	0040484300208e430000b34300c07e430080a94300806b4300a09a430080c643
 3dTshift.copy.float32-tiny-offsets	header	2d28c82b5e4b7373ecd88301d2686509e45b1abc121a18ae548b94a76de91546	-	-
@@ -38,6 +38,12 @@
 3dTshift.linear.float32.nifti2-environment	header	87fadfadc91e292cedda17f6d0f8b5835ca8229d47157902733042b53266efee	-	-
 3dTshift.linear.float32.overwrite	data	d8bbe320fc73af5b40ece09fc8512daea64ed6368bcef3aef243a98cf2d4d946	float32	c6c04b4300208e43ccf0b343214f8043dbeea9431d32694300a09a43d4bdc443
 3dTshift.linear.float32.overwrite	header	d0dbbb595c05bd2882d30181c155ab1c9d17b74cc1e91713c6c3ea21bfa62b7e	-	-
+3dTshift.linear.int16-intercept.nifti-scale-no	data	c13c339a6c97a69c98e8a6f661cb5f41c51a49a6eed2ca4f4c74a5759e6cc535	int16	2f037104a00502044f05a503d5042606
+3dTshift.linear.int16-intercept.nifti-scale-no	header	573055b6ca25727286a802a0879eeb3b5b1d89bd986423e41db8db7f036a2cce	-	-
+3dTshift.linear.int16-intercept.nifti-scale-no.reproduce	data	c13c339a6c97a69c98e8a6f661cb5f41c51a49a6eed2ca4f4c74a5759e6cc535	int16	2f037104a00502044f05a503d5042606
+3dTshift.linear.int16-intercept.nifti-scale-no.reproduce	header	e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c	-	-
+3dTshift.linear.int16-intercept.nifti-scale-no.rlt-ignore	data	2e3e3935e8a2909f66f7b1c4cdd728799c3d4ea59480cc4fcd8abd0a26407836	float32	002096430020c0431a0018c04c4460c0ceffdf3f9a6d1fc080e7bbc0cef8b23f
+3dTshift.linear.int16-intercept.nifti-scale-no.rlt-ignore	header	d0dbbb595c05bd2882d30181c155ab1c9d17b74cc1e91713c6c3ea21bfa62b7e	-	-
 3dTshift.linear.int16-negative-slope	data	ebff3a839fc9f4ca5ce9142c7748734b16ca6b3093f2b62072c6844adb4a110e	int16	2f036c049805ff035305a503dc043406
 3dTshift.linear.int16-negative-slope	header	e5cdf9a712997056a1f3256452dc787fb0f6d2c166af83e26554579b3855ed5e	-	-
 3dTshift.linear.int16-negative-slope.reproduce	data	165b6da32162b322731e19c18d958cd54c135d47da06bc7ce8f5e867dd98db5b	int16	44f34fee980504f0b4ea6df192ec3406

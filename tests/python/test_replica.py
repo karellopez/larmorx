@@ -12,6 +12,7 @@ import os
 import sys
 from pathlib import Path
 
+import nibabel as nib
 import numpy as np
 import pytest
 
@@ -30,7 +31,8 @@ with open(here / "calls.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS"),
                         "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS"),
                         "afni": {k: v for k, v in os.environ.items()
-                                 if k.upper().startswith("AFNI_")}}) + "\\n")
+                                 if k.upper().startswith(("AFNI_", "NIML_"))
+                                 or k.upper() == "IDCODE_PREFIX"}}) + "\\n")
 if args == ["--version"]:
     print("larmorx-gpl " + config["version"])
     sys.exit(0)
@@ -194,10 +196,11 @@ def test_the_replica_receives_the_upstream_defects_choice(scripts, tmp_path):
 
 
 def test_afni_global_options_and_variables_reach_the_replica(scripts, monkeypatch, tmp_path):
-    """AFNI's global options (``-overwrite``, ``-Dname=value``) pass through larmorx's dispatch
-    unchanged and in place, wherever they stand, and AFNI's environment variables reach the
-    replica, which takes them out and applies them itself; ``lx.afni.tshift`` sets the ones its
-    own use of the replica needs."""
+    """On the command line, AFNI's global options (``-overwrite``, ``-Dname=value``) pass
+    through larmorx's dispatch unchanged and in place, wherever they stand, and AFNI's
+    environment variables reach the replica, which takes them out and applies them itself.
+    ``lx.afni.tshift`` never passes the process environment's AFNI variables on (CLAUDE.md
+    rule 6): only its ``afni_settings`` and the ones its own use of the replica needs."""
     program = stub(scripts)
     _, path = series(tmp_path)
     out = tmp_path / "out.nii"
@@ -221,12 +224,106 @@ def test_afni_global_options_and_variables_reach_the_replica(scripts, monkeypatc
     assert run["afni"]["AFNI_MESSAGE_PREFIX"] == "run1"
 
     lx.afni.tshift(path, slice_times="alt+z")
-    env = calls(program)[-1]["afni"]
-    assert env["AFNI_NIFTI_VIEW"] == "tlrc"  # passed on
-    assert env["AFNI_PATH_SPACES_OK"] == "YES"  # a path is one file
-    assert env["AFNI_MESSAGE_COLORIZE"] == "NO"  # plain messages, read as warnings
-    assert "AFNI_MESSAGE_PREFIX" not in env
-    assert env["AFNI_NO_OBLIQUE_WARNING"] == "YES"  # AFNI's advice, not a warning here
+    fixed = {
+        "AFNI_PATH_SPACES_OK": "YES",  # a path is one file
+        "AFNI_MESSAGE_COLORIZE": "NO",  # plain messages, read as warnings
+        "AFNI_NO_OBLIQUE_WARNING": "YES",  # AFNI's advice, not a warning here
+    }
+    assert calls(program)[-1]["afni"] == fixed  # AFNI_NIFTI_VIEW, AFNI_MESSAGE_PREFIX: not
+
+
+def test_afni_settings_are_explicit_never_the_environment(scripts, monkeypatch, tmp_path):
+    """``afni_settings`` reaches the replica; AFNI's variables of the process environment never
+    do, whatever their case (CLAUDE.md rule 6): the same call gives the same result whatever
+    the shell has set."""
+    program = stub(scripts)
+    _, path = series(tmp_path)
+    fixed = {"AFNI_PATH_SPACES_OK": "YES", "AFNI_MESSAGE_COLORIZE": "NO"}
+    fixed["AFNI_NO_OBLIQUE_WARNING"] = "YES"
+    lx.afni.tshift(path, slice_times="alt+z")
+    assert calls(program)[-1]["afni"] == fixed
+    for name, value in [
+        ("AFNI_NIFTI_SCALE", "NO"),
+        ("AFNI_NIFTI_PRIORITY", "Q"),
+        ("afni_nifti_view", "tlrc"),  # Windows reads names whatever their case
+        ("AFNI_PATH_SPACES_OK", "NO"),
+        ("AFNI_MESSAGE_PREFIX", "run1"),
+        ("NIML_DEBUG", "1"),
+        ("IDCODE_PREFIX", "XYZ"),
+    ]:
+        monkeypatch.setenv(name, value)
+    lx.afni.tshift(path, slice_times="alt+z")
+    assert calls(program)[-1]["afni"] == fixed  # no effect
+
+    settings = {"AFNI_NIFTI_SCALE": "NO", "AFNI_NIFTI_VIEW": "tlrc", "AFNI_DECONFLICT": "YES"}
+    lx.afni.tshift(path, slice_times="alt+z", afni_settings=settings)
+    assert calls(program)[-1]["afni"] == {**settings, **fixed}  # these, and only these
+
+
+def test_afni_settings_are_checked(no_replica, tmp_path):
+    """Names 3dTshift does not read, the settings ``tshift`` makes itself, empty values and
+    other types are refused, whichever implementation would run."""
+    _, path = series(tmp_path)
+    for settings, error, match in [
+        ({"AFNI_NIFTI_SCAL": "NO"}, ValueError, "does not read 'AFNI_NIFTI_SCAL'"),
+        ({"afni_nifti_scale": "NO"}, ValueError, "case-sensitive"),
+        ({"PATH": "/bin"}, ValueError, "does not read 'PATH'"),
+        ({"AFNI_PATH_SPACES_OK": "YES"}, ValueError, "sets AFNI_PATH_SPACES_OK itself"),
+        ({"AFNI_MESSAGE_PREFIX": "run1"}, ValueError, "sets AFNI_MESSAGE_PREFIX itself"),
+        ({"AFNI_NIFTI_SCALE": ""}, ValueError, "non-empty value"),
+        ({"AFNI_NIFTI_SCALE": 0}, TypeError, "must be str"),
+        ([("AFNI_NIFTI_SCALE", "NO")], TypeError, "mapping"),
+    ]:
+        with pytest.raises(error, match=match):
+            lx.afni.tshift(path, slice_times="alt+z", afni_settings=settings)
+
+
+def test_the_original_refuses_settings_it_does_not_read_yet(no_replica, monkeypatch, tmp_path):
+    """The clean-room original reads none of AFNI's variables yet (part 2b): the ones that would
+    change the result raise ``NotImplementedError`` naming them, never silently ignored; the ones
+    that change nothing a call returns are accepted; the environment changes nothing."""
+    _, path = series(tmp_path)
+    reference = lx.afni.tshift(path, slice_times="alt+z", method="linear")
+    with pytest.raises(NotImplementedError, match="AFNI_NIFTI_PRIORITY, AFNI_NIFTI_SCALE yet"):
+        lx.afni.tshift(
+            path,
+            slice_times="alt+z",
+            afni_settings={"AFNI_NIFTI_SCALE": "NO", "AFNI_NIFTI_PRIORITY": "Q"},
+        )
+    with pytest.raises(NotImplementedError, match=r"implementation='replica'"):
+        lx.afni.tshift(
+            path,
+            slice_times="alt+z",
+            implementation="original",
+            afni_settings={"AFNI_NIFTI_WRITE_TYPE": "2"},
+        )
+    monkeypatch.setenv("AFNI_NIFTI_WRITE_TYPE", "2")
+    monkeypatch.setenv("AFNI_NIFTI_SCALE", "NO")
+    img = lx.afni.tshift(
+        path,
+        slice_times="alt+z",
+        method="linear",
+        afni_settings={"AFNI_DECONFLICT": "YES", "AFNI_NIFTI_TYPE_WARN": "YES"},
+    )
+    np.testing.assert_array_equal(img.data, reference.data)
+    assert img.header.to_bytes() == reference.header.to_bytes()
+
+
+def test_a_replica_output_with_an_intercept_is_scaled(scripts, tmp_path):
+    """The replica writes the input's intercept back when it corrects AFNI-23: the result's
+    values are those ``lx.load`` gives, slope and intercept applied."""
+    stub(scripts)  # its output is a copy of its input
+    values = np.asfortranarray(np.arange(2 * 2 * 3 * 8, dtype=np.int16).reshape(2, 2, 3, 8))
+    values += 1000
+    hdr = nib.Nifti1Image(values, AFFINE).header
+    hdr.set_data_dtype(np.int16)
+    hdr["vox_offset"] = 352
+    hdr.set_slope_inter(0.25, 100.0)
+    path = tmp_path / "scaled.nii"
+    path.write_bytes(hdr.binaryblock + b"\0" * 4 + values.tobytes(order="F"))
+    img = lx.afni.tshift(path, slice_times="alt+z")
+    np.testing.assert_array_equal(img.data, lx.load(path).data)
+    assert img.data[0, 0, 0, 0] == 1000 * 0.25 + 100
 
 
 def test_a_failing_replica_raises_and_never_falls_back(scripts, tmp_path):

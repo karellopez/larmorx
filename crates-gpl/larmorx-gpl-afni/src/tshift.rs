@@ -481,6 +481,7 @@ mod tests {
                 code: 1,
             },
             seq_dec: None,
+            dropped_inter: None,
         }
     }
 

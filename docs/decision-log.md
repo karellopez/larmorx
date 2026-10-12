@@ -757,7 +757,71 @@ Decided by the user on the questions the defect register raised
   `AFNI_PATH_SPACES_OK=YES` for its temporary paths and keeps AFNI's message prefix, colours,
   echoed command line and oblique report out of its warnings. To review: whether the Python
   API should read AFNI's variables at all (rule 6, no global configuration); the original
-  should do whatever is decided.
+  should do whatever is decided. (Decided the same day, below: it does not.)
+
+## 2026-10-12: AFNI-23 corrected by default; the Python API takes AFNI's settings explicitly
+- **User decisions:**
+  1. **AFNI-23 is fixed by default.** With `AFNI_NIFTI_SCALE=NO`, AFNI keeps an integer image's
+     slope but drops its intercept, so the values are off by it. larmorx's default keeps the
+     values right; a notice names AFNI-23 where AFNI would have dropped it;
+     `LARMORX_UPSTREAM_DEFECTS=reproduce` gives AFNI's bytes.
+  2. **The Python API never reads the process environment** (CLAUDE.md rule 6). AFNI's
+     variables are explicit settings of the call; the command line keeps reading the
+     environment, as AFNI does.
+- **What `AFNI_NIFTI_SCALE=NO` is for** (replica author; the details are in the restricted
+  register entry AFNI-23). The variable is not documented. AFNI's change history explains it:
+  until 2021 it meant "do not scale" (uint8 and int16 data read as stored, slope and intercept
+  ignored); in 2021 AFNI began keeping scaled integers as integers wherever a scale factor can
+  carry the scaling (a slope alone). Since then the variable no longer stops the slope, and
+  its only effect is to keep data with an intercept as integers, losing the intercept. The
+  defect is the interaction of the two changes.
+- **The choice:** keep what the variable still does (integers stay integers), and keep both
+  scalings in the header: the output has AFNI's stored integers and `scl_slope` (1 where AFNI
+  writes none), with the input's intercept as `scl_inter`. 3dTshift's operations carry a
+  constant offset through (the trend absorbs it and is restored), so the output reads back as
+  the run without the variable, to within half a stored unit, and only the header differs from
+  AFNI's output. Two cases follow from what `-rlt` does: it removes the trend, the intercept
+  with it, so without `-ignore` AFNI's output is already right (nothing changes, nothing is
+  named); with `-ignore` the ignored volumes keep the intercept and the others do not, which
+  one `scl_inter` cannot describe, so the data are read as without the variable (float32,
+  `slope·x + inter`). Applying both scalings in every case (always float32) was the
+  alternative; it would have made the variable do nothing. Implemented in the replica;
+  `specs/3dTshift.md` §7.1 describes AFNI's behaviour (observed) and the correction for the
+  clean-room original.
+- **The Python API:** `lx.afni.tshift(..., afni_settings={"AFNI_NIFTI_PRIORITY": "Q"})`, a
+  `Mapping[str, str] | None` (the same shape as the command line's environment; AFNI's values
+  are strings with AFNI's own tests). The replica runs with exactly these, every AFNI
+  variable of the caller's environment removed, as environment variables (values as written;
+  a `-D` would be read with AFNI-22's quirks in `reproduce`), plus the five the wrapper fixes
+  for its own use (a path is one file, plain messages, no oblique report), which cannot be
+  given. Names are checked (a name 3dTshift does not read, or an empty value, is a
+  `ValueError`). Six variables change what a call returns (`AFNI_NIFTI_PRIORITY`, `_SCALE`,
+  `_VIEW`, `AFNI_DEFAULT_STD_SPACE`, `AFNI_NIFTI_WRITE_TYPE`, `AFNI_NOREALPATH`); the
+  clean-room original does not read them yet and raises `NotImplementedError` naming them
+  (part 2b adds them); the rest change nothing a call returns and are accepted. The pattern is
+  in `docs/porting-guide.md` §9.1.
+- **Records** from `c479c1a`, standard tier, against the AFNI 25.2.09 oracle, 311 cases each
+  (3 new: `environment/nifti-scale-no-copy`, `-rlt`, `-rlt-ignore`):
+  - Replica, `reproduce`: 279 of 279 compared cases bit-identical to AFNI, the 4 AFNI-23 cases
+    included; the 60 cases of AFNI's global options and variables identical in exit status
+    and messages too. Fix pass: AFNI-23 named in 4 cases (`environment/nifti-scale-no`,
+    `-copy`, `-rlt-ignore`, `global/D-nifti-scale-no`), the header's `scl_inter` changed
+    (and in `-rlt-ignore` the type, float32), not in `-rlt`, where the outputs are the same.
+    By hand on int16 and uint8 inputs (slope 1 included, every restore mode, `-no_detrend`,
+    `-tpattern zero`, a copy): the default reads back within half a stored unit of the run
+    without the variable (at most 0.185, 0.25, 0.5), and the `-rlt -ignore` default is AFNI's
+    output without the variable byte for byte.
+  - Python API with `afni_settings`: on the 28 cases of AFNI's variables and global options
+    it can express, the command line's output bit for bit, with `AFNI_NIFTI_WRITE_TYPE=2`,
+    `AFNI_NIFTI_SCALE=NO`, `AFNI_NIFTI_VIEW=tlrc` and `AFNI_NIFTI_PRIORITY=Q` in the process
+    environment (any of which would change the output if it reached the replica).
+  - Original: unchanged where compared (223 pass, 163 bit-identical); the 3 new cases are
+    expected divergences (it does not read AFNI's variables yet).
+- **Golden:** three new GPL cases (`3dTshift.linear.int16-intercept.nifti-scale-no`, its
+  `.reproduce`, and `.rlt-ignore`; the first two have the same data checksum, only the header
+  differs); no checksum changed. Python tests on all six platforms: a stand-in replica program
+  receives `afni_settings` and none of the environment's AFNI variables; the original raises
+  `NotImplementedError` for the variables it does not read.
 
 ## Open decisions (PLAN.md §16)
 

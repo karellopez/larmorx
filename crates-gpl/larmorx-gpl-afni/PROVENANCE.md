@@ -173,6 +173,14 @@ output through a temporary file and a rename).
     writes a 1D text file (with a random identifier) unless `AFNI_WRITE_1D_AS_PREFIX` is yes.
   - AFNI-22 (`environ::prefilter`): `-Dname=value`'s value is the text after the first `=`;
     AFNI's `sscanf` reading (`environ::afni_setenv`) is used in `reproduce` mode.
+  - AFNI-23 (`dataset::read`, `dataset::write`, `cli::tshift::rlt_dropped_intercept`; user
+    decision 2026-10-12): with `AFNI_NIFTI_SCALE=NO`, `THD_open_nifti` keeps uint8 and int16
+    data with a slope and an intercept as stored, with the slope as brick factor, and the
+    intercept is lost (`THD_load_nifti` scales only float bricks). Both modes read them as AFNI
+    does; by default the output's `scl_inter` is the input's intercept (`scl_slope` 1 when
+    there is no factor), so it reads back as the input's values shifted. With `-rlt` the trend
+    takes the intercept with it: without `-ignore` nothing changes; with `-ignore` the data are
+    read as `THD_load_nifti` reads them without the variable (float, `slope * x + inter`).
   - AFNI-21 (`message::Style`; messages only): AFNI's terminal colour codes around warning and
     error labels are written in `reproduce` mode only.
 - **`long double`** (2026-10-12; until then the translation computed these in double).
@@ -193,7 +201,7 @@ output through a temporary file and a rename).
 | `csfft` | `tools/csfft-verify/run.sh`: AFNI's compiled `csfft_cox` (from the oracle build's `libmri.a`) and its general radix-2 loop on 3,336 + 160 input records, every length AFNI computes itself | 36,950,784 + 2,621,400 float values, 0 differ |
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
-| 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` (from `4aaad72`: 276 of 276 compared cases bit-identical, 3 expected divergences) |
+| 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` (from `c479c1a`: 279 of 279 compared cases bit-identical, 3 expected divergences) |
 | `x87` (2026-10-12) | the emulated operations against GCC's `long double` on x86-64: 3 million quotients of the kind `nifti_dmat44_to_quatern` forms, and 2 million random sums, products and quotients (scratch C programs) | 0 differ (1,071 of them differ from plain double arithmetic) |
-| Global options and environment variables (2026-10-12) | the parity categories `global` and `environment`: exit status, standard output and error byte for byte, and the output files, against the AFNI binary in a clean environment; NIfTI-2 headers of 120 random oblique inputs and 160 qform-only, near-180° and trace-near-0 ones | 57 of 57 identical: exit status, messages and outputs (from `4aaad72`; `environment/one-row-dataset`'s output is an expected divergence, AFNI-20); the headers identical except `vox_offset` |
+| Global options and environment variables (2026-10-12) | the parity categories `global` and `environment`: exit status, standard output and error byte for byte, and the output files, against the AFNI binary in a clean environment; NIfTI-2 headers of 120 random oblique inputs and 160 qform-only, near-180° and trace-near-0 ones | 60 of 60 identical: exit status, messages and outputs (from `c479c1a`, AFNI-23's cases included; `environment/one-row-dataset`'s output is an expected divergence, AFNI-20); the headers identical except `vox_offset` |
 | The geometry AFNI writes (2026-10-12) | AFNI's and the replica's (`reproduce`) outputs compared byte for byte on plumb, oblique, nearly plumb, qform-only, sform-only and form-less inputs, in millimetres, metres and micrometres, on AFNI-01, -02, -03, -05, -08 inputs, and on five real BOLD runs (ds000210 with AFNI's extension, ds001600, ds003345, ds005454, ds006736) | the 348-byte headers identical except `vox_offset` (AFNI's extension), the data identical; `tests/oracle.rs` checks 20 cases the same way |

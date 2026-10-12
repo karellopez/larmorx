@@ -54,7 +54,10 @@
 //! [`slice_offsets`]); metre and micrometre units leaving the origin, and an oblique matrix,
 //! unconverted (AFNI-07, [`geometry`]); slice times all within 0.003 of 0 written with
 //! `slice_end` 0 (AFNI-08, [`slice_fields`]); and a matrix within about 0.01° to 0.024° of plumb
-//! written plumb (AFNI-16, [`write`], [`axes::snaps`]).
+//! written plumb (AFNI-16, [`write`], [`axes::snaps`]). A sixth comes with an environment
+//! variable: `AFNI_NIFTI_SCALE=NO` keeps uint8 and int16 data with a slope and an intercept as
+//! stored and drops the intercept (AFNI-23, [`DroppedIntercept`]); the default writes it back
+//! as the output's `scl_inter`.
 
 use std::path::{Path, PathBuf};
 
@@ -155,6 +158,47 @@ pub struct Dataset {
     /// `(slice_start, slice_end)` when the time axis's slice offsets come from the header's
     /// slice code 2 (sequential decreasing), whose offsets AFNI-03 concerns.
     pub seq_dec: Option<(i64, i64)>,
+    /// AFNI-23: the intercept `AFNI_NIFTI_SCALE=NO` dropped when the file was read, if any.
+    pub dropped_inter: Option<DroppedIntercept>,
+}
+
+/// AFNI-23: uint8 or int16 data with both a slope and an intercept that `AFNI_NIFTI_SCALE=NO`
+/// kept as stored. AFNI keeps the slope as their brick factor (none for a slope of 1) and drops
+/// the intercept, which its brick factors cannot hold, so the values it works on and writes
+/// are off by the intercept. By default larmorx-gpl writes the intercept back as the output's
+/// `scl_inter` ([`write`]), wherever the values written still carry it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DroppedIntercept {
+    /// The NIfTI data type code (uint8 or int16).
+    pub datatype: i16,
+    /// `scl_slope` as read.
+    pub slope: f64,
+    /// `scl_inter` as read.
+    pub inter: f64,
+    /// Whether the values written carry the intercept: true when read; false once `-rlt` has
+    /// removed it from every volume with the trend, which leaves AFNI's output right.
+    pub carried: bool,
+}
+
+impl DroppedIntercept {
+    /// The data type's name in messages.
+    pub fn type_name(&self) -> &'static str {
+        datatype_string(self.datatype)
+    }
+
+    /// The values `THD_load_nifti` gives such data without the variable: converted to float,
+    /// then `slope * x + inter` in double, rounded to float (non-finite results 0).
+    pub fn scaled(&self, data: &BrickData) -> Vec<f32> {
+        let f = |x: f32| {
+            let v = (self.slope * f64::from(x) + self.inter) as f32;
+            if v.is_finite() { v } else { 0.0 }
+        };
+        match data {
+            BrickData::Byte(v) => v.iter().map(|&x| f(f32::from(x))).collect(),
+            BrickData::Short(v) => v.iter().map(|&x| f(f32::from(x))).collect(),
+            BrickData::Float(v) => v.iter().map(|&x| f(x)).collect(),
+        }
+    }
 }
 
 impl Dataset {
@@ -746,9 +790,18 @@ pub fn read(
 
     // The datum, chosen when the header is opened. `AFNI_NIFTI_SCALE=NO` keeps uint8 and int16
     // data with a slope and an intercept as they are stored: the slope becomes their scale
-    // factor and the intercept is dropped.
-    let scale_open =
-        nim.scl_slope != 0.0 && nim.scl_inter != 0.0 && !settings.no("AFNI_NIFTI_SCALE");
+    // factor and the intercept is dropped (AFNI-23, in both modes; the default writes it back).
+    let scaled_pair = nim.scl_slope != 0.0 && nim.scl_inter != 0.0;
+    let scale_open = scaled_pair && !settings.no("AFNI_NIFTI_SCALE");
+    let dropped_inter = (scaled_pair
+        && !scale_open
+        && matches!(nim.datatype, dt::UINT8 | dt::INT16))
+    .then_some(DroppedIntercept {
+        datatype: nim.datatype,
+        slope: nim.scl_slope,
+        inter: nim.scl_inter,
+        carried: true,
+    });
     let (float_datum, xform_data) = match nim.datatype {
         dt::UINT8 | dt::INT16 => (scale_open, scale_open),
         dt::FLOAT32 => (true, false),
@@ -990,6 +1043,7 @@ pub fn read(
         taxis,
         geometry,
         seq_dec,
+        dropped_inter,
     })
 }
 
@@ -1426,6 +1480,15 @@ pub fn write(
     let fac0 = ds.factors.first().copied().unwrap_or(0.0);
     h.scl_slope = f64::from(fac0);
     h.scl_inter = 0.0;
+    // AFNI-23: the intercept AFNI_NIFTI_SCALE=NO dropped, written back by default where the
+    // values still carry it (a slope of 1 gives no factor: then scl_slope 1).
+    if let Some(d) = ds.dropped_inter.filter(|d| d.carried) {
+        notices.add(&defects::AFNI_23, dropped_inter_detail(&d, fac0, mode));
+        if mode.fix() {
+            h.scl_slope = if fac0 != 0.0 { f64::from(fac0) } else { 1.0 };
+            h.scl_inter = d.inter;
+        }
+    }
     h.cal_min = 0.0;
     h.cal_max = 0.0;
     h.slice_code = 0;
@@ -1517,6 +1580,29 @@ fn plumb_detail(geometry: &Axes, mode: UpstreamDefects) -> String {
         format!(
             "the input's matrix is {degrees} degrees from plumb: written as the plumb matrix \
              of its axes, as AFNI does (entries up to {apart} from the input's)"
+        )
+    }
+}
+
+/// The AFNI-23 notice's detail for an output that carries the dropped intercept `d`, written
+/// with the brick factor `fac0`.
+fn dropped_inter_detail(d: &DroppedIntercept, fac0: f32, mode: UpstreamDefects) -> String {
+    let (ty, slope, inter) = (d.type_name(), fmt_g(d.slope), fmt_g(d.inter));
+    let factor = if fac0 != 0.0 {
+        format!("scl_slope {slope} as their scale factor")
+    } else {
+        format!("no scale factor (scl_slope {slope})")
+    };
+    if mode.fix() {
+        format!(
+            "AFNI_NIFTI_SCALE=NO keeps the {ty} data as stored, with {factor}: the output keeps \
+             scl_inter {inter} too, so its values are right; AFNI drops the intercept and its \
+             values are off by {inter}"
+        )
+    } else {
+        format!(
+            "AFNI_NIFTI_SCALE=NO keeps the {ty} data as stored, with {factor}, and drops \
+             scl_inter {inter}, as AFNI does: the values written are off by {inter}"
         )
     }
 }

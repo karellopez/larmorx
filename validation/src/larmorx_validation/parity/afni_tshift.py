@@ -642,6 +642,28 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
             {"env": (("AFNI_NIFTI_SCALE", "NO"),)},
         ),
         (
+            "nifti-scale-no-copy",
+            "AFNI_NIFTI_SCALE=NO on a copy of the input: the intercept dropped (AFNI-23)",
+            i16_si,
+            (),
+            {"env": (("AFNI_NIFTI_SCALE", "NO"),)},
+        ),
+        (
+            "nifti-scale-no-rlt",
+            "AFNI_NIFTI_SCALE=NO with -rlt: the trend takes the intercept away, nothing to correct",
+            i16_si,
+            (*tz, "-rlt"),
+            {"env": (("AFNI_NIFTI_SCALE", "NO"),)},
+        ),
+        (
+            "nifti-scale-no-rlt-ignore",
+            "AFNI_NIFTI_SCALE=NO with -rlt -ignore 2: the ignored volumes lose the intercept "
+            "(AFNI-23; corrected, read as without the variable)",
+            i16_si,
+            (*tz, "-rlt", "-ignore", "2"),
+            {"env": (("AFNI_NIFTI_SCALE", "NO"),)},
+        ),
+        (
             "type-warn-default",
             "AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines",
             f64,
@@ -1687,6 +1709,8 @@ def _run_separately(
     _expected_divergence(checks, case.id, implementation)
     if s.expect != "pass":
         return
+    if implementation == "replica" and not copy:
+        _check_python_settings(checks, s, image, pl)
     # The fix pass: larmorx's default on the same arguments, in a directory of its own.
     import nibabel as nib
 
@@ -1728,6 +1752,73 @@ def _run_separately(
             detail=f"fix: {entries}; reproduce: {reproduced_entries}",
         )
     _expected_divergence(checks, case.id, implementation)
+
+
+#: AFNI variables set in this process's environment while the Python API runs with
+#: ``afni_settings`` (:func:`_check_python_settings`): each would change the output if
+#: ``lx.afni.tshift`` passed the environment on (NIfTI-2, int16 kept, the tlrc view).
+_ENVIRONMENT_NOISE = {
+    "AFNI_NIFTI_WRITE_TYPE": "2",
+    "AFNI_NIFTI_SCALE": "NO",
+    "AFNI_NIFTI_VIEW": "tlrc",
+    "AFNI_NIFTI_PRIORITY": "Q",
+}
+
+#: The check that compares ``lx.afni.tshift(afni_settings=...)`` with the command line.
+PY_SETTINGS = "Python API with afni_settings: the command line's output"
+
+
+def _check_python_settings(checks: CheckList, s: Scenario, image: Path, cli_out: Path) -> None:
+    """A case of AFNI's variables through the Python API: ``lx.afni.tshift`` with the case's
+    variables and ``-D`` options as ``afni_settings`` gives the command line's output, while
+    this process's environment holds AFNI variables that would change it if they reached the
+    replica (:data:`_ENVIRONMENT_NOISE`; the Python API never reads the environment, CLAUDE.md
+    rule 6). Skipped where the Python API has no equivalent: the variables ``tshift`` sets
+    itself or does not take, other global options, AFNI 1D files."""
+    import larmorx as lx
+
+    if "{input}" in s.args:
+        return
+    settings = {name: value for name, value in s.env if value is not None}
+    rest: list[str] = []
+    for a in s.args:
+        if a.startswith("-D") and "=" in a:  # the -D wins over the environment, as in AFNI
+            name, value = a[2:].split("=", 1)
+            settings[name] = value
+        elif a in ("-overwrite", "-ok_1D_text", "-skip_afnirc"):
+            return
+        else:
+            rest.append(a)
+    kw = _python_call(s, rest)
+    if kw is None:
+        return
+    noisy = {**os.environ, **_ENVIRONMENT_NOISE}
+    try:
+        with _process_environment(noisy), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = lx.afni.tshift(
+                str(image),
+                implementation="replica",
+                upstream_defects="reproduce",
+                afni_settings=settings,
+                **kw,
+            )
+    except ValueError:  # a variable tshift sets itself or does not take, or an empty value
+        return
+    expected = lx.load(cli_out)
+    header = lx.io.read_header(cli_out)
+    differing = _differing(result.data, expected.data)
+    same_header = result.header.replace(vox_offset=header.vox_offset).to_bytes() == (
+        header.to_bytes()
+    )
+    checks(
+        PY_SETTINGS,
+        differing == 0 and same_header,
+        metric="differing values",
+        value=differing,
+        threshold=0,
+        detail=f"settings {settings}; header {'identical' if same_header else 'differs'}",
+    )
 
 
 def _produced(code: int, target: Path, occupied: bool) -> bool:
@@ -2104,6 +2195,15 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
         f"for bit (data and header). From an image in memory: {memory_ok} of {memory_n} give "
         "the same values."
     )
+    settings_ok, settings_n = python(PY_SETTINGS)
+    if settings_n:
+        lines.append(
+            "- Python API with AFNI's variables (`afni_settings=`, the case's variables and "
+            f"`-D` options), on the {settings_n} cases of AFNI's environment variables and "
+            f"global options it can express: {settings_ok} give the command line's output bit "
+            "for bit (data and header), with AFNI variables in the process environment that "
+            f"would change it if they reached the replica ({', '.join(_ENVIRONMENT_NOISE)})."
+        )
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     if messages:
         lines.append(

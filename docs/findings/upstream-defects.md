@@ -161,7 +161,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in both implementations (decided 2026-10-12; the original the same day): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1) | – |
 | AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | both implementations give x86-64's results on every platform (2026-10-12) | – |
 | AFNI-25 † | 3dTshift | `-ignore` as the last argument: a crash (exit 1 from AFNI's signal handler, with a crash banner) | a | none | "-ignore needs an argument!", exit 1, in both implementations and both modes | – |
-| AFNI-26 † | 3dTshift | a NIfTI output that cannot be created (missing or read-only directory): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
+| AFNI-26 † | 3dTshift | an output that cannot be opened for writing (a missing or read-only directory, a read-only file, a directory of that name): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -1893,17 +1893,31 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   still fail: Nipype checks that the output exists (`out_file`, `exists=True`,
   `nipype/interfaces/afni/base.py:145`; `FileNotFoundError` in `aggregate_outputs`,
   `nipype/interfaces/base/core.py:452-460`).
-- **larmorx:** both implementations exit 1 by default (the replica naming AFNI-26). The
-  replica's `reproduce` (2026-10-12) checks first whether AFNI's writer could open the file (an existing
-  file writable, a new one creatable; `larmorx_gpl_afni::cli::output::openable`), and where it
-  could not, prints the NIfTI library's message with the name AFNI gives, writes nothing,
-  prints `-verbose`'s line and exits 0: AFNI's exit status and messages byte for byte on a
-  missing and a read-only directory, `.nii` and `.nii.gz`, shifts and copies, relative,
-  `./` and absolute names, with `-overwrite` and with `-verbose` (`errors/missing-directory*`).
-  A write that fails after the file is opened (a full disk) stays an error in both modes:
-  AFNI's messages then depend on where it failed, and it may leave part of a file.
-- **D13 / gap:** the clean-room original's switch (item 5, decided: a switch for failures
-  too). The spec describes it (§7.1, "A failed write").
+- **More cases** (found by the clean-room implementer's black-box runs, 2026-10-12; read
+  since): a read-only file with `-overwrite` or `AFNI_DECONFLICT=O...`, a directory of the
+  output's name (AFNI's existing-output tests are `THD_is_file`, a regular file:
+  `thd_opendset.c:479`, `:493`, `3dTshift.c:539`, so a directory is no conflict, and renaming
+  can choose a directory's name), a renamed output that cannot be written. A one-row dataset
+  (AFNI-20) fails silently: AFNI's 1D text writer prints nothing.
+- **larmorx:** both implementations check, in both modes and changing nothing on disk, whether
+  AFNI's writer could open the output (a directory of that name; an existing file opened for
+  writing without truncation; a new one created and removed; only refusals count: not found,
+  not a directory, a directory, no permission, a read-only file system, and on Windows not a
+  file another program holds open, which the write waits for): the replica's
+  `larmorx_gpl_afni::cli::output::cannot_open`, the original's `larmorx_afni::output::cannot_open`
+  (2026-10-12). By default: an error, exit 1, naming AFNI-26 (the replica's default refused a
+  read-only file only where its rename failed until the same day: on Windows, after 2 s). With
+  the switch: the NIfTI library's message with the name AFNI gives (none for a one-row
+  dataset), nothing written, `-verbose`'s line, exit 0: AFNI's exit status and messages byte
+  for byte on missing and read-only directories, read-only files with `-overwrite` and
+  `AFNI_DECONFLICT`, a directory of the output's name, renaming onto one, `.nii` and `.nii.gz`,
+  shifts and copies, relative, `./` and absolute names, `-verbose` (`errors/missing-directory*`
+  in both records; the rest by hand). A write that fails after the file is opened (a full
+  disk) stays an error in both modes: AFNI's messages then depend on where it failed, and it
+  may leave part of a file. Not AFNI-26 but larmorx's own difference: an existing writable
+  output in a directory that cannot be written, with `-overwrite`, which AFNI rewrites in
+  place and larmorx cannot (its temporary file), an error in both modes.
+- **D13 / gap:** done (item 5, decided: a switch for failures too).
 
 ### AFNI-15 † The build races under `make -j` — (b)
 - **What:** AFNI's niml sub-make races in a parallel build; FSL's own `ld` on `PATH` also breaks

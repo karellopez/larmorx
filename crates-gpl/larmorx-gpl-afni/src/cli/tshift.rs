@@ -82,7 +82,7 @@ use crate::shift::Method;
 use crate::tpattern::{TpatternError, parse_tpattern};
 use crate::tshift::{Rlt, TshiftParams, fft_length, slice_shift, tshift};
 
-use super::output::{openable, replace_atomically};
+use super::output::{cannot_open, replace_atomically};
 use super::threads;
 
 /// The first `-verbose` line: which implementation runs (larmorx's addition, not AFNI's).
@@ -658,7 +658,7 @@ impl Output {
             )
             .into());
         }
-        if notices.fix() && self.rule == Deconflict::Refuse && self.path.exists() {
+        if notices.fix() && self.rule == Deconflict::Refuse && self.exists() {
             io.notice(&Notice::new(
                 &defects::AFNI_11,
                 notices.mode(),
@@ -683,9 +683,11 @@ impl Output {
 /// ([`Deconflict`]); refused, AFNI writes nothing, prints two errors and the run ends with
 /// status 0 (AFNI-11 reproduced), and the dataset keeps the free name AFNI found for it. With
 /// AFNI-12 reproduced, a name that `THD_write_nifti` refuses ([`output_name_ok`]) is not
-/// written either. A file that cannot be written is an error by default; AFNI ignores the
-/// write's result and exits with status 0 (AFNI-26), which `reproduce` gives where AFNI's
-/// writer cannot open the file ([`openable`]): its message, nothing written.
+/// written either. An output AFNI's writer cannot open ([`cannot_open`]: a missing or
+/// read-only directory, a read-only file, a directory of that name) is an error by default,
+/// naming AFNI-26; AFNI ignores the write's result and exits with status 0, which `reproduce`
+/// gives: the NIfTI library's message (none for a one-row dataset, whose 1D text writer says
+/// nothing, AFNI-20), nothing written. A write that fails later is an error in both modes.
 fn write(
     out: &Output,
     ds: &Dataset,
@@ -755,16 +757,29 @@ fn write(
         );
         written = false;
     }
-    if written
-        && notices.reproduce()
-        && let Err(e) = openable(&target)
-    {
+    if written && let Some(e) = cannot_open(&target) {
+        if notices.fix() {
+            io.notice(&Notice::new(
+                &defects::AFNI_26,
+                notices.mode(),
+                format!(
+                    "the output '{shown}' cannot be written ({e}): an error (exit status 1); \
+                     AFNI writes nothing and exits with status 0"
+                ),
+            ));
+            return Err(Fail::Fatal(format!(
+                "cannot open output file '{shown}' ({e}): nothing was written"
+            )));
+        }
         // `nifti_image_write_engine` (`nifti2_io.c:7908-7912`, `LNI_FERR`, a plain `fprintf`);
         // `THD_write_nifti` returns the failure and 3dTshift ignores it (`3dTshift.c:696`,
-        // `:709`).
-        io.raw(format!(
-            "** ERROR (nifti_image_write_engine): cannot open output file '{shown}'\n"
-        ));
+        // `:709`). AFNI's 1D text writer (AFNI-20, `THD_write_1D`) prints nothing.
+        let [_, ny, nz] = ds.nxyz;
+        if !(ny == 1 && nz == 1 && !settings.yes("AFNI_WRITE_1D_AS_PREFIX")) {
+            io.raw(format!(
+                "** ERROR (nifti_image_write_engine): cannot open output file '{shown}'\n"
+            ));
+        }
         notices.add(
             &defects::AFNI_26,
             format!(

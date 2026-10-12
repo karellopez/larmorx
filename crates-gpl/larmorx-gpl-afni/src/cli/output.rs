@@ -13,6 +13,7 @@
 //! A failed write also removes the temporary file. Names with blanks or non-ASCII characters
 //! need nothing special: the system's own path type is used throughout.
 
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -91,13 +92,37 @@ pub fn replace_atomically<E: std::fmt::Display>(
     Ok(())
 }
 
-/// Whether AFNI's NIfTI writer could open `target` (`znzopen(name, "wb")` in
-/// `nifti_image_write_engine`, `nifti2_io.c:7908`): an existing file must be writable, a new
-/// one creatable in its directory. Nothing changes: an existing file is opened without
-/// truncation, and a new one is removed again. Used to reproduce AFNI-26, where AFNI writes
-/// nothing and exits with status 0.
-pub fn openable(target: &Path) -> std::io::Result<()> {
-    if target.exists() {
+/// The failures that mean AFNI's NIfTI writer cannot open the output: a missing directory, a
+/// path through a file, a directory of the output's name, no permission, a read-only file
+/// system. On Windows a sharing or lock violation (another program holds the file open) is
+/// not one: the write waits for it ([`rename_with_retries`]).
+fn refuses(e: &std::io::Error) -> bool {
+    if cfg!(windows) && matches!(e.raw_os_error(), Some(32 | 33)) {
+        return false;
+    }
+    matches!(
+        e.kind(),
+        ErrorKind::NotFound
+            | ErrorKind::NotADirectory
+            | ErrorKind::IsADirectory
+            | ErrorKind::PermissionDenied
+            | ErrorKind::ReadOnlyFilesystem
+    )
+}
+
+/// Why AFNI's NIfTI writer could not open `target` (`znzopen(name, "wb")` in
+/// `nifti_image_write_engine`, `nifti2_io.c:7908`), if it could not: a directory of that name,
+/// an existing file that may not be written, or a new one that cannot be created in its
+/// directory. Nothing changes: an existing file is opened without truncation, and a new one is
+/// removed again. AFNI then writes nothing and exits with status 0 (AFNI-26).
+pub fn cannot_open(target: &Path) -> Option<std::io::Error> {
+    if target.is_dir() {
+        return Some(std::io::Error::new(
+            ErrorKind::IsADirectory,
+            "a directory of that name exists",
+        ));
+    }
+    let probe = if target.is_file() {
         std::fs::OpenOptions::new()
             .write(true)
             .open(target)
@@ -106,9 +131,10 @@ pub fn openable(target: &Path) -> std::io::Result<()> {
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(target)?;
-        std::fs::remove_file(target)
-    }
+            .open(target)
+            .and_then(|_| std::fs::remove_file(target))
+    };
+    probe.err().filter(refuses)
 }
 
 #[cfg(test)]
@@ -116,18 +142,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn openable_changes_nothing() {
+    fn cannot_open_changes_nothing() {
         let dir = tempfile::tempdir().unwrap();
         let new = dir.path().join("sübject out.nii");
-        openable(&new).unwrap();
+        assert!(cannot_open(&new).is_none());
         assert!(!new.exists(), "the probe's file is removed again");
         let old = dir.path().join("old.nii");
         std::fs::write(&old, "kept").unwrap();
-        openable(&old).unwrap();
+        assert!(cannot_open(&old).is_none());
         assert_eq!(std::fs::read(&old).unwrap(), b"kept", "not truncated");
         let missing = dir.path().join("no such directory").join("out.nii");
-        assert!(openable(&missing).is_err());
+        assert_eq!(cannot_open(&missing).unwrap().kind(), ErrorKind::NotFound);
         assert!(!dir.path().join("no such directory").exists());
+        let through_file = old.join("out.nii");
+        assert!(cannot_open(&through_file).is_some());
+        let a_directory = dir.path().join("out.nii");
+        std::fs::create_dir(&a_directory).unwrap();
+        assert_eq!(
+            cannot_open(&a_directory).unwrap().kind(),
+            ErrorKind::IsADirectory
+        );
+        // A read-only file (the read-only attribute on Windows), unless this user may write it
+        // anyway (root).
+        let mut readonly = std::fs::metadata(&old).unwrap().permissions();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&old, readonly.clone()).unwrap();
+        if std::fs::OpenOptions::new().write(true).open(&old).is_err() {
+            assert_eq!(
+                cannot_open(&old).unwrap().kind(),
+                ErrorKind::PermissionDenied
+            );
+        }
+        #[allow(clippy::permissions_set_readonly_false)]
+        readonly.set_readonly(false);
+        std::fs::set_permissions(&old, readonly).unwrap();
     }
 
     #[test]

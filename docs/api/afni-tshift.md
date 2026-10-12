@@ -281,7 +281,9 @@ AFNI_DECONFLICT=YES larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii
   Windows, while another program holds the output open (an antivirus scan, a viewer), the
   rename is retried for about 2 s; then the run fails with a message that names the file and
   says that nothing was written. Paths with blanks and non-ASCII characters work on every
-  system.
+  system. So the output's directory must allow creating a file: an existing output that can
+  be written, in a directory that cannot, is replaced in place by AFNI (with `-overwrite`) but
+  is an error in larmorx (exit 1, nothing written), in both modes and both implementations.
 - **`AFNI_NIFTI_SCALE=NO`** (AFNI-23, decided 2026-10-12). AFNI keeps uint8 and int16 data
   with both a slope and an intercept as integers, with the slope as their scale factor, and
   drops the intercept, so its output's values are off by the intercept. The variable is

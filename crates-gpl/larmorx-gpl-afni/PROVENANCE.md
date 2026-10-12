@@ -84,7 +84,7 @@ Changes from the originals are listed below and in each module's documentation.
 
 Not translations (written for larmorx-gpl, GPL-3.0-or-later): `x87` (the arithmetic of x86-64's
 `long double`, for the formulas of `nifti2_io.c` that use it) and `cli::output` (writing the
-output through a temporary file and a rename; `openable`, whether AFNI's NIfTI writer could
+output through a temporary file and a rename; `cannot_open`, whether AFNI's NIfTI writer could
 open the output, for AFNI-26).
 
 ## glibc files translated (`glibc_sincosf`)

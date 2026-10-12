@@ -235,6 +235,39 @@ fn tshift_upstream_defects_switch() {
         "{err}"
     );
     assert!(!dir.path().join("nodir").exists());
+    // A read-only output with -overwrite (the read-only attribute on Windows), which AFNI's
+    // writer cannot open either: an error naming AFNI-26, the file kept (unless this user may
+    // write it anyway, as root may).
+    let readonly = dir.path().join("readonly.nii");
+    std::fs::write(&readonly, "kept").unwrap();
+    let mut permissions = std::fs::metadata(&readonly).unwrap().permissions();
+    permissions.set_readonly(true);
+    std::fs::set_permissions(&readonly, permissions.clone()).unwrap();
+    if std::fs::OpenOptions::new()
+        .write(true)
+        .open(&readonly)
+        .is_err()
+    {
+        let input = input.to_str().unwrap();
+        let args = [
+            "-overwrite",
+            "-tpattern",
+            "alt+z",
+            "-prefix",
+            "readonly.nii",
+            input,
+        ];
+        let (code, err) = tshift_in(dir.path(), &args, &[]);
+        assert_eq!(code, Some(1), "{err}");
+        assert!(
+            err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+            "{err}"
+        );
+        assert_eq!(std::fs::read(&readonly).unwrap(), b"kept");
+    }
+    #[allow(clippy::permissions_set_readonly_false)]
+    permissions.set_readonly(false);
+    std::fs::set_permissions(&readonly, permissions).unwrap();
     // Only an output that cannot be opened: a writable one is written as before.
     let (code, err) = run("plain-reproduced.nii", Some("reproduce"));
     assert_eq!(code, Some(0), "{err}");

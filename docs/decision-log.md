@@ -710,19 +710,24 @@ Decided by the user on the questions the defect register raised
   behaviours. GPL golden: two new cases (`3dTshift.linear.float32-nearly-plumb` and
   `.reproduce`), no checksum changed.
 
-## 2026-10-12: AFNI's global options and environment variables in both 3dTshift implementations
-- **Decided by the user:** both implementations accept AFNI's global options `-overwrite` and
-  `-Dname=value`, anywhere on the command line as AFNI does, working identically on Linux,
-  macOS and Windows.
-  - `-overwrite`: write to a temporary file in the output's directory, then rename it over
-    the target; on Windows retry the rename briefly while another program holds the file, then
-    fail with a clear message, never leaving a partial file; paths with blanks and non-ASCII
-    names work.
-  - `-Dname=value`: **never modify the process environment** (`std::env::set_var` is unsafe in
-    multithreaded Rust). Each `-D` goes into an explicit table of settings passed to the tool;
-    the real environment is read into the same table, `-D` winning as in AFNI. Every variable
-    3dTshift's code path consults is implemented explicitly and listed; a `-D` of a variable
-    AFNI would not consult is accepted with a short notice that it has no effect.
+## 2026-10-12: AFNI's global options, the same on every platform
+- **User decision:** both larmorx 3dTshift implementations accept AFNI's global options
+  `-overwrite` and `-Dname=value` anywhere on the command line, working identically on Linux,
+  macOS and Windows. The user asked how to make that portable; the design:
+  - **`-overwrite`:** write to a temporary file in the output's directory, then rename it over
+    the target (`std::fs::rename` replaces on all three systems). On Windows, retry briefly while
+    another program holds the file (antivirus, viewers), then fail clearly. Never leave a
+    partial file.
+  - **`-Dname=value`:** never modify the process environment (unsafe in multithreaded Rust).
+    Parse the options into an explicit settings table passed to the tool. Read the real
+    environment into the same table, with `-D` winning as in AFNI. Implement each AFNI variable
+    that 3dTshift's path consults explicitly; any other variable gets a notice that it has no
+    effect.
+  - Tiny tests in CI prove both work on all six platforms.
+- **Order:** the replica and the spec (replica author), then the clean-room original from the
+  spec, together with spec §6.1-6.5.
+
+## 2026-10-12: Completing 3dTshift, part 2a: AFNI's global options and variables in the replica
 - **Part 2a done** (2026-10-12, replica author): the replica takes `-overwrite`,
   `-Dname=value`, `-ok_1D_text` and `-skip_afnirc`, and reads every variable 3dTshift
   consults (found in the source, confirmed by tracing the oracle's `getenv` calls; each one

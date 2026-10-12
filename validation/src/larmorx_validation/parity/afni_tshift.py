@@ -2210,7 +2210,7 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
             f"`-D` options), on the {settings_n} cases of AFNI's environment variables and "
             f"global options it can express: {settings_ok} give the command line's output bit "
             "for bit (data and header), with AFNI variables in the process environment that "
-            f"would change it if they reached the replica ({', '.join(_ENVIRONMENT_NOISE)})."
+            f"would change it if the call read the environment ({', '.join(_ENVIRONMENT_NOISE)})."
         )
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     if messages:

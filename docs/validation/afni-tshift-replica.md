@@ -1,6 +1,6 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 311 cases on the `standard` tier: 279 pass, 29 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 314 cases on the `standard` tier: 279 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
@@ -13,7 +13,7 @@
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 - Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
 - Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if the call read the environment (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
-- **AFNI's global options and environment variables** (categories `global` and `environment`, 60 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 60 of 60 identical.
+- **AFNI's global options and environment variables** (categories `global` and `environment`, 63 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 63 of 63 identical.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
@@ -59,7 +59,7 @@
 | defects | 8 | 8 | 0 | 0 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | environment | 34 | 29 | 4 | 1 | 0 |
-| errors | 18 | 0 | 18 | 0 | 0 |
+| errors | 21 | 0 | 21 | 0 | 0 |
 | geometry | 3 | 3 | 0 | 0 | 0 |
 | global | 26 | 19 | 7 | 0 | 0 |
 | header-timing | 13 | 13 | 0 | 0 | 0 |
@@ -110,12 +110,15 @@
 | `environment/input-with-blank` | an input in a directory with a blank: AFNI reads a list of datasets and fails (AFNI-18) | AFNI exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii'; larmorx exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/wi… |
 | `environment/1D-text-error` | text in the -tpattern file: AFNI's parse error | AFNI exit 1: ** FATAL ERROR: Can't read tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Can't read tpattern file st.1D (the same messages) |
 | `environment/use-fgets` | AFNI_USE_FGETS=YES: a file with CR line ends is one row, of 8 values (9 > TR) | AFNI exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D (the same messages) |
+| `errors/missing-directory` | an output in a missing directory: nothing written, exit 0 (AFNI-26) | AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open out… |
+| `errors/missing-directory-copy` | the same for a copy of the input (AFNI-26) | AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open out… |
+| `errors/missing-directory-verbose` | the same with -verbose, whose last line names the file not written (AFNI-26) | AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open out… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4c6cd3ac13dc) |
+| larmorx | 0.0.1 (2644219f8f44) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -416,6 +419,9 @@ Both programs read the same files with the same arguments; outputs are read with
 | `environment/nifti-noext` | pass | 17/17 | AFNI_NIFTI_NOEXT=YES: AFNI writes no header extension, as larmorx: the whole file |
 | `environment/one-row-dataset` | expected-divergence | 3/4 | a dataset of one row: AFNI writes a 1D text file under the NIfTI name (AFNI-20) |
 | `environment/write-1D-as-prefix` | pass | 16/16 | AFNI_WRITE_1D_AS_PREFIX=YES: a dataset of one row is written as NIfTI |
+| `errors/missing-directory` | both-error | 2/2 | an output in a missing directory: nothing written, exit 0 (AFNI-26) |
+| `errors/missing-directory-copy` | both-error | 2/2 | the same for a copy of the input (AFNI-26) |
+| `errors/missing-directory-verbose` | both-error | 2/2 | the same with -verbose, whose last line names the file not written (AFNI-26) |
 | `global/D-nifti-priority-Q` | pass | 16/16 | -DAFNI_NIFTI_PRIORITY=Q: as the environment variable |
 | `global/D-nifti-view-tlrc` | pass | 16/16 | -DAFNI_NIFTI_VIEW=TLRC: as the environment variable |
 | `global/D-write-type-2` | pass | 16/16 | -DAFNI_NIFTI_WRITE_TYPE=2: as the environment variable |

@@ -1033,7 +1033,13 @@ def _rerun_resample(s: rn.Settings, node: Node, out_file: str) -> dict[str, Any]
     if directory.exists():
         shutil.rmtree(directory)
     directory.mkdir(parents=True)
-    inputs = {k: v for k, v in ((k, _value(v)) for k, v in node.inputs.items()) if v is not None}
+    # an empty list (``inverse : []`` of a node without transforms) is left to the interface's
+    # default: nipype turns an empty list given to a multi-object input into Undefined
+    inputs = {
+        k: v
+        for k, v in ((k, _value(v)) for k, v in node.inputs.items())
+        if v is not None and v != []
+    }
     # The node's own num_threads (in ``inputs``), and OMP_NUM_THREADS=1 as fMRIPrep's image
     # sets it: with more, the concurrent volumes' OpenBLAS calls race and corrupt the output
     # (docs/findings/fmriprep-oracle.md).

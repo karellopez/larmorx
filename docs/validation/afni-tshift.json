@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "c479c1ae933e",
+  "larmorx_commit": "4c6cd3ac13dc",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,7 +22,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.078,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -32,7 +32,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -82,7 +82,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -102,7 +102,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -112,7 +112,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -202,7 +202,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -252,7 +252,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -262,7 +262,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -282,7 +282,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -292,7 +292,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -302,7 +302,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -322,7 +322,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -342,7 +342,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.11,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -352,7 +352,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -372,7 +372,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -382,7 +382,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -402,7 +402,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -412,7 +412,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -422,7 +422,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -432,7 +432,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -452,7 +452,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -482,7 +482,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -502,7 +502,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -512,7 +512,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -522,7 +522,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -532,7 +532,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -542,7 +542,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -562,7 +562,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -572,7 +572,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -582,7 +582,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -592,7 +592,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -612,7 +612,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -632,7 +632,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -642,7 +642,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -652,7 +652,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -682,7 +682,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -692,7 +692,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -702,7 +702,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -722,7 +722,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -732,7 +732,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -762,7 +762,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -792,7 +792,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -802,7 +802,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -812,7 +812,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -832,7 +832,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -842,7 +842,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -872,7 +872,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -892,7 +892,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -922,7 +922,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -932,7 +932,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -952,7 +952,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -972,7 +972,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -992,7 +992,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1002,7 +1002,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1012,7 +1012,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1022,7 +1022,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1032,7 +1032,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1052,7 +1052,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1072,7 +1072,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1092,7 +1092,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1122,7 +1122,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1152,7 +1152,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1162,7 +1162,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1172,7 +1172,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1182,7 +1182,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1192,7 +1192,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1202,7 +1202,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1212,7 +1212,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -1232,7 +1232,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1272,7 +1272,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1282,7 +1282,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1292,7 +1292,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1302,7 +1302,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1312,7 +1312,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1322,7 +1322,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1332,7 +1332,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1342,7 +1342,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1362,7 +1362,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1372,7 +1372,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1392,7 +1392,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1402,7 +1402,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1422,7 +1422,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1442,7 +1442,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1462,7 +1462,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1482,7 +1482,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1512,7 +1512,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1522,7 +1522,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1532,7 +1532,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1552,7 +1552,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1572,7 +1572,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1592,7 +1592,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1612,7 +1612,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1622,7 +1622,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1632,7 +1632,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1672,7 +1672,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1682,7 +1682,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1692,7 +1692,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1702,7 +1702,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1712,7 +1712,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1722,7 +1722,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1732,7 +1732,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1742,7 +1742,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1752,7 +1752,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1762,7 +1762,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1782,7 +1782,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1822,7 +1822,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -1832,7 +1832,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1862,7 +1862,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1872,7 +1872,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1882,7 +1882,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1898,29 +1898,12 @@
   {
    "case": "header-timing/code2-beyond-tr",
    "category": "header-timing",
-   "checks_passed": 11,
-   "checks_total": 13,
-   "failed_checks": [
-    {
-     "detail": "no defect named: no values; header slice_code changed",
-     "metric": "values changed by the corrections",
-     "name": "D13 fix pass",
-     "passed": false,
-     "threshold": "reported (named iff changed)",
-     "value": 0
-    },
-    {
-     "detail": "fix: []; reproduce: ['AFNI-03']",
-     "metric": "exact",
-     "name": "D13 notices in both modes",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the original's default writes the corrected copy but does not name AFNI-03 when the corrected slice times exceed the TR (its reproduce output is AFNI's)",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
    "seconds": 0.019,
-   "status": "expected-divergence"
+   "status": "pass"
   },
   {
    "case": "header-timing/code3-no-slice-dim",
@@ -1929,7 +1912,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1949,7 +1932,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1969,7 +1952,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1989,7 +1972,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2005,178 +1988,82 @@
   {
    "case": "defects/oblique-metre",
    "category": "defects",
-   "checks_passed": 10,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (sform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "3.2e+00"
-    }
-   ],
-   "reason": "AFNI writes an oblique sform in metres as it is (only the voxel sizes are converted); the original converts its linear part to millimetres in reproduce mode too (AFNI-07). Its default, which converts the whole matrix, is the replica's",
-   "seconds": 0.017,
-   "status": "expected-divergence"
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "defects/tiny-offsets-copy",
    "category": "defects",
-   "checks_passed": 10,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "slice_code: AFNI 0, larmorx 1; slice_end: AFNI 0, larmorx 3; slice_duration: AFNI 0.0, larmorx 0.0005000000237487257",
-     "metric": "exact",
-     "name": "header fields (scaling, timing, slice fields, units, xform codes)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the kept slice times, all within 3 ms of 0: none; the original keeps the header's code 1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "geometry/slightly-oblique",
    "category": "geometry",
-   "checks_passed": 9,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (sform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    },
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (qform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    }
-   ],
-   "reason": "AFNI writes the plumb matrix of a grid less than about 0.014\u00b0 from plumb (its 0.01\u00b0 test, in float); the original keeps the input's matrix (4e-4 mm apart here)",
-   "seconds": 0.016,
-   "status": "expected-divergence"
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "geometry/slightly-oblique-qform",
    "category": "geometry",
-   "checks_passed": 9,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (sform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    },
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (qform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    }
-   ],
-   "reason": "AFNI writes the plumb matrix of a qform less than about 0.014\u00b0 from plumb (AFNI-16); the original keeps the input's matrix",
-   "seconds": 0.016,
-   "status": "expected-divergence"
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "geometry/slightly-oblique-metre",
    "category": "geometry",
-   "checks_passed": 9,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (sform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    },
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (qform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "4.0e-04"
-    }
-   ],
-   "reason": "AFNI writes the plumb matrix (AFNI-16), its steps in millimetres and its origin in metres (AFNI-07); the original keeps the tilt",
-   "seconds": 0.016,
-   "status": "expected-divergence"
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
   },
   {
    "case": "defects/oblique-metre-zero-origin",
    "category": "defects",
-   "checks_passed": 10,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |diff| (mm)",
-     "name": "geometry (sform)",
-     "passed": false,
-     "threshold": "1e-06",
-     "value": "3.2e+00"
-    }
-   ],
-   "reason": "AFNI writes an oblique sform in metres as it is (AFNI-07); the original converts its linear part to millimetres in reproduce mode too",
-   "seconds": 0.017,
-   "status": "expected-divergence"
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
   },
   {
    "case": "copy/short-slice-spacing",
    "category": "copy",
-   "checks_passed": 10,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "slice_start: AFNI 1, larmorx 0",
-     "metric": "exact",
-     "name": "header fields (scaling, timing, slice fields, units, xform codes)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 here; the original writes the header's fields back (slice_start 0)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "copy/alt-two-slices",
    "category": "copy",
-   "checks_passed": 10,
-   "checks_total": 11,
-   "failed_checks": [
-    {
-     "detail": "slice_code: AFNI 1, larmorx 3",
-     "metric": "exact",
-     "name": "header fields (scaling, timing, slice fields, units, xform codes)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "AFNI derives the slice fields of a copy from the times: two slices are slice code 1; the original writes the header's code 3 back",
-   "seconds": 0.016,
-   "status": "expected-divergence"
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "copy/no-timing-int16",
@@ -2185,7 +2072,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2205,7 +2092,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2235,7 +2122,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2254,7 +2141,7 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** FATAL ERROR: found -no_detrend, changing default to -heptic; larmorx: ** FATAL ERROR: -no_detrend needs a non-Fourier method given before it (e.g. -heptic -no_detrend)",
+   "reason": "AFNI: ** FATAL ERROR: found -no_detrend, changing default to -heptic; larmorx: ** FATAL ERROR: found -no_detrend, changing default to -heptic",
    "seconds": 0.003,
    "status": "both-error"
   },
@@ -2265,7 +2152,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: cannot use both -rlt and -no_detrend; larmorx: ** FATAL ERROR: cannot use both -rlt and -no_detrend",
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -2274,7 +2161,7 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** ERROR: Unknown tpattern = ALT+Z; larmorx: ** FATAL ERROR: Unknown tpattern = ALT+Z",
+   "reason": "AFNI: ** ERROR: Unknown tpattern = ALT+Z; larmorx: ** ERROR: Unknown tpattern = ALT+Z",
    "seconds": 0.004,
    "status": "both-error"
   },
@@ -2344,8 +2231,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D: can't read 1D file <tmp>/none.1D: No such file or directory (os error 2)",
-   "seconds": 0.037,
+   "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D",
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -2354,8 +2241,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but the dataset has 4 slices",
-   "seconds": 0.004,
+   "reason": "AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices",
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -2365,7 +2252,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.004,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -2375,7 +2262,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.004,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -2384,8 +2271,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D: 1D text <tmp>/st.1D: 'abc' is not a number",
-   "seconds": 0.005,
+   "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D",
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -2394,8 +2281,8 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii': <generated>/does-not-exist.nii: No such file or directory (os error 2)",
-   "seconds": 0.004,
+   "reason": "AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'",
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -2404,1306 +2291,519 @@
    "checks_passed": 0,
    "checks_total": 0,
    "failed_checks": [],
-   "reason": "AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** FATAL ERROR: output dataset name '<tmp>/out.nii' conflicts with existing file",
-   "seconds": 0.007,
+   "reason": "AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** ERROR: dataset NOT written to disk!",
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
    "case": "errors/prefix-with-blank",
    "category": "errors",
    "checks_passed": 0,
-   "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "AFNI exit 1: ** FATAL ERROR: illegal value '<tmp>/afni-out put.nii' after -prefix; larmorx exit 0: ",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "expected an error from both",
-     "metric": "exact",
-     "name": "both reject the arguments",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too (no switch for AFNI-12)",
-   "seconds": 0.004,
-   "status": "expected-divergence"
+   "checks_total": 0,
+   "failed_checks": [],
+   "reason": "AFNI: ** FATAL ERROR: illegal value '<tmp>/afni-out put.nii' after -prefix; larmorx: ** FATAL ERROR: illegal value '<tmp>/larmorx-out put.nii' after -prefix",
+   "seconds": 0.005,
+   "status": "both-error"
   },
   {
    "case": "global/overwrite-after-dataset",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: output dataset name 'out.nii' conflicts with existing file",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.034,
+   "status": "pass"
   },
   {
    "case": "global/overwrite-as-option-value",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: larmorx writes NIfTI only: give -prefix name.nii or name.nii.gz",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
   },
   {
    "case": "global/overwrite-copy",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m*+ WARNING:\\x1b[0m dataset is already aligned in time!', larmorx '** FATAL ERROR: Unknown option: -overwrite'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: ==>> output dataset is just a copy of input dataset; larmorx exit 1: ** FATAL ERROR: Unknown option: -overwrite",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "global/overwrite-no-existing-file",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -overwrite",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.046,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "global/overwrite-then-D",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: changed output dataset name from 'out.nii' to 'out_AA1.nii'; larmorx exit 1: ** FATAL ERROR: Unknown option: -overwrite",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "global/D-deconflict-yes",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: changed output dataset name from 'out.nii' to 'out_AA1.nii'; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_DECONFLICT=YES",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "global/D-deconflict-no",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI \"\\x1b[7m** FATAL ERROR:\\x1b[0m output dataset already exists './out.nii'\", larmorx '** FATAL ERROR: Unknown option: -DAFNI_DECONFLICT=NO'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: output dataset already exists './out.nii'; larmorx exit 1: ** FATAL ERROR: output dataset already exists './out.nii' (the same messages)",
+   "seconds": 0.006,
+   "status": "both-error"
   },
   {
    "case": "global/D-wins-over-environment",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: Over-writing dataset ./out.nii; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_DECONFLICT=OVERWRITE",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "global/D-arbitrary-filenames",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES=YES",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "global/D-after-dataset",
    "category": "global",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
   },
   {
    "case": "global/D-as-option-value",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: larmorx writes NIfTI only: give -prefix name.nii or name.nii.gz",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "global/D-value-with-blank",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "global/D-blank-before-value",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI \"\\x1b[7m** FATAL ERROR:\\x1b[0m illegal value 'out put.nii' after -prefix\", larmorx '** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES= YES'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.003,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
+   "seconds": 0.006,
+   "status": "both-error"
   },
   {
    "case": "global/D-empty-value",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI \"\\x1b[7m** FATAL ERROR:\\x1b[0m illegal value 'out put.nii' after -prefix\", larmorx '** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES='",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
+   "seconds": 0.009,
+   "status": "both-error"
   },
   {
    "case": "global/D-empty-name",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI \"\\x1b[7m** FATAL ERROR:\\x1b[0m illegal value 'out put.nii' after -prefix\", larmorx '** FATAL ERROR: Unknown option: -D=YES'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
    "seconds": 0.005,
-   "status": "expected-divergence"
+   "status": "both-error"
   },
   {
    "case": "global/D-without-equals",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m** FATAL ERROR:\\x1b[0m Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES', larmorx '** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES (the same messages)",
+   "seconds": 0.003,
+   "status": "both-error"
   },
   {
    "case": "global/D-alone",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m** FATAL ERROR:\\x1b[0m Unknown option: -D', larmorx '** FATAL ERROR: Unknown option: -D'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.006,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -D; larmorx exit 1: ** FATAL ERROR: Unknown option: -D (the same messages)",
+   "seconds": 0.005,
+   "status": "both-error"
   },
   {
    "case": "global/D-lowercase",
    "category": "global",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m** FATAL ERROR:\\x1b[0m Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES', larmorx '** FATAL ERROR: Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES; larmorx exit 1: ** FATAL ERROR: Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES (the same messages)",
+   "seconds": 0.004,
+   "status": "both-error"
   },
   {
    "case": "global/D-message-prefix-with-blank",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stderr line 1: AFNI 'a=b::\\x1b[7m*+ WARNING:\\x1b[0m dataset is already aligned in time!', larmorx '** FATAL ERROR: Unknown option: -DAFNI_MESSAGE_PREFIX=a b'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: a=b::*+ WARNING: ==>> output dataset is just a copy of input dataset; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_MESSAGE_PREFIX=a b",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
   },
   {
    "case": "global/D-unknown-variable",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_NOT_A_VARIABLE=1",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "global/ok-1D-text",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.625', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -ok_1D_text",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "global/skip-afnirc",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -skip_afnirc",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "environment/deconflict-overwrite",
    "category": "environment",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: Over-writing dataset ./out.nii; larmorx exit 1: ** FATAL ERROR: output dataset name 'out.nii' conflicts with existing file",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/deconflict-yes",
    "category": "environment",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: changed output dataset name from 'out.nii' to 'out_AA1.nii'; larmorx exit 1: ** FATAL ERROR: output dataset name 'out.nii' conflicts with existing file",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.027,
+   "status": "pass"
   },
   {
    "case": "environment/deconflict-no-copy",
    "category": "environment",
-   "checks_passed": 0,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m*+ WARNING:\\x1b[0m dataset is already aligned in time!', larmorx \"** FATAL ERROR: output dataset name 'out.nii' conflicts with existing file\"",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
+   "failed_checks": [],
+   "reason": "AFNI exit 0: ** ERROR: dataset NOT written to disk!; larmorx exit 0: ** ERROR: dataset NOT written to disk! (the same messages)",
    "seconds": 0.006,
-   "status": "expected-divergence"
+   "status": "both-error"
   },
   {
    "case": "environment/arbitrary-filenames",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "environment/input-with-blank",
    "category": "environment",
-   "checks_passed": 0,
-   "checks_total": 4,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 1,
-     "value": 0
-    },
-    {
-     "detail": "stderr line 1: AFNI \"\\x1b[7m*+ WARNING:\\x1b[0m THD_open_tcat: can't open dataset <generated>/with\", larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii'; larmorx exit 0: ",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "expected an error from both",
-     "metric": "exact",
-     "name": "both reject the arguments",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii'; larmorx exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii' (the same messages)",
+   "seconds": 0.012,
+   "status": "both-error"
   },
   {
    "case": "environment/path-spaces-ok",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-priority-Q",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-priority-illegal",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-scale-no",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-scale-no-copy",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m*+ WARNING:\\x1b[0m dataset is already aligned in time!', larmorx '*+ WARNING: dataset is already aligned in time!'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-scale-no-rlt",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-scale-no-rlt-ignore",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
   },
   {
    "case": "environment/type-warn-default",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
   },
   {
    "case": "environment/type-warn-yes",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-view-tlrc",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.016,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/default-std-space",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/sform-code-7",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.015,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.024,
+   "status": "pass"
   },
   {
    "case": "environment/write-type-2",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "environment/allow-milliseconds",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 750', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "environment/1D-zero-text",
    "category": "environment",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.625', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Can't read tpattern file st.1D: 1D text st.1D: 'abc' is not a number",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "environment/1D-text-error",
    "category": "environment",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '', larmorx \"** FATAL ERROR: Can't read tpattern file st.1D: 1D text st.1D: 'abc' is not a number\"",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Can't read tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Can't read tpattern file st.1D (the same messages)",
    "seconds": 0.005,
-   "status": "expected-divergence"
+   "status": "both-error"
   },
   {
    "case": "environment/use-fgets",
    "category": "environment",
-   "checks_passed": 1,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "stderr line 1: AFNI '\\x1b[7m** FATAL ERROR:\\x1b[0m Illegal value 9 in tpattern file st.1D', larmorx '** FATAL ERROR: Illegal value 9 in tpattern file st.1D'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "failed_checks": [],
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D (the same messages)",
+   "seconds": 0.004,
+   "status": "both-error"
   },
   {
    "case": "environment/cr-line-ends",
    "category": "environment",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "environment/realpath",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.019,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.026,
+   "status": "pass"
   },
   {
    "case": "environment/norealpath",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "environment/oblique-warning",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.018,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
   },
   {
    "case": "environment/no-oblique-warning",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "environment/message-prefix",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ opening input dataset header', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "environment/message-colorize-no",
@@ -3712,243 +2812,107 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
    "case": "environment/echo-commandline",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "environment/quiet-startup",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
   },
   {
    "case": "environment/nifti-noext",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
   },
   {
    "case": "environment/one-row-dataset",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
+   "checks_passed": 3,
+   "checks_total": 4,
    "failed_checks": [
     {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0', larmorx '(nothing)'",
+     "detail": "it starts with b'# <AFNI_3D_dataset\\n#  self_idc'",
      "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
+     "name": "AFNI's output is NIfTI",
      "passed": false,
      "threshold": null,
      "value": null
     }
    ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.009,
+   "reason": "AFNI writes a dataset of one row as a 1D text file under the NIfTI name, with a random identifier (AFNI-20, unless AFNI_WRITE_1D_AS_PREFIX is YES); larmorx writes NIfTI in both modes, as AFNI does with that variable set (environment/write-1D-as-prefix)",
+   "seconds": 0.008,
    "status": "expected-divergence"
   },
   {
    "case": "environment/write-1D-as-prefix",
    "category": "environment",
-   "checks_passed": 2,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.013,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.018,
+   "status": "pass"
   },
   {
    "case": "global/D-nifti-priority-Q",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: *+ WARNING: NIfTI('<generated>/sq.nii'): Qform/Sform handedness differ; Q wins!; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_NIFTI_PRIORITY=Q",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.011,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
   },
   {
    "case": "global/D-nifti-view-tlrc",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_NIFTI_VIEW=TLRC",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.011,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
   },
   {
    "case": "global/D-write-type-2",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_NIFTI_WRITE_TYPE=2",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.012,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
   },
   {
    "case": "global/D-nifti-scale-no",
    "category": "global",
-   "checks_passed": 0,
-   "checks_total": 3,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "exit status",
-     "name": "exit status",
-     "passed": false,
-     "threshold": 0,
-     "value": 1
-    },
-    {
-     "detail": "stdout line 1: AFNI '++ updating time offset to 0.75', larmorx '(nothing)'",
-     "metric": "exact",
-     "name": "messages: AFNI's, byte for byte",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "AFNI exit 0: ++ 3dTshift: AFNI version=AFNI_25.2.09 (Oct  9 2026) [64-bit]; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_NIFTI_SCALE=NO",
-     "metric": "exact",
-     "name": "both succeed",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) or read AFNI's environment variables yet: specs/3dTshift.md \u00a77.1 describes them for it (completing 3dTshift, part 2b)",
-   "seconds": 0.011,
-   "status": "expected-divergence"
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
   },
   {
    "case": "divergence/afni-format-output",
@@ -3957,7 +2921,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format.",
-   "seconds": 0.036,
+   "seconds": 0.045,
    "status": "expected-divergence"
   },
   {
@@ -3967,7 +2931,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "-voxshift is not supported by larmorx (fMRIPrep does not use it).",
-   "seconds": 0.015,
+   "seconds": 0.016,
    "status": "expected-divergence"
   },
   {
@@ -3987,7 +2951,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.207,
+   "seconds": 1.234,
    "status": "pass"
   },
   {
@@ -3997,7 +2961,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.208,
+   "seconds": 1.219,
    "status": "pass"
   },
   {
@@ -4007,7 +2971,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.836,
+   "seconds": 2.707,
    "status": "pass"
   },
   {
@@ -4017,7 +2981,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.505,
+   "seconds": 11.825,
    "status": "pass"
   },
   {
@@ -4027,7 +2991,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.37,
+   "seconds": 12.152,
    "status": "pass"
   },
   {
@@ -4037,7 +3001,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.422,
+   "seconds": 12.588,
    "status": "pass"
   },
   {
@@ -4047,7 +3011,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.955,
+   "seconds": 8.04,
    "status": "pass"
   },
   {
@@ -4057,7 +3021,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 34.937,
+   "seconds": 36.184,
    "status": "pass"
   },
   {
@@ -4067,7 +3031,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.659,
+   "seconds": 11.671,
    "status": "pass"
   },
   {
@@ -4077,7 +3041,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 286.726,
+   "seconds": 284.914,
    "status": "pass"
   },
   {
@@ -4087,7 +3051,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.213,
+   "seconds": 10.029,
    "status": "pass"
   },
   {
@@ -4097,7 +3061,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 9.879,
+   "seconds": 9.909,
    "status": "pass"
   },
   {
@@ -4107,7 +3071,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.224,
+   "seconds": 10.234,
    "status": "pass"
   },
   {
@@ -4117,7 +3081,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.404,
+   "seconds": 10.177,
    "status": "pass"
   },
   {
@@ -4127,7 +3091,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.265,
+   "seconds": 11.521,
    "status": "pass"
   },
   {
@@ -4137,7 +3101,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 13.677,
+   "seconds": 12.87,
    "status": "pass"
   },
   {
@@ -4147,7 +3111,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.441,
+   "seconds": 11.414,
    "status": "pass"
   },
   {
@@ -4157,7 +3121,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 9.012,
+   "seconds": 9.137,
    "status": "pass"
   },
   {
@@ -4167,16 +3131,16 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.055,
+   "seconds": 0.052,
    "status": "pass"
   }
  ],
  "suite": "afni-tshift",
  "summary": {
-  "both-error": 17,
-  "expected-divergence": 71,
+  "both-error": 29,
+  "expected-divergence": 3,
   "fail": 0,
-  "pass": 223,
+  "pass": 279,
   "skipped": 0
  },
  "tier": "standard"

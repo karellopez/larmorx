@@ -1280,77 +1280,82 @@ def _replica_program(implementation: str):
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
 
+#: AFNI-20, kept by design in both implementations: AFNI's 1D text file holds a random
+#: identifier, so neither reproduces it.
+_ONE_ROW = (
+    frozenset({"AFNI's output is NIfTI"}),
+    "AFNI writes a dataset of one row as a 1D text file under the NIfTI name, with a random "
+    "identifier (AFNI-20, unless AFNI_WRITE_1D_AS_PREFIX is YES); larmorx writes NIfTI in both "
+    "modes, as AFNI does with that variable set (environment/write-1D-as-prefix)",
+)
+
 #: Cases where an implementation is known to differ from AFNI in ``reproduce`` mode, or to name
 #: the wrong defects in its default (the fix pass): the checks that differ, and why. Once the
-#: implementation matches, the case passes as usual. The replica has none (its two unit cases,
-#: an expected divergence until 2026-10-12, now pass). The clean-room original's are
-#: behaviours that ``specs/3dTshift.md`` did not describe, found by black-box runs of AFNI
-#: 25.2.09 on D13's cases (2026-10-12); the spec describes them since 2026-10-12 (§6.1-6.4), for
-#: the original to follow.
+#: implementation matches, the case passes as usual. Both implementations have one, AFNI-20.
+#: The replica's two unit cases were expected divergences until 2026-10-12. The clean-room
+#: original had 10 more and the 59 cases of AFNI's global options and environment variables
+#: until 2026-10-12 (completing 3dTshift, part 2b), when it implemented spec §6.1-6.5 and §7.1;
+#: the old list is kept in ``_ORIGINAL_BEFORE_PART_2B`` for the record.
 DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
-    "replica": {
-        "environment/one-row-dataset": (
-            frozenset({"AFNI's output is NIfTI"}),
-            "AFNI writes a dataset of one row as a 1D text file under the NIfTI name, with a "
-            "random identifier (AFNI-20, unless AFNI_WRITE_1D_AS_PREFIX is YES); larmorx writes "
-            "NIfTI in both modes, as AFNI does with that variable set "
-            "(environment/write-1D-as-prefix)",
-        ),
-    },
-    "original": {
-        "defects/oblique-metre": (
-            frozenset({"geometry (sform)"}),
-            "AFNI writes an oblique sform in metres as it is (only the voxel sizes are "
-            "converted); the original converts its linear part to millimetres in reproduce mode "
-            "too (AFNI-07). Its default, which converts the whole matrix, is the replica's",
-        ),
-        "defects/tiny-offsets-copy": (
-            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
-            "AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the "
-            "kept slice times, all within 3 ms of 0: none; the original keeps the header's code "
-            "1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08",
-        ),
-        "geometry/slightly-oblique": (
-            frozenset({"geometry (sform)", "geometry (qform)"}),
-            "AFNI writes the plumb matrix of a grid less than about 0.014° from plumb (its 0.01° "
-            "test, in float); the original keeps the input's matrix (4e-4 mm apart here)",
-        ),
-        "errors/prefix-with-blank": (
-            frozenset({"both succeed", "both reject the arguments"}),
-            "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too "
-            "(no switch for AFNI-12)",
-        ),
-        "geometry/slightly-oblique-qform": (
-            frozenset({"geometry (sform)", "geometry (qform)"}),
-            "AFNI writes the plumb matrix of a qform less than about 0.014° from plumb (AFNI-16); "
-            "the original keeps the input's matrix",
-        ),
-        "geometry/slightly-oblique-metre": (
-            frozenset({"geometry (sform)", "geometry (qform)"}),
-            "AFNI writes the plumb matrix (AFNI-16), its steps in millimetres and its origin in "
-            "metres (AFNI-07); the original keeps the tilt",
-        ),
-        "defects/oblique-metre-zero-origin": (
-            frozenset({"geometry (sform)", "geometry (qform)"}),
-            "AFNI writes an oblique sform in metres as it is (AFNI-07); the original converts its "
-            "linear part to millimetres in reproduce mode too",
-        ),
-        "copy/short-slice-spacing": (
-            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
-            "AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 "
-            "here; the original writes the header's fields back (slice_start 0)",
-        ),
-        "copy/alt-two-slices": (
-            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
-            "AFNI derives the slice fields of a copy from the times: two slices are slice code 1; "
-            "the original writes the header's code 3 back",
-        ),
-        "header-timing/code2-beyond-tr": (
-            frozenset({defects.FIX_PASS, "D13 notices in both modes"}),
-            "the original's default writes the corrected copy but does not name AFNI-03 when the "
-            "corrected slice times exceed the TR (its reproduce output is AFNI's)",
-        ),
-    },
+    "replica": {"environment/one-row-dataset": _ONE_ROW},
+    "original": {"environment/one-row-dataset": _ONE_ROW},
+}
+
+#: The clean-room original's expected divergences before part 2b (2026-10-12), which it has met
+#: since: behaviours ``specs/3dTshift.md`` did not describe until 2026-10-12 (§6.1-6.4).
+_ORIGINAL_BEFORE_PART_2B: dict[str, tuple[frozenset[str], str]] = {
+    "defects/oblique-metre": (
+        frozenset({"geometry (sform)"}),
+        "AFNI writes an oblique sform in metres as it is (only the voxel sizes are "
+        "converted); the original converts its linear part to millimetres in reproduce mode "
+        "too (AFNI-07). Its default, which converts the whole matrix, is the replica's",
+    ),
+    "defects/tiny-offsets-copy": (
+        frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+        "AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the "
+        "kept slice times, all within 3 ms of 0: none; the original keeps the header's code "
+        "1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08",
+    ),
+    "geometry/slightly-oblique": (
+        frozenset({"geometry (sform)", "geometry (qform)"}),
+        "AFNI writes the plumb matrix of a grid less than about 0.014° from plumb (its 0.01° "
+        "test, in float); the original keeps the input's matrix (4e-4 mm apart here)",
+    ),
+    "errors/prefix-with-blank": (
+        frozenset({"both succeed", "both reject the arguments"}),
+        "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too "
+        "(no switch for AFNI-12)",
+    ),
+    "geometry/slightly-oblique-qform": (
+        frozenset({"geometry (sform)", "geometry (qform)"}),
+        "AFNI writes the plumb matrix of a qform less than about 0.014° from plumb (AFNI-16); "
+        "the original keeps the input's matrix",
+    ),
+    "geometry/slightly-oblique-metre": (
+        frozenset({"geometry (sform)", "geometry (qform)"}),
+        "AFNI writes the plumb matrix (AFNI-16), its steps in millimetres and its origin in "
+        "metres (AFNI-07); the original keeps the tilt",
+    ),
+    "defects/oblique-metre-zero-origin": (
+        frozenset({"geometry (sform)", "geometry (qform)"}),
+        "AFNI writes an oblique sform in metres as it is (AFNI-07); the original converts its "
+        "linear part to millimetres in reproduce mode too",
+    ),
+    "copy/short-slice-spacing": (
+        frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+        "AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 "
+        "here; the original writes the header's fields back (slice_start 0)",
+    ),
+    "copy/alt-two-slices": (
+        frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+        "AFNI derives the slice fields of a copy from the times: two slices are slice code 1; "
+        "the original writes the header's code 3 back",
+    ),
+    "header-timing/code2-beyond-tr": (
+        frozenset({defects.FIX_PASS, "D13 notices in both modes"}),
+        "the original's default writes the corrected copy but does not name AFNI-03 when the "
+        "corrected slice times exceed the TR (its reproduce output is AFNI's)",
+    ),
 }
 
 
@@ -1390,25 +1395,11 @@ def _last_error(log: str, tmp: Path) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", line)
 
 
-#: The categories of AFNI's global options and environment variables, which the clean-room
-#: original does not follow yet (completing 3dTshift, part 2b): any failure there is an expected
-#: divergence of the original's.
-PENDING_FOR_ORIGINAL = ("global/", "environment/")
-PENDING_REASON = (
-    "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) "
-    "or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it "
-    "(completing 3dTshift, part 2b)"
-)
-
-
 def _expected_divergence(checks: CheckList, case_id: str, implementation: str) -> None:
-    """Ends the case as an expected divergence when exactly its known checks failed (any check,
-    for the ``*`` of the original's pending categories)."""
+    """Ends the case as an expected divergence when exactly its known checks failed."""
     known = DIVERGENCES.get(implementation, {}).get(case_id)
-    if known is None and implementation == "original" and case_id.startswith(PENDING_FOR_ORIGINAL):
-        known = (frozenset({"*"}), PENDING_REASON)
     failed = {c.name for c in checks.checks if not c.passed}
-    if known and failed and ("*" in known[0] or failed <= known[0]):
+    if known and failed and failed <= known[0]:
         raise Outcome(EXPECTED, known[1])
 
 
@@ -1701,16 +1692,31 @@ def _run_separately(
     )
     _compare(checks, pa, pl)
     if s.whole_file:
-        checks(
-            "the whole file, byte for byte",
-            pa.read_bytes() == pl.read_bytes(),
-            detail=f"AFNI {pa.stat().st_size} bytes, larmorx {pl.stat().st_size}",
-        )
+        a_bytes, l_bytes = pa.read_bytes(), pl.read_bytes()
+        if implementation == "replica":
+            checks(
+                "the whole file, byte for byte",
+                a_bytes == l_bytes,
+                detail=f"AFNI {len(a_bytes)} bytes, larmorx {len(l_bytes)}",
+            )
+        else:
+            # The original's data are compared above, with its thresholds (its Fourier
+            # method differs from AFNI's in the last bits); the header, byte for byte.
+            n = (
+                int(np.frombuffer(a_bytes[108:112], "<f4")[0])
+                if a_bytes[:4] == b"\x5c\x01\x00\x00"
+                else 544
+            )
+            checks(
+                "the header, byte for byte",
+                a_bytes[:n] == l_bytes[:n] and len(a_bytes) == len(l_bytes),
+                detail=f"{n} header bytes; AFNI {len(a_bytes)} bytes, larmorx {len(l_bytes)}",
+            )
     _expected_divergence(checks, case.id, implementation)
     if s.expect != "pass":
         return
-    if implementation == "replica" and not copy:
-        _check_python_settings(checks, s, image, pl)
+    if not copy:
+        _check_python_settings(checks, s, image, pl, implementation)
     # The fix pass: larmorx's default on the same arguments, in a directory of its own.
     import nibabel as nib
 
@@ -1768,13 +1774,15 @@ _ENVIRONMENT_NOISE = {
 PY_SETTINGS = "Python API with afni_settings: the command line's output"
 
 
-def _check_python_settings(checks: CheckList, s: Scenario, image: Path, cli_out: Path) -> None:
+def _check_python_settings(
+    checks: CheckList, s: Scenario, image: Path, cli_out: Path, implementation: str
+) -> None:
     """A case of AFNI's variables through the Python API: ``lx.afni.tshift`` with the case's
     variables and ``-D`` options as ``afni_settings`` gives the command line's output, while
     this process's environment holds AFNI variables that would change it if they reached the
-    replica (:data:`_ENVIRONMENT_NOISE`; the Python API never reads the environment, CLAUDE.md
-    rule 6). Skipped where the Python API has no equivalent: the variables ``tshift`` sets
-    itself or does not take, other global options, AFNI 1D files."""
+    implementation (:data:`_ENVIRONMENT_NOISE`; the Python API never reads the environment,
+    CLAUDE.md rule 6). Skipped where the Python API has no equivalent: the variables ``tshift``
+    sets itself or does not take, other global options, AFNI 1D files."""
     import larmorx as lx
 
     if "{input}" in s.args:
@@ -1798,7 +1806,7 @@ def _check_python_settings(checks: CheckList, s: Scenario, image: Path, cli_out:
             warnings.simplefilter("ignore")
             result = lx.afni.tshift(
                 str(image),
-                implementation="replica",
+                implementation=implementation,
                 upstream_defects="reproduce",
                 afni_settings=settings,
                 **kw,
@@ -2202,7 +2210,7 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
             f"`-D` options), on the {settings_n} cases of AFNI's environment variables and "
             f"global options it can express: {settings_ok} give the command line's output bit "
             "for bit (data and header), with AFNI variables in the process environment that "
-            f"would change it if they reached the replica ({', '.join(_ENVIRONMENT_NOISE)})."
+            f"would change it if the call read the environment ({', '.join(_ENVIRONMENT_NOISE)})."
         )
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     if messages:

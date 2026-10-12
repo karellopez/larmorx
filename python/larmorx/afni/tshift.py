@@ -5,9 +5,9 @@ bit-exact replica from ``larmorx-gpl``, run as a separate program).
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
 by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
 intercept (AFNI-02), header slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel
-pairs (AFNI-05), metre or micron units (AFNI-07) and nearly plumb grids (AFNI-16); the replica
-also corrects the intercept ``AFNI_NIFTI_SCALE=NO`` drops (AFNI-23).
-``upstream_defects="reproduce"`` gives AFNI's output.
+pairs (AFNI-05), metre or micron units (AFNI-07), nearly plumb grids (AFNI-16) and the
+intercept ``AFNI_NIFTI_SCALE=NO`` drops (AFNI-23). ``upstream_defects="reproduce"`` gives
+AFNI's output.
 
 AFNI's environment variables are settings of the call (``afni_settings``), never read from the
 process environment (CLAUDE.md rule 6); the command line reads them from it, as AFNI does."""
@@ -63,9 +63,8 @@ _RESTORE_OPTIONS = {"trend": [], "none": ["-rlt"], "intercept": ["-rlt+"]}
 # with exactly those, the caller's own AFNI variables removed. The command line
 # (``larmorx afni 3dTshift``) reads the environment, as AFNI does.
 
-#: The variables that change what ``tshift`` returns (values, header, warnings): the replica
-#: applies them; the clean-room original does not read them yet (completing 3dTshift, part 2b),
-#: so with it they raise ``NotImplementedError``.
+#: The variables that change what ``tshift`` returns (values, header, warnings); both
+#: implementations apply them.
 _SETTINGS_APPLIED = frozenset(
     {
         "AFNI_NIFTI_PRIORITY",
@@ -285,9 +284,8 @@ def tshift(
         (``AFNI_NO_OBLIQUE_WARNING``). Names are case-sensitive; a name 3dTshift does not
         read, or an empty value, is a ``ValueError``. ``AFNI_NIFTI_PRIORITY``,
         ``AFNI_NIFTI_SCALE``, ``AFNI_NIFTI_VIEW``, ``AFNI_DEFAULT_STD_SPACE``,
-        ``AFNI_NIFTI_WRITE_TYPE`` and ``AFNI_NOREALPATH`` change the result; the clean-room
-        original does not read them yet and raises ``NotImplementedError``. The other
-        variables 3dTshift reads change nothing a call returns, with either implementation.
+        ``AFNI_NIFTI_WRITE_TYPE`` and ``AFNI_NOREALPATH`` change the result, with either
+        implementation; the other variables 3dTshift reads change nothing a call returns.
 
     Returns
     -------
@@ -307,9 +305,6 @@ def tshift(
         :class:`~larmorx.ReplicaError`.
     TypeError
         ``afni_settings`` is not a mapping of strings to strings.
-    NotImplementedError
-        ``afni_settings`` names a variable that changes the result while the clean-room
-        original runs (``implementation="original"``, or ``"auto"`` without the replica).
     larmorx.ReplicaNotFoundError
         ``implementation="replica"`` without ``larmorx-gpl`` installed.
     larmorx.ReplicaError
@@ -340,23 +335,20 @@ def tshift(
     selected = _replica.select("afni", "3dTshift", implementation)
     if selected is not None:
         return _tshift_replica(selected, image, times, options, settings)
-    unsupported = sorted(name for name in settings if name in _SETTINGS_APPLIED)
-    if unsupported:
-        them = "it" if len(unsupported) == 1 else "them"
-        raise NotImplementedError(
-            f"afni_settings: the clean-room original of 3dTshift does not read "
-            f"{', '.join(unsupported)} yet (specs/3dTshift.md §7.1; completing 3dTshift, part "
-            f"2b). Run the replica (implementation='replica', pip install \"larmorx[exact]\") "
-            f"or leave {them} out."
-        )
+    # The original reads the settings the replica receives (``_SETTINGS_FIXED`` is applied in
+    # Rust), and an absolute path, as the replica does.
+    pairs = sorted(settings.items()) or None
     if isinstance(image, (str, os.PathLike)):
-        data, fields, messages, notices = _core.afni_tshift_file(os.fspath(image), times, **options)
+        path = os.path.abspath(os.fspath(image))
+        data, fields, messages, notices = _core.afni_tshift_file(
+            path, times, **options, afni_settings=pairs
+        )
         header = NiftiHeader.from_dict(fields)
         data = _scaled(data, header)
     else:
         array, fields_in = _in_memory(image, tr)
         data, fields, messages, notices = _core.afni_tshift_array(
-            array, fields_in, times, **options
+            array, fields_in, times, **options, afni_settings=pairs
         )
         header = NiftiHeader.from_dict(fields)
     for message in messages:

@@ -90,10 +90,21 @@ Names are case-sensitive except `zero` and `simult`.
   value per line reads top to bottom; `0 9 / 1.5 9 / ...` reads the first column first);
 - `N@v` stands for `N` copies of `v`;
 - `-tpattern '@1D: 0 1 0.5'` gives the values inline, with `|` starting a new column;
-- a token that is not a number (text, `nan`, `0;1`) is an error, and so are an empty file,
+- a token that is not a number (text, `nan`) is an error, and so are an empty file,
   a missing file and fewer than `nz` values; more than `nz` values is fine;
 - AFNI also accepts hexadecimal numbers, sub-matrix selectors (`file[0]`) and transposition
   (`file'`); larmorx does not.
+
+**(observed** by the clean-room implementer, 2026-10-12, refining the list above**)** In a
+file, colons separate values too (`0,1:2` is three values; semicolons do not). A token is an
+error only when it starts with a character other than a digit, `+`, `-`, `.`, `e`, `@` or `*`
+(§7.1, "`-tpattern @file` messages"); every other token is the decimal number it starts with,
+or 0: `2x` is 2, `1e` is 1, `e5`, `-x`, `.x`, `+x` and `*` are 0, `0x1` is 1 (hexadecimal),
+`3@2` is three 2s, `2@` and `2@x` two 0s, `@2` one 0. So `0;1` is 0, not an error. With
+`AFNI_1D_ZERO_TEXT` yes every token that would be an error is 0 (`abc`, `nan`, `inf`). An
+inline `1D:` string is strict: each value must be a whole number or `N@v` (`2x` and `*` are
+errors there; messages in §7.1). larmorx reads hexadecimal numbers, and infinities or NaN with
+a sign (`-inf`, which AFNI reads as a number and then refuses as beyond the TR), as errors.
 
 ### 3.2 Without `-tpattern`
 If the input has no slice-timing information, the output is a copy of the input, with a
@@ -430,7 +441,10 @@ switches depends on the step: from 0.0099° (a step just below a power of 2) to 
 that is a power of 2), about 0.014° for most steps. Examples **(observed)**: a 2 mm column
 tilted toward y stays plumb up to a y entry of 0.000845728 (0.0242°) and is oblique from the
 next float32 up; a 3 mm column switches at 0.000690534 (0.0132°), a 0.8 mm one at 0.000172634
-(0.0124°). A matrix with a zero column is degenerate and not covered.
+(0.0124°). **(observed** by the clean-room implementer: for the 0.8 mm column, 0.000172634 is the
+first oblique value printed with 6 digits; the last plumb one is 0.000172633489, which this
+test gives too, as it gives 0.000845728 and 0.000690534.**)** A matrix with a zero column is
+degenerate and not covered.
 
 The *row* of column `j`, `r_j`, is the row of its largest `|m_ij|` (for a plumb grid the three
 differ).
@@ -762,10 +776,10 @@ as described (observed), in both modes unless a defect is named.
 | `AFNI_PATH_SPACES_OK` | yes | an input name with a blank is one file name (AFNI-18, below) |
 | `HOME` | a directory | an input name that starts with `~/` starts there; with `AFNI_ECHO_COMMANDLINE` (below) |
 | `AFNI_NOREALPATH` | yes | the input's name in messages, below |
-| `AFNI_NIFTI_PRIORITY` | `S`, `Q` (first character, any case) | with both a qform and an sform (codes > 0), `Q` takes the qform; `S`, the default, the sform. Any other value (an empty one included): `*+ WARNING: Illegal AFNI_NIFTI_PRIORITY='X'`, and the sform. When the two 3×3 parts' determinants (in float) have opposite signs: `*+ WARNING: NIfTI('<input>'): Qform/Sform handedness differ; S wins!` (`Q wins!` with `Q`) |
+| `AFNI_NIFTI_PRIORITY` | `S`, `Q` (first character, any case) | with both a qform and an sform (codes > 0), `Q` takes the qform; `S`, the default, the sform. Any other value (an empty one included): `*+ WARNING: Illegal AFNI_NIFTI_PRIORITY='X'`, and the sform (observed: whatever forms the file has, one or none included). When the two 3×3 parts' determinants (in float) have opposite signs: `*+ WARNING: NIfTI('<input>'): Qform/Sform handedness differ; S wins!` (`Q wins!` with `Q`) |
 | `AFNI_NIFTI_SCALE` | no | uint8 and int16 data with both a slope and an intercept stay uint8 and int16 (§6's table): the slope becomes the scale factor and the intercept is dropped (AFNI-23, below). Other types are unchanged |
 | `AFNI_NIFTI_TYPE_WARN` | unset, yes, no | when the input is converted to float32 (§6: int8, uint16, int32, uint32 and float64; uint8 and int16 with a slope and an intercept), AFNI prints, without a label: `** AFNI converts NIFTI_datatype=64 (FLOAT64) in file <input> to FLOAT32`, then, unless yes, `     Warnings of this type will be muted for this session.` and `     Set AFNI_NIFTI_TYPE_WARN to YES to see them all, NO to see none.`; with no, nothing. The type names: `INT8` (256), `UINT16` (512), `INT32` (8), `UINT32` (768), `FLOAT64` (64), `UINT8` (2), `INT16` (4) |
-| `AFNI_NIFTI_VIEW` | `tlrc`, `orig`, `acpc` (any case) | the output's xform codes, below; default orig |
+| `AFNI_NIFTI_VIEW` | `tlrc`, `orig`, `acpc` (any case) | the output's xform codes, below; default orig (observed: the whole word, any case; `t`, `tl`, `tlrcx` and an empty value are orig) |
 | `AFNI_DEFAULT_STD_SPACE` | a template space | the output's xform codes, below; default `TLRC` |
 | `AFNI_NO_OBLIQUE_WARNING` | yes | no report of an oblique input (below) |
 | `AFNI_1D_ZERO_TEXT` | yes | text in a `-tpattern @file` is read as 0 (below); `-ok_1D_text` sets it |
@@ -832,7 +846,10 @@ dataset <part>` (no extra line); then, if any could not be opened, `** FATAL ERR
 input dataset '<name>'`, exit 1. So an input in a directory whose name has a blank cannot be
 opened. A list of one dataset is that dataset; a list of several is joined in time, which
 larmorx does not support (an error). larmorx's default reads the name as one file, and names
-AFNI-18 when it has a blank and `AFNI_PATH_SPACES_OK` is not yes.
+AFNI-18 when it has a blank and `AFNI_PATH_SPACES_OK` is not yes. **(observed** by the
+clean-room implementer: only a blank makes a list; then both blanks and `~` separate its parts
+(`<dir>/a b~c` gives the parts `<dir>/a`, `b` and `c`). A name with a `~` and no blank
+(`<dir>/t~x/in.nii`) or with a tab is one file name; a trailing blank leaves a list of one.**)**
 
 **`AFNI_NIFTI_SCALE=NO`: the intercept** (AFNI-23; observed 2026-10-12 on int16 and uint8
 inputs with a slope and an intercept, a slope of 1 included, with every restore mode,
@@ -891,8 +908,11 @@ spaces names their generic space: TT_N27, TT_avg and TLRC are TLRC; MNI_152, MNI
 MNI_FSL, MNI_OTHER, MNI_2009c_asym and MNI_N27 are MNI; MNIa and MNI_ANAT are MNI_ANAT (so 5).
 (AFNI reads that table from its file `AFNI_atlas_spaces.niml`, which an AFNI installation finds
 beside its programs; larmorx uses the table of AFNI 25.2.09's file. An AFNI that finds no file
-knows only TLRC, MNI and MNI_ANAT: then TT_N27 gives 5. The repository's oracle finds none; the
-parity cases use TLRC, MNI and MNI_ANAT only.) Examples (observed): sform code 2 with
+knows only TLRC, MNI and MNI_ANAT: then TT_N27 gives 5. The parity cases use TLRC, MNI and
+MNI_ANAT only.) **(observed** by the clean-room implementer, 2026-10-12, with the repository's
+oracle run as the parity suite runs it: TT_N27 gives 3 and MNI_152 4, the table's answers, and
+ACPC and ORIG 1; the names are case-sensitive: `mni`, `tlrc`, `xyz` and an empty value give 5.
+With the tlrc view, `AFNI_DEFAULT_STD_SPACE` ORIG or ACPC gives 1.**)** Examples (observed): sform code 2 with
 `AFNI_NIFTI_VIEW=TLRC` gives 3, with `acpc` 1; sform code 5 with `AFNI_DEFAULT_STD_SPACE=MNI`
 gives 4, with `MNI_ANAT` 5; code 7 with `AFNI_NIFTI_VIEW=tlrc` gives 3. The AFNI extension's
 `TEMPLATE_SPACE`, when the input has one, replaces the space.
@@ -944,14 +964,19 @@ ends the row) is an error; AFNI prints, without a label,
 
 then `** FATAL ERROR: Can't read tpattern file st.1D` (exit 1): the row number counts the rows
 read before, the file name is cut at 44 bytes, and the row is shown with its commas and colons
-made blanks (the separators AFNI reads as blanks), cut at 64 characters, the last four ` ...`.
+made blanks (the separators AFNI reads as blanks), cut at 64 characters, the last four ` ...`
+(observed by the clean-room implementer: the row's leading blanks are removed, its tabs and its
+comment kept, `'0  1  abc 1.5   # c'` for `0, 1, abc 1.5   # c`; a longer row is its first 60
+characters and ` ...`; comment lines and blank lines are not rows).
 With `AFNI_1D_ZERO_TEXT` yes such values are 0 (a word or `*` is 0; anything else the number it
 starts with, or 0), and a row of text counts as a row (its values set the number of columns
 when it is the first). A file that cannot be opened: `** ERROR: mri_read_ascii: couldn't open
 file st.1D` before the fatal error; one with no row: `** ERROR: mri_read_ascii: can't read any
 valid data from file st.1D`. A `-tpattern '@1D: 0 1 abc'` with a value that is not a number:
 `** ERROR: Illegal 1D: value 'abc'` and `** ERROR: mri_read_1D: can't read from string '1D: 0 1
-abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
+abc'` (`AFNI_1D_ZERO_TEXT` does not apply there), then `** FATAL ERROR: Can't read tpattern file
+1D: 0 1 abc`; an empty one (`@1D:`): `** ERROR: Can't decode 1D: string` and `** ERROR:
+mri_read_1D: can't read from string '1D:'` (observed by the clean-room implementer).
 
 **Messages** (observed).
 - AFNI's labelled messages are `++ ` (information), ` + ` (more information), `*+ WARNING: `,
@@ -982,6 +1007,49 @@ abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
 - larmorx adds lines of its own, in both modes: the upstream-defect notices, `-verbose`'s first
   two lines (the implementation and the mode), and its warnings about global options (ending in
   `(larmorx)`). Everything else is AFNI's, in AFNI's order.
+
+**The messages of a run** (observed by the clean-room implementer, 2026-10-12; numbers as C's
+`%g` of the float values, the oblique angle as `%f`). In order:
+1. Standard output, `-verbose` only: `++ opening input dataset header`.
+2. Reading the input, standard error: ` + reading x.nii.gz instead of non-existing x.nii` (when
+   the name is shown as given), the conversion message, `Illegal AFNI_NIFTI_PRIORITY`, the
+   handedness warning, `*+ WARNING: NO spatial transform (neither qform nor sform), in NIfTI
+   file '<input>'` (both codes 0 or less), the sform-code warning, the oblique report.
+3. One value per voxel: `*+ WARNING: Input dataset has only 1 value per voxel!`, then the copy
+   (6.).
+4. `-slice` beyond the last slice, then `-ignore` beyond nt − 5, are fatal here, before the TR
+   (a series of 2 to 4 time points is the `-ignore` error).
+5. Standard output, `-verbose` only, when `-TR` is not given: `++ using dataset TR = 2 s`. Then
+   the slice times: `-tpattern`'s errors, or the header's timing; `-verbose`'s `++ using tpattern
+   = 0 1 0.5 1.5 s` (`ms` with `-TR` in milliseconds) once they are read, before the header's
+   are checked against the TR; `*+ WARNING: some value in tpattern is outside range 0..TR=2`
+   (then the copy, 6.); `*+ WARNING: dataset is already aligned in time!` (then the copy).
+6. A copy: `*+ WARNING: ==>> output dataset is just a copy of input dataset`, then the output
+   (8.), and `-verbose`'s `++ Wrote output: ./out.nii` as a labelled message (with
+   `AFNI_MESSAGE_PREFIX`).
+7. A shift: `*+ WARNING: input has only 1 time offset, 0` when every time is the same;
+   `-verbose`'s `++ common time point set to 0.75` and `++ copying input dataset bricks`
+   (standard output); `AFNI_DECONFLICT`'s stop (§7.1); always, on standard output, `++
+   updating time offset to 0.75` (in milliseconds with `-TR` in milliseconds); `-verbose`'s `++
+   Time series length = 100; FFT length set to 120` (Fourier only) and `++ slice 0: fractional
+   shift = -0.375` for each slice (the shift `s_k` of §4; `-0` for a zero one); then the output
+   (8.), and `-verbose`'s `++ Wrote output: ./out.nii` on standard error without a label.
+8. The output: an existing file (§6.3, §7.1), the second name check, the file written. The
+   name in `Wrote output` is AFNI's for the output (§7.1), the renamed one when nothing was
+   written because the file exists (AFNI-11), the refused one when its name was refused.
+Options parsed: `*+ WARNING: TR expressed in milliseconds is deprecated [not wanted].` for
+`-TR` in milliseconds, and `*+ WARNING: -no_detrend with Fourier interpolation is dangerous`,
+come first, as their options are read. An option without its value: `** FATAL ERROR: -TR needs
+an argument!` (likewise `-tzero`, `-slice`, `-prefix`, `-tpattern`); AFNI 25.2.09 crashes on
+`-ignore` without a value (a segmentation fault, exit 1; a class (a) defect for the register):
+larmorx refuses it as the others, in both modes. `3dTshift -h` prints nothing and exits 1;
+larmorx prints its help.
+
+**A failed write** (observed by the clean-room implementer, 2026-10-12; for the register). When
+the output cannot be created (its directory does not exist), AFNI prints `** ERROR
+(nifti_image_write_engine): cannot open output file 'sub/out.nii'` without a label, then
+`-verbose`'s `++ Wrote output: sub/out.nii`, and exits with status 0, as for AFNI-11. larmorx
+fails with a message and exit status 1 in both modes; no switch reproduces it yet.
 
 **The defaults and the notices** (as §6.5, for this section; AFNI-11 and AFNI-12 are in §6.5):
 

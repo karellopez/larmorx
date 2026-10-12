@@ -12,12 +12,19 @@
 //! - The original command lines are in [`cli`].
 #![forbid(unsafe_code)]
 
+pub mod cfmt;
 pub mod cli;
 pub mod dataset;
 pub mod fft;
+pub mod geometry;
+pub mod input;
+pub mod msg;
 pub mod oned;
+pub mod output;
+pub mod settings;
 pub mod timing;
 pub mod tshift;
+pub mod x87;
 
 pub use dataset::{BrickData, Bricks};
 pub use tshift::{Method, Restore, TshiftError, TshiftParams, tshift};

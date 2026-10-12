@@ -143,10 +143,12 @@ def afni_tshift_file(
     detrend: bool = True,
     n_threads: int = 1,
     upstream_defects: str = "fix",
+    afni_settings: list[tuple[str, str]] | None = None,
 ) -> tuple[np.ndarray, dict[str, Any], list[str], list[Notice]]:
     """Read a NIfTI file with AFNI's rules and shift it (``3dTshift``): the voxels in AFNI's
     storage type (before the brick factor, the header's ``scl_slope``), the output header
-    fields, warnings and upstream-defect notices."""
+    fields, warnings and upstream-defect notices. ``afni_settings`` are AFNI's environment
+    variables for the call (never read from the process environment)."""
 
 def afni_tshift_array(
     data: np.ndarray,
@@ -161,6 +163,7 @@ def afni_tshift_array(
     detrend: bool = True,
     n_threads: int = 1,
     upstream_defects: str = "fix",
+    afni_settings: list[tuple[str, str]] | None = None,
 ) -> tuple[np.ndarray, dict[str, Any], list[str], list[Notice]]:
     """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
     the shifted voxels, the output header fields, warnings and upstream-defect notices."""

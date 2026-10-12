@@ -331,6 +331,45 @@ def _write_negative_series(path: Path) -> None:
     _core.nifti_write(os.fspath(path), data, fields, 2, 1)
 
 
+def _write_slope_inter_series(path: Path) -> None:
+    """The 3dTshift series as int16 with ``scl_slope`` 0.25 and ``scl_inter`` 12.5."""
+    img = series()
+    data = np.asfortranarray(_series_values().astype(np.int16))
+    fields = img.header.replace(datatype=4, bitpix=16, scl_slope=0.25, scl_inter=12.5).to_dict()
+    _core.nifti_write(os.fspath(path), data, fields, 2, 1)
+
+
+def _write_metre_series(path: Path) -> None:
+    """The 3dTshift series in metres, 1e-4 rad (0.006°) from plumb with an origin: AFNI writes
+    it plumb (AFNI-16), its offsets in metres (AFNI-07)."""
+    data = np.asfortranarray((_series_values() / 4).astype(np.float32))
+    aff = np.array(
+        [
+            [0.002, 0.0, -3e-7, -0.1],
+            [0.0, 0.002, 0.0, 0.05],
+            [2e-7, 0.0, 0.003, 0.02],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    hdr = header_for(data, aff, pixdim=(1.0, 0.002, 0.002, 0.003, 2.0, 1.0, 1.0, 1.0), xyzt_units=9)
+    lx.save(lx.Image(data, aff, hdr), path)
+
+
+def _write_tiny_times_series(path: Path) -> None:
+    """The 3dTshift series with header slice timing 0.5 ms apart beyond a 1 ms TR: a copy of
+    the input, keeping slice times all within 3 ms of 0 (AFNI-08)."""
+    img = series()
+    hdr = img.header.replace(
+        dim_info=48,
+        slice_code=1,
+        slice_start=0,
+        slice_end=4,
+        slice_duration=0.0005,
+        pixdim=(1.0, 2.0, 2.0, 3.0, 0.001, 1.0, 1.0, 1.0),
+    )
+    lx.save(lx.Image(img.data, img.affine, hdr), path)
+
+
 def _write_warp(path: Path) -> None:
     """``field_xfm()`` as ANTs writes a displacement field: a 5D NIfTI vector image."""
     t = field_xfm()
@@ -368,6 +407,9 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "bold.nii": lambda p: lx.save(bold(), p),
     "series.nii": _write_scaled_series,
     "series_negative.nii": _write_negative_series,
+    "series_slope_inter.nii": _write_slope_inter_series,
+    "series_metre.nii": _write_metre_series,
+    "series_tiny_times.nii": _write_tiny_times_series,
     "reference.nii": lambda p: lx.save(
         lx.Image(np.zeros(REFERENCE, np.uint8), affine(REFERENCE, (2.2, 2.2, 2.2), oblique=False)),
         p,
@@ -625,17 +667,19 @@ def case(case_id: str, covers: tuple[str, ...] | list[str] = ()) -> Callable:
 def cli(*argv: str, upstream_defects: str = "fix") -> str:
     """Run ``larmorx <argv...>`` in process (``larmorx.cli``); its standard output. Tools with a
     replica run the original (the replica has its own golden cases, in ``crates-gpl``).
-    ``upstream_defects`` is set as ``LARMORX_UPSTREAM_DEFECTS`` for the call (D13), so that the
-    environment of the test run cannot change it."""
-    previous = os.environ.get("LARMORX_UPSTREAM_DEFECTS")
+    ``upstream_defects`` is set as ``LARMORX_UPSTREAM_DEFECTS`` for the call (D13), and AFNI's
+    variables of the test run are removed (``larmorx afni`` reads them, as AFNI does), so that
+    the environment of the test run cannot change the result."""
+    saved = dict(os.environ)
+    for name in list(os.environ):
+        if name.upper().startswith(("AFNI_", "NIML_")):
+            del os.environ[name]
     os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
     try:
         code, out, err = _core.cli_main(["larmorx", *argv], [], "original")
     finally:
-        if previous is None:
-            del os.environ["LARMORX_UPSTREAM_DEFECTS"]
-        else:
-            os.environ["LARMORX_UPSTREAM_DEFECTS"] = previous
+        os.environ.clear()
+        os.environ.update(saved)
     if code != 0:
         raise RuntimeError(f"larmorx {' '.join(argv)} exited with {code}:\n{err}{out}")
     return out
@@ -1502,6 +1546,72 @@ def _(ctx: Context) -> dict[str, Any]:
         warnings.simplefilter("ignore")
         no_detrend = lx.afni.tshift(u8, slice_times="seq-z", slice=1, detrend=False, method="cubic", implementation=ORIGINAL, upstream_defects=REPRODUCE)  # fmt: skip
     return {"uint8_no_detrend": no_detrend.data}
+
+
+@case("cli.afni.3dTshift.geometry", covers=("cli:afni 3dTshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A slightly oblique grid in metres: the tilt and the metres converted by default; AFNI's
+    plumb matrix with its offsets in metres reproduced (AFNI-16, AFNI-07; the quaternion of
+    the cardinal matrix, the steps converted)."""
+    fixed, afni = ctx.out("fix.nii"), ctx.out("reproduce.nii")
+    args = ("afni", "3dTshift", "-tpattern", "alt+z", "-linear")
+    cli(*args, "-prefix", fixed, ctx.file("series_metre.nii"))
+    cli(*args, "-prefix", afni, ctx.file("series_metre.nii"), upstream_defects=REPRODUCE)
+    return {"fix": Nifti(fixed), "reproduce": Nifti(afni)}
+
+
+@case("cli.afni.3dTshift.copy", covers=("cli:afni 3dTshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A copy of the input keeping its header slice times (all within 3 ms of 0): the slice
+    fields derived from them, slice_end nz - 1 by default and 0 reproduced (AFNI-08)."""
+    fixed, afni = ctx.out("fix.nii"), ctx.out("reproduce.nii")
+    cli("afni", "3dTshift", "-prefix", fixed, ctx.file("series_tiny_times.nii"))
+    cli("afni", "3dTshift", "-prefix", afni, ctx.file("series_tiny_times.nii"), upstream_defects=REPRODUCE)  # fmt: skip
+    return {"fix": Nifti(fixed), "reproduce": Nifti(afni)}
+
+
+@case("cli.afni.3dTshift.scale-no", covers=("cli:afni 3dTshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """AFNI_NIFTI_SCALE=NO (as -D) on int16 data with a slope and an intercept: the intercept
+    kept in the header by default, the data read as without the variable with -rlt -ignore,
+    and AFNI's output (the intercept dropped) reproduced (AFNI-23)."""
+    out = {name: ctx.out(f"{name}.nii") for name in ("fix", "rlt_ignore", "reproduce")}
+    src = ctx.file("series_slope_inter.nii")
+    args = ("afni", "3dTshift", "-DAFNI_NIFTI_SCALE=NO", "-tpattern", "alt+z", "-cubic")
+    cli(*args, "-prefix", out["fix"], src)
+    cli(*args, "-rlt", "-ignore", "2", "-prefix", out["rlt_ignore"], src)
+    cli(*args, "-prefix", out["reproduce"], src, upstream_defects=REPRODUCE)
+    return {name: Nifti(path) for name, path in out.items()}
+
+
+@case("cli.afni.3dTshift.globals", covers=("cli:afni 3dTshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """AFNI's global options: -overwrite after the dataset replaces an existing output, and
+    -D sets AFNI's variables (renaming the output to _AA1, NIfTI-2 output, the tlrc view)."""
+    out = ctx.out("out.nii")
+    with open(out, "wb") as f:
+        f.write(b"taken")
+    src = ctx.file("series.nii")
+    stdout = cli("afni", "3dTshift", "-tpattern", "seq+z", "-prefix", out, src, "-overwrite")
+    cli("afni", "3dTshift", "-DAFNI_DECONFLICT=YES", "-DAFNI_NIFTI_WRITE_TYPE=2", "-DAFNI_NIFTI_VIEW=tlrc", "-tpattern", "seq+z", "-prefix", out, src)  # fmt: skip
+    return {"out": Nifti(out), "renamed": Nifti(ctx.out("out_AA1.nii")), "stdout": stdout}
+
+
+@case("py.afni.tshift.settings", covers=("lx.afni.tshift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``afni_settings`` in the clean-room original: AFNI_NIFTI_SCALE=NO (the intercept in the
+    header) and NIfTI-2 header fields."""
+    settings = {"AFNI_NIFTI_SCALE": "NO", "AFNI_NIFTI_WRITE_TYPE": "2"}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        img = lx.afni.tshift(
+            ctx.file("series_slope_inter.nii"),
+            slice_times=SLICE_TIMES,
+            method="heptic",
+            afni_settings=settings,
+            implementation=ORIGINAL,
+        )
+    return image_outputs("out", img, header=True)
 
 
 @case("py.afni.fmriprep_slice_timing", covers=("lx.afni.fmriprep_slice_timing",))

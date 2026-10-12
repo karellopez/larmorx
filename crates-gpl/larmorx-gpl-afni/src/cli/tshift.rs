@@ -551,18 +551,25 @@ fn run(args: &[String], mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), Fa
                 return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
             }
             if let Some((start, end)) = ds.seq_dec {
+                // Corrected, the times can exceed the TR: then the output is a copy (below).
+                let copy = offsets.iter().any(|&t| t < 0.0 || t > o.tr);
                 notices.add(
                     &defects::AFNI_03,
-                    if mode.fix() {
-                        format!(
+                    match (mode.fix(), copy) {
+                        (true, false) => format!(
                             "header slice code 2 (sequential decreasing) orders slices \
                              {end}..{start} from the top; AFNI gives every slice time 0 and \
                              shifts nothing"
-                        )
-                    } else {
-                        "header slice code 2 (sequential decreasing) gives every slice time 0, \
-                         so nothing is shifted, as AFNI does"
-                            .to_owned()
+                        ),
+                        (true, true) => format!(
+                            "header slice code 2 (sequential decreasing) orders slices \
+                             {end}..{start} from the top, and their times exceed the TR: the \
+                             output is a copy of the input that keeps them; AFNI gives every \
+                             slice time 0, shifts nothing and writes no slice timing"
+                        ),
+                        (false, _) => "header slice code 2 (sequential decreasing) gives every \
+                                       slice time 0, so nothing is shifted, as AFNI does"
+                            .to_owned(),
                     },
                 );
             }

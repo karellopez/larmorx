@@ -248,6 +248,11 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         ("code3-partial", "slice_code 3 over slices 1..2 only"),
         ("code3-ms", "slice_code 3 with the TR and duration in milliseconds"),
         ("code3-beyond-tr", "times beyond the TR: a copy of the input, timing kept"),
+        (
+            "code2-beyond-tr",
+            "slice_code 2: AFNI gives every slice time 0 and shifts nothing; corrected, the "
+            "times exceed the TR and the output is a copy (AFNI-03)",
+        ),
         ("code3-no-slice-dim", "no slice axis in dim_info: no timing, a copy"),
         ("code3-zero-duration", "slice_duration 0: no timing, a copy"),
     ]
@@ -305,7 +310,7 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add(
         "geometry/slightly-oblique",
         "geometry",
-        "an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°)",
+        "an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°, AFNI-16)",
         Scenario("gen:slightly-oblique", ("-tpattern", "alt+z")),
     )
 
@@ -704,11 +709,13 @@ def _replica_program(implementation: str):
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
 
-#: Cases where an implementation is known to differ from AFNI in ``reproduce`` mode: the checks
-#: that differ, and why. Once the implementation matches, the case passes as usual. The
-#: replica has none (its two unit cases, an expected divergence until 2026-10-12, now pass).
-#: The clean-room original's are behaviours that ``specs/3dTshift.md`` does not describe yet,
-#: found by black-box runs of AFNI 25.2.09 on D13's cases (2026-10-12).
+#: Cases where an implementation is known to differ from AFNI in ``reproduce`` mode, or to name
+#: the wrong defects in its default (the fix pass): the checks that differ, and why. Once the
+#: implementation matches, the case passes as usual. The replica has none (its two unit cases,
+#: an expected divergence until 2026-10-12, now pass). The clean-room original's are
+#: behaviours that ``specs/3dTshift.md`` did not describe, found by black-box runs of AFNI
+#: 25.2.09 on D13's cases (2026-10-12); the spec describes them since 2026-10-12 (§6.1-6.4), for
+#: the original to follow.
 DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
     "replica": {},
     "original": {
@@ -733,6 +740,11 @@ DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
             frozenset({"both succeed", "both reject the arguments"}),
             "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too "
             "(no switch for AFNI-12)",
+        ),
+        "header-timing/code2-beyond-tr": (
+            frozenset({defects.FIX_PASS, "D13 notices in both modes"}),
+            "the original's default writes the corrected copy but does not name AFNI-03 when the "
+            "corrected slice times exceed the TR (its reproduce output is AFNI's)",
         ),
     },
 }
@@ -1116,6 +1128,7 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
                 fixed = _fix_pass(
                     checks, args, image, tmp, outputs["larmorx"], logs["larmorx"], implementation
                 )
+                _expected_divergence(checks, case.id, implementation)
                 if implementation == "replica" and fixed is not None:
                     entries, target = fixed
                     if entries or case.category in ("defects", "geometry"):

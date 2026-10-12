@@ -130,6 +130,12 @@ Changes from the originals are listed below and in each module's documentation.
     output is reported with AFNI's messages and not written (exit 0), and a name
     `THD_filename_ok` rejects is refused; AFNI's environment variables (`AFNI_DECONFLICT`,
     `AFNI_ALLOW_ARBITRARY_FILENAMES`) are not read.
+  - AFNI-16 (`axes::written`, `axes::snaps`; decided 2026-10-12): a matrix that
+    `THD_compute_oblique_angle` calls plumb (less than about 0.014° from plumb) but that has a
+    non-zero entry off its axes' rows keeps its obliquity: it is written as AFNI writes an
+    oblique matrix (the sform as carried, its quaternion, the axes' origins and steps), where
+    `THD_set_dataset_attributes` replaces it by the cardinal matrix of the axes. A matrix
+    without such an entry is written from its axes in both modes.
 - **Quaternions in double.** `nifti_dmat44_to_quatern` and `nifti_dmat33_inverse` form a few
   quotients in x87 extended precision (`1.0l / deti`, `0.25l * (r32-r23) / a`) and round them
   to double; the translation divides in double. The two can differ in the last bit of a double

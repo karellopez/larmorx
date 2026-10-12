@@ -31,6 +31,15 @@
 //! for a plumb input in metres or micrometres the sform's linear part is in millimetres (the
 //! steps are converted on reading, the origins are not); and an input less than about 0.014°
 //! from plumb comes out exactly plumb.
+//!
+//! **Upstream defect AFNI-16 (D13, decided 2026-10-12).** The second consequence discards a
+//! small obliquity. By default ([`UpstreamDefects::Fix`]) larmorx-gpl keeps the input's matrix
+//! wherever AFNI would replace an oblique matrix by a plumb one ([`snaps`]), and writes it as
+//! AFNI writes an oblique matrix; [`UpstreamDefects::Reproduce`] writes the plumb matrix, as
+//! AFNI does. A matrix with no obliquity at all (every entry off its axis zero) is written from
+//! its axes in both modes, as AFNI writes it.
+
+use larmorx_core::defects::UpstreamDefects;
 
 /// AFNI's orientation codes (`ORI_*_TYPE`): the direction an axis points to, in DICOM
 /// coordinates (+x = left, +y = posterior, +z = superior).
@@ -313,6 +322,40 @@ pub fn cardinal(axes: &Axes) -> Option<[[f32; 4]; 3]> {
     Some(t)
 }
 
+/// AFNI-16: whether AFNI, writing `axes`, discards an obliquity: the matrix is plumb by AFNI's
+/// test ([`is_plumb`]) but has a non-zero entry off the row of some axis's coordinate, so its
+/// cardinal matrix ([`cardinal`]) moves the grid. False for a matrix without such an entry
+/// (whose cardinal matrix is itself, but for the steps' and signed zeros' representation), for
+/// an oblique matrix (written as it is), without an orientation, and for a matrix with a
+/// non-finite entry.
+pub fn snaps(axes: &Axes) -> bool {
+    let Some(orient) = axes.orient else {
+        return false;
+    };
+    if !is_plumb(&axes.real) || axes.real.iter().flatten().any(|v| !v.is_finite()) {
+        return false;
+    }
+    (0..3).any(|col| (0..3).any(|row| row != coordinate(orient[col]) && axes.real[row][col] != 0.0))
+}
+
+/// The largest angle, in degrees, between a column of the linear part of `real` and the
+/// coordinate axis nearest to it (computed in double), for messages: how far from plumb the
+/// matrix is.
+pub fn obliquity_degrees(real: &[[f32; 4]; 3]) -> f64 {
+    (0..3)
+        .map(|j| {
+            let col = [0, 1, 2].map(|i| f64::from(real[i][j]));
+            let len = (col[0] * col[0] + col[1] * col[1] + col[2] * col[2]).sqrt();
+            let largest = col.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+            if len > 0.0 {
+                (largest / len).min(1.0).acos().to_degrees()
+            } else {
+                0.0
+            }
+        })
+        .fold(0.0, f64::max)
+}
+
 /// The spatial fields AFNI writes for a dataset ([`written`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Written {
@@ -332,8 +375,12 @@ pub struct Written {
 /// replaces a plumb `ijk_to_dicom_real` by the cardinal matrix, then `populate_nifti_image`
 /// writes it with x and y negated as the sform, its quaternion as the qform, and the axes'
 /// origins and steps as the qform's offset and the voxel sizes.
-pub fn written(axes: &Axes) -> Written {
-    let matrix = if is_plumb(&axes.real) {
+///
+/// AFNI-16: with [`UpstreamDefects::Fix`], a matrix whose obliquity AFNI would discard
+/// ([`snaps`]) is kept and written as AFNI writes an oblique one.
+pub fn written(axes: &Axes, mode: UpstreamDefects) -> Written {
+    let plumb = is_plumb(&axes.real) && !(mode.fix() && snaps(axes));
+    let matrix = if plumb {
         cardinal(axes).unwrap_or(axes.real)
     } else {
         axes.real
@@ -599,7 +646,7 @@ mod tests {
             [0.0, 0.0, 0.004, 0.02],
         ];
         axes.orient = Some([ORI_L2R, ORI_P2A, ORI_I2S]);
-        let w = written(&axes);
+        let w = written(&axes, UpstreamDefects::Reproduce);
         let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
         assert_eq!(
             bits(&w.sform[0]),
@@ -620,6 +667,42 @@ mod tests {
             w.qoffset,
             [f64::from(-0.1f32), f64::from(0.05f32), f64::from(0.02f32)]
         );
+        // No obliquity to discard: the default writes the same (AFNI-16 does not apply).
+        assert!(!snaps(&axes));
+        assert_eq!(written(&axes, UpstreamDefects::Fix), w);
+    }
+
+    #[test]
+    fn nearly_plumb_grids_keep_their_matrix_by_default() {
+        // 1e-4 rad (0.0057°) about y: plumb for AFNI, which writes the cardinal matrix
+        // (AFNI-16); the default keeps the matrix, as AFNI writes an oblique one.
+        let mut axes = axial([3.0, 3.0, 4.0], [-10.0, 20.0, 30.0]);
+        axes.real[2][0] = 3.0e-4;
+        axes.real[0][2] = -4.0e-4;
+        assert!(is_plumb(&axes.real) && snaps(&axes));
+        let afni = written(&axes, UpstreamDefects::Reproduce);
+        assert_eq!(afni.sform[2][0], 0.0);
+        assert_eq!(afni.sform[0][2], -0.0);
+        // 180° about z in NIfTI's coordinates.
+        assert_eq!(afni.quatern, [0.0, 0.0, 1.0]);
+        let kept = written(&axes, UpstreamDefects::Fix);
+        assert_eq!(kept.sform[2][0], f64::from(3.0e-4f32));
+        assert_eq!(kept.sform[0][2], f64::from(4.0e-4f32));
+        // The same, tilted by 1e-4 rad about y: b = sin(0.5e-4).
+        assert!((kept.quatern[0] - 5.0e-5).abs() < 1.0e-9, "{kept:?}");
+        assert_eq!((kept.qoffset, kept.voxel), (afni.qoffset, afni.voxel));
+        let degrees = obliquity_degrees(&axes.real);
+        assert!(
+            (degrees - 1.0e-4f64.to_degrees()).abs() < 1.0e-6,
+            "{degrees}"
+        );
+        // Beyond AFNI's threshold the matrix is kept in both modes.
+        axes.real[2][0] = 1.0e-3;
+        assert!(!is_plumb(&axes.real) && !snaps(&axes));
+        assert_eq!(
+            written(&axes, UpstreamDefects::Fix),
+            written(&axes, UpstreamDefects::Reproduce)
+        );
     }
 
     #[test]
@@ -635,7 +718,7 @@ mod tests {
             del: [3.0, 3.0, 4.0],
             org: [-10.0, 20.0, 30.0],
         };
-        let w = written(&axes);
+        let w = written(&axes, UpstreamDefects::Fix);
         assert_eq!(w.sform[0][0], -f64::from(3.0 * c));
         assert_eq!(w.sform[2][0], f64::from(3.0 * s));
         // In NIfTI's coordinates (x and y negated) the grid is turned by 180° about z and by

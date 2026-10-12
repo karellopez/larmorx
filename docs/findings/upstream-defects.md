@@ -41,8 +41,8 @@ Gap: **yes** = a class (c) or (e) defect larmorx reproduces by default today (or
 reproduces at all); **decide** = needs a user decision first; **rule 8** = to follow the
 source (decided); **replica** = corrected in the clean-room original, the replica's switch
 still to do; **original** = corrected by default in both 3dTshift implementations, but the
-clean-room original's `reproduce` did not give AFNI's result yet (none left since 2026-10-12,
-completing 3dTshift, part 2b; AFNI-26 since it was found the same day); – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
+clean-room original's `reproduce` did not give AFNI's result yet (none left since 2026-10-12:
+completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
 
 | ID | Tool | Defect | Class | fMRIPrep users | larmorx today | Gap |
 |---|---|---|---|---|---|---|
@@ -161,7 +161,7 @@ completing 3dTshift, part 2b; AFNI-26 since it was found the same day); – = no
 | AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in both implementations (decided 2026-10-12; the original the same day): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1) | – |
 | AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | both implementations give x86-64's results on every platform (2026-10-12) | – |
 | AFNI-25 † | 3dTshift | `-ignore` as the last argument: a crash (exit 1 from AFNI's signal handler, with a crash banner) | a | none | "-ignore needs an argument!", exit 1, in both implementations and both modes | – |
-| AFNI-26 † | 3dTshift | a NIfTI output that cannot be created (missing or read-only directory): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in the replica (2026-10-12) | original |
+| AFNI-26 † | 3dTshift | a NIfTI output that cannot be created (missing or read-only directory): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -194,10 +194,10 @@ completing 3dTshift, part 2b; AFNI-26 since it was found the same day); – = no
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
-column (2026-10-12, after completing 3dTshift, part 2b): no **yes**, no **replica** and no
-**original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18, -19, -22 and -23,
-closed by the clean-room original that day), 1 **original** (AFNI-26, added the same day; the
-replica reproduces it), 18 decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept), AFNI-16 (a
+column (2026-10-12, after completing 3dTshift, part 2b, and AFNI-26's switch): no **yes**, no
+**replica** and no **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18,
+-19, -22 and -23, closed by the clean-room original that day, and AFNI-26, added the same day
+and closed by the original after the replica), 18 decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept), AFNI-16 (a
 defect, corrected by default) and AFNI-23 (a defect, corrected by default) on 2026-10-12;
 AFNI-17 (an imprecision) was added the same day, and AFNI-25 and AFNI-26 (found by the
 clean-room implementer of part 2b) after it. The first D13
@@ -240,8 +240,9 @@ variables in the replica, with AFNI-18, -19 and -22 (spec §7.1), and AFNI-23 co
 default (decided 2026-10-12). The clean-room original followed (completing 3dTshift, part 2b, 2026-10-12): `reproduce`
 for AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12, AFNI-16, AFNI-18, AFNI-19, AFNI-22 and
 AFNI-23, AFNI-03's notice when the corrected times make the output a copy, and AFNI's global
-options and variables (spec §6.1 to §6.5 and §7.1). Left for 3dTshift: AFNI-26's switch in
-the clean-room original (found the same day; the replica's is done).
+options and variables (spec §6.1 to §6.5 and §7.1). AFNI-26's switch, found the same day,
+followed in the replica and then in the clean-room original (2026-10-12): nothing is left for
+3dTshift.
 
 **Main package (`crates/`, `python/larmorx/`), ANTs and ITK** (done 2026-10-12):
 
@@ -323,7 +324,7 @@ the oracle, and AFNI-11 and AFNI-12 given a switch:
 | AFNI-16 | a nearly plumb matrix written plumb | the replica's writer (default changed 2026-10-12); the original's (`larmorx_afni::geometry`, 2026-10-12) | slightly oblique inputs |
 | AFNI-18, AFNI-19, AFNI-22 | an input name with a blank; `AFNI_ALLOW_MILLISECONDS`; `-D` values | the replica's input opening, writer and global options (2026-10-12); the original's (`larmorx_afni::input`, `larmorx_afni::settings`, `larmorx_afni::cli::tshift`, 2026-10-12) | paths with blanks |
 | AFNI-23 | `AFNI_NIFTI_SCALE=NO` drops the intercept | the replica's reader, writer and `-rlt` path (2026-10-12); the original's (`larmorx_afni::dataset::intercept_plan`, 2026-10-12) | none |
-| AFNI-26 | a failed write exits 0 | the replica's command line (2026-10-12); **to do** in the original's (`larmorx_afni::output::write_replacing`, `larmorx_afni::cli::tshift`): `reproduce` prints the NIfTI library's message, `-verbose`'s line, writes nothing and exits 0 (spec §7.1, "A failed write"; parity cases `errors/missing-directory*`, expected divergences in the original's record until then) | none |
+| AFNI-26 | a failed write exits 0 | the replica's command line (2026-10-12); the original's (`larmorx_afni::output::cannot_open`, `larmorx_afni::cli::tshift`, 2026-10-12): `reproduce` prints the NIfTI library's message, `-verbose`'s line, writes nothing and exits 0 (spec §7.1, "A failed write"; parity cases `errors/missing-directory*`, rejected by both with AFNI's exit status and messages in both records) | none |
 
 ### Decisions needed before switching
 

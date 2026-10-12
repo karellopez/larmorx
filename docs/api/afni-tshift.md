@@ -216,7 +216,7 @@ warning names each one that changed the output, in both modes
 | AFNI-20 | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes (AFNI's file holds a random identifier, so `reproduce` does not reproduce it; the warning says so) | the command line |
 | AFNI-22 | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written | the command line |
 | AFNI-23 | with `AFNI_NIFTI_SCALE=NO`, uint8 and int16 data with both a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the output's values are off by it (12.5 lower for an intercept of 12.5) | the integers and `scl_slope` kept, the intercept written as `scl_inter` (`scl_slope` 1 where AFNI writes 0), so the output reads back as without the variable, to within half a stored unit; with `-rlt` and `-ignore`, the data read as without the variable (below) | with that variable (the command line, or `afni_settings`) |
-| AFNI-26 | an output that cannot be written (its directory is missing or cannot be written) is not written, and the exit status is 0 | an error (exit 1); `reproduce` prints AFNI's message, writes nothing and exits 0 (the replica since 2026-10-12; the clean-room original to follow) | the command line |
+| AFNI-26 | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error (exit 1); `reproduce` prints AFNI's message, writes nothing and exits 0 (both implementations, since 2026-10-12) | the command line |
 
 On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
 `-no_detrend`, fresh output names) none of them applies but AFNI-16, so the default output is
@@ -388,8 +388,10 @@ Found while completing 3dTshift, part 2b (2026-10-12; spec §3.1, §6.1, §7 and
   names are case-sensitive, `AFNI_NIFTI_VIEW` is a whole word in any case.
 - **AFNI crashes on `-ignore` without a value** (AFNI-25; larmorx: an error, exit 1, as AFNI's
   crash handler), and **exits 0 after a failed write** (AFNI-26: an output in a directory that
-  does not exist or cannot be written; larmorx: exit 1 by default, AFNI's result with the
-  switch).
+  does not exist or cannot be written, a read-only file, a directory of the output's name;
+  larmorx: exit 1 by default, AFNI's result with the switch). A directory of the output's name
+  is not an existing output for `AFNI_DECONFLICT` (no conflict, no renaming), and renaming
+  chooses a directory of the new name; AFNI then cannot open it.
 
 ## Deliberate differences
 

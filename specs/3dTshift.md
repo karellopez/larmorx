@@ -838,6 +838,13 @@ directory, else the `-prefix` (`sub/out.nii`); the conflict and rename messages 
 without its directory. `-verbose`'s `++ Wrote output:` names the file renamed as above, also
 when nothing was written (AFNI-11 with `-verbose` prints `++ Wrote output: ./out_AA1.nii`).
 larmorx's default differs only where AFNI-11 applies: an error before the work, exit 1.
+**(observed** by the clean-room implementer, 2026-10-12: a directory of the output's name is
+not an existing output: no AFNI-11, no stop with `N`, no renaming with `Y`; AFNI tries to
+write it and cannot open it, "A failed write" below. Renaming chooses the first name that is
+not a file, a directory of that name included: with `out.nii` a file and `out_AA1.nii` a
+directory, the output is `out_AA1.nii`, which cannot be opened. A read-only file of the
+output's name is an existing output as any other: AFNI-11 unless `AFNI_DECONFLICT` says to
+replace it, and then a failed write.**)**
 
 **An input name with a blank** (AFNI-18; observed). Unless `AFNI_PATH_SPACES_OK` is yes, AFNI
 reads the input name as a list of datasets separated by blanks (and `~`), to join in time:
@@ -1058,6 +1065,49 @@ name is the one `-verbose` prints, AFNI's name for the output (§7.1): `./out.ni
 Only the case where the file cannot be opened is reproduced; a write that fails later (a full
 disk) stays an error.
 
+**(observed** by the clean-room implementer of AFNI-26's switch, 2026-10-12, with the AFNI
+25.2.09 binary in a clean environment, as the parity suite runs it:
+- The cases where AFNI's writer cannot open the output: its directory is missing; a component
+  of its directory is a file (`-prefix f/out.nii` with `f` a file); its directory cannot be
+  written (a new output); the output is a read-only file and `-overwrite` or `AFNI_DECONFLICT`
+  (`OVERWRITE`, `O...`) says to replace it; a directory has the output's name (with or without
+  `-overwrite`, `AFNI_DECONFLICT=NO` or `YES`: a directory is not an existing output, above);
+  `AFNI_DECONFLICT=YES` renames to a name in a directory that cannot be written, or to a
+  directory's name (the message names the renamed file, `ro/out_AA1.nii`). An absolute name and
+  one with `..` are named as given (`'/x/out.nii'`, `'../x/out.nii'`); `.nii.gz` likewise
+  (`'nodir/out.nii.gz'`); `AFNI_NIFTI_WRITE_TYPE=2` (NIfTI-2) prints the same message.
+- The message is on standard error, without `AFNI_MESSAGE_PREFIX` (whatever its value) and
+  never in colour (also with `AFNI_MESSAGE_COLORIZE` unset). It comes where the file would be
+  written: after every other message of the run (after standard output's `++ updating time
+  offset` and `-verbose`'s slice lines, after the copy warning, after `Over-writing dataset` or
+  `changed output dataset name`), and just before `-verbose`'s `++ Wrote output:` line, which
+  stays as §7.1 says: plain after a shift, labelled (with `AFNI_MESSAGE_PREFIX`) after a copy.
+  With `AFNI_ECHO_COMMANDLINE`, the echoed command line comes first, as always.
+- A read-only file of the output's name without `-overwrite` and with `AFNI_DECONFLICT` unset is
+  AFNI-11 (two errors, nothing written, exit 0), not this; `AFNI_DECONFLICT=YES` with a
+  read-only `out.nii` in a writable directory writes `out_AA1.nii`. A name AFNI refuses when it
+  writes (AFNI-12's second check, e.g. `-d/out.nii` with `AFNI_ALLOW_ARBITRARY_FILENAMES`) gives
+  `Illegal filename for NIfTI output` and not this message, also when its directory is missing.
+- A one-row dataset (AFNI-20) in a missing directory: AFNI's 1D text writer fails without a
+  message; nothing is written, `-verbose`'s line is printed and the exit status is 0. With
+  `AFNI_WRITE_1D_AS_PREFIX` yes, the NIfTI message as above.
+- An existing output that can be written, in a directory that cannot be written, with
+  `-overwrite`: AFNI replaces it in place (exit 0). larmorx writes through a temporary file in
+  the output's directory (below), which cannot be created there: an error (exit 1) in both
+  modes, nothing written. A known difference, left as it is.**)**
+
+How larmorx tells (both modes, before writing, changing nothing on disk): a directory of the
+output's name; an existing file that cannot be opened for writing (opened without truncation,
+and closed); for a new file, a probe file that cannot be created in the output's directory
+(created and removed when it can). Only refusals count (the directory missing or not a
+directory, no permission, a read-only file system); other failures, such as a file another
+program holds open on Windows, are left to the write (§7.1, "Writing the output"). By default
+larmorx names AFNI-26 and fails (`** FATAL ERROR: cannot open output file '<name>' (<the
+system's reason>): nothing was written`, exit status 1), at the same point; a read-only output
+that `-overwrite` asks to replace is such a failure on every system, not replaced. `reproduce`
+prints no message for a one-row dataset without `AFNI_WRITE_1D_AS_PREFIX` (AFNI's 1D writer
+says nothing), although larmorx would have written NIfTI there (AFNI-20).
+
 **The defaults and the notices** (as §6.5, for this section; AFNI-11 and AFNI-12 are in §6.5):
 
 | Entry | `reproduce` (AFNI) | `fix` (default) | Named when |
@@ -1068,6 +1118,7 @@ disk) stays an error.
 | AFNI-21 | labels in terminal colours (above) | plain labels | never (messages only) |
 | AFNI-22 | `-D` read as above | the name before the first `=`, the value after it, as written | AFNI's reading would change what a variable of the table does (above) |
 | AFNI-23 | `AFNI_NIFTI_SCALE` no: uint8 and int16 data with a slope and an intercept kept as stored, the intercept dropped (above) | the intercept kept as the output's `scl_inter` (`scl_slope` 1 where AFNI writes 0); with `-rlt` and `-ignore`, the data read as without the variable | the output carries the intercept (anything but a shifted `-rlt` output), or `-rlt` with `-ignore` shifts |
+| AFNI-26 | an output AFNI's writer cannot open: the NIfTI library's message (none for a one-row dataset), nothing written, `-verbose`'s line, exit status 0 (above) | an error, exit status 1, nothing written | the output cannot be opened for writing (above) |
 
 **Writing the output: the cross-platform design** (decided 2026-10-12).
 - The output is written to a temporary file in its own directory (a hidden name ending with

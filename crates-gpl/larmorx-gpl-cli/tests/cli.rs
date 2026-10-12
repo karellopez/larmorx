@@ -360,6 +360,78 @@ fn tshift_global_options() {
     );
 }
 
+/// AFNI-23: `AFNI_NIFTI_SCALE=NO` keeps int16 data with a slope and an intercept as int16,
+/// with the slope as their scale factor, and AFNI drops the intercept. By default the output
+/// keeps it as `scl_inter`, so it reads back as the run without the variable does, to within
+/// half a stored unit; with `-rlt` the trend takes the intercept away (nothing to correct);
+/// with `-rlt -ignore` the data are read as without the variable.
+#[test]
+fn tshift_nifti_scale_no_keeps_the_intercept() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("in.nii");
+    common::int16_slope_inter(&input);
+    let input = input.to_str().unwrap();
+    let reproduce = ("LARMORX_UPSTREAM_DEFECTS", "reproduce");
+    let run = |extra: &[&str], out: &str, env: &[(&str, &str)]| {
+        let mut args = vec!["-tpattern", "alt+z", "-linear"];
+        args.extend(extra);
+        args.extend(["-prefix", out, input]);
+        let (code, err) = tshift_in(dir.path(), &args, env);
+        assert_eq!(code, Some(0), "{err}");
+        let (bytes, h) = common::read(&dir.path().join(out));
+        (common::scaled(&bytes, &h), bytes, h, err)
+    };
+    let max_diff = |a: &[f64], b: &[f64]| {
+        a.iter()
+            .zip(b)
+            .fold(0.0f64, |m, (x, y)| m.max((x - y).abs()))
+    };
+    let corrected = "upstream defect AFNI-23 (3dTshift) corrected";
+    let reproduced = "upstream defect AFNI-23 (3dTshift) reproduced";
+
+    // Without the variable: float32, slope * x + inter.
+    let (plain, _, h, err) = run(&[], "plain.nii", &[]);
+    assert_eq!((h.datatype, h.scl_slope), (16, 0.0));
+    assert!(!err.contains("AFNI-23"), "{err}");
+
+    // With it, from -D and from the environment alike.
+    let (fix, fix_bytes, h, err) = run(&["-DAFNI_NIFTI_SCALE=NO"], "fix.nii", &[]);
+    assert_eq!((h.datatype, h.scl_slope, h.scl_inter), (4, 0.25, 100.0));
+    assert!(err.contains(corrected), "{err}");
+    assert!(
+        max_diff(&fix, &plain) <= 0.125,
+        "{}",
+        max_diff(&fix, &plain)
+    );
+    let (_, env_bytes, _, _) = run(&[], "env.nii", &[("AFNI_NIFTI_SCALE", "NO")]);
+    assert_eq!(env_bytes, fix_bytes);
+    let (rep, rep_bytes, h, err) = run(&["-DAFNI_NIFTI_SCALE=NO"], "rep.nii", &[reproduce]);
+    assert_eq!((h.datatype, h.scl_slope, h.scl_inter), (4, 0.25, 0.0));
+    assert!(err.contains(reproduced), "{err}");
+    assert_eq!(rep_bytes, fix_bytes, "only the header differs");
+    assert!((max_diff(&rep, &plain) - 100.0).abs() <= 0.125);
+
+    // -rlt: the trend, intercept included, is removed; AFNI's output is right as it is.
+    let (rlt_plain, ..) = run(&["-rlt"], "rlt-plain.nii", &[]);
+    for env in [&[][..], &[reproduce][..]] {
+        let (rlt, _, h, err) = run(&["-rlt", "-DAFNI_NIFTI_SCALE=NO"], "rlt.nii", env);
+        assert_eq!((h.datatype, h.scl_inter), (4, 0.0));
+        assert!(!err.contains("AFNI-23"), "{err}");
+        assert!(max_diff(&rlt, &rlt_plain) <= 0.125);
+    }
+
+    // -rlt -ignore 2: the ignored volumes keep the intercept, the others lose it.
+    let ignore = ["-rlt", "-ignore", "2", "-DAFNI_NIFTI_SCALE=NO"];
+    let (_, plain_bytes, ..) = run(&ignore[..3], "ign-plain.nii", &[]);
+    let (_, bytes, h, err) = run(&ignore, "ign-fix.nii", &[]);
+    assert_eq!(h.datatype, 16);
+    assert_eq!(bytes, plain_bytes, "read as without the variable");
+    assert!(err.contains(corrected), "{err}");
+    let (_, _, h, err) = run(&ignore, "ign-rep.nii", &[reproduce]);
+    assert_eq!((h.datatype, h.scl_inter), (4, 0.0));
+    assert!(err.contains(reproduced), "{err}");
+}
+
 /// On Windows a rename over a file another program holds open fails; the output is renamed
 /// over it once it is released (here after 0.3 s), within the replica's retries.
 #[cfg(windows)]

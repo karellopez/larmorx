@@ -60,7 +60,10 @@
 //! - an input name with a blank is one file (AFNI-18; unless `AFNI_PATH_SPACES_OK` is YES,
 //!   AFNI reads it as a list of datasets, so an input in a directory with a blank cannot be
 //!   opened);
-//! - `-Dname=value` takes the value as written (AFNI-22; AFNI reads `-DX=a b` as `X=a=b`).
+//! - `-Dname=value` takes the value as written (AFNI-22; AFNI reads `-DX=a b` as `X=a=b`);
+//! - with `-rlt` and `-ignore`, data whose intercept `AFNI_NIFTI_SCALE=NO` dropped are read as
+//!   without the variable (AFNI-23, [`rlt_dropped_intercept`]; otherwise the dataset's writer
+//!   puts the intercept back).
 //!
 //! In `reproduce` mode the labels of warnings and errors carry AFNI's terminal escape codes
 //! unless `AFNI_MESSAGE_COLORIZE` is NO; by default they are plain text (AFNI-21).
@@ -766,6 +769,51 @@ fn write(
     Ok(shown)
 }
 
+/// AFNI-23 with `-rlt`, which removes the trend, intercept included, from every volume after
+/// the first `ignore`: those keep the intercept `AFNI_NIFTI_SCALE=NO` dropped
+/// ([`dataset::DroppedIntercept`]), the others no longer need it.
+///
+/// - Without `-ignore`, AFNI's output is right as it is: nothing changes and nothing is named.
+/// - With `-ignore n`, one `scl_inter` cannot describe both kinds of volume. The default reads
+///   the data as AFNI does without the variable (float32, `slope * x + inter`), which gives
+///   AFNI's output without it; `reproduce` keeps AFNI's integers, whose `n` first volumes are
+///   off by the intercept. Named in both modes.
+fn rlt_dropped_intercept(ds: &mut Dataset, ignore: usize, notices: &mut Notices) {
+    let Some(d) = ds.dropped_inter.as_mut() else {
+        return;
+    };
+    if ignore == 0 {
+        d.carried = false;
+        return;
+    }
+    let d = *d;
+    ds.dropped_inter = None;
+    let (ty, slope, inter) = (d.type_name(), fmt_g(d.slope), fmt_g(d.inter));
+    if notices.fix() {
+        notices.add(
+            &defects::AFNI_23,
+            format!(
+                "AFNI_NIFTI_SCALE=NO with -rlt and -ignore {ignore}: the ignored volumes keep \
+                 scl_inter {inter} and the detrended ones lose it, which one scl_inter cannot \
+                 describe, so the {ty} data are read as float32 with scl_slope {slope} and \
+                 scl_inter {inter} applied, as without the variable; AFNI keeps them as {ty} \
+                 and drops the intercept, so its {ignore} ignored volumes are off by {inter}"
+            ),
+        );
+        ds.data = dataset::BrickData::Float(d.scaled(&ds.data));
+        ds.factors.iter_mut().for_each(|f| *f = 0.0);
+    } else {
+        notices.add(
+            &defects::AFNI_23,
+            format!(
+                "AFNI_NIFTI_SCALE=NO with -rlt and -ignore {ignore}: the {ty} data are kept as \
+                 stored and scl_inter {inter} is dropped, as AFNI does: the {ignore} ignored \
+                 volumes are off by {inter}"
+            ),
+        );
+    }
+}
+
 /// `TS_copy_input_to_output()`: the dataset as read, written unchanged.
 fn copy_input_to_output(
     ds: &Dataset,
@@ -1097,6 +1145,9 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
                 fmt_g(f64::from(s))
             ));
         }
+    }
+    if o.rlt == Rlt::Nothing {
+        rlt_dropped_intercept(&mut ds, params.ignore, &mut notices);
     }
     let shift_notices = tshift(&mut ds, &params).map_err(|e| Fail::Fatal(e.to_string()))?;
     notices.extend(shift_notices);

@@ -173,6 +173,14 @@ output through a temporary file and a rename).
     writes a 1D text file (with a random identifier) unless `AFNI_WRITE_1D_AS_PREFIX` is yes.
   - AFNI-22 (`environ::prefilter`): `-Dname=value`'s value is the text after the first `=`;
     AFNI's `sscanf` reading (`environ::afni_setenv`) is used in `reproduce` mode.
+  - AFNI-23 (`dataset::read`, `dataset::write`, `cli::tshift::rlt_dropped_intercept`; user
+    decision 2026-10-12): with `AFNI_NIFTI_SCALE=NO`, `THD_open_nifti` keeps uint8 and int16
+    data with a slope and an intercept as stored, with the slope as brick factor, and the
+    intercept is lost (`THD_load_nifti` scales only float bricks). Both modes read them as AFNI
+    does; by default the output's `scl_inter` is the input's intercept (`scl_slope` 1 when
+    there is no factor), so it reads back as the input's values shifted. With `-rlt` the trend
+    takes the intercept with it: without `-ignore` nothing changes; with `-ignore` the data are
+    read as `THD_load_nifti` reads them without the variable (float, `slope * x + inter`).
   - AFNI-21 (`message::Style`; messages only): AFNI's terminal colour codes around warning and
     error labels are written in `reproduce` mode only.
 - **`long double`** (2026-10-12; until then the translation computed these in double).

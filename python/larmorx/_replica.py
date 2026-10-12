@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sysconfig
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -202,12 +202,16 @@ def run(
     n_threads: int = 1,
     upstream_defects: str | None = None,
     env: Mapping[str, str | None] | None = None,
+    exclude: Callable[[str], bool] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``<program> <family> <tool> args...`` in ``cwd``; :class:`ReplicaError` unless it
     exits with 0.
 
-    The program gets this process's environment, with the changes in ``env`` (a value of
-    ``None`` removes the variable). Replica programs take their thread count from
+    The program gets this process's environment without the variables ``exclude`` names
+    (``exclude(name)`` is true), with the changes in ``env`` (a value of ``None`` removes the
+    variable). A wrapper whose replica reads the upstream's own variables excludes them all and
+    passes its settings in ``env``, so that its result never depends on the caller's
+    environment (CLAUDE.md rule 6). Replica programs take their thread count from
     ``OMP_NUM_THREADS`` (AFNI's variable): it is set to ``n_threads``, or removed for 0 (all
     logical CPUs). Their results do not depend on it. They take D13's choice (``"fix"`` or
     ``"reproduce"``, ``docs/api/upstream-defects.md``) from ``LARMORX_UPSTREAM_DEFECTS``, as the
@@ -215,7 +219,7 @@ def run(
     """
     r = selected.replica
     command = [selected.program, r.family, r.tool, *args]
-    child_env = dict(os.environ)
+    child_env = {k: v for k, v in os.environ.items() if exclude is None or not exclude(k)}
     for name, value in (env or {}).items():
         if value is None:
             child_env.pop(name, None)

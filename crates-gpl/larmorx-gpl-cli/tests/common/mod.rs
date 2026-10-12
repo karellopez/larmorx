@@ -32,6 +32,17 @@ pub fn values() -> Vec<f64> {
 
 /// Writes a 4D file of `data` (TR 2 s), with `scl_slope` = `slope`.
 pub fn write<T: Element>(path: &Path, data: &[T], data_type: DataType, slope: f64) {
+    write_scaled(path, data, data_type, slope, 0.0);
+}
+
+/// Writes a 4D file of `data` (TR 2 s), with `scl_slope` = `slope` and `scl_inter` = `inter`.
+pub fn write_scaled<T: Element>(
+    path: &Path,
+    data: &[T],
+    data_type: DataType,
+    slope: f64,
+    inter: f64,
+) {
     let mut h = NiftiHeader::new(NiftiVersion::V1, &SHAPE, data_type).unwrap();
     let affine = Affine::from_zooms([2.0, 2.0, 3.0], [-4.0, -2.0, -6.0]);
     h.set_sform(&affine, 1);
@@ -39,7 +50,7 @@ pub fn write<T: Element>(path: &Path, data: &[T], data_type: DataType, slope: f6
     h.pixdim[4] = 2.0;
     h.xyzt_units = 2 | 8;
     h.scl_slope = slope;
-    h.scl_inter = 0.0;
+    h.scl_inter = inter;
     let view = ArrayViewD::from_shape(IxDyn(&SHAPE).f(), data).unwrap();
     nifti::write(path, &h, view, &WriteOptions::default()).unwrap();
 }
@@ -52,6 +63,37 @@ pub fn float32(path: &Path) {
 pub fn int16_scaled(path: &Path) {
     let v: Vec<i16> = values().iter().map(|&x| (x * 4.0).round() as i16).collect();
     write(path, &v, DataType::I16, 0.25);
+}
+
+/// int16 with `scl_slope` 0.25 and `scl_inter` 100.
+pub fn int16_slope_inter(path: &Path) {
+    let v: Vec<i16> = values().iter().map(|&x| (x * 4.0).round() as i16).collect();
+    write_scaled(path, &v, DataType::I16, 0.25, 100.0);
+}
+
+/// The values of a file `read` returned (int16 or float32 data), with its scaling applied as
+/// NIfTI defines it (`scl_slope` 0: none).
+pub fn scaled(bytes: &[u8], h: &NiftiHeader) -> Vec<f64> {
+    let raw: Vec<f64> = match h.datatype {
+        4 => bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|b| f64::from(i16::from_le_bytes(*b)))
+            .collect(),
+        16 => bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f64::from(f32::from_le_bytes(*b)))
+            .collect(),
+        other => panic!("unexpected data type {other}"),
+    };
+    if h.scl_slope == 0.0 {
+        raw
+    } else {
+        raw.iter().map(|x| x * h.scl_slope + h.scl_inter).collect()
+    }
 }
 
 /// Runs `exe` with `args` in larmorx's default mode (`LARMORX_UPSTREAM_DEFECTS` unset).

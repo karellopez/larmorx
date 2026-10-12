@@ -52,6 +52,9 @@ enum Input {
     Float32TinyOffsets,
     /// float32 with an sform 1e-4 rad (0.006°) from plumb, which AFNI writes plumb (AFNI-16).
     Float32NearlyPlumb,
+    /// int16 with `scl_slope` 0.25 and `scl_inter` 100, whose intercept `AFNI_NIFTI_SCALE=NO`
+    /// drops (AFNI-23).
+    Int16Intercept,
 }
 
 struct Case {
@@ -298,6 +301,44 @@ const CASES: &[Case] = &[
         ],
     },
     Case {
+        id: "3dTshift.linear.int16-intercept.nifti-scale-no",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &["AFNI-23"],
+        mode: "fix",
+        input: Input::Int16Intercept,
+        args: &["-DAFNI_NIFTI_SCALE=NO", "-tpattern", "seq+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.int16-intercept.nifti-scale-no.reproduce",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &["AFNI-23"],
+        mode: "reproduce",
+        input: Input::Int16Intercept,
+        args: &["-DAFNI_NIFTI_SCALE=NO", "-tpattern", "seq+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.int16-intercept.nifti-scale-no.rlt-ignore",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &["AFNI-23"],
+        mode: "fix",
+        input: Input::Int16Intercept,
+        args: &[
+            "-DAFNI_NIFTI_SCALE=NO",
+            "-tpattern",
+            "seq+z",
+            "-linear",
+            "-rlt",
+            "-ignore",
+            "2",
+        ],
+    },
+    Case {
         id: "3dTshift.linear.float32.msec.reproduce",
         tool: "afni 3dTshift",
         env: &[],
@@ -426,6 +467,7 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         ("float32-defects", dir.join("float32-defects.nii")),
         ("float32-tiny-offsets", dir.join("float32-tiny-offsets.nii")),
         ("float32-nearly-plumb", dir.join("float32-nearly-plumb.nii")),
+        ("int16-intercept", dir.join("int16-intercept.nii")),
     ]);
     let f32s: Vec<f32> = values.iter().map(|&v| v as f32 / 4.0).collect();
     write_input(&paths["float32"], &f32s, DataType::F32, 0.0);
@@ -445,6 +487,9 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         &nearly_plumb_header(),
         &f32s,
     );
+    let mut intercept = input_header(DataType::I16, 0.25);
+    intercept.scl_inter = 100.0;
+    write_with(&paths["int16-intercept"], &intercept, &i16s);
     paths
 }
 
@@ -710,6 +755,7 @@ fn golden() {
             Input::Float32Defects => &inputs["float32-defects"],
             Input::Float32TinyOffsets => &inputs["float32-tiny-offsets"],
             Input::Float32NearlyPlumb => &inputs["float32-nearly-plumb"],
+            Input::Int16Intercept => &inputs["int16-intercept"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];

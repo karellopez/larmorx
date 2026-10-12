@@ -5,8 +5,12 @@ bit-exact replica from ``larmorx-gpl``, run as a separate program).
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
 by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
 intercept (AFNI-02), header slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel
-pairs (AFNI-05) and metre or micron units (AFNI-07). ``upstream_defects="reproduce"`` gives
-AFNI's output."""
+pairs (AFNI-05), metre or micron units (AFNI-07) and nearly plumb grids (AFNI-16); the replica
+also corrects the intercept ``AFNI_NIFTI_SCALE=NO`` drops (AFNI-23).
+``upstream_defects="reproduce"`` gives AFNI's output.
+
+AFNI's environment variables are settings of the call (``afni_settings``), never read from the
+process environment (CLAUDE.md rule 6); the command line reads them from it, as AFNI does."""
 
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ import math
 import os
 import tempfile
 import warnings
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -54,12 +58,93 @@ RestoreName = Literal["trend", "none", "intercept"]
 _METHOD_OPTIONS = {m: "-Fourier" if m == "fourier" else f"-{m}" for m in METHODS}
 _RESTORE_OPTIONS = {"trend": [], "none": ["-rlt"], "intercept": ["-rlt+"]}
 
-#: AFNI's environment for the replica, over this process's: the input is a path, never a list
-#: of datasets separated by blanks (AFNI-18); its messages are plain text without a prefix, as
-#: this wrapper reads them, and without AFNI's report on oblique inputs (advice for AFNI's own
-#: programs, not a warning about this result). AFNI's other variables are passed on, so that
-#: the replica reads the input and writes its output as the command line would.
-_REPLICA_ENV = {
+# AFNI's environment variables (specs/3dTshift.md §7.1). ``tshift`` never reads them from the
+# process environment (CLAUDE.md rule 6): ``afni_settings`` gives them, and the replica runs
+# with exactly those, the caller's own AFNI variables removed. The command line
+# (``larmorx afni 3dTshift``) reads the environment, as AFNI does.
+
+#: The variables that change what ``tshift`` returns (values, header, warnings): the replica
+#: applies them; the clean-room original does not read them yet (completing 3dTshift, part 2b),
+#: so with it they raise ``NotImplementedError``.
+_SETTINGS_APPLIED = frozenset(
+    {
+        "AFNI_NIFTI_PRIORITY",
+        "AFNI_NIFTI_SCALE",
+        "AFNI_NIFTI_VIEW",
+        "AFNI_DEFAULT_STD_SPACE",
+        "AFNI_NIFTI_WRITE_TYPE",
+        "AFNI_NOREALPATH",
+    }
+)
+
+#: The variables 3dTshift reads that change nothing ``tshift`` returns, with either
+#: implementation: they concern the output's file name (``tshift`` writes a fresh temporary
+#: file), the slice-time file (``tshift`` writes it), ``-TR`` in milliseconds (``tshift``
+#: passes seconds), messages ``tshift`` does not turn into warnings, or what larmorx never
+#: writes or prints (spec §7.1's list). Accepted and passed to the replica.
+_SETTINGS_NO_EFFECT = frozenset(
+    {
+        "AFNI_DECONFLICT",
+        "AFNI_ALLOW_ARBITRARY_FILENAMES",
+        "HOME",
+        "AFNI_NIFTI_TYPE_WARN",
+        "AFNI_1D_ZERO_TEXT",
+        "AFNI_USE_FGETS",
+        "AFNI_ALLOW_MILLISECONDS",
+        "AFNI_WRITE_1D_AS_PREFIX",
+        "AFNI_DONT_LOGFILE",
+        "AFNI_QUIET_STARTUP",
+        "AFNI_NIFTI_NOEXT",
+        "AFNI_HISTDB_SCRIPT",
+        "AFNI_HISTORY_NAME",
+        "AFNI_HISTORY_USERNAME",
+        "AFNI_INCLUDE_HISTORY",
+        "IDCODE_PREFIX",
+        "AFNI_INDEX_PREFIX",
+        "AFNI_TRACE",
+        "AFNI_TRACE_FILE",
+        "AFNI_NIFTI_DEBUG",
+        "NIML_DEBUG",
+        "AFNI_WAMI_DEBUG",
+        "AFNI_DEBUG",
+        "AFNI_SYSTEM_AFNIRC",
+        "AFNI_ENVIRON_RESET",
+        "AFNI_ENVIRON_WARNINGS",
+        "AFNI_RANDOM_SEEDVAL",
+        "AFNI_NOMMAP",
+        "AFNI_FLOATSCAN",
+        "AFNI_BYTEORDER",
+        "AFNI_NIML_BUFSIZE",
+        "NIML_BUFSIZE",
+        "BUFSIZE",
+        "AFNI_ATLAS_PATH",
+        "AFNI_PLUGINPATH",
+        "AFNI_PLUGIN_PATH",
+        "AFNI_SUPP_ATLAS",
+        "AFNI_SUPP_ATLAS_DIR",
+        "AFNI_LOCAL_ATLAS",
+        "AFNI_USE_THD_open_dataset",
+        "AFNI_TCAT_SELECTORS",
+        "AFNI_TCAT_SELECTORS_VERB",
+        "AFNI_1D_TRANOUT",
+        "AFNI_3D_BINARY",
+        "AFNI_AUTOGZIP",
+        "AFNI_COMPRESSOR",
+        "AFNI_DONT_USE_PIGZ",
+        "AFNI_WRITE_NIML",
+        "AFNI_GLOB_DEBUG",
+        "AFNI_GLOB_SELECTORS",
+        "AFNI_SHELL_GLOB",
+        "SKIP_COMPRESS_SETUP",
+    }
+)
+
+#: What ``tshift`` sets itself for the replica (``None``: unset), whatever ``afni_settings``
+#: says, which may not name them: the input is a path, never a list of datasets separated by
+#: blanks (AFNI-18; temporary directories can have blanks); its messages are plain text without
+#: a prefix or an echoed command line, as this wrapper reads them, and without AFNI's report on
+#: oblique inputs (advice for AFNI's own programs, not a warning about this result).
+_SETTINGS_FIXED: dict[str, str | None] = {
     "AFNI_PATH_SPACES_OK": "YES",
     "AFNI_MESSAGE_COLORIZE": "NO",
     "AFNI_MESSAGE_PREFIX": None,
@@ -67,13 +152,57 @@ _REPLICA_ENV = {
     "AFNI_NO_OBLIQUE_WARNING": "YES",
 }
 
+#: AFNI's variables without the ``AFNI_`` or ``NIML_`` prefix.
+_AFNI_OTHER_NAMES = frozenset({"IDCODE_PREFIX", "BUFSIZE", "SKIP_COMPRESS_SETUP"})
+
+
+def _is_afni_variable(name: str) -> bool:
+    """Whether a variable of the process environment is one of AFNI's, which the replica must
+    not inherit (whatever its case: Windows does not tell them apart)."""
+    upper = name.upper()
+    return upper.startswith(("AFNI_", "NIML_")) or upper in _AFNI_OTHER_NAMES
+
+
+def _check_settings(afni_settings: Mapping[str, str] | None) -> dict[str, str]:
+    """``afni_settings`` as a plain dict, after checking each name and value."""
+    if afni_settings is None:
+        return {}
+    if not isinstance(afni_settings, Mapping):
+        raise TypeError(
+            f"afni_settings must be a mapping of AFNI variable names to values, not "
+            f"{type(afni_settings).__name__}"
+        )
+    settings: dict[str, str] = {}
+    for name, value in afni_settings.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise TypeError(f"afni_settings: names and values must be str, not {name!r}: {value!r}")
+        if name in _SETTINGS_FIXED:
+            raise ValueError(
+                f"afni_settings: lx.afni.tshift sets {name} itself (a path is one file; plain "
+                f"messages, read as warnings); leave it out"
+            )
+        if name not in _SETTINGS_APPLIED and name not in _SETTINGS_NO_EFFECT:
+            raise ValueError(
+                f"afni_settings: AFNI's 3dTshift does not read {name!r} (names are "
+                f"case-sensitive; the variables are listed in specs/3dTshift.md §7.1)"
+            )
+        if value == "" or "\0" in value:
+            raise ValueError(
+                f"afni_settings: {name} needs a non-empty value without NUL characters, not "
+                f"{value!r} (leave it out to unset it)"
+            )
+        settings[name] = value
+    return settings
+
 
 def _scaled(data: np.ndarray, header: NiftiHeader) -> np.ndarray:
-    """What ``lx.load`` returns for data stored with ``header``'s ``scl_slope``."""
-    slope = header.scl_slope
-    if slope == 0 or not math.isfinite(slope) or slope == 1:
+    """What ``lx.load`` returns for data stored with ``header``'s ``scl_slope`` and
+    ``scl_inter`` (the replica writes an intercept when AFNI-23 is corrected)."""
+    scaling = header.slope_inter
+    if scaling is None or scaling == (1.0, 0.0):
         return data
-    return data.astype(np.float64) * slope
+    slope, inter = scaling
+    return data.astype(np.float64) * slope + inter
 
 
 def tshift(
@@ -90,6 +219,7 @@ def tshift(
     n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
+    afni_settings: Mapping[str, str] | None = None,
 ) -> Image:
     """Align every slice of a 4D image to one time origin (AFNI's ``3dTshift``).
 
@@ -136,16 +266,28 @@ def tshift(
         installed (``pip install "larmorx[exact]"``), else the clean-room original.
         ``"replica"`` or ``"original"`` force one. The replica runs as a separate program on
         temporary NIfTI files (``docs/licensing.md``). The two differ only in the last bits of
-        some values (``docs/validation/afni-tshift.md``). The replica reads AFNI's environment
-        variables (``AFNI_NIFTI_PRIORITY``, ``AFNI_NIFTI_VIEW``, ...) as the command line
-        does, except that a path with blanks is always one file (``AFNI_PATH_SPACES_OK=YES``),
-        its messages are plain text and an oblique input is not reported
-        (``docs/api/afni-tshift.md``, "AFNI's global options and environment variables").
+        some values (``docs/validation/afni-tshift.md``).
     upstream_defects
-        ``"fix"`` (default) corrects AFNI's defects AFNI-01, -02, -05 and -07;
-        ``"reproduce"`` gives AFNI's output. A :class:`~larmorx.UpstreamDefectWarning` names
-        each defect that changed the result (or, reproduced, would have been corrected). The
-        replica receives the choice as ``LARMORX_UPSTREAM_DEFECTS``.
+        ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -05, -07, -16, and with
+        ``afni_settings`` AFNI-23); ``"reproduce"`` gives AFNI's output. A
+        :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result (or,
+        reproduced, would have been corrected). The replica receives the choice as
+        ``LARMORX_UPSTREAM_DEFECTS``.
+    afni_settings
+        AFNI's environment variables for this call, by name, e.g.
+        ``{"AFNI_NIFTI_PRIORITY": "Q"}`` (``specs/3dTshift.md`` §7.1;
+        ``docs/api/afni-tshift.md``, "AFNI's settings in Python"). **The process environment
+        is never read**: the same call gives the same result whatever the shell has set. The
+        replica runs with exactly these (AFNI's variables of this process removed) and the
+        ones ``tshift`` sets itself, which may not be given: a path is one file
+        (``AFNI_PATH_SPACES_OK``), messages are plain (``AFNI_MESSAGE_COLORIZE``,
+        ``AFNI_MESSAGE_PREFIX``, ``AFNI_ECHO_COMMANDLINE``), oblique inputs are not reported
+        (``AFNI_NO_OBLIQUE_WARNING``). Names are case-sensitive; a name 3dTshift does not
+        read, or an empty value, is a ``ValueError``. ``AFNI_NIFTI_PRIORITY``,
+        ``AFNI_NIFTI_SCALE``, ``AFNI_NIFTI_VIEW``, ``AFNI_DEFAULT_STD_SPACE``,
+        ``AFNI_NIFTI_WRITE_TYPE`` and ``AFNI_NOREALPATH`` change the result; the clean-room
+        original does not read them yet and raises ``NotImplementedError``. The other
+        variables 3dTshift reads change nothing a call returns, with either implementation.
 
     Returns
     -------
@@ -159,9 +301,15 @@ def tshift(
     Raises
     ------
     ValueError
-        Invalid arguments. The checks that need the image (the number of slice times, their
-        range, ``slice``, ``ignore``) are made by the implementation that runs: the replica
-        reports them as a :class:`~larmorx.ReplicaError`.
+        Invalid arguments (``afni_settings`` included). The checks that need the image (the
+        number of slice times, their range, ``slice``, ``ignore``) are made by the
+        implementation that runs: the replica reports them as a
+        :class:`~larmorx.ReplicaError`.
+    TypeError
+        ``afni_settings`` is not a mapping of strings to strings.
+    NotImplementedError
+        ``afni_settings`` names a variable that changes the result while the clean-room
+        original runs (``implementation="original"``, or ``"auto"`` without the replica).
     larmorx.ReplicaNotFoundError
         ``implementation="replica"`` without ``larmorx-gpl`` installed.
     larmorx.ReplicaError
@@ -169,6 +317,7 @@ def tshift(
     """
     _check(slice_times, tr, tzero, slice, ignore, method, restore, detrend)
     _defects.check(upstream_defects)
+    settings = _check_settings(afni_settings)
     if not detrend and method == "fourier":
         warnings.warn(
             "detrend=False (-no_detrend) with Fourier interpolation: AFNI calls it dangerous",
@@ -190,7 +339,16 @@ def tshift(
     )
     selected = _replica.select("afni", "3dTshift", implementation)
     if selected is not None:
-        return _tshift_replica(selected, image, times, options)
+        return _tshift_replica(selected, image, times, options, settings)
+    unsupported = sorted(name for name in settings if name in _SETTINGS_APPLIED)
+    if unsupported:
+        them = "it" if len(unsupported) == 1 else "them"
+        raise NotImplementedError(
+            f"afni_settings: the clean-room original of 3dTshift does not read "
+            f"{', '.join(unsupported)} yet (specs/3dTshift.md §7.1; completing 3dTshift, part "
+            f"2b). Run the replica (implementation='replica', pip install \"larmorx[exact]\") "
+            f"or leave {them} out."
+        )
     if isinstance(image, (str, os.PathLike)):
         data, fields, messages, notices = _core.afni_tshift_file(os.fspath(image), times, **options)
         header = NiftiHeader.from_dict(fields)
@@ -264,9 +422,12 @@ def _tshift_replica(
     image: Any,
     times: str | list[float],
     options: dict[str, Any],
+    settings: dict[str, str],
 ) -> Image:
     """``larmorx-gpl afni 3dTshift`` on files in a temporary directory, with the options
-    ``lx.afni.tshift`` has (they mean what the same options mean on the command line)."""
+    ``lx.afni.tshift`` has (they mean what the same options mean on the command line), and
+    AFNI's environment variables ``settings`` and :data:`_SETTINGS_FIXED` in place of this
+    process's."""
     implementation = selected.implementation()
     n_threads = options["n_threads"]
     with tempfile.TemporaryDirectory(prefix="larmorx-tshift-", ignore_cleanup_errors=True) as tmp:
@@ -292,7 +453,8 @@ def _tshift_replica(
             cwd=tmp,
             n_threads=n_threads,
             upstream_defects=options["upstream_defects"],
-            env=_REPLICA_ENV,
+            env={**settings, **_SETTINGS_FIXED},
+            exclude=_is_afni_variable,
         )
         out = os.path.join(tmp, "out.nii")
         data = _core.nifti_read(out, "raw", n_threads)[0]

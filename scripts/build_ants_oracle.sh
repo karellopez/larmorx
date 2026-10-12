@@ -160,7 +160,8 @@ cmake --build "$OUT/itk-build" -j "$JOBS" > "$OUT/logs/itk-build.log" 2>&1
 
 PROGRAMS=(ImageMath ThresholdImage SmoothImage ResampleImage ResampleImageBySpacing
   MultiplyImages antsApplyTransforms antsRegistration N4BiasFieldCorrection DenoiseImage
-  Atropos antsAI LabelGeometryMeasures PrintHeader CopyImageHeaderInformation)
+  Atropos antsAI antsAffineInitializer LabelGeometryMeasures PrintHeader
+  CopyImageHeaderInformation)
 echo "configuring ANTs v2.6.5 ..."
 cmake -S "$ANTS_SRC" -B "$OUT/ants-build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \

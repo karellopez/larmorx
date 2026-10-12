@@ -1041,15 +1041,20 @@ Options parsed: `*+ WARNING: TR expressed in milliseconds is deprecated [not wan
 `-TR` in milliseconds, and `*+ WARNING: -no_detrend with Fourier interpolation is dangerous`,
 come first, as their options are read. An option without its value: `** FATAL ERROR: -TR needs
 an argument!` (likewise `-tzero`, `-slice`, `-prefix`, `-tpattern`); AFNI 25.2.09 crashes on
-`-ignore` without a value (a segmentation fault, exit 1; a class (a) defect for the register):
+`-ignore` without a value (a segmentation fault, exit 1; AFNI-25, class (a)):
 larmorx refuses it as the others, in both modes. `3dTshift -h` prints nothing and exits 1;
 larmorx prints its help.
 
-**A failed write** (observed by the clean-room implementer, 2026-10-12; for the register). When
-the output cannot be created (its directory does not exist), AFNI prints `** ERROR
-(nifti_image_write_engine): cannot open output file 'sub/out.nii'` without a label, then
-`-verbose`'s `++ Wrote output: sub/out.nii`, and exits with status 0, as for AFNI-11. larmorx
-fails with a message and exit status 1 in both modes; no switch reproduces it yet.
+**A failed write** (AFNI-26; observed by the clean-room implementer, 2026-10-12). When the
+output cannot be created (its directory does not exist, or cannot be written), AFNI prints
+`** ERROR (nifti_image_write_engine): cannot open output file 'sub/out.nii'` without a label
+(never in colour, whatever `AFNI_MESSAGE_COLORIZE` says), then `-verbose`'s
+`++ Wrote output: sub/out.nii`, writes nothing and exits with status 0, as for AFNI-11. The
+name is the one `-verbose` prints, AFNI's name for the output (§7.1): `./out.nii` for
+`-prefix out.nii`, `./d/out.nii` for `-prefix ./d/out.nii`, an absolute path as given; for a
+`.hdr`/`.img` pair, the `.hdr`. Shifts and copies alike, `.nii` and `.nii.gz` alike (observed
+2026-10-12). larmorx fails with a message and exit status 1 in both modes; no switch
+reproduces it yet.
 
 **The defaults and the notices** (as §6.5, for this section; AFNI-11 and AFNI-12 are in §6.5):
 

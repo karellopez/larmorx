@@ -42,7 +42,8 @@ reproduces at all); **decide** = needs a user decision first; **rule 8** = to fo
 source (decided); **replica** = corrected in the clean-room original, the replica's switch
 still to do; **original** = corrected by default in both 3dTshift implementations, but the
 clean-room original's `reproduce` did not give AFNI's result yet (none left since 2026-10-12,
-completing 3dTshift, part 2b); – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
+completing 3dTshift, part 2b); **switch** = corrected by default in both 3dTshift
+implementations, the compatibility switch still to do in both; – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
 
 | ID | Tool | Defect | Class | fMRIPrep users | larmorx today | Gap |
 |---|---|---|---|---|---|---|
@@ -148,18 +149,20 @@ completing 3dTshift, part 2b); – = nothing to do. How the switch works: [api/u
 | AFNI-10 † | 3dTshift | AFNI's own header extension (7 digits) wins over the NIfTI header | d | AFNI-written inputs | replica reproduces; original ignores | – |
 | AFNI-11 † | 3dTshift | existing output: not written, exit 0 (unless `-overwrite` or `AFNI_DECONFLICT` says to overwrite, rename or stop) | e | none | error (exit 1) in both implementations; `reproduce` exits 0 without writing; `-overwrite` and `AFNI_DECONFLICT` as AFNI in both modes (both implementations, the original since 2026-10-12; spec §6.3, §7.1) | – |
 | AFNI-12 † | 3dTshift | output names with blanks or non-ASCII refused, at the option scan (exit 1) and, for names starting with `3dcalc`, when written (nothing written, exit 0); with `AFNI_ALLOW_ARBITRARY_FILENAMES` only empty names and, when written, names starting with `-` | e | paths with blanks | any name accepted in both implementations; `reproduce` refuses them at both checks, with the variable as AFNI (the original since 2026-10-12; spec §6.3, §7.1) | – |
-| AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | – | – |
-| AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | – | – |
+| AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | AFNI's text in both implementations (the original since 2026-10-12) | – |
+| AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | AFNI's text in both implementations (the original since 2026-10-12) | – |
 | AFNI-15 † | AFNI build | parallel make races | b | none | – | – |
 | AFNI-16 † | 3dTshift | a matrix within about 0.01° to 0.024° of plumb (a single-precision test; the angle depends on the voxel size) is written plumb, its tilt discarded | c | slightly oblique inputs | corrected by default in both implementations (keeps the matrix; decided 2026-10-12); `reproduce` writes AFNI's plumb matrix byte for byte in both (the original since 2026-10-12, spec §6.1) | – |
 | AFNI-17 † | 3dTshift | the slice fields of a copy describe its slice times only to within 3 ms (slices less than 3 ms apart can be shifted by one in the range) | d | none | both implementations reproduce it in both modes (the original since 2026-10-12, spec §6.2) | – |
 | AFNI-18 † | 3dTshift | an input name with a blank is read as a list of datasets (unless `AFNI_PATH_SPACES_OK`): an input in a directory with a blank cannot be opened | e | paths with blanks | both implementations read one file by default, AFNI's list in `reproduce` (2026-10-12; spec §7.1) | – |
 | AFNI-19 † | 3dTshift | `AFNI_ALLOW_MILLISECONDS` with `-TR` in ms: `toffset` written in ms, labelled seconds | c | none | both implementations write seconds by default, AFNI's in `reproduce` (2026-10-12; spec §7.1) | – |
 | AFNI-20 † | 3dTshift | a one-row dataset written as a 1D text file under the NIfTI name (unless `AFNI_WRITE_1D_AS_PREFIX`) | c | none | NIfTI in both implementations and both modes, the decision named (AFNI's file has a random identifier) | – |
-| AFNI-21 † | 3dTshift | warning and error labels in terminal colour codes, also in files and pipes | f | log files | the replica's `reproduce` writes them; plain labels by default | – |
+| AFNI-21 † | 3dTshift | warning and error labels in terminal colour codes, also in files and pipes | f | log files | `reproduce` writes them in both implementations (the original since 2026-10-12); plain labels by default | – |
 | AFNI-22 † | 3dTshift | `-Dname=value` with blanks or a blank around `=` sets another value (`-DX=a b` sets `a=b`) | e | none | both implementations read the value as written by default, as AFNI in `reproduce` (2026-10-12; spec §7.1) | – |
 | AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in both implementations (decided 2026-10-12; the original the same day): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1) | – |
-| AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | the replica gives x86-64's results on every platform (2026-10-12) | – |
+| AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | both implementations give x86-64's results on every platform (2026-10-12) | – |
+| AFNI-25 † | 3dTshift | `-ignore` as the last argument: a crash (exit 1 from AFNI's signal handler, with a crash banner) | a | none | "-ignore needs an argument!", exit 1, in both implementations and both modes | – |
+| AFNI-26 † | 3dTshift | a NIfTI output that cannot be created (missing or read-only directory): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations and both modes | switch |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -179,24 +182,26 @@ completing 3dTshift, part 2b); – = nothing to do. How the switch works: [api/u
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (132 entries; an entry with two classes counts under its first):
+**Counts** (134 entries; an entry with two classes counts under its first):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 13 | |
+| (a) crash, undefined behaviour, out of bounds | 14 | |
 | (b) race, nondeterminism | 6 | |
 | (c) deterministic bug that changes results | 58 | 14 |
 | (d) imprecision | 19 | |
-| (e) command-line or parsing quirk | 28 | |
+| (e) command-line or parsing quirk | 29 | |
 | (f) documentation or message only | 8 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
 column (2026-10-12, after completing 3dTshift, part 2b): no **yes**, no **replica** and no
 **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18, -19, -22 and -23,
-closed by the clean-room original that day), 18 decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept), AFNI-16 (a
+closed by the clean-room original that day), 1 **switch** (AFNI-26, added the same day), 18
+decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept), AFNI-16 (a
 defect, corrected by default) and AFNI-23 (a defect, corrected by default) on 2026-10-12;
-AFNI-17 (an imprecision) was added the same day. The first D13
+AFNI-17 (an imprecision) was added the same day, and AFNI-25 and AFNI-26 (found by the
+clean-room implementer of part 2b) after it. The first D13
 switches (2026-10-11) corrected 13 entries; part 1 (2026-10-12) the 29 ANTs and ITK entries
 marked **yes**, ANTS-06 and SCI-02 (decided), ANTS-47 (new), and gave ANTS-07, -19, -28, -29
 and ITK-08 a compatibility switch (Decisions, item 5);
@@ -236,7 +241,8 @@ variables in the replica, with AFNI-18, -19 and -22 (spec §7.1), and AFNI-23 co
 default (decided 2026-10-12). The clean-room original followed (completing 3dTshift, part 2b, 2026-10-12): `reproduce`
 for AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12, AFNI-16, AFNI-18, AFNI-19, AFNI-22 and
 AFNI-23, AFNI-03's notice when the corrected times make the output a copy, and AFNI's global
-options and variables (spec §6.1 to §6.5 and §7.1); nothing is left for 3dTshift.
+options and variables (spec §6.1 to §6.5 and §7.1). Left for 3dTshift: AFNI-26's switch, in
+both implementations (found the same day).
 
 **Main package (`crates/`, `python/larmorx/`), ANTs and ITK** (done 2026-10-12):
 
@@ -318,6 +324,7 @@ the oracle, and AFNI-11 and AFNI-12 given a switch:
 | AFNI-16 | a nearly plumb matrix written plumb | the replica's writer (default changed 2026-10-12); the original's (`larmorx_afni::geometry`, 2026-10-12) | slightly oblique inputs |
 | AFNI-18, AFNI-19, AFNI-22 | an input name with a blank; `AFNI_ALLOW_MILLISECONDS`; `-D` values | the replica's input opening, writer and global options (2026-10-12); the original's (`larmorx_afni::input`, `larmorx_afni::settings`, `larmorx_afni::cli::tshift`, 2026-10-12) | paths with blanks |
 | AFNI-23 | `AFNI_NIFTI_SCALE=NO` drops the intercept | the replica's reader, writer and `-rlt` path (2026-10-12); the original's (`larmorx_afni::dataset::intercept_plan`, 2026-10-12) | none |
+| AFNI-26 | a failed write exits 0 | **to do**, both implementations: the output writing of the replica's command line and of the original's (`larmorx_afni::output::write_replacing`, `larmorx_afni::cli::tshift`); `reproduce` prints the NIfTI library's message, `-verbose`'s line, and exits 0 (spec §7.1, "A failed write") | none |
 
 ### Decisions needed before switching
 
@@ -1504,15 +1511,14 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **larmorx:** both implementations convert the whole matrix and the origin by default and
   warn (the original since 2026-10-11, the replica since 2026-10-12:
   `larmorx_gpl_afni::dataset::geometry`, `larmorx_gpl_afni::axes`); the replica reproduces AFNI
-  byte for byte with the switch. The original's `reproduce` converts the linear part of an
-  oblique sform too (its spec §6 describes the plumb case): an expected divergence in its
-  record (`defects/oblique-metre`).
-- **D13 / gap:** the original's `reproduce` for oblique grids. The spec describes AFNI's
-  geometry byte for byte since 2026-10-12 (§6.1: 162 inputs, six orientations, plumb, nearly
-  plumb and oblique, sform, qform and both, millimetres, metres and micrometres), and when the
-  notice is due: metres or micrometres with an origin, or with an entry off the axes (an
-  oblique or nearly plumb matrix, whose conversion differs in at least one AFNI-16 mode; the
-  replica names AFNI-07 so since 2026-10-12, in both modes alike).
+  byte for byte with the switch. So does the clean-room original since 2026-10-12 (completing
+  3dTshift, part 2b; `larmorx_afni::geometry`, from spec §6.1): `defects/oblique-metre` and
+  `-zero-origin`, once expected divergences in its record, pass.
+- **D13 / gap:** done. The spec describes AFNI's geometry byte for byte (§6.1: 162 inputs, six
+  orientations, plumb, nearly plumb and oblique, sform, qform and both, millimetres, metres and
+  micrometres), and when the notice is due: metres or micrometres with an origin, or with an
+  entry off the axes (an oblique or nearly plumb matrix, whose conversion differs in at least
+  one AFNI-16 mode; both implementations name AFNI-07 so, in both modes alike).
 
 ### AFNI-08 † An all-zero slice-time list writes `slice_end` 0 — (c)
 - **What:** when the output keeps slice offsets, `populate_nifti_image`
@@ -1535,15 +1541,15 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **larmorx:** the replica makes the test what it meant ("no time away from 0") by default, so
   such a list gets no slice code, no duration and `slice_end = nz − 1`, and reproduces
   `slice_end = 0` with the switch, warning in both modes (2026-10-12:
-  `larmorx_gpl_afni::dataset::slice_fields`). The clean-room original writes `nz − 1` always,
-  but keeps the input header's slice code and duration in a copy (code 1, 0.5 ms here), where
-  AFNI derives them from the times; it has no switch (`defects/tiny-offsets-copy`, an expected
-  divergence in its record).
-- **D13 / gap:** the original's switch. The spec describes the trigger and the derivation of
-  the slice fields of a copy since 2026-10-12 (§6.2; the rule matched AFNI's fields on 150
-  random header timings, 30 of them AFNI-08). The same derivation writes AFNI-17's fields and
-  turns a two-slice header code 3 into code 1, which the original does not follow yet either
-  (`copy/short-slice-spacing`, `copy/alt-two-slices`, expected divergences in its record).
+  `larmorx_gpl_afni::dataset::slice_fields`). The clean-room original does the same since
+  2026-10-12 (completing 3dTshift, part 2b; `larmorx_afni::timing::copy_slice_fields`, from
+  spec §6.2). Until then it wrote `nz − 1` always and kept the input header's slice code and
+  duration in a copy (code 1, 0.5 ms here), where AFNI derives them from the times.
+- **D13 / gap:** done. The spec describes the trigger and the derivation of the slice fields of
+  a copy (§6.2; the rule matched AFNI's fields on 150 random header timings, 30 of them
+  AFNI-08). The same derivation writes AFNI-17's fields and turns a two-slice header code 3
+  into code 1; both implementations follow it (`defects/tiny-offsets-copy`,
+  `copy/short-slice-spacing`, `copy/alt-two-slices` pass in both records).
 
 ### AFNI-09 † Slice-time files are rounded two ways — (d)
 - **What:** a line without a letter, `*` or `@` is read with `strtod` and rounded to float
@@ -1589,13 +1595,15 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **fMRIPrep:** none (fresh working directories).
 - **larmorx:** an error, exit 1, in both implementations by default; the replica's switch
   (2026-10-12) prints AFNI's two messages, writes nothing and exits 0, as AFNI does with its
-  environment variables unset. The clean-room original has no switch. Since 2026-10-12
-  (AFNI's global options, `specs/3dTshift.md` §7.1) the replica takes `-overwrite` and
-  `AFNI_DECONFLICT` (also as `-DAFNI_DECONFLICT=...`) in both modes, with AFNI's messages:
-  AFNI-11 applies only where AFNI would not overwrite, rename or stop; `-verbose`'s
-  misleading name is reproduced in `reproduce` only.
-- **D13 / gap:** the original's switch (item 5, decided: a switch for failures too); spec
-  §6.3 and §7.1 since 2026-10-12.
+  environment variables unset. Since 2026-10-12 (AFNI's global options, `specs/3dTshift.md`
+  §7.1) the replica takes `-overwrite` and `AFNI_DECONFLICT` (also as
+  `-DAFNI_DECONFLICT=...`) in both modes, with AFNI's messages: AFNI-11 applies only where AFNI
+  would not overwrite, rename or stop; `-verbose`'s misleading name is reproduced in
+  `reproduce` only. The clean-room original does all of this too since 2026-10-12 (completing
+  3dTshift, part 2b; `larmorx_afni::settings`, `larmorx_afni::cli::tshift`, from spec §6.3 and
+  §7.1): `errors/existing-output` and `environment/deconflict-*` give AFNI's exit status and
+  messages in its record.
+- **D13 / gap:** done (item 5, decided: a switch for failures too).
 
 ### AFNI-12 † Output names are refused — (e)
 - **What:** `THD_filename_ok` (`thd_filestuff.c:638`) refuses a `-prefix` with control
@@ -1622,19 +1630,21 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   the name is one AFNI refuses, and with the switch (2026-10-12) refuses it with AFNI's message
   (`errors/prefix-with-blank`; AFNI's environment variables unset), at both checks since
   2026-10-12 (`larmorx_gpl_afni::cli::tshift::output_name_ok`; tested against the oracle in
-  `tests/oracle.rs`); by default it writes such a name and names AFNI-12. The clean-room
-  original has no switch (an expected divergence in its record). Since 2026-10-12 the
+  `tests/oracle.rs`); by default it writes such a name and names AFNI-12. Since 2026-10-12 the
   replica reads `AFNI_ALLOW_ARBITRARY_FILENAMES` (also as `-D`) in both modes: with it yes,
   `reproduce` refuses only what AFNI still refuses (`global/D-arbitrary-filenames`,
-  `environment/arbitrary-filenames`).
-- **D13 / gap:** the original's switch (item 5); spec §6.3 and §7.1 since 2026-10-12.
+  `environment/arbitrary-filenames`). The clean-room original does the same since 2026-10-12
+  (completing 3dTshift, part 2b; `larmorx_afni::output`, from spec §6.3 and §7.1), at both
+  checks.
+- **D13 / gap:** done (item 5).
 
 ### AFNI-13 † "ERROR", not "FATAL ERROR" — (f)
 - **What:** an unknown `-tpattern` name is reported by `ERROR_message`, then 3dTshift exits 1
   (`thd_timeof.c:186-188`, `3dTshift.c:422`).
 - **Evidence:** read; validated (`errors/unknown-pattern`).
 - **fMRIPrep:** none.
-- **larmorx:** the replica prints AFNI's text; the original "FATAL ERROR"; both exit 1.
+- **larmorx:** both print AFNI's text and exit 1 (the original "FATAL ERROR" until
+  2026-10-12, when it took AFNI's messages, part 2b).
 - **D13 / gap:** not D13.
 
 ### AFNI-14 † "changing default", then fatal — (f)
@@ -1642,7 +1652,8 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   default to -heptic" as a fatal error and exits.
 - **Evidence:** validated (`errors/no-detrend-fourier`).
 - **fMRIPrep:** none.
-- **larmorx:** the replica prints AFNI's text; the original explains the order needed.
+- **larmorx:** both print AFNI's text (the original explained the order needed until
+  2026-10-12, when it took AFNI's messages, part 2b).
 - **D13 / gap:** not D13.
 
 ### AFNI-16 † A nearly plumb sform is written plumb — (c; c? until 2026-10-12)
@@ -1672,11 +1683,11 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   with a non-zero entry off its axes' rows is written as AFNI writes an oblique one; a matrix
   without one is written from its axes in both modes; AFNI-16 is named in both modes when it
   applies; `reproduce` gives AFNI's header byte for byte (`geometry/slightly-oblique`,
-  `-qform`, `-metre`). The clean-room original keeps the input's matrix in both modes (an
-  expected divergence in its record for `reproduce`); the replica's default and the original's
-  now agree on these cases.
-- **D13 / gap:** the original's `reproduce`; the spec describes the test, the cardinal matrix
-  and every header field since 2026-10-12 (§6.1).
+  `-qform`, `-metre`). The clean-room original does the same since 2026-10-12 (completing
+  3dTshift, part 2b; `larmorx_afni::geometry::plumb_test`, `output_geometry`, from spec §6.1,
+  which describes the test, the cardinal matrix and every header field); until then it kept
+  the input's matrix in both modes.
+- **D13 / gap:** done.
 
 ### AFNI-17 † The slice fields of a copy describe its times within 3 ms — (d)
 - **What:** `get_slice_timing_pattern` and `populate_nifti_image` (`thd_niftiwrite.c:519-594`)
@@ -1691,9 +1702,10 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **Evidence:** read; verified (2026-10-12): the rule of `specs/3dTshift.md` §6.2 gives AFNI's
   four fields on 150 random header timings, 28 of them different from the header's.
 - **fMRIPrep:** none (slice spacings under 3 ms and a TR below the slice times).
-- **larmorx:** the replica reproduces it in both modes (its translation of the two functions);
-  the clean-room original writes the header's fields back (`copy/short-slice-spacing`, an
-  expected divergence in its record), and is to follow §6.2.
+- **larmorx:** both implementations reproduce it in both modes: the replica by its translation
+  of the two functions, the clean-room original by spec §6.2 since 2026-10-12 (completing
+  3dTshift, part 2b; `larmorx_afni::timing::copy_slice_fields`; until then it wrote the
+  header's fields back).
 - **D13 / gap:** an imprecision, not D13; no gap.
 
 ### AFNI-18 † An input name with a blank is read as a list of datasets — (e)
@@ -1714,8 +1726,9 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   as AFNI does (`larmorx_gpl_afni::cli::tshift::open_dataset`, `open_list`): one dataset is
   that dataset, several are not supported (an error; AFNI joins them in time).
   `lx.afni.tshift` runs the replica with the variable set, so its temporary paths are one file
-  each. The clean-room original reads one file in both modes.
-- **D13 / gap:** the original's `reproduce` (spec §7.1, 2026-10-12).
+  each. The clean-room original does the same since 2026-10-12 (completing 3dTshift, part 2b;
+  `larmorx_afni::input`, from spec §7.1); until then it read one file in both modes.
+- **D13 / gap:** done.
 
 ### AFNI-19 † `AFNI_ALLOW_MILLISECONDS` writes the time offset in milliseconds — (c)
 - **What:** with the variable yes, `THD_write_3dim_dataset` skips `DSET_UNMSEC`
@@ -1728,8 +1741,9 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **fMRIPrep:** none (it passes `-TR` in seconds and does not set the variable).
 - **larmorx:** the replica (2026-10-12) writes `toffset` in seconds by default and names
   AFNI-19 when the two differ; `reproduce` writes AFNI's (`larmorx_gpl_afni::dataset::write`).
-  The parity's fix pass shows it.
-- **D13 / gap:** the original's (spec §7.1).
+  The parity's fix pass shows it. The clean-room original does the same since 2026-10-12
+  (completing 3dTshift, part 2b; `larmorx_afni::cli::tshift`, from spec §7.1).
+- **D13 / gap:** done.
 
 ### AFNI-20 † A dataset of one row is written as a 1D text file — (c)
 - **What:** `THD_write_3dim_dataset` writes a dataset with one voxel along y and z as a 1D text
@@ -1740,10 +1754,10 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **Evidence:** read; verified 2026-10-12 (`environment/one-row-dataset`; with the variable,
   `environment/write-1D-as-prefix` writes NIfTI).
 - **fMRIPrep:** none (BOLD series have more than one row).
-- **larmorx:** both implementations write NIfTI in both modes; the replica names AFNI-20 (as
-  corrected, in both modes) when AFNI would have written text. Not reproduced: the random
-  identifier would make the file differ from run to run. An expected divergence in the
-  replica's record.
+- **larmorx:** both implementations write NIfTI in both modes and name AFNI-20 (as corrected,
+  in both modes) when AFNI would have written text (the original since 2026-10-12, part 2b).
+  Not reproduced: the random identifier would make the file differ from run to run. An
+  expected divergence in both records.
 - **D13 / gap:** none: AFNI's output is not deterministic (class (b) in that part), so the
   switch reproduces only the decision, by naming it.
 
@@ -1755,8 +1769,9 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **Evidence:** read; verified 2026-10-12 (every message check of the `global` and
   `environment` categories compares them byte for byte).
 - **fMRIPrep:** its log files of 3dTshift runs hold the codes (cosmetic).
-- **larmorx:** the replica writes AFNI's codes in `reproduce` only; by default plain labels
-  (`larmorx_gpl_afni::message::Style`). Nothing is named (messages only).
+- **larmorx:** both implementations write AFNI's codes in `reproduce` only; by default plain
+  labels (`larmorx_gpl_afni::message::Style`; the original since 2026-10-12, part 2b,
+  `larmorx_afni::msg`). Nothing is named (messages only).
 - **D13 / gap:** not D13.
 
 ### AFNI-22 † `-Dname=value` with blanks, or a blank around `=`, sets another value — (e)
@@ -1774,8 +1789,9 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   after it as written, and names AFNI-22 when AFNI's reading would change what a variable
   3dTshift reads does (a different yes or no, or a different value; `environ::same_effect`);
   `reproduce` reads as AFNI does (`environ::afni_setenv`). A `-D` that sets nothing is
-  dropped in both modes, with a warning by default.
-- **D13 / gap:** the original's (spec §7.1).
+  dropped in both modes, with a warning by default. The clean-room original does the same
+  since 2026-10-12 (completing 3dTshift, part 2b; `larmorx_afni::settings`, from spec §7.1).
+- **D13 / gap:** done.
 
 ### AFNI-23 † `AFNI_NIFTI_SCALE=NO` keeps the slope and drops the intercept — (c; c? until 2026-10-12)
 - **What:** with the variable starting with `N` or `n` (`thd_niftiread.c:149-150`), uint8 and
@@ -1814,9 +1830,10 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   without the variable (byte for byte the run without it). Named in both modes where the two
   outputs differ; `reproduce` gives AFNI's bytes. Applying both slope and intercept in every
   case (float32 output, the run without the variable) was the alternative; it would make the
-  variable do nothing at all. The clean-room original does not read the variable yet; spec
-  §7.1 describes the behaviour and the correction.
-- **D13 / gap:** the original's (spec §7.1).
+  variable do nothing at all. The clean-room original does the same since 2026-10-12
+  (completing 3dTshift, part 2b; `larmorx_afni::dataset`, `larmorx_afni::cli::tshift`, from
+  spec §7.1, which describes the behaviour and the correction).
+- **D13 / gap:** done.
 
 ### AFNI-24 † NIfTI quaternions depend on the build's `long double` — (d)
 - **What:** `nifti_dmat44_to_quatern` and `nifti_quatern_to_dmat44`
@@ -1834,9 +1851,52 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   ones give AFNI's header byte for byte. The emulation gives GCC's double for 5 million random
   operations.
 - **fMRIPrep:** none (NIfTI-1, and x86-64 builds only).
-- **larmorx:** the replica gives x86-64's results on every platform
-  (`larmorx_gpl_afni::x87`, 2026-10-12).
+- **larmorx:** both implementations give x86-64's results on every platform
+  (`larmorx_gpl_afni::x87`, 2026-10-12; the original's own emulation `larmorx_afni::x87`,
+  part 2b the same day, matched GCC's `long double` on 6 million random operations).
 - **D13 / gap:** an imprecision, not D13 (rule 5, D11).
+
+### AFNI-25 † `-ignore` as the last argument crashes — (a)
+- **What:** `-ignore` reads its value as `strtod(argv[++nopt],NULL)` without checking `argc`
+  (`3dTshift.c:315-318`), unlike `-TR`, `-tzero`, `-slice`, `-prefix` and `-tpattern`, which
+  stop with "needs an argument!". As the last argument it passes `argv[argc]`, a null pointer,
+  to `strtod`: a segmentation fault. AFNI's signal handler prints "Fatal Signal 11 (SIGSEGV)
+  received", its stack and a crash banner with the build's compile date and binary name, appends
+  them to `~/.afni.crashlog`, and exits 1. `-voxshift` has the same missing check
+  (`:299`): `THD_open_dataset(NULL)` fails and the message prints the null pointer as
+  `'(null)'` (glibc's `printf`): "Can't open -voxshift dataset '(null)'", exit 1.
+- **Evidence:** read; verified 2026-10-12 with the oracle (`3dTshift -prefix o.nii -ignore`,
+  `3dTshift -ignore`, `3dTshift -voxshift`); first seen by the clean-room implementer (spec
+  §7.1, observed).
+- **fMRIPrep:** none (it always gives `-ignore` a value).
+- **larmorx:** both implementations stop with "-ignore needs an argument!" and exit 1 in both
+  modes, as for the other options; the exit status is AFNI's. Not reproduced: the crash banner
+  (build-specific text) and the line appended to the crash log in the home directory.
+  `-voxshift` is not supported by either implementation (an expected divergence in both
+  records), so its `'(null)'` message does not arise.
+- **D13 / gap:** never reproduced (a null-pointer read). No gap.
+
+### AFNI-26 † A failed write exits 0 — (e)
+- **What:** 3dTshift ignores `DSET_write`'s result (`3dTshift.c:696`, `:709`) and exits 0.
+  When a NIfTI output cannot be created (a missing or read-only directory),
+  `nifti_image_write_engine` prints "** ERROR (nifti_image_write_engine): cannot open output
+  file 'NAME'" (`nifti/nifti2/nifti2_io.c:7908-7912`, the NIfTI library's own message, never in
+  colour, AFNI-21) and returns 1; `THD_write_nifti` returns it (`thd_niftiwrite.c:126-127`),
+  `THD_write_3dim_dataset` returns False (`thd_writedset.c:238-240`), and nothing reads it.
+  With `-verbose` AFNI then prints `++ Wrote output: NAME` of a file it did not write, as in
+  AFNI-11. Shifts and copies alike. AFNI's own format (`-prefix sub/out`) is not affected:
+  its writer creates the missing directory.
+- **Evidence:** read; verified 2026-10-12 with the oracle (`-prefix nodir/out.nii`, `.nii.gz`,
+  a copy, a read-only directory, `-verbose`); first seen by the clean-room implementer (spec
+  §7.1, "A failed write", observed).
+- **fMRIPrep:** none (its working directories exist). Were the write to fail, the node would
+  still fail: Nipype checks that the output exists (`out_file`, `exists=True`,
+  `nipype/interfaces/afni/base.py:145`; `FileNotFoundError` in `aggregate_outputs`,
+  `nipype/interfaces/base/core.py:452-460`).
+- **larmorx:** both implementations exit 1 with a message naming the output, in both modes.
+- **D13 / gap:** the switch in both implementations (item 5, decided: a switch for failures
+  too): `reproduce` prints the NIfTI library's message with the name AFNI gives, writes
+  nothing, prints `-verbose`'s line and exits 0. The spec describes it (§7.1).
 
 ### AFNI-15 † The build races under `make -j` — (b)
 - **What:** AFNI's niml sub-make races in a parallel build; FSL's own `ld` on `PATH` also breaks

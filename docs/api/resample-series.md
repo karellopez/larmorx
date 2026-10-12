@@ -140,8 +140,12 @@ fMRIPrep's own calls (`grid-constant`, composites of two or three transforms) me
 with field maps in T1w and standard spaces (PEPOLAR field maps apply the Jacobian by default).
 The parity record's "D13 fix pass" lists what the corrections change, case by case. On the
 grids and transforms of a real fMRIPrep run, with a 3 T-like field map, fMRIPrep's factor is
-off the exact one by more than 1 % of the signal in 40 % of T1w-space brain voxels and 33 % of
-MNI-space ones (99th-percentile error 0.23 and 0.16), larmorx's by at most 0.002 and 0.008
+off the exact one by more than 1 % of the signal in 40 % of brain voxels on the 1 mm T1w grid
+and 33 % on the MNI res-2 one (99th-percentile error 0.23 and 0.16), larmorx's by at most 0.002
+and 0.008. On fMRIPrep's own PEPOLAR field map (ds005040, where fMRIPrep applies the Jacobian),
+larmorx's default changes fMRIPrep's MNI res-2 BOLD by more than 1 % in 60 % of brain voxels
+(99th percentile 11 %, up to 56 % in the inferior temporal lobes), its `space-T1w` BOLD (the
+BOLD's voxel size) by more than 1 % in 2.8 %, and its native BOLD not at all
 ([validation/resample-series-jacobian.md](../validation/resample-series-jacobian.md)).
 
 ## Rust API

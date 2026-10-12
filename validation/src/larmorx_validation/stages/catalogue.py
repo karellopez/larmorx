@@ -39,11 +39,12 @@ class Stage:
     """A step of fMRIPrep's pipeline that larmorx can run."""
 
     id: str
-    group: str  # "anatomical" or "functional"
+    group: str  # "anatomical", "fieldmap" or "functional"
     title: str
     #: Regular expression on the normalised node path (:func:`normalise`).
     pattern: str
-    #: ``cli`` (a program run with its own arguments), ``hmc`` or ``resample``.
+    #: ``cli`` (a program run with its own arguments), ``tshift`` (3dTshift, both
+    #: implementations), ``hmc`` or ``resample``.
     kind: str
     #: larmorx's tool.
     tool: str
@@ -60,6 +61,9 @@ THRESHOLDS = {
     "scipy-interpolation": ("interpolation (SciPy)", "max |diff| / max |ref|", 1e-6),
     "n4-denoise": ("N4 / denoise", "NCC", 0.995),
     "masks": ("masks", "Dice", 0.98),
+    # docs/validation/afni-tshift.md (specs/3dTshift.md §9): float32 outputs within 1e-5 of
+    # the largest |AFNI output|, integer outputs within 1
+    "tshift": ("slice timing (3dTshift)", "max |diff| / max |ref|; integers max |diff|", 1e-5),
     "motion": ("motion parameters", "median |diff|; FD r", (0.05, 0.05, 0.99)),
     "bold": (
         "preprocessed BOLD",
@@ -87,7 +91,7 @@ STAGES: tuple[Stage, ...] = (
         "cli",
         "lx.ants.n4_bias_field_correction",
         "n4-denoise",
-        absent="runs only with more than one T1w; ds000005 sub-01 has one",
+        absent="runs only with more than one T1w; this subject has one",
     ),
     Stage(
         "A03",
@@ -171,6 +175,37 @@ STAGES: tuple[Stage, ...] = (
         "lx.ants.apply_transforms",
         "itk-interpolation",
     ),
+    # --- susceptibility distortion (field maps) -----------------------------------------------
+    Stage(
+        "S01",
+        "fieldmap",
+        "Field map: N4 of the field-map reference (sdcflows' brain extraction)",
+        r"fmap_preproc_wf/.*brainextraction_wf/n4$",
+        "cli",
+        "lx.ants.n4_bias_field_correction",
+        "n4-denoise",
+        absent="no field map estimated (no estimator assigned to a BOLD run)",
+    ),
+    Stage(
+        "S02",
+        "fieldmap",
+        "Unwarp the HMC boldref for coregistration (`ResampleSeries` with the field map)",
+        r"bold_fit_wf/unwarp_boldref$",
+        "resample",
+        "lx.transforms.resample_series",
+        "scipy-interpolation",
+        absent="no field map applied to a BOLD run",
+    ),
+    Stage(
+        "S03",
+        "fieldmap",
+        "Field-map report: the field map and its reference to the boldref (Lanczos, `--float 1`)",
+        r"func_fit_reports_wf/(fmap_boldref|fmapref_boldref)$",
+        "cli",
+        "lx.ants.apply_transforms",
+        "itk-interpolation",
+        absent="no field map applied to a BOLD run",
+    ),
     # --- functional --------------------------------------------------------------------------
     Stage(
         "F01",
@@ -185,11 +220,14 @@ STAGES: tuple[Stage, ...] = (
         "F02",
         "functional",
         "Slice-timing correction (`3dTshift`)",
-        r"bold_stc_wf/slice_timing_corrected$",
-        "cli",
+        # fMRIPrep 25.2.6 names the node slice_timing_correction (fmriprep/workflows/bold/
+        # stc.py:121-131); the catalogue's first pattern (slice_timing_corrected) never
+        # matched it.
+        r"bold_stc_wf/slice_timing_correct(ion|ed)$",
+        "tshift",
         "lx.afni.tshift",
-        "arithmetic",
-        absent="no `SliceTiming` in ds000005's metadata, so fMRIPrep skips it",
+        "tshift",
+        absent="no `SliceTiming` in the BOLD runs' metadata, so fMRIPrep skips it",
     ),
     Stage(
         "F03",
@@ -329,6 +367,63 @@ MISSING: tuple[Missing, ...] = (
         "FreeSurfer (trivial; nitransforms has it)",
     ),
     Missing(
+        "topup",
+        ("topup",),
+        "PEPOLAR field-map estimation (sdcflows' PEPOLAR workflow)",
+        "FSL (clean-room + `larmorx-nc`)",
+    ),
+    Missing(
+        "prelude",
+        ("prelude",),
+        "phase unwrapping of the phase-difference field map",
+        "FSL (clean-room + `larmorx-nc`)",
+    ),
+    Missing(
+        "mri_robust_template",
+        ("mri_robust_template",),
+        "anatomical template of several T1w images",
+        "FreeSurfer",
+    ),
+    Missing(
+        "field-map B-splines",
+        (),
+        "sdcflows' B-spline fit of the field (`BSplineApprox`, `TOPUPCoeffReorient`) and "
+        "fMRIPrep's `ReconstructFieldmap` (the field from its coefficients on a target grid, "
+        "the input of `ResampleSeries`)",
+        "larmorprepx (Rust: B-spline evaluation)",
+        names=("bs_filter", "fix_coeff", "fmap_recon", "boldref_fmap"),
+    ),
+    Missing(
+        "field-map preparation",
+        (),
+        "sdcflows' Python steps: phase difference to Hz (`calc_phdiff`, `phmap2rads`, "
+        "`compfmap`), PEPOLAR series sorted, padded, regridded and averaged, the field-map "
+        "reference's brain mask, readout times and distortion parameters",
+        "larmorprepx (numpy)",
+        names=(
+            "calc_phdiff",
+            "phmap2rads",
+            "compfmap",
+            "check_register",
+            "sort_pe_blips",
+            "pad_blip_slices",
+            "regrid",
+            "to_las",
+            "from_las",
+            "from_las_fmap",
+            "concat_blips",
+            "runwise_avg",
+            "setwise_avg",
+            "ref_average",
+            "magmrg",
+            "masker",
+            "clipper_pre",
+            "clipper_post",
+            "readout_time",
+            "distortion_params",
+        ),
+    ),
+    Missing(
         "confounds",
         (),
         "DVARS, CompCor (a/t/crown), global signals, expansion, spikes "
@@ -392,6 +487,8 @@ def stage_of(node: Node) -> Stage | None:
         if not re.search(stage.pattern, norm):
             continue
         if stage.kind == "cli" and node.program not in CLI_PROGRAMS:
+            continue
+        if stage.kind == "tshift" and node.program != "3dTshift":
             continue
         if stage.kind == "hmc" and node.program != "mcflirt":
             continue

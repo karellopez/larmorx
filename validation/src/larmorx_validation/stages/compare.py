@@ -237,6 +237,63 @@ def compare_files(
     return compare_arrays(a, b, affine_diff=float(np.abs(aa - ab).max()), kind=kind)
 
 
+def raw_header(path: str | Path):
+    """A NIfTI file's header as stored (``nib.load`` moves ``scl_slope`` and ``scl_inter`` to
+    the data proxy and resets them in the header it returns), with its extensions."""
+    import nibabel as nib
+    from nibabel.openers import Opener
+
+    kind = type(nib.load(str(path)).header)
+    with Opener(str(path)) as f:
+        return kind.from_fileobj(f)
+
+
+def stored_diff(ref_path: str | Path, test_path: str | Path) -> dict[str, Any]:
+    """Two files' data as stored, before any scaling: the stored type, the scale factors and,
+    for integer types, the largest difference in stored units."""
+    import nibabel as nib
+
+    ra, rb = nib.load(str(ref_path)), nib.load(str(test_path))
+    ha, hb = raw_header(ref_path), raw_header(test_path)
+    out: dict[str, Any] = {
+        "dtype": [str(ra.get_data_dtype()), str(rb.get_data_dtype())],
+        "scl_slope": [float(ha["scl_slope"]), float(hb["scl_slope"])],
+        "scl_inter": [float(ha["scl_inter"]), float(hb["scl_inter"])],
+    }
+    same = ra.get_data_dtype() == rb.get_data_dtype()
+    if same and ra.get_data_dtype().kind in "iu" and ra.shape == rb.shape:
+        a = np.asanyarray(ra.dataobj.get_unscaled())
+        b = np.asanyarray(rb.dataobj.get_unscaled())
+        d = np.abs(a.astype(np.int64) - b.astype(np.int64))
+        out["differing"] = int(np.count_nonzero(d))
+        out["max_abs"] = int(d.max())
+        out["values"] = int(d.size)
+    return out
+
+
+def header_diff(ref_path: str | Path, test_path: str | Path) -> dict[str, Any]:
+    """The NIfTI header fields (as nibabel reads them) in which two files differ, and whether
+    their header extensions have the same codes and contents."""
+    a = raw_header(ref_path)
+    b = raw_header(test_path)
+    fields = []
+    if type(a) is not type(b):
+        fields.append("format")
+    else:
+        for key in a.keys():  # noqa: SIM118 (nibabel headers are not plain mappings)
+            va, vb = np.asarray(a[key]), np.asarray(b[key])
+            if va.shape != vb.shape or va.tobytes() != vb.tobytes():
+                fields.append(key)
+    ea = [(int(e.get_code()), e.get_content()) for e in getattr(a, "extensions", [])]
+    eb = [(int(e.get_code()), e.get_content()) for e in getattr(b, "extensions", [])]
+    return {
+        "identical": not fields,
+        "fields": fields,
+        "extension_codes": [[c for c, _ in ea], [c for c, _ in eb]],
+        "extensions_identical": ea == eb,
+    }
+
+
 def bold_measures(ref: np.ndarray, test: np.ndarray) -> dict[str, float]:
     """PLAN.md §11.3's measures for preprocessed BOLD, inside the voxels where the reference's
     temporal mean is above 10 % of its maximum: NCC of the temporal means, correlation of the
@@ -348,9 +405,12 @@ __all__ = [
     "compare_arrays",
     "compare_files",
     "decompose",
+    "header_diff",
     "load",
     "motion_diff",
+    "raw_header",
     "read_itk_affines",
     "read_mats",
     "rms_deviation",
+    "stored_diff",
 ]

@@ -34,12 +34,14 @@ Paths below are under `work/fmriprep_25_2_wf/sub_01_wf/`; `<run>` is
   correctly rounded maths, is bit-identical to fMRIPrep's N4 binary in all 45 cases of the N4
   parity suite and in all six N4 outputs of this run (below); the oracle is rebuilt by a fixed
   compiler.
-- **61 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran**, on the steps'
-  own inputs and parameters: every ImageMath, ThresholdImage and MultiplyImages step, the
-  one-shot resampling in all three spaces, and the antsApplyTransforms calls with linear,
-  MultiLabel or nearest-neighbour interpolation in double precision. The others are explained
-  by the thread count, glibc's maths or the ANTs build, except the 14 calls with `--float 1`,
-  which ANTs computes in single precision and larmorx in double (the record).
+- **75 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran** (record
+  regenerated 2026-10-12; 61 on 2026-10-11), on the steps' own inputs and parameters: every
+  ImageMath, ThresholdImage and MultiplyImages step, the one-shot resampling in all three
+  spaces, and every antsApplyTransforms call but the Gaussian ones of A06 and F10 (glibc's
+  `exp`), the 14 with `--float 1` included (larmorx computes them in single precision as ANTs
+  does since 2026-10-11). The other 17 are explained by the thread count and glibc's maths
+  alone: with the GCC 14.3 oracle, the ANTs build no longer separates anything (the record).
+  The field-map runs are below.
 - **Parameters differ from the analysis in two places**: the BOLD reference's antsAI uses
   `Affine[0.1]`, not `Rigid[0.1]`; and the BOLD reference's N4 runs with ANTs' default shrink
   factor (4), because `shrink_factor=2` is given to nipype's `Node`, not to the interface (as
@@ -261,3 +263,63 @@ Each step was re-run in fMRIPrep's image with fMRIPrep's thread count (the recor
   fMRIPrep's binary and the ANTs 2.6.5 oracle agree bit for bit; fMRIPrep's 8-thread result
   differs from that in 4,900,198 voxels, by up to 271 (1 − NCC 1.1e-4), which is what separates
   larmorx (ANTs' one-thread result) from fMRIPrep's denoised T1w.
+
+## The field-map runs (2026-10-12)
+
+Three more oracle runs with the same image and options (`scripts/run_fmriprep_oracle.sh`,
+`--fs-no-reconall`), compared stage by stage with the same harness:
+[ds005040](../validation/fmriprep-stages-ds005040.md) sub-002 (one T1w; one BOLD run of 63
+volumes, 3×3×3.3 mm, slice timing; a PEPOLAR pair estimated with `topup`),
+[ds005454](../validation/fmriprep-stages-ds005454.md) sub-16 (two T1w, so the anatomical
+template with `mri_robust_template` and the pre-template N4; one oblique BOLD run of 280
+volumes at 1.4 mm, multiband with repeated slice times; a `phasediff` field map, unwrapped by
+`prelude`) and [ds005752](../validation/fmriprep-stages-ds005752.md) sub-ON01016 (one T1w; BOLD
+runs of 200 and 10 volumes with slice timing; a direct `fieldmap` with its magnitude).
+Paths below are under each run's `work/fmriprep_25_2_wf/sub_<label>_wf/`. *Verified* from the
+working directories, the logs and the stage comparisons:
+
+- **ds005752's field map is not used.** Neither the field map's sidecar (`IntendedFor`,
+  `B0FieldIdentifier`) nor the BOLD runs' (`B0FieldSource`) say which BOLD it corrects.
+  sdcflows finds the estimator (`sdcflows/utils/wrangler.py:389-411`, 2.15.1), but fMRIPrep
+  keeps only estimators a BOLD run maps to (`fmriprep/workflows/base.py:995-1021`,
+  `get_estimator` at 1034-1050) and drops it; the log says only "No fieldmap correction -
+  skipping Stage 3". So no oracle run covers the direct-`fieldmap` path yet; a copy of ds005752
+  with `IntendedFor` (or `B0FieldIdentifier`/`B0FieldSource`) added would.
+- **The Jacobian is applied for PEPOLAR field maps only** (`fmriprep/workflows/base.py:853-858`):
+  ds005040's `ResampleSeries` nodes have `jacobian : True`, ds005454's (`phasediff`) `False`.
+- **Slice timing** runs as `bold_native_wf/bold_stc_wf/slice_timing_correction`
+  (`fmriprep/workflows/bold/stc.py:121-131`): `3dTshift -ignore 0 -prefix <name>_tshift.nii.gz
+  -tpattern @slice_timing.1D -TR <TR>s -tzero <t0> <BOLD>` with `OMP_NUM_THREADS=1`, `t0` the
+  middle of the slice times rounded to 3 decimals (`--slice-time-ref` 0.5,
+  `fmriprep/workflows/bold/stc.py:107`), then niworkflows' `CopyXForm` restores the input's
+  header. nipype's
+  `TShift` writes `slice_timing.1D` in the node directory from the `slice_timing` input (the
+  times joined by tabs as Python prints them, reversed for a negative slice-encoding
+  direction; `nipype/interfaces/afni/preprocess.py:3290-3298`, 1.12.0) and links the input
+  there (`copyfile=False`); both are removed after the run, so only `command.txt`, the report
+  and the hash file `_0x<hash>.json` (which keeps the input's original path) remain. AFNI keeps
+  the int16 input's type, scaled by a factor of its own when the shifted values need it
+  (ds005040: `scl_slope` 47.67; ds005454 and ds005752: unscaled), and writes its history
+  extension.
+- **The 3dTshift replica reproduces all four slice-timing outputs bit for bit** (data and
+  header, `vox_offset` aside: larmorx writes no history extension), as does the repository's
+  AFNI 25.2.09 build; fMRIPrep's AFNI reproduces itself. The clean-room original differs by one
+  stored unit in 189 of 10,321,920 values (ds005040), 1,808 of 688,128,000 (ds005454), 86 of
+  39,321,600 and 1 of 1,966,080 (ds005752), within [afni-tshift.md](../validation/afni-tshift.md)'s
+  thresholds. None of AFNI's defects is met: larmorx's default gives the same files.
+- **nipype re-quantizes the field-map reference's N4 output** (PIPE-16): sdcflows clips the
+  reference to int16 (`IntensityClip`, `niworkflows/interfaces/nibabel.py:667-723`) and runs N4
+  with `copy_header=True`; nipype's N4 interface then writes the corrected image in the
+  input's type (`_copy_header_map`, `keep_dtype=False`), so fMRIPrep's node output is N4's
+  float32 result rounded to int16 with a scale factor (ds005040: slope 0.0032, inter 105.19).
+  Re-run in fMRIPrep's image at the node's 8 threads (serially and six at once), N4 gives the
+  same bits every time, and after nipype's own `copy_header` exactly fMRIPrep's output.
+- **fMRIPrep's `space-T1w` grid is at the BOLD's voxel size** in all runs (`gen_ref`,
+  `keep_native`), so PIPE-03 matters there only through the angle between the BOLD's and the
+  T1w's axes: little for ds005040 (axial BOLD), much for ds005454 (its phase-encoding axis 22.5°
+  from the scanner's anterior axis).
+- **Head motion.** larmorx's matrices stay within 0.003 mm / 0.005° (median) of mcflirt's in
+  every run. In ds005752's 200-volume run (largest FD 0.56 mm) the FD correlation is 0.974,
+  below PLAN.md's 0.99 but within mcflirt's own band on that run (0.961 to 0.976 under ±0.5
+  noise and reversed volumes, measured by the harness); ds005040 (largest FD 0.17 mm) gives
+  0.77, where the correlation is not required (mcflirt's testdata band for the dataset 0.82).

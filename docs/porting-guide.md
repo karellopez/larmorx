@@ -196,10 +196,13 @@ least once.
 - **Check that the pipeline will actually process the data,** not only that the files exist.
   ds001600 was chosen for its three field-map kinds and slice timing, but its BOLD runs have
   5 volumes each, and fMRIPrep skips series of 5 volumes or fewer ("Too short BOLD series"):
-  that oracle run processed only the anatomy. Check series length, the metadata the pipeline
-  needs (`SliceTiming`, `PhaseEncodingDirection`, `TotalReadoutTime` or `EffectiveEchoSpacing`,
-  `IntendedFor` or `B0FieldIdentifier` pointing at files that exist), and read the run's log
-  for skipped steps before treating a run as an oracle for a path.
+  that oracle run processed only the anatomy. ds005752 was chosen for its direct `fieldmap`,
+  but neither the field map nor the BOLD runs say which goes with which (`IntendedFor`,
+  `B0FieldIdentifier`, `B0FieldSource`), so fMRIPrep found the estimator and dropped it ("No
+  fieldmap correction"): that path is still not covered. Check series length, the metadata the
+  pipeline needs (`SliceTiming`, `PhaseEncodingDirection`, `TotalReadoutTime` or
+  `EffectiveEchoSpacing`, `IntendedFor` or `B0FieldIdentifier` pointing at files that exist),
+  and read the run's log for skipped steps before treating a run as an oracle for a path.
 - **The pipeline's own command lines on real data**, as a category of the parity suite
   (`fmriprep/...` cases in the ANTs records).
 
@@ -228,6 +231,15 @@ What the first oracle run showed ([findings/fmriprep-oracle.md](findings/fmripre
   reference's sform and qform onto antsApplyTransforms' output and replaces `descrip`; N4's
   output gets its input's header back. Compare data and affines, not the header bytes, at
   those nodes.
+- **nipype can rewrite the data too.** Its N4 interface with `copy_header=True` writes the
+  corrected image in the *input's* data type: sdcflows' field-map reference is int16, so the
+  node's output is N4's result re-quantized by nibabel (PIPE-16). Apply the same step to every
+  run before comparing (the stage comparison runs nipype's own `copy_header` in the image), or
+  the rounding is mistaken for a thread or version effect.
+- **nipype removes files from the node directory after the run**: inputs it linked there
+  (3dTshift's `in_file`) and files it wrote for the program (`slice_timing.1D`). The node's
+  hash file `_0x<hash>.json` keeps the inputs' original paths; the rest must be written again
+  from the node's inputs, as the interface writes it.
 - **fMRIPrep's image sets `OMP_NUM_THREADS=1`; fMRIPrep's Python code does not.** Outside the
   image, the one-shot resampler races with OpenBLAS's threads.
 - **The image ships other versions** than you port: ANTs 2.6.2 on ITK 5.4.4 in fMRIPrep

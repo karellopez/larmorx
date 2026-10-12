@@ -26,10 +26,20 @@ working directory of an oracle run), and compares them with fMRIPrep's own outpu
 step; where they differ, the step is re-run in fMRIPrep's image and with the oracle builds to
 separate thread effects, ANTs' version, glibc's maths and larmorx. It is a record of the
 pipeline's stages, not of one tool, so it has no status of its own; it also lists the tools
-larmorx does not have yet. [fmriprep-stages-float](fmriprep-stages-float.md) re-runs the
-antsApplyTransforms stages (A06, A11, F08, F09, F12) after larmorx learnt `--float 1`
-(2026-10-11): all 14 of fMRIPrep's `--float 1` outputs bit-identical to fMRIPrep's own; the
-full record is to be regenerated.
+larmorx does not have yet. One record per oracle run:
+
+| Record | Run | What it adds |
+|---|---|---|
+| [fmriprep-stages](fmriprep-stages.md) | ds000005 sub-01 | three BOLD runs, no field maps, no slice timing |
+| [fmriprep-stages-ds005040](fmriprep-stages-ds005040.md) | ds005040 sub-002 | PEPOLAR field map (`topup`) applied with the Jacobian, slice timing: both 3dTshift implementations, PIPE-03 on a real field map |
+| [fmriprep-stages-ds005454](fmriprep-stages-ds005454.md) | ds005454 sub-16 | two T1w (the pre-template N4), `phasediff` field map, an oblique multiband BOLD of 280 volumes |
+| [fmriprep-stages-ds005752](fmriprep-stages-ds005752.md) | ds005752 sub-ON01016 | two BOLD runs with slice timing; its direct `fieldmap` is not used by fMRIPrep (no `IntendedFor`) |
+
+[fmriprep-stages-float](fmriprep-stages-float.md) re-ran the antsApplyTransforms stages of
+ds000005 (A06, A11, F08, F09, F12) after larmorx learnt `--float 1` (2026-10-11); the
+regenerated [fmriprep-stages](fmriprep-stages.md) now covers them, so it is kept as history.
+PIPE-03's effect on fMRIPrep's own field maps is collected in
+[resample-series-jacobian](resample-series-jacobian.md).
 
 These records compare larmorx with the original tools on Linux x86-64. That the other five
 platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:

@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -82,7 +83,7 @@ def _label(program: str | None, outputs: list[str], i: int) -> str:
 
 def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     res = _base(node, stage)
-    argv = node.argv
+    argv, files = rn.prepare_inputs(s.run, node, node.argv)
     names = rn.output_names(argv)
     refs = rn.reference_outputs(s.run, node, names)
     if not names:
@@ -93,17 +94,27 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
         return res
     base = s.compare / node.path
     threads = s.threads or node.threads
-    lx = rn.run_larmorx(s, node, argv, base / "larmorx", threads)
+    lx = rn.run_larmorx(s, node, argv, base / "larmorx", threads, files=files)
     res["larmorx_threads"] = threads
     res["larmorx_seconds"] = lx.seconds
     if not lx.ok:
         res.update(status="larmorx-error", note=lx.stderr.strip()[-300:])
         return res
+    # what nipype did to the program's outputs (N4's header copy), done to every run's
+    post = _NipypePost(s, node, argv, names)
+    if post.active:
+        res["nipype_copy_header"] = post.describe()
+    lx_out = post(lx)
+    assert lx_out is not None
     derivatives = s.run.derivatives()
     outputs = []
-    for i, (ref, out) in enumerate(zip(refs, lx.outputs, strict=True)):
+    for i, (ref, out) in enumerate(zip(refs, lx_out, strict=True)):
         d = cmp.compare_files(ref, out)
         entry: dict[str, Any] = {"output": _label(node.program, names, i), "vs_fmriprep": d}
+        if post.active:
+            # larmorx's own output (float32) against fMRIPrep's re-quantized one: nipype's share
+            entry["raw_vs_fmriprep"] = cmp.compare_files(ref, lx.outputs[i])
+            entry["raw_stored"] = cmp.stored_diff(ref, lx.outputs[i])
         if (deriv := derivatives.get(str(ref))) and Path(deriv).is_file():
             entry["derivative"] = os.path.relpath(deriv, s.run.root)
             entry["vs_derivative"] = cmp.compare_files(deriv, out)
@@ -115,11 +126,18 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     cn = None
     if s.container:
         cn = rn.run_container(
-            s, node, argv, base / f"container-{node.threads}t", node.threads, timed=True
+            s,
+            node,
+            argv,
+            base / f"container-{node.threads}t",
+            node.threads,
+            timed=True,
+            files=files,
         )
         res["container_seconds"] = cn.seconds
-        if cn.ok:
-            for entry, ref, out in zip(outputs, refs, cn.outputs, strict=True):
+        cn_out = post(cn)
+        if cn_out is not None:
+            for entry, ref, out in zip(outputs, refs, cn_out, strict=True):
                 entry["rerun_vs_fmriprep"] = cmp.compare_files(ref, out)
     if all(e["vs_fmriprep"].identical for e in outputs):
         res["status"] = "identical"
@@ -128,24 +146,30 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     # Take the difference apart.
     chain: list[tuple[str, list[Path] | None]] = [("fmriprep", refs)]
     if s.container:
-        c1 = cn if node.threads == 1 else rn.run_container(s, node, argv, base / "container-1t", 1)
-        chain.append(("container-1t", c1.outputs if c1 and c1.ok else None))
-        cr = rn.run_container(s, node, argv, base / "container-1t-cr", 1, correctly_rounded=True)
-        chain.append(("container-1t-cr", cr.outputs if cr and cr.ok else None))
+        c1 = (
+            cn
+            if node.threads == 1
+            else rn.run_container(s, node, argv, base / "container-1t", 1, files=files)
+        )
+        chain.append(("container-1t", post(c1)))
+        cr = rn.run_container(
+            s, node, argv, base / "container-1t-cr", 1, correctly_rounded=True, files=files
+        )
+        chain.append(("container-1t-cr", post(cr)))
     if s.ants_oracle and node.program in ANTS_PROGRAMS:
         r = rn.run_ants_oracle(s, argv, base / "ants-2.6.5-1t-cr", correctly_rounded=True)
-        chain.append(("ants-2.6.5-1t-cr", r.outputs if r and r.ok else None))
+        chain.append(("ants-2.6.5-1t-cr", post(r)))
         # ANTs 2.6.5 as built (glibc's maths), as the tool's own records compare
         a = rn.run_ants_oracle(s, argv, base / "ants-2.6.5-1t", correctly_rounded=False)
         if a is not None and a.ok:
             for entry, ants_out, out in zip(outputs, a.outputs, lx.outputs, strict=True):
                 entry["vs_ants_as_built"] = cmp.compare_files(ants_out, out)
-    chain.append(("larmorx", lx.outputs))
+    chain.append(("larmorx", lx_out))
     for i, entry in enumerate(outputs):
         links = []
         previous = chain[0]
-        for name, files in chain[1:]:
-            if files is None:
+        for name, produced in chain[1:]:
+            if produced is None:
                 links.append({"from": previous[0], "to": name, "diff": None})
                 continue
             prev_files = previous[1]
@@ -154,10 +178,10 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
                 {
                     "from": previous[0],
                     "to": name,
-                    "diff": cmp.compare_files(prev_files[i], files[i]),
+                    "diff": cmp.compare_files(prev_files[i], produced[i]),
                 }
             )
-            previous = (name, files)
+            previous = (name, produced)
         entry["chain"] = links
         entry["cause"] = explain(links, node.threads, entry.get("rerun_vs_fmriprep"))
     _check_float_pipeline(s, node, argv, base, outputs, lx.outputs)
@@ -171,6 +195,70 @@ def compare_cli(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     else:
         res["status"] = "unexplained"
     return res
+
+
+_COPY_HEADER_SCRIPT = r'''
+"""nipype 1.12.0's header copy after a program (CopyHeaderInterface._post_run_hook with the
+interface's _copy_header_map), done on copies of a run's outputs, in fMRIPrep's image."""
+import shutil
+import sys
+
+from nipype.utils.imagemanip import copy_header
+
+source = sys.argv[1]
+for spec in sys.argv[2:]:
+    name, target, keep = spec.split(":")
+    shutil.copyfile(name, target)
+    copy_header(source, target, keep_dtype=keep == "1")
+'''
+
+
+class _NipypePost:
+    """What nipype does to a program's outputs after the run, done again to every run's
+    outputs, so that they compare with fMRIPrep's node output.
+
+    nipype's ``N4BiasFieldCorrection`` with ``copy_header=True`` (niworkflows' brain
+    extraction, sdcflows' field-map reference) copies the input's header onto the outputs
+    (``nipype/interfaces/ants/segmentation.py``, ``_copy_header_map``): the corrected image
+    **with the input's data type** (``keep_dtype=False``), the bias field with its own. When the
+    input is an integer image (sdcflows' clipped field-map reference is int16), nibabel
+    re-quantizes N4's float32 output to that type with a scale factor (PIPE-16). The copy runs
+    nipype's own function in fMRIPrep's image on a copy of each output (``nipype-<name>``);
+    runs whose input is float32 are left as they are (their data do not change)."""
+
+    def __init__(self, s: rn.Settings, node: Node, argv: list[str], names: list[str]):
+        self.s = s
+        self.names = [os.path.basename(n) for n in names]
+        self.source = rn._option(argv, ("-i", "--input-image")) or ""
+        self.dtype = ""
+        self.active = False
+        if node.program == "N4BiasFieldCorrection" and node.inputs.get("copy_header") == "True":
+            import nibabel as nib
+
+            try:
+                self.dtype = str(nib.load(s.run.host(self.source)).get_data_dtype())
+            except (OSError, ValueError):
+                self.dtype = ""
+            self.active = bool(self.dtype) and self.dtype != "float32" and s.run.image is not None
+
+    def describe(self) -> dict[str, Any]:
+        return {"input": self.source, "input_dtype": self.dtype, "outputs": self.names}
+
+    def __call__(self, run: rn.RunResult | None) -> list[Path] | None:
+        if run is None or not run.ok:
+            return None
+        if not self.active:
+            return run.outputs
+        targets = [run.directory / f"nipype-{n}" for n in self.names]
+        specs = [
+            f"/cmp/{n}:/cmp/nipype-{n}:{'0' if i == 0 else '1'}" for i, n in enumerate(self.names)
+        ]
+        p = rn.run_container_python(
+            self.s, run.directory, _COPY_HEADER_SCRIPT, [self.source, *specs]
+        )
+        if p.returncode != 0 or not all(t.is_file() for t in targets):
+            raise RuntimeError(f"nipype's copy_header failed: {p.stderr[-300:]}")
+        return targets
 
 
 #: larmorx's documented divergences, by the cause :func:`_check_float_pipeline` confirms.
@@ -263,6 +351,152 @@ def explain(
         "explained": explained,
         "complete": reached and len(compared) == len(links),
     }
+
+
+# ------------------------------------------------------------------------------------------------
+# Slice timing: 3dTshift, both implementations
+
+#: 3dTshift's implementations in larmorx (docs/licensing.md): the bit-exact replica, a
+#: translation of AFNI's source run as the ``larmorx-gpl`` program, and the clean-room
+#: original of the main package, written from ``specs/3dTshift.md``.
+TSHIFT_IMPLEMENTATIONS = ("replica", "original")
+
+_NOTICE = re.compile(r"\b(?:AFNI|ANTS|ITK|FSL|PIPE|SCI)-\d+\b")
+
+
+def tshift_within(d: cmp.ImageDiff, stored: dict[str, Any] | None = None) -> tuple[bool, str]:
+    """docs/validation/afni-tshift.md's thresholds for one output: the same stored type and
+    scale factor; float32 values within 1e-5 of the largest |AFNI output|; integers within 1
+    stored unit (``stored``: :func:`~larmorx_validation.stages.compare.stored_diff`)."""
+    if d.identical:
+        return True, "bit-identical"
+    if d.note:
+        return False, d.note
+    if stored and stored["dtype"][0] != stored["dtype"][1]:
+        return False, f"stored types differ: {stored['dtype'][0]}, {stored['dtype'][1]}"
+    if stored and "max_abs" in stored:
+        same = stored["dtype"][0] == stored["dtype"][1] and np.array_equal(
+            np.array(stored["scl_slope"]), np.array(stored["scl_slope"][::-1]), equal_nan=True
+        )
+        text = (
+            f"{stored['dtype'][0]}: {stored['differing']:,} of {stored['values']:,} stored "
+            f"values differ, max |diff| {stored['max_abs']} unit"
+        )
+        if not same:
+            text += f"; types or scale factors differ ({stored['dtype']}, {stored['scl_slope']})"
+        return same and stored["max_abs"] <= 1, text
+    return d.max_rel <= 1e-5, f"max rel {d.max_rel:.2g}"
+
+
+def compare_tshift(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
+    """3dTshift as fMRIPrep ran it, with both larmorx implementations in ``reproduce`` mode
+    (fMRIPrep's run) and in their default (``fix``) mode; references: fMRIPrep's program
+    again in its image, and the repository's AFNI 25.2.09 build."""
+    res = _base(node, stage)
+    argv, files = rn.prepare_inputs(s.run, node, node.argv)
+    res["argv"] = argv
+    res["files"] = files
+    names = rn.output_names(argv)
+    refs = rn.reference_outputs(s.run, node, names)
+    if not names:
+        res.update(status="error", note="cannot tell the outputs from the command line")
+        return res
+    if missing := [str(p) for p in refs if not p.exists()]:
+        res.update(status="skipped", note=f"fMRIPrep's output is gone: {missing[0]}")
+        return res
+    ref = refs[0]
+    base = s.compare / node.path
+    threads = s.threads or node.threads
+    res["larmorx_threads"] = threads
+    outputs: list[dict[str, Any]] = []
+    produced: dict[str, Path] = {}
+    for impl in TSHIFT_IMPLEMENTATIONS:
+        entry: dict[str, Any] = {"output": os.path.basename(names[0]), "implementation": impl}
+        outputs.append(entry)
+        try:
+            r = rn.run_larmorx(
+                s, node, argv, base / f"larmorx-{impl}", threads, implementation=impl, files=files
+            )
+        except FileNotFoundError as e:
+            entry["error"] = str(e)
+            continue
+        res[f"larmorx_{impl}_seconds"] = r.seconds
+        if not r.ok:
+            entry["error"] = r.stderr.strip()[-300:]
+            continue
+        produced[impl] = r.outputs[0]
+        entry["vs_fmriprep"] = cmp.compare_files(ref, r.outputs[0])
+        entry["header_vs_fmriprep"] = cmp.header_diff(ref, r.outputs[0])
+        entry["stored_vs_fmriprep"] = cmp.stored_diff(ref, r.outputs[0])
+        entry["within"] = tshift_within(entry["vs_fmriprep"], entry["stored_vs_fmriprep"])
+        # larmorx's default: AFNI's defects corrected (D13)
+        f = rn.run_larmorx(
+            s,
+            node,
+            argv,
+            base / f"larmorx-{impl}-fix",
+            threads,
+            mode="fix",
+            implementation=impl,
+            files=files,
+        )
+        if f.ok:
+            entry["fix"] = {
+                "vs_reproduce": cmp.compare_files(r.outputs[0], f.outputs[0]),
+                "header": cmp.header_diff(r.outputs[0], f.outputs[0]),
+                "notices": sorted(set(_NOTICE.findall(f.stderr))),
+            }
+        else:
+            entry["fix"] = {"error": f.stderr.strip()[-300:]}
+    res["larmorx_seconds"] = res.get("larmorx_replica_seconds", res.get("larmorx_original_seconds"))
+    res["outputs"] = outputs
+
+    # fMRIPrep's program again, in its image, as it ran (one thread): the time on this machine
+    # and whether AFNI reproduces fMRIPrep's own output.
+    if s.container:
+        cn = rn.run_container(
+            s,
+            node,
+            argv,
+            base / f"container-{node.threads}t",
+            node.threads,
+            timed=True,
+            files=files,
+        )
+        res["container_seconds"] = cn.seconds if cn else None
+        if cn is not None and cn.ok:
+            res["rerun_vs_fmriprep"] = cmp.compare_files(ref, cn.outputs[0])
+    # The repository's AFNI 25.2.09 build (the parity suites' oracle)
+    a = rn.run_afni_oracle(s, argv, base / "afni-25.2.09", files)
+    if a is not None and a.ok:
+        res["afni_oracle_vs_fmriprep"] = cmp.compare_files(ref, a.outputs[0])
+        res["afni_oracle_header_vs_fmriprep"] = cmp.header_diff(ref, a.outputs[0])
+        for entry in outputs:
+            if entry["implementation"] in produced:
+                entry["vs_afni_oracle"] = cmp.compare_files(
+                    a.outputs[0], produced[entry["implementation"]]
+                )
+    if "replica" in produced and "original" in produced:
+        res["original_vs_replica"] = cmp.compare_files(produced["replica"], produced["original"])
+
+    by = {e["implementation"]: e for e in outputs}
+    rep, orig = by["replica"], by["original"]
+    if "error" in rep or "error" in orig:
+        res["status"] = "larmorx-error"
+        res["note"] = rep.get("error") or orig.get("error")
+    elif not rep["vs_fmriprep"].identical:
+        afni = res.get("afni_oracle_vs_fmriprep")
+        rep_afni = rep.get("vs_afni_oracle")
+        # explained when the replica is AFNI's oracle build bit for bit and fMRIPrep's own
+        # program differs from that build
+        res["status"] = (
+            "explained" if rep_afni is not None and rep_afni.identical and afni else "unexplained"
+        )
+    elif not orig["within"][0]:
+        res["status"] = "unexplained"
+    else:
+        res["status"] = "identical" if orig["vs_fmriprep"].identical else "explained"
+    return res
 
 
 # ------------------------------------------------------------------------------------------------
@@ -444,6 +678,13 @@ def compare_hmc(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
         band = _mcflirt_band(s)
         if band:
             res["band"] = band
+        # Where PLAN.md §11.3's FD correlation applies and larmorx misses it, mcflirt's own
+        # band on this very run decides (porting guide §3, §7).
+        if (
+            res["fd_max_fmriprep"] >= HMC_FD_MIN_MM
+            and res["confounds"]["larmorx"]["fd_r"] <= HMC_FD_R
+        ):
+            res["node_band"] = _node_band(s, node, base, source, reference, table)
         if hmc_xfm is not None:
             fx = cmp.read_itk_affines(hmc_xfm)
             res["itk"] = {
@@ -474,6 +715,76 @@ def compare_hmc(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
         )
     res["status"] = "compared"
     return res
+
+
+#: PLAN.md §11.3's FD correlation, required where fMRIPrep's largest FD reaches 0.5 mm
+#: (specs/mcflirt.md §14; record.FD_MIN_MM, record.FD_R).
+HMC_FD_MIN_MM = 0.5
+HMC_FD_R = 0.99
+
+#: The perturbations of the node band: the threshold perturbations of the mri-hmc band
+#: (``larmorx_validation.parity.mri_hmc_band``), which leave the geometry unchanged.
+NODE_BAND_PERTURBATIONS = ("noise", "noise2", "noise3", "reverse")
+
+
+def _node_band(
+    s: rn.Settings, node: Node, base: Path, source: str, reference: str, table
+) -> dict[str, Any]:
+    """mcflirt's own variability on this node: FSL 6.0.7's mcflirt (which reproduces
+    fMRIPrep's matrices bit for bit), black-box runs with fMRIPrep's arguments on the series
+    perturbed as the mri-hmc band perturbs it (noise of ±0.5 of a stored unit, three
+    realisations; the volumes reversed), and fMRIPrep's own confound code on each, against
+    fMRIPrep's confounds file, as larmorx's matrices are compared."""
+    import subprocess
+
+    from larmorx_validation.parity.mri_hmc_band import SEED, _perturb
+
+    exe = rn.host_mcflirt()
+    if exe is None:
+        return {"error": "FSL 6.0.7's mcflirt was not found"}
+    env = {
+        "HOME": os.environ.get("HOME", ""),
+        "PATH": "/usr/bin:/bin",
+        "FSLDIR": str(exe.resolve().parents[1]),
+        "FSLOUTPUTTYPE": "NIFTI_GZ",
+        "OMP_NUM_THREADS": "1",
+    }
+    out: dict[str, Any] = {"mcflirt": rn.fsl_version(exe), "seed": SEED, "perturbations": {}}
+    for kind in NODE_BAND_PERTURBATIONS:
+        d = base / f"band-{kind}"
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True)
+        made = _perturb(kind, Path(s.run.host(source)), Path(s.run.host(reference)), d)
+        if made is None:
+            continue
+        series, ref = made
+        p = subprocess.run(
+            [str(exe), "-in", str(series), "-out", str(d / "out_mcf.nii.gz")]
+            + (["-reffile", str(ref)] if ref is not None else [])
+            + ["-mats"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        mats = d / "out_mcf.nii.gz.mat"
+        if p.returncode != 0 or not mats.is_dir():
+            out["perturbations"][kind] = {"error": p.stderr[-300:]}
+            continue
+        if kind == "reverse":
+            # MAT_i of the reversed series is volume n-1-i
+            names = sorted(mats.glob("MAT_*"), key=lambda q: int(q.name[4:]))
+            ordered = d / "ordered.mat"
+            ordered.mkdir()
+            for i, q in enumerate(names):
+                shutil.copyfile(q, ordered / f"MAT_{len(names) - 1 - i:04d}")
+            mats = ordered
+        conf = _confounds(s, d / "confounds", mats, source, reference)
+        out["perturbations"][kind] = _confound_diff(table, conf["table"])
+    fd = [v["fd_r"] for v in out["perturbations"].values() if "fd_r" in v]
+    if fd:
+        out["fd_r"] = min(fd)
+    return out
 
 
 def _mcflirt_band(s: rn.Settings) -> dict[str, float] | None:
@@ -512,13 +823,14 @@ def _hmc_xfm(s: rn.Settings, node: Node) -> Path | None:
 
 
 def _bids_run(filename: str) -> str:
-    """``sub-01_task-x_run-01_desc-...`` -> ``task_x_run_01`` (as nipype names the workflow)."""
+    """``sub-01_ses-1_task-x_run-01_desc-...`` -> ``ses_1_task_x_run_01``, as fMRIPrep names the
+    run's workflow (``get_wf_name``: every entity but the subject; the session too)."""
     parts = [
         p
         for p in filename.split("_")
-        if p.split("-")[0] in ("task", "acq", "ce", "dir", "rec", "run", "echo", "part", "ses")
+        if p.split("-")[0] in ("ses", "task", "acq", "ce", "rec", "dir", "run", "echo", "part")
     ]
-    return "_".join(p.replace("-", "_") for p in parts if not p.startswith("ses-"))
+    return "_".join(p.replace("-", "_") for p in parts)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -604,9 +916,172 @@ def compare_resample(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]
     del ref
     res["outputs"] = [entry]
     res["status"] = "identical" if d.identical else "different"
+    if kwargs["fieldmap"] is not None and kwargs["pe_dir"] and kwargs["ro_time"]:
+        res["fieldmap"] = i.get("fieldmap")
+        res["jacobian_fix"] = _jacobian_fix_pass(
+            s, i, transforms, kwargs, data, img.affine, threads
+        )
     if s.container:
         res.update(_rerun_resample(s, node, out_file))
     return res
+
+
+def _brain_mask(s: rn.Settings, shape: tuple[int, ...], affine: np.ndarray) -> tuple:
+    """fMRIPrep's BOLD brain mask on this grid: the ``desc-brain_mask`` derivative of the run
+    (any space) whose shape and affine are the grid's. ``(mask, its file)``, or ``(None, "")``."""
+    import nibabel as nib
+
+    for p in sorted((s.run.root / "out").rglob("*_desc-brain_mask.nii.gz")):
+        if "/func/" not in p.as_posix():
+            continue
+        m = nib.load(p)
+        if m.shape[:3] == tuple(shape[:3]) and np.allclose(m.affine, affine, atol=1e-4):
+            return np.asanyarray(m.dataobj) > 0, os.path.relpath(p, s.run.root)
+    return None, ""
+
+
+def _relative_change(
+    rep: np.ndarray, fix: np.ndarray, mask: np.ndarray | None, affine: np.ndarray
+) -> dict[str, Any]:
+    """How much larmorx's default (``fix``) changes fMRIPrep's output (``rep``) per brain
+    voxel: the relative change of the voxel's temporal mean, ``(fix - rep) / |rep|`` (with
+    the Jacobian, the ratio of the two factors), its distribution, and where it is largest
+    (the largest clusters of voxels changed by more than 1 %, 6-connected, in world mm)."""
+    from scipy import ndimage as ndi
+
+    a = rep.mean(axis=3, dtype=np.float64) if rep.ndim == 4 else rep.astype(np.float64)
+    b = fix.mean(axis=3, dtype=np.float64) if fix.ndim == 4 else fix.astype(np.float64)
+    if mask is None:
+        mask = a > 0.1 * a.max()
+    valid = mask & (np.abs(a) > 0)
+    rel = np.zeros(a.shape)
+    rel[valid] = (b[valid] - a[valid]) / np.abs(a[valid])
+    r = rel[valid]
+    ar = np.abs(r)
+    big = np.abs(rel) > 0.01
+    labels, n = ndi.label(big)
+    clusters = []
+    if n:
+        sizes = ndi.sum_labels(np.ones(a.shape), labels, index=np.arange(1, n + 1))
+        for k in np.argsort(sizes)[::-1][:3]:
+            idx = np.argwhere(labels == k + 1)
+            centre = affine[:3, :3] @ idx.mean(axis=0) + affine[:3, 3]
+            clusters.append(
+                {
+                    "voxels": int(sizes[k]),
+                    "centroid_mm": [round(float(x), 1) for x in centre],
+                    "max_abs": float(np.abs(rel[labels == k + 1]).max()),
+                }
+            )
+    at = np.unravel_index(int(np.argmax(np.abs(rel))), rel.shape)
+    return {
+        "brain_voxels": int(valid.sum()),
+        "over": {f"{t:g}": float(np.mean(ar > t)) for t in (1e-3, 1e-2, 5e-2, 0.2)},
+        "abs_percentiles": {f"{p:g}": float(np.percentile(ar, p)) for p in (50, 90, 99, 99.9)},
+        "max_abs": float(ar.max()),
+        "signed_range": [float(r.min()), float(r.max())],
+        "signed_median": float(np.median(r)),
+        "max_at_mm": [round(float(x), 1) for x in affine[:3, :3] @ np.array(at) + affine[:3, 3]],
+        "clusters_over_1pct": clusters,
+        "clusters_count": int(n),
+    }
+
+
+def _jacobian_fix_pass(
+    s: rn.Settings,
+    i: dict[str, Any],
+    transforms: list[str],
+    kwargs: dict[str, Any],
+    reproduced: np.ndarray,
+    affine: np.ndarray,
+    threads: int,
+) -> dict[str, Any]:
+    """PIPE-03 on fMRIPrep's own field map: larmorx's default (``fix``) against fMRIPrep's
+    result (``reproduce``, compared with fMRIPrep's output above), and the two Jacobian factors
+    themselves. Where fMRIPrep ran without the Jacobian (its default for field maps other than
+    PEPOLAR, ``fmriprep/workflows/base.py``, ``_jacobian_for``), larmorx's default must leave
+    the output unchanged, and both are run again with the Jacobian on, as fMRIPrep's
+    ``--force fmap-jacobian`` would run them."""
+    import warnings
+
+    import nibabel as nib
+
+    import larmorx as lx
+
+    def resample(source, xfms, defects: str, **over) -> tuple[np.ndarray, list[str]]:
+        kw = {**kwargs, **over}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            out = lx.transforms.resample_series(
+                source,
+                s.run.host(i["ref_file"]),
+                xfms,
+                n_threads=threads,
+                upstream_defects=defects,
+                **kw,
+            )
+        notices = sorted({m for w in caught for m in _NOTICE.findall(str(w.message))})
+        return np.asarray(out.data), notices
+
+    out: dict[str, Any] = {"jacobian": bool(kwargs["jacobian"])}
+    mask, mask_file = _brain_mask(s, reproduced.shape, affine)
+    out["mask"] = mask_file or "temporal mean above 10 % of its maximum"
+    source = s.run.host(i["in_file"])
+    t0 = time.perf_counter()
+    fixed, notices = resample(source, transforms, "fix")
+    out["seconds"] = time.perf_counter() - t0
+    out["notices"] = notices
+    out["fix_vs_reproduce"] = cmp.compare_arrays(reproduced, fixed)
+    if kwargs["jacobian"]:
+        if not out["fix_vs_reproduce"].identical:
+            out["change"] = _relative_change(reproduced, fixed, mask, affine)
+        rep_forced = reproduced
+    else:
+        # the Jacobian forced on: fMRIPrep's factor (reproduce) against larmorx's (fix)
+        del fixed
+        rep_forced, _ = resample(source, transforms, "reproduce", jacobian=True)
+        fix_forced, forced_notices = resample(source, transforms, "fix", jacobian=True)
+        out["forced"] = {
+            "notices": forced_notices,
+            "fix_vs_reproduce": cmp.compare_arrays(rep_forced, fix_forced),
+        }
+        if not out["forced"]["fix_vs_reproduce"].identical:
+            out["forced"]["change"] = _relative_change(rep_forced, fix_forced, mask, affine)
+        del fix_forced
+    del rep_forced
+    # The factors themselves: a volume of ones on the source's grid, through the transforms
+    # without head motion (both factors are computed before it), with the field map.
+    src = nib.load(source)
+    ones = (np.ones(src.shape[:3], np.float32), src.affine)
+    keep = [k for k, t in enumerate(transforms) if "desc-hmc_xfm" not in os.path.basename(t)]
+    inverse = kwargs["inverse"]
+    if isinstance(inverse, list | tuple) and len(inverse) == len(transforms):
+        inverse = [inverse[k] for k in keep]
+    factors = {}
+    for defects in ("reproduce", "fix"):
+        factors[defects], _ = resample(
+            ones,
+            [transforms[k] for k in keep],
+            defects,
+            jacobian=True,
+            inverse=inverse or False,
+            order=1,
+            mode="nearest",
+        )
+    inside = mask if mask is not None else np.ones(factors["fix"].shape, bool)
+    fr, ff = (
+        factors["reproduce"][inside].astype(np.float64),
+        factors["fix"][inside].astype(np.float64),
+    )
+    gap = np.abs(ff - fr)
+    out["factors"] = {
+        "fmriprep_range": [float(fr.min()), float(fr.max())],
+        "larmorx_range": [float(ff.min()), float(ff.max())],
+        "over": {f"{t:g}": float(np.mean(gap > t)) for t in (0.001, 0.01, 0.05, 0.2)},
+        "median_gap": float(np.median(gap)),
+        "max_gap": float(gap.max()),
+    }
+    return out
 
 
 _RESAMPLE_SCRIPT = r'''
@@ -635,7 +1110,13 @@ def _rerun_resample(s: rn.Settings, node: Node, out_file: str) -> dict[str, Any]
     if directory.exists():
         shutil.rmtree(directory)
     directory.mkdir(parents=True)
-    inputs = {k: v for k, v in ((k, _value(v)) for k, v in node.inputs.items()) if v is not None}
+    # an empty list (``inverse : []`` of a node without transforms) is left to the interface's
+    # default: nipype turns an empty list given to a multi-object input into Undefined
+    inputs = {
+        k: v
+        for k, v in ((k, _value(v)) for k, v in node.inputs.items())
+        if v is not None and v != []
+    }
     # The node's own num_threads (in ``inputs``), and OMP_NUM_THREADS=1 as fMRIPrep's image
     # sets it: with more, the concurrent volumes' OpenBLAS calls race and corrupt the output
     # (docs/findings/fmriprep-oracle.md).
@@ -658,6 +1139,8 @@ def compare_node(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     try:
         if stage.kind == "hmc":
             res = compare_hmc(s, node, stage)
+        elif stage.kind == "tshift":
+            res = compare_tshift(s, node, stage)
         elif stage.kind == "resample":
             res = compare_resample(s, node, stage)
         else:
@@ -675,4 +1158,12 @@ def compare_node(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
     return res
 
 
-__all__ = ["compare_cli", "compare_hmc", "compare_node", "compare_resample", "explain"]
+__all__ = [
+    "compare_cli",
+    "compare_hmc",
+    "compare_node",
+    "compare_resample",
+    "compare_tshift",
+    "explain",
+    "tshift_within",
+]

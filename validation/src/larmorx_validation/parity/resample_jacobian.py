@@ -95,6 +95,12 @@ def measure(run: Path) -> list[dict]:
             lx.load(_first(anat, "*_desc-brain_mask.nii.gz", exclude="space-")),
         ),
         (
+            "T1w at the BOLD's voxel size (fMRIPrep's `space-T1w` BOLD)",
+            func / f"{stem}_space-T1w_boldref.nii.gz",
+            [coreg],
+            lx.load(func / f"{stem}_space-T1w_desc-brain_mask.nii.gz"),
+        ),
+        (
             "MNI152NLin2009cAsym res-2",
             func / f"{stem}_space-MNI152NLin2009cAsym_res-2_boldref.nii.gz",
             [coreg, to_mni],
@@ -105,9 +111,20 @@ def measure(run: Path) -> list[dict]:
     for name, target, xfms, target_mask in targets:
         t = lx.load(target)
         world = _grid_points(t.shape, t.affine)
+        # fMRIPrep's derivative steps over one voxel along target axis j: that step in the
+        # BOLD reference's voxels, at the grid's centre (length 1 and angle 0 on its own grid)
+        mid = (np.array(t.shape[:3], float) - 1) / 2
+        step = np.array([mid, mid + np.eye(3)[1]]) @ t.affine[:3, :3].T + t.affine[:3, 3]
         if xfms:
             chain = lx.transforms.load_transforms([str(x) for x in xfms])
             world = chain.map(world, n_threads=0)
+            step = chain.map(step, n_threads=1)
+        step = (np.c_[step, np.ones(2)] @ np.linalg.inv(boldref.affine).T)[:, :3]
+        d = step[1] - step[0]
+        step_text = (
+            f"{np.linalg.norm(d):.2f} / "
+            f"{np.degrees(np.arccos(min(1.0, abs(d[1]) / np.linalg.norm(d)))):.0f}°"
+        )
         fmap = _field(world, centre, half).reshape(t.shape[:3], order="F").astype(np.float32)
         out = {}
         for mode in ("fix", "reproduce"):
@@ -136,6 +153,7 @@ def measure(run: Path) -> list[dict]:
                 "target": name,
                 "shape": "×".join(map(str, t.shape[:3])),
                 "zooms": "×".join(f"{z:.3g}" for z in t.header.zooms[:3]),
+                "step": step_text,
                 "voxels": int(brain.sum()),
                 "fix_range": (float(a.min()), float(a.max())),
                 "fmriprep_range": (float(b.min()), float(b.max())),
@@ -190,14 +208,16 @@ def report(rows: list[dict], run: Path) -> str:
         "",
         "## Corrected against fMRIPrep",
         "",
-        "| Target grid | Shape | Voxel size (mm) | Brain voxels | Jacobian, corrected | "
+        "| Target grid | Shape | Voxel size (mm) | fMRIPrep's step (BOLD voxels / angle to `j`) "
+        "| Brain voxels | Jacobian, corrected | "
         "Jacobian, fMRIPrep | Identical | Differ by > 0.01 | > 0.05 | > 0.2 | "
         "Median / max difference |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         lines.append(
-            f"| {r['target']} | {r['shape']} | {r['zooms']} | {r['voxels']} | "
+            f"| {r['target']} | {r['shape']} | {r['zooms']} | {r.get('step', '–')} | "
+            f"{r['voxels']} | "
             f"{r['fix_range'][0]:.3f} to {r['fix_range'][1]:.3f} | "
             f"{r['fmriprep_range'][0]:.3f} to {r['fmriprep_range'][1]:.3f} | "
             f"{100 * r['identical'] / r['voxels']:.1f} % | {100 * r['over_001']:.1f} % | "
@@ -230,25 +250,65 @@ def report(rows: list[dict], run: Path) -> str:
         "factor is compressed towards 1 (its derivative is taken in finer target voxels, and "
         "along whichever anatomical direction the target's second axis has), so it undoes "
         "only part of the intensity pile-up and spread of the distortion; the corrected factor "
-        "follows the exact one.",
+        "follows the exact one. fMRIPrep's own `space-T1w` BOLD is not on the 1 mm T1w grid but "
+        "on the T1w's orientation at the BOLD's voxel size (`bold_anat_wf/gen_ref`, "
+        "`keep_native`): there the voxel sizes match, and only the angle between the BOLD's "
+        "axes and the T1w's (through the boldref→T1w transform) separates the two factors. "
+        '"fMRIPrep\'s step" is what its derivative steps over, at the centre of the grid: one '
+        "voxel along target axis `j`, in the BOLD reference's voxels; the Jacobian needs one "
+        'BOLD voxel along `j` (1 / 0°). In this run the angle is large, so the row "T1w at '
+        "the BOLD's voxel size\" differs almost as much as the 1 mm grid; with a small angle "
+        "the difference is small (ds005040, below).",
         "",
     ]
     return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> None:
+    from larmorx_validation.parity.resample_jacobian_oracle import (
+        measure_oracle,
+        report_changes,
+        report_oracle,
+        stage_changes,
+    )
+
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--run", type=Path, required=True, help="fMRIPrep output directory of a subject")
+    p.add_argument(
+        "--oracle",
+        type=Path,
+        action="append",
+        default=[],
+        help="an fMRIPrep oracle run directory with field maps (repeatable): the factors on "
+        "fMRIPrep's own field maps",
+    )
     p.add_argument("--out", type=Path, help="write resample-series-jacobian.md/.json here")
     args = p.parse_args(argv)
     rows = measure(args.run)
     text = report(rows, args.run)
+    oracle = {_shown(r).split("/")[-1]: measure_oracle(r) for r in args.oracle}
+    if oracle:
+        command = (
+            "python -m larmorx_validation.parity.resample_jacobian --run <run>/out/<subject> "
+            + " ".join(f"--oracle <workspace>/{_shown(r)}" for r in args.oracle)
+            + " --out docs/validation"
+        )
+        text = text.replace(
+            "Generated with `python -m larmorx_validation.parity.resample_jacobian --run "
+            "<run>/out/<subject> --out docs/validation`",
+            f"Generated with `{command}`",
+        )
+        text += "\n" + "\n".join(report_oracle(oracle))
+        records = args.out if args.out is not None else Path("docs/validation")
+        changes = {name: stage_changes(records, name) for name in oracle}
+        text += "\n" + "\n".join(report_changes({k: v for k, v in changes.items() if v}))
     if args.out is None:
         print(text)
         return
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "resample-series-jacobian.json").write_text(
-        json.dumps({"run": _shown(args.run), "rows": rows}, indent=1), encoding="utf-8"
+        json.dumps({"run": _shown(args.run), "rows": rows, "oracle": oracle}, indent=1),
+        encoding="utf-8",
     )
     (args.out / "resample-series-jacobian.md").write_text(text, encoding="utf-8")
 

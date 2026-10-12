@@ -108,3 +108,83 @@ fn bit_identical_to_afni() {
     }
     eprintln!("{n} cases bit-identical to {}", afni.display());
 }
+
+/// AFNI-16 and AFNI-12's check when AFNI writes, against AFNI itself: with
+/// `LARMORX_UPSTREAM_DEFECTS=reproduce` the replica writes AFNI's plumb header for an sform
+/// 0.006° from plumb (byte for byte, `vox_offset` aside), and refuses to write a `-prefix` that
+/// passes AFNI's option scan only through its `3dcalc` exception (exit 0, no file), as AFNI
+/// does; by default it keeps the matrix and writes the file.
+#[test]
+fn nearly_plumb_and_write_time_names_as_afni() {
+    use larmorx_core::affine::Affine;
+    use larmorx_core::element::DataType;
+    use larmorx_core::ndarray::{ArrayViewD, IxDyn, ShapeBuilder};
+    use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+
+    let Some(afni) = oracle() else {
+        eprintln!("skipped: the AFNI 3dTshift oracle was not found (LARMORX_AFNI_BIN)");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("nearly-plumb.nii");
+    let mut h = NiftiHeader::new(NiftiVersion::V1, &common::SHAPE, DataType::F32).unwrap();
+    let affine = Affine::from_linear(
+        [[2.0, 0.0, -3.0e-4], [0.0, 2.0, 0.0], [2.0e-4, 0.0, 3.0]],
+        [-4.0, -2.0, -6.0],
+    );
+    h.set_sform(&affine, 1);
+    h.set_qform(&affine, 1).unwrap();
+    h.pixdim[4] = 2.0;
+    h.xyzt_units = 2 | 8;
+    let v: Vec<f32> = common::values().iter().map(|&x| x as f32).collect();
+    let view = ArrayViewD::from_shape(IxDyn(&common::SHAPE).f(), v.as_slice()).unwrap();
+    nifti::write(&input, &h, view, &WriteOptions::default()).unwrap();
+
+    let run = |exe: &Path, gpl: bool, prefix: &str, mode: &str| {
+        let mut command = std::process::Command::new(exe);
+        if gpl {
+            command.args(["afni", "3dTshift"]);
+        }
+        let out = command
+            .args(["-tpattern", "alt+z", "-prefix", prefix])
+            .arg(&input)
+            .current_dir(dir.path())
+            .env("AFNI_DONT_LOGFILE", "YES")
+            .env("LARMORX_UPSTREAM_DEFECTS", mode)
+            .output()
+            .unwrap();
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    let exe = Path::new(EXE);
+    let (a, _) = run(&afni, false, "afni.nii", "");
+    let (r, err) = run(exe, true, "reproduce.nii", "reproduce");
+    let (f, _) = run(exe, true, "fix.nii", "fix");
+    assert_eq!((a, r, f), (Some(0), Some(0), Some(0)), "{err}");
+    assert!(
+        err.contains("upstream defect AFNI-16 (3dTshift) reproduced"),
+        "{err}"
+    );
+    let raw = |name: &str| std::fs::read(dir.path().join(name)).unwrap();
+    let header = |r: &[u8]| [&r[..108], &r[112..348]].concat();
+    assert_eq!(header(&raw("afni.nii")), header(&raw("reproduce.nii")));
+    let (_, kept) = common::read(&dir.path().join("fix.nii"));
+    assert_eq!(
+        kept.srow_z[0],
+        f64::from(2.0e-4f32),
+        "the default keeps the matrix"
+    );
+
+    // "./3dcalc a b.nii" is refused when AFNI writes it.
+    for (exe, gpl, mode) in [(afni.as_path(), false, ""), (exe, true, "reproduce")] {
+        let (code, err) = run(exe, gpl, "3dcalc a b.nii", mode);
+        assert_eq!(code, Some(0), "{err}");
+        assert!(
+            err.contains("Illegal filename for NIfTI output: ./3dcalc a b.nii"),
+            "{err}"
+        );
+        assert!(!dir.path().join("3dcalc a b.nii").exists());
+    }
+}

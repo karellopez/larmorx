@@ -313,6 +313,40 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         "an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°, AFNI-16)",
         Scenario("gen:slightly-oblique", ("-tpattern", "alt+z")),
     )
+    add(
+        "geometry/slightly-oblique-qform",
+        "geometry",
+        "a qform only, 0.006° from plumb: AFNI writes the plumb matrix with the header's voxel "
+        "sizes as steps (AFNI-16)",
+        Scenario("gen:slightly-oblique-qform", ("-tpattern", "alt+z")),
+    )
+    add(
+        "geometry/slightly-oblique-metre",
+        "geometry",
+        "an sform in metres 0.006° from plumb: AFNI writes the plumb matrix, its steps in "
+        "millimetres and its origin in metres (AFNI-16, AFNI-07)",
+        Scenario("gen:d13-slightly-oblique-metre", ("-tpattern", "alt+z")),
+    )
+    add(
+        "defects/oblique-metre-zero-origin",
+        "defects",
+        "units in metres, an oblique sform at the origin: AFNI keeps the whole sform in metres "
+        "(AFNI-07)",
+        Scenario("gen:d13-oblique-metre-origin0", ("-tpattern", "alt+z")),
+    )
+    add(
+        "copy/short-slice-spacing",
+        "copy",
+        "header slice times 2 ms apart beyond a 5 ms TR: a copy, whose slice fields AFNI derives "
+        "from the times within 3 ms (slice_start 1)",
+        Scenario("gen:d13-short-slices", ()),
+    )
+    add(
+        "copy/alt-two-slices",
+        "copy",
+        "header slice code 3 over slices 1..2, beyond the TR: a copy, written with slice code 1",
+        Scenario("gen:d13-alt-two-slices", ()),
+    )
 
     # Copies of the input.
     for path, desc in [
@@ -549,12 +583,14 @@ def _generated(name: str) -> Path:
     if name == "voxshift":
         nib.Nifti1Image(np.full(data.shape[:3], 0.25, np.float32), src.affine).to_filename(path)
         return path
-    if name == "slightly-oblique":
+    if name in ("slightly-oblique", "slightly-oblique-qform"):
         affine = src.affine.copy()
         affine[2, 0] = 1e-4 * affine[0, 0]  # 1e-4 rad (0.006°) about y
         affine[0, 2] = -1e-4 * affine[2, 2]
         affine[:3, 3] = (-100.0, 50.0, 20.0)
         img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
+        if name.endswith("qform"):  # the qform only
+            img.header.set_sform(affine, 0)
         img.header["pixdim"][4] = src.header["pixdim"][4]
         img.to_filename(path)
         return path
@@ -603,22 +639,29 @@ def _generated_d13(name: str, data: np.ndarray, src, path: Path) -> Path:  # typ
             f.write(hdr.binaryblock + b"\0" * 4)
             f.write(np.asfortranarray(data, dtype=np.float32).tobytes(order="F"))
         return path
-    if name == "d13-tiny-offsets":
+    timing = {  # header slice timing: code, start, end, duration, TR
+        "d13-tiny-offsets": (1, 0, 3, 0.0005, 0.001),
+        "d13-short-slices": (1, 0, 3, 0.002, 0.005),
+        "d13-alt-two-slices": (3, 1, 2, 2.5, 2.0),
+    }
+    if name in timing:
         img = nib.Nifti1Image(data, src.affine, src.header)
         h = img.header
-        h["slice_code"] = 1
-        h["slice_start"], h["slice_end"] = 0, 3
-        h["slice_duration"] = 0.0005
+        h["slice_code"], h["slice_start"], h["slice_end"], h["slice_duration"], tr = timing[name]
         h.set_dim_info(slice=2)
-        h["pixdim"][4] = 0.001
+        h["pixdim"][4] = tr
         img.to_filename(path)
         return path
-    scale = {"d13-metre": 0.001, "d13-micron": 1000.0, "d13-oblique-metre": 0.001}[name]
+    scale = 1000.0 if name == "d13-micron" else 0.001
     affine = src.affine.copy()
-    if name == "d13-oblique-metre":  # a rotation about y with cos 0.8, sin 0.6
+    if name.startswith("d13-oblique-metre"):  # a rotation about y with cos 0.8, sin 0.6
         rotation = np.array([[0.8, 0.0, -0.6], [0.0, 1.0, 0.0], [0.6, 0.0, 0.8]])
         affine[:3, :3] = rotation @ affine[:3, :3]
-    affine[:3, 3] = (-100.0, 50.0, 20.0)  # an origin, in mm before the change of units
+    if name == "d13-slightly-oblique-metre":  # 1e-4 rad (0.006°) about y
+        affine[2, 0] = 1e-4 * affine[0, 0]
+        affine[0, 2] = -1e-4 * affine[2, 2]
+    # an origin, in mm before the change of units
+    affine[:3, 3] = (0.0, 0.0, 0.0) if name.endswith("origin0") else (-100.0, 50.0, 20.0)
     affine[:3] *= scale
     img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
     img.header.set_xyzt_units("meter" if scale < 1 else "micron", "sec")
@@ -740,6 +783,31 @@ DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
             frozenset({"both succeed", "both reject the arguments"}),
             "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too "
             "(no switch for AFNI-12)",
+        ),
+        "geometry/slightly-oblique-qform": (
+            frozenset({"geometry (sform)", "geometry (qform)"}),
+            "AFNI writes the plumb matrix of a qform less than about 0.014° from plumb (AFNI-16); "
+            "the original keeps the input's matrix",
+        ),
+        "geometry/slightly-oblique-metre": (
+            frozenset({"geometry (sform)", "geometry (qform)"}),
+            "AFNI writes the plumb matrix (AFNI-16), its steps in millimetres and its origin in "
+            "metres (AFNI-07); the original keeps the tilt",
+        ),
+        "defects/oblique-metre-zero-origin": (
+            frozenset({"geometry (sform)", "geometry (qform)"}),
+            "AFNI writes an oblique sform in metres as it is (AFNI-07); the original converts its "
+            "linear part to millimetres in reproduce mode too",
+        ),
+        "copy/short-slice-spacing": (
+            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+            "AFNI derives the slice fields of a copy from the times, within 3 ms: slice_start 1 "
+            "here; the original writes the header's fields back (slice_start 0)",
+        ),
+        "copy/alt-two-slices": (
+            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+            "AFNI derives the slice fields of a copy from the times: two slices are slice code 1; "
+            "the original writes the header's code 3 back",
         ),
         "header-timing/code2-beyond-tr": (
             frozenset({defects.FIX_PASS, "D13 notices in both modes"}),

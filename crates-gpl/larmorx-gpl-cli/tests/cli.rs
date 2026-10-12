@@ -197,6 +197,21 @@ fn tshift_upstream_defects_switch() {
     );
     assert!(dir.path().join("with blank.nii").exists());
 
+    // AFNI-12 when AFNI writes: a -prefix that passes AFNI's option scan through its "3dcalc"
+    // exception is refused by its NIfTI writer as "./3dcalc a b.nii" (nothing written, exit 0).
+    let (code, err) = run("3dcalc a b.nii", Some("reproduce"));
+    assert_eq!(code, Some(0), "{err}");
+    assert!(
+        err.contains("** ERROR: Illegal filename for NIfTI output: ./3dcalc a b.nii"),
+        "{err}"
+    );
+    assert!(err.contains("upstream defect AFNI-12 (3dTshift) reproduced"));
+    assert!(!dir.path().join("3dcalc a b.nii").exists());
+    let (code, err) = run("3dcalc a b.nii", None);
+    assert_eq!(code, Some(0), "{err}");
+    assert!(err.contains("upstream defect AFNI-12 (3dTshift) corrected"));
+    assert!(dir.path().join("3dcalc a b.nii").exists());
+
     // A plain run names nothing, in either mode.
     for mode in [None, Some("fix"), Some("reproduce"), Some("")] {
         let name = format!("plain-{}.nii", mode.unwrap_or("unset"));

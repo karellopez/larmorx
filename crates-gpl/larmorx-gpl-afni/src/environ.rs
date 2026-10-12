@@ -113,6 +113,8 @@ pub const CONSULTED: &[(&str, Use)] = &[
     ("AFNI_NIFTI_DEBUG", Use::NoEffect(DEBUG)),
     ("NIML_DEBUG", Use::NoEffect(DEBUG)),
     ("AFNI_WAMI_DEBUG", Use::NoEffect(DEBUG)),
+    // Read only when a -D sets it (AFNI_setenv turns tracing on for `y` or `Y`).
+    ("AFNI_DEBUG", Use::NoEffect(DEBUG)),
     ("AFNI_SYSTEM_AFNIRC", Use::NoEffect(AFNIRC)),
     ("AFNI_ENVIRON_RESET", Use::NoEffect(AFNIRC)),
     ("AFNI_ENVIRON_WARNINGS", Use::NoEffect(AFNIRC)),

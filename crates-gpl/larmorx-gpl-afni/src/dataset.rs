@@ -4,7 +4,9 @@
 // src/nifti/nifti2/nifti2_io.c (the header conversion of nifti_image_read and
 // nifti_quatern_to_dmat44), src/thd_floatscan.c (thd_floatscan), src/edt_fullcopy.c
 // (EDIT_full_copy), src/thd_atlas.c (THD_get_generic_space, with the space table of
-// src/AFNI_atlas_spaces.niml) and the DSET_UNMSEC macro of src/3ddata.h.
+// src/AFNI_atlas_spaces.niml), src/thd_coords.c (THD_report_obliquity), src/thd_writedset.c
+// (the AFNI_ALLOW_MILLISECONDS and one-row tests of THD_write_3dim_dataset) and the
+// DSET_UNMSEC macro of src/3ddata.h.
 // Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
 // released under the GNU GPL version 2 or any later version. thd_niftiread.c,
 // thd_niftiwrite.c, thd_atlas.c and the NIfTI library were written at the NIH and are in the
@@ -67,6 +69,7 @@ use crate::axes::{self, Axes, ORI_I2S, ORI_L2R, ORI_P2A};
 use crate::cnum::fmt_g;
 use crate::environ::Settings;
 use crate::message::Message;
+use crate::x87;
 
 /// The voxels of a dataset in one of AFNI's storage types (`MRI_byte`, `MRI_short`,
 /// `MRI_float`), x fastest, then y, z and the sub-brick (time point).
@@ -256,7 +259,10 @@ struct Nim {
     sto_xyz: [[f64; 4]; 4],
 }
 
-/// `nifti_quatern_to_dmat44` (in double; the C code uses long double for some products).
+/// `nifti_quatern_to_dmat44`, with its `long double` operations (`1.0l - (b*b + c*c + d*d)`,
+/// `1.0l / sqrt(...)`, the products `2.0l * (b*c - a*d) * yd`) in x87 extended precision, as
+/// AFNI's x86-64 build computes them ([`x87`]). (Their double rounding changes the last bit of
+/// a matrix entry now and then; AFNI keeps the matrix in float, which hides it almost always.)
 fn quatern_to_dmat44(
     qb: f64,
     qc: f64,
@@ -266,9 +272,9 @@ fn quatern_to_dmat44(
     qfac: f64,
 ) -> [[f64; 4]; 4] {
     let (mut b, mut c, mut dd) = (qb, qc, qd);
-    let mut a = 1.0 - (b * b + c * c + dd * dd);
-    if a < 1.0e-7 {
-        a = 1.0 / (b * b + c * c + dd * dd).sqrt();
+    let mut a = x87::add(1.0, -(b * b + c * c + dd * dd));
+    if x87::less_than_1e_minus_7_extended(a) {
+        a = x87::div(1.0, (b * b + c * c + dd * dd).sqrt());
         b *= a;
         c *= a;
         dd *= a;
@@ -282,22 +288,24 @@ fn quatern_to_dmat44(
     if qfac < 0.0 {
         zd = -zd;
     }
+    // `2.0l * x * y`: the doubling is exact, the product with the step is rounded twice.
+    let twice = |x: f64, step: f64| x87::mul(2.0 * x, step);
     [
         [
             (a * a + b * b - c * c - dd * dd) * xd,
-            2.0 * (b * c - a * dd) * yd,
-            2.0 * (b * dd + a * c) * zd,
+            twice(b * c - a * dd, yd),
+            twice(b * dd + a * c, zd),
             offset[0],
         ],
         [
-            2.0 * (b * c + a * dd) * xd,
+            twice(b * c + a * dd, xd),
             (a * a + c * c - b * b - dd * dd) * yd,
-            2.0 * (c * dd - a * b) * zd,
+            twice(c * dd - a * b, zd),
             offset[1],
         ],
         [
-            2.0 * (b * dd - a * c) * xd,
-            2.0 * (c * dd + a * b) * yd,
+            twice(b * dd - a * c, xd),
+            twice(c * dd + a * b, yd),
             (a * a + dd * dd - c * c - b * b) * zd,
             offset[2],
         ],

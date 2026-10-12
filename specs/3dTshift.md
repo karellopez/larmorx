@@ -459,8 +459,9 @@ For the matrix written (`C` or `M`):
   `d = 0.25·(r21 − r12)/a` when `1 + r11 + r22 + r33 > 0.5`; otherwise from
   `1 + r11 − r22 − r33` if it exceeds 1, else from `1 + r22 − r11 − r33` if it exceeds 1, else
   from `1 + r33 − r11 − r22`, with `(b, c, d)` negated when the `a` so found is negative.
-  (AFNI forms the quotients in extended precision; this changes the last bit of a double at
-  most, which the float32 fields practically never show.) For `C` the components are exact
+  (AFNI forms the quotients, and the sum of 1 and `r11 + r22 + r33`, in extended precision,
+  §7.1; this changes the last bit of a double at most, which the float32 fields practically
+  never show.) For `C` the components are exact
   (0, ±½, ±√½ or ±1), and the signs of their zeros follow IEEE arithmetic on `C`'s signed
   zeros: a diagonal `C` with positive entries gives (0, −0, 0);
 - `qoffset_x`, `qoffset_y`, `qoffset_z` are `M`'s offsets (the same as the sform's),
@@ -586,8 +587,9 @@ Letters, digits and ``# $ % + , - . / : = @ \ ^ _ ` ~`` are accepted.
    `** ERROR: Illegal filename for NIfTI output: ./3dcalc a b.nii` and exits with status 0.
    The existing-file check comes first. `3dcalc/x y.nii` passes both checks and is written.
 
-With `AFNI_ALLOW_ARBITRARY_FILENAMES` yes (§7.1) AFNI refuses no name at the first check, and
-at the second only a name that begins with `-`; `reproduce` follows it. larmorx's default
+With `AFNI_ALLOW_ARBITRARY_FILENAMES` yes (§7.1) AFNI refuses only an empty name at the
+first check, and at the second an empty name or one that begins with `-`; `reproduce` follows
+it. larmorx's default
 writes any name. AFNI-12 is named in both modes when AFNI would refuse the name at either
 check.
 
@@ -755,7 +757,7 @@ as described (observed), in both modes unless a defect is named.
 | Variable | Values | Effect |
 |---|---|---|
 | `AFNI_DECONFLICT` | see below | what happens to an existing output |
-| `AFNI_ALLOW_ARBITRARY_FILENAMES` | yes | the output names of §6.3 are all accepted at both checks, except, at the second, a name that begins with `-` (`-d/out.nii`: `Illegal filename for NIfTI output: -d/out.nii`, exit 0) |
+| `AFNI_ALLOW_ARBITRARY_FILENAMES` | yes | the output names of §6.3 are all accepted at both checks, except an empty one and, at the second, a name that begins with `-` (`-d/out.nii`: `Illegal filename for NIfTI output: -d/out.nii`, exit 0) |
 | `AFNI_PATH_SPACES_OK` | yes | an input name with a blank is one file name (AFNI-18, below) |
 | `HOME` | a directory | an input name that starts with `~/` starts there; with `AFNI_ECHO_COMMANDLINE` (below) |
 | `AFNI_NOREALPATH` | yes | the input's name in messages, below |
@@ -780,8 +782,8 @@ They change nothing larmorx writes or prints, so both implementations accept and
 larmorx's, byte for byte): `AFNI_NIFTI_NOEXT`, `AFNI_HISTDB_SCRIPT`, `AFNI_HISTORY_NAME`,
 `AFNI_HISTORY_USERNAME`, `AFNI_INCLUDE_HISTORY`, `IDCODE_PREFIX` and `AFNI_INDEX_PREFIX` (AFNI's
 header extension, which larmorx never writes); `AFNI_TRACE`, `AFNI_TRACE_FILE`,
-`AFNI_NIFTI_DEBUG`, `NIML_DEBUG` and `AFNI_WAMI_DEBUG` (AFNI's own debugging output, which
-larmorx does not reproduce); `AFNI_QUIET_STARTUP` (AFNI's version banner, which larmorx does
+`AFNI_NIFTI_DEBUG`, `NIML_DEBUG`, `AFNI_WAMI_DEBUG` and `AFNI_DEBUG` (AFNI's own debugging
+output, which larmorx does not reproduce; AFNI reads the last only from a `-D`); `AFNI_QUIET_STARTUP` (AFNI's version banner, which larmorx does
 not print); `AFNI_SYSTEM_AFNIRC`, `AFNI_ENVIRON_RESET`, `AFNI_ENVIRON_WARNINGS` (`.afnirc`
 files); `AFNI_RANDOM_SEEDVAL` (AFNI's random identifiers); `AFNI_NOMMAP`, `AFNI_FLOATSCAN`,
 `AFNI_BYTEORDER`, `AFNI_NIML_BUFSIZE`, `NIML_BUFSIZE`, `BUFSIZE` (no effect on NIfTI files:
@@ -870,11 +872,16 @@ necessary` when a dimension exceeds 32767; anything else (`2k` is 2048) NIfTI-1 
 dimension exceeds 32767. A NIfTI-2 output holds the same values as §6 and §6.1 give NIfTI-1,
 in its wider fields: `pixdim`, `toffset`, `slice_duration`, `scl_slope`, the sform and
 `qoffset` are the float values widened to double, and the quaternion parameters are the
-doubles §6.1 computes, not rounded to float. There every quotient of that computation is
-AFNI's: rounded first to 64 significant bits (x87 extended precision on AFNI's x86-64 build),
-then to double (both to nearest, ties to even), which differs from a direct double division in
-the last bit of about one quotient in 4,000; the header is AFNI's byte for byte, `vox_offset`
-aside (observed on plumb, metre and oblique inputs).
+doubles §6.1 computes, not rounded to float. There the operations AFNI carries out in
+extended precision show: each quotient `0.25·(…)/a` and the sum of 1 and `r11 + r22 + r33`
+(computed in double) is rounded first to 64 significant bits (x87 extended precision on
+AFNI's x86-64 build), then to double, both to nearest with ties to even. This differs from a
+direct double operation in the last bit of about one quotient in 4,000, and of the sum only
+when `r11 + r22 + r33` is within 2^-11 of 0. (AFNI reads a qform with extended precision too:
+`1 − (b² + c² + d²)`, the reciprocal of the length of `(b, c, d)`, and the products of the
+off-diagonal entries `2(bc − ad)` etc. with the voxel sizes; the float32 matrix it keeps
+practically never shows it.) The header is AFNI's byte for byte, `vox_offset` aside (observed
+on plumb, metre and oblique inputs, and on 120 random oblique ones).
 
 **`-tpattern @file` messages** (observed). Without `AFNI_1D_ZERO_TEXT`, a row with a value that
 starts with a character other than a digit, `+`, `-`, `.`, `e`, `,`, `@`, `*` or a `#` (which
@@ -916,7 +923,10 @@ abc'` (`AFNI_1D_ZERO_TEXT` does not apply there).
   first line on standard error is `+++++===== 3dTshift <arguments>`, the arguments after the
   global options were taken out, each one the output-name rule of §6.3 refuses (with
   `AFNI_ALLOW_ARBITRARY_FILENAMES` applied) written between `'` with its blanks, control
-  characters and non-ASCII bytes made blanks (`-prefix 'a b.nii'`).
+  characters and non-ASCII bytes made blanks (`-prefix 'a b.nii'`). (AFNI echoes the line
+  after appending it to its log file `~/.afni.log`, which larmorx does not write: with a
+  `HOME` it cannot write in, AFNI echoes nothing, and with a log over 100 MB it also warns
+  about the log's size. larmorx reproduces neither.)
 - After a fatal error AFNI also prints `** Program compile date = <the date it was compiled>`,
   and every run starts with the banner `++ 3dTshift: AFNI version=AFNI_25.2.09 (<date>)
   [64-bit]` unless `AFNI_QUIET_STARTUP` is yes. They name AFNI's build, not what it does;

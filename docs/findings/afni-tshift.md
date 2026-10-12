@@ -18,7 +18,7 @@
 > of 2026-10-12, -16 in [upstream-defects.md](upstream-defects.md); AFNI-06 is kept, its help
 > text being the error). "The replica reproduces" below means: with the switch. The
 > behaviours the clean-room original needs are described, in behaviour terms only, in
-> `specs/3dTshift.md` §6.1 to §6.5 (2026-10-12).
+> `specs/3dTshift.md` §6.1 to §6.5 and §7.1 (2026-10-12).
 
 Slice-timing correction in fMRIPrep (`fmriprep/workflows/bold/stc.py`), run as
 `3dTshift -ignore <dummies> -tzero <t0> -TR <TR>s -tpattern @<slice times> -prefix out in`
@@ -319,7 +319,7 @@ covers the whole path, directories included, so an output in `C:\Users\Jane Doe\
 directory with accented letters is refused. *Read.*
 
 **The name is checked a second time, when it is written.** `THD_filename_ok` accepts any
-name of more than 6 characters that begins with `3dcalc` (`thd_filestuff.c:643-645`), so
+name of more than 6 characters that begins with `3dcalc` (`thd_filestuff.c:644-646`), so
 `-prefix '3dcalc a b.nii'` passes the option scan. `THD_write_3dim_dataset` then hands
 `THD_write_nifti` the dataset's directory and prefix (`thd_writedset.c:186-189`; `./` when the
 prefix names no directory), which checks `THD_filename_ok` again and refuses a name that begins
@@ -352,6 +352,87 @@ environment variables are not read: `reproduce` is AFNI with them unset.
 after all the work: "output dataset name '...' conflicts with existing file" (the name without
 its directory), "dataset NOT written to disk!", and 3dTshift exits 0. larmorx refuses before
 the work (exit 1); the replica's `reproduce` does what AFNI does.
+
+## Global options and environment variables (2026-10-12)
+
+The user decided (2026-10-12) that both implementations accept AFNI's global options
+`-overwrite` and `-Dname=value` anywhere on the command line, and read the environment
+variables 3dTshift consults. The replica does so since 2026-10-12
+(`larmorx_gpl_afni::environ`, `message`, `cli::output`); the behaviour is in
+`specs/3dTshift.md` §7.1, the defects in [upstream-defects.md](upstream-defects.md)
+(AFNI-11, -12 corrected, AFNI-18 to -24 new).
+
+- **Where the options go.** 3dTshift checks for `-help` (or no argument) first
+  (`3dTshift.c:288`), then `mainENTRY` (`debugtrace.h:338`) calls `AFNI_prefilter_args`
+  (`afni_environ.c:477`), which marks the global options as used, wherever they stand, and
+  rebuilds `argv` without them; so `-tpattern -overwrite alt+z` works, and
+  `3dTshift -overwrite -help` reports `-help` as unknown. `-Dname=val` goes to `AFNI_setenv`
+  (`:298`, `:515-517`), `-Vname=` prints a variable and exits (`:521-531`), `-overwrite` sets
+  `AFNI_DECONFLICT=OVERWRITE` and a quiet overwrite (`:535-540`). AFNI changes its own
+  environment (`putenv`); the replica keeps a table (`environ::Settings`) built once from the
+  process environment, because `std::env::set_var` is unsafe in a multithreaded program and
+  would leak into other code. Every routine that reads a variable takes the table.
+- **`AFNI_setenv`'s parsing** (`afni_environ.c:298-327`) is `sscanf("%255s %1023s")`, then,
+  when a word is missing, the same after the first `=` is made a blank; `putenv("w1=w2")`.
+  The table of §7.1 follows from it (AFNI-22); `environ::afni_setenv` translates it,
+  `environ::plain_setenv` is larmorx's reading.
+- **The tests.** `AFNI_yesenv`/`AFNI_noenv` (`afni_environ.c`, `YESSISH`/`NOISH` in
+  `afni_environ.h`) look at the first character only (`Y`/`y`, `N`/`n`); `AFNI_numenv` reads a
+  number with `strtod` and a `k`, `m` or `g` multiplier. Some routines use their own tests:
+  `THD_deathcon` (`afni_environ.c:791-796`) an upper-case `N` only, `THD_ok_overwrite`
+  (`:804-810`) exactly `OVERWRITE`, `THD_write_3dim_dataset` (`thd_writedset.c:148-170`) the
+  first character, upper-cased, against `O` and `Y`; `AFNI_ECHO_COMMANDLINE` `Y`/`y`
+  (`afni_logger.c:79-81`); `AFNI_MESSAGE_COLORIZE` `toupper(*e) == 'N'` (`debugtrace.c:134`);
+  `AFNI_NIFTI_SCALE` likewise (`thd_niftiread.c:149-150`).
+- **Finding the variables.** Every routine on 3dTshift's path was read for `getenv`,
+  `my_getenv`, `AFNI_yesenv`, `AFNI_noenv` and `AFNI_numenv`; then the oracle ran 40 command
+  lines (every method, slice-time files, header timing, copies, int16, float64, metres,
+  milliseconds, oblique and qform inputs, sform codes 2, 5 and 7, an existing output, refused
+  names, AFNI's own format, a missing input, a blank in the input's directory, `~/`,
+  `-overwrite`, `-D`) under an `LD_PRELOAD` library that logs every `getenv` call (scratch
+  tools, not kept). The trace found 52 names, all among those read in the source; it does not
+  show every read (AFNI also keeps variables it has `putenv`'d itself: `AFNI_NIFTI_WRITE_TYPE`
+  shows only in runs with a `-D`). The list with what the replica does with each is
+  `environ::CONSULTED`; `AFNI_DEBUG` is read only by `AFNI_setenv` (`:317-323`, AFNI's
+  tracing). Each variable that changes something was then run in the environment and as `-D`
+  against the oracle (the parity categories `global` and `environment`).
+- **`.afnirc`.** AFNI reads `~/.afnirc` (or `AFNI_SYSTEM_AFNIRC`) at start-up unless
+  `-skip_afnirc`; the replica never does. This machine has a `~/.afnirc` from 2023 (it sets
+  `AFNI_DONT_LOGFILE=YES`, `IDCODE_PREFIX`, `AFNI_FLOATSCAN`, `AFNI_AUTOGZIP` and GUI
+  settings, none of which changes 3dTshift's NIfTI output). The parity suite now runs both
+  programs with `HOME` an empty directory, so AFNI reads no `.afnirc`, and with AFNI's
+  variables cleared except the case's.
+- **The command-line echo** (`AFNI_logger`, `afni_logger.c:42-83`, called at
+  `3dTshift.c:290`): with `HOME` set and `AFNI_DONT_LOGFILE` not yes, AFNI appends the command
+  line to `~/.afni.log`, and only after that succeeds echoes it when `AFNI_ECHO_COMMANDLINE`
+  is yes; it warns when the log exceeds 100 MB. The replica writes no log: it echoes when
+  `HOME` is a directory. Not reproduced: an unwritable `HOME` (AFNI does not echo) and the
+  100 MB warning. `tross_commandline` quotes the arguments `THD_filename_ok` refuses, with
+  their unprintable bytes made blanks.
+- **Messages** (`debugtrace.c:121-200`, `output_message`). The prefix and colour rules of
+  spec §7.1; colour codes go to standard error whatever it is (AFNI-21). `ERROR_exit` adds
+  `** Program compile date = ...` and `PRINT_VERSION` (`3dTshift.c:291`) the banner unless
+  `AFNI_QUIET_STARTUP`; neither is reproduced (they name the build), and the parity's message
+  comparison sets them aside.
+- **Existing outputs** (`thd_writedset.c:146-170`, `THD_deconflict_prefix`,
+  `thd_opendset.c:455`, `THD_deathcon` at `3dTshift.c:539-540`): AFNI-11 in the register,
+  corrected 2026-10-12. The rename tries `_AA1` to `_ZZ9` and changes the dataset's prefix in
+  place, which is why `-verbose` names the renamed file even when nothing was written.
+- **Input names** (`thd_mastery.c:89-100`, `THD_open_tcat` in `thd_opentcat.c`): AFNI-18.
+  The real path: `THD_open_nifti` names the input by `realpath` unless `AFNI_NOREALPATH` is
+  yes or the file is a symbolic link, and says ` + reading x.nii.gz instead of non-existing
+  x.nii` only when it uses the name as given.
+- **x87 extended precision** (AFNI-24): `nifti2_io.c`'s quaternion routines mix `long double`
+  constants into double formulas. The replica computes the same doubles with integer
+  arithmetic (`larmorx_gpl_afni::x87`): checked against GCC's `long double` on 5 million
+  random operations (sums, products, quotients, 1,071 of them different from plain double
+  arithmetic) and against AFNI's headers of 120 random oblique inputs (NIfTI-1 and NIfTI-2)
+  and of 160 qform-only, near-180° and trace-near-0 ones. Found because a NIfTI-2 output's `quatern_c` differed from AFNI's in
+  its last bit.
+- **Writing the output** (decided 2026-10-12): the replica writes to a temporary file in the
+  output's directory and renames it over the output (`cli::output::replace_atomically`;
+  Windows: retried for 2 s on errors 5, 32 and 33, then the temporary file is removed and the
+  run fails). AFNI writes in place.
 
 ## Bugs worth knowing
 

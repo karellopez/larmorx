@@ -7,8 +7,9 @@
 // src/thd_mastery.c (the blank and "~/" cases of THD_open_dataset) and src/thd_opentcat.c (the
 // failure path of THD_open_tcat).
 // Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
-// released under the GNU GPL version 2 or any later version. thd_writedset.c, thd_opendset.c,
-// thd_mastery.c and thd_opentcat.c were written at the NIH and are in the public domain.
+// released under the GNU GPL version 2 or any later version. afni_logger.c and
+// thd_opentcat.c carry no such notice: they were written at the NIH and are in the public
+// domain.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
 //! `3dTshift` with its original arguments: the option scan, checks, messages and output of
 //! AFNI's `main()`, step by step.

@@ -710,6 +710,43 @@ Decided by the user on the questions the defect register raised
   behaviours. GPL golden: two new cases (`3dTshift.linear.float32-nearly-plumb` and
   `.reproduce`), no checksum changed.
 
+## 2026-10-12: AFNI's global options and environment variables in both 3dTshift implementations
+- **Decided by the user:** both implementations accept AFNI's global options `-overwrite` and
+  `-Dname=value`, anywhere on the command line as AFNI does, working identically on Linux,
+  macOS and Windows.
+  - `-overwrite`: write to a temporary file in the output's directory, then rename it over
+    the target; on Windows retry the rename briefly while another program holds the file, then
+    fail with a clear message, never leaving a partial file; paths with blanks and non-ASCII
+    names work.
+  - `-Dname=value`: **never modify the process environment** (`std::env::set_var` is unsafe in
+    multithreaded Rust). Each `-D` goes into an explicit table of settings passed to the tool;
+    the real environment is read into the same table, `-D` winning as in AFNI. Every variable
+    3dTshift's code path consults is implemented explicitly and listed; a `-D` of a variable
+    AFNI would not consult is accepted with a short notice that it has no effect.
+- **Part 2a done** (2026-10-12, replica author): the replica takes `-overwrite`,
+  `-Dname=value`, `-ok_1D_text` and `-skip_afnirc`, and reads every variable 3dTshift
+  consults (found in the source, confirmed by tracing the oracle's `getenv` calls; each one
+  that changes something run against the oracle in the environment and as `-D`). In
+  `reproduce` mode its exit status, files and messages are AFNI's, byte for byte (AFNI's
+  version banner and compile date aside); the messages include AFNI's terminal colour codes,
+  which it writes into files and pipes too. The behaviour is in `specs/3dTshift.md` §7.1 for
+  the clean-room original (part 2b). Found and registered: AFNI-18 (an input name with a blank
+  is read as a list of datasets, so an input in a directory with a blank cannot be opened),
+  AFNI-19 (`AFNI_ALLOW_MILLISECONDS` writes `toffset` in milliseconds), AFNI-20 (a one-row
+  dataset is written as a 1D text file under the NIfTI name), AFNI-21 (colour codes, messages
+  only), AFNI-22 (`-D` values with blanks), AFNI-23 (`AFNI_NIFTI_SCALE=NO` drops the
+  intercept; questionable, to decide) and AFNI-24 (the NIfTI library's `long double`
+  arithmetic, which the replica now emulates on every platform so that NIfTI-2 headers are
+  AFNI's byte for byte); AFNI-11 and AFNI-12 corrected for `AFNI_DECONFLICT` and
+  `AFNI_ALLOW_ARBITRARY_FILENAMES`. Defaults: the corrections are named as usual; the
+  questionable AFNI-23 stays AFNI's until decided.
+- **`lx.afni.tshift`** passes the process environment's AFNI variables on to the replica (so
+  the replica reads the input and writes the output as the command line would), but sets
+  `AFNI_PATH_SPACES_OK=YES` for its temporary paths and keeps AFNI's message prefix, colours,
+  echoed command line and oblique report out of its warnings. To review: whether the Python
+  API should read AFNI's variables at all (rule 6, no global configuration); the original
+  should do whatever is decided.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

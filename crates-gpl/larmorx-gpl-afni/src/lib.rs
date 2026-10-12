@@ -36,3 +36,4 @@ pub mod oned;
 pub mod shift;
 pub mod tpattern;
 pub mod tshift;
+pub mod x87;

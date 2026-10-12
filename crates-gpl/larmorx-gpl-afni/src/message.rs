@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Translated to Rust from AFNI 25.2.09 src/debugtrace.c (output_message, INFO_message,
 // ININFO_message, WARNING_message, ERROR_message, ERROR_exit).
-// Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
-// released under the GNU GPL version 2 or any later version.
+// debugtrace.c carries no Medical College of Wisconsin notice: it was written at the NIH and is
+// in the public domain (AFNI's LICENSE.txt). This translation is part of the GPL-3.0-or-later
+// larmorx-gpl package.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
 //! AFNI's messages: what each of its message routines prints, with `AFNI_MESSAGE_PREFIX` and
 //! `AFNI_MESSAGE_COLORIZE`.

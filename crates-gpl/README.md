@@ -25,7 +25,7 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 
 | Crate | What |
 |---|---|
-| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`) and 1D reader, and a port of glibc's `sinf`/`cosf`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
+| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`, and x87 extended precision where AFNI's NIfTI library uses `long double`, `x87`) and 1D reader, AFNI's global options and environment variables (`environ`) and messages (`message`), and a port of glibc's `sinf`/`cosf`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
 | `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl afni 3dTshift <AFNI's arguments>` |
 | `larmorx-gpl-afni/tools/csfft-verify` | compares the FFT with AFNI's compiled code, bit for bit (needs the AFNI oracle build) |
 | `larmorx-gpl-afni/tools/sincosf-verify` | compares the `sinf`/`cosf` port with the C library, on all 2^32 inputs |
@@ -90,18 +90,38 @@ pip install --find-links dist "larmorx[exact]"      # the exact extra pulls in l
 output only; an existing output file is an error; any `-prefix` path is accepted). With
 `-verbose`, its first line names the implementation and its version.
 
+**AFNI's global options and environment variables** (decided 2026-10-12): it takes
+`-overwrite`, `-Dname=value`, `-ok_1D_text` and `-skip_afnirc` anywhere on the command line,
+as AFNI does, and reads every environment variable AFNI's 3dTshift consults
+(`AFNI_DECONFLICT`, `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_WRITE_TYPE`, ...), the same way on
+Linux, macOS and Windows. It never changes its process environment: the variables are read
+once into a table of settings (`larmorx_gpl_afni::environ`), `-D` options are applied to it
+(winning over the environment, as in AFNI), and the table is passed to every routine that
+reads one. The output is written to a temporary file in its directory and renamed over the
+target, so an existing output (with `-overwrite`) is replaced whole or not at all; on Windows
+the rename is retried for about 2 s while another program holds the file. The list of
+variables and what each does: `docs/api/afni-tshift.md` and `specs/3dTshift.md` §7.1.
+
+```bash
+larmorx-gpl afni 3dTshift -tpattern alt+z -prefix out.nii in.nii -overwrite
+larmorx-gpl afni 3dTshift -DAFNI_NIFTI_WRITE_TYPE=2 -tpattern alt+z -prefix out.nii in.nii
+```
+
 **AFNI's defects** (D13, `docs/api/upstream-defects.md`): like the clean-room original, the
 replica corrects AFNI's deterministic defects by default (a negative `scl_slope`, float32
 data scaled twice, header slice code 2, `-no_detrend`'s voxel pairs, metre and micrometre
 units, slice times all within 3 ms of 0 in a copy, an existing output, refused output names,
-and a grid within about 0.01° to 0.024° of plumb written plumb; register entries AFNI-01, -02,
--03, -05, -07, -08, -11, -12, -16 in `docs/findings/upstream-defects.md`) and names each one
+a grid within about 0.01° to 0.024° of plumb written plumb, an input name with a blank read as
+a list, `AFNI_ALLOW_MILLISECONDS`' time offset, a one-row dataset written as text, and `-D`
+values with blanks; register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12, -16, -18,
+-19, -20, -22 in `docs/findings/upstream-defects.md`) and names each one
 that changed the output in a warning
 on standard error (`*+ WARNING: upstream defect AFNI-01 (3dTshift) corrected: ...`), which
 the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
 `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension
-aside (AFNI's environment variables unset); any value other than `fix`, `reproduce` or empty
-exits with status 2:
+aside, and AFNI's messages (AFNI's version banner and compile date aside; a one-row dataset
+is still written as NIfTI, AFNI-20); any value other than `fix`, `reproduce` or empty exits
+with status 2:
 
 ```bash
 larmorx-gpl afni 3dTshift -tpattern alt+z -prefix out.nii in.nii                 # corrected

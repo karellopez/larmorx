@@ -59,7 +59,18 @@ Changes from the originals are listed below and in each module's documentation.
 | `axes` | `src/3ddata.h`, `src/vecmat.h` | `ORIENT_xyz`, `ORIENT_sign`, `ORIENT_xyzint`; `DMAT_DET`, `DMAT_MUL` | MCW 1994-2000 |
 | `axes` | `src/nifti/nifti2/nifti2_io.c` | `nifti_dmat44_to_orientation`, `nifti_dmat44_to_quatern`, `nifti_dmat33_polar`, `nifti_dmat33_inverse`, `nifti_dmat33_determ`, `nifti_dmat33_rownorm`, `nifti_dmat33_colnorm`, `nifti_dmat33_mul` | NIH, public domain |
 | `dataset` | `src/thd_niftiread.c` | the axes of `THD_open_nifti` (orientation, steps and origins for the qform, sform and form-less cases) | NIH, public domain |
-| `cli::tshift` | `src/thd_writedset.c` | the existing-output check of `THD_write_3dim_dataset` (its messages and exit status, AFNI-11 reproduced) | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_writedset.c` | the existing-output part of `THD_write_3dim_dataset`: `AFNI_DECONFLICT`'s overwrite, rename and refusal, with their messages and exit status (AFNI-11 reproduced) | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_opendset.c` | `THD_deconflict_prefix`, `THD_deconflict_nifti` | MCW 1994-2000 |
+| `cli::tshift` | `src/afni_environ.c` | `THD_deathcon`, `THD_ok_overwrite` | MCW 1994-2000 |
+| `cli::tshift` | `src/afni_logger.c` | the `AFNI_ECHO_COMMANDLINE` part of `AFNI_logger` (no log file is written) | NIH, public domain |
+| `cli::tshift` | `src/thd_notes.c` | `tross_commandline` | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_mastery.c` | the blank (`AFNI_PATH_SPACES_OK`) and `~/` cases of `THD_open_dataset` | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_opentcat.c` | the opening of each listed dataset in `THD_open_tcat`, and its warning (joining several in time is not translated) | NIH, public domain |
+| `environ` | `src/afni_environ.c` | `AFNI_prefilter_args` (the `-Dname=val`, `-overwrite`, `-ok_1D_text` and `-skip_afnirc` options), `AFNI_setenv`, `AFNI_yesenv`, `AFNI_noenv`, `AFNI_numenv` | MCW 1994-2000 |
+| `environ` | `src/afni_environ.h` | `YESSISH`, `NOISH` | MCW 1994-2000 |
+| `message` | `src/debugtrace.c` | `output_message` (the labels, `AFNI_MESSAGE_PREFIX`, `AFNI_MESSAGE_COLORIZE`), `INFO_message`, `ININFO_message`, `WARNING_message`, `ERROR_message`, `ERROR_exit` | NIH, public domain |
+| `dataset` | `src/thd_coords.c` | `THD_report_obliquity` | MCW 1994-2000 |
+| `dataset` | `src/thd_writedset.c` | the `AFNI_ALLOW_MILLISECONDS` and one-row (`AFNI_WRITE_1D_AS_PREFIX`) tests of `THD_write_3dim_dataset` | MCW 1994-2000 |
 | `dataset` | `src/edt_fullcopy.c` | `EDIT_full_copy` (the order of copying and loading) | MCW 1994-2000 |
 | `dataset` | `src/3ddata.h` | `DSET_UNMSEC` | MCW 1994-2000 |
 | `tshift` | `src/3dTshift.c` | the slice and voxel-pair loop of `main` | MCW 1994-2000 |
@@ -69,7 +80,10 @@ Changes from the originals are listed below and in each module's documentation.
 | `tshift` | `src/mrilib.h` | `SHORTIZE`, `BYTEIZE` | MCW 1994-2000 |
 | `cli::tshift` | `src/3dTshift.c` | `main` (option scan, checks, messages), `TS_copy_input_to_output` | MCW 1994-2000 |
 | `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (to name AFNI-12, and to refuse a `-prefix` when it is reproduced) | MCW 1994-2000 |
-| `cli::tshift` | `src/debugtrace.c` | the message prefixes of `INFO_message`, `WARNING_message`, `ERROR_message`, `ERROR_exit` | NIH, public domain |
+
+Not translations (written for larmorx-gpl, GPL-3.0-or-later): `x87` (the arithmetic of x86-64's
+`long double`, for the formulas of `nifti2_io.c` that use it) and `cli::output` (writing the
+output through a temporary file and a rename).
 
 ## glibc files translated (`glibc_sincosf`)
 
@@ -100,8 +114,21 @@ Changes from the originals are listed below and in each module's documentation.
 - **Inputs not supported** (an error instead): datasets that are not NIfTI, complex and RGB
   data, sub-brick selectors, `-voxshift`, 1D `.tsv`/`.csv` tables, standard input, and the
   1D `[...]`/`{...}` selectors. Of AFNI's header extension only the attributes 3dTshift's
-  output depends on are read (time axis, matrix, space); none is written. The `AFNI_*`
-  environment variables are not read.
+  output depends on are read (time axis, matrix, space); none is written.
+- **AFNI's environment** (2026-10-12). AFNI changes its process environment (`putenv`) for
+  each `-Dname=val`; the replica never does (`std::env::set_var` is unsafe in a multithreaded
+  program): it reads the environment once into a table of settings, applies the global
+  options to it, and passes it to every routine that reads a variable (`environ::Settings`).
+  `~/.afnirc` is not read (as with `-skip_afnirc`). Of AFNI's global options, `-overwrite`,
+  `-Dname=val`, `-ok_1D_text` and `-skip_afnirc` are taken; the others (`-Vname=`,
+  `-echo_edu`, `-np`, `-all_opts`, `-h_view`, `<<` inclusions, ...) are unknown options. Not
+  reproduced: AFNI's version banner and the compile date after a fatal error (they name
+  AFNI's build), the log file `~/.afni.log` (and its size warning; the command line is echoed
+  when `HOME` is a directory), AFNI's debugging output (`AFNI_TRACE`, `AFNI_DEBUG`, ...).
+- **Writing the output** (2026-10-12): to a temporary file in the output's directory, renamed
+  over the output (`cli::output::replace_atomically`), so an existing output is replaced whole
+  or left as it was; on Windows the rename is retried for about 2 s while another program
+  holds the file. AFNI writes in place.
 - **Output** (the larmorx conventions shared with `larmorx afni 3dTshift`): NIfTI only, and
   an existing output file is an error. Any `-prefix` path is accepted (2026-10-11), so that
   paths with blanks or non-ASCII characters work on every platform whichever implementation
@@ -128,8 +155,8 @@ Changes from the originals are listed below and in each module's documentation.
     it was meant to be (no time away from 0); AFNI's can never be true.
   - AFNI-11, AFNI-12 (`cli::tshift`): the larmorx conventions above. Reproduced, an existing
     output is reported with AFNI's messages and not written (exit 0), and a name
-    `THD_filename_ok` rejects is refused; AFNI's environment variables (`AFNI_DECONFLICT`,
-    `AFNI_ALLOW_ARBITRARY_FILENAMES`) are not read.
+    `THD_filename_ok` rejects is refused. Since 2026-10-12 `-overwrite`, `AFNI_DECONFLICT` and
+    `AFNI_ALLOW_ARBITRARY_FILENAMES` are read in both modes, as AFNI reads them.
   - AFNI-16 (`axes::written`, `axes::snaps`; decided 2026-10-12): a matrix that
     `THD_compute_oblique_angle` calls plumb (within about 0.01° to 0.024° of plumb, depending on
     the step) but that has a
@@ -137,11 +164,24 @@ Changes from the originals are listed below and in each module's documentation.
     oblique matrix (the sform as carried, its quaternion, the axes' origins and steps), where
     `THD_set_dataset_attributes` replaces it by the cardinal matrix of the axes. A matrix
     without such an entry is written from its axes in both modes.
-- **Quaternions in double.** `nifti_dmat44_to_quatern` and `nifti_dmat33_inverse` form a few
-  quotients in x87 extended precision (`1.0l / deti`, `0.25l * (r32-r23) / a`) and round them
-  to double; the translation divides in double. The two can differ in the last bit of a double
-  for an oblique matrix (never for a plumb one, whose quotients are exact), which the NIfTI-1
-  header's float fields almost never show.
+  - AFNI-18 (`cli::tshift::open_dataset`; 2026-10-12): an input name with a blank is one file;
+    AFNI reads a list of datasets unless `AFNI_PATH_SPACES_OK` is yes. Reproduced, a list of
+    one dataset is that dataset; several are an error (AFNI joins them in time).
+  - AFNI-19 (`dataset::write`): with `AFNI_ALLOW_MILLISECONDS`, `toffset` is converted to
+    seconds with the TR; AFNI skips `DSET_UNMSEC` and writes it in milliseconds.
+  - AFNI-20 (`dataset::write`): a dataset of one row is written as NIfTI in both modes; AFNI
+    writes a 1D text file (with a random identifier) unless `AFNI_WRITE_1D_AS_PREFIX` is yes.
+  - AFNI-22 (`environ::prefilter`): `-Dname=value`'s value is the text after the first `=`;
+    AFNI's `sscanf` reading (`environ::afni_setenv`) is used in `reproduce` mode.
+  - AFNI-21 (`message::Style`; messages only): AFNI's terminal colour codes around warning and
+    error labels are written in `reproduce` mode only.
+- **`long double`** (2026-10-12; until then the translation computed these in double).
+  `nifti_dmat44_to_quatern`, `nifti_quatern_to_dmat44` and `nifti_dmat33_inverse` mix
+  `long double` constants into double formulas (`0.25l * (r32-r23) / a`,
+  `r11 + r22 + r33 + 1.0l`, `1.0l - (b*b+c*c+d*d)`, `2.0l * (b*c-a*d) * yd`, `1.0l / deti`).
+  On x86-64, AFNI's platform, these are x87 operations rounded to 64 bits, then to double;
+  `x87::add`, `mul` and `div` compute the same doubles with integer arithmetic, on every
+  platform (AFNI-24). NIfTI-2 output shows the difference (its quaternion fields are doubles).
 - **The axes' orientation** where `nifti_dmat44_to_orientation` fails (a degenerate sform, a
   zero or repeated column): AFNI indexes its orientation tables out of bounds there; the
   replica writes the matrix as read.
@@ -154,4 +194,6 @@ Changes from the originals are listed below and in each module's documentation.
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
 | 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` |
+| `x87` (2026-10-12) | the emulated operations against GCC's `long double` on x86-64: 3 million quotients of the kind `nifti_dmat44_to_quatern` forms, and 2 million random sums, products and quotients (scratch C programs) | 0 differ (1,071 of them differ from plain double arithmetic) |
+| Global options and environment variables (2026-10-12) | the parity categories `global` and `environment`: exit status, standard output and error byte for byte, and the output files, against the AFNI binary in a clean environment; NIfTI-2 headers of 120 random oblique inputs and 160 qform-only, near-180° and trace-near-0 ones | see `docs/validation/afni-tshift-replica.md`; the headers identical except `vox_offset` |
 | The geometry AFNI writes (2026-10-12) | AFNI's and the replica's (`reproduce`) outputs compared byte for byte on plumb, oblique, nearly plumb, qform-only, sform-only and form-less inputs, in millimetres, metres and micrometres, on AFNI-01, -02, -03, -05, -08 inputs, and on five real BOLD runs (ds000210 with AFNI's extension, ds001600, ds003345, ds005454, ds006736) | the 348-byte headers identical except `vox_offset` (AFNI's extension), the data identical; `tests/oracle.rs` checks 20 cases the same way |

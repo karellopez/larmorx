@@ -40,6 +40,7 @@
 //! AFNI does. A matrix with no obliquity at all (every entry off its axis zero) is written from
 //! its axes in both modes, as AFNI writes it.
 
+use crate::x87;
 use larmorx_core::defects::UpstreamDefects;
 
 /// AFNI's orientation codes (`ORI_*_TYPE`): the direction an axis points to, in DICOM
@@ -439,70 +440,13 @@ pub fn written(axes: &Axes, mode: UpstreamDefects) -> Written {
     }
 }
 
-/// `(double)((long double)n / d)` as AFNI's x86-64 build computes it: the quotient rounded to
-/// the 64-bit significand of x87's extended precision, then to double's 53 bits, both to
-/// nearest with ties to even. This double rounding differs from a double division in the last
-/// bit of some quotients, which NIfTI-2's double header fields show. (`long double` is the x87
-/// format on x86-64 Linux, AFNI's reference platform; it is a 128-bit format on aarch64 Linux
-/// and plain double on macOS on Apple silicon, where AFNI's own results would differ there.)
-pub fn div_extended(n: f64, d: f64) -> f64 {
-    let normal = |x: f64| x.is_normal();
-    if !normal(n) || !normal(d) {
-        return n / d;
-    }
-    // x = m * 2^e with 2^52 <= m < 2^53.
-    let parts = |x: f64| {
-        let bits = x.abs().to_bits();
-        let m = (bits & ((1u64 << 52) - 1)) | (1u64 << 52);
-        (m, ((bits >> 52) & 0x7ff) as i32 - 1075)
-    };
-    let (mn, en) = parts(n);
-    let (md, ed) = parts(d);
-    // The quotient mn/md, scaled by 2^75: 75 or 76 bits, the remainder for exactness.
-    let num = u128::from(mn) << 75;
-    let (quotient, remainder) = (num / u128::from(md), num % u128::from(md));
-    let width = 128 - quotient.leading_zeros() as i32;
-    // To 64 bits, to nearest (the remainder decides a tie exactly), ties to even.
-    let cut = width - 64;
-    let mut q64 = quotient >> cut;
-    let rest = quotient & ((1u128 << cut) - 1);
-    let half = 1u128 << (cut - 1);
-    if rest > half || (rest == half && (remainder != 0 || q64 & 1 == 1)) {
-        q64 += 1;
-    }
-    let mut exponent = en - ed - 75 + cut;
-    if q64 >> 64 != 0 {
-        q64 >>= 1;
-        exponent += 1;
-    }
-    // Then to 53 bits, from the 64-bit value alone.
-    let low = q64 & 0x7ff;
-    let mut q53 = q64 >> 11;
-    if low > 0x400 || (low == 0x400 && q53 & 1 == 1) {
-        q53 += 1;
-    }
-    exponent += 11;
-    // q53 <= 2^53 converts exactly, and so does the product by a power of 2 in the normal range.
-    let scale = if (-1022..=1023).contains(&exponent) {
-        f64::from_bits(((exponent + 1023) as u64) << 52)
-    } else {
-        return n / d;
-    };
-    let value = q53 as f64 * scale;
-    if (n < 0.0) != (d < 0.0) {
-        -value
-    } else {
-        value
-    }
-}
-
 /// `nifti_dmat33_inverse`, with AFNI's `1.0l / deti` in x87 extended precision
-/// ([`div_extended`]).
+/// ([`x87::div`]).
 fn inverse(r: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
     let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = *r;
     let mut deti = nifti_det(r);
     if deti != 0.0 {
-        deti = div_extended(1.0, deti);
+        deti = x87::div(1.0, deti);
     }
     [
         [
@@ -596,12 +540,12 @@ fn polar(a: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
 /// `nifti_dmat44_to_quatern(R)`: the quaternion parameters `(b, c, d)` and `qfac` of the
 /// rotation nearest to `R`'s upper 3×3 corner.
 ///
-/// AFNI forms the quotients in x87 extended precision (`0.25l * (r32-r23) / a`) and rounds
-/// them to double: [`div_extended`]. (A double division can differ in the last bit of the
-/// double for an oblique matrix, never for a plumb one, whose quotients are exact; NIfTI-2's
-/// double fields show it, NIfTI-1's float ones almost never. The sum `r11 + r22 + r33 + 1.0l`
-/// is rounded twice as well, which changes nothing unless the trace is within about 2^-11 of
-/// -1; it is a double sum here.)
+/// AFNI forms the quotients (`0.25l * (r32-r23) / a`) and the sum `r11 + r22 + r33 + 1.0l` in
+/// x87 extended precision and rounds them to double: [`x87::div`], [`x87::add`]. (A double
+/// division can differ in the last bit of the double for an oblique matrix, never for a plumb
+/// one, whose quotients are exact; NIfTI-2's double fields show it, NIfTI-1's float ones almost
+/// never. The sum can differ only when the trace `r11 + r22 + r33` is within about 2^-11 of
+/// 0.)
 pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
     let [mut r11, mut r12, mut r13] = [r[0][0], r[0][1], r[0][2]];
     let [mut r21, mut r22, mut r23] = [r[1][0], r[1][1], r[1][2]];
@@ -632,13 +576,13 @@ pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
         (r13, r23, r33) = (-r13, -r23, -r33);
         -1.0
     };
-    let mut a = r11 + r22 + r33 + 1.0;
+    let mut a = x87::add(r11 + r22 + r33, 1.0);
     let (b, c, d);
     if a > 0.5 {
         a = 0.5 * a.sqrt();
-        b = div_extended(0.25 * (r32 - r23), a);
-        c = div_extended(0.25 * (r13 - r31), a);
-        d = div_extended(0.25 * (r21 - r12), a);
+        b = x87::div(0.25 * (r32 - r23), a);
+        c = x87::div(0.25 * (r13 - r31), a);
+        d = x87::div(0.25 * (r21 - r12), a);
     } else {
         let xd = 1.0 + r11 - (r22 + r33);
         let yd = 1.0 + r22 - (r11 + r33);
@@ -646,19 +590,19 @@ pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
         let (mut bb, mut cc, mut dd);
         if xd > 1.0 {
             bb = 0.5 * xd.sqrt();
-            cc = div_extended(0.25 * (r12 + r21), bb);
-            dd = div_extended(0.25 * (r13 + r31), bb);
-            a = div_extended(0.25 * (r32 - r23), bb);
+            cc = x87::div(0.25 * (r12 + r21), bb);
+            dd = x87::div(0.25 * (r13 + r31), bb);
+            a = x87::div(0.25 * (r32 - r23), bb);
         } else if yd > 1.0 {
             cc = 0.5 * yd.sqrt();
-            bb = div_extended(0.25 * (r12 + r21), cc);
-            dd = div_extended(0.25 * (r23 + r32), cc);
-            a = div_extended(0.25 * (r13 - r31), cc);
+            bb = x87::div(0.25 * (r12 + r21), cc);
+            dd = x87::div(0.25 * (r23 + r32), cc);
+            a = x87::div(0.25 * (r13 - r31), cc);
         } else {
             dd = 0.5 * zd.sqrt();
-            bb = div_extended(0.25 * (r13 + r31), dd);
-            cc = div_extended(0.25 * (r23 + r32), dd);
-            a = div_extended(0.25 * (r21 - r12), dd);
+            bb = x87::div(0.25 * (r13 + r31), dd);
+            cc = x87::div(0.25 * (r23 + r32), dd);
+            a = x87::div(0.25 * (r21 - r12), dd);
         }
         if a < 0.0 {
             (bb, cc, dd) = (-bb, -cc, -dd);
@@ -671,29 +615,6 @@ pub fn dmat44_to_quatern(r: &[[f64; 4]; 3]) -> ([f64; 3], f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn extended_precision_division() {
-        // (n, d, (double)((long double)n / d)) from GCC on x86-64, where the double rounding
-        // gives another double than n / d (4,949 of 20 million random quotients).
-        let cases: [(u64, u64, u64); 6] = [
-            (0x3fb199b0014069f8, 0x3fdc4b99284c5daa, 0x3fc3e79d963471c6),
-            (0xbfc6b1d9dd60484e, 0x3fd7f77189516818, 0xbfde4d4572af317c),
-            (0x3fc9dee6548ee900, 0x3fddc9922970fad7, 0x3fdbcad9a3560546),
-            (0x3f77a04319ab1640, 0x3fd7fb4f681c8721, 0x3f8f868284906e10),
-            (0xbf8e46defc5b1a80, 0x3fe039e8c40fc190, 0xbf9ddad120a8808a),
-            (0xbfcd84e7b97739c2, 0x3fe72a32706f0dea, 0xbfd4639223c44514),
-        ];
-        for (n, d, want) in cases {
-            let (n, d) = (f64::from_bits(n), f64::from_bits(d));
-            assert_eq!(div_extended(n, d).to_bits(), want, "{n} / {d}");
-            assert_ne!((n / d).to_bits(), want);
-        }
-        // Elsewhere the same as a double division, exact quotients included.
-        for (n, d) in [(1.0, 3.0), (-0.3, 0.7), (0.5, 0.25), (1.0, 1.0), (0.0, 2.0)] {
-            assert_eq!(div_extended(n, d), n / d, "{n} / {d}");
-        }
-    }
 
     /// A plumb axial grid: i to the left, j posterior, k superior (DICOM).
     fn axial(del: [f32; 3], org: [f32; 3]) -> Axes {

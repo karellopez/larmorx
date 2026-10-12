@@ -148,6 +148,28 @@ def test_tshift_thresholds():
     assert not tshift_within(d)[0]  # float: 47.7 / 47.7 relative
 
 
+def test_stored_and_header_diff(tmp_path):
+    """Scaled integer files compare in stored units; the header as stored (nibabel moves
+    scl_slope out of the header it returns)."""
+    import nibabel as nib
+    from larmorx_validation.stages.compare import header_diff, stored_diff
+
+    data = np.arange(24, dtype=np.int16).reshape(2, 3, 4)
+    a = nib.Nifti1Image(data, np.eye(4))
+    a.header.set_slope_inter(2.5, 0.0)
+    b = nib.Nifti1Image(data + (data == 5), np.eye(4))
+    b.header.set_slope_inter(2.5, 0.0)
+    c = nib.Nifti1Image(data, np.eye(4))
+    c.header.set_slope_inter(1.0, 0.0)
+    for name, img in (("a", a), ("b", b), ("c", c)):
+        img.to_filename(tmp_path / f"{name}.nii.gz")
+    s = stored_diff(tmp_path / "a.nii.gz", tmp_path / "b.nii.gz")
+    assert (s["differing"], s["max_abs"], s["scl_slope"]) == (1, 1, [2.5, 2.5])
+    assert header_diff(tmp_path / "a.nii.gz", tmp_path / "b.nii.gz")["identical"]
+    h = header_diff(tmp_path / "a.nii.gz", tmp_path / "c.nii.gz")
+    assert "scl_slope" in h["fields"]
+
+
 ORACLE = _oracle()
 needs_oracle = pytest.mark.skipif(ORACLE is None, reason="no fMRIPrep oracle run")
 

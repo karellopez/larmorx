@@ -31,22 +31,32 @@
 //! [`write`] writes a dataset as `THD_write_nifti` does, after `DSET_UNMSEC` turns milliseconds
 //! into seconds.
 //!
-//! The geometry is carried as AFNI carries it in `ijk_to_dicom_real`: the matrix AFNI took from
-//! the header (sform, else qform, else the voxel sizes), stored as `float`.
+//! The geometry is carried as AFNI carries it ([`crate::axes`]): the matrix AFNI took from the
+//! header (sform, else qform, else the voxel sizes) as `ijk_to_dicom_real`, and the axes'
+//! orientations, steps and origins.
 //!
 //! An AFNI header extension (code 4) in the input replaces the time axis, the matrix and the
 //! space, as AFNI applies it ([`crate::afni_ext`]); its other attributes are ignored, and no
 //! extension is written. The `AFNI_NIFTI_*` environment variables are not read.
+//!
+//! **Upstream defects (D13).** Four of AFNI's reading and writing rules are defects that
+//! larmorx-gpl corrects by default and reproduces with [`UpstreamDefects::Reproduce`]
+//! (`docs/findings/upstream-defects.md`): float32 data with a slope and an intercept scaled
+//! twice (AFNI-02, [`read`]); header slice code 2 giving every slice time 0 (AFNI-03,
+//! [`slice_offsets`]); metre and micrometre units leaving the origin, and an oblique matrix,
+//! unconverted (AFNI-07, [`geometry`]); and slice times all within 0.003 of 0 written with
+//! `slice_end` 0 (AFNI-08, [`slice_fields`]).
 
 use std::path::{Path, PathBuf};
 
-use larmorx_core::affine::Affine;
 use larmorx_core::array::DynArray;
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
 use larmorx_core::element::DataType;
 use larmorx_core::ndarray::{ArrayD, ArrayViewD, IxDyn, ShapeBuilder};
 use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, ReadOptions, Scaling, WriteOptions};
 
 use crate::afni_ext;
+use crate::axes::{self, Axes, ORI_I2S, ORI_L2R, ORI_P2A};
 use crate::cnum::fmt_g;
 
 /// The voxels of a dataset in one of AFNI's storage types (`MRI_byte`, `MRI_short`,
@@ -110,13 +120,11 @@ pub struct TimeAxis {
     pub toff_sl: Option<Vec<f32>>,
 }
 
-/// The geometry AFNI writes back: `ijk_to_dicom_real` turned back to NIfTI's RAS convention
-/// (float values), the grid steps `|xxdel|`, `|yydel|`, `|zzdel|`, and the xform code
-/// `space_to_NIFTI_code` gives.
+/// A dataset's geometry: its axes and `ijk_to_dicom_real` ([`crate::axes`]), and the xform
+/// code `space_to_NIFTI_code` gives.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Geometry {
-    pub matrix: [[f64; 4]; 4],
-    pub steps: [f32; 3],
+    pub axes: Axes,
     pub code: i32,
 }
 
@@ -132,6 +140,9 @@ pub struct Dataset {
     pub factors: Vec<f32>,
     pub taxis: Option<TimeAxis>,
     pub geometry: Geometry,
+    /// `(slice_start, slice_end)` when the time axis's slice offsets come from the header's
+    /// slice code 2 (sequential decreasing), whose offsets AFNI-03 concerns.
+    pub seq_dec: Option<(i64, i64)>,
 }
 
 impl Dataset {
@@ -368,15 +379,34 @@ fn output_code(form_code: i32) -> i32 {
     }
 }
 
-/// `THD_open_nifti`'s geometry: the matrix it stores in `ijk_to_dicom_real` (a float `mat44`),
-/// written back with x and y negated (NIfTI's convention), the grid steps, and the code.
-fn geometry(nim: &Nim, warnings: &mut Vec<String>, path: &str) -> Geometry {
-    let to_f32 = |m: [[f64; 4]; 4]| m.map(|r| r.map(|v| f64::from(v as f32)));
-    let units = |v: f32| match nim.xyz_units {
-        UNITS_METER => (f64::from(v) * 1000.0) as f32,
-        UNITS_MICRON => (f64::from(v) * 0.001) as f32,
-        _ => v,
-    };
+/// Millimetres per spatial unit of the header, the factor `THD_open_nifti` applies to the voxel
+/// sizes: 1000 for metres, 0.001 for micrometres, else 1.
+fn millimetres_per_unit(nim: &Nim) -> f64 {
+    match nim.xyz_units {
+        UNITS_METER => 1000.0,
+        UNITS_MICRON => 0.001,
+        _ => 1.0,
+    }
+}
+
+/// `THD_open_nifti`'s geometry: the matrix it stores in `ijk_to_dicom_real` (a float `mat44`,
+/// in DICOM coordinates), the axes it derives from it, and the code.
+///
+/// AFNI converts the voxel sizes (the axes' steps) of a header in metres or micrometres to
+/// millimetres, but neither the matrix nor the origins. So a plumb grid comes out with its
+/// origin unconverted, an oblique one with its whole sform unconverted ([`crate::axes`]):
+/// AFNI-07, reproduced by [`UpstreamDefects::Reproduce`]. [`UpstreamDefects::Fix`] converts the
+/// matrix and the origins too, in double before they are rounded to float.
+fn geometry(
+    nim: &Nim,
+    defects: UpstreamDefects,
+    warnings: &mut Vec<String>,
+    path: &str,
+) -> Geometry {
+    let unit = millimetres_per_unit(nim);
+    // The matrix and the origins: as read (AFNI), or converted to millimetres (the fix).
+    let convert = if defects.fix() { unit } else { 1.0 };
+    let scaled = |v: f64| if convert == 1.0 { v } else { v * convert };
     let (use_q, use_s) = match (nim.qform_code > 0, nim.sform_code > 0) {
         // Both present: the sform wins (AFNI's default `form_priority = 'S'`).
         (true, true) => (false, true),
@@ -389,50 +419,110 @@ fn geometry(nim: &Nim, warnings: &mut Vec<String>, path: &str) -> Geometry {
             (false, false)
         }
     };
+    // `ijk_to_dicom44`: x and y negated (AFNI works in DICOM's RAI coordinates).
+    let dicom = |m: &[[f64; 4]; 4]| -> [[f32; 4]; 3] {
+        let row = |r: usize, sign: f64| m[r].map(|v| scaled(sign * v) as f32);
+        [row(0, -1.0), row(1, -1.0), row(2, 1.0)]
+    };
+    // `orgx = (ORIENT_xyz[o] == 'z') ? m[2][3] : -m[row][3]` for each axis, as float.
+    let origins = |m: &[[f64; 4]; 4], orient: Option<[u8; 3]>| -> [f32; 3] {
+        let Some(orient) = orient else {
+            return [0.0; 3];
+        };
+        orient.map(|o| {
+            let c = axes::coordinate(o);
+            let t = if c == 2 { m[2][3] } else { -m[c][3] };
+            scaled(t) as f32
+        })
+    };
+    // `(ORIENT_sign[o] == '+') ? d : -d`.
+    let signed = |orient: Option<[u8; 3]>, d: [f32; 3]| -> [f32; 3] {
+        let Some(orient) = orient else {
+            return d;
+        };
+        [0, 1, 2].map(|i| {
+            if axes::positive(orient[i]) {
+                d[i]
+            } else {
+                -d[i]
+            }
+        })
+    };
     if use_q {
+        let m = &nim.qto_xyz;
+        let r = [
+            [-m[0][0], -m[0][1], -m[0][2]],
+            [-m[1][0], -m[1][1], -m[1][2]],
+            [m[2][0], m[2][1], m[2][2]],
+        ]
+        .map(|row| row.map(|v| v as f32));
+        let orient = Some(axes::matrix_to_orientation(r));
+        // `nim->dx *= 1000.0` (double), stored in a float THD_fvec3.
         let steps = [1, 2, 3].map(|i| {
-            // `nim->dx *= 1000.0` (double), stored in a float THD_fvec3.
-            let d = match nim.xyz_units {
-                UNITS_METER => nim.pixdim[i] * 1000.0,
-                UNITS_MICRON => nim.pixdim[i] * 0.001,
-                _ => nim.pixdim[i],
-            };
-            (d as f32).abs()
+            if unit == 1.0 {
+                nim.pixdim[i] as f32
+            } else {
+                (nim.pixdim[i] * unit) as f32
+            }
         });
         Geometry {
-            matrix: to_f32(nim.qto_xyz),
-            steps,
+            axes: Axes {
+                real: dicom(m),
+                orient,
+                del: signed(orient, steps),
+                org: origins(m, orient),
+            },
             code: output_code(nim.qform_code),
         }
     } else if use_s {
-        let m = nim.sto_xyz;
+        let m = &nim.sto_xyz;
+        let orient = axes::nifti_orientation([0, 1, 2].map(|i| [m[i][0], m[i][1], m[i][2]]));
+        // `dxtmp = sqrt(...)` (float), then `dxtmp *= 1000.0`.
         let steps = [0, 1, 2].map(|j| {
             let norm = (m[0][j] * m[0][j] + m[1][j] * m[1][j] + m[2][j] * m[2][j]).sqrt() as f32;
-            units(norm).abs()
+            if unit == 1.0 {
+                norm
+            } else {
+                (f64::from(norm) * unit) as f32
+            }
         });
         Geometry {
-            matrix: to_f32(m),
-            steps,
+            axes: Axes {
+                real: dicom(m),
+                orient,
+                del: signed(orient, steps),
+                org: origins(m, orient),
+            },
             code: output_code(nim.sform_code),
         }
     } else {
-        // No transform: AFNI sets the orientation to LPI with the voxel sizes as steps and the
-        // origin at 0, and writes diag(dx, dy, dz) in NIfTI's (RAS) convention: the matrix of
-        // those axes, not the `ijk_to_dicom44` it loads here with x and y negated back.
-        // Verified with the oracle; where AFNI rebuilds the matrix was not traced.
+        // No transform: orientation LPI, the voxel sizes as steps (1 if not positive), the
+        // origin at 0, and the scaled identity as the matrix (not negated).
         let step = |i: usize| {
-            let p = nim.pixdim[i] as f32;
-            units(if p > 0.0 { p } else { 1.0 })
+            let p = if nim.pixdim[i] > 0.0 {
+                nim.pixdim[i] as f32
+            } else {
+                1.0
+            };
+            if unit == 1.0 {
+                p
+            } else {
+                (f64::from(p) * unit) as f32
+            }
         };
         let (dx, dy, dz) = (step(1), step(2), step(3));
+        let orient = Some([ORI_L2R, ORI_P2A, ORI_I2S]);
         Geometry {
-            matrix: [
-                [f64::from(dx), 0.0, 0.0, 0.0],
-                [0.0, f64::from(dy), 0.0, 0.0],
-                [0.0, 0.0, f64::from(dz), 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            steps: [dx.abs(), dy.abs(), dz.abs()],
+            axes: Axes {
+                real: [
+                    [dx, 0.0, 0.0, 0.0],
+                    [0.0, dy, 0.0, 0.0],
+                    [0.0, 0.0, dz, 0.0],
+                ],
+                orient,
+                del: signed(orient, [dx, dy, dz]),
+                org: [0.0; 3],
+            },
             code: output_code(0),
         }
     }
@@ -440,7 +530,12 @@ fn geometry(nim: &Nim, warnings: &mut Vec<String>, path: &str) -> Geometry {
 
 /// The slice offsets `THD_open_nifti` builds from `slice_code`, `slice_start`, `slice_end`
 /// and `slice_duration` (already in seconds), or `None` if the header gives none.
-fn slice_offsets(nim: &Nim, nz: i64, duration: f64) -> Option<Vec<f32>> {
+///
+/// AFNI-03: for code 2 (`NIFTI_SLICE_SEQ_DEC`) AFNI's loop runs
+/// `for( kk=slice_end ; kk >= slice_end ; kk-- )`, so only `slice_end` gets a time (0) and
+/// every slice stays at 0. [`UpstreamDefects::Fix`] visits the slices from `slice_end` down to
+/// `slice_start`, as NIfTI defines the code.
+fn slice_offsets(nim: &Nim, nz: i64, duration: f64, defects: UpstreamDefects) -> Option<Vec<f32>> {
     let (start, end) = (nim.slice_start, nim.slice_end);
     if !(nim.slice_dim == 3
         && nim.slice_code > 0
@@ -464,7 +559,8 @@ fn slice_offsets(nim: &Nim, nz: i64, duration: f64) -> Option<Vec<f32>> {
     match nim.slice_code {
         1 => (start..=end).for_each(&mut put),
         // NIFTI_SLICE_SEQ_DEC: AFNI's loop runs `for( kk=slice_end ; kk >= slice_end ; kk-- )`,
-        // so only slice_end gets a time (0) and every slice stays at 0.
+        // so only slice_end gets a time (0) and every slice stays at 0 (AFNI-03).
+        2 if defects.fix() => (start..=end).rev().for_each(&mut put),
         2 => put(end),
         3 => up(start).chain(up(start + 1)).for_each(&mut put),
         4 => down(end).chain(down(end - 1)).for_each(&mut put),
@@ -476,12 +572,16 @@ fn slice_offsets(nim: &Nim, nz: i64, duration: f64) -> Option<Vec<f32>> {
 }
 
 /// Reads a NIfTI file as 3dTshift gets it: `THD_open_dataset` + `EDIT_full_copy` (see the
-/// module documentation). Messages AFNI prints while reading are added to `warnings`.
+/// module documentation). Messages AFNI prints while reading are added to `warnings`, and the
+/// upstream defects that change how the file is read (AFNI-02, AFNI-07) to `notices`, whose
+/// mode chooses between AFNI's behaviour and the correction.
 pub fn read(
     path: &str,
     n_threads: usize,
     warnings: &mut Vec<String>,
+    notices: &mut Notices,
 ) -> Result<Dataset, ReadError> {
+    let mode = notices.mode();
     let lower = path.to_ascii_lowercase();
     if !(lower.ends_with(".nii") || lower.ends_with(".nii.gz")) {
         return Err(ReadError::Unsupported(format!(
@@ -555,13 +655,46 @@ pub fn read(
         }
     };
     // The brick factors of the copy: set at open time, before loading.
-    let factor = if !xform_data && nim.scl_slope != 0.0 && nim.scl_slope != 1.0 {
+    let mut factor = if !xform_data && nim.scl_slope != 0.0 && nim.scl_slope != 1.0 {
         nim.scl_slope as f32
     } else {
         0.0
     };
+    // AFNI-02: float32 data with a slope and an intercept are scaled when loaded (below) and
+    // keep the slope as their brick factor, so they are scaled twice.
+    if nim.datatype == dt::FLOAT32 && nim.scl_inter != 0.0 && factor != 0.0 {
+        let (slope, inter) = (fmt_g(nim.scl_slope), fmt_g(nim.scl_inter));
+        notices.add(
+            &defects::AFNI_02,
+            if mode.fix() {
+                format!(
+                    "{shown}: float32 data with scl_slope {slope} and scl_inter {inter} are \
+                     scaled once; AFNI also keeps the slope as a scale factor, scaling them twice"
+                )
+            } else {
+                format!(
+                    "{shown}: float32 data with scl_slope {slope} and scl_inter {inter} are \
+                     scaled, and the slope is kept as a scale factor, as AFNI does: the output \
+                     is scaled twice"
+                )
+            },
+        );
+        if mode.fix() {
+            factor = 0.0;
+        }
+    }
 
-    let mut geometry = geometry(&nim, warnings, &shown);
+    // AFNI-07: the geometry the other mode gives, to say whether the correction changes it.
+    let mut other_geometry = (millimetres_per_unit(&nim) != 1.0).then(|| {
+        let other = if mode.fix() {
+            UpstreamDefects::Reproduce
+        } else {
+            UpstreamDefects::Fix
+        };
+        geometry(&nim, other, &mut Vec::new(), &shown)
+    });
+    let mut geometry = geometry(&nim, mode, warnings, &shown);
+    let mut seq_dec = None;
     let mut taxis = (ntt > 1).then(|| {
         let (mut dtt, mut toffset, mut duration) = (nim.pixdim[4], nim.toffset, nim.slice_duration);
         match nim.time_units {
@@ -577,11 +710,15 @@ pub fn read(
             }
             _ => {}
         }
+        let toff_sl = slice_offsets(&nim, nz, duration, mode);
+        if toff_sl.is_some() && nim.slice_code == 2 {
+            seq_dec = Some((nim.slice_start, nim.slice_end));
+        }
         TimeAxis {
             ttdel: dtt as f32,
             ttorg: toffset as f32,
             units: TimeUnits::Sec,
-            toff_sl: slice_offsets(&nim, nz, duration),
+            toff_sl,
         }
     });
 
@@ -592,7 +729,19 @@ pub fn read(
         .map(|e| (e.code, e.content.as_slice()))
         .collect();
     if let Some(ext) = afni_ext::parse(&extensions) {
+        let before = taxis.clone();
         apply_afni_ext(&ext, &nim, &shown, &mut geometry, &mut taxis, warnings);
+        if let Some(other) = &mut other_geometry {
+            apply_afni_ext(&ext, &nim, &shown, other, &mut None, &mut Vec::new());
+        }
+        if taxis != before {
+            seq_dec = None;
+        }
+    }
+    if let Some(other) = &other_geometry
+        && let Some(detail) = units_detail(&nim, &geometry, other, mode)
+    {
+        notices.add(&defects::AFNI_07, detail);
     }
 
     // THD_load_nifti.
@@ -661,6 +810,49 @@ pub fn read(
         factors: vec![factor; nvals as usize],
         taxis,
         geometry,
+        seq_dec,
+    })
+}
+
+/// The AFNI-07 notice's detail when the geometry written in `mode` differs from the one the
+/// other mode writes (`other`), or `None`: a header in metres or micrometres whose origin is
+/// not 0, or whose matrix is oblique.
+fn units_detail(
+    nim: &Nim,
+    geometry: &Geometry,
+    other: &Geometry,
+    mode: UpstreamDefects,
+) -> Option<String> {
+    if axes::written(&geometry.axes) == axes::written(&other.axes) {
+        return None;
+    }
+    let unit = if nim.xyz_units == UNITS_METER {
+        "metres"
+    } else {
+        "micrometres"
+    };
+    // The geometry as AFNI writes it: oblique (the whole matrix unconverted) or plumb (only
+    // the origin unconverted).
+    let afni = if mode.fix() { other } else { geometry };
+    let oblique = !axes::is_plumb(&afni.axes.real);
+    Some(match (mode.fix(), oblique) {
+        (true, false) => format!(
+            "the input's units are {unit}: its origin is converted to millimetres with its \
+             voxel sizes; AFNI converts only the voxel sizes"
+        ),
+        (true, true) => format!(
+            "the input's units are {unit}: its oblique matrix and origin are converted to \
+             millimetres with its voxel sizes; AFNI converts only the voxel sizes and writes \
+             the matrix (sform) in {unit}"
+        ),
+        (false, false) => format!(
+            "the input's units are {unit}: its voxel sizes are converted to millimetres and its \
+             origin is not, as AFNI does"
+        ),
+        (false, true) => format!(
+            "the input's units are {unit}: its voxel sizes are converted to millimetres and its \
+             oblique matrix (sform) and origin are not, as AFNI does"
+        ),
     })
 }
 
@@ -708,14 +900,11 @@ fn apply_afni_ext(
         }
     }
     if let Some(m) = ext.floats("IJK_TO_DICOM_REAL").filter(|m| m.len() >= 12) {
-        // AFNI's matrix is in DICOM (RAI) order; populate_nifti_image negates the first two
-        // rows to write it.
-        let v = |i: usize| f64::from(m[i]);
-        geometry.matrix = [
-            [-v(0), -v(1), -v(2), -v(3)],
-            [-v(4), -v(5), -v(6), -v(7)],
-            [v(8), v(9), v(10), v(11)],
-            [0.0, 0.0, 0.0, 1.0],
+        // AFNI's matrix, in DICOM (RAI) order; the axes stay those of the NIfTI header.
+        geometry.axes.real = [
+            [m[0], m[1], m[2], m[3]],
+            [m[4], m[5], m[6], m[7]],
+            [m[8], m[9], m[10], m[11]],
         ];
     }
     if let (Some(nums), Some(fl)) = (
@@ -841,9 +1030,11 @@ fn alt_dec2(len: usize) -> impl Iterator<Item = usize> {
 /// `(slice_code, slice_start, slice_end, slice_duration)`.
 ///
 /// AFNI's test for "all zeros" (`sfirst == slast && MYFPEQ(tlist[sfirst],0.0)`) can never be
-/// true, so a list of zeros goes through the pattern search, finds none, and gets
-/// `slice_end = 0`.
-fn slice_fields(tlist: &[f32]) -> (i32, i64, i64, f32) {
+/// true, so a list of zeros (every time within 0.003 of 0) goes through the pattern search,
+/// finds none, and gets `slice_end = 0` (AFNI-08). [`UpstreamDefects::Fix`] makes the test
+/// what it was meant to be, no time away from 0, so such a list gets the defaults: no code,
+/// no duration, `slice_end = nz - 1`.
+pub fn slice_fields(tlist: &[f32], defects: UpstreamDefects) -> (i32, i64, i64, f32) {
     let nz = tlist.len() as i64;
     let t = |i: i64| tlist[i as usize];
     let mut ii = 0;
@@ -857,7 +1048,12 @@ fn slice_fields(tlist: &[f32]) -> (i32, i64, i64, f32) {
     }
     let mut slast = ii;
     // The defaults: slice_start = 0, slice_end = nz - 1, no code, no duration.
-    if sfirst == slast && fpeq(t(sfirst), 0.0) {
+    let all_zeros = if defects.fix() {
+        sfirst > slast
+    } else {
+        sfirst == slast && fpeq(t(sfirst), 0.0)
+    };
+    if all_zeros {
         return (0, 0, nz - 1, 0.0);
     }
     let tlen = slast - sfirst + 2;
@@ -890,7 +1086,16 @@ fn slice_fields(tlist: &[f32]) -> (i32, i64, i64, f32) {
 /// Writes `ds` to `path` (`.nii` or `.nii.gz`) as AFNI's `THD_write_nifti` does: the datum,
 /// `scl_slope` = the first brick factor (0 = none), the geometry AFNI carries, the time axis
 /// (after `DSET_UNMSEC`) and the slice timing it keeps.
-pub fn write(path: &Path, ds: &Dataset, n_threads: usize) -> Result<(), nifti::Error> {
+///
+/// The geometry is what `THD_set_dataset_attributes` and `populate_nifti_image` make of the
+/// dataset's axes ([`axes::written`]). The slice fields follow `notices`' mode ([`slice_fields`],
+/// AFNI-08), which is noted when the two modes write different fields.
+pub fn write(
+    path: &Path,
+    ds: &Dataset,
+    n_threads: usize,
+    notices: &mut Notices,
+) -> Result<(), nifti::Error> {
     // DSET_UNMSEC: milliseconds become seconds (`*= 0.001` in double, stored as float).
     let taxis = ds.taxis.as_ref().map(|t| {
         if t.units == TimeUnits::Msec {
@@ -936,16 +1141,19 @@ pub fn write(path: &Path, ds: &Dataset, n_threads: usize) -> Result<(), nifti::E
             message: e.to_string(),
         }
     })?;
-    // The sform is the matrix AFNI carries, and the qform is computed from it.
-    let affine = Affine::from_rows(ds.geometry.matrix);
+    // `nifti_convert_nim2n1hdr`.
+    h.analyze.regular = b'r';
+    // The sform is the matrix AFNI carries (or the axes' cardinal one), the qform its
+    // quaternion with the axes' origins, the voxel sizes the axes' steps.
+    let w = axes::written(&ds.geometry.axes);
     let code = ds.geometry.code;
-    h.set_sform(&affine, code);
-    if h.set_qform(&affine, code).is_err() {
-        h.qform_code = code;
-    }
-    for (i, &s) in ds.geometry.steps.iter().enumerate() {
-        h.pixdim[i + 1] = f64::from(s);
-    }
+    [h.srow_x, h.srow_y, h.srow_z] = w.sform;
+    h.sform_code = code;
+    h.qform_code = code;
+    [h.quatern_b, h.quatern_c, h.quatern_d] = w.quatern;
+    [h.qoffset_x, h.qoffset_y, h.qoffset_z] = w.qoffset;
+    h.pixdim[0] = if w.qfac >= 0.0 { 1.0 } else { -1.0 };
+    h.pixdim[1..4].copy_from_slice(&w.voxel);
     for p in &mut h.pixdim[4..] {
         *p = 0.0;
     }
@@ -967,7 +1175,30 @@ pub fn write(path: &Path, ds: &Dataset, n_threads: usize) -> Result<(), nifti::E
         h.slice_end = nz as i64 - 1;
         h.toffset = f64::from(t.ttorg);
         if let Some(tlist) = &t.toff_sl {
-            let (code, start, end, dur) = slice_fields(tlist);
+            let mode = notices.mode();
+            let (code, start, end, dur) = slice_fields(tlist, mode);
+            let other = if mode.fix() {
+                UpstreamDefects::Reproduce
+            } else {
+                UpstreamDefects::Fix
+            };
+            if slice_fields(tlist, other) != (code, start, end, dur) {
+                let n = tlist.len();
+                notices.add(
+                    &defects::AFNI_08,
+                    if mode.fix() {
+                        format!(
+                            "the {n} slice times kept in the output are all within 0.003 of 0: \
+                             no slice timing, slice_end {}; AFNI writes slice_end 0",
+                            n - 1
+                        )
+                    } else {
+                        "the slice times kept in the output are all within 0.003 of 0: \
+                         slice_end 0, as AFNI writes it"
+                            .to_owned()
+                    },
+                );
+            }
             h.slice_code = code;
             h.slice_start = start;
             h.slice_end = end;
@@ -1027,9 +1258,22 @@ mod tests {
         assert_eq!(slice_timing_pattern(&[0.0, 0.1, 0.5]).0, 0);
         // Whole lists, with the leading zero.
         let t = mk(&[0, 2, 1, 3], 0.5);
-        assert_eq!(slice_fields(&t), (3, 0, 3, 0.5));
-        assert_eq!(slice_fields(&[0.0; 4]), (0, 0, 0, 0.0));
-        assert_eq!(slice_fields(&[0.0, 0.0, 0.5, 0.0]).0, 1);
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            assert_eq!(slice_fields(&t, mode), (3, 0, 3, 0.5));
+            assert_eq!(slice_fields(&[0.0, 0.0, 0.5, 0.0], mode).0, 1);
+        }
+        // AFNI-08: every time within 0.003 of 0. AFNI writes slice_end 0; corrected, the
+        // defaults (slice_end nz - 1).
+        let zeros = [0.0, 0.0005, 0.001, 0.0015];
+        assert_eq!(
+            slice_fields(&zeros, UpstreamDefects::Reproduce),
+            (0, 0, 0, 0.0)
+        );
+        assert_eq!(slice_fields(&zeros, UpstreamDefects::Fix), (0, 0, 3, 0.0));
+        assert_eq!(
+            slice_fields(&[0.0; 4], UpstreamDefects::Fix),
+            (0, 0, 3, 0.0)
+        );
     }
 
     #[test]
@@ -1050,9 +1294,29 @@ mod tests {
             (7, [0.0; 4]),
         ] {
             nim.slice_code = code;
-            assert_eq!(slice_offsets(&nim, 4, 0.5).unwrap(), want, "code {code}");
+            let reproduce = UpstreamDefects::Reproduce;
+            assert_eq!(
+                slice_offsets(&nim, 4, 0.5, reproduce).unwrap(),
+                want,
+                "code {code}"
+            );
+            if code != 2 {
+                let fix = UpstreamDefects::Fix;
+                assert_eq!(
+                    slice_offsets(&nim, 4, 0.5, fix).unwrap(),
+                    want,
+                    "code {code}"
+                );
+            }
         }
+        // AFNI-03 corrected: code 2 from slice_end down to slice_start.
+        nim.slice_code = 2;
+        let fixed = slice_offsets(&nim, 4, 0.5, UpstreamDefects::Fix).unwrap();
+        assert_eq!(fixed, [1.5, 1.0, 0.5, 0.0]);
+        (nim.slice_start, nim.slice_end) = (1, 2);
+        let fixed = slice_offsets(&nim, 4, 0.5, UpstreamDefects::Fix).unwrap();
+        assert_eq!(fixed, [0.0, 0.5, 0.0, 0.0]);
         nim.slice_duration = 0.0;
-        assert_eq!(slice_offsets(&nim, 4, 0.0), None);
+        assert_eq!(slice_offsets(&nim, 4, 0.0, UpstreamDefects::Fix), None);
     }
 }

@@ -13,6 +13,12 @@ larmorx's own dispatch (``implementation="replica"``), which runs the replica's 
 separate process. This package is Apache-2.0 and never loads the replica. The program under
 test is ``LARMORX_GPL_BIN``, else the ``crates-gpl`` build, else ``larmorx-gpl`` on the PATH.
 
+Both implementations are compared with AFNI in D13's ``reproduce`` mode; a fix pass then runs
+larmorx's default on the same arguments and reports what the corrections change. In the
+replica's suite, the cases where a correction applies also compare the replica's default with
+the clean-room original's: ``implementation="auto"`` may run either, so their corrected outputs
+must agree.
+
 Every case the Python API can express (a ``-tpattern`` name, fMRIPrep's slice timing, the
 options in seconds) also runs through ``lx.afni.tshift(..., implementation=...)``, from the file
 and, for unscaled uint8, int16 and float32 inputs, from memory; the results must be the
@@ -133,6 +139,7 @@ class Scenario:
     sidecar: str | None = None
     suffix: str = ".nii"
     files: tuple[tuple[str, str], ...] = ()  # (name, text) written to {tmp} first
+    output: str | None = None  # the output's file name in {tmp} (default: <tool><suffix>)
 
 
 def _scenarios() -> list[tuple[str, str, str, Scenario]]:
@@ -282,6 +289,25 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         "int16 with scl_slope -0.5 and -tpattern zero: nothing is shifted, so AFNI-01 changes nothing",
         Scenario(f"{S}/dtypes/int16-negative-slope.nii.gz", ("-tpattern", "zero")),
     )
+    add(
+        "defects/oblique-metre",
+        "defects",
+        "units in metres, an oblique sform with an origin (AFNI-07)",
+        Scenario("gen:d13-oblique-metre", ("-tpattern", "alt+z")),
+    )
+    add(
+        "defects/tiny-offsets-copy",
+        "defects",
+        "header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input that keeps "
+        "them, all within 3 ms of 0 (AFNI-08)",
+        Scenario("gen:d13-tiny-offsets", ()),
+    )
+    add(
+        "geometry/slightly-oblique",
+        "geometry",
+        "an sform 0.006° from plumb (AFNI writes the plumb matrix below about 0.014°)",
+        Scenario("gen:slightly-oblique", ("-tpattern", "alt+z")),
+    )
 
     # Copies of the input.
     for path, desc in [
@@ -342,8 +368,14 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add(
         "errors/existing-output",
         "errors",
-        "an output that exists already (AFNI exits 0 without writing; larmorx exits 1)",
+        "an output that exists already (AFNI exits 0 without writing; larmorx exits 1, AFNI-11)",
         Scenario(F32, ("-tpattern", "alt+z"), expect="error", files=(("out.nii", "taken"),)),
+    )
+    add(
+        "errors/prefix-with-blank",
+        "errors",
+        "a -prefix with a blank (AFNI refuses it; larmorx writes it, AFNI-12)",
+        Scenario(F32, ("-tpattern", "alt+z"), expect="error", output="out put.nii"),
     )
 
     # Deliberate differences.
@@ -512,6 +544,15 @@ def _generated(name: str) -> Path:
     if name == "voxshift":
         nib.Nifti1Image(np.full(data.shape[:3], 0.25, np.float32), src.affine).to_filename(path)
         return path
+    if name == "slightly-oblique":
+        affine = src.affine.copy()
+        affine[2, 0] = 1e-4 * affine[0, 0]  # 1e-4 rad (0.006°) about y
+        affine[0, 2] = -1e-4 * affine[2, 2]
+        affine[:3, 3] = (-100.0, 50.0, 20.0)
+        img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
+        img.header["pixdim"][4] = src.header["pixdim"][4]
+        img.to_filename(path)
+        return path
     if name.startswith("d13-"):
         return _generated_d13(name, data, src, path)
     img = nib.Nifti1Image(data, src.affine, src.header)
@@ -557,8 +598,21 @@ def _generated_d13(name: str, data: np.ndarray, src, path: Path) -> Path:  # typ
             f.write(hdr.binaryblock + b"\0" * 4)
             f.write(np.asfortranarray(data, dtype=np.float32).tobytes(order="F"))
         return path
-    scale = {"d13-metre": 0.001, "d13-micron": 1000.0}[name]
+    if name == "d13-tiny-offsets":
+        img = nib.Nifti1Image(data, src.affine, src.header)
+        h = img.header
+        h["slice_code"] = 1
+        h["slice_start"], h["slice_end"] = 0, 3
+        h["slice_duration"] = 0.0005
+        h.set_dim_info(slice=2)
+        h["pixdim"][4] = 0.001
+        img.to_filename(path)
+        return path
+    scale = {"d13-metre": 0.001, "d13-micron": 1000.0, "d13-oblique-metre": 0.001}[name]
     affine = src.affine.copy()
+    if name == "d13-oblique-metre":  # a rotation about y with cos 0.8, sin 0.6
+        rotation = np.array([[0.8, 0.0, -0.6], [0.0, 1.0, 0.0], [0.6, 0.0, 0.8]])
+        affine[:3, :3] = rotation @ affine[:3, :3]
     affine[:3, 3] = (-100.0, 50.0, 20.0)  # an origin, in mm before the change of units
     affine[:3] *= scale
     img = nib.Nifti1Image(np.asarray(data, np.float32), affine)
@@ -650,18 +704,37 @@ def _replica_program(implementation: str):
 
 REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
 
-#: Cases where the replica is known to differ from AFNI: the one check that differs, and why.
-#: Found by black-box runs of the replica's program on D13's cases (2026-10-11) and left to
-#: the replica's owner; once the replica matches, the case passes as usual.
-_REPLICA_UNITS = (
-    "the replica writes the input's sform unchanged (still in metres or micrometres, with the "
-    "units set to mm), where AFNI converts its linear part to millimetres (AFNI-07); the "
-    "replica's qform matches AFNI's. Found by D13's unit cases (2026-10-11); a replica fix is "
-    "pending"
-)
-REPLICA_DIVERGENCES = {
-    "defects/metre": ("geometry (sform)", _REPLICA_UNITS),
-    "defects/micron-copy": ("geometry (sform)", _REPLICA_UNITS),
+#: Cases where an implementation is known to differ from AFNI in ``reproduce`` mode: the checks
+#: that differ, and why. Once the implementation matches, the case passes as usual. The
+#: replica has none (its two unit cases, an expected divergence until 2026-10-12, now pass).
+#: The clean-room original's are behaviours that ``specs/3dTshift.md`` does not describe yet,
+#: found by black-box runs of AFNI 25.2.09 on D13's cases (2026-10-12).
+DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
+    "replica": {},
+    "original": {
+        "defects/oblique-metre": (
+            frozenset({"geometry (sform)"}),
+            "AFNI writes an oblique sform in metres as it is (only the voxel sizes are "
+            "converted); the original converts its linear part to millimetres in reproduce mode "
+            "too (AFNI-07). Its default, which converts the whole matrix, is the replica's",
+        ),
+        "defects/tiny-offsets-copy": (
+            frozenset({"header fields (scaling, timing, slice fields, units, xform codes)"}),
+            "AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the "
+            "kept slice times, all within 3 ms of 0: none; the original keeps the header's code "
+            "1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08",
+        ),
+        "geometry/slightly-oblique": (
+            frozenset({"geometry (sform)", "geometry (qform)"}),
+            "AFNI writes the plumb matrix of a grid less than about 0.014° from plumb (its 0.01° "
+            "test, in float); the original keeps the input's matrix (4e-4 mm apart here)",
+        ),
+        "errors/prefix-with-blank": (
+            frozenset({"both succeed", "both reject the arguments"}),
+            "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too "
+            "(no switch for AFNI-12)",
+        ),
+    },
 }
 
 
@@ -701,6 +774,14 @@ def _last_error(log: str, tmp: Path) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", line)
 
 
+def _expected_divergence(checks: CheckList, case_id: str, implementation: str) -> None:
+    """Ends the case as an expected divergence when exactly its known checks failed."""
+    known = DIVERGENCES.get(implementation, {}).get(case_id)
+    failed = {c.name for c in checks.checks if not c.passed}
+    if known and failed and failed <= known[0]:
+        raise Outcome(EXPECTED, known[1])
+
+
 def _ulps(a: np.ndarray, b: np.ndarray) -> int:
     if a.dtype != np.float32:
         return 0
@@ -727,9 +808,13 @@ HEADER_FIELDS = (
 )
 
 
-def _compare(checks: CheckList, a_path: Path, l_path: Path) -> None:
+def _compare(
+    checks: CheckList, a_path: Path, l_path: Path, names: tuple[str, str] = ("AFNI", "larmorx")
+) -> None:
+    """Compares the output ``l_path`` with the reference ``a_path`` (named ``names``)."""
     import nibabel as nib
 
+    na, nl = names
     a_img, l_img = nib.load(a_path), nib.load(l_path)
     a = np.asanyarray(a_img.dataobj.get_unscaled())
     b = np.asanyarray(l_img.dataobj.get_unscaled())
@@ -739,12 +824,12 @@ def _compare(checks: CheckList, a_path: Path, l_path: Path) -> None:
         metric="dtype",
         value=str(b.dtype),
         threshold=str(a.dtype),
-        detail=f"AFNI {a.dtype}, larmorx {b.dtype}",
+        detail=f"{na} {a.dtype}, {nl} {b.dtype}",
     )
-    checks("shape", a.shape == b.shape, detail=f"AFNI {a.shape}, larmorx {b.shape}")
+    checks("shape", a.shape == b.shape, detail=f"{na} {a.shape}, {nl} {b.shape}")
     ha, hb = a_img.header, l_img.header
     differing = [
-        f"{k}: AFNI {np.asarray(ha[k]).tolist()}, larmorx {np.asarray(hb[k]).tolist()}"
+        f"{k}: {na} {np.asarray(ha[k]).tolist()}, {nl} {np.asarray(hb[k]).tolist()}"
         for k in HEADER_FIELDS
         if not np.array_equal(np.asarray(ha[k]), np.asarray(hb[k]), equal_nan=True)
     ]
@@ -754,7 +839,7 @@ def _compare(checks: CheckList, a_path: Path, l_path: Path) -> None:
         detail="; ".join(differing),
     )
     tr_a, tr_b = float(ha["pixdim"][4]), float(hb["pixdim"][4])
-    checks("TR (pixdim[4])", tr_a == tr_b, detail=f"AFNI {tr_a}, larmorx {tr_b}")
+    checks("TR (pixdim[4])", tr_a == tr_b, detail=f"{na} {tr_a}, {nl} {tr_b}")
     for name, fa, fb in [
         ("sform", ha.get_sform(), hb.get_sform()),
         ("qform", ha.get_qform(), hb.get_qform()),
@@ -983,7 +1068,8 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
         args = _args(s, tmp)
         outputs, logs, codes, produced = {}, {}, {}, {}
         for tool, runner in [("afni", _run_afni), ("larmorx", ours)]:
-            target = tmp / ("out.nii" if occupied else f"{tool}{s.suffix}")
+            name = f"{tool}-{s.output}" if s.output else f"{tool}{s.suffix}"
+            target = tmp / ("out.nii" if occupied else name)
             codes[tool], logs[tool] = runner([*args, "-prefix", str(target), str(image)])
             outputs[tool] = target
             produced[tool] = _produced(codes[tool], target, occupied)
@@ -1010,6 +1096,7 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
         )
         if s.expect == "error":
             checks("both reject the arguments", False, detail="expected an error from both")
+        _expected_divergence(checks, case.id, implementation)
         if produced["afni"] and produced["larmorx"]:
             copy = "just a copy of input" in logs["larmorx"]
             checks.add(
@@ -1022,28 +1109,80 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
                 )
             )
             _compare(checks, outputs["afni"], outputs["larmorx"])
-            known = REPLICA_DIVERGENCES.get(case.id) if implementation == "replica" else None
-            failed = {c.name for c in checks.checks if not c.passed}
-            if known and failed == {known[0]}:
-                raise Outcome(EXPECTED, known[1])
+            _expected_divergence(checks, case.id, implementation)
             if s.expect == "pass" and not copy:
                 _check_python(checks, s, args, image, outputs["larmorx"], implementation)
-            if s.expect == "pass" and implementation == "original":
-                _fix_pass(checks, args, image, tmp, outputs["larmorx"], logs["larmorx"])
+            if s.expect == "pass":
+                fixed = _fix_pass(
+                    checks, args, image, tmp, outputs["larmorx"], logs["larmorx"], implementation
+                )
+                if implementation == "replica" and fixed is not None:
+                    entries, target = fixed
+                    if entries or case.category in ("defects", "geometry"):
+                        _defaults_agree(checks, case.id, args, image, tmp, target)
+
+
+#: The name of the check that compares the replica's default with the original's.
+DEFAULTS = "D13 defaults: replica = original"
+
+
+def _defaults_agree(
+    checks: CheckList, case_id: str, args: list[str], image: Path, tmp: Path, replica: Path
+) -> None:
+    """The replica's default output (``replica``) against the clean-room original's on the same
+    arguments: ``implementation="auto"`` may run either, so their corrections must agree in
+    everything a defect concerns (header fields, geometry, scaling and values), within the
+    thresholds that compare the original with AFNI. Bit-identity is reported."""
+    target = tmp / f"original-fix{''.join(replica.suffixes)}"
+    code, _ = _run_larmorx(
+        [*args, "-prefix", str(target), str(image)], implementation="original", mode=defects.FIX
+    )
+    if code != 0 or not target.exists():
+        checks(DEFAULTS, False, detail=f"the original's default run failed (exit {code})")
+        return
+    sub = CheckList()
+    _compare(sub, replica, target, names=("replica", "original"))
+    failed = [f"{c.name}: {c.detail or c.value}" for c in sub.checks if not c.passed]
+    identical = next((c.value == 0 for c in sub.checks if c.name == "bit-identical"), False)
+    known = DIVERGENCES["original"].get(case_id)
+    detail = "bit-identical" if identical else "within the thresholds, not bit-identical"
+    if failed:
+        detail = "differ: " + "; ".join(failed)
+        if known:
+            detail = f"known (the original diverges from AFNI here): {detail}"
+    checks(
+        DEFAULTS,
+        not failed or known is not None,
+        metric="agreement",
+        value="bit-identical" if identical and not failed else ("differ" if failed else "within"),
+        threshold="the original's thresholds",
+        detail=detail,
+    )
 
 
 def _fix_pass(
-    checks: CheckList, args: list[str], image: Path, tmp: Path, reproduced: Path, log: str
-) -> None:
+    checks: CheckList,
+    args: list[str],
+    image: Path,
+    tmp: Path,
+    reproduced: Path,
+    log: str,
+    implementation: str = "original",
+) -> tuple[list[str], Path] | None:
     """D13: larmorx's default (``fix``) on the same arguments, compared with its ``reproduce``
-    output: the defects named, and what the corrections change (values and header)."""
+    output: the defects named, and what the corrections change (values and header). Returns
+    the defects named and the default's output, or ``None`` if the default run failed."""
     import nibabel as nib
 
     target = tmp / f"fix{''.join(reproduced.suffixes)}"
-    code, fix_log = _run_larmorx([*args, "-prefix", str(target), str(image)], mode=defects.FIX)
+    code, fix_log = _run_larmorx(
+        [*args, "-prefix", str(target), str(image)],
+        implementation=implementation,
+        mode=defects.FIX,
+    )
     if code != 0 or not target.exists():
         checks(defects.FIX_PASS, False, detail=f"the fix pass failed (exit {code})")
-        return
+        return None
     a, b = nib.load(target), nib.load(reproduced)
     change = defects.Change.of(
         np.asanyarray(a.dataobj.get_unscaled()), np.asanyarray(b.dataobj.get_unscaled())
@@ -1070,6 +1209,7 @@ def _fix_pass(
             False,
             detail=f"fix: {entries}; reproduce: {reproduced_entries}",
         )
+    return entries, target
 
 
 def _differing_fraction(r: CaseResult) -> float:
@@ -1153,8 +1293,9 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
         f"for bit (data and header). From an image in memory: {memory_ok} of {memory_n} give "
         "the same values."
     )
-    if implementation == "original":
-        lines += defects.summary(results)
+    lines += defects.summary(results)
+    if implementation == "replica":
+        lines += _defaults_summary(results)
     rows = []
     for category in sorted({r.category for r in compared}):
         rs = [r for r in compared if r.category == category]
@@ -1183,6 +1324,27 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
             rows,
         ),
     ]
+    return lines
+
+
+def _defaults_summary(results: list[CaseResult]) -> list[str]:
+    """The report's lines on the replica's default against the original's."""
+    rs = [(r.case, c) for r in results for c in r.checks if c.name == DEFAULTS]
+    if not rs:
+        return []
+    same = [case for case, c in rs if c.value == "bit-identical"]
+    within = [case for case, c in rs if c.value == "within"]
+    known = [(case, c) for case, c in rs if c.value == "differ" and c.passed]
+    bad = [(case, c) for case, c in rs if not c.passed]
+    lines = [
+        f'- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, '
+        f"the {len(rs)} cases where a correction applies or that test one): {len(same)} "
+        f"bit-identical, {len(within)} within the original's thresholds (Fourier and other "
+        f"last bits, as in the original's own record), {len(known)} where the original is "
+        f"known to diverge from AFNI, {len(bad)} disagreeing."
+    ]
+    for case, c in known + bad:
+        lines.append(f"  - `{case}`: {c.detail}")
     return lines
 
 

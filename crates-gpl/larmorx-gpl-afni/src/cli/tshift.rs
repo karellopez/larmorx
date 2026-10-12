@@ -14,18 +14,29 @@
 //! Differences from AFNI, shared with `larmorx afni 3dTshift` (the larmorx conventions):
 //! - input and output are NIfTI only, and `-prefix` must end in `.nii` or `.nii.gz` (AFNI
 //!   writes its own format otherwise, and by default, with the prefix `tshift`);
-//! - an existing output file is an error (AFNI prints "dataset NOT written to disk" and exits
-//!   with status 0);
-//! - any `-prefix` path is accepted, so paths with blanks or non-ASCII characters work on every
-//!   platform; AFNI refuses names that `THD_filename_ok` rejects (blanks, shell metacharacters,
-//!   non-ASCII bytes), and `-verbose` says when AFNI would have;
 //! - `-voxshift`, sub-brick selectors and AFNI's own formats are not supported;
 //! - AFNI's history extension is not written, and the version banner is not printed;
 //! - with `-verbose`, a first line on standard error names the implementation that runs (the
 //!   replica), as `larmorx afni 3dTshift` names the clean-room original.
+//!
+//! **Upstream defects (D13).** AFNI's defects are corrected unless the environment variable
+//! `LARMORX_UPSTREAM_DEFECTS` is `reproduce`, which gives AFNI's result
+//! (`docs/findings/upstream-defects.md`); a warning (`*+ WARNING: upstream defect ...`, the
+//! line of `larmorx_core::defects::Notice::line`) names each one that changed the output, or
+//! would have. Besides those of the dataset ([`dataset`]) and the shift ([`tshift`]), two are
+//! the command line's:
+//! - an existing output file is an error (AFNI-11; AFNI prints "dataset NOT written to disk!"
+//!   and exits with status 0);
+//! - any `-prefix` path is accepted, so paths with blanks or non-ASCII characters work on every
+//!   platform (AFNI-12; AFNI refuses names that `THD_filename_ok` rejects: blanks, shell
+//!   metacharacters, non-ASCII bytes).
+//!
+//! AFNI's environment variables are not read: `reproduce` gives AFNI's result with them unset.
 
 use std::io::Write;
 use std::path::Path;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, Notices, UpstreamDefects};
 
 use crate::cnum::{fmt_g, strtod};
 use crate::dataset::{self, Dataset, TimeAxis, TimeUnits};
@@ -67,14 +78,31 @@ Options (before the dataset):
                   slice (default: the slice timing in the dataset header)
 ";
 
-/// Runs `3dTshift` with `args`; returns the exit status.
+/// Runs `3dTshift` with `args`; returns the exit status. The D13 mode comes from
+/// `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    match UpstreamDefects::from_env() {
+        Ok(mode) => main_with(args, mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "** FATAL ERROR: {e}");
+            EXIT_BAD_MODE
+        }
+    }
+}
+
+/// [`main`] with the D13 mode given.
+pub fn main_with(
+    args: &[String],
+    mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     if args.is_empty() || args[0] == "-help" {
         let _ = out.write_all(USAGE.as_bytes());
         return 0;
     }
     let mut io = Io { out, err };
-    match run(args, &mut io) {
+    match run(args, mode, &mut io) {
         Ok(()) => 0,
         Err(Fail::Fatal(message)) => {
             let _ = writeln!(io.err, "** FATAL ERROR: {message}");
@@ -122,6 +150,11 @@ impl Io<'_> {
         let _ = writeln!(self.err, "*+ WARNING: {s}");
     }
 
+    /// `ERROR_message(...)` (the run goes on).
+    fn error(&mut self, s: impl std::fmt::Display) {
+        let _ = writeln!(self.err, "** ERROR: {s}");
+    }
+
     /// `INFO_message(...)`.
     fn info(&mut self, s: impl std::fmt::Display) {
         let _ = writeln!(self.err, "++ {s}");
@@ -130,6 +163,12 @@ impl Io<'_> {
     /// `ININFO_message(...)`.
     fn ininfo(&mut self, s: impl std::fmt::Display) {
         let _ = writeln!(self.err, " + {s}");
+    }
+
+    /// An upstream-defect notice, as a warning line (`Notice::line`), which the Python
+    /// wrappers turn into `larmorx.UpstreamDefectWarning`s.
+    fn notice(&mut self, n: &Notice) {
+        self.warn(n.line());
     }
 }
 
@@ -148,14 +187,15 @@ struct Options {
     detrend: bool,
     tpattern: Option<String>,
     dataset: String,
-    /// Whether AFNI would accept `prefix` ([`filename_ok`]); larmorx-gpl accepts any path.
+    /// Whether AFNI would accept `prefix` ([`filename_ok`]); larmorx-gpl accepts any path
+    /// unless AFNI-12 is reproduced.
     prefix_afni_ok: bool,
 }
 
 /// `THD_filename_ok`: no control characters, blanks, shell metacharacters or non-ASCII bytes
 /// (without its `AFNI_ALLOW_ARBITRARY_FILENAMES` escape, which accepts any name). larmorx-gpl
-/// accepts any `-prefix`, as AFNI does with that variable set; this only says when AFNI would
-/// not (`docs/findings/afni-tshift.md`, "Output names").
+/// accepts any `-prefix`, as AFNI does with that variable set; AFNI-12 reproduced refuses the
+/// names this rejects (`docs/findings/afni-tshift.md`, "Output names").
 fn filename_ok(name: &str) -> bool {
     if name.is_empty() {
         return false;
@@ -198,7 +238,7 @@ fn strtod_int(s: &str) -> i64 {
     strtod(s).0 as i64
 }
 
-fn parse(args: &[String], io: &mut Io<'_>) -> Result<Options, Fail> {
+fn parse(args: &[String], mode: UpstreamDefects, io: &mut Io<'_>) -> Result<Options, Fail> {
     let mut o = Options {
         verbose: 0,
         bad: false,
@@ -287,6 +327,17 @@ fn parse(args: &[String], io: &mut Io<'_>) -> Result<Options, Fail> {
                 let v = value(&mut nopt, "-prefix")?;
                 // AFNI: "illegal value '...' after -prefix" (larmorx accepts any path).
                 o.prefix_afni_ok = filename_ok(&v);
+                if !o.prefix_afni_ok && mode.reproduce() {
+                    io.notice(&Notice::new(
+                        &defects::AFNI_12,
+                        mode,
+                        format!(
+                            "the -prefix '{v}' has blanks, shell metacharacters or non-ASCII \
+                             characters: refused, as AFNI does"
+                        ),
+                    ));
+                    return Err(format!("illegal value '{v}' after -prefix").into());
+                }
                 o.prefix = v;
             }
             "-rlt" => {
@@ -339,8 +390,16 @@ fn output_path(prefix: &str) -> Result<&Path, Fail> {
     Ok(Path::new(prefix))
 }
 
-fn check_absent(path: &Path) -> Result<(), Fail> {
-    if path.exists() {
+/// An existing output file (larmorx's convention, before the work starts): an error, unless
+/// AFNI-11 is reproduced, where AFNI finds out only when it writes ([`write`]).
+fn check_absent(path: &Path, notices: &Notices, io: &mut Io<'_>) -> Result<(), Fail> {
+    if notices.fix() && path.exists() {
+        io.notice(&Notice::new(
+            &defects::AFNI_11,
+            notices.mode(),
+            "the output exists: an error (exit status 1); AFNI writes nothing and exits with \
+             status 0",
+        ));
         return Err(format!(
             "output dataset name '{}' conflicts with existing file",
             path.display()
@@ -350,10 +409,38 @@ fn check_absent(path: &Path) -> Result<(), Fail> {
     Ok(())
 }
 
-fn write(path: &Path, ds: &Dataset, n_threads: usize) -> Result<(), Fail> {
-    check_absent(path)?;
-    dataset::write(path, ds, n_threads)
-        .map_err(|e| Fail::Fatal(format!("can't write output dataset: {e}")))
+/// Writes the output (`DSET_write`), then names the upstream defects collected in `notices`.
+/// With AFNI-11 reproduced, an existing output is not written and the run ends with status 0,
+/// as AFNI's `THD_write_3dim_dataset` does.
+fn write(
+    path: &Path,
+    ds: &Dataset,
+    n_threads: usize,
+    notices: &mut Notices,
+    io: &mut Io<'_>,
+) -> Result<(), Fail> {
+    check_absent(path, notices, io)?;
+    if path.exists() {
+        let name = path.file_name().map_or_else(
+            || path.display().to_string(),
+            |n| n.to_string_lossy().into_owned(),
+        );
+        io.error(format!(
+            "output dataset name '{name}' conflicts with existing file"
+        ));
+        io.error("dataset NOT written to disk!");
+        notices.add(
+            &defects::AFNI_11,
+            "the output exists: nothing is written and the exit status is 0, as AFNI does",
+        );
+    } else {
+        dataset::write(path, ds, n_threads, notices)
+            .map_err(|e| Fail::Fatal(format!("can't write output dataset: {e}")))?;
+    }
+    for n in notices.as_slice() {
+        io.notice(n);
+    }
+    Ok(())
 }
 
 /// `TS_copy_input_to_output()`: the dataset as read, written unchanged.
@@ -362,35 +449,41 @@ fn copy_input_to_output(
     path: &Path,
     o: &Options,
     n_threads: usize,
+    notices: &mut Notices,
     io: &mut Io<'_>,
 ) -> Result<(), Fail> {
     io.warn("==>> output dataset is just a copy of input dataset");
-    write(path, ds, n_threads)?;
+    write(path, ds, n_threads, notices, io)?;
     if o.verbose > 0 {
         io.info(format!("Wrote output: {}", path.display()));
     }
     Ok(())
 }
 
-fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
-    let mut o = parse(args, io)?;
+fn run(args: &[String], mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), Fail> {
+    let mut o = parse(args, mode, io)?;
     let path = output_path(&o.prefix)?;
     let n_threads = threads();
+    let mut notices = Notices::new(mode);
+    if !o.prefix_afni_ok {
+        notices.add(
+            &defects::AFNI_12,
+            format!(
+                "the -prefix '{}' has blanks, shell metacharacters or non-ASCII characters: \
+                 accepted; AFNI refuses it",
+                o.prefix
+            ),
+        );
+    }
 
     // Open the dataset; extract values, check for errors.
     if o.verbose > 0 {
         io.info(IMPLEMENTATION);
-        if !o.prefix_afni_ok {
-            io.info(format!(
-                "AFNI would refuse the -prefix '{}' (blanks, shell metacharacters or non-ASCII \
-                 characters); larmorx-gpl accepts it",
-                o.prefix
-            ));
-        }
+        io.info(format!("upstream defects: {mode} ({})", defects::ENV));
         io.print("++ opening input dataset header");
     }
     let mut warnings = Vec::new();
-    let read = dataset::read(&o.dataset, n_threads, &mut warnings);
+    let read = dataset::read(&o.dataset, n_threads, &mut warnings, &mut notices);
     for w in &warnings {
         if w.starts_with("reading ") {
             io.ininfo(w);
@@ -409,7 +502,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
 
     if ntt < 2 {
         io.warn("Input dataset has only 1 value per voxel!");
-        return copy_input_to_output(&ds, path, &o, n_threads, io);
+        return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
     }
     if o.slice >= nzz as i64 {
         return Err(format!("-slice value is too large ({} >= {nzz})", o.slice).into());
@@ -440,11 +533,11 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
     if ds.taxis.is_none() {
         if o.tr == 0.0 || o.tpattern.is_none() {
             io.warn("dataset has no time axis!");
-            return copy_input_to_output(&ds, path, &o, n_threads, io);
+            return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
         }
     } else if o.tpattern.is_none() && header_offsets.is_none() {
         io.warn("dataset is already aligned in time!");
-        return copy_input_to_output(&ds, path, &o, n_threads, io);
+        return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
     }
     let tpat = match &o.tpattern {
         Some(p) => parse_tpattern(nzz, o.tr, p).map_err(|e| match e {
@@ -455,7 +548,23 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
             let offsets = header_offsets.expect("checked above");
             if offsets.len() != nzz {
                 io.warn("dataset temporal pattern is malformed!");
-                return copy_input_to_output(&ds, path, &o, n_threads, io);
+                return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
+            }
+            if let Some((start, end)) = ds.seq_dec {
+                notices.add(
+                    &defects::AFNI_03,
+                    if mode.fix() {
+                        format!(
+                            "header slice code 2 (sequential decreasing) orders slices \
+                             {end}..{start} from the top; AFNI gives every slice time 0 and \
+                             shifts nothing"
+                        )
+                    } else {
+                        "header slice code 2 (sequential decreasing) gives every slice time 0, \
+                         so nothing is shifted, as AFNI does"
+                            .to_owned()
+                    },
+                );
             }
             offsets
         }
@@ -483,7 +592,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
             "some value in tpattern is outside range 0..TR={}",
             fmt_g(f64::from(o.tr))
         ));
-        return copy_input_to_output(&ds, path, &o, n_threads, io);
+        return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
     } else if tomin == tomax {
         io.warn(format!(
             "input has only 1 time offset, {}",
@@ -495,7 +604,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
             fmt_g(f64::from(tomin)),
             fmt_g(f64::from(tomax))
         ));
-        return copy_input_to_output(&ds, path, &o, n_threads, io);
+        return copy_input_to_output(&ds, path, &o, n_threads, &mut notices, io);
     }
 
     // The common time point.
@@ -515,7 +624,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
         ));
         io.print("++ copying input dataset bricks");
     }
-    check_absent(path)?;
+    check_absent(path, &notices, io)?;
 
     // Reconfigure the time axis.
     io.print(format!(
@@ -539,6 +648,7 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
         detrend: o.detrend,
         bad: o.bad,
         n_threads,
+        upstream_defects: mode,
     };
     if o.verbose > 0 {
         if o.method == Method::Fourier {
@@ -555,8 +665,9 @@ fn run(args: &[String], io: &mut Io<'_>) -> Result<(), Fail> {
             ));
         }
     }
-    tshift(&mut ds, &params).map_err(|e| Fail::Fatal(e.to_string()))?;
-    write(path, &ds, n_threads)?;
+    let shift_notices = tshift(&mut ds, &params).map_err(|e| Fail::Fatal(e.to_string()))?;
+    notices.extend(shift_notices);
+    write(path, &ds, n_threads, &mut notices, io)?;
     if o.verbose > 0 {
         let _ = writeln!(io.err, "++ Wrote output: {}", path.display());
     }
@@ -574,7 +685,7 @@ mod tests {
             out: &mut out,
             err: &mut err,
         };
-        parse(&args, &mut io).map_err(|e| match e {
+        parse(&args, UpstreamDefects::Fix, &mut io).map_err(|e| match e {
             Fail::Fatal(m) | Fail::Error(m) => m,
         })
     }

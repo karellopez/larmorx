@@ -7,7 +7,9 @@
 //! Python golden tests) and plain integer arithmetic. Each case runs the `larmorx-gpl` binary
 //! on them and hashes (SHA-256) the header and the data of the NIfTI file it writes; the
 //! hashes are compared with `tests/golden.tsv`. One case per distinct code path: each
-//! interpolation method, each stored type, the restore and detrend options.
+//! interpolation method, each stored type, the restore and detrend options, and the paths of
+//! AFNI's defects (D13): each corrected (the default, `LARMORX_UPSTREAM_DEFECTS=fix`) and,
+//! in the `*.reproduce` cases, reproduced.
 //!
 //! Recording, on Linux x86_64 only, from a committed tree whose replica parity passes:
 //! `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden`
@@ -40,6 +42,14 @@ enum Input {
     /// int16 with `scl_slope` 0.25.
     Int16,
     Uint8,
+    /// int16 with `scl_slope` -0.25 (AFNI-01).
+    Int16Negative,
+    /// float32 with `scl_slope` 2 and `scl_inter` 10 (AFNI-02), an oblique sform in metres
+    /// with an origin (AFNI-07), and header slice code 2 (AFNI-03).
+    Float32Defects,
+    /// float32 with header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input
+    /// that keeps them (AFNI-08).
+    Float32TinyOffsets,
 }
 
 struct Case {
@@ -48,48 +58,66 @@ struct Case {
     tool: &'static str,
     input: Input,
     args: &'static [&'static str],
+    /// `LARMORX_UPSTREAM_DEFECTS`: `fix` (the default) or `reproduce`.
+    mode: &'static str,
+    /// The upstream defects the run must name on standard error, and no other.
+    named: &'static [&'static str],
 }
 
 const CASES: &[Case] = &[
     Case {
         id: "3dTshift.fourier.int16",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Int16,
         args: &["-tpattern", "alt+z2"],
     },
     Case {
         id: "3dTshift.fourier.float32.ignore",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Float32,
         args: &["-tpattern", "alt+z", "-ignore", "2"],
     },
     Case {
         id: "3dTshift.linear.float32",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Float32,
         args: &["-tpattern", "seq+z", "-linear"],
     },
     Case {
         id: "3dTshift.cubic.int16.rlt+",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Int16,
         args: &["-tpattern", "alt-z", "-cubic", "-rlt+"],
     },
     Case {
         id: "3dTshift.quintic.float32.tzero",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Float32,
         args: &["-tpattern", "alt+z2", "-quintic", "-tzero", "0"],
     },
     Case {
         id: "3dTshift.heptic.uint8.no_detrend",
         tool: "afni 3dTshift",
+        named: &["AFNI-05"],
+        mode: "fix",
         input: Input::Uint8,
         args: &["-tpattern", "seq-z", "-heptic", "-no_detrend"],
     },
     Case {
         id: "3dTshift.wsinc5.float32.rlt",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Float32,
         args: &[
             "-tpattern",
@@ -105,8 +133,66 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.wsinc9.int16.slice",
         tool: "afni 3dTshift",
+        named: &[],
+        mode: "fix",
         input: Input::Int16,
         args: &["-tpattern", "alt+z", "-wsinc9", "-slice", "3"],
+    },
+    Case {
+        id: "3dTshift.linear.int16-negative-slope",
+        tool: "afni 3dTshift",
+        named: &["AFNI-01"],
+        mode: "fix",
+        input: Input::Int16Negative,
+        args: &["-tpattern", "alt+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.cubic.float32-defects",
+        tool: "afni 3dTshift",
+        named: &["AFNI-02", "AFNI-07", "AFNI-03"],
+        mode: "fix",
+        input: Input::Float32Defects,
+        args: &["-cubic"],
+    },
+    Case {
+        id: "3dTshift.copy.float32-tiny-offsets",
+        tool: "afni 3dTshift",
+        named: &["AFNI-08"],
+        mode: "fix",
+        input: Input::Float32TinyOffsets,
+        args: &[],
+    },
+    Case {
+        id: "3dTshift.heptic.uint8.no_detrend.reproduce",
+        tool: "afni 3dTshift",
+        named: &["AFNI-05"],
+        mode: "reproduce",
+        input: Input::Uint8,
+        args: &["-tpattern", "seq-z", "-heptic", "-no_detrend"],
+    },
+    Case {
+        id: "3dTshift.linear.int16-negative-slope.reproduce",
+        tool: "afni 3dTshift",
+        named: &["AFNI-01"],
+        mode: "reproduce",
+        input: Input::Int16Negative,
+        args: &["-tpattern", "alt+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.cubic.float32-defects.reproduce",
+        tool: "afni 3dTshift",
+        named: &["AFNI-02", "AFNI-07", "AFNI-03"],
+        mode: "reproduce",
+        input: Input::Float32Defects,
+        args: &["-cubic"],
+    },
+    Case {
+        id: "3dTshift.copy.float32-tiny-offsets.reproduce",
+        tool: "afni 3dTshift",
+        named: &["AFNI-08"],
+        mode: "reproduce",
+        input: Input::Float32TinyOffsets,
+        args: &[],
     },
 ];
 
@@ -139,7 +225,8 @@ fn series_values() -> Vec<i64> {
         .collect()
 }
 
-fn write_input<T: Element>(path: &Path, data: &[T], data_type: DataType, slope: f64) {
+/// A header for the inputs: plumb, 2 × 2 × 3 mm, TR 2 s, `scl_slope` = `slope`.
+fn input_header(data_type: DataType, slope: f64) -> NiftiHeader {
     let mut h = NiftiHeader::new(NiftiVersion::V1, &SHAPE, data_type).unwrap();
     let affine = Affine::from_zooms([2.0, 2.0, 3.0], [-7.0, -5.0, -6.0]);
     h.set_sform(&affine, 1);
@@ -148,8 +235,51 @@ fn write_input<T: Element>(path: &Path, data: &[T], data_type: DataType, slope: 
     h.xyzt_units = 2 | 8;
     h.scl_slope = slope;
     h.scl_inter = 0.0;
+    h
+}
+
+fn write_with<T: Element>(path: &Path, h: &NiftiHeader, data: &[T]) {
     let view = ArrayViewD::from_shape(IxDyn(&SHAPE).f(), data).unwrap();
-    nifti::write(path, &h, view, &WriteOptions::default()).unwrap();
+    nifti::write(path, h, view, &WriteOptions::default()).unwrap();
+}
+
+fn write_input<T: Element>(path: &Path, data: &[T], data_type: DataType, slope: f64) {
+    write_with(path, &input_header(data_type, slope), data);
+}
+
+/// The float32 input of AFNI's defects (D13): stored values with `scl_slope` 2 and
+/// `scl_inter` 10; an oblique sform in metres (a rotation about y with cosine 0.8 and sine 0.6;
+/// steps 2, 2 and 3 mm) with an origin; header slice code 2 over all 5 slices, 0.4 s apart.
+fn defects_header() -> NiftiHeader {
+    let mut h = input_header(DataType::F32, 2.0);
+    h.scl_inter = 10.0;
+    let affine = Affine::from_linear(
+        [
+            [0.0016, 0.0, -0.0018],
+            [0.0, 0.002, 0.0],
+            [0.0012, 0.0, 0.0024],
+        ],
+        [-0.007, -0.005, -0.006],
+    );
+    h.set_sform(&affine, 1);
+    h.set_qform(&affine, 1).unwrap();
+    h.xyzt_units = 1 | 8;
+    h.dim_info = 3 << 4;
+    h.slice_code = 2;
+    (h.slice_start, h.slice_end) = (0, 4);
+    h.slice_duration = 0.4;
+    h
+}
+
+/// The float32 input of AFNI-08: header slice code 1, slices 0.5 ms apart, a TR of 1 ms.
+fn tiny_offsets_header() -> NiftiHeader {
+    let mut h = input_header(DataType::F32, 0.0);
+    h.pixdim[4] = 0.001;
+    h.dim_info = 3 << 4;
+    h.slice_code = 1;
+    (h.slice_start, h.slice_end) = (0, 4);
+    h.slice_duration = 0.0005;
+    h
 }
 
 fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
@@ -158,6 +288,9 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         ("float32", dir.join("float32.nii")),
         ("int16", dir.join("int16.nii")),
         ("uint8", dir.join("uint8.nii")),
+        ("int16-negative", dir.join("int16-negative.nii")),
+        ("float32-defects", dir.join("float32-defects.nii")),
+        ("float32-tiny-offsets", dir.join("float32-tiny-offsets.nii")),
     ]);
     let f32s: Vec<f32> = values.iter().map(|&v| v as f32 / 4.0).collect();
     write_input(&paths["float32"], &f32s, DataType::F32, 0.0);
@@ -165,6 +298,13 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     write_input(&paths["int16"], &i16s, DataType::I16, 0.25);
     let u8s: Vec<u8> = values.iter().map(|&v| (v / 8 - 80) as u8).collect();
     write_input(&paths["uint8"], &u8s, DataType::U8, 0.0);
+    write_input(&paths["int16-negative"], &i16s, DataType::I16, -0.25);
+    write_with(&paths["float32-defects"], &defects_header(), &f32s);
+    write_with(
+        &paths["float32-tiny-offsets"],
+        &tiny_offsets_header(),
+        &f32s,
+    );
     paths
 }
 
@@ -422,14 +562,44 @@ fn golden() {
             Input::Float32 => &inputs["float32"],
             Input::Int16 => &inputs["int16"],
             Input::Uint8 => &inputs["uint8"],
+            Input::Int16Negative => &inputs["int16-negative"],
+            Input::Float32Defects => &inputs["float32-defects"],
+            Input::Float32TinyOffsets => &inputs["float32-tiny-offsets"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];
         args.extend(case.args.iter().map(|a| (*a).to_owned()));
-        args.extend(["-prefix".into(), output.display().to_string()]);
+        // The output is named relative to the temporary directory, so that a blank in its path
+        // cannot make the -prefix one AFNI refuses (AFNI-12).
+        args.extend(["-prefix".into(), format!("{}.nii", case.id)]);
         args.push(input.display().to_string());
-        let out = Command::new(EXE).args(&args).output().unwrap();
+        let out = Command::new(EXE)
+            .args(&args)
+            .current_dir(dir.path())
+            .env("LARMORX_UPSTREAM_DEFECTS", case.mode)
+            .output()
+            .unwrap();
         assert!(out.status.success(), "{}: {out:?}", case.id);
+        // The notices (`*+ WARNING: upstream defect <ID> (3dTshift) corrected: ...`).
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let found: Vec<&str> = stderr
+            .lines()
+            .filter_map(|l| l.split("upstream defect ").nth(1))
+            .filter_map(|rest| rest.split(' ').next())
+            .collect();
+        assert_eq!(found, case.named, "{}: {stderr}", case.id);
+        let verb = if case.mode == "fix" {
+            "corrected"
+        } else {
+            "reproduced"
+        };
+        for id in case.named {
+            assert!(
+                stderr.contains(&format!("upstream defect {id} (3dTshift) {verb}: ")),
+                "{}: {stderr}",
+                case.id
+            );
+        }
         for (name, fp) in nifti_fingerprints(&output) {
             actual.insert((case.id.to_owned(), name.to_owned()), fp);
         }

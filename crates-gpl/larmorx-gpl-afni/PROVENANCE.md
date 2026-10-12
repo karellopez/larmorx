@@ -52,6 +52,14 @@ Changes from the originals are listed below and in each module's documentation.
 | `dataset` | `src/thd_niftiwrite.c` | `populate_nifti_image` (datum, scaling, geometry, dimensions, time and slice-timing fields, units, codes), `get_slice_timing_pattern`, `space_to_NIFTI_code` | NIH, public domain |
 | `dataset` | `src/nifti/nifti2/nifti2_io.c` | the header conversion of `nifti_image_read` (`nifti_convert_n1hdr2nim`, `nifti_convert_n2hdr2nim`: dimension and spacing fixes, `FIXED_FLOAT`), `nifti_quatern_to_dmat44` | NIH, public domain |
 | `dataset` | `src/thd_floatscan.c` | `thd_floatscan` | MCW 1994-2000 |
+| `axes` | `src/thd_mattor.c` | `THD_matrix_to_orientation` | MCW 1994-2000 (no header; written by Robert W. Cox) |
+| `axes` | `src/thd_coords.c` | `THD_dicom_card_xform`, `THD_compute_oblique_angle` (with its `MINNUM`, `MAXNUM`, `MIN3`, `MAX3`) | MCW 1994-2000 |
+| `axes` | `src/thd_dsetatr.c` | the obliquity update of `THD_set_dataset_attributes` (a plumb `ijk_to_dicom_real` replaced by the cardinal matrix) | MCW 1994-2000 (no header) |
+| `axes` | `src/thd_niftiwrite.c` | the spatial transforms of `populate_nifti_image` (sform, quaternion, qform offsets, voxel sizes) | NIH, public domain |
+| `axes` | `src/3ddata.h`, `src/vecmat.h` | `ORIENT_xyz`, `ORIENT_sign`, `ORIENT_xyzint`; `DMAT_DET`, `DMAT_MUL` | MCW 1994-2000 |
+| `axes` | `src/nifti/nifti2/nifti2_io.c` | `nifti_dmat44_to_orientation`, `nifti_dmat44_to_quatern`, `nifti_dmat33_polar`, `nifti_dmat33_inverse`, `nifti_dmat33_determ`, `nifti_dmat33_rownorm`, `nifti_dmat33_colnorm`, `nifti_dmat33_mul` | NIH, public domain |
+| `dataset` | `src/thd_niftiread.c` | the axes of `THD_open_nifti` (orientation, steps and origins for the qform, sform and form-less cases) | NIH, public domain |
+| `cli::tshift` | `src/thd_writedset.c` | the existing-output check of `THD_write_3dim_dataset` (its messages and exit status, AFNI-11 reproduced) | MCW 1994-2000 |
 | `dataset` | `src/edt_fullcopy.c` | `EDIT_full_copy` (the order of copying and loading) | MCW 1994-2000 |
 | `dataset` | `src/3ddata.h` | `DSET_UNMSEC` | MCW 1994-2000 |
 | `tshift` | `src/3dTshift.c` | the slice and voxel-pair loop of `main` | MCW 1994-2000 |
@@ -60,7 +68,7 @@ Changes from the originals are listed below and in each module's documentation.
 | `tshift` | `src/thd_initdblk.c` | `THD_need_brick_factor` | MCW 1994-2000 |
 | `tshift` | `src/mrilib.h` | `SHORTIZE`, `BYTEIZE` | MCW 1994-2000 |
 | `cli::tshift` | `src/3dTshift.c` | `main` (option scan, checks, messages), `TS_copy_input_to_output` | MCW 1994-2000 |
-| `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (used only to say, with `-verbose`, that AFNI would refuse a `-prefix`) | MCW 1994-2000 |
+| `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (to name AFNI-12, and to refuse a `-prefix` when it is reproduced) | MCW 1994-2000 |
 | `cli::tshift` | `src/debugtrace.c` | the message prefixes of `INFO_message`, `WARNING_message`, `ERROR_message`, `ERROR_exit` | NIH, public domain |
 
 ## glibc files translated (`glibc_sincosf`)
@@ -98,8 +106,38 @@ Changes from the originals are listed below and in each module's documentation.
   an existing output file is an error. Any `-prefix` path is accepted (2026-10-11), so that
   paths with blanks or non-ASCII characters work on every platform whichever implementation
   `larmorx afni 3dTshift` runs. AFNI refuses the names `THD_filename_ok` rejects unless
-  `AFNI_ALLOW_ARBITRARY_FILENAMES` is set; `-verbose` says when it would have.
-- **`-verbose`** starts with a line naming the implementation (the replica, with its version).
+  `AFNI_ALLOW_ARBITRARY_FILENAMES` is set. Both are AFNI defects corrected by default and
+  reproduced with the switch (AFNI-11, AFNI-12; below).
+- **`-verbose`** starts with a line naming the implementation (the replica, with its version)
+  and one naming the D13 mode.
+- **AFNI's deterministic defects are corrected by default** (D13, 2026-10-12;
+  `docs/findings/upstream-defects.md`), as the clean-room original corrects them, and named in
+  a warning on standard error; `LARMORX_UPSTREAM_DEFECTS=reproduce` restores AFNI's code
+  paths, bit for bit:
+  - AFNI-01 (`tshift::extract`): a negative brick factor is applied when the series is
+    extracted, as `THD_insert_series` divides by it; AFNI applies only a positive one.
+  - AFNI-02 (`dataset::read`): float32 data with a slope and an intercept, scaled when loaded,
+    get no brick factor; AFNI keeps the slope as one.
+  - AFNI-03 (`dataset::slice_offsets`): header slice code 2 visits `slice_end` down to
+    `slice_start`; AFNI's loop visits `slice_end` only.
+  - AFNI-05 (`tshift::shift_pair`): `-no_detrend` de-means the second voxel of each pair with
+    its own mean; AFNI de-means the first voxel twice.
+  - AFNI-07 (`dataset::geometry`): a metre or micrometre header's matrix and origins are
+    converted to millimetres with its steps; AFNI converts only the steps.
+  - AFNI-08 (`dataset::slice_fields`): the "all zeros" test of `populate_nifti_image` is what
+    it was meant to be (no time away from 0); AFNI's can never be true.
+  - AFNI-11, AFNI-12 (`cli::tshift`): the larmorx conventions above. Reproduced, an existing
+    output is reported with AFNI's messages and not written (exit 0), and a name
+    `THD_filename_ok` rejects is refused; AFNI's environment variables (`AFNI_DECONFLICT`,
+    `AFNI_ALLOW_ARBITRARY_FILENAMES`) are not read.
+- **Quaternions in double.** `nifti_dmat44_to_quatern` and `nifti_dmat33_inverse` form a few
+  quotients in x87 extended precision (`1.0l / deti`, `0.25l * (r32-r23) / a`) and round them
+  to double; the translation divides in double. The two can differ in the last bit of a double
+  for an oblique matrix (never for a plumb one, whose quotients are exact), which the NIfTI-1
+  header's float fields almost never show.
+- **The axes' orientation** where `nifti_dmat44_to_orientation` fails (a degenerate sform, a
+  zero or repeated column): AFNI indexes its orientation tables out of bounds there; the
+  replica writes the matrix as read.
 
 ## Verification
 
@@ -108,3 +146,5 @@ Changes from the originals are listed below and in each module's documentation.
 | `csfft` | `tools/csfft-verify/run.sh`: AFNI's compiled `csfft_cox` (from the oracle build's `libmri.a`) and its general radix-2 loop on 3,336 + 160 input records, every length AFNI computes itself | 36,950,784 + 2,621,400 float values, 0 differ |
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
+| 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` |
+| The geometry AFNI writes (2026-10-12) | AFNI's and the replica's (`reproduce`) outputs compared byte for byte on plumb, oblique, nearly plumb, qform-only, sform-only and form-less inputs, in millimetres, metres and micrometres, and on AFNI-01, -02, -03, -05, -08 inputs | the 348-byte headers identical except `vox_offset` (AFNI's extension), the data identical |

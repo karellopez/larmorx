@@ -219,7 +219,13 @@ defects! {
     AFNI_05 = "AFNI-05", "3dTshift", true,
         "-no_detrend removes and restores the mean of only the first voxel of each pair; the second is shifted as raw values";
     AFNI_07 = "AFNI-07", "3dTshift", true,
-        "metre and micron units: the voxel sizes and directions are converted to millimetres but the origin is not";
+        "metre and micron units: the voxel sizes and directions are converted to millimetres but the origin is not (and an oblique matrix is not converted at all)";
+    AFNI_08 = "AFNI-08", "3dTshift", true,
+        "a copy of the input whose slice times are all within 0.003 of 0 is written with slice_end 0";
+    AFNI_11 = "AFNI-11", "3dTshift", true,
+        "an output file that exists already is not written, and the program exits with status 0";
+    AFNI_12 = "AFNI-12", "3dTshift", true,
+        "a -prefix with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

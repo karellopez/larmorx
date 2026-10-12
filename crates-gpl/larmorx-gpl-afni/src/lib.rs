@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 pub mod afni_ext;
+pub mod axes;
 pub mod cli;
 pub mod cnum;
 pub mod csfft;

@@ -350,7 +350,11 @@ with the classes of the [defect register](findings/upstream-defects.md):
   details"). `implementation="auto"` picks the replica whenever it is installed, so a fix that
   only the original made would disappear on installation. The replica program reads the same
   `LARMORX_UPSTREAM_DEFECTS`, and with `reproduce` gives exactly the original program's
-  result.
+  result. The replica's parity suite checks the shared default: on every case where a
+  correction applies, it compares the replica's default output with the clean-room original's
+  (`D13 defaults: replica = original` in [afni-tshift-replica.md](validation/afni-tshift-replica.md)),
+  with the thresholds that compare the original with the upstream. Where they disagree, find
+  which follows the upstream's intent and record it in both records.
 - **How parity uses the switch.** The bit-for-bit comparison runs larmorx with the switch.
   A second pass runs larmorx's default on the same cases, and the record reports, per defect,
   which cases the fix changes and by how much, next to the band. A test checks that the

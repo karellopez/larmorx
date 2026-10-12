@@ -54,8 +54,13 @@ pub fn int16_scaled(path: &Path) {
     write(path, &v, DataType::I16, 0.25);
 }
 
+/// Runs `exe` with `args` in larmorx's default mode (`LARMORX_UPSTREAM_DEFECTS` unset).
 pub fn run(exe: &str, args: &[&str]) -> Output {
-    Command::new(exe).args(args).output().unwrap()
+    Command::new(exe)
+        .args(args)
+        .env_remove("LARMORX_UPSTREAM_DEFECTS")
+        .output()
+        .unwrap()
 }
 
 /// The stored data bytes and the header of a NIfTI file.

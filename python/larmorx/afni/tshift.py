@@ -2,10 +2,11 @@
 """``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 25.2.09, or its
 bit-exact replica from ``larmorx-gpl``, run as a separate program).
 
-AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
-a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an intercept (AFNI-02), header
-slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel pairs (AFNI-05) and metre or
-micron units (AFNI-07). ``upstream_defects="reproduce"`` gives AFNI's output."""
+AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
+by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
+intercept (AFNI-02), header slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel
+pairs (AFNI-05) and metre or micron units (AFNI-07). ``upstream_defects="reproduce"`` gives
+AFNI's output."""
 
 from __future__ import annotations
 

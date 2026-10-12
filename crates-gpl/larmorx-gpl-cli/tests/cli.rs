@@ -131,3 +131,77 @@ fn tshift_copies_and_errors() {
         assert!(err.contains(message), "{message}: {err}");
     }
 }
+
+/// D13: `LARMORX_UPSTREAM_DEFECTS` chooses between the corrections and AFNI's behaviour; the
+/// command line's own defects are an existing output (AFNI-11) and refused names (AFNI-12).
+/// Outputs are named relative to the temporary directory, so that its own path (which may hold
+/// a blank) is not part of the `-prefix`.
+#[test]
+fn tshift_upstream_defects_switch() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("in.nii");
+    common::float32(&input);
+    let run = |prefix: &str, mode: Option<&str>| {
+        let mut command = std::process::Command::new(EXE);
+        command
+            .args(["afni", "3dTshift", "-tpattern", "alt+z", "-prefix", prefix])
+            .arg(&input)
+            .current_dir(dir.path())
+            .env_remove("LARMORX_UPSTREAM_DEFECTS");
+        if let Some(mode) = mode {
+            command.env("LARMORX_UPSTREAM_DEFECTS", mode);
+        }
+        let out = command.output().unwrap();
+        (out.status.code(), String::from_utf8(out.stderr).unwrap())
+    };
+
+    // An invalid mode is a usage error.
+    let (code, err) = run("fine.nii", Some("faithful"));
+    assert_eq!(code, Some(2), "{err}");
+    assert!(err.contains("must be 'fix' or 'reproduce'"), "{err}");
+
+    // AFNI-11: an existing output.
+    let taken = dir.path().join("taken.nii");
+    std::fs::write(&taken, "taken").unwrap();
+    let (code, err) = run("taken.nii", None);
+    assert_eq!(code, Some(1), "{err}");
+    assert!(
+        err.contains("upstream defect AFNI-11 (3dTshift) corrected"),
+        "{err}"
+    );
+    let (code, err) = run("taken.nii", Some("reproduce"));
+    assert_eq!(code, Some(0), "{err}");
+    assert!(
+        err.contains("** ERROR: output dataset name 'taken.nii' conflicts with existing file"),
+        "{err}"
+    );
+    assert!(
+        err.contains("** ERROR: dataset NOT written to disk!"),
+        "{err}"
+    );
+    assert_eq!(std::fs::read(&taken).unwrap(), b"taken");
+
+    // AFNI-12: a -prefix with a blank.
+    let (code, err) = run("with blank.nii", Some("reproduce"));
+    assert_eq!(code, Some(1), "{err}");
+    assert!(
+        err.contains("illegal value 'with blank.nii' after -prefix"),
+        "{err}"
+    );
+    assert!(!dir.path().join("with blank.nii").exists());
+    let (code, err) = run("with blank.nii", None);
+    assert_eq!(code, Some(0), "{err}");
+    assert!(
+        err.contains("upstream defect AFNI-12 (3dTshift) corrected"),
+        "{err}"
+    );
+    assert!(dir.path().join("with blank.nii").exists());
+
+    // A plain run names nothing, in either mode.
+    for mode in [None, Some("fix"), Some("reproduce"), Some("")] {
+        let name = format!("plain-{}.nii", mode.unwrap_or("unset"));
+        let (code, err) = run(&name, mode);
+        assert_eq!(code, Some(0), "{err}");
+        assert!(!err.contains("upstream defect"), "{err}");
+    }
+}

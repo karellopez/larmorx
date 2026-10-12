@@ -42,8 +42,9 @@ LARMORX_UPSTREAM_DEFECTS=reproduce larmorx mri hmc -in bold.nii.gz -reffile ref.
 - **Replicas** receive the same variable: `lx.afni.tshift(..., implementation="replica")` sets
   `LARMORX_UPSTREAM_DEFECTS` for the `larmorx-gpl` program, and `larmorx afni 3dTshift` passes
   its environment on. Replicas share the corrected default, and with `reproduce` give exactly
-  the original's result (decision log, "D13's details"). The 3dTshift replica's corrections
-  are a separate task: until it lands, the replica gives AFNI's result in both modes.
+  the original's result (decision log, "D13's details"): the 3dTshift replica corrects the same
+  defects as the clean-room original by default (2026-10-12), and with `reproduce` writes
+  AFNI's output bytes.
 
 ## Warnings
 
@@ -78,11 +79,14 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | PIPE-03 | fMRIPrep `ResampleSeries` | `lx.transforms.resample_series` | the field map's Jacobian is the gradient along the *target* axis with the source's phase-encoding index, in target voxels: right only when the target's axes are the source's (the native boldref) | `1 + ∇vsm · ∂t/∂s_pe`: the derivative along the phase-encoding direction mapped into the target grid; on the source's own grid, fMRIPrep's value bit for bit ([resample-series.md](resample-series.md)) |
 | PIPE-04 | nitransforms | `lx.transforms.load_itk_composite`, `load_transforms`, `resample_series` | a composite `.h5` file's transforms are read in name order (`"10"` before `"2"`) | numeric order |
 | SCI-03 | SciPy `ndimage` | `lx.ndimage.*`, `resample_series(mode=...)` | the spline prefilter's reflect boundary (modes `reflect`, `grid-mirror`, `nearest`) reads a coefficient it has already updated: the splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: splines through the samples |
-| AFNI-01 | 3dTshift | `lx.afni.tshift`, `larmorx afni 3dTshift` | a negative `scl_slope` is applied on output only: shifted slices come out sign-flipped and scaled | the factor is applied on input too |
+| AFNI-01 | 3dTshift | `lx.afni.tshift`, `larmorx afni 3dTshift` (both implementations) | a negative `scl_slope` is applied on output only: shifted slices come out sign-flipped and scaled | the factor is applied on input too |
 | AFNI-02 | 3dTshift | same | float32 data with a slope and an intercept are scaled, and the slope is kept as a scale factor: scaled twice | scaled once, no factor |
 | AFNI-03 | 3dTshift | `larmorx afni 3dTshift` (header slice timing) | header slice code 2 (sequential decreasing) gives every slice time 0: nothing is shifted | slices `slice_end` down to `slice_start`, as NIfTI defines the code |
 | AFNI-05 | 3dTshift | `lx.afni.tshift(detrend=False)`, `-no_detrend` | only the first voxel of each pair has its mean removed and restored; the second is shifted raw (its edges fall toward 0) | every voxel has its mean removed and restored |
-| AFNI-07 | 3dTshift | both | metre and micron units: the voxel sizes and directions are converted to millimetres, the origin is not | the whole matrix is converted |
+| AFNI-07 | 3dTshift | both | metre and micron units: the voxel sizes are converted to millimetres, the origin is not, and an oblique sform not at all | the whole matrix is converted |
+| AFNI-08 | 3dTshift | `larmorx afni 3dTshift` | a copy of the input whose kept slice times are all within 3 ms of 0 is written with `slice_end` 0 | the defaults: no slice code, `slice_end` = nz − 1 (the replica has the switch; the original writes nz − 1 always) |
+| AFNI-11 | 3dTshift | `larmorx afni 3dTshift` | an existing output is not written, exit 0 | an error, exit 1 (the replica's `reproduce` writes nothing and exits 0; the original has no switch yet) |
+| AFNI-12 | 3dTshift | `larmorx afni 3dTshift` | a `-prefix` with blanks, shell metacharacters or non-ASCII characters is refused | any name is written, with a warning when AFNI would refuse it (the replica's `reproduce` refuses it; the original has no switch yet) |
 | FSL-01 | mcflirt | `lx.mri.hmc`, `larmorx mri hmc` | the last volume of the series starts the first stage from the identity instead of its predecessor's result (every fMRIPrep run's last volume) | it continues its chain like every other volume |
 | FSL-03 | mcflirt | both | the in-plane mode pads the first stage's reference grid twice | once, like the other stages |
 | FSL-14 | mcflirt | both | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN | non-finite voxels are left out of the centre of mass and the cost |
@@ -149,11 +153,11 @@ changed it (`reproduce`); nothing is said when the two would agree.
   uncentred. The corrected count, the sum of the weights, is available as
   `lx.mri.hmc(..., normcorr_count="weights")`; whether it becomes the default is decided with
   the user once its effect is measured ([mri-hmc.md](mri-hmc.md), "The correlation count").
-- **AFNI-08** (an all-zero slice-time list writes `slice_end` 0): no input tried in black-box
-  runs of AFNI 25.2.09 made 3dTshift write `slice_end` 0, so the clean-room original writes
-  `nz − 1` in every case and has no switch for it (`specs/3dTshift.md` §6).
-- The 3dTshift replica's switch (a separate task): until it lands, the replica gives AFNI's
-  result in both modes.
+- **The clean-room 3dTshift's switch for AFNI-08, AFNI-11 and AFNI-12**, and for AFNI-07 on
+  oblique grids: its defaults are the replica's, but its `reproduce` does not give AFNI's
+  result there yet (the spec does not describe these behaviours; the replica, translated from
+  AFNI's source, does). AFNI-08's trigger was found in AFNI's source (2026-10-12): slice times
+  all within 3 ms of 0, kept in a copy of the input because they lie beyond the TR.
 
 ## How the switch is validated
 

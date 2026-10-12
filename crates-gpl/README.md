@@ -93,9 +93,10 @@ output only; an existing output file is an error; any `-prefix` path is accepted
 **AFNI's defects** (D13, `docs/api/upstream-defects.md`): like the clean-room original, the
 replica corrects AFNI's deterministic defects by default (a negative `scl_slope`, float32
 data scaled twice, header slice code 2, `-no_detrend`'s voxel pairs, metre and micrometre
-units, slice times all within 3 ms of 0 in a copy, an existing output, refused output names;
-register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12 in
-`docs/findings/upstream-defects.md`) and names each one that changed the output in a warning
+units, slice times all within 3 ms of 0 in a copy, an existing output, refused output names,
+and a grid within about 0.01° to 0.024° of plumb written plumb; register entries AFNI-01, -02,
+-03, -05, -07, -08, -11, -12, -16 in `docs/findings/upstream-defects.md`) and names each one
+that changed the output in a warning
 on standard error (`*+ WARNING: upstream defect AFNI-01 (3dTshift) corrected: ...`), which
 the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
 `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension

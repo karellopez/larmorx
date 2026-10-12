@@ -131,7 +131,8 @@ Changes from the originals are listed below and in each module's documentation.
     `THD_filename_ok` rejects is refused; AFNI's environment variables (`AFNI_DECONFLICT`,
     `AFNI_ALLOW_ARBITRARY_FILENAMES`) are not read.
   - AFNI-16 (`axes::written`, `axes::snaps`; decided 2026-10-12): a matrix that
-    `THD_compute_oblique_angle` calls plumb (less than about 0.014° from plumb) but that has a
+    `THD_compute_oblique_angle` calls plumb (within about 0.01° to 0.024° of plumb, depending on
+    the step) but that has a
     non-zero entry off its axes' rows keeps its obliquity: it is written as AFNI writes an
     oblique matrix (the sform as carried, its quaternion, the axes' origins and steps), where
     `THD_set_dataset_attributes` replaces it by the cardinal matrix of the axes. A matrix

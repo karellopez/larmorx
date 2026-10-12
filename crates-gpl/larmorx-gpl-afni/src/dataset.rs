@@ -45,7 +45,7 @@
 //! twice (AFNI-02, [`read`]); header slice code 2 giving every slice time 0 (AFNI-03,
 //! [`slice_offsets`]); metre and micrometre units leaving the origin, and an oblique matrix,
 //! unconverted (AFNI-07, [`geometry`]); slice times all within 0.003 of 0 written with
-//! `slice_end` 0 (AFNI-08, [`slice_fields`]); and a matrix less than about 0.014° from plumb
+//! `slice_end` 0 (AFNI-08, [`slice_fields`]); and a matrix within about 0.01° to 0.024° of plumb
 //! written plumb (AFNI-16, [`write`], [`axes::snaps`]).
 
 use std::path::{Path, PathBuf};
@@ -824,8 +824,13 @@ fn units_detail(
     other: &Geometry,
     mode: UpstreamDefects,
 ) -> Option<String> {
-    // Only the units differ between the two: AFNI-16 is taken in `mode` for both.
-    if axes::written(&geometry.axes, mode) == axes::written(&other.axes, mode) {
+    // Only the units differ between the two. Whether that changes the output can depend on
+    // AFNI-16 (a nearly plumb grid at the origin: written plumb, its steps converted either
+    // way; kept, its matrix in metres or in millimetres), so the conversion is named when it
+    // matters in either AFNI-16 mode: the same notices in both modes.
+    let same =
+        |m: UpstreamDefects| axes::written(&geometry.axes, m) == axes::written(&other.axes, m);
+    if same(UpstreamDefects::Fix) && same(UpstreamDefects::Reproduce) {
         return None;
     }
     let unit = if nim.xyz_units == UNITS_METER {

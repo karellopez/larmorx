@@ -23,14 +23,15 @@
 //!
 //! When a dataset is written, `THD_set_dataset_attributes` replaces `ijk_to_dicom_real` by the
 //! *cardinal* matrix of the axes ([`cardinal`]) whenever the matrix is plumb by AFNI's test
-//! ([`is_plumb`]: nominally 0.01°, about 0.014° in float). `populate_nifti_image` then writes that matrix, with x and y negated,
+//! ([`is_plumb`]: nominally 0.01°; in float, 0.0099° to 0.0242° depending on the step).
+//! `populate_nifti_image` then writes that matrix, with x and y negated,
 //! as the sform, its quaternion ([`dmat44_to_quatern`]) as the qform, the axes' origins as the
 //! qform offset and the axes' steps as the voxel sizes ([`written`]).
 //!
 //! Two consequences show in AFNI's output (`docs/findings/afni-tshift.md`, "Geometry"):
 //! for a plumb input in metres or micrometres the sform's linear part is in millimetres (the
-//! steps are converted on reading, the origins are not); and an input less than about 0.014°
-//! from plumb comes out exactly plumb.
+//! steps are converted on reading, the origins are not); and an input that close to plumb
+//! comes out exactly plumb.
 //!
 //! **Upstream defect AFNI-16 (D13, decided 2026-10-12).** The second consequence discards a
 //! small obliquity. By default ([`UpstreamDefects::Fix`]) larmorx-gpl keeps the input's matrix
@@ -293,7 +294,10 @@ fn max3<T: PartialOrd + Copy>(a: T, b: T, c: T) -> T {
 /// 1 or more, or NaN (a zero column; `acos` of a value above 1 is NaN too): the largest float
 /// below 1, `1 − 2⁻²⁴`, is already `acos(1 − 2⁻²⁴) ≥ √(2⁻²³)` radians, 0.0198°, from plumb. So
 /// no `acos` is needed to decide, and the effective threshold is the angle whose cosine rounds
-/// to 1 in float, about 0.014° (`√(2⁻²⁴)` radians), not 0.01°.
+/// to 1 in float, not 0.01°. That angle depends on where the column's length lies between
+/// powers of 2, through the float rounding of its square and its square root: from 0.0099° (a
+/// length just below a power of 2) to 0.0242° (a power of 2), about 0.014° (`√(2⁻²⁴)` radians)
+/// for most lengths (`specs/3dTshift.md` §6.1, observed at the float32 boundary).
 pub fn is_plumb(real: &[[f32; 4]; 3]) -> bool {
     let column = |j: usize| {
         let (a, b, c) = (real[0][j], real[1][j], real[2][j]);

@@ -301,7 +301,8 @@ fn tiny_offsets_header() -> NiftiHeader {
 }
 
 /// The float32 input of AFNI-16: the 2 × 2 × 3 mm grid turned by 1e-4 rad about y (the
-/// entries of the rotation rounded to 4 decimals: plain arithmetic), less than AFNI's 0.014°.
+/// entries of the rotation rounded to 4 decimals: plain arithmetic), which AFNI's test calls
+/// plumb.
 fn nearly_plumb_header() -> NiftiHeader {
     let mut h = input_header(DataType::F32, 0.0);
     let affine = Affine::from_linear(

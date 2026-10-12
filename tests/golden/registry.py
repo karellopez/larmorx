@@ -862,26 +862,52 @@ IMAGE_MATH_3D: dict[str, tuple[str, ...]] = {
 }
 
 
-def _image_math_case(op: str, args: tuple[str, ...]) -> None:
-    @case(f"cli.ants.ImageMath.{op}", covers=("cli:ants ImageMath", f"imagemath:{op}"))
+#: The operations whose only output is ANTs' defect: with the defects corrected, larmorx
+#: refuses them (``vtotal``, ANTS-10), so their case runs them reproduced.
+IMAGE_MATH_REPRODUCED_ONLY = ("vtotal",)
+
+
+def _image_math(ctx: Context, op: str, out: str, upstream_defects: str = "fix") -> dict[str, Any]:
+    """ImageMath ``op`` on its :data:`IMAGE_MATH_3D` arguments: the image, and what
+    ``total`` and ``mean`` print."""
+    args = IMAGE_MATH_3D[op]
+    stdout = cli(
+        "ants",
+        "ImageMath",
+        "3",
+        out,
+        op,
+        *(ctx.file(a) if a.endswith(".nii") else a for a in args),
+        upstream_defects=upstream_defects,
+    )
+    result: dict[str, Any] = {"out": Nifti(out)}
+    if op in ("total", "mean"):
+        result["stdout"] = stdout
+    return result
+
+
+def _image_math_case(op: str) -> None:
+    reproduced = op in IMAGE_MATH_REPRODUCED_ONLY
+    name = f"cli.ants.ImageMath.{op}" + (".reproduce" if reproduced else "")
+
+    @case(name, covers=("cli:ants ImageMath", f"imagemath:{op}"))
     def _(ctx: Context) -> dict[str, Any]:
-        out = ctx.out("out.nii")
-        stdout = cli(
-            "ants",
-            "ImageMath",
-            "3",
-            out,
-            op,
-            *(ctx.file(a) if a.endswith(".nii") else a for a in args),
-        )
-        result: dict[str, Any] = {"out": Nifti(out)}
-        if op in ("total", "mean"):
-            result["stdout"] = stdout
-        return result
+        return _image_math(ctx, op, ctx.out("out.nii"), REPRODUCE if reproduced else "fix")
 
 
-for _op, _args in IMAGE_MATH_3D.items():
-    _image_math_case(_op, _args)
+for _op in IMAGE_MATH_3D:
+    _image_math_case(_op)
+
+
+@case("cli.ants.ImageMath.reproduce", covers=("cli:ants ImageMath",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``/``, ``total`` and ``mean`` with ANTs' defects reproduced (ANTS-08, ANTS-09): their
+    cases' outputs before D13."""
+    out: dict[str, Any] = {}
+    for op, name in (("/", "divide"), ("total", "total"), ("mean", "mean")):
+        result = _image_math(ctx, op, ctx.out(f"{name}.nii"), REPRODUCE)
+        out.update({name if k == "out" else f"{name}.{k}": v for k, v in result.items()})
+    return out
 
 
 @case("cli.ants.ImageMath.2d", covers=("cli:ants ImageMath",))
@@ -1018,6 +1044,26 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out), "bias": Nifti(bias)}
 
 
+@case("cli.ants.N4BiasFieldCorrection.reproduce", covers=("cli:ants N4BiasFieldCorrection",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.ants.N4BiasFieldCorrection`` with ITK's defects reproduced (ANTS-38: the mask's
+    first voxel is the log image's minimum)."""
+    out, bias = ctx.out("out.nii"), ctx.out("bias.nii")
+    cli(
+        "ants",
+        "N4BiasFieldCorrection",
+        "-d", "3",
+        "-i", ctx.file("anat.nii"),
+        "-x", ctx.file("mask.nii"),
+        "-b", "[20]",
+        "-s", "2",
+        "-c", "[6x4,0]",
+        "-o", f"[{out},{bias}]",
+        upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    return {"out": Nifti(out), "bias": Nifti(bias)}
+
+
 @case("cli.ants.DenoiseImage", covers=("cli:ants DenoiseImage",))
 def _(ctx: Context) -> dict[str, Any]:
     """sMRIPrep's Rician model with a mask and the noise image; the Gaussian model with
@@ -1052,6 +1098,24 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("cli.ants.DenoiseImage.reproduce", covers=("cli:ants DenoiseImage",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.ants.DenoiseImage``'s Rician model with ITK's defect reproduced (ANTS-43: the
+    Rician correction factor becomes NaN at a high SNR)."""
+    out, noise = ctx.out("out.nii"), ctx.out("noise.nii")
+    cli(
+        "ants",
+        "DenoiseImage",
+        "-d", "3",
+        "-i", ctx.file("anat.nii"),
+        "-n", "Rician",
+        "-x", ctx.file("mask.nii"),
+        "-o", f"[{out},{noise}]",
+        upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    return {"out": Nifti(out), "noise": Nifti(noise)}
+
+
 @case("py.ants.denoise_image", covers=("lx.ants.denoise_image",))
 def _(ctx: Context) -> dict[str, Any]:
     """The Rician model (sMRIPrep's); the Gaussian model with a mask; shrink 2; 2D; 4D with
@@ -1069,6 +1133,22 @@ def _(ctx: Context) -> dict[str, Any]:
         r = call()
         out[f"{name}.denoised"] = r.denoised.data
         out[f"{name}.noise"] = r.noise.data
+    return out
+
+
+@case("py.ants.denoise_image.reproduce", covers=("lx.ants.denoise_image",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.ants.denoise_image``'s Rician cases with ITK's defect reproduced (ANTS-43)."""
+    dn = lx.ants.denoise_image
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, r in (
+            ("rician", dn(anat(), upstream_defects=REPRODUCE)),
+            ("plane", dn(plane(), patch_radius=(1, 2), upstream_defects=REPRODUCE)),
+        ):
+            out[f"{name}.denoised"] = r.denoised.data
+            out[f"{name}.noise"] = r.noise.data
     return out
 
 
@@ -1103,6 +1183,19 @@ def _(ctx: Context) -> dict[str, Any]:
     return out
 
 
+@case("py.ants.n4.reproduce", covers=("lx.ants.n4_bias_field_correction",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.ants.n4``'s masked case with ITK's defects reproduced (ANTS-38)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = lx.ants.n4_bias_field_correction(anat2(), mask=mask(), shrink_factor=2, convergence=([30], 0.02), rescale_intensities=True, upstream_defects=REPRODUCE)  # fmt: skip
+    return {
+        "threshold.corrected": r.corrected.data,
+        "threshold.bias": r.bias_field.data,
+        "threshold.convergence": np.array([it.convergence for it in r.iterations], np.float32),
+    }
+
+
 @case("py.ants.image_math", covers=("lx.ants.image_math",))
 def _(ctx: Context) -> dict[str, Any]:
     """The generic ``image_math`` on in-memory images (Normalize by the mean)."""
@@ -1126,6 +1219,15 @@ def _(ctx: Context) -> dict[str, Any]:
         "add_to_zero": lx.ants.add_to_zero(mask(), anat()).data,
         "negative": lx.ants.negative_image(signed()).data,
     }
+
+
+@case("py.ants.arithmetic.reproduce", covers=("lx.ants.image_arithmetic",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.ants.arithmetic``'s division with ANTs' defect reproduced (ANTS-08)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        divide = lx.ants.image_arithmetic(anat(), "divide", signed(), upstream_defects=REPRODUCE)
+    return {"divide": divide.data}
 
 
 @case(

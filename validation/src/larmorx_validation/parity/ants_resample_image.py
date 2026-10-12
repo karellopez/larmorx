@@ -129,12 +129,15 @@ def all_cases() -> list[AntsCase]:
         resample(
             "bspline-0-char",
             N,
-            "B-spline order 0 with pixel type 0 (char)",
+            "B-spline order 0 with pixel type 0 (char): ANTs reads both from argument 7 "
+            "(ANTS-30); larmorx reads the pixel type from argument 8, so it writes float",
             HEAD,
             "1.4",
             "0",
             "4",
             "0",
+            # Only the char output (reproduced) meets the out-of-range conversions.
+            one_mode=("ANTS-06",),
         ),
         resample(
             "bspline-7-double",
@@ -315,14 +318,11 @@ def all_cases() -> list[AntsCase]:
         resample(
             "size-1",
             E,
-            "size 1: ANTs divides by size - 1 and writes a 1-voxel image with infinite spacing",
+            "size 1: ANTs divides by size - 1 and writes a 1-voxel image of 0 with infinite "
+            "spacing and a NaN origin (ANTS-29; larmorx refuses it unless reproducing)",
             HEAD,
             "1",
             "1",
-            expect="divergence",
-            reason="ANTs computes the spacing old·(n - 1)/(1 - 1), infinite, and writes a "
-            "1 x 1 x 1 image of value 0 with infinite spacing (vnl's SVD fails on the grid "
-            "matrix); larmorx refuses a size below 2.",
         ),
         resample(
             "missing-input",

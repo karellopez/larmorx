@@ -268,11 +268,12 @@ def all_cases() -> list[AntsCase]:
             "2",
             "2",
             "4",
-            expect="divergence",
-            reason="ANTs prints 'Exception catched !' and goes on with the smoothing filter's "
-            "output, a buffer that was allocated but never written: the result is "
-            "uninitialised memory (values up to ±1e27 that change from run to run). larmorx "
-            "stops with ITK's message instead (docs/findings/ants-gaussian-filters.md).",
+            undefined_values="ANTs prints 'Exception catched !' and goes on with the smoothing "
+            "filter's output, a buffer that was allocated but never written: its values are "
+            "uninitialised memory (up to ±1e27, changing from run to run). With the defects "
+            "reproduced larmorx writes the same file with that buffer filled with zeros "
+            "(ANTS-28); by default it stops with ITK's message "
+            "(docs/findings/ants-gaussian-filters.md).",
         ),
         resample(
             "missing-input",

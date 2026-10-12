@@ -38,7 +38,15 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
-from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
+from larmorx_validation.parity import defects
+from larmorx_validation.parity.ants_programs import (
+    affine_difference,
+    ants_bin,
+    ants_version,
+    crmath_preload,
+    header_differences,
+    raw_header,
+)
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     PASS,
@@ -584,13 +592,53 @@ def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> int:
         return int(ants.internal.get_lib_fn("antsApplyTransforms")(args))
 
 
-def _run_larmorx(args: list[str]) -> tuple[int, str]:
+def _run_larmorx(args: list[str], mode: str = defects.REPRODUCE) -> tuple[int, str]:
+    """``larmorx ants antsApplyTransforms`` in-process; ``mode`` is D13's
+    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs."""
     from larmorx.cli import run
 
     err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+    with (
+        defects.mode(mode),
+        contextlib.redirect_stderr(err),
+        contextlib.redirect_stdout(io.StringIO()),
+    ):
         code = run(["larmorx", "ants", "antsApplyTransforms", *args])
     return code, err.getvalue().strip()
+
+
+def _fix_pass(s: Scenario, tmp: Path, checks: CheckList, code: int, err: str, out: Path) -> bool:
+    """D13: larmorx's default (``fix``) on the same arguments, compared with its
+    ``reproduce`` run (exit ``code``, standard error ``err``, output ``out``): the defects
+    named, and what the corrections changed. Returns whether the check passed."""
+    import nibabel as nib
+
+    target = tmp / "larmorx-fix.nii.gz"
+    fix_code, fix_err = _run_larmorx(_args(s, tmp, target), mode=defects.FIX)
+    ok, r_ok = fix_code == 0 and target.exists(), code == 0 and out.exists()
+    other = []
+    if fix_code != code:
+        other.append(f"exit {code} -> {fix_code}")
+    if ok != r_ok:
+        other.append("outputs written" if ok else "outputs not written")
+    change = defects.Change(0, 0, 0.0)
+    if ok and r_ok:
+        fields = [d.split(":")[0] for d in header_differences(raw_header(out), raw_header(target))]
+        if fields:
+            other.append(f"header {', '.join(fields)}")
+        change = defects.Change.of(
+            np.asanyarray(nib.load(target).dataobj), np.asanyarray(nib.load(out).dataobj)
+        )
+    entries = defects.notices_in(fix_err)
+    check = defects.add_fix_check(checks, entries, change, other_changes="; ".join(other))
+    if ok and r_ok and entries != defects.notices_in(err):
+        checks(
+            "D13 notices in both modes",
+            False,
+            detail=f"fix: {entries}; reproduce: {defects.notices_in(err)}",
+        )
+        return False
+    return check.passed
 
 
 def _ulps(a: np.ndarray, b: np.ndarray) -> int:
@@ -616,7 +664,9 @@ def run_case(case: Case, checks: CheckList) -> None:
         ants_ok = ants_code == 0 and ants_out.exists()
         lx_ok = lx_code == 0 and lx_out.exists()
         if not ants_ok and not lx_ok:
-            raise Outcome(BOTH_ERROR, f"ANTs exit {ants_code}; larmorx: {lx_err or lx_code}")
+            if _fix_pass(s, tmp, checks, lx_code, lx_err, lx_out):
+                raise Outcome(BOTH_ERROR, f"ANTs exit {ants_code}; larmorx: {lx_err or lx_code}")
+            return
         checks(
             "both succeed",
             ants_ok and lx_ok,
@@ -626,6 +676,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             checks("both reject the arguments", False, detail="expected an error from both")
         if not (ants_ok and lx_ok):
             return
+        _fix_pass(s, tmp, checks, lx_code, lx_err, lx_out)
         a_img, l_img = nib.load(ants_out), nib.load(lx_out)
         a, b = np.asanyarray(a_img.dataobj), np.asanyarray(l_img.dataobj)
         checks(
@@ -641,7 +692,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             a.shape == b.shape,
             detail=f"ANTs {a.shape}, larmorx {b.shape}",
         )
-        affine_diff = float(np.abs(a_img.affine - l_img.affine).max())
+        affine_diff = affine_difference(a_img.affine, l_img.affine)
         checks(
             "affine",
             affine_diff <= AFFINE_ATOL,
@@ -764,6 +815,7 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             lines.append(
                 "**Not explained by the maths library**: " + ", ".join(f"`{c}`" for c in rest) + "."
             )
+    lines += defects.summary(results)
     return lines
 
 

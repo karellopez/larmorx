@@ -11,14 +11,22 @@
 //! - the sigma is `ConvertVector<float>` (`1.5` or `1x1x2`); in voxels (multiplied by the
 //!   spacing, in float) unless the fifth argument is non-zero (`std::stoi`);
 //! - a sigma list whose length is neither 1 nor the dimension prints "Incorrect sigma vector
-//!   size" and smooths with the filter's default, 1 mm;
+//!   size" and smooths with the filter's default, 1 mm, exit 0 (ANTS-15); with the median
+//!   filter it leaves the radius uninitialised (ANTS-28);
 //! - with a non-zero sixth argument, the sigma is the median filter's radius in voxels
 //!   (truncated to an integer).
 //!
 //! Where ANTs crashes (a missing input, no output name: `std::string(nullptr)` throws), larmorx
 //! prints a message and exits 1.
+//!
+//! **Upstream defects (D13).** By default a sigma list of the wrong length is an error (exit
+//! 1). With `LARMORX_UPSTREAM_DEFECTS=reproduce` the Gaussian smooths with 1 mm as ANTs does,
+//! and the median, whose radius ANTs leaves uninitialised (its result depends on memory),
+//! uses a radius of 0 (the image unchanged), with a notice that says so.
 
 use std::io::Write;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use super::cstd::{convert_vector_f32, stoi};
 use crate::image::{AntsImage, FileStore, ImageStore, ReadError, read_with, write_with};
@@ -30,16 +38,24 @@ SmoothImage ImageDimension image.ext smoothingsigma outimage.ext {sigma-is-in-sp
  A separate sigma can be specified for each dimension, e.g., 1.5x1x2
 ";
 
-/// Runs `SmoothImage` on files; returns the exit code.
+/// Runs `SmoothImage` on files, in the D13 mode of `LARMORX_UPSTREAM_DEFECTS`; returns the
+/// exit code.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    run(args, &mut FileStore, super::itk_threads(), out, err)
+    match UpstreamDefects::from_env() {
+        Ok(mode) => run(args, &mut FileStore, super::itk_threads(), mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
 }
 
-/// Runs `SmoothImage` with images from `store`.
+/// Runs `SmoothImage` with images from `store` in the D13 mode `mode`.
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -62,13 +78,16 @@ pub fn run(
         let _ = writeln!(out, "Unsupported dimension");
         return 1;
     }
-    match smooth(&argv, dim as usize, store, n_threads, err) {
+    let mut notices = Notices::new(mode);
+    let code = match smooth(&argv, dim as usize, store, n_threads, &mut notices, err) {
         Ok(()) => 0,
         Err(message) => {
             let _ = writeln!(err, "{message}");
             1
         }
-    }
+    };
+    notices.print(err);
+    code
 }
 
 fn crash(what: &str) -> String {
@@ -80,6 +99,7 @@ fn smooth(
     dim: usize,
     store: &mut dyn ImageStore,
     n_threads: usize,
+    notices: &mut Notices,
     err: &mut dyn Write,
 ) -> Result<(), String> {
     let sigma = convert_vector_f32(&argv[3]).ok_or_else(|| {
@@ -88,7 +108,8 @@ fn smooth(
             argv[3]
         ))
     })?;
-    let image: AntsImage<f32> = match read_with::<f32, _>(store, &argv[2], dim, n_threads) {
+    let image: AntsImage<f32> = match read_with::<f32, _>(store, &argv[2], dim, n_threads, notices)
+    {
         Ok(i) => i,
         Err(ReadError::Unsupported { name, message }) => {
             return Err(format!("larmorx: {name}: {message}"));
@@ -118,23 +139,59 @@ fn smooth(
             err,
             "Incorrect sigma vector size.  Must either be of size 1 or ImageDimension."
         );
+        // ANTS-15: ANTs goes on (1 mm, or an uninitialised median radius) and exits 0.
+        let what = format!("{} sigma(s) for a {dim}-dimensional image", sigma.len());
+        if notices.fix() {
+            notices.add(
+                &defects::ANTS_15,
+                format!(
+                    "{what}: an error; ANTs {} and exits 0",
+                    if use_median {
+                        "filters with a median radius it leaves uninitialised"
+                    } else {
+                        "smooths with 1 mm"
+                    }
+                ),
+            );
+            return Err(format!(
+                "larmorx: SmoothImage needs 1 or {dim} sigmas, not {} ({}=reproduce goes on as \
+                 ANTs does)",
+                sigma.len(),
+                defects::ENV
+            ));
+        }
+        notices.add(
+            &defects::ANTS_15,
+            if use_median {
+                format!("{what}: the median filter runs, as in ANTs")
+            } else {
+                format!("{what}: the image is smoothed with 1 mm, as in ANTs")
+            },
+        );
     }
     let data = if use_median {
-        if incorrect {
-            return Err(crash("the median radius is left uninitialised"));
-        }
-        // `static_cast<unsigned long>(float)`: truncation; negative or NaN radii are
-        // undefined.
-        let radius = sigma
-            .iter()
-            .map(|&s| {
-                if (0.0..1.0e9).contains(&s) {
-                    Ok(s as usize)
-                } else {
-                    Err(crash(&format!("a median radius of {s} voxels")))
-                }
-            })
-            .collect::<Result<Vec<usize>, String>>()?;
+        let radius = if incorrect {
+            // ANTS-28: ANTs leaves the radius uninitialised; its result depends on memory.
+            notices.add(
+                &defects::ANTS_28,
+                "the median radius ANTs leaves uninitialised (its result depends on memory) is \
+                 0 here: the image is copied unchanged",
+            );
+            vec![0usize; dim]
+        } else {
+            // `static_cast<unsigned long>(float)`: truncation; negative or NaN radii are
+            // undefined (ANTs then cannot allocate the neighbourhood): an error.
+            sigma
+                .iter()
+                .map(|&s| {
+                    if (0.0..1.0e9).contains(&s) {
+                        Ok(s as usize)
+                    } else {
+                        Err(crash(&format!("a median radius of {s} voxels")))
+                    }
+                })
+                .collect::<Result<Vec<usize>, String>>()?
+        };
         smooth_image(
             image.view(),
             Smoothing::Median { radius: &radius },
@@ -152,7 +209,7 @@ fn smooth(
     let Some(name) = argv.get(4) else {
         return Err(crash("no output name (std::string(nullptr) throws)"));
     };
-    write_with(store, name, image.derived(data).into(), n_threads)
+    write_with(store, name, image.derived(data).into(), n_threads, notices)
         .map_err(|e| format!("larmorx: cannot write '{name}': {e}"))?;
     Ok(())
 }

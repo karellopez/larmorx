@@ -31,7 +31,18 @@
 //!
 //! **Threads:** ITK's B-spline fit accumulates per thread, so ANTs' result depends on its
 //! thread count. larmorx computes ITK's single-thread result on any number of threads.
+//!
+//! **Upstream defects (D13),** corrected unless [`N4Parameters::upstream_defects`] is
+//! [`UpstreamDefects::Reproduce`]:
+//! - ANTS-38: ITK finds the histogram's range with `if (v > max) ... else if (v < min)`, so
+//!   the first voxel used is never compared with the minimum: if it is the unique smallest
+//!   value it falls outside the histogram (and if the values only increase, the minimum is
+//!   never set). Corrected: the true range.
+//! - ANTS-39: the histogram is padded to `2^(ceil(logf(bins) / log(2.0)) + 1)` points, a float
+//!   logarithm divided by a double one: for 256 bins the quotient is slightly above 8 and the
+//!   FFT has 1024 points instead of 512. Corrected: an exact power-of-two test.
 
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use rayon::prelude::*;
 
 use crate::FilterError;
@@ -66,6 +77,9 @@ pub struct N4Parameters {
     /// 110182; [`gcc11_double_axes`](crate::bspline::fit::gcc11_double_axes)). For
     /// comparisons with such a build only.
     pub double_axes: usize,
+    /// Correct ITK's defects (ANTS-38, ANTS-39; the default) or reproduce them (see the
+    /// module).
+    pub upstream_defects: UpstreamDefects,
 }
 
 impl N4Parameters {
@@ -82,6 +96,7 @@ impl N4Parameters {
             wiener_noise: 0.01,
             bins: 200,
             double_axes: 0,
+            upstream_defects: UpstreamDefects::Fix,
         }
     }
 }
@@ -104,6 +119,8 @@ pub struct N4Result {
     pub lattice: Lattice,
     /// Every iteration, in order.
     pub iterations: Vec<N4Iteration>,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
 /// The voxels N4 uses: mask not 0 and confidence above 0.
@@ -115,24 +132,58 @@ fn included(mask: Option<&[f32]>, confidence: Option<&[f32]>, len: usize) -> Vec
         .collect()
 }
 
+/// The exponent of the histogram's padded size: ITK's `ceil(logf(bins) / log(2.0)) + 1`
+/// (ANTS-39), or the exact `ceil(log2(bins)) + 1`.
+fn padding_exponent(bins: u32, mode: UpstreamDefects) -> u32 {
+    if mode.fix() {
+        bins.next_power_of_two().trailing_zeros() + 1
+    } else {
+        let ln2 = std::f64::consts::LN_2;
+        ((f64::from(math::logf(bins as f32)) / ln2).ceil() + 1.0) as f32 as u32
+    }
+}
+
 /// `SharpenImage`: the sharpened log image (0 at the voxels not used).
 fn sharpen(
     unsharpened: &[f32],
     voxels: &[usize],
     p: &N4Parameters,
     n_threads: usize,
+    notices: &mut Notices,
 ) -> Result<Vec<f32>, FilterError> {
     let bins = p.bins as usize;
     // The range, as ITK finds it: a voxel that raises the maximum is not compared with the
-    // minimum.
+    // minimum (ANTS-38).
     let mut bin_max = -f32::MAX;
     let mut bin_min = f32::MAX;
+    let (mut true_max, mut true_min) = (-f32::MAX, f32::MAX);
     for &i in voxels {
         let v = unsharpened[i];
         if v > bin_max {
             bin_max = v;
         } else if v < bin_min {
             bin_min = v;
+        }
+        true_max = true_max.max(v);
+        true_min = true_min.min(v);
+    }
+    if !voxels.is_empty() && (bin_min, bin_max) != (true_min, true_max) {
+        notices.add(
+            &defects::ANTS_38,
+            if notices.fix() {
+                format!(
+                    "the histogram's range is the log image's [{true_min}, {true_max}]; ITK \
+                     finds [{bin_min}, {bin_max}] and leaves the first voxel used out"
+                )
+            } else {
+                format!(
+                    "the histogram's range is [{bin_min}, {bin_max}], as ITK finds it, not the \
+                     log image's [{true_min}, {true_max}]"
+                )
+            },
+        );
+        if notices.fix() {
+            (bin_min, bin_max) = (true_min, true_max);
         }
     }
     let slope = (bin_max - bin_min) / (p.bins.wrapping_sub(1)) as f32;
@@ -154,9 +205,89 @@ fn sharpen(
         }
     }
 
-    // Zero-pad to a power of 2.
+    // Zero-pad to a power of 2 (ANTS-39). Both sizes avoid the circular wrap-around; they
+    // differ in the FFTs' rounding, so the notice comes only when that changes a voxel's
+    // sharpened value.
+    let itk_exponent = padding_exponent(p.bins, UpstreamDefects::Reproduce);
+    let exact_exponent = padding_exponent(p.bins, UpstreamDefects::Fix);
+    let (exponent, other) = if notices.fix() {
+        (exact_exponent, itk_exponent)
+    } else {
+        (itk_exponent, exact_exponent)
+    };
+    let e = conditional_means(&h, bin_min, slope, p, exponent)?;
+    let alternative = if exponent != other {
+        Some(conditional_means(&h, bin_min, slope, p, other)?)
+    } else {
+        None
+    };
+
+    // Map the voxels through E.
+    let map = |e: &[f32], v: f32| {
+        let cidx = (v - bin_min) / slope;
+        let idx = vnl_floor_f32(cidx) as u32 as usize;
+        if idx < bins.wrapping_sub(1) {
+            e[idx] + (e[idx + 1] - e[idx]) * (cidx - idx as u32 as f32)
+        } else {
+            e[bins - 1]
+        }
+    };
+    let mut sharpened = vec![0.0f32; unsharpened.len()];
+    let (mapped, differing): (Vec<f32>, usize) =
+        larmorx_core::parallel::with_threads(n_threads, || {
+            let mapped: Vec<f32> = voxels
+                .par_iter()
+                .with_min_len(4096)
+                .map(|&i| map(&e, unsharpened[i]))
+                .collect();
+            let differing = alternative.as_ref().map_or(0, |alt| {
+                voxels
+                    .par_iter()
+                    .zip(&mapped)
+                    .with_min_len(4096)
+                    .filter(|&(&i, v)| map(alt, unsharpened[i]).to_bits() != v.to_bits())
+                    .count()
+            });
+            (mapped, differing)
+        })?;
+    if differing > 0 {
+        let (exact, itk) = (1u64 << exact_exponent, 1u64 << itk_exponent);
+        let n = voxels.len();
+        notices.add(
+            &defects::ANTS_39,
+            if notices.fix() {
+                format!(
+                    "{} histogram bins are padded to {exact} points; ITK pads them to {itk}, \
+                     which changes the sharpened value of {differing} of {n} voxels",
+                    p.bins
+                )
+            } else {
+                format!(
+                    "{} histogram bins are padded to {itk} points, as ITK pads them, not \
+                     {exact}, which changes the sharpened value of {differing} of {n} voxels",
+                    p.bins
+                )
+            },
+        );
+    }
+    for (&i, v) in voxels.iter().zip(mapped) {
+        sharpened[i] = v;
+    }
+    Ok(sharpened)
+}
+
+/// The sharpened value of every histogram bin, E(u|v), with the histogram `h` zero-padded
+/// to `2^exponent` points (`SharpenImage`'s FFT part).
+fn conditional_means(
+    h: &[f32],
+    bin_min: f32,
+    slope: f32,
+    p: &N4Parameters,
+    exponent: u32,
+) -> Result<Vec<f32>, FilterError> {
+    let bins = h.len();
     let ln2 = std::f64::consts::LN_2;
-    let exponent = ((f64::from(math::logf(p.bins as f32)) / ln2).ceil() + 1.0) as f32;
+    let exponent = exponent as f32;
     let padded = (f64::from(2.0f32.powi(exponent as i32)) + 0.5) as u32 as usize;
     let offset = (0.5 * padded.wrapping_sub(bins) as u32 as f64) as u32 as usize;
     let fft = VnlFft1d::new(padded).ok_or_else(|| {
@@ -241,27 +372,7 @@ fn sharpen(
         })
         .collect();
 
-    // Map the voxels through E.
-    let mut sharpened = vec![0.0f32; unsharpened.len()];
-    let mapped: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
-        voxels
-            .par_iter()
-            .with_min_len(4096)
-            .map(|&i| {
-                let cidx = (unsharpened[i] - bin_min) / slope;
-                let idx = vnl_floor_f32(cidx) as u32 as usize;
-                if idx < bins.wrapping_sub(1) {
-                    e[idx] + (e[idx + 1] - e[idx]) * (cidx - idx as u32 as f32)
-                } else {
-                    e[bins - 1]
-                }
-            })
-            .collect()
-    })?;
-    for (&i, v) in voxels.iter().zip(mapped) {
-        sharpened[i] = v;
-    }
-    Ok(sharpened)
+    Ok(e)
 }
 
 /// `CalculateConvergenceMeasurement`: the coefficient of variation of `exp(old − new)` over
@@ -364,6 +475,7 @@ pub fn n4_bias_field(
         .map(|a| grid.origin[a] + grid.spacing[a] * grid.start[a] as f64)
         .collect();
 
+    let mut notices = Notices::new(p.upstream_defects);
     let mut log_uncorrected = log_input.clone();
     let mut log_bias = vec![0.0f32; len];
     let mut lattice: Option<Lattice> = None;
@@ -392,7 +504,7 @@ pub fn n4_bias_field(
             if !(within && measure > p.convergence_threshold) {
                 break;
             }
-            let sharpened = sharpen(&log_uncorrected, &voxels, p, n_threads)?;
+            let sharpened = sharpen(&log_uncorrected, &voxels, p, n_threads, &mut notices)?;
             let residual: Vec<f32> = voxels
                 .iter()
                 .map(|&i| log_uncorrected[i] - sharpened[i])
@@ -449,6 +561,7 @@ pub fn n4_bias_field(
     Ok(N4Result {
         lattice: lattice.unwrap_or_else(|| Lattice::zeros(&p.control_points)),
         iterations: log,
+        notices: notices.into_vec(),
     })
 }
 
@@ -494,6 +607,45 @@ mod tests {
         assert_eq!(a.iterations.len(), 9);
         assert_eq!(a.lattice.size, [5, 5, 5]);
         assert!(a.lattice.data.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn histogram_padding() {
+        // ANTS-39: logf(256) / log(2) is slightly above 8.
+        assert_eq!(padding_exponent(256, UpstreamDefects::Reproduce), 10);
+        assert_eq!(padding_exponent(256, UpstreamDefects::Fix), 9);
+        for bins in [1, 2, 3, 100, 128, 200, 255, 257, 1000] {
+            let k = padding_exponent(bins, UpstreamDefects::Fix);
+            assert!(1u64 << (k - 1) >= u64::from(bins), "{bins}");
+            assert!(bins == 1 || 1u64 << (k - 2) < u64::from(bins), "{bins}");
+        }
+        assert_eq!(
+            padding_exponent(200, UpstreamDefects::Fix),
+            padding_exponent(200, UpstreamDefects::Reproduce)
+        );
+    }
+
+    #[test]
+    fn histogram_range_with_the_minimum_first() {
+        // ANTS-38: the first voxel used is the image's unique minimum.
+        let (mut data, grid) = phantom();
+        data[0] = 50.0;
+        let mut p = N4Parameters::itk_defaults(3);
+        p.iterations = vec![2];
+        p.convergence_threshold = 0.0;
+        let fixed = n4_bias_field(&data, &grid, None, None, &p, 1, None).unwrap();
+        p.upstream_defects = UpstreamDefects::Reproduce;
+        let ants = n4_bias_field(&data, &grid, None, None, &p, 1, None).unwrap();
+        assert_eq!(fixed.notices[0].defect.id, "ANTS-38");
+        assert_eq!(ants.notices[0].defect.id, "ANTS-38");
+        assert_ne!(fixed.lattice, ants.lattice);
+        // Without it the two agree.
+        let (data, grid) = phantom();
+        let a = n4_bias_field(&data, &grid, None, None, &p, 1, None).unwrap();
+        p.upstream_defects = UpstreamDefects::Fix;
+        let b = n4_bias_field(&data, &grid, None, None, &p, 1, None).unwrap();
+        assert_eq!(a, b);
+        assert!(a.notices.is_empty());
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //! `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `ThresholdAtMean` and
 //! `ReplaceVoxelValue`.
 
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::parallel;
 use larmorx_image::FilterError;
 use larmorx_image::intensity::rescale_intensity;
@@ -40,6 +41,8 @@ pub struct Truncated {
     /// The intensities the voxels were clipped to.
     pub lower: f32,
     pub upper: f32,
+    /// The upstream defects that changed this result (or, reproduced, would have).
+    pub notices: Vec<Notice>,
 }
 
 /// `TruncateImageIntensity`: clips every voxel to the `lower_quantile` and `upper_quantile`
@@ -52,7 +55,9 @@ pub struct Truncated {
 ///   from `min = FLT_MAX`, `max = −FLT_MAX`, before the infinite values are excluded: a
 ///   voxel that lowers the minimum is never compared with the maximum (so if the first such
 ///   voxel is the brightest, the maximum is the next brightest, and the brightest falls
-///   outside the histogram), and `+inf` becomes the maximum;
+///   outside the histogram), and `+inf` becomes the maximum. This is defect ANTS-12:
+///   reproduced with [`UpstreamDefects::Reproduce`]; corrected (the default), the range is
+///   the counted voxels' true minimum and maximum;
 /// - `bins` bins between those bounds (`LabelStatisticsImageFilter`), and
 ///   `Histogram::Quantile` for both quantiles, in double, rounded to float;
 /// - every voxel, inside the mask or not, is clipped to `[lower, upper]` (NaN stays).
@@ -63,6 +68,7 @@ pub fn truncate_image_intensity(
     mask: Option<&[i32]>,
     options: &TruncateOptions,
     n_threads: usize,
+    mode: UpstreamDefects,
 ) -> Result<Truncated, FilterError> {
     if let Some(m) = mask
         && m.len() != data.len()
@@ -80,6 +86,7 @@ pub fn truncate_image_intensity(
     }
     let mut labels = vec![0i32; data.len()];
     let (mut min, mut max) = (f32::MAX, -f32::MAX);
+    let (mut true_min, mut true_max) = (f32::MAX, -f32::MAX);
     for (i, &v) in data.iter().enumerate() {
         let m = mask.map_or(1, |m| m[i]);
         if v > 0.0 && f64::from(m) >= 0.5 {
@@ -89,9 +96,26 @@ pub fn truncate_image_intensity(
                 max = v;
             }
             labels[i] = 1;
+            if v.is_finite() {
+                true_min = true_min.min(v);
+                true_max = true_max.max(v);
+            }
         }
         if v.is_nan() || v.is_infinite() {
             labels[i] = 0;
+        }
+    }
+    let mut notices = Notices::new(mode);
+    if labels.contains(&1) && (min, max) != (true_min, true_max) {
+        notices.add(
+            &defects::ANTS_12,
+            format!(
+                "the histogram's range is [{true_min}, {true_max}]; ANTs finds [{min}, {max}]{}",
+                if mode.fix() { "" } else { ", and uses it" }
+            ),
+        );
+        if mode.fix() {
+            (min, max) = (true_min, true_max);
         }
     }
     let histogram = label_histogram(
@@ -126,15 +150,21 @@ pub fn truncate_image_intensity(
             })
             .collect()
     })?;
-    Ok(Truncated { data, lower, upper })
+    Ok(Truncated {
+        data,
+        lower,
+        upper,
+        notices: notices.into_vec(),
+    })
 }
 
 /// How [`normalize`] scales the image.
 #[derive(Clone, Copy, Debug)]
 pub enum Normalization<'a> {
-    /// `Normalize img` (or an option that reads as 0): `(v − min) / (max − min)`, with the
-    /// range found from `max = 0`, `min = 1e9` (so an image with no positive voxel keeps
-    /// `max = 0`, and one above 1e9 keeps `min = 1e9`).
+    /// `Normalize img` (or an option that reads as 0): `(v − min) / (max − min)`. ANTs finds
+    /// the range from `max = 0`, `min = 1e9` (so an image with no positive voxel keeps
+    /// `max = 0`, and one above 1e9 keeps `min = 1e9`): defect ANTS-13, reproduced with
+    /// [`UpstreamDefects::Reproduce`]; corrected, the range is the image's true one.
     Range,
     /// `Normalize img <non-zero number>`: divide by the mean of all voxels.
     Mean,
@@ -150,7 +180,9 @@ pub fn normalize(
     data: &[f32],
     mode: Normalization<'_>,
     n_threads: usize,
-) -> Result<Vec<f32>, FilterError> {
+    defects_mode: UpstreamDefects,
+) -> Result<(Vec<f32>, Vec<Notice>), FilterError> {
+    let mut notices = Notices::new(defects_mode);
     let map = |f: &(dyn Fn(f32) -> f32 + Sync)| -> Result<Vec<f32>, FilterError> {
         Ok(parallel::with_threads(n_threads, || {
             data.par_iter().with_min_len(CHUNK).map(|&v| f(v)).collect()
@@ -173,10 +205,11 @@ pub fn normalize(
                 }
             }
             let mean = sum / count;
-            map(&|v| v / mean)
+            Ok((map(&|v| v / mean)?, notices.into_vec()))
         }
         Normalization::Range | Normalization::Mean => {
             let (mut max, mut min, mut mean) = (0.0f32, 1.0e9f32, 0.0f32);
+            let (mut true_max, mut true_min) = (f32::NEG_INFINITY, f32::INFINITY);
             for &v in data {
                 mean += v;
                 if v > max {
@@ -185,11 +218,27 @@ pub fn normalize(
                 if v < min {
                     min = v;
                 }
+                true_max = true_max.max(v);
+                true_min = true_min.min(v);
             }
             mean /= data.len() as f32;
             match mode {
-                Normalization::Range => map(&|v| (v - min) / (max - min)),
-                _ => map(&|v| v / mean),
+                Normalization::Range => {
+                    if true_min <= true_max && (min, max) != (true_min, true_max) {
+                        notices.add(
+                            &defects::ANTS_13,
+                            format!(
+                                "the range is [{true_min}, {true_max}]; ANTs finds [{min}, {max}]{}",
+                                if defects_mode.fix() { "" } else { ", and uses it" }
+                            ),
+                        );
+                        if defects_mode.fix() {
+                            (min, max) = (true_min, true_max);
+                        }
+                    }
+                    Ok((map(&|v| (v - min) / (max - min))?, notices.into_vec()))
+                }
+                _ => Ok((map(&|v| v / mean)?, notices.into_vec())),
             }
         }
     }
@@ -278,36 +327,80 @@ mod tests {
     #[test]
     fn truncation_clips_to_quantiles() {
         let data: Vec<f32> = (1..=1000).map(|i| i as f32).collect();
-        let t = truncate_image_intensity(&data, None, &TruncateOptions::default(), 3).unwrap();
-        assert!(t.lower > 1.0 && t.lower < 50.0, "{t:?}");
-        assert!(t.upper > 950.0 && t.upper < 1000.0);
-        assert_eq!(t.data[0], t.lower);
-        assert_eq!(t.data[999], t.upper);
-        assert_eq!(t.data[500], 501.0);
-        // No positive voxel: an error (ANTs crashes).
-        assert!(
-            truncate_image_intensity(&[0.0, -1.0], None, &TruncateOptions::default(), 1).is_err()
-        );
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let t = truncate_image_intensity(&data, None, &TruncateOptions::default(), 3, mode)
+                .unwrap();
+            assert!(t.lower > 1.0 && t.lower < 50.0, "{t:?}");
+            assert!(t.upper > 950.0 && t.upper < 1000.0);
+            assert_eq!(t.data[0], t.lower);
+            assert_eq!(t.data[999], t.upper);
+            assert_eq!(t.data[500], 501.0);
+            // Increasing values: the range is found right.
+            assert!(t.notices.is_empty());
+            // No positive voxel: an error (ANTs crashes).
+            assert!(
+                truncate_image_intensity(&[0.0, -1.0], None, &TruncateOptions::default(), 1, mode)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn truncation_range_with_the_brightest_voxel_first() {
+        // ANTS-12: the first voxel is the brightest, so ANTs' maximum is the next brightest
+        // and the brightest falls outside the histogram.
+        let mut data: Vec<f32> = (1..=100).map(|i| i as f32).collect();
+        data.insert(0, 1000.0);
+        let options = TruncateOptions {
+            lower_quantile: 0.0,
+            upper_quantile: 1.0,
+            bins: 10,
+        };
+        let r =
+            truncate_image_intensity(&data, None, &options, 1, UpstreamDefects::Reproduce).unwrap();
+        let f = truncate_image_intensity(&data, None, &options, 1, UpstreamDefects::Fix).unwrap();
+        assert_eq!(r.notices[0].defect.id, "ANTS-12");
+        assert_eq!(f.notices[0].defect.id, "ANTS-12");
+        assert!(r.upper <= 100.0, "{r:?}");
+        assert_eq!(f.upper, 1000.0);
+        assert_eq!(f.data[0], 1000.0);
+        assert!(r.data[0] <= 100.0);
     }
 
     #[test]
     fn normalization_modes() {
         let d = [1.0f32, 2.0, 3.0, 4.0];
+        let fix = UpstreamDefects::Fix;
+        let norm = |data: &[f32], how, mode| normalize(data, how, 1, mode).unwrap();
         assert_eq!(
-            normalize(&d, Normalization::Range, 1).unwrap(),
-            [0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0]
+            norm(&d, Normalization::Range, fix),
+            (vec![0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0], vec![])
         );
-        assert_eq!(
-            normalize(&d, Normalization::Mean, 1).unwrap(),
-            [0.4, 0.8, 1.2, 1.6]
-        );
+        assert_eq!(norm(&d, Normalization::Mean, fix).0, [0.4, 0.8, 1.2, 1.6]);
         let mask = [0.0f32, 1.0, 1.0, 0.0];
         assert_eq!(
-            normalize(&d, Normalization::MaskMean(&mask), 1).unwrap(),
+            norm(&d, Normalization::MaskMean(&mask), fix).0,
             [0.4, 0.8, 1.2, 1.6]
         );
-        // All negative: max stays 0.
-        let out = normalize(&[-4.0, -2.0], Normalization::Range, 1).unwrap();
+        // All negative: ANTs' maximum stays 0 (ANTS-13).
+        let (out, notices) = norm(
+            &[-4.0, -2.0],
+            Normalization::Range,
+            UpstreamDefects::Reproduce,
+        );
         assert_eq!(out, [0.0, 0.5]);
+        assert_eq!(notices[0].defect.id, "ANTS-13");
+        let (out, notices) = norm(&[-4.0, -2.0], Normalization::Range, fix);
+        assert_eq!(out, [0.0, 1.0]);
+        assert_eq!(notices[0].defect.id, "ANTS-13");
+        // All above 1e9: ANTs' minimum stays 1e9.
+        let (out, _) = norm(
+            &[2e9, 3e9],
+            Normalization::Range,
+            UpstreamDefects::Reproduce,
+        );
+        assert_eq!(out, [0.5, 1.0]);
+        let (out, _) = norm(&[2e9, 3e9], Normalization::Range, fix);
+        assert_eq!(out, [0.0, 1.0]);
     }
 }

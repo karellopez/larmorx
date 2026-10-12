@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import memory_image
 from larmorx.image import Image, as_image
 
@@ -69,6 +70,7 @@ def n4_bias_field_correction(
     rescale_intensities: bool = False,
     dimension: int | None = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> N4Result:
     """``N4BiasFieldCorrection -d D -i image [-x mask] [-w weight] -s shrink -c [iters,thr]
     -b [fitting,order] -t [fwhm,noise,bins] [-r] -o [corrected,bias]``.
@@ -101,7 +103,12 @@ def n4_bias_field_correction(
     and ``log`` are correctly rounded; glibc's are not always, and where ANTs' run met such a
     value its result differs from larmorx's by about as much as between its own thread counts
     (``docs/findings/ants-n4.md``).
+
+    ITK's filter defects are corrected: the histogram's range (ANTS-38: ITK can leave out a
+    first voxel that is the unique minimum) and its FFT size (ANTS-39: 256 bins give 1024
+    points instead of 512). ``upstream_defects="reproduce"`` gives ANTs' result.
     """
+    check(upstream_defects)
     source, header, ndim = _source(image)
     dim = int(dimension) if dimension is not None else ndim
     mask_source = None if mask is None else _source(mask)[0]
@@ -115,7 +122,7 @@ def n4_bias_field_correction(
         else:
             mesh = [float(v) for v in bspline_fitting]
     fwhm, noise, bins = histogram_sharpening
-    corrected, bias, its = _core.ants_n4_bias_field_correction(
+    corrected, bias, its, notices = _core.ants_n4_bias_field_correction(
         source,
         dim,
         mask_source,
@@ -131,7 +138,9 @@ def n4_bias_field_correction(
         int(bins),
         bool(rescale_intensities),
         n_threads,
+        upstream_defects,
     )
+    warn(notices)
     if dim != ndim:
         # Read with another number of dimensions (a 4D file as 3D: its first volume).
         header = None

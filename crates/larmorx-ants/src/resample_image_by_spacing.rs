@@ -14,7 +14,16 @@
 //!   (truncated).
 //! - **Outside the input** (the output may extend past it), voxels get the input's value at
 //!   index `(1, 1, …)`, before smoothing.
+//!
+//! **ANTS-28.** ITK cannot smooth an axis of fewer than 4 voxels and throws; ANTs catches the
+//! exception ("Exception catched !") and resamples the smoothing filter's output buffer,
+//! which was allocated but never written: its values depend on memory and change from run to
+//! run. With [`UpstreamDefects::Fix`] (the default) that is an error, with ITK's message. With
+//! [`UpstreamDefects::Reproduce`] the run goes on as ANTs' does, with the unwritten buffer
+//! filled with 0, and a notice that says so.
 
+use larmorx_core::IndexFloor;
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_image::FilterError;
 use larmorx_image::gaussian::{GaussianOrder, recursive_gaussian};
 use larmorx_io::nifti::itk::ItkGeometry;
@@ -95,13 +104,27 @@ pub fn plan(
     })
 }
 
+/// The axes whose smoothing ITK refuses (a positive sigma on an axis of fewer than 4 voxels;
+/// ANTS-28).
+pub fn unsmoothable_axes(input: &ItkGeometry, plan: &ResampleBySpacingPlan) -> Vec<usize> {
+    plan.sigmas
+        .iter()
+        .enumerate()
+        .filter(|&(k, &sigma)| sigma > 0.0 && input.size[k] < 4)
+        .map(|(k, _)| k)
+        .collect()
+}
+
 /// `ResampleImageBySpacing`: `input` smoothed (if `options.smooth`) and resampled onto the
-/// grid of [`plan`]. Returns the image and the plan.
+/// grid of [`plan`]. Returns the image, the plan and the notices of the defects it met
+/// (ANTS-28, see the module).
 pub fn resample_image_by_spacing(
     input: &AntsImage<f32>,
     options: &ResampleBySpacingOptions,
     n_threads: usize,
-) -> Result<(AntsImage<f32>, ResampleBySpacingPlan), ResampleBySpacingError> {
+    mode: UpstreamDefects,
+) -> Result<(AntsImage<f32>, ResampleBySpacingPlan, Vec<Notice>), ResampleBySpacingError> {
+    let mut notices = Notices::new(mode);
     let plan = plan(&input.geometry, options)?;
     let d = input.dim();
     // `inputImage->GetPixel({1, 1, ...})`, read before smoothing.
@@ -114,6 +137,20 @@ pub fn resample_image_by_spacing(
     let default_value = input.data[strides.iter().sum::<usize>()];
     let mut smoothed: Option<Vec<f32>> = None;
     for (k, &sigma) in plan.sigmas.iter().enumerate() {
+        if sigma > 0.0 && input.size()[k] < 4 && mode.reproduce() {
+            // ITK throws before writing its output; ANTs goes on with that buffer.
+            notices.add(
+                &defects::ANTS_28,
+                format!(
+                    "the smoothing of axis {k} ({} voxels) fails as in ANTs, which then \
+                     resamples the filter's never-written buffer (its values depend on memory): \
+                     here 0",
+                    input.size()[k]
+                ),
+            );
+            smoothed = Some(vec![0.0; input.data.len()]);
+            continue;
+        }
         if sigma > 0.0 {
             let current = smoothed.as_deref().unwrap_or(&input.data);
             let view =
@@ -136,6 +173,7 @@ pub fn resample_image_by_spacing(
     };
     // `ResampleImageFilter<float, float>`: the double result cast to float (a linear or
     // nearest value of float voxels is always within float's range).
+    let floor = IndexFloor::new(mode);
     let data = resample_identity(
         source,
         &input.geometry,
@@ -143,15 +181,17 @@ pub fn resample_image_by_spacing(
         &interpolation,
         default_value,
         |v| v as f32,
+        &floor,
         n_threads,
     )?;
+    floor.notice(&mut notices, "output voxels");
     debug_assert_eq!(plan.geometry.ndim, d);
     let image = AntsImage {
         data,
         geometry: plan.geometry.clone(),
         meta: Default::default(),
     };
-    Ok((image, plan))
+    Ok((image, plan, notices.into_vec()))
 }
 
 #[cfg(test)]
@@ -188,10 +228,12 @@ mod tests {
             add_voxels: 0,
             nearest: false,
         };
-        let (a, plan) = resample_image_by_spacing(&input, &options, 1).unwrap();
+        let fix = UpstreamDefects::Fix;
+        let (a, plan, notices) = resample_image_by_spacing(&input, &options, 1, fix).unwrap();
         assert_eq!(plan.sigmas, [1.0, 0.0, 0.5]);
         assert_eq!(a.size(), [5, 9, 5]);
-        let (b, _) = resample_image_by_spacing(&input, &options, 4).unwrap();
+        assert!(notices.is_empty());
+        let (b, _, _) = resample_image_by_spacing(&input, &options, 4, fix).unwrap();
         assert_eq!(a.data, b.data);
         let more = ResampleBySpacingOptions {
             add_voxels: 2,
@@ -199,10 +241,31 @@ mod tests {
             smooth: false,
             ..options
         };
-        let (c, plan) = resample_image_by_spacing(&input, &more, 2).unwrap();
+        let (c, plan, _) = resample_image_by_spacing(&input, &more, 2, fix).unwrap();
         assert!(plan.sigmas.is_empty());
         assert_eq!(c.size(), [7, 11, 7]);
         // Beyond the input: the value at (1, 1, 1).
         assert_eq!(*c.data.last().unwrap(), input.data[1 + 10 + 90]);
+    }
+
+    #[test]
+    fn thin_smoothed_axes() {
+        // ANTS-28: the third axis has 3 voxels and a positive sigma.
+        let input = image(&[10, 9, 3], &[1.0, 1.0, 1.0]);
+        let options = ResampleBySpacingOptions {
+            spacing: vec![1.0, 1.0, 2.0],
+            smooth: true,
+            add_voxels: 2,
+            nearest: false,
+        };
+        let e = resample_image_by_spacing(&input, &options, 1, UpstreamDefects::Fix);
+        assert!(e.unwrap_err().to_string().contains("less than 4"));
+        let (out, plan, notices) =
+            resample_image_by_spacing(&input, &options, 1, UpstreamDefects::Reproduce).unwrap();
+        assert_eq!(unsmoothable_axes(&input.geometry, &plan), [2]);
+        assert_eq!(notices[0].defect.id, "ANTS-28");
+        // Inside the input the zeros of the unwritten buffer, beyond it the value at (1, 1, 1).
+        assert_eq!(out.data[0], 0.0);
+        assert_eq!(*out.data.last().unwrap(), input.data[1 + 10 + 90]);
     }
 }

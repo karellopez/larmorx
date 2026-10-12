@@ -556,16 +556,35 @@ pub struct ItkImage {
 /// LPS (x and y negated); other vector intents are taken as LPS already (ANTs writes
 /// `NIFTI_INTENT_VECTOR`). Complex and RGB data are not supported.
 pub fn read_itk_image(path: impl AsRef<Path>, n_threads: usize) -> Result<ItkImage, Error> {
-    let path = path.as_ref();
+    read_itk_image_from(path.as_ref(), None, n_threads)
+}
+
+/// [`read_itk_image`] with the voxels read from `data` (at the header's `vox_offset`) instead
+/// of the file `path` names for them, as nifti_clib does when it finds `data` first
+/// ([`super::NiftiPaths::nifti_clib_image_path`], defect ITK-08).
+pub fn read_itk_image_with_data_from(
+    path: impl AsRef<Path>,
+    data: &Path,
+    n_threads: usize,
+) -> Result<ItkImage, Error> {
+    read_itk_image_from(path.as_ref(), Some(data), n_threads)
+}
+
+fn read_itk_image_from(
+    path: &Path,
+    data: Option<&Path>,
+    n_threads: usize,
+) -> Result<ItkImage, Error> {
     let stored = super::read_header(path)?;
     let geometry = itk_geometry(&stored).map_err(|e| super::format_err(path, e.to_string()))?;
-    let image = super::read(
-        path,
-        &ReadOptions {
-            scaling: Scaling::Raw,
-            n_threads,
-        },
-    )?;
+    let options = ReadOptions {
+        scaling: Scaling::Raw,
+        n_threads,
+    };
+    let image = match data {
+        Some(data) => super::read_with_data_from(path, data, &options)?,
+        None => super::read(path, &options)?,
+    };
     let (slope, inter) = itk_rescale(&stored);
     let rescale = must_rescale(slope, inter);
     let is_float = matches!(image.data, DynArray::F32(_) | DynArray::F64(_));

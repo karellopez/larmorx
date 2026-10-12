@@ -5,8 +5,9 @@
 //! translation `t` and centre of rotation `c`. Only the way `M` is built from the parameters
 //! differs. Ported from ITK v5.4.5 (`Modules/Core/Transform`, `Modules/Core/Common/itkVersor`).
 
-use larmorx_core::ItkReal;
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::linalg::Mat3;
+use larmorx_core::{ItkReal, Precision};
 
 use crate::TransformError;
 
@@ -108,12 +109,25 @@ fn versor_matrix<R: ItkReal>(x: R, y: R, z: R, w: R) -> [[R; 3]; 3] {
     ]
 }
 
+/// A versor's `(x, y, z, w)`.
+type VersorParts<R> = (R, R, R, R);
+
 /// The versor of ITK's versor-based transforms from the axis parameters `p` and their norm
 /// (computed by the caller as its class does): the axis scaled down slightly when the norm
 /// reaches 1 (`axis / (norm + ε·norm)`, a double division stored as `R`), then
 /// `Versor<R>::Set(axis)`: `sin = |axis|` (summed and rooted in double, stored as `R`) and
 /// `w = √(1 − sin²)` (in double, stored as `R`).
-fn versor<R: ItkReal>(p: [R; 3], norm: f64) -> Result<(R, R, R, R), TransformError> {
+///
+/// In float the scaled axis, rounded to float, can again be longer than 1, and ITK throws
+/// ("Trying to initialize a Versor with a vector whose magnitude is greater than 1"; defect
+/// ITK-10). With [`UpstreamDefects::Reproduce`] that is the error here too; with
+/// [`UpstreamDefects::Fix`] the versor is computed as ITK computes it in double, then stored as
+/// `R` (the second value says whether that happened).
+fn versor<R: ItkReal>(
+    p: [R; 3],
+    norm: f64,
+    mode: UpstreamDefects,
+) -> Result<(VersorParts<R>, bool), TransformError> {
     const EPSILON: f64 = 1e-10;
     let mut v = p;
     if norm >= 1.0 - EPSILON {
@@ -125,12 +139,33 @@ fn versor<R: ItkReal>(p: [R; 3], norm: f64) -> Result<(R, R, R, R), TransformErr
     }
     let sin = R::from_f64(squared.sqrt());
     if sin.to_f64() > 1.0 {
-        return Err(TransformError::Invalid(
-            "versor with magnitude greater than 1".into(),
+        if R::PRECISION == Precision::Double {
+            return Err(TransformError::Invalid(
+                "versor with magnitude greater than 1".into(),
+            ));
+        }
+        if mode.reproduce() {
+            return Err(TransformError::Invalid(
+                "versor with magnitude greater than 1 in single precision, as ITK fails to load \
+                 it (ITK-10; corrected, larmorx loads it)"
+                    .into(),
+            ));
+        }
+        let pd = p.map(|c| c.to_f64());
+        let nd = (pd[0] * pd[0] + pd[1] * pd[1] + pd[2] * pd[2]).sqrt();
+        let ((x, y, z, w), _) = versor::<f64>(pd, nd, UpstreamDefects::Reproduce)?;
+        return Ok((
+            (
+                R::from_f64(x),
+                R::from_f64(y),
+                R::from_f64(z),
+                R::from_f64(w),
+            ),
+            true,
         ));
     }
     let cos = R::from_f64((1.0 - sin.to_f64() * sin.to_f64()).sqrt());
-    Ok((v[0], v[1], v[2], cos))
+    Ok(((v[0], v[1], v[2], cos), false))
 }
 
 /// `vnl_matrix_fixed` product `a · b` in `R`: each entry starts from the first product.
@@ -158,6 +193,24 @@ impl<R: ItkReal> MatrixOffset<R> {
         parameters: &[f64],
         fixed_parameters: &[f64],
     ) -> Result<Self, TransformError> {
+        Self::from_itk_mode(
+            kind,
+            parameters,
+            fixed_parameters,
+            UpstreamDefects::Reproduce,
+        )
+        .map(|(m, _)| m)
+    }
+
+    /// [`MatrixOffset::from_itk`] with ITK-10 corrected ([`UpstreamDefects::Fix`]) or
+    /// reproduced; the second value says whether the correction changed the transform.
+    pub fn from_itk_mode(
+        kind: LinearKind,
+        parameters: &[f64],
+        fixed_parameters: &[f64],
+        mode: UpstreamDefects,
+    ) -> Result<(Self, bool), TransformError> {
+        let mut corrected = false;
         let p: Vec<R> = parameters.iter().map(|&v| R::from_f64(v)).collect();
         let (zero, one) = (R::ZERO, R::ONE);
         let identity = [[one, zero, zero], [zero, one, zero], [zero, zero, one]];
@@ -195,7 +248,8 @@ impl<R: ItkReal> MatrixOffset<R> {
                 // VersorRigid3DTransform::SetParameters: the norm of the parameters, summed
                 // and rooted in R.
                 let norm = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt().to_f64();
-                let (x, y, z, w) = versor([p[0], p[1], p[2]], norm)?;
+                let ((x, y, z, w), c) = versor([p[0], p[1], p[2]], norm, mode)?;
+                corrected |= c;
                 (versor_matrix(x, y, z, w), [p[3], p[4], p[5]])
             }
             LinearKind::Similarity3D => {
@@ -206,7 +260,8 @@ impl<R: ItkReal> MatrixOffset<R> {
                 if norm > 0.0 {
                     norm = norm.sqrt();
                 }
-                let (x, y, z, w) = versor([p[0], p[1], p[2]], norm)?;
+                let ((x, y, z, w), c) = versor([p[0], p[1], p[2]], norm, mode)?;
+                corrected |= c;
                 let r = versor_matrix(x, y, z, w);
                 (r.map(|row| row.map(|v| v * p[6])), [p[3], p[4], p[5]])
             }
@@ -221,11 +276,14 @@ impl<R: ItkReal> MatrixOffset<R> {
             }
             o
         });
-        Ok(MatrixOffset {
-            matrix,
-            offset,
-            translation_only: kind == LinearKind::Translation,
-        })
+        Ok((
+            MatrixOffset {
+                matrix,
+                offset,
+                translation_only: kind == LinearKind::Translation,
+            },
+            corrected,
+        ))
     }
 
     /// Maps a point (`TransformPoint`): each row of `M·x` summed from 0 in `R`, then
@@ -337,6 +395,15 @@ impl LinearTransform {
     /// transform's own matrix and offset.
     pub fn with_precision<R: ItkReal>(&self) -> Result<MatrixOffset<R>, TransformError> {
         MatrixOffset::<R>::from_itk(self.kind, &self.parameters, &self.fixed_parameters)
+    }
+
+    /// [`LinearTransform::with_precision`] with ITK-10 corrected or reproduced
+    /// ([`MatrixOffset::from_itk_mode`]).
+    pub fn with_precision_mode<R: ItkReal>(
+        &self,
+        mode: UpstreamDefects,
+    ) -> Result<(MatrixOffset<R>, bool), TransformError> {
+        MatrixOffset::<R>::from_itk_mode(self.kind, &self.parameters, &self.fixed_parameters, mode)
     }
 
     /// Maps a point: `M·x + offset` (ITK's `MatrixOffsetTransformBase::TransformPoint`), or

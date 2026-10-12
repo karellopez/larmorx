@@ -18,7 +18,9 @@ differ only where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussia
 sinc in double), by at most about 1e-15 relative ([why](../findings/platform-math.md)). With
 correctly rounded maths preloaded into ANTs, all 158 are byte-identical. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
-([stage record](../validation/fmriprep-stages.md)).
+([stage record](../validation/fmriprep-stages.md)). Compared with ANTs' defects reproduced
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
+default changes.
 
 ## Quick start
 
@@ -85,13 +87,13 @@ are placed by their affine.
 | `-n NearestNeighbor` | `"nearest"` | |
 | `-n BSpline[order]` | `"bspline"`, `order=3` | orders 0–5 |
 | `-n Gaussian[sigma,alpha]` | `"gaussian"`, `sigma=`, `alpha=` | sigma in mm (one value or three); defaults: input spacing, 1 |
-| `-n MultiLabel[sigma]` | `"multilabel"`, `sigma=`, `alpha=` | ANTs ignores an alpha on the command line (always 4); the Python API accepts one, default 4 |
-| `-n GenericLabel` | `"genericlabel"` | |
+| `-n MultiLabel[sigma,alpha]` | `"multilabel"`, `sigma=`, `alpha=` | alpha default 4 (ANTs ignores the command line's, ANTS-33 below) |
+| `-n GenericLabel[Linear]` | `"genericlabel"` | `GenericLabel[NearestNeighbor]` interpolates each label's mask by nearest neighbour (ANTs ignores the parameter, ANTS-33) |
 | `-n LanczosWindowedSinc` (and Cosine, Hamming, Welch, Blackman) | `"lanczos"`, `"cosine"`, `"hamming"`, `"welch"`, `"blackman"` | ANTs' names are accepted too |
 | `-e 0` / `-e 3` | `time_series=None/False/True` | 4D images are resampled volume by volume by default; `False` with 4D is an error, as `-e 0` is |
 | `--time-index t` | `image.data[..., t]` | |
 | `-f value` | `default_value=` | value outside the input |
-| `-u type` | `dtype=` | default: the computation type (float64, or float32 with `precision="float32"`). Integers truncate toward zero and saturate in Python; the CLI wraps out-of-range values as ANTs does on x86-64 ([finding](../findings/ants-cli.md)) |
+| `-u type` | `dtype=` | `char`, `uchar`, `short`, `int`, `float`, `double`; default: the computation type (float64, or float32 with `precision="float32"`). Integers truncate toward zero; out-of-range values clamp (ANTs wraps them, ANTS-06 below; [finding](../findings/ants-cli.md)) |
 | `--float 1` | `precision="float32"` | single precision exactly as ANTs computes it ([finding](../findings/ants-float.md)); `--float 0` is `"float64"`, the default |
 | `-v 1` | – | |
 | (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
@@ -130,6 +132,7 @@ them, stay float32, so a 1 mm warp takes 100 MB instead of 200 MB.
 ```rust
 use larmorx_ants::{ApplyTransformsOptions, apply_transforms};
 use larmorx_core::Precision;
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_interp::{Interpolation, Window};
 use larmorx_io::itk_transform::read_itk_transform;
 use larmorx_io::nifti::{self, itk::{ItkVoxels, itk_geometry, read_itk_image}};
@@ -145,23 +148,37 @@ let options = ApplyTransformsOptions {
     default_value: 0.0,
     n_threads: 0,
     precision: Precision::Double, // Precision::Float is --float 1
+    upstream_defects: UpstreamDefects::Fix, // Reproduce gives ANTs' defects (D13, below)
 };
 // f64 values on the reference grid, x fastest (one block per volume for a series); with
-// Precision::Float they are the f32 values of ANTs' float output. Text transform files are
-// read for the precision with larmorx_io::itk_transform::read_itk_transform_with.
-let values = match &image.voxels {
+// Precision::Float they are the f32 values of ANTs' float output; and the notices of the
+// upstream defects met. Text transform files are read for the precision with
+// larmorx_io::itk_transform::read_itk_transform_with.
+let (values, notices) = match &image.voxels {
     ItkVoxels::F32(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options)?,
     ItkVoxels::F64(v) => apply_transforms(v, &input_grid, &reference_grid, &chain, &options)?,
 };
 ```
 
+## Upstream defects (D13)
+
+ANTs' and ITK's deterministic defects are corrected by default and reproduced bit for bit on
+request: `upstream_defects="reproduce"` in Python, `LARMORX_UPSTREAM_DEFECTS=reproduce` on the
+command line, `ApplyTransformsOptions::upstream_defects` in Rust. A warning (on the command line
+a line on standard error) names the entry wherever it changed the result
+([upstream-defects.md](upstream-defects.md); each entry in the
+[register](../findings/upstream-defects.md)).
+
+| ID | ANTs (what `reproduce` gives) | larmorx's default |
+|---|---|---|
+| ANTS-33 | an unknown `-u` name keeps the default output type; `MultiLabel[sigma,alpha]` ignores alpha (always 4); `GenericLabel[...]` ignores its parameter (always linear) | an unknown `-u` name is an error; alpha is used; `GenericLabel[Linear]` and `GenericLabel[NearestNeighbor]` interpolate each label's mask that way, any other parameter is an error |
+| ANTS-06 | `-u` integer types: values out of the type's range, and NaN, are converted as x86-64 converts them (they wrap around; C++ leaves it undefined): `-u uchar` turns 400.7 into 144 and −3.7 into 253 | clamped to the range, NaN to 0, with a warning (Python's `dtype=` likewise) |
+| ITK-01 | ITK's floor of a continuous index just below 0 is 0, not −1 (x86-64), in the displacement-field and windowed-sinc lookups | the exact floor; each output voxel whose lookups met a differing floor is computed again with ITK's, and the warning counts those whose value changed |
+| ITK-10 | with `--float 1`, a versor transform whose axis has a norm of at least 1 can fail to load: rounded to float, the scaled axis exceeds 1 and ITK refuses it (exit 1) | the versor is computed in double and stored as float, so the transform loads |
+| ANTS-03, ITK-02, ITK-08 | as for every ANTs program ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
+
 ## Deliberate and known differences
 
-- **ITK's defects are reproduced** for now, as the [register](../findings/upstream-defects.md)
-  lists them: unknown `-u` names and ignored interpolator parameters (ANTS-33), ITK's `floor` of
-  tiny negative indices (ITK-01, in the field and sinc lookups), and with `--float 1` the versor
-  transforms that ITK refuses to read in float (ITK-10: a valid axis of norm ≥ 1, rounded to
-  float, exceeds 1). D13 decides each of them.
 - **Not reproduced:** `Rigid3DTransform`'s orthogonality check (ITK refuses a non-orthogonal
   matrix; larmorx reads it as an affine), and `GenericLabel`'s merging of `−0.0` and `+0.0` into
   one label ([ants-float.md](../findings/ants-float.md), last section).

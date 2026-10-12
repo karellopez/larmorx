@@ -10,6 +10,7 @@ from typing import Any, Literal
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.image import Image, as_image
 from larmorx.transforms import ItkTransform
 from larmorx.transforms.itk import _read_parts
@@ -82,9 +83,18 @@ def _grid_of(image: Image) -> dict[str, Any]:
     return _core.grid_from_ras_affine(shape, image.affine)
 
 
-def _cast(values: np.ndarray, dtype: Any) -> np.ndarray:
-    """ANTs' output cast: floats round, integers truncate toward zero (saturating here)."""
+def _cast(values: np.ndarray, dtype: Any, upstream_defects: str) -> np.ndarray:
+    """ANTs' output cast (``-u``): floats round, integers truncate toward zero; out of an
+    integer type's range clamped (NaN to 0), or wrapped as ANTs on x86-64 converts them with
+    ``upstream_defects="reproduce"`` (ANTS-06). The types ``-u`` writes go through the Rust
+    cast (``antsApplyTransforms``' own); the others are clamped either way."""
     dtype = np.dtype(dtype)
+    if dtype.name in ("int8", "uint8", "int16", "int32", "float32", "float64"):
+        out, notices = _core.ants_cast_output(
+            np.asarray(values, dtype=np.float64), dtype.name, upstream_defects
+        )
+        warn(notices, stacklevel=3)
+        return out
     if dtype.kind in "iu":
         info = np.iinfo(dtype)
         values = np.nan_to_num(np.trunc(values), nan=0.0)
@@ -107,6 +117,7 @@ def apply_transforms(
     dtype: Any = None,
     precision: Precision = "float64",
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """Resample ``image`` onto the grid of ``reference`` through ``transforms``
     (``antsApplyTransforms``).
@@ -138,8 +149,9 @@ def apply_transforms(
         The value of output voxels outside the input (``-f``).
     dtype
         Output type (``-u``). The default is the computation type (``precision``), as in ANTs.
-        Integer types truncate toward zero and saturate outside their range. (The command line
-        reproduces ANTs on x86-64 instead, which wraps out-of-range values.)
+        Integer types truncate toward zero and saturate outside their range (NaN becomes 0);
+        ANTs on x86-64 wraps out-of-range values instead (ANTS-06), which
+        ``upstream_defects="reproduce"`` gives.
     precision
         The computation type: ``"float64"`` (ANTs' default) or ``"float32"``, which computes
         in single precision exactly as ``antsApplyTransforms --float 1`` does: the image is
@@ -148,7 +160,14 @@ def apply_transforms(
         float32.
     n_threads
         Worker threads (0 = all). The result does not depend on it.
+    upstream_defects
+        ``"fix"`` (the default) corrects ITK's and ANTs' defects: the floor of indices just
+        below an integer (ITK-01), versors that fail to load in single precision (ITK-10), the
+        ``dtype`` cast (ANTS-06); ``"reproduce"`` gives ANTs' result, MultiLabel's ``alpha``
+        ignored as ANTs ignores it (ANTS-33). An :class:`~larmorx.UpstreamDefectWarning`
+        names each defect that changed the result (``docs/api/upstream-defects.md``).
     """
+    check(upstream_defects)
     if precision not in ("float64", "float32"):
         raise ValueError(f"precision must be 'float64' or 'float32', not {precision!r}")
     # The input image.
@@ -188,7 +207,7 @@ def apply_transforms(
     if sigma is not None:
         s = np.broadcast_to(np.asarray(sigma, dtype=np.float64), (3,))
         sigma = tuple(float(v) for v in s)
-    values = _core.ants_apply_transforms(
+    values, notices = _core.ants_apply_transforms(
         data,
         grid,
         ref_grid,
@@ -200,8 +219,10 @@ def apply_transforms(
         float(default_value),
         n_threads,
         precision,
+        upstream_defects,
     )
-    out = values if dtype is None else _cast(values, dtype)
+    warn(notices)
+    out = values if dtype is None else _cast(values, dtype, upstream_defects)
     header = template if out.ndim == 4 else None
     return Image(out, _core.grid_ras_affine(ref_grid), header)
 

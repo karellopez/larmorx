@@ -124,7 +124,7 @@ nitransforms on such a machine, and on every platform
 
 ## Upstream defects (D13)
 
-Three defects of fMRIPrep's resampler and its libraries are corrected by default and reproduced
+Four defects of fMRIPrep's resampler and its libraries are corrected by default and reproduced
 with `upstream_defects="reproduce"`; an `lx.UpstreamDefectWarning` names each one that changed
 the result, in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 [findings/upstream-defects.md](../findings/upstream-defects.md)):
@@ -134,6 +134,7 @@ the result, in both modes ([upstream-defects.md](upstream-defects.md); register 
 | PIPE-03 | `ResampleSeries` multiplies by `1 + np.gradient(vsm, axis=pe)`: the gradient along the *target* array axis whose index is the source's phase-encoding axis, in target voxels. It is the Jacobian only when the target's axes are the source's (the native boldref); in T1w or standard space it is taken along another direction (a target whose axes are permuted or flipped relative to the BOLD grid) or at another scale (a target voxel smaller than the source's: the derivative per target voxel is a fraction of the derivative per source voxel) | `1 + ∇_t vsm · ∂t/∂s_pe`, the Jacobian determinant of the corrected mapping relative to the uncorrected one (the matrix determinant lemma), with `∂t/∂s_pe` column `pe` of the inverse Jacobian of the map from target voxels to source voxels: exact for a chain of affines, by central differences (±0.5 voxel) through a displacement field. Where the target's axes are the source's, it is fMRIPrep's float32 value bit for bit. Head motion is left out, as in fMRIPrep |
 | PIPE-04 | nitransforms reads the transforms of a composite `.h5` file in h5py's name order, so a composite of 10 or more transforms is applied out of order (`"10"` before `"2"`) | numeric order |
 | SCI-03 | SciPy's spline prefilter, for the reflect boundary (modes `reflect`, `grid-mirror`, `nearest`), reads a coefficient it has already updated, so its splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: the splines pass through the samples |
+| SCI-02 | `lx.ndimage`: a NaN result written to a signed integer output, and a `cval` an integer input type cannot hold, are converted as x86-64 converts them (C leaves it undefined): `INT32_MIN` for int32, 0 once narrowed to int8 or int16 | NaN is 0, `cval` clamped to the type (NaN to 0), with a warning |
 
 fMRIPrep's own calls (`grid-constant`, composites of two or three transforms) meet only PIPE-03,
 with field maps in T1w and standard spaces (PEPOLAR field maps apply the Jacobian by default).

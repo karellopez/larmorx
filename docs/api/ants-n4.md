@@ -80,10 +80,8 @@ larmorx ants N4BiasFieldCorrection -d 3 -b [ 200 ] -c [ 50x50x50x50x50, 1e-07 ] 
 
 ## Behaviour worth knowing
 
-From ANTs, reproduced ([findings](../findings/ants-n4.md)):
-- options that need brackets do nothing without them: `-c 50x50` or `-b 200` leave ITK's
-  defaults (one level of 50 iterations, threshold 0.001, 4 control points); without `-c`
-  ANTs uses four levels of 50 and threshold 0;
+From ANTs ([findings](../findings/ants-n4.md)):
+- without `-c` ANTs uses four levels of 50 iterations and threshold 0;
 - the log image keeps zero and negative values as they are, so without a mask a raw image's
   background is part of the histogram;
 - with a mask, voxels outside it (mask almost 0) get the input's values back, and rescaling
@@ -91,8 +89,24 @@ From ANTs, reproduced ([findings](../findings/ants-n4.md)):
   the mask is almost exactly 1;
 - a spline distance pads the image with zeros (and its mask and weight); the outputs are cropped
   back;
-- a mask file that cannot be read is replaced by ones but still counts as given;
 - the mask and weight must share the input's grid (ITK's tolerance: 1e-6 of the first spacing).
+
+## Upstream defects (D13)
+
+ANTs' and ITK's deterministic defects are corrected by default and reproduced bit for bit on
+request: `upstream_defects="reproduce"` in Python (`N4Options::upstream_defects` /
+`DenoiseOptions::upstream_defects` in Rust), `LARMORX_UPSTREAM_DEFECTS=reproduce` on the
+command line. A warning (on the command line a line on standard error) names the entry
+wherever it changed the result ([upstream-defects.md](upstream-defects.md); each entry in the
+[register](../findings/upstream-defects.md)).
+
+| ID | ANTs (what `reproduce` gives) | larmorx's default |
+|---|---|---|
+| ANTS-38 | the histogram's range is found with `else if` from ∓`FLT_MAX`: the first voxel used always sets the maximum and is never compared with the minimum, so when it is the log image's unique minimum (with a mask, the mask's first voxel in memory order) it falls outside the histogram and is sharpened to the mapping's last value | the true range |
+| ANTS-39 | the histogram is padded to `2^(ceil(logf(bins)/log(2)) + 1)` points: a power of two of bins (64, 128, 256) gets twice the size it needs | `2^(ceil(log2(bins)) + 1)`. The size changes only the FFTs' rounding, so the warning comes only where a voxel's sharpened value changes (rare) |
+| ANTS-35 | `-c`, `-b` and `-t` without brackets set nothing: `-c 50x50`, `-b 200` and `-t 0.15` leave ITK's defaults (one level of 50 iterations, threshold 0.001, 4 control points) | the value is read as the option's first parameter (`-c 50x50` is `-c [50x50]`) |
+| ANTS-36 | a mask that cannot be read is replaced by ones and still counts as given (restoration and rescaling run) | an error (exit 1). `-r` without a mask does nothing, in both modes; a warning says so |
+| ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `-d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
 ## Deliberate differences
 

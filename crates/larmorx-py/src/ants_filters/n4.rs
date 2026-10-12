@@ -13,13 +13,16 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 
 use super::resample::{ants_input, output_with_spacing};
+use crate::defects::{mode_from_py, tuple_with_notices};
+use larmorx_core::defects::Notices;
 
-/// `N4BiasFieldCorrection` with ANTs' options: returns `(corrected, bias_field, iterations)`,
+/// `N4BiasFieldCorrection` with ANTs' options: returns `(corrected, bias_field, iterations,
+/// notices)`,
 /// the images as `(data, ras_affine, descrip, spacing)` and the iterations as
 /// `(level, iteration, convergence)` tuples. `spline_distance` and `mesh` are exclusive (`-b
 /// [distance]` or `-b [AxBxC]`); without either, 4 control points per axis.
 #[pyfunction]
-#[pyo3(signature = (image, dim, mask = None, weight = None, shrink_factor = 4, iterations = vec![50, 50, 50, 50], convergence_threshold = 0.0, spline_distance = None, mesh = None, spline_order = 3, fwhm = 0.15, wiener_noise = 0.01, bins = 200, rescale_intensities = false, n_threads = 1))]
+#[pyo3(signature = (image, dim, mask = None, weight = None, shrink_factor = 4, iterations = vec![50, 50, 50, 50], convergence_threshold = 0.0, spline_distance = None, mesh = None, spline_order = 3, fwhm = 0.15, wiener_noise = 0.01, bins = 200, rescale_intensities = false, n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn ants_n4_bias_field_correction<'py>(
     py: Python<'py>,
@@ -38,7 +41,10 @@ fn ants_n4_bias_field_correction<'py>(
     bins: u32,
     rescale_intensities: bool,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
+    let mut notices = Notices::new(mode);
     if !(2..=4).contains(&dim) {
         return Err(PyValueError::new_err(format!(
             "N4 runs on 2, 3 or 4 dimensions, not {dim}"
@@ -54,12 +60,12 @@ fn ants_n4_bias_field_correction<'py>(
         (None, Some(m)) => BSplineMesh::Elements(m),
         (None, None) => BSplineMesh::Default,
     };
-    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads)?;
+    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads, &mut notices)?;
     let mask: Option<AntsImage<f32>> = mask
-        .map(|m| ants_input(py, m, dim, n_threads))
+        .map(|m| ants_input(py, m, dim, n_threads, &mut notices))
         .transpose()?;
     let weight: Option<AntsImage<f32>> = weight
-        .map(|w| ants_input(py, w, dim, n_threads))
+        .map(|w| ants_input(py, w, dim, n_threads, &mut notices))
         .transpose()?;
     let options = N4Options {
         shrink_factor,
@@ -71,6 +77,7 @@ fn ants_n4_bias_field_correction<'py>(
         wiener_noise,
         bins,
         rescale_intensities,
+        upstream_defects: mode,
     };
     let out = py
         .detach(|| {
@@ -95,13 +102,15 @@ fn ants_n4_bias_field_correction<'py>(
             .iter()
             .map(|it| (it.level, it.iteration, it.convergence)),
     )?;
-    PyTuple::new(
+    notices.extend(out.notices);
+    tuple_with_notices(
         py,
-        [
+        vec![
             output_with_spacing(py, OutputImage::F32(out.corrected))?.into_any(),
             output_with_spacing(py, OutputImage::F32(out.bias_field))?.into_any(),
             iterations.into_any(),
         ],
+        notices.into_vec(),
     )
 }
 

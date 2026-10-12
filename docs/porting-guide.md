@@ -316,7 +316,7 @@ with the classes of the [defect register](findings/upstream-defects.md):
 
 | Class | Default | Warning | Compatibility switch | Parity |
 |---|---|---|---|---|
-| (a) crash, undefined behaviour, read out of bounds | a defined result or a refusal with a message (exit 1) | the message | **never**: undefined behaviour is not reproduced | "rejected by both" or an expected divergence |
+| (a) crash, undefined behaviour, read out of bounds | a defined result or a refusal with a message (exit 1); undefined conversions to integers clamp, NaN to 0 | the message, or a warning for a clamp | **yes, for what the original defines** (decided 2026-10-11): exit code, files, headers, printed text; what depends on memory (an unwritten buffer, a read past the data) is filled deterministically (zeros) with a warning; undefined conversions give x86-64's answers. Crashes, aborts and hangs define nothing: a refusal in both modes | run with the switch; values the original takes from memory are not compared (`undefined_values`), everything else is |
 | (b) race, nondeterminism | one defined result (the single-thread one) on any thread count | no | **never** | against the original at one thread; the band reported |
 | (c) deterministic bug that changes results | **fixed** | when the bug would have changed this result | **yes**: reproduces the original bit for bit | run with the switch |
 | (d) imprecision (e.g. not correctly rounded) | correctly rounded (rule 5) or the more precise method (D11) | no | no (D11 decides) | explained by preload or the band |
@@ -330,7 +330,12 @@ with the classes of the [defect register](findings/upstream-defects.md):
   code.
 - **The warning fires only where the result differs.** Detect the triggering condition (a
   negative `scl_slope` in the header; the first included voxel being the histogram's unique
-  minimum) rather than warning on every call.
+  minimum) rather than warning on every call. Where the condition is common but changes the
+  result only sometimes, compute both ways where they differ and compare what is stored:
+  ITK's floor of an index just below 0 (`larmorx_core::IndexFloor::checked` recomputes the
+  voxels that met a differing floor) and N4's FFT size (both sizes, compared voxel by voxel)
+  change the last bits of a value at most, mostly not at all once it is rounded to float.
+  Notices of a failed run are added only once the result exists (ImageMath's `Laplacian`).
 - **The compatibility switch** restores the original's behaviour bit for bit, one switch per
   call restoring all of the tool's reproduced defects at once (parity needs all of them
   together): `upstream_defects="fix" | "reproduce"` in Python (default `"fix"`),
@@ -350,9 +355,13 @@ with the classes of the [defect register](findings/upstream-defects.md):
   A second pass runs larmorx's default on the same cases, and the record reports, per defect,
   which cases the fix changes and by how much, next to the band. A test checks that the
   warning fires exactly in the cases where the two passes differ
-  (`larmorx_validation.parity.defects`: `mode`, `add_fix_check`, `summary`). The stage comparison with
-  fMRIPrep uses the switch, since it compares with fMRIPrep as it ran. Golden cases cover the
-  default and, where the code differs, the switch.
+  (`larmorx_validation.parity.defects`: `mode`, `add_fix_check`, `summary`). Two exceptions
+  are declared per case: `silent_ok`, a notice about a condition whose effect the comparison
+  cannot see (N4's `-r` without a mask does nothing in either mode), and `one_mode`, a defect
+  only one mode meets because another correction takes a different path (ResampleImage's
+  pixel type read from another argument, ANTS-30, decides whether ANTS-06's conversions
+  happen). The stage comparison with fMRIPrep uses the switch, since it compares with
+  fMRIPrep as it ran. Golden cases cover the default and, where the code differs, the switch.
 - **Write every defect into the register** when you find it, with its evidence and what
   larmorx does, and into the tool's API page under "Deliberate differences".
 

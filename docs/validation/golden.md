@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 91 cases, 371 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 97 cases, 395 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |
@@ -30,9 +30,9 @@ A coverage test fails when anything below has no case; its message says what to 
 
 | Family | Cases | What |
 |---|---|---|
-| Command line, ANTs | 49 | every ImageMath operation once (38, in 3D), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `DenoiseImage` with the Rician model, a mask and the noise image, and with the Gaussian model, shrink 2 and per-axis radii; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite |
+| Command line, ANTs | 53 | every ImageMath operation once (38, in 3D; `vtotal`, which larmorx refuses by default, with `LARMORX_UPSTREAM_DEFECTS=reproduce`), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `/`, `total` and `mean` with `reproduce`; `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `DenoiseImage` with the Rician model, a mask and the noise image, and with the Gaussian model, shrink 2 and per-axis radii; N4 and the Rician DenoiseImage again with `reproduce`; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite |
 | Command line, AFNI and MRI | 4 | `3dTshift` (int16 with a scale factor, Fourier); `hmc` with `-mats -plots -stats` (gzip output, `.par`, `MAT_*`); both with `LARMORX_UPSTREAM_DEFECTS=reproduce` (`3dTshift` with a negative scale factor and `-no_detrend`) |
-| `lx.ants` | 14 | all 39 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2 |
+| `lx.ants` | 18 | all 39 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2; the division, the masked N4 and the Rician denoising again with `upstream_defects="reproduce"` |
 | `lx.afni` | 4 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects="reproduce"`; `fmriprep_slice_timing` |
 | `lx.mri` | 4 | `hmc` with the default, each other cost function, the mean volume with sinc interpolation, a separate reference with splines and 12 degrees of freedom, the in-plane mode with nearest neighbour and an initial matrix; the reference and in-plane cases with `upstream_defects="reproduce"`, and `normcorr_count="weights"`; `HmcResult.save_mats`/`save_par`/`save_itk`, `read_mats` |
 | `lx.transforms` | 7 | ITK files written and read (text, MATLAB, HDF5); `load_itk_linear`, `load_itk_composite`, `load_transforms`, and a composite of 11 transforms in both orders (PIPE-04); `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction (also with `upstream_defects="reproduce"`) |
@@ -60,7 +60,11 @@ fails the coverage test, and so does a case in `golden.json` that the registry n
 corrected ([api/upstream-defects.md](../api/upstream-defects.md)); `cli(...)` sets
 `LARMORX_UPSTREAM_DEFECTS` explicitly, so the environment of a test run cannot change them. The
 `*.reproduce` cases run the same computations with the defects reproduced; on Linux x86-64
-their checksums equal those the default cases had before D13 (2026-10-11).
+their checksums equal those the default cases had before D13 (2026-10-11; for the ANTs
+cases, before D13 part 1, 2026-10-12: `cli.ants.ImageMath.reproduce`,
+`cli.ants.ImageMath.vtotal.reproduce`, `cli.ants.N4BiasFieldCorrection.reproduce`,
+`cli.ants.DenoiseImage.reproduce`, `py.ants.arithmetic.reproduce`, `py.ants.n4.reproduce`,
+`py.ants.denoise_image.reproduce`).
 
 ## How inputs are made
 

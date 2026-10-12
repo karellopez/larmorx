@@ -12,7 +12,8 @@ For each case the harness:
 2. runs the ANTs binary (``LARMORX_ANTS_BIN``, else the workspace's
    ``oracles/ants-2.6.5/bin``, built by ``scripts/build_ants_oracle.sh``) and
    ``larmorx ants <program>`` (in-process, through the Python console entry point) on the
-   same inputs, with ``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`` set for both;
+   same inputs, with ``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`` set for both, larmorx with
+   ANTs' defects reproduced (``LARMORX_UPSTREAM_DEFECTS=reproduce``, D13);
 3. compares what they wrote, read with nibabel (a reader independent of both):
    - the **header**, field by field from the raw 348 bytes (every field must match; the
      report says whether all bytes do);
@@ -20,10 +21,14 @@ For each case the harness:
      only when the values are bit-identical, unless it declares ``tolerance_ulps`` (the
      largest distance in units in the last place) with the reason; the number of differing
      values, the largest difference and the largest distance in ulps are always reported;
-   - the **affine** (as nibabel reads it), and **stdout** when ``stdout=True``.
+   - the **affine** (as nibabel reads it), and **stdout** when ``stdout=True``;
+4. runs larmorx once more in its default mode (the defects corrected) and reports what the
+   corrections changed and which defects they named (:mod:`~larmorx_validation.parity.defects`).
 
 A case ends as ``both-error`` when neither program produces its outputs (ANTs exits non-zero,
-crashes, or exits 0 without writing, as ImageMath does after printing an error).
+crashes, or exits 0 without writing, as ImageMath does after printing an error). Where ANTs'
+output depends on memory it never wrote (``undefined_values``), larmorx fills that part
+deterministically: everything else is compared, the values are not.
 
 **Adding cases** (another filter group): write a module with a list of :class:`AntsCase`
 (for ImageMath, ``parity/ants_image_math/<group>.py`` with ``CASES``; register it in that
@@ -47,7 +52,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.parity import ants_inputs
+from larmorx_validation.parity import ants_inputs, defects
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -109,7 +114,11 @@ class AntsCase:
     ``expect`` is ``"pass"``, ``"error"`` (both must fail) or ``"divergence"`` (ANTs succeeds,
     larmorx refuses on purpose, ``reason`` says why). ``tolerance_ulps`` allows values that are
     not bit-identical, up to that many units in the last place, with ``reason`` explaining
-    the cause.
+    the cause. ``undefined_values`` says why ANTs' values depend on memory it never wrote:
+    they are then not compared (the rest is). ``silent_ok`` lists the defects the fix pass
+    may name without changing the outputs (a notice about a condition, such as an ignored
+    option, whose effect the comparison cannot see). ``one_mode`` lists the defects only one
+    mode meets, because another defect's correction takes a different path there.
     """
 
     id: str
@@ -124,6 +133,9 @@ class AntsCase:
     stdout: bool = False
     outputs: tuple[str, ...] = ("{out}",)
     files: tuple[tuple[str, str], ...] = field(default=())  # (name, text) written to {tmp}
+    undefined_values: str = ""
+    silent_ok: tuple[str, ...] = ()
+    one_mode: tuple[str, ...] = ()
 
 
 def cases_for(tier: str, all_cases: Sequence[AntsCase]) -> list[Case]:
@@ -200,14 +212,22 @@ def _run_ants(
     return p.returncode, p.stdout, p.stderr
 
 
-def _run_larmorx(program: str, args: list[str], threads: int = THREADS) -> tuple[int, str, str]:
+def _run_larmorx(
+    program: str, args: list[str], threads: int = THREADS, *, mode: str = defects.REPRODUCE
+) -> tuple[int, str, str]:
+    """Run ``larmorx ants <program>`` in-process; ``mode`` is D13's
+    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs."""
     from larmorx.cli import run
 
     out, err = io.StringIO(), io.StringIO()
     previous = os.environ.get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     try:
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        with (
+            defects.mode(mode),
+            contextlib.redirect_stdout(out),
+            contextlib.redirect_stderr(err),
+        ):
             code = run(["larmorx", "ants", program, *args])
     finally:
         if previous is None:
@@ -215,6 +235,14 @@ def _run_larmorx(program: str, args: list[str], threads: int = THREADS) -> tuple
         else:
             os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = previous
     return code, out.getvalue(), err.getvalue()
+
+
+def printed(text: str) -> str:
+    """Standard output as compared: stripped, with what no port can know written alike: the
+    addresses and the build directory in a printed ITK exception (ANTs prints one when it
+    catches it, ANTS-28; larmorx writes 0x0 and ``<ITK source>``)."""
+    text = re.sub(r"\b0x[0-9a-f]+\b", "0x…", text.strip())
+    return re.sub(r"(?m)^File: .*?/Modules/", "File: …/Modules/", text)
 
 
 def _last_line(text: str, tmp: Path) -> str:
@@ -287,10 +315,27 @@ def ulps(a: np.ndarray, b: np.ndarray) -> int:
     return int(d.max())
 
 
+def affine_difference(a: np.ndarray, b: np.ndarray) -> float:
+    """The largest difference between two affines, equal infinities and NaNs counting 0
+    (ANTs writes an infinite spacing and a NaN origin for an image of one voxel per axis,
+    ANTS-29)."""
+    a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
+    with np.errstate(invalid="ignore"):
+        d = np.abs(a - b)
+    d = np.where((a == b) | (np.isnan(a) & np.isnan(b)), 0.0, d)
+    return float(np.where(np.isnan(d), np.inf, d).max())
+
+
 def compare_outputs(
-    checks: CheckList, ants_path: Path, lx_path: Path, label: str, tolerance_ulps: int | None
+    checks: CheckList,
+    ants_path: Path,
+    lx_path: Path,
+    label: str,
+    tolerance_ulps: int | None,
+    undefined_values: str = "",
 ) -> None:
-    """Compare two output files (header, type, shape, values, affine)."""
+    """Compare two output files (header, type, shape, values, affine); with
+    ``undefined_values`` (why ANTs' values are undefined), everything but the values."""
     import nibabel as nib
 
     prefix = f"{label}: " if label else ""
@@ -315,7 +360,7 @@ def compare_outputs(
         threshold=str(a.dtype),
     )
     checks(f"{prefix}shape", a.shape == b.shape, detail=f"ANTs {a.shape}, larmorx {b.shape}")
-    affine_diff = float(np.abs(a_img.affine - b_img.affine).max())
+    affine_diff = affine_difference(a_img.affine, b_img.affine)
     checks(
         f"{prefix}affine",
         affine_diff <= AFFINE_ATOL,
@@ -324,6 +369,27 @@ def compare_outputs(
         threshold=f"{AFFINE_ATOL:g}",
     )
     if a.shape != b.shape or a.dtype != b.dtype:
+        return
+    if undefined_values:
+        checks.add(
+            Check(
+                f"{prefix}values not compared",
+                True,
+                metric="undefined in ANTs",
+                value=int(np.count_nonzero(_canonical_bits(a) != _canonical_bits(b))),
+                threshold="reported",
+                detail=undefined_values,
+            )
+        )
+        checks.add(
+            Check(
+                f"{prefix}header bytes identical",
+                True,
+                metric="identical",
+                value=str(not differing),
+                threshold="reported",
+            )
+        )
         return
     diff_mask = _canonical_bits(a) != _canonical_bits(b)
     n = int(np.count_nonzero(diff_mask))
@@ -408,26 +474,86 @@ def run_case(case: Case, checks: CheckList) -> None:
         if c.expect == "divergence":
             ok = a_ok and not l_ok
             checks("ANTs succeeds and larmorx refuses", ok, detail=summary)
-            if ok:
+            if ok and fix_pass(c, tmp, checks, results["larmorx"]):
                 raise Outcome(EXPECTED, c.reason)
             return
         if not a_ok and not l_ok:
-            raise Outcome(BOTH_ERROR, summary)
+            if fix_pass(c, tmp, checks, results["larmorx"]):
+                raise Outcome(BOTH_ERROR, summary)
+            return
         checks("both succeed", a_ok and l_ok, detail=summary)
         if c.expect == "error":
             checks("both reject the arguments", False, detail="expected an error from both")
         if not (a_ok and l_ok):
             return
         if c.stdout:
-            same = a_out.strip() == l_out.strip()
+            a_text, l_text = printed(a_out), printed(l_out)
+            same = a_text == l_text
             checks(
                 "stdout",
                 same,
-                detail="" if same else f"ANTs {a_out.strip()!r}, larmorx {l_out.strip()!r}",
+                detail="" if same else f"ANTs {a_text!r}, larmorx {l_text!r}",
             )
         for i, (pa, pl) in enumerate(zip(a_outputs, l_outputs, strict=True)):
             label = "" if len(a_outputs) == 1 else f"output {i + 1}"
-            compare_outputs(checks, pa, pl, label, c.tolerance_ulps)
+            compare_outputs(checks, pa, pl, label, c.tolerance_ulps, c.undefined_values)
+        fix_pass(c, tmp, checks, results["larmorx"])
+
+
+def fix_pass(
+    c: AntsCase,
+    tmp: Path,
+    checks: CheckList,
+    reproduced: tuple,
+    threads: int = THREADS,
+) -> bool:
+    """D13: larmorx's default (``fix``) on the case's arguments, compared with its
+    ``reproduce`` run (``reproduced``: exit code, stdout, stderr, outputs, produced): the
+    defects named, and what the corrections changed (values, headers, exit code, files,
+    stdout). Returns whether the check passed."""
+    r_code, r_out, r_err, r_outputs, r_ok = reproduced
+    outdir = tmp / "larmorx-fix"
+    outdir.mkdir()
+    args = [_resolve(a, tmp, outdir) for a in c.args]
+    outputs = [Path(_resolve(o, tmp, outdir)) for o in c.outputs]
+    code, out, err = _run_larmorx(c.program, args, threads, mode=defects.FIX)
+    ok = code == 0 and all(o.exists() for o in outputs)
+    other = []
+    if code != r_code:
+        other.append(f"exit {r_code} -> {code}")
+    if ok != r_ok:
+        other.append("outputs written" if ok else "outputs not written")
+    change = defects.Change(0, 0, 0.0)
+    if ok and r_ok:
+        if c.stdout and out.strip() != r_out.strip():
+            other.append("stdout")
+        for fixed, rep_ in zip(outputs, r_outputs, strict=True):
+            fields = [
+                d.split(":")[0] for d in header_differences(raw_header(rep_), raw_header(fixed))
+            ]
+            if fields:
+                other.append(f"header {', '.join(fields)}")
+            change = change + defects.Change.of(_values(fixed), _values(rep_))
+    entries = defects.notices_in(err)
+    check = defects.add_fix_check(
+        checks, entries, change, other_changes="; ".join(other), silent_ok=c.silent_ok
+    )
+    both = ok and r_ok
+    named = [e for e in entries if e not in c.one_mode]
+    if both and named != [e for e in defects.notices_in(r_err) if e not in c.one_mode]:
+        checks(
+            "D13 notices in both modes",
+            False,
+            detail=f"fix: {entries}; reproduce: {defects.notices_in(r_err)}",
+        )
+        return False
+    return check.passed
+
+
+def _values(path: Path) -> np.ndarray:
+    import nibabel as nib
+
+    return np.asanyarray(nib.load(path).dataobj.get_unscaled())
 
 
 # ------------------------------------------------------------------------------------------------
@@ -460,6 +586,17 @@ def highlights(results: list[CaseResult]) -> list[str]:
             "Not bit-identical (each within its declared tolerance; the cause is in the case's "
             "reason): " + ", ".join(f"`{r.case}`" for r in rest) + "."
         )
+    undefined = [
+        r for r in compared if any(ch.name.endswith("values not compared") for ch in r.checks)
+    ]
+    if undefined:
+        lines.append(
+            "Values not compared, as ANTs' depend on memory it never wrote (larmorx reproduces "
+            "the rest: exit code, header, type, shape, affine): "
+            + ", ".join(f"`{r.case}`" for r in undefined)
+            + "."
+        )
+    lines += defects.summary(results)
 
     def worst(rs: list[CaseResult]) -> str:
         values = [
@@ -535,7 +672,9 @@ def make_suite(
         notes=(
             "Both programs get the same arguments and files; ANTs runs as its own binary and "
             "larmorx in-process through its Python console entry point, both with "
-            f"`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS={THREADS}`. Outputs are read with nibabel "
+            f"`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS={THREADS}`, larmorx with ANTs' defects "
+            "reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`; its default corrects them, and "
+            "the D13 fix pass reports what that changes). Outputs are read with nibabel "
             "(values as stored, before `scl_slope`) and the headers from their raw bytes. "
             "Inputs named `gen:<name>` are built by `larmorx_validation.parity.ants_inputs`. "
             + notes
@@ -546,11 +685,13 @@ def make_suite(
 __all__ = [
     "THREADS",
     "AntsCase",
+    "affine_difference",
     "ants_bin",
     "ants_version",
     "cases_for",
     "compare_outputs",
     "crmath_preload",
+    "fix_pass",
     "header_differences",
     "highlights",
     "make_suite",

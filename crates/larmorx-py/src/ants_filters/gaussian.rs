@@ -15,6 +15,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use super::{array_like, slice_f32, value_err};
+use crate::defects::{mode_from_py, with_notices};
+use pyo3::types::PyTuple;
 
 /// The voxels of `a` and its shape, checked against `spacing`.
 pub(crate) fn checked<'a>(
@@ -89,25 +91,28 @@ fn ants_smooth_image<'py>(
 /// ImageMath `G`: `DiscreteGaussianImageFilter` with `sigma` (one value or one per axis,
 /// physical units).
 #[pyfunction]
-#[pyo3(signature = (a, spacing, sigma, n_threads = 1))]
+#[pyo3(signature = (a, spacing, sigma, n_threads = 1, upstream_defects = "fix"))]
 fn ants_discrete_gaussian<'py>(
     py: Python<'py>,
     a: PyReadonlyArrayDyn<'py, f32>,
     spacing: Vec<f64>,
     sigma: Vec<f32>,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
     let (shape, data) = checked(&a, &spacing)?;
-    let out = py
+    let (out, notices) = py
         .detach(|| {
             smooth_discrete(
                 VolumeRef::new(&data, &shape, &spacing),
                 Some(&sigma),
                 n_threads,
+                mode,
             )
         })
         .map_err(value_err)?;
-    array_like(py, out, &shape)
+    with_notices(py, array_like(py, out, &shape)?.into_any(), notices)
 }
 
 /// ImageMath `Laplacian` (`LaplacianRecursiveGaussianImageFilter`, then `[0, 1]` if

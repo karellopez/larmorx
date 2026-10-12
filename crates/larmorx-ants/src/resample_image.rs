@@ -14,8 +14,16 @@
 //! - the output pixel type is the input's (`char` … `double`): each interpolated value is
 //!   clamped to the type's range and converted with a C++ `static_cast` (truncation for
 //!   integers), as `CastPixelWithBoundsChecking` does; points outside the input get 0.
+//!
+//! **ANTS-29.** By size, a size of 1 makes the spacing `old · (n − 1) / 0`, infinite: vnl's
+//! SVD then fails on the grid's matrix, no output point maps into the input, and ANTs writes
+//! an image of zeros with an infinite spacing, exit 0; ITK's writer places the image's first
+//! voxel at `origin + D · diag(spacing) · 0`, NaN. With [`UpstreamDefects::Fix`] (the default)
+//! a size below 2 is an error; with [`UpstreamDefects::Reproduce`] the output is ANTs': that
+//! grid, every voxel 0.
 
-use larmorx_core::RealElement;
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
+use larmorx_core::{IndexFloor, RealElement};
 use larmorx_interp::Interpolation;
 use larmorx_io::nifti::itk::ItkGeometry;
 
@@ -51,13 +59,16 @@ fn per_axis<T: Copy>(values: &[T], d: usize, what: &str) -> Result<Vec<T>, Resam
     }
 }
 
-/// The output grid of `ResampleImage` for an input on `input`.
+/// The output grid of `ResampleImage` for an input on `input`. With
+/// [`UpstreamDefects::Reproduce`] a size of 1 gives ANTs' grid (ANTS-29, see the module).
 pub fn output_geometry(
     input: &ItkGeometry,
     target: ResampleTarget<'_>,
+    mode: UpstreamDefects,
 ) -> Result<ItkGeometry, ResampleImageError> {
     let d = input.ndim;
     let mut out = input.clone();
+    let mut size_one = false;
     match target {
         ResampleTarget::Spacing(spacing) => {
             let spacing = per_axis(spacing, d, "spacing")?;
@@ -76,16 +87,35 @@ pub fn output_geometry(
         ResampleTarget::Size(size) => {
             let size = per_axis(size, d, "size")?;
             for (k, &n) in size.iter().enumerate() {
-                if n < 2 {
+                if n < 2 && !(n == 1 && mode.reproduce()) {
                     return Err(ResampleImageError::Invalid(format!(
-                        "an output size of {n} along axis {k}: ANTs divides by size − 1"
+                        "an output size of {n} along axis {k}: ANTs divides by size − 1{}",
+                        if n == 1 {
+                            " and writes an image of zeros with an infinite spacing (ANTS-29; \
+                             with the upstream defects reproduced, so does larmorx)"
+                                .to_owned()
+                        } else {
+                            String::new()
+                        }
                     )));
                 }
+                size_one |= n == 1;
                 let ratio = (input.size[k] as f64 - 1.0) / (n as f64 - 1.0);
                 out.size[k] = n;
                 out.spacing[k] = input.spacing[k] * ratio;
             }
         }
+    }
+    if size_one {
+        // ANTS-29 reproduced: ITK's writer places index 0 at origin + D·diag(spacing)·0.
+        for i in 0..d {
+            let mut p = out.origin[i];
+            for j in 0..d {
+                p += input.direction[i][j] * out.spacing[j] * 0.0;
+            }
+            out.origin[i] = p;
+        }
+        return Ok(out.stored_in_new_image());
     }
     if out.spacing.iter().any(|s| !(s.is_finite() && *s > 0.0)) {
         return Err(ResampleImageError::Invalid(format!(
@@ -97,15 +127,33 @@ pub fn output_geometry(
 }
 
 /// `ResampleImage`: `input` resampled onto the grid of [`output_geometry`] with
-/// `interpolation`, in its own pixel type. Linear and nearest-neighbour interpolation work in
-/// 2, 3 and 4 dimensions, the others in 3D.
+/// `interpolation`, in its own pixel type; with the notices of the defects it met. Linear and
+/// nearest-neighbour interpolation work in 2, 3 and 4 dimensions, the others in 3D.
 pub fn resample_image<T: Pixel + RealElement>(
     input: &AntsImage<T>,
     target: ResampleTarget<'_>,
     interpolation: &Interpolation,
     n_threads: usize,
-) -> Result<AntsImage<T>, ResampleImageError> {
-    let geometry = output_geometry(&input.geometry, target)?;
+    mode: UpstreamDefects,
+) -> Result<(AntsImage<T>, Vec<Notice>), ResampleImageError> {
+    let mut notices = Notices::new(mode);
+    let geometry = output_geometry(&input.geometry, target, mode)?;
+    if geometry.spacing.iter().any(|s| !s.is_finite()) {
+        // ANTS-29 reproduced: no output point maps into the input.
+        notices.add(
+            &defects::ANTS_29,
+            "a size of 1 gives an infinite spacing: the image is all 0, its origin NaN, as ANTs \
+             writes it",
+        );
+        let n = geometry.size.iter().product();
+        let image = AntsImage {
+            data: vec![T::from_f64(0.0); n],
+            geometry,
+            meta: Default::default(),
+        };
+        return Ok((image, notices.into_vec()));
+    }
+    let floor = IndexFloor::new(mode);
     let data = resample_identity(
         &input.data,
         &input.geometry,
@@ -113,13 +161,18 @@ pub fn resample_image<T: Pixel + RealElement>(
         interpolation,
         T::from_f64(0.0),
         T::from_f64_bounded,
+        &floor,
         n_threads,
     )?;
-    Ok(AntsImage {
-        data,
-        geometry,
-        meta: Default::default(),
-    })
+    floor.notice(&mut notices, "output voxels");
+    Ok((
+        AntsImage {
+            data,
+            geometry,
+            meta: Default::default(),
+        },
+        notices.into_vec(),
+    ))
 }
 
 #[cfg(test)]
@@ -149,12 +202,43 @@ mod tests {
     #[test]
     fn grids_by_spacing_and_by_size() {
         let input = image(&[10, 9, 8], &[1.0, 1.5, 2.0], vec![0.0f32; 720]);
-        let g = output_geometry(&input.geometry, ResampleTarget::Spacing(&[2.0])).unwrap();
+        let fix = UpstreamDefects::Fix;
+        let geometry = |t| output_geometry(&input.geometry, t, fix);
+        let g = geometry(ResampleTarget::Spacing(&[2.0])).unwrap();
         assert_eq!(g.size, [5, 7, 8]);
-        let g = output_geometry(&input.geometry, ResampleTarget::Size(&[19, 17, 15])).unwrap();
+        let g = geometry(ResampleTarget::Size(&[19, 17, 15])).unwrap();
         assert_eq!(g.spacing, [0.5, 0.75, 1.0]);
-        assert!(output_geometry(&input.geometry, ResampleTarget::Size(&[1])).is_err());
-        assert!(output_geometry(&input.geometry, ResampleTarget::Spacing(&[1.0, 2.0])).is_err());
+        assert!(geometry(ResampleTarget::Size(&[1])).is_err());
+        assert!(geometry(ResampleTarget::Spacing(&[1.0, 2.0])).is_err());
+    }
+
+    #[test]
+    fn size_one() {
+        // ANTS-29: an error, or ANTs' image of zeros with an infinite spacing.
+        let input = image(&[10, 9, 8], &[1.0, 1.5, 2.0], vec![5.0f32; 720]);
+        let target = ResampleTarget::Size(&[1, 9, 8]);
+        let e = resample_image(
+            &input,
+            target,
+            &Interpolation::Linear,
+            1,
+            UpstreamDefects::Fix,
+        );
+        assert!(e.unwrap_err().to_string().contains("ANTS-29"));
+        let (out, notices) = resample_image(
+            &input,
+            target,
+            &Interpolation::Linear,
+            1,
+            UpstreamDefects::Reproduce,
+        )
+        .unwrap();
+        assert_eq!(out.size(), [1, 9, 8]);
+        assert_eq!(out.geometry.spacing[0], f64::INFINITY);
+        assert_eq!(&out.geometry.spacing[1..], [1.5, 2.0]);
+        assert!(out.geometry.origin.iter().all(|o| o.is_nan()));
+        assert!(out.data.iter().all(|&v| v == 0.0));
+        assert_eq!(notices[0].defect.id, "ANTS-29");
     }
 
     #[test]
@@ -163,22 +247,24 @@ mod tests {
         // are truncated (227.5 is 227).
         let data: Vec<u8> = vec![0, 100, 200, 255];
         let input = image(&[4, 2], &[1.0, 1.0], [data.clone(), data].concat());
-        let out = resample_image(
+        let (out, _) = resample_image(
             &input,
             ResampleTarget::Spacing(&[0.5, 1.0]),
             &Interpolation::Linear,
             1,
+            UpstreamDefects::Fix,
         )
         .unwrap();
         // The last output voxel (x = 3.5) lies outside: 0.
         assert_eq!(&out.data[..8], &[0, 50, 100, 150, 200, 227, 255, 0]);
         let wide: Vec<i16> = vec![-300, 0, 300, 600];
         let input = image(&[4, 2], &[1.0, 1.0], [wide.clone(), wide].concat());
-        let out = resample_image(
+        let (out, _) = resample_image(
             &input,
             ResampleTarget::Spacing(&[0.5, 1.0]),
             &Interpolation::Linear,
             2,
+            UpstreamDefects::Fix,
         )
         .unwrap();
         assert_eq!(&out.data[..4], &[-300, -150, 0, 150]);

@@ -3,6 +3,8 @@
 //! `UnsharpMask` (`ImageMath_Templates.hxx`, ANTs v2.6.5: `SmoothImage<DIM>`,
 //! `LaplacianImage`, `GradientImage`, `UnsharpMaskImage`).
 
+use larmorx_core::defects::{self, Notices};
+
 use super::{Context, OpError, Operation};
 use crate::cli::cstd::{atof, convert_vector_f32, stof, stoi};
 use crate::image::AntsImage;
@@ -79,26 +81,112 @@ fn run_g(ctx: &mut Context<'_>) -> Result<(), OpError> {
             ctx.err,
             "Incorrect sigma vector size.  Must either be of size 1 or ImageDimension."
         );
+        // ANTS-15: ANTs goes on with a variance of 0 and exits 0.
+        if ctx.fix() {
+            ctx.notices.add(
+                &defects::ANTS_15,
+                format!(
+                    "{} sigma(s) for a {}-dimensional image: an error; ANTs filters with a \
+                     variance of 0 (the image unchanged) and exits 0",
+                    sigma.len(),
+                    ctx.dim
+                ),
+            );
+            return Err(OpError::crash(format!(
+                "larmorx: G needs 1 or {} sigmas, not {} ({}=reproduce goes on as ANTs does)",
+                ctx.dim,
+                sigma.len(),
+                defects::ENV
+            )));
+        }
+        ctx.notices.add(
+            &defects::ANTS_15,
+            format!(
+                "{} sigma(s) for a {}-dimensional image: the image is filtered with a variance \
+                 of 0 (unchanged), as in ANTs",
+                sigma.len(),
+                ctx.dim
+            ),
+        );
         None
     };
-    let data = smooth_discrete(image.view(), sigma, ctx.n_threads)?;
+    let (data, notices) = smooth_discrete(image.view(), sigma, ctx.n_threads, ctx.notices.mode())?;
+    ctx.notices.extend(notices);
     ctx.write(&output, image.derived(data))?;
     Ok(())
 }
 
-/// `LaplacianImage`: `ImageMath d out Laplacian image [s]`. ANTs reads **both** sigma and
-/// the normalize flag from the same argument (`argv[5]`): sigma with `atof`, the flag with
-/// `std::stoi`. So `Laplacian img 1.5 1` normalizes because `1.5` reads as 1, `0.8 1` does
-/// not, and the argument after the sigma is ignored.
+/// `LaplacianImage`: `ImageMath d out Laplacian image [s] [normalize]`. ANTs reads **both**
+/// sigma and the normalize flag from the same argument (`argv[5]`): sigma with `atof`, the
+/// flag with `std::stoi` (ANTS-16). So `Laplacian img 1.5 1` normalizes because `1.5` reads as
+/// 1, `0.8 1` does not, `.5` aborts, and the argument after the sigma is ignored. larmorx
+/// reads the flag from its own argument (`argv[6]`), as `Grad` does, unless reproducing.
 fn run_laplacian(ctx: &mut Context<'_>) -> Result<(), OpError> {
     let output = ctx.output().to_owned();
     let fn1 = ctx.required(4)?.to_owned();
-    let (sigma, normalize) = match ctx.arg(5).map(str::to_owned) {
-        None => (1.0f32, false),
-        Some(s) => (atof(&s) as f32, stoi_arg("Laplacian", &s)? != 0),
+    let sigma_arg = ctx.arg(5).map(str::to_owned);
+    let flag_arg = ctx.arg(6).map(str::to_owned);
+    let sigma = sigma_arg.as_deref().map_or(1.0f32, |s| atof(s) as f32);
+    // ANTs' flag: stoi of the sigma's argument (None where std::stoi throws).
+    let ants_flag = sigma_arg.as_deref().map(|s| stoi(s).map(|v| v != 0));
+    let own_flag = match flag_arg.as_deref() {
+        None => false,
+        Some(s) => stoi_arg("Laplacian", s)? != 0,
+    };
+    // Named only once the result exists (ITK refuses an axis of fewer than 4 voxels).
+    let mut pending = Notices::new(ctx.notices.mode());
+    let normalize = if ctx.fix() {
+        match ants_flag {
+            Some(Some(f)) if f == own_flag => {}
+            Some(ants) => {
+                let ants = match ants {
+                    Some(true) => "normalizes",
+                    Some(false) => "does not normalize",
+                    None => "aborts (std::stoi throws)",
+                };
+                pending.add(
+                    &defects::ANTS_16,
+                    format!(
+                        "the normalize flag is read from its own argument ({}); ANTs reads it \
+                         from the sigma's and {ants}",
+                        if own_flag {
+                            "normalize"
+                        } else {
+                            "do not normalize"
+                        }
+                    ),
+                );
+            }
+            None => {}
+        }
+        own_flag
+    } else {
+        match ants_flag {
+            None => false,
+            Some(Some(f)) => {
+                if f != own_flag {
+                    pending.add(
+                        &defects::ANTS_16,
+                        format!(
+                            "the normalize flag is read from the sigma's argument, as in ANTs: \
+                             {}",
+                            if f { "normalize" } else { "do not normalize" }
+                        ),
+                    );
+                }
+                f
+            }
+            Some(None) => {
+                return Err(OpError::crash(format!(
+                    "larmorx: Laplacian: '{}' is not a number (ANTs aborts: std::stoi throws)",
+                    sigma_arg.as_deref().unwrap_or_default()
+                )));
+            }
+        }
     };
     let image: AntsImage<f32> = ctx.read(&fn1)?;
     let data = laplacian(image.view(), sigma, normalize, ctx.n_threads)?;
+    ctx.notices.extend(pending.into_vec());
     ctx.write(&output, image.derived(data))?;
     Ok(())
 }

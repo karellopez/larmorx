@@ -22,9 +22,9 @@
 //! Points more than half a voxel outside the input get the default value; the others go
 //! through the caller's cast (ITK's `CastPixelWithBoundsChecking` for the output pixel type).
 
-use larmorx_core::RealElement;
 use larmorx_core::parallel::{self, ThreadPoolError};
 use larmorx_core::vnl_svd::vnl_inverse;
+use larmorx_core::{IndexFloor, RealElement, same_value};
 use larmorx_interp::{
     InterpError, Interpolation, Interpolator, LinearYz, NearestYz, Volume, linear, nearest,
 };
@@ -147,13 +147,15 @@ fn linear_unoptimized<T: RealElement>(
     size: &[usize],
     strides: &[usize],
     c: &[f64],
+    floor: &IndexFloor,
 ) -> f64 {
     let d = size.len();
     let mut base = [0i64; 8];
     let mut distance = [0.0f64; 8];
     for k in 0..d {
-        // `Math::Floor<long>(double)` (0, not −1, for negative values closer to 0 than 2⁻⁵⁵).
-        base[k] = larmorx_image::grid::itk_floor_f64(c[k]);
+        // `Math::Floor<long>(double)` (0, not −1, for negative values closer to 0 than 2⁻⁵⁵;
+        // ITK-01, the exact floor unless reproduced).
+        base[k] = floor.pick(larmorx_image::grid::itk_floor_f64(c[k]), c[k]);
         distance[k] = c[k] - base[k] as f64;
     }
     let mut value = 0.0f64;
@@ -186,6 +188,7 @@ fn linear_unoptimized_f32<T: RealElement>(
     size: &[usize],
     strides: &[usize],
     c: &[f64],
+    floor: &IndexFloor,
 ) -> f64 {
     let d = size.len();
     let mut base = [0i64; 8];
@@ -194,7 +197,10 @@ fn linear_unoptimized_f32<T: RealElement>(
         // `Math::Floor<long>(float)`: vnl's SSE2 floor, `(2x − 0.5f)` rounded to an integer
         // and halved, which is 0 (not −1) for negative values closer to 0 than 2⁻²⁵ or so.
         let x = c[k] as f32;
-        base[k] = i64::from(larmorx_image::grid::vnl_floor_f32(x));
+        base[k] = floor.pick(
+            i64::from(larmorx_image::grid::vnl_floor_f32(x)),
+            f64::from(x),
+        );
         distance[k] = x - base[k] as f32;
     }
     let mut value = 0.0f64;
@@ -251,6 +257,10 @@ pub enum Coordinates {
 /// interpolated value (in double) passed through `cast`.
 ///
 /// Linear and nearest-neighbour interpolation work in 1 to 4 dimensions; the others in 3D.
+/// `floor` chooses the floor of the base index of linear interpolation in 4D and of the
+/// windowed sinc (ITK's, or the exact one: defect ITK-01) and counts the output values the
+/// choice changed ([`IndexFloor::checked`]).
+#[allow(clippy::too_many_arguments)]
 pub fn resample_identity<T, O>(
     input: &[T],
     input_geometry: &ItkGeometry,
@@ -258,11 +268,12 @@ pub fn resample_identity<T, O>(
     interpolation: &Interpolation,
     default_value: O,
     cast: impl Fn(f64) -> O + Sync,
+    floor: &IndexFloor,
     n_threads: usize,
 ) -> Result<Vec<O>, ResampleError>
 where
     T: RealElement,
-    O: Copy + Send + Sync,
+    O: Copy + PartialEq + Send + Sync,
 {
     resample_identity_with(
         input,
@@ -272,6 +283,7 @@ where
         default_value,
         cast,
         Coordinates::Double,
+        floor,
         n_threads,
     )
 }
@@ -286,11 +298,12 @@ pub fn resample_identity_with<T, O>(
     default_value: O,
     cast: impl Fn(f64) -> O + Sync,
     coordinates: Coordinates,
+    floor: &IndexFloor,
     n_threads: usize,
 ) -> Result<Vec<O>, ResampleError>
 where
     T: RealElement,
-    O: Copy + Send + Sync,
+    O: Copy + PartialEq + Send + Sync,
 {
     let d = input_geometry.ndim;
     if output.ndim != d {
@@ -346,6 +359,7 @@ where
         default_value,
         cast: &cast,
         float: coordinates == Coordinates::Float,
+        floor,
     };
     parallel::with_threads(n_threads, || match d {
         1 => job.run::<1>(&mut out),
@@ -381,12 +395,14 @@ struct Rows<'a, T, O, C> {
     cast: &'a C,
     /// [`Coordinates::Float`].
     float: bool,
+    /// The floor of base indices (ITK-01).
+    floor: &'a IndexFloor,
 }
 
 impl<T, O, C> Rows<'_, T, O, C>
 where
     T: RealElement,
-    O: Copy + Send + Sync,
+    O: Copy + PartialEq + Send + Sync,
     C: Fn(f64) -> O + Sync,
 {
     /// Fills `out` row by row (in parallel on the current pool), for `D` dimensions.
@@ -436,24 +452,38 @@ where
                     continue;
                 }
                 let c3: [f64; 3] = std::array::from_fn(|k| if k < D { c[k] } else { 0.0 });
-                let value = match &self.evaluator {
-                    Evaluator::Linear3(volume) => linear(volume, c3),
-                    Evaluator::Nearest3(volume) => nearest(volume, c3),
-                    Evaluator::LinearN if self.float => {
-                        linear_unoptimized_f32(self.input, self.in_size, self.strides, &c)
-                    }
-                    Evaluator::LinearN => {
-                        linear_unoptimized(self.input, self.in_size, self.strides, &c)
-                    }
-                    Evaluator::NearestN => {
-                        let offset: usize = (0..D)
-                            .map(|k| (c[k] + 0.5) as i64 as usize * self.strides[k])
-                            .sum();
-                        self.input[offset].to_f64()
-                    }
-                    Evaluator::Other(interpolator) => interpolator.evaluate(c3),
+                let evaluate = |floor: &IndexFloor| {
+                    (self.cast)(match &self.evaluator {
+                        Evaluator::Linear3(volume) => linear(volume, c3),
+                        Evaluator::Nearest3(volume) => nearest(volume, c3),
+                        Evaluator::LinearN if self.float => linear_unoptimized_f32(
+                            self.input,
+                            self.in_size,
+                            self.strides,
+                            &c,
+                            floor,
+                        ),
+                        Evaluator::LinearN => {
+                            linear_unoptimized(self.input, self.in_size, self.strides, &c, floor)
+                        }
+                        Evaluator::NearestN => {
+                            let offset: usize = (0..D)
+                                .map(|k| (c[k] + 0.5) as i64 as usize * self.strides[k])
+                                .sum();
+                            self.input[offset].to_f64()
+                        }
+                        Evaluator::Other(interpolator) => {
+                            interpolator.evaluate_with_floor(c3, floor)
+                        }
+                    })
                 };
-                *o = (self.cast)(value);
+                // Only these take ITK's floor (ITK-01).
+                *o = match &self.evaluator {
+                    Evaluator::LinearN | Evaluator::Other(_) => {
+                        self.floor.checked(evaluate, same_value)
+                    }
+                    _ => evaluate(self.floor),
+                };
             }
         });
     }
@@ -529,6 +559,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_core::defects::UpstreamDefects;
     use larmorx_io::nifti::itk::GeometrySource;
 
     fn geometry(size: &[usize], spacing: &[f64]) -> ItkGeometry {
@@ -554,7 +585,17 @@ mod tests {
         default: f32,
         threads: usize,
     ) -> Vec<f32> {
-        resample_identity(data, g, o, interpolation, default, |v| v as f32, threads).unwrap()
+        resample_identity(
+            data,
+            g,
+            o,
+            interpolation,
+            default,
+            |v| v as f32,
+            &IndexFloor::itk(),
+            threads,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -643,10 +684,71 @@ mod tests {
         let out = f32s(&data, &g, &o, &Interpolation::Linear, 9.0, 1);
         assert_eq!(&out[..8], &[1.0, 1.0, 1.0, 1.0, 9.0, 9.0, 9.0, 9.0]);
         let bspline = Interpolation::BSpline { order: 3 };
-        assert!(resample_identity(&data, &g, &o, &bspline, 0.0, |v| v, 1).is_err());
+        assert!(
+            resample_identity(&data, &g, &o, &bspline, 0.0, |v| v, &IndexFloor::itk(), 1).is_err()
+        );
         let g3 = geometry(&[4, 4, 4], &[1.0, 1.0, 1.0]);
         let data3 = vec![2.0f64; 64];
-        let out = resample_identity(&data3, &g3, &g3, &bspline, 0.0, |v| v, 1).unwrap();
+        let out = resample_identity(
+            &data3,
+            &g3,
+            &g3,
+            &bspline,
+            0.0,
+            |v| v,
+            &IndexFloor::itk(),
+            1,
+        )
+        .unwrap();
         assert!(out.iter().all(|&v| (v - 2.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn a_floor_just_below_zero_in_4d() {
+        // ITK-01: the output grid starts 1e-20 voxels before the input, so the first x index
+        // is −1e-20, whose floor ITK takes as 0: linear interpolation in 4D then mixes in the
+        // next voxel with weight −1e-20. With a 0 there and 100 next to it, ITK gives −1e-18.
+        let size = [3usize, 1, 1, 2];
+        let data = [0.0f32, 100.0, 100.0, 0.0, 100.0, 100.0];
+        let g = geometry(&size, &[1.0; 4]);
+        let mut o = g.clone();
+        o.origin[0] = -1e-20;
+        let run = |mode| {
+            let floor = IndexFloor::new(mode);
+            let out = resample_identity(
+                &data,
+                &g,
+                &o,
+                &Interpolation::Linear,
+                0.0,
+                |v| v as f32,
+                &floor,
+                1,
+            )
+            .unwrap();
+            (out, floor.differing(), floor.changed())
+        };
+        let (fixed, d, c) = run(UpstreamDefects::Fix);
+        assert_eq!(fixed[0], 0.0);
+        assert_eq!((d, c), (2, 2));
+        let (ants, d, c) = run(UpstreamDefects::Reproduce);
+        assert_eq!(ants[0], -1e-18);
+        assert_eq!((d, c), (2, 2));
+        assert_eq!(fixed[1..3], ants[1..3]);
+        // Without a 0 beside the 100, the tiny weight vanishes in the sum: no change counted.
+        let data = [50.0f32, 100.0, 100.0, 50.0, 100.0, 100.0];
+        let floor = IndexFloor::new(UpstreamDefects::Fix);
+        resample_identity(
+            &data,
+            &g,
+            &o,
+            &Interpolation::Linear,
+            0.0,
+            |v| v as f32,
+            &floor,
+            1,
+        )
+        .unwrap();
+        assert_eq!((floor.differing(), floor.changed()), (2, 0));
     }
 }

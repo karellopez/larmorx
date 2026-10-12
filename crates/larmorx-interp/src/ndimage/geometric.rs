@@ -29,7 +29,7 @@
 //! STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //! USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use larmorx_core::defects::{Notice, UpstreamDefects};
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 
 use super::splines::interpolation_weights;
 use super::{
@@ -51,8 +51,9 @@ pub struct Spline<const D: usize> {
     spline_mode: Extend,
     cval: f64,
     npad: f64,
-    /// The SCI-03 notice, when the prefilter's reflect boundary made a difference.
-    notice: Option<Notice>,
+    /// The SCI-03 notice, when the prefilter's reflect boundary made a difference, and the
+    /// SCI-02 notice, when `cval` had no defined value in the input's type.
+    notice: Vec<Notice>,
 }
 
 impl<const D: usize> Spline<D> {
@@ -89,10 +90,32 @@ impl<const D: usize> Spline<D> {
         let filtered = prefilter && order > 1;
         let npad = if filtered { mode.prepad() } else { 0 };
         let padded: [usize; D] = std::array::from_fn(|d| shape[d] + 2 * npad);
+        let mut notice = Vec::new();
         let mut coefficients = if npad == 0 {
             input.iter().map(|v| v.to_f64()).collect::<Vec<f64>>()
         } else {
-            pad(input, shape, npad, mode, cval)
+            // SCI-02: numpy stores `cval` in the input's type with an unsafe cast.
+            let fill = if mode != Mode::Nearest && !T::pad_defined(cval) {
+                let detail = match defects {
+                    UpstreamDefects::Fix => format!(
+                        "the padding value {cval} is clamped to the input's integer type; \
+                         numpy's cast of it is undefined (x86-64 wraps it)"
+                    ),
+                    UpstreamDefects::Reproduce => format!(
+                        "the padding value {cval} is converted to the input's integer type as \
+                         numpy on x86-64 converts it"
+                    ),
+                };
+                notice.push(Notice::new(&defects::SCI_02, defects, detail));
+                if defects.fix() {
+                    T::pad_value_clamped(cval)
+                } else {
+                    T::pad_value(cval)
+                }
+            } else {
+                T::pad_value(cval)
+            };
+            pad(input, shape, npad, mode, fill)
         };
         let mut changed = false;
         if filtered {
@@ -128,14 +151,17 @@ impl<const D: usize> Spline<D> {
             },
             cval,
             npad: npad as f64,
-            notice: reflect_notice(changed, mode, defects),
+            notice: {
+                notice.extend(reflect_notice(changed, mode, defects));
+                notice
+            },
         })
     }
 
     /// The upstream defects that changed (or, reproduced, would have changed) the prepared
-    /// coefficients: SCI-03 for the reflect boundary.
+    /// coefficients: SCI-03 for the reflect boundary, SCI-02 for the padding value.
     pub fn notices(&self) -> Vec<Notice> {
-        self.notice.iter().cloned().collect()
+        self.notice.clone()
     }
 
     /// The prepared coefficients (Fortran order) and their shape.
@@ -394,18 +420,17 @@ impl Spline<3> {
     }
 }
 
-/// `np.pad(input, npad, mode='constant', constant_values=cval)` (grid-constant) or
-/// `mode='edge'` (nearest), read as doubles.
+/// `np.pad(input, npad, mode='constant', constant_values=cval)` (grid-constant, `fill` being
+/// `cval` in the input's type) or `mode='edge'` (nearest), read as doubles.
 fn pad<T: Sample, const D: usize>(
     input: &[T],
     shape: [usize; D],
     npad: usize,
     mode: Mode,
-    cval: f64,
+    fill: f64,
 ) -> Vec<f64> {
     let padded: [usize; D] = std::array::from_fn(|d| shape[d] + 2 * npad);
     let total: usize = padded.iter().product();
-    let fill = T::pad_value(cval);
     let nearest = mode == Mode::Nearest;
     let (nx, px) = (shape[0], padded[0]);
     let mut out = vec![fill; total];

@@ -16,7 +16,8 @@
 //!   only with `-v`);
 //! - the mask is read as `unsigned char` (a C++ cast of each value) and must be on the grid
 //!   the filter runs on: with `-s 2` a full-resolution mask makes ITK throw, and ANTs exits 1
-//!   (printing the exception only with `-v`); a mask that cannot be read is no mask;
+//!   (printing the exception only with `-v`); a mask that cannot be read is no mask, and
+//!   the whole image is denoised (ANTS-47);
 //! - without `-d`, the dimension is the input file's;
 //! - `-o [denoised,noise]` writes the noise first, then the denoised image; without `-o`
 //!   nothing is written.
@@ -25,9 +26,16 @@
 //! replaced by the filter's parameters. ANTs uses `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`
 //! threads and its result depends on it; larmorx uses the same number of threads and gives
 //! ANTs' single-thread result (`docs/findings/ants-denoise.md`).
+//!
+//! **Upstream defects (D13).** By default larmorx refuses a mask it cannot read (ANTS-47),
+//! clamps mask values outside `unsigned char`'s range (ANTS-06) and corrects the filter's
+//! Rician correction factor (ANTS-43); `LARMORX_UPSTREAM_DEFECTS=reproduce` gives ANTs'
+//! behaviour.
 
 use std::io::Write;
 use std::time::Instant;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use super::cstd::{
     format_g, parser_convert_bool, parser_convert_i32, parser_convert_u32,
@@ -82,16 +90,24 @@ OPTIONS:
      --help
 ";
 
-/// Runs `DenoiseImage` on files; returns the exit code.
+/// Runs `DenoiseImage` on files, in the D13 mode of `LARMORX_UPSTREAM_DEFECTS`; returns the
+/// exit code.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    run(args, &mut FileStore, super::itk_threads(), out, err)
+    match UpstreamDefects::from_env() {
+        Ok(mode) => run(args, &mut FileStore, super::itk_threads(), mode, out, err),
+        Err(e) => {
+            let _ = writeln!(err, "larmorx: {e}");
+            EXIT_BAD_MODE
+        }
+    }
 }
 
-/// Runs `DenoiseImage` with images from `store`.
+/// Runs `DenoiseImage` with images from `store` in the D13 mode `mode`.
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
     n_threads: usize,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -106,7 +122,8 @@ pub fn run(
             return 1;
         }
     };
-    match execute(&parsed, store, n_threads, out, err) {
+    let mut notices = Notices::new(mode);
+    let code = match execute(&parsed, store, n_threads, &mut notices, out, err) {
         Ok(code) => code,
         Err(message) => {
             if !message.is_empty() {
@@ -114,7 +131,9 @@ pub fn run(
             }
             1
         }
-    }
+    };
+    notices.print(err);
+    code
 }
 
 /// ANTs aborts here: an uncaught exception from `Convert<T>`.
@@ -148,9 +167,10 @@ fn read<T: Pixel>(
     name: &str,
     dim: usize,
     n_threads: usize,
+    notices: &mut Notices,
     err: &mut dyn Write,
 ) -> Result<Option<AntsImage<T>>, String> {
-    match read_with::<T, _>(store, name, dim, n_threads) {
+    match read_with::<T, _>(store, name, dim, n_threads, notices) {
         Ok(image) => Ok(Some(image)),
         Err(ReadError::Unsupported { name, message }) => Err(format!("larmorx: {name}: {message}")),
         Err(e) => {
@@ -188,6 +208,7 @@ fn execute(
     p: &Parsed,
     store: &mut dyn ImageStore,
     n_threads: usize,
+    notices: &mut Notices,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<u8, String> {
@@ -227,7 +248,7 @@ fn execute(
                 return Ok(1);
             };
             let name = i.parameters.first().unwrap_or(&i.name).clone();
-            match store.load(&name, n_threads) {
+            match store.load(&name, n_threads, notices) {
                 Ok(image) => image.geometry.ndim,
                 Err(_) => {
                     return Err(format!(
@@ -256,13 +277,16 @@ fn execute(
         }
         return Ok(1);
     };
-    let Some(input) = read::<f32>(store, &input_option.name, dim, n_threads, err)? else {
+    let Some(input) = read::<f32>(store, &input_option.name, dim, n_threads, notices, err)? else {
         return Err(
             "larmorx: DenoiseImage: cannot read the input image (ANTs crashes here)".into(),
         );
     };
 
-    let mut options = DenoiseOptions::default();
+    let mut options = DenoiseOptions {
+        upstream_defects: notices.mode(),
+        ..DenoiseOptions::default()
+    };
     // -s, read before the noise model.
     if let Some(s) = p.last("shrink-factor") {
         options.shrink_factor =
@@ -282,9 +306,38 @@ fn execute(
             return Ok(1);
         }
     };
-    // -x, read as unsigned char; a mask that cannot be read is no mask.
+    // -x, read as unsigned char; ANTs takes a mask that cannot be read as no mask
+    // (ANTS-47).
     let mask = match p.last("mask-image") {
-        Some(m) => read::<u8>(store, &m.name, dim, n_threads, err)?,
+        Some(m) => {
+            let mask = read::<u8>(store, &m.name, dim, n_threads, notices, err)?;
+            if mask.is_none() {
+                if notices.fix() {
+                    notices.add(
+                        &defects::ANTS_47,
+                        format!(
+                            "the mask '{}' cannot be read: an error; ANTs denoises the whole \
+                             image",
+                            m.name
+                        ),
+                    );
+                    return Err(format!(
+                        "larmorx: DenoiseImage: cannot read the mask '{}' ({}=reproduce \
+                         denoises the whole image, as ANTs does)",
+                        m.name,
+                        defects::ENV
+                    ));
+                }
+                notices.add(
+                    &defects::ANTS_47,
+                    format!(
+                        "the mask '{}' cannot be read: the whole image is denoised, as in ANTs",
+                        m.name
+                    ),
+                );
+            }
+            mask
+        }
         None => None,
     };
     // -r, then -p.
@@ -357,14 +410,21 @@ fn execute(
         );
     }
 
+    notices.extend(result.notices);
     if let Some(o) = p.last("output") {
         let (denoised_name, noise_name) = outputs(o);
         if let Some(name) = noise_name {
-            write_with(store, &name, result.noise.into(), n_threads)
+            write_with(store, &name, result.noise.into(), n_threads, notices)
                 .map_err(|e| format!("larmorx: cannot write '{name}': {e}"))?;
         }
-        write_with(store, &denoised_name, result.denoised.into(), n_threads)
-            .map_err(|e| format!("larmorx: cannot write '{denoised_name}': {e}"))?;
+        write_with(
+            store,
+            &denoised_name,
+            result.denoised.into(),
+            n_threads,
+            notices,
+        )
+        .map_err(|e| format!("larmorx: cannot write '{denoised_name}': {e}"))?;
     }
     Ok(0)
 }

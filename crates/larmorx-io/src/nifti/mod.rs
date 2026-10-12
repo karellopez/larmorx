@@ -262,7 +262,21 @@ pub fn read_header(path: impl AsRef<Path>) -> Result<NiftiHeader> {
 
 /// Reads a NIfTI image.
 pub fn read(path: impl AsRef<Path>, options: &ReadOptions) -> Result<NiftiImage> {
-    let path = path.as_ref();
+    read_from(path.as_ref(), None, options)
+}
+
+/// [`read`] with the header from `path` and the voxels from `data`, at the header's
+/// `vox_offset`, whatever file `path` names for them: what nifti_clib does when it finds
+/// another file first ([`NiftiPaths::nifti_clib_image_path`], defect ITK-08).
+pub fn read_with_data_from(
+    path: impl AsRef<Path>,
+    data: &Path,
+    options: &ReadOptions,
+) -> Result<NiftiImage> {
+    read_from(path.as_ref(), Some(data), options)
+}
+
+fn read_from(path: &Path, data: Option<&Path>, options: &ReadOptions) -> Result<NiftiImage> {
     let paths = checked_paths(path)?;
     let hpath = paths.header_path();
     let mut reader = open_stream(hpath)?;
@@ -272,8 +286,15 @@ pub fn read(path: impl AsRef<Path>, options: &ReadOptions) -> Result<NiftiImage>
     let data_type = hdr.data_type().map_err(header_err(hpath))?;
 
     let offset = vox_offset_bytes(&hdr, hpath)?;
-    let ipath = paths.image_path();
-    let mut data_reader = if paths.is_single() {
+    let ipath = data.unwrap_or(paths.image_path());
+    let mut data_reader = if let Some(other) = data.filter(|d| *d != hpath) {
+        if paths.is_single() && offset == 0 {
+            return Err(format_err(hpath, "vox_offset is 0 in a single-file image"));
+        }
+        let mut r = open_stream(other)?;
+        io::copy(&mut (&mut r).take(offset as u64), &mut io::sink()).map_err(io_err(other))?;
+        r
+    } else if paths.is_single() {
         if offset == 0 {
             return Err(format_err(hpath, "vox_offset is 0 in a single-file image"));
         }

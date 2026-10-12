@@ -4,6 +4,7 @@
 use larmorx_core::defects::{DEFECTS, Notice, UpstreamDefects};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 
 /// `"fix"` or `"reproduce"` as [`UpstreamDefects`].
 pub(crate) fn mode_from_py(name: &str) -> PyResult<UpstreamDefects> {
@@ -22,6 +23,28 @@ pub(crate) fn notices_to_py(notices: Vec<Notice>) -> Vec<PyNotice> {
         .into_iter()
         .map(|n| (n.defect.id, n.defect.tool, n.mode.name(), n.detail))
         .collect()
+}
+
+/// `(value, notices)`: a result and the notices Python raises as warnings.
+pub(crate) fn with_notices<'py>(
+    py: Python<'py>,
+    value: Bound<'py, PyAny>,
+    notices: Vec<Notice>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    PyTuple::new(
+        py,
+        [value, notices_to_py(notices).into_pyobject(py)?.into_any()],
+    )
+}
+
+/// `items` followed by the notices, as one tuple.
+pub(crate) fn tuple_with_notices<'py>(
+    py: Python<'py>,
+    mut items: Vec<Bound<'py, PyAny>>,
+    notices: Vec<Notice>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    items.push(notices_to_py(notices).into_pyobject(py)?.into_any());
+    PyTuple::new(py, items)
 }
 
 /// Every register entry larmorx has a switch for: `[(id, tool, what, fixed_by_default)]`.

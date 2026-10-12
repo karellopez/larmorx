@@ -13,6 +13,7 @@ from typing import Any, Literal
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import memory_image
 from larmorx.image import Image, as_image
 
@@ -63,6 +64,7 @@ def denoise_image(
     *,
     dimension: int | None = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> DenoiseResult:
     """``DenoiseImage -d D -i image -n model [-x mask] -s shrink -p patch -r search
     -o [denoised,noise]``: adaptive non-local means (Manjón et al., JMRI 2010).
@@ -87,7 +89,13 @@ def denoise_image(
     own result changes with its thread count). larmorx's ``expf`` and ``exp`` are correctly
     rounded; glibc's are not always, and where ANTs' run met such a value its result differs
     from larmorx's by a few float units (``docs/findings/ants-denoise.md``).
+
+    At a high signal-to-noise ratio ITK's Rician correction factor overflows and the bias
+    becomes 0 (ANTS-43); larmorx computes it without the overflow. Mask values outside
+    ``unsigned char``'s range are clamped (ANTS-06; ANTs on x86-64 wraps them).
+    ``upstream_defects="reproduce"`` gives ANTs' result.
     """
+    check(upstream_defects)
     model = str(noise_model).lower()
     if model not in ("rician", "gaussian"):
         raise ValueError(f'noise_model must be "Rician" or "Gaussian", not {noise_model!r}')
@@ -99,7 +107,7 @@ def denoise_image(
         if len(values) not in (1, dim):
             raise ValueError(f"{name} needs one value or {dim}, not {len(values)}")
     mask_source = None if mask is None else _source(mask)[0]
-    denoised, noise = _core.ants_denoise_image(
+    denoised, noise, notices = _core.ants_denoise_image(
         source,
         dim,
         mask_source,
@@ -108,7 +116,9 @@ def denoise_image(
         patch,
         search,
         n_threads,
+        upstream_defects,
     )
+    warn(notices)
     if dim != ndim:
         # Read with another number of dimensions (a 4D file as 3D: its first volume).
         header = None

@@ -239,6 +239,18 @@ fn c_casts_follow_x86_64() {
     assert_eq!(<i16 as Output>::from_interp(f64::NAN), 0);
     assert_eq!(<i32 as Output>::from_interp(f64::NAN), i32::MIN);
     assert_eq!(<i64 as Output>::from_interp(f64::NAN), i64::MIN);
+    // SCI-02 corrected: NaN is 0.
+    assert_eq!(<i32 as Output>::from_interp_clamped(f64::NAN), 0);
+    assert_eq!(<i64 as Output>::from_interp_clamped(f64::NAN), 0);
+    assert_eq!(<i32 as Output>::from_interp_clamped(-2.5), -3);
+    assert!(<i32 as Output>::interp_undefined(f64::NAN));
+    assert!(!<u8 as Output>::interp_undefined(f64::NAN));
+    // numpy's cast of a padding value: wrapped (x86-64) or clamped.
+    assert_eq!(<u8 as Sample>::pad_value(300.0), 44.0);
+    assert!(!<u8 as Sample>::pad_defined(300.0));
+    assert_eq!(<u8 as Sample>::pad_value_clamped(300.0), 255.0);
+    assert_eq!(<i16 as Sample>::pad_value_clamped(f64::NAN), 0.0);
+    assert!(<f32 as Sample>::pad_defined(1e300));
 }
 
 #[test]

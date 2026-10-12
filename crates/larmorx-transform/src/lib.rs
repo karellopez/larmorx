@@ -13,7 +13,8 @@
 //! OpenBLAS's Haswell kernels, in a fixed order, so they are the same on every platform.
 #![forbid(unsafe_code)]
 
-use larmorx_core::ItkReal;
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
+use larmorx_core::{IndexFloor, ItkReal};
 
 pub mod field;
 pub mod linear;
@@ -141,20 +142,55 @@ impl TransformChain {
     /// (inverted in `R` where the chain inverts it), displacement fields looked up in `R`.
     /// For `R = f64` it maps points exactly as [`TransformChain::transform_point`].
     pub fn with_precision<R: ItkReal>(&self) -> Result<PrecisionChain<'_, R>, TransformError> {
+        self.prepare::<R>(UpstreamDefects::Reproduce)
+            .map(|(chain, _)| chain)
+    }
+
+    /// [`TransformChain::with_precision`] with ITK's defects corrected
+    /// ([`UpstreamDefects::Fix`]) or reproduced: ITK-10 (a versor that fails to load in
+    /// float) and ITK-01 (the floor of displacement-field lookups,
+    /// [`PrecisionChain::index_floor`]). Returns the chain and the notices of the defects met
+    /// while building it (ITK-01's are counted while the chain maps points).
+    pub fn prepare<R: ItkReal>(
+        &self,
+        mode: UpstreamDefects,
+    ) -> Result<(PrecisionChain<'_, R>, Vec<Notice>), TransformError> {
+        let mut notices = Notices::new(mode);
         let mut steps = Vec::with_capacity(self.transforms.len());
+        let mut instantiate = |l: &LinearTransform| -> Result<MatrixOffset<R>, TransformError> {
+            let (m, corrected) = l.with_precision_mode::<R>(mode)?;
+            if corrected {
+                notices.add(
+                    &defects::ITK_10,
+                    format!(
+                        "the {} is loaded in single precision from its versor computed in double; \
+                         ITK fails to load it (the versor's axis, rounded to float, is longer \
+                         than 1)",
+                        l.itk_name
+                    ),
+                );
+            }
+            Ok(m)
+        };
         for (t, from) in self.transforms.iter().zip(&self.inverted_from) {
             steps.push(match (t, from) {
                 (Transform::Linear(_), Some(original)) => {
-                    Step::Linear(original.with_precision::<R>()?.inverse().ok_or_else(|| {
+                    Step::Linear(instantiate(original)?.inverse().ok_or_else(|| {
                         TransformError::Invalid("singular linear transform".into())
                     })?)
                 }
-                (Transform::Linear(l), None) => Step::Linear(l.with_precision::<R>()?),
+                (Transform::Linear(l), None) => Step::Linear(instantiate(l)?),
                 (Transform::DisplacementField(f), _) => Step::Field(f),
                 (Transform::Composite(_), _) => unreachable!("composites are expanded"),
             });
         }
-        Ok(PrecisionChain { steps })
+        Ok((
+            PrecisionChain {
+                steps,
+                floor: IndexFloor::new(mode),
+            },
+            notices.into_vec(),
+        ))
     }
 
     /// The transforms in ITK's composite-queue order (the last one acts first on a point).
@@ -187,6 +223,8 @@ impl TransformChain {
 pub struct PrecisionChain<'a, R> {
     /// ITK's composite queue, applied from the back.
     steps: Vec<Step<'a, R>>,
+    /// The floor of displacement-field lookups (ITK-01).
+    floor: IndexFloor,
 }
 
 #[derive(Clone, Debug)]
@@ -200,10 +238,23 @@ impl<R: ItkReal> PrecisionChain<'_, R> {
     /// the queue from the back, each transform taking and returning `Point<R>`).
     #[inline]
     pub fn transform_point(&self, p: [R; 3]) -> [R; 3] {
+        self.transform_point_with(p, &self.floor)
+    }
+
+    /// [`PrecisionChain::transform_point`] with the displacement-field lookups' floor chosen
+    /// by `floor` (ITK-01) instead of the chain's own.
+    #[inline]
+    pub fn transform_point_with(&self, p: [R; 3], floor: &IndexFloor) -> [R; 3] {
         self.steps.iter().rev().fold(p, |q, step| match step {
             Step::Linear(m) => m.transform_point(q),
-            Step::Field(f) => f.transform_point_as(q),
+            Step::Field(f) => f.transform_point_with(q, floor),
         })
+    }
+
+    /// The floor of the displacement-field lookups, with the count of lookups where ITK's
+    /// floor differed from the exact one (ITK-01).
+    pub fn index_floor(&self) -> &IndexFloor {
+        &self.floor
     }
 
     /// Whether every transform is linear (ITK's `TransformCategory::Linear`).

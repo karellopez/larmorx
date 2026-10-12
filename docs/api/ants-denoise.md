@@ -57,7 +57,7 @@ larmorx ants DenoiseImage -d 3 -i t1w.nii.gz -n Rician -x mask.nii.gz \
 | `-d 2/3/4` | `dimension` (default: the image's) | a 4D file read with `-d 3` gives its first volume; in 4D, patches and search boxes extend along time too |
 | `-i image` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
 | `-n Rician/(Gaussian)` | `noise_model="Rician"` | **different default**: the command line's is Gaussian, Python's is Rician (sMRIPrep's choice). Case does not matter |
-| `-x mask` | `mask` | read as `unsigned char` (C++ casts: 0.4 → 0, 256 → 0); only voxels where it is not 0 are patch centres. Must be on the grid the filter runs on (the shrunk grid with `-s` above 1) |
+| `-x mask` | `mask` | read as `unsigned char` (0.4 → 0; values beyond 0 to 255 clamped, ANTS-06 below); only voxels where it is not 0 are patch centres. Must be on the grid the filter runs on (the shrunk grid with `-s` above 1) |
 | `-s 1` | `shrink_factor=1` | `ShrinkImageFilter` along every axis (time too); 0 acts as 1. The noise is resampled linearly onto the full grid |
 | `-p 1` / `-p 1x1x1` | `patch_radius=1` / `(1, 1, 1)` | one value for every axis or one per axis |
 | `-r 2` / `-r 2x2x2` | `search_radius=2` / `(2, 2, 2)` | one value for every axis or one per axis |
@@ -71,7 +71,7 @@ mean threshold 0.95, variance threshold 0.5, smoothing variance 2. The Rust filt
 
 ## Behaviour worth knowing
 
-From ANTs, reproduced ([findings](../findings/ants-denoise.md)):
+From ANTs ([findings](../findings/ants-denoise.md)):
 - the output is `input − noise`, with the noise `shrunk − denoised` resampled onto the input's
   grid with float coordinates; so even without shrinking it is not exactly the filter's
   output, and with shrinking, voxels beyond the shrunk grid's extent (more than half a shrunk
@@ -81,9 +81,30 @@ From ANTs, reproduced ([findings](../findings/ants-denoise.md)):
   before the square root; values below it become 0;
 - voxels that do not take part (value ≤ 0, local variance ≤ 1e-5, outside the mask) are still
   averaged with themselves through their neighbours' patches, so they change by rounding;
-- a mask file that cannot be read means no mask; `-r [2]` (in brackets) reads no radius and
-  exits 1;
+- `-r [2]` (in brackets) reads no radius and exits 1;
 - `-o [denoised,noise]` writes the noise first; without `-o` nothing is written.
+
+## Upstream defects (D13)
+
+ANTs' and ITK's deterministic defects are corrected by default and reproduced bit for bit on
+request: `upstream_defects="reproduce"` in Python (`N4Options::upstream_defects` /
+`DenoiseOptions::upstream_defects` in Rust), `LARMORX_UPSTREAM_DEFECTS=reproduce` on the
+command line. A warning (on the command line a line on standard error) names the entry
+wherever it changed the result ([upstream-defects.md](upstream-defects.md); each entry in the
+[register](../findings/upstream-defects.md)).
+
+| ID | ANTs (what `reproduce` gives) | larmorx's default |
+|---|---|---|
+| ANTS-43 | at a high local signal-to-noise ratio the Rician correction factor overflows (`float(I₀) · expf(−x)` is `∞ · 0`): the factor is NaN, passes both range checks, and the bias becomes 0 | the factor computed in double with exponentially scaled Bessel functions (finite at any ratio), then ITK's range checks; the warning counts the voxels whose factor ITK makes NaN |
+| ANTS-47 | a mask file that cannot be read is no mask: the whole image is denoised, exit 0 | an error (exit 1) |
+| ANTS-06 | mask values beyond `unsigned char`'s range are converted as x86-64 converts them (256 → 0, −1 → 255; C++ leaves it undefined) | clamped (256 → 255, −1 → 0), NaN to 0, with a warning |
+| ITK-01 | with `-s` above 1, the noise is resampled with ITK's floor, 0 instead of −1 for an index just below 0 (x86-64), in 4D linear interpolation | the exact floor; the warning counts the output voxels this changed |
+| ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `-d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
+
+On sMRIPrep's command (`-n Rician`) ANTS-43 is common: on two real T1w images (ds000005,
+ds000210) ITK's factor is NaN in 7.4 % and 8.4 % of the voxels, and the corrected bias lowers
+them by a median of 0.58 and 2.9, at most 2.8 and 17.7 (0.7 % of each image's 99th
+percentile); ANTs' own result moves far more between thread counts (ANTS-42).
 
 ## Deliberate differences
 

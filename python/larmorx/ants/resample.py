@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import extra_spacing, memory_image
 from larmorx.image import Image, as_image
 
@@ -57,6 +58,7 @@ def resample_image_by_spacing(
     add_voxels: int = 0,
     nearest: bool = False,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ResampleImageBySpacing d in out sx sy [sz [st]] smooth addvox nn``: the image resampled
     onto a grid with the same origin and direction and the new ``spacing`` (one value per
@@ -68,13 +70,23 @@ def resample_image_by_spacing(
     ``(new/old - 1) / old`` voxels). Interpolation is linear, or nearest-neighbour with
     ``nearest``. Output voxels beyond the input take the input's value at index ``(1, 1, …)``.
 
-    Unlike the command line, ``nearest`` works in 2D too (there ANTs reads it from the
-    ``addvox`` argument).
+    ``nearest`` works in 2D too (there ANTs' command line reads it from the ``addvox``
+    argument). Smoothing an axis of fewer than 4 voxels is an error; ANTs goes on with a buffer
+    it never wrote (ANTS-28), which ``upstream_defects="reproduce"`` gives with that buffer
+    filled with 0.
     """
+    check(upstream_defects)
     source, header, _size, _spacing = _source(image)
-    data, affine, _descrip, out_spacing = _core.ants_resample_image_by_spacing(
-        source, [float(s) for s in spacing], bool(smooth), int(add_voxels), bool(nearest), n_threads
+    (data, affine, _descrip, out_spacing), notices = _core.ants_resample_image_by_spacing(
+        source,
+        [float(s) for s in spacing],
+        bool(smooth),
+        int(add_voxels),
+        bool(nearest),
+        n_threads,
+        upstream_defects,
     )
+    warn(notices)
     return _result(data, affine, header, out_spacing)
 
 
@@ -99,6 +111,7 @@ def resample_image(
     pixel_type: str = "float",
     dimension: int | None = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ResampleImage d in out MxNxO [size?] [interpolation] [pixeltype]``: the image resampled
     onto a grid with the same origin and direction and a new ``spacing`` or ``size`` (one value
@@ -118,9 +131,12 @@ def resample_image(
     in: values are clamped to its range and truncated toward zero for integer types, as ITK
     casts them. ``dimension`` defaults to the image's.
 
-    Unlike the command line, every window and B-spline order is reachable here (ANTs reads the
-    window, the order and the pixel type from the same argument).
+    Unlike ANTs' command line, every window and B-spline order is reachable here (ANTs reads
+    the window, the order and the pixel type from the same argument; ANTS-30). A ``size`` of 1
+    is an error; ANTs writes an image of zeros with an infinite spacing (ANTS-29), which
+    ``upstream_defects="reproduce"`` gives.
     """
+    check(upstream_defects)
     source, header, shape, in_spacing = _source(image)
     dim = int(dimension) if dimension is not None else len(shape)
     if pixel_type not in PIXEL_TYPES:
@@ -133,7 +149,7 @@ def resample_image(
     sig = _values(sigma)
     if interpolation == "gaussian" and sig is None:
         sig = list(in_spacing[:3])
-    data, affine, _descrip, out_spacing = _core.ants_resample_image(
+    (data, affine, _descrip, out_spacing), notices = _core.ants_resample_image(
         source,
         dim,
         _values(spacing),
@@ -145,5 +161,7 @@ def resample_image(
         int(order),
         pixel_type,
         n_threads,
+        upstream_defects,
     )
+    warn(notices)
     return _result(data, affine, header, out_spacing)

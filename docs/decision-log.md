@@ -569,6 +569,62 @@ Decided by the user on the questions the defect register raised
   skipped them. ds005040 (PEPOLAR), ds005454 (`phasediff`) and ds005752 (direct `fieldmap`)
   replace it; the porting guide now says to check series length and metadata first.
 
+## 2026-10-12: D13 part 1, the ANTs and ITK defects corrected by default
+- **Corrected by default**, with the shared switch (`upstream_defects="reproduce"`,
+  `LARMORX_UPSTREAM_DEFECTS=reproduce`) giving ANTs' result bit for bit and a warning wherever
+  a correction changed the result: every ANTs and ITK entry the register listed as a gap
+  (ANTS-03, -04, -05, -08 to -16, -19, -20, -24, -25, -27, -30, -31, -33, -35, -36, -38, -39,
+  -43; ITK-01, -02, -03, -10), the undefined conversions (ANTS-06, SCI-02: clamped, NaN to 0,
+  with a warning, as decided), and a new entry, ANTS-47 (DenoiseImage takes an unreadable mask
+  for no mask). What each tool now does: the "Upstream defects (D13)" section of its API page.
+- **Failures and garbage get a switch** (decided 2026-10-11): ANTS-29 (ResampleImage to size
+  1) and ITK-08 (nifti_clib's `x.nii` read for `x.nii.gz`) are reproduced byte for byte;
+  ANTS-07, ANTS-19 and ANTS-28, whose ANTs results depend on memory outside the data, are
+  reproduced in everything defined (exit code, files, headers, printed text) with the
+  undefined reads or buffer as zeros and a warning. ANTS-02 and ANTS-26 (crashes and a hang)
+  and ResampleImage's wrong-length spacing list (an abort after an uninitialised read) define
+  nothing beyond the failure and stay refusals in both modes.
+- **ResampleImage's command line** (ANTS-30, designed here, for the user's review): each
+  interpolator's parameters follow it where ANTs reads them, and the pixel type after them
+  (argument 7 for linear and nearest neighbour, as in ANTs; 8 for windowed sinc and B-spline;
+  9 for Gaussian); the window `b` is Blackman, as the usage says
+  ([api/ants-resample-image.md](api/ants-resample-image.md), "The seventh argument").
+- **Warnings only where the result changes.** Two corrections change a value's last bits at
+  most and mostly not at all once it is stored: ITK's floor of an index just below 0 (ITK-01)
+  and N4's FFT size (ANTS-39). larmorx computes both ways where they differ and warns only
+  where a stored value changes (`larmorx_core::IndexFloor::checked`). Short file names
+  (ANTS-03) and nifti_clib's file choice (ITK-08) are named only when such a file exists and,
+  for ITK-08, when its voxels differ.
+- **Parity in `reproduce` mode is unchanged** against the ANTs 2.6.5 oracle (GCC 14.3),
+  standard tier, from commit `50509e30b3e8`: ImageMath 296 of 301 compared outputs
+  bit-identical, ThresholdImage 35 of 35, MultiplyImages 12 of 12, SmoothImage 30 of 30,
+  ResampleImageBySpacing 28 of 28, ResampleImage 47 of 47, N4 29 of 45 as built and 45 of 45
+  with CORE-MATH, DenoiseImage 7 of 40 and 40 of 40, antsApplyTransforms 144 of 158 and 158
+  of 158; every header byte-identical as before. Two former expected divergences now pass:
+  ResampleImage `errors/size-1` (byte for byte) and ResampleImageBySpacing
+  `errors/thin-smoothed-axis` (everything but the uninitialised values), and so does
+  ImageMath `fill-holes/hole-first-slice-0.5` (everything but the values ANTs reads beyond the
+  image). ResampleImage now compares 47 outputs (46 before), ImageMath passes 303 cases (302).
+- **The fix pass** (larmorx's default on the same cases) changed: ImageMath, 12 entries in 38
+  cases (`/` on a real T1w, `total`, `mean`, the `Laplacian` flag in 11 cases, `GetLargestComponent`
+  with nothing kept, ...); ResampleImage, ANTS-30 in 7 cases and ANTS-06 in 5; N4, ANTS-38 in
+  4 cases (3 with a mask on the generated head phantom, whose mask's first voxel is the log
+  image's minimum, up to 3.9e3; none of fMRIPrep's command lines), ANTS-35 in 1; DenoiseImage, ANTS-43 in 25 of 40 compared cases, sMRIPrep's
+  command on real T1w images included. Measured on sMRIPrep's denoising of two real T1w
+  images: the corrected Rician factor changes 7.4 % and 8.4 % of the voxels, by a median of
+  0.58 and 2.9 and at most 2.8 and 17.7 (0.7 % of the images' 99th percentiles), always
+  downward (the bias ITK zeroes is subtracted); ANTs' own thread band on such an image is
+  up to 271. antsApplyTransforms changed only `-u` outputs (ANTS-06).
+- **Golden checksums** re-recorded: the defaults of `cli.ants.ImageMath./`, `.total`, `.mean`,
+  `cli.ants.N4BiasFieldCorrection`, `cli.ants.DenoiseImage`, `py.ants.arithmetic`,
+  `py.ants.n4`, `py.ants.denoise_image` changed and `py.ants.image_math_operations` (the usage
+  lines); `cli.ants.ImageMath.vtotal` became `cli.ants.ImageMath.vtotal.reproduce` (larmorx
+  refuses `vtotal` by default). Seven `*.reproduce` cases give the checksums the changed
+  cases had before.
+- **Found while doing it:** ITK-11, ITK's `GaussianOperator` coefficients lose accuracy for
+  variances above about 50 voxels² (Numerical Recipes' Miller start ignores the argument: 1.5e-3
+  relative at 100, 52 % at 700), an imprecision, not D13; ANTS-47.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

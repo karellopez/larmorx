@@ -86,7 +86,8 @@ class Change:
         if a.dtype != b.dtype:
             same &= False
         n = int(np.count_nonzero(~same))
-        diff = np.abs(fa - fb)[~same]
+        with np.errstate(invalid="ignore", over="ignore"):
+            diff = np.abs(fa - fb)[~same]
         finite = diff[np.isfinite(diff)]
         return Change(
             n, a.size, float(finite.max()) if finite.size else (0.0 if n == 0 else float("inf"))

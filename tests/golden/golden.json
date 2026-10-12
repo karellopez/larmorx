@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "fb6cc8dccf8f8f2c3477ed3b7a1e323751ce6e59", "date": "2026-10-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "f82dd8229fe13a8b775ada6cac744802956c5583", "date": "2026-10-12", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
@@ -12,14 +12,20 @@
    "out:header": {"bytes": 352, "sha256": "f54ab8203c5b5c40ae2e7e07405fdd05752b3f3ebcc2585b5ef0245702290093"}
   },
   "cli.ants.DenoiseImage": {
-   "noise:data": {"dtype": "<f4", "sample": "2549923ffaff7fb500e04cbd00000000fcff7fb500ea13400000802b00000000", "sha256": "9ede860481f6c73e2642de8dcd7fc727b5c60160b2272acd32a58aad517dc61e", "shape": [24, 20, 16], "sum": "10543.096957455518"},
+   "noise:data": {"dtype": "<f4", "sample": "2549923ffaff7fb5003a8d3f00000000fcff7fb500ea13400000802b00000000", "sha256": "3508f26f8b4c4ad99be293c4eb80b541062cbc2728456b4ca5a9b9b928d84c85", "shape": [24, 20, 16], "sum": "10868.991825941148"},
    "noise:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
-   "out:data": {"dtype": "<f4", "sample": "00000000b86d6b4142bdd4439224c94070dbb640e3c5d243000088414992a43f", "sha256": "687eb16c4a281be85e4ee6786fe4b0dff5b3723b04a8021f8997837ce75c0588", "shape": [24, 20, 16], "sum": "800380.6171710414"},
+   "out:data": {"dtype": "<f4", "sample": "00000000b86d6b41a129d4439224c94070dbb640e3c5d243000088414992a43f", "sha256": "2105b61fd6ef7a510b7b8832da48fb292ff4cf7be30f92daafde7248848c062b", "shape": [24, 20, 16], "sum": "800054.7223040981"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
    "shrunk:data": {"dtype": "<f4", "sample": "22de95c060fc0a429f15cc43d6c60141562e0c413163d14374c7be4133435f3f", "sha256": "595499bccde724a574ed944ec7866b34ff533e108eafe7238321cea29a968912", "shape": [24, 20, 16], "sum": "811039.0863401219"},
    "shrunk:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
    "shrunk_noise:data": {"dtype": "<f4", "sample": "6b70ba40e541a0c1bc138a4169a4e9bf7b0243c078a1a240ce1ddbc0bec2d33e", "sha256": "b6e342702160a8072f4c53874f55edd8c69116ec50008de6329b305a9e607733", "shape": [24, 20, 16], "sum": "-115.37214010179741"},
    "shrunk_noise:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
+  },
+  "cli.ants.DenoiseImage.reproduce": {
+   "noise:data": {"dtype": "<f4", "sample": "2549923ffaff7fb500e04cbd00000000fcff7fb500ea13400000802b00000000", "sha256": "9ede860481f6c73e2642de8dcd7fc727b5c60160b2272acd32a58aad517dc61e", "shape": [24, 20, 16], "sum": "10543.096957455518"},
+   "noise:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "out:data": {"dtype": "<f4", "sample": "00000000b86d6b4142bdd4439224c94070dbb640e3c5d243000088414992a43f", "sha256": "687eb16c4a281be85e4ee6786fe4b0dff5b3723b04a8021f8997837ce75c0588", "shape": [24, 20, 16], "sum": "800380.6171710414"},
+   "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.ImageMath.+": {
    "out:data": {"dtype": "<f4", "sample": "92246940dcb68941dbf6d54349920c41b76d0341b72dd54300009c4124497240", "sha256": "3b22e816fafae0e36a5a8d686b8051c5ab401d9eb3bcdbef2f8a06899ba5abea", "shape": [24, 20, 16], "sum": "830123.7145209312"},
@@ -30,7 +36,7 @@
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.ImageMath./": {
-   "out:data": {"dtype": "<f4", "sample": "000000005207a03faf488d3f6fcf9c3f882f9d3f9b568d3fdd9a9f3fdd9a9f3f", "sha256": "100c507721fe13973a463508c9592678e6b1b2732fc40845585f830833ed24cf", "shape": [24, 20, 16], "sum": "8541.657436013222"},
+   "out:data": {"dtype": "<f4", "sample": "f1f0f0bcc5f814bfaf488d3f4dea3ebeabaa2abe9b568d3fa7373dbf8e0708bd", "sha256": "b4d9f04a46fe522d4647c062dd570da42941cc8510b22b6ef1d4b28d1b017347", "shape": [24, 20, 16], "sum": "1182.8936960031278"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.ImageMath.2d": {
@@ -166,7 +172,7 @@
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.ImageMath.mean": {
-   "out:data": {"dtype": "<f4", "sample": "2549923f66c36a46f3c0ea4746c99748303ef448e5bf284958494249e2fa4549", "sha256": "f31caba1c24eadeab45295625b1d7d330a6411add26bffd465012cfff36d512a", "shape": [24, 20, 16], "sum": "3114397765.123351"},
+   "out:data": {"dtype": "<f4", "sample": "be2dd342be2dd342be2dd342be2dd342be2dd342be2dd342be2dd342be2dd342", "sha256": "968fc26bd925f870d51e89250446b6a6e59fecf1d3f5c6b0ad5bd35ee4daadea", "shape": [24, 20, 16], "sum": "810926.1328125"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
    "stdout": {"bytes": 8, "sha256": "82f36499499ea80c5d930f99654ddd7f1d4403252e426a60163dfab87f301c41"}
   },
@@ -174,12 +180,22 @@
    "out:data": {"dtype": "<f4", "sample": "2549923fb76d6b410000803f9224c9406edbb6400000803f000088414992a43f", "sha256": "43cfa52a7c81c412d0c398ffe36aab8a00f48aa22d5a097f4d42f49797a890d0", "shape": [24, 20, 16], "sum": "378123.00026503205"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
+  "cli.ants.ImageMath.reproduce": {
+   "divide:data": {"dtype": "<f4", "sample": "000000005207a03faf488d3f6fcf9c3f882f9d3f9b568d3fdd9a9f3fdd9a9f3f", "sha256": "100c507721fe13973a463508c9592678e6b1b2732fc40845585f830833ed24cf", "shape": [24, 20, 16], "sum": "8541.657436013222"},
+   "divide:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "mean.stdout": {"bytes": 8, "sha256": "82f36499499ea80c5d930f99654ddd7f1d4403252e426a60163dfab87f301c41"},
+   "mean:data": {"dtype": "<f4", "sample": "2549923f66c36a46f3c0ea4746c99748303ef448e5bf284958494249e2fa4549", "sha256": "f31caba1c24eadeab45295625b1d7d330a6411add26bffd465012cfff36d512a", "shape": [24, 20, 16], "sum": "3114397765.123351"},
+   "mean:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "total.stdout": {"bytes": 40, "sha256": "190ea342a50048b4f9449cb0fa051be14f5edde59cd36dd366354f59d927a4b9"},
+   "total:data": {"dtype": "<f4", "sample": "0b1a353f7191ee45b42c684781b51848a61076488975a748fed5c048d366c448", "sha256": "fc0727a69f652c6fcc49f91a928690a978b33e482fd1b9c5153b1ca1c370d762", "shape": [24, 20, 16], "sum": "1553056861.0704882"},
+   "total:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
+  },
   "cli.ants.ImageMath.total": {
-   "out:data": {"dtype": "<f4", "sample": "0b1a353f7191ee45b42c684781b51848a61076488975a748fed5c048d366c448", "sha256": "fc0727a69f652c6fcc49f91a928690a978b33e482fd1b9c5153b1ca1c370d762", "shape": [24, 20, 16], "sum": "1553056861.0704882"},
+   "out:data": {"dtype": "<f4", "sample": "d366c448d366c448d366c448d366c448d366c448d366c448d366c448d366c448", "sha256": "9528625f1533ab28b9af6b6eb9854d0a421d5d70a22db0b6adfe641320b9f020", "shape": [24, 20, 16], "sum": "3089130960.0"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
    "stdout": {"bytes": 40, "sha256": "190ea342a50048b4f9449cb0fa051be14f5edde59cd36dd366354f59d927a4b9"}
   },
-  "cli.ants.ImageMath.vtotal": {
+  "cli.ants.ImageMath.vtotal.reproduce": {
    "out:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
@@ -188,6 +204,12 @@
    "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
   },
   "cli.ants.N4BiasFieldCorrection": {
+   "bias:data": {"dtype": "<f4", "sample": "d5ed7d3f1bc8843f79ab7e3fe3cc7d3f49bf813fabb9813fa0b97a3f33a6803f", "sha256": "656d6f19e19188e43156d38b3a6bd01b41ebd7be40bd5e090abd2a6d386fdfd8", "shape": [24, 20, 16], "sum": "7701.213757991791"},
+   "bias:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
+   "out:data": {"dtype": "<f4", "sample": "2549923fb76d6b414a61da439224c9406edbb6403f90d543000088414992a43f", "sha256": "cbf60ab88b79b60bc231e870960127fb4b8230b05e51f5e178c49ad1754e2300", "shape": [24, 20, 16], "sum": "818676.8568629324"},
+   "out:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"}
+  },
+  "cli.ants.N4BiasFieldCorrection.reproduce": {
    "bias:data": {"dtype": "<f4", "sample": "1949003d3379833f8730833f6d48803fa0ef823f0687833f20287c3fb976803f", "sha256": "70f0eb430cbd0caccee28b02fddad7b839ed65cfcc7b599b18cf76b2a2b8893d", "shape": [24, 20, 16], "sum": "7257.384758010507"},
    "bias:header": {"bytes": 352, "sha256": "0e4d5e758e9f79e393e1149d090bf7e26c07e672e64c83c5589a87c57fde107f"},
    "out:data": {"dtype": "<f4", "sample": "2549923fb76d6b41a001bc439224c9406edbb6408ac7ba43000088414992a43f", "sha256": "ac73aff63bee141470a307f01760a5782540aea3f53c5acd8d08c7359d5ce98c", "shape": [24, 20, 16], "sum": "761757.0965937674"},
@@ -344,9 +366,12 @@
   },
   "py.ants.arithmetic": {
    "add_to_zero": {"dtype": "<f4", "sample": "2549923fb76d6b410000803f9224c9406edbb6400000803f000088414992a43f", "sha256": "43cfa52a7c81c412d0c398ffe36aab8a00f48aa22d5a097f4d42f49797a890d0", "shape": [24, 20, 16], "sum": "378123.00026503205"},
-   "divide": {"dtype": "<f4", "sample": "000000005207a03faf488d3f6fcf9c3f882f9d3f9b568d3fdd9a9f3fdd9a9f3f", "sha256": "100c507721fe13973a463508c9592678e6b1b2732fc40845585f830833ed24cf", "shape": [24, 20, 16], "sum": "8541.657436013222"},
+   "divide": {"dtype": "<f4", "sample": "f1f0f0bcc5f814bfaf488d3f4dea3ebeabaa2abe9b568d3fa7373dbf8e0708bd", "sha256": "b4d9f04a46fe522d4647c062dd570da42941cc8510b22b6ef1d4b28d1b017347", "shape": [24, 20, 16], "sum": "1182.8936960031278"},
    "negative": {"dtype": "<f4", "sample": "25c9e0430000da433049ca41dc36de430080de4370dbd6416edbd843dcb6e043", "sha256": "f4a5dccd79404e0db16b54631e2d7d59001811d6a817e535dab09e5376db3def", "shape": [24, 20, 16], "sum": "2650562.0673065186"},
    "power": {"dtype": "<f4", "sample": "9f7b8d3f3969f0403059bb42ce107e40cd896c4043d4ba424df40541bd8c9a3f", "sha256": "67e725c433f0c660bd36b3c03f48a9bc0cbbf63f36decce6bcb3e1bcd76e7713", "shape": [24, 20, 16], "sum": "206543.99603396654"}
+  },
+  "py.ants.arithmetic.reproduce": {
+   "divide": {"dtype": "<f4", "sample": "000000005207a03faf488d3f6fcf9c3f882f9d3f9b568d3fdd9a9f3fdd9a9f3f", "sha256": "100c507721fe13973a463508c9592678e6b1b2732fc40845585f830833ed24cf", "shape": [24, 20, 16], "sum": "8541.657436013222"}
   },
   "py.ants.components": {
    "distance_map": {"dtype": "<f4", "sample": "4e35c041ba3af4400000000034ff204134ff204100000000ba3af4404e35c041", "sha256": "6ed235ff81117216689c79704d80db76f1ad33e6764f8db6f38f4e9d62a5b49f", "shape": [24, 20, 16], "sum": "64752.96003341675"},
@@ -361,18 +386,24 @@
    "bold.noise": {"dtype": "<f4", "sample": "0000b64100006e4100aa7b4180d8cc416ca00f4180b5a5410070854100c0c041", "sha256": "beadf17ba3bc9ae36d5375ee8c77333222443b84ce93fe1610b93f1133b7c130", "shape": [16, 14, 12, 4], "sum": "565267.5681159012"},
    "gaussian_mask.denoised": {"dtype": "<f4", "sample": "3e7d8d40145d1440290a4d438f2e12412fba08402f194e430000b040a28bfe40", "sha256": "e8478655e5bc5378c4a62ef14612cc0aa0d88902a0daba1ac7ef9b8d636db86a", "shape": [24, 20, 16], "sum": "395068.2067050338"},
    "gaussian_mask.noise": {"dtype": "<f4", "sample": "2873083ffdff3f35001af53f000040b60000c02ac0e213400000000000000035", "sha256": "eb8c437311ba7074b9c5b5c965cec33e124e77b5103ee369a7eed35fa7a8e268", "shape": [24, 20, 16], "sum": "-153.0245483015096"},
+   "plane.denoised": {"dtype": "<f4", "sample": "e68e0441fc4f5d43ceee794314a5f84350590344000000006f4e604361f74740", "sha256": "7e1f30beecac5452602699d68dbb99b24c1dbb9730fdfc3737dbf5d82b32f1f1", "shape": [32, 24], "sum": "176466.9307026863"},
+   "plane.noise": {"dtype": "<f4", "sample": "34e2f64020abc040806846410097853f80ad8840abaa2a3fe0e1c24140df553e", "sha256": "bb37c63a7b9dbf0e92374fb6b0bc5ba16af064fbb610a0a62da96da36d159625", "shape": [32, 24], "sum": "5770.06907838583"},
+   "rician.denoised": {"dtype": "<f4", "sample": "beb2774000000036e928d44300000000000000005ebdd2430000000000000000", "sha256": "c377e0ceb6c697ed7f21805938bf88fa98fa374a73354b349883b08b8cc168f5", "shape": [24, 20, 16], "sum": "761724.1947270037"},
+   "rician.noise": {"dtype": "<f4", "sample": "2c8e2ec0b56d6b4100f28d3f9224c9406edbb640802c1840000088414992a43f", "sha256": "3c20142151bc9f8d1850d0017d914e91c2532ff8213878d1080a60a20a7e2924", "shape": [24, 20, 16], "sum": "49199.51935781141"},
+   "shrink.denoised": {"dtype": "<f4", "sample": "6ddb16c17ed1cc4008a6c743e886df3f44078740b2c2cf433e2d174200000000", "sha256": "3ae6d4b181c1b8b09bb3b486a9b78bd37c7fff16aabfd8eaaac9bb41727d3442", "shape": [24, 20, 16], "sum": "783137.1507556885"},
+   "shrink.noise": {"dtype": "<f4", "sample": "92242941f80405412e0dd141d8429140a750bf3f9a6005417c5aa6c14992a43f", "sha256": "691e9cdc7c3fedaf8b5f31c4aad80e7196f6715c9dd3440a749423c7ad1eab87", "shape": [24, 20, 16], "sum": "27786.563784833532"}
+  },
+  "py.ants.denoise_image.reproduce": {
    "plane.denoised": {"dtype": "<f4", "sample": "e68e0441fc4f5d43ceee7943e9b2f8439cd90344000000006f4e604361f74740", "sha256": "9ff528cc6eae08f37b65688c6869c111c653d4e5eba3802d2d1593576a03ab92", "shape": [32, 24], "sum": "176578.45432329178"},
    "plane.noise": {"dtype": "<f4", "sample": "34e2f64020abc0408068464100846f3f000f1140abaa2a3fe0e1c24140df553e", "sha256": "022efde7d3477a9154378f34ac53346e9d7e862549a37736bec3b8a62c96fe18", "shape": [32, 24], "sum": "5658.545457780361"},
    "rician.denoised": {"dtype": "<f4", "sample": "beb277400000003642bdd44300000000000000005ebdd2430000000000000000", "sha256": "35f91708008e40413e9b30cdfeac6192789a205984ac9e78021bb86e7901ac82", "shape": [24, 20, 16], "sum": "762057.6662235857"},
-   "rician.noise": {"dtype": "<f4", "sample": "2c8e2ec0b56d6b4100e04cbd9224c9406edbb640802c1840000088414992a43f", "sha256": "7b732730b60821205a6b46a30f373c5f75e131d0d0b5af9fbd20233e9933e052", "shape": [24, 20, 16], "sum": "48866.04785830875"},
-   "shrink.denoised": {"dtype": "<f4", "sample": "6ddb16c17ed1cc4008a6c743e886df3f44078740b2c2cf433e2d174200000000", "sha256": "3ae6d4b181c1b8b09bb3b486a9b78bd37c7fff16aabfd8eaaac9bb41727d3442", "shape": [24, 20, 16], "sum": "783137.1507556885"},
-   "shrink.noise": {"dtype": "<f4", "sample": "92242941f80405412e0dd141d8429140a750bf3f9a6005417c5aa6c14992a43f", "sha256": "691e9cdc7c3fedaf8b5f31c4aad80e7196f6715c9dd3440a749423c7ad1eab87", "shape": [24, 20, 16], "sum": "27786.563784833532"}
+   "rician.noise": {"dtype": "<f4", "sample": "2c8e2ec0b56d6b4100e04cbd9224c9406edbb640802c1840000088414992a43f", "sha256": "7b732730b60821205a6b46a30f373c5f75e131d0d0b5af9fbd20233e9933e052", "shape": [24, 20, 16], "sum": "48866.04785830875"}
   },
   "py.ants.image_math": {
    "normalize": {"dtype": "<f4", "sample": "7c55313ccab20e3e46ee80408ad5733ddbaa5d3d5c74804079dd243e2b80473c", "sha256": "94f1b4adf2435d7a23ed9a490f73bad7852be9eaddf4c40e80d46222dcebcf94", "shape": [24, 20, 16], "sum": "7679.977101014461"}
   },
   "py.ants.image_math_operations": {
-   "operations": {"bytes": 3411, "sha256": "6aebeb136e7159ec566a828bdd1d00f4989b56a5975a0493ffebb69a3d1c42c2"}
+   "operations": {"bytes": 3381, "sha256": "c101cb94e3470225acf23bbf9d187e53b037658f6a6b752fcd75659e84e6b42b"}
   },
   "py.ants.intensity": {
    "normalize": {"dtype": "<f4", "sample": "d919303bcdb40d3dcb08803f8a23723c4f205c3c721f7f3f08b8233d141d463b", "sha256": "2632e1fede346092c87f2143ebeb213f340081c7098bd009a096361c3b8a61b8", "shape": [24, 20, 16], "sum": "1906.6450928487466"},
@@ -406,12 +437,17 @@
    "quintic.bias": {"dtype": "<f4", "sample": "27757d3f40107f3f690f7e3fd3687d3fdb5c7f3f98667e3f0fac7d3f858c7f3f", "sha256": "a04173d60daf9829f5eb1edb00a204ba0233795a45f073b451b7c960d1578d43", "shape": [24, 20, 16], "sum": "7630.519185304642"},
    "quintic.convergence": {"dtype": "<f4", "sample": "8c0b943a7d468e3a0ced883a", "sha256": "13c15e7944f0a7e4f7328e5305cd64bdcd25e9ccef649bc881f53a5a9e52d0c2", "shape": [3], "sum": "0.003259631455875933"},
    "quintic.corrected": {"dtype": "<f4", "sample": "cac0933f024b6c41a156d643f732cb404150b740c542d543803f8941a7dca43f", "sha256": "01f41866cc8bdb44a1f8f149fe265765fbb95f78dda54ae2016661511e42bf9a", "shape": [24, 20, 16], "sum": "816421.1668145806"},
-   "threshold.bias": {"dtype": "<f4", "sample": "a86c493eed75313f0486323ff5bb493fbc435a3f4ddb563f05b0603fe778763f", "sha256": "82ff2a64e65f6d654d0354d770e9a415f005e3b994116a1fe24106088c385429", "shape": [24, 20, 16], "sum": "5872.322193786502"},
-   "threshold.convergence": {"dtype": "<f4", "sample": "8565ff3cf50fde3c54a6c33ccf46b53cb166b73cef3caf3cc535a73caa07a13c", "sha256": "6b382045f0ceb1777f0e7d46be7af61357b396c03e300c525fa0227aa215e622", "shape": [8], "sum": "0.18814262002706528"},
-   "threshold.corrected": {"dtype": "<f4", "sample": "a38b9e40175d1440885329438c2e12412fba0840f58e0d430000b040a38bfe40", "sha256": "96ed4b9b581f91062e6041b3f1a715c86cc2b546ca03b92207f77e75b537e59c", "shape": [24, 20, 16], "sum": "346118.12389642"},
+   "threshold.bias": {"dtype": "<f4", "sample": "57817f3f094c803f19e97f3f02427f3fe46a803f4125803f529d7f3f9756803f", "sha256": "f2da103ed369d49d4c15f411b5cc0c503d1a2b0da5e84379a834298486f7c556", "shape": [24, 20, 16], "sum": "7682.985587835312"},
+   "threshold.convergence": {"dtype": "<f4", "sample": "6e00aa3a", "sha256": "ff2166a9ee2120d8373f387f3226cbb21ea2cc1590acf1e959a050d0b6ec3783", "shape": [1], "sum": "0.001297009875997901"},
+   "threshold.corrected": {"dtype": "<f4", "sample": "a38b9e40175d1440d98a4f438c2e12412fba0840d7b050430000b040a38bfe40", "sha256": "2198b20b14681d56037cdf3360ef23dab7cd4443334ec1157b65992e8afd120c", "shape": [24, 20, 16], "sum": "395313.9848354459"},
    "weight_mesh.bias": {"dtype": "<f4", "sample": "17b2743f7464743f8494623f1ba4673f22f2783f89a8693f1bc9693fbe607b3f", "sha256": "e66a088885779d9e555b942794693e21011cc6547095644afbcc07fb46085773", "shape": [24, 20, 16], "sum": "7160.261128425598"},
    "weight_mesh.convergence": {"dtype": "<f4", "sample": "c8c5bb3be260be3b50a2a33bddf4833b8ac2d23b6f34b23be9ae903b", "sha256": "aaa7c1c9d02d4e8d6ec12912d66022c1f922a4674f25c6c3ab1fe4baea5c36bf", "shape": [7], "sum": "0.03684660466387868"},
    "weight_mesh.corrected": {"dtype": "<f4", "sample": "340b993f459c76417155f043704bde40e309bc404831e8433cec9441f098a73f", "sha256": "bf0930e56993cfcdfe27ecc6fc536e9ed8d27e2d288ecc06af7777ba7c32608e", "shape": [24, 20, 16], "sum": "890105.4511395246"}
+  },
+  "py.ants.n4.reproduce": {
+   "threshold.bias": {"dtype": "<f4", "sample": "a86c493eed75313f0486323ff5bb493fbc435a3f4ddb563f05b0603fe778763f", "sha256": "82ff2a64e65f6d654d0354d770e9a415f005e3b994116a1fe24106088c385429", "shape": [24, 20, 16], "sum": "5872.322193786502"},
+   "threshold.convergence": {"dtype": "<f4", "sample": "8565ff3cf50fde3c54a6c33ccf46b53cb166b73cef3caf3cc535a73caa07a13c", "sha256": "6b382045f0ceb1777f0e7d46be7af61357b396c03e300c525fa0227aa215e622", "shape": [8], "sum": "0.18814262002706528"},
+   "threshold.corrected": {"dtype": "<f4", "sample": "a38b9e40175d1440885329438c2e12412fba0840f58e0d430000b040a38bfe40", "sha256": "96ed4b9b581f91062e6041b3f1a715c86cc2b546ca03b92207f77e75b537e59c", "shape": [24, 20, 16], "sum": "346118.12389642"}
   },
   "py.ants.resample": {
    "bspline": {"dtype": "<f4", "sample": "2549923f051d5b436761da4151856143a9b6ec3fff308941b721b44224f42341", "sha256": "2bf8b92e83b2da5e0f9d351abbf8eefa9ca0224f1f8df591ac99d0af3f333964", "shape": [18, 24, 17], "sum": "769383.481296856"},

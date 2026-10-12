@@ -48,6 +48,10 @@ Single-precision steps are kept where ITK computes in `float`. The SVD compariso
 - the slope and intercept rules, and nifti_clib's `FIXED_FLOAT`;
 - `ConvertRASToFromLPS_CXYZT` for `NIFTI_INTENT_DISPVECT` vectors (`m_ConvertRASDisplacementVectors`);
 - nifti_clib's `nifti_read_buffer`: non-finite float values read as 0 (public domain).
+- nifti_clib's `nifti_findimgname` (`nifti1_io.c`, public domain): the order in which it looks
+  for the image file of a name (`.nii`, `.nii.gz`, `.img`, `.img.gz` for a single file),
+  `NiftiPaths::nifti_clib_image_path` and `read_with_data_from`, used only to reproduce
+  defect ITK-08 (the voxels of `x.nii` read for `x.nii.gz`).
 
 ## ITK's writing of NIfTI headers (`src/nifti/itk/write.rs`)
 

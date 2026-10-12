@@ -113,9 +113,18 @@ def ants_apply_transforms(
     default_value: float = 0.0,
     n_threads: int = 1,
     precision: str = "float64",
-) -> np.ndarray:
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """Resample ``data`` onto ``reference_grid`` (``antsApplyTransforms``), computing in
-    ``precision`` (``float64``, or ``float32`` as ``--float 1``); a result of that type."""
+    ``precision`` (``float64``, or ``float32`` as ``--float 1``): a result of that type and the
+    upstream-defect notices."""
+
+def ants_cast_output(
+    values: np.ndarray, dtype: str, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[Notice]]:
+    """``antsApplyTransforms -u``'s cast of float64 ``values`` to ``dtype`` (``int8``,
+    ``uint8``, ``int16``, ``int32``, ``float32``, ``float64``): out of an integer type's range
+    clamped (``fix``) or wrapped as x86-64 converts (``reproduce``; ANTS-06)."""
 
 def ants_transform_points(points: np.ndarray, transforms: list[tuple[Parts, bool]]) -> np.ndarray:
     """Map ``(n, 3)`` LPS points through ``transforms``."""
@@ -258,12 +267,14 @@ def ants_program(
     inputs: dict[str, ImageTuple],
     outputs: list[str],
     n_threads: int = 1,
+    upstream_defects: str = "fix",
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
     """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``, ``N4BiasFieldCorrection``,
     ``ResampleImageBySpacing`` or ``ResampleImage`` with ``args`` on in-memory ``inputs`` (by
     placeholder name);
     writes to ``outputs`` names are returned:
-    ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``."""
+    ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``. The program runs in
+    the D13 mode ``upstream_defects``; its notices are lines of ``stderr``."""
 
 def ants_image_math_operations() -> list[tuple[str, str]]:
     """The ImageMath operations larmorx implements: ``(name, usage)``."""
@@ -274,12 +285,19 @@ def ants_read_float(
     """Read a NIfTI image as ANTs reads it into ``itk::Image<float, dim>``."""
 
 def ants_arithmetic(
-    op: str, a: np.ndarray, b: np.ndarray | float, n_threads: int = 1
-) -> tuple[np.ndarray, float, int]:
-    """ImageMath's voxel-wise arithmetic on float32 arrays: ``(data, result, count)``."""
+    op: str,
+    a: np.ndarray,
+    b: np.ndarray | float,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, float, int, list[Notice]]:
+    """ImageMath's voxel-wise arithmetic on float32 arrays: ``(data, result, count,
+    notices)``."""
 
-def ants_negative_image(a: np.ndarray, n_threads: int = 1) -> np.ndarray:
-    """ImageMath ``Neg``."""
+def ants_negative_image(
+    a: np.ndarray, n_threads: int = 1, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[Notice]]:
+    """ImageMath ``Neg``: ``(data, notices)``."""
 
 def ants_truncate_image_intensity(
     a: np.ndarray,
@@ -288,13 +306,19 @@ def ants_truncate_image_intensity(
     bins: int = 64,
     mask: np.ndarray | None = None,
     n_threads: int = 1,
-) -> tuple[np.ndarray, float, float]:
-    """ImageMath ``TruncateImageIntensity``: ``(data, lower, upper)``."""
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, float, float, list[Notice]]:
+    """ImageMath ``TruncateImageIntensity``: ``(data, lower, upper, notices)``."""
 
 def ants_normalize_image(
-    a: np.ndarray, mode: str = "range", mask: np.ndarray | None = None, n_threads: int = 1
-) -> np.ndarray:
-    """ImageMath ``Normalize`` (``mode``: ``range``, ``mean`` or ``mask``)."""
+    a: np.ndarray,
+    mode: str = "range",
+    mask: np.ndarray | None = None,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
+    """ImageMath ``Normalize`` (``mode``: ``range``, ``mean`` or ``mask``): ``(data,
+    notices)``."""
 
 def ants_rescale_image(
     a: np.ndarray, minimum: float, maximum: float, n_threads: int = 1
@@ -315,9 +339,13 @@ def ants_threshold_image(
     """``ThresholdImage`` with a range."""
 
 def ants_otsu_threshold(
-    a: np.ndarray, n_thresholds: int, mask: np.ndarray | None = None, n_threads: int = 1
-) -> tuple[np.ndarray, np.ndarray]:
-    """``ThresholdImage ... Otsu n [mask]``: ``(labels, thresholds)``."""
+    a: np.ndarray,
+    n_thresholds: int,
+    mask: np.ndarray | None = None,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, np.ndarray, list[Notice]]:
+    """``ThresholdImage ... Otsu n [mask]``: ``(labels, thresholds, notices)``."""
 
 # The Gaussian group: ``a`` is float32 in 2 to 4 dimensions, ``spacing`` ITK's spacing of every
 # axis (mm; seconds for a fourth axis).
@@ -334,9 +362,14 @@ def ants_smooth_image(
     (radius ``sigma`` voxels)."""
 
 def ants_discrete_gaussian(
-    a: np.ndarray, spacing: list[float], sigma: list[float], n_threads: int = 1
-) -> np.ndarray:
-    """ImageMath ``G``: ``DiscreteGaussianImageFilter`` (sigma in physical units)."""
+    a: np.ndarray,
+    spacing: list[float],
+    sigma: list[float],
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
+    """ImageMath ``G``: ``DiscreteGaussianImageFilter`` (sigma in physical units):
+    ``(data, notices)``."""
 
 def ants_laplacian(
     a: np.ndarray,
@@ -378,13 +411,15 @@ def ants_denoise_image(
     patch_radius: list[int] = ...,
     search_radius: list[int] = ...,
     n_threads: int = 1,
+    upstream_defects: str = "fix",
 ) -> tuple[
     tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
     tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
+    list[Notice],
 ]:
     """``DenoiseImage`` (paths or in-memory images; the image read as a ``dim``-dimensional
-    float image, the mask as ``unsigned char``): ``(denoised, noise)``, each as ``(data,
-    ras_affine, descrip, spacing)``. ``patch_radius`` (default ``[1]``) and ``search_radius``
+    float image, the mask as ``unsigned char``): ``(denoised, noise, notices)``, the images as
+    ``(data, ras_affine, descrip, spacing)``. ``patch_radius`` (default ``[1]``) and ``search_radius``
     (default ``[2]``) hold one value for every axis or one per axis."""
 
 def ants_n4_bias_field_correction(
@@ -403,13 +438,15 @@ def ants_n4_bias_field_correction(
     bins: int = 200,
     rescale_intensities: bool = False,
     n_threads: int = 1,
+    upstream_defects: str = "fix",
 ) -> tuple[
     tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
     tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]],
     list[tuple[int, int, float]],
+    list[Notice],
 ]:
     """``N4BiasFieldCorrection`` (paths or in-memory images, read as ``dim``-dimensional float
-    images): ``(corrected, bias_field, [(level, iteration, convergence)])``, the images as
+    images): ``(corrected, bias_field, [(level, iteration, convergence)], notices)``, the images as
     ``(data, ras_affine, descrip, spacing)``. ``spline_distance`` (``-b [mm]``) and ``mesh``
     (``-b [AxBxC]``) are exclusive; ``iterations`` defaults to ``[50, 50, 50, 50]``."""
 
@@ -420,9 +457,10 @@ def ants_resample_image_by_spacing(
     add_voxels: int = 0,
     nearest: bool = False,
     n_threads: int = 1,
-) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
+    upstream_defects: str = "fix",
+) -> tuple[tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]], list[Notice]]:
     """``ResampleImageBySpacing`` on a path (read in ``len(spacing)`` dimensions) or an
-    in-memory image: ``(data, ras_affine, descrip, spacing)``."""
+    in-memory image: ``((data, ras_affine, descrip, spacing), notices)``."""
 
 def ants_resample_image(
     image: str | ImageTuple,
@@ -436,10 +474,11 @@ def ants_resample_image(
     order: int = 3,
     pixel_type: str = "float",
     n_threads: int = 1,
-) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
+    upstream_defects: str = "fix",
+) -> tuple[tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]], list[Notice]]:
     """``ResampleImage`` by ``spacing`` or ``size`` (``interpolation``: ``linear``, ``nearest``,
     ``gaussian``, ``sinc``, ``bspline``; ``pixel_type``: ``char`` ... ``double``):
-    ``(data, ras_affine, descrip, spacing)``."""
+    ``((data, ras_affine, descrip, spacing), notices)``."""
 
 # The morphology group: ``a`` is float32 in 2 to 4 dimensions; radii are in voxels.
 
@@ -449,9 +488,12 @@ def ants_morphology(
     """ImageMath ``MD``/``ME``/``MO``/``MC``/``GD``/``GE``/``GO``/``GC`` (``ants::Morphological``)
     with ITK's ball of ``radius`` voxels; ``value`` is the binary operations' foreground."""
 
-def ants_fill_holes(a: np.ndarray, hole_param: float = 2.0, n_threads: int = 1) -> np.ndarray:
+def ants_fill_holes(
+    a: np.ndarray, hole_param: float = 2.0, n_threads: int = 1, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[Notice]]:
     """ImageMath ``FillHoles``: the background regions other than the largest set to 1 (all for
-    ``hole_param`` 2; by their share of object neighbours for ``hole_param ≤ 1``)."""
+    ``hole_param`` 2; by their share of object neighbours for ``hole_param ≤ 1``): ``(data,
+    notices)``."""
 
 def ants_pad_image(
     image: str | ImageTuple, dim: int, pad: float, value: float = 0.0, n_threads: int = 1
@@ -461,10 +503,12 @@ def ants_pad_image(
 
 # Components, distance maps and label values: ``a`` is float32 in 2 to 4 dimensions.
 
-def ants_largest_component(a: np.ndarray, smallest: int = 50, n_threads: int = 1) -> np.ndarray:
+def ants_largest_component(
+    a: np.ndarray, smallest: int = 50, n_threads: int = 1, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[Notice]]:
     """ImageMath ``GetLargestComponent``: 1 in the largest face-connected component(s) of the
-    voxels in ``[0.25, 1e9]``, 0 elsewhere (1 everywhere if no component has ``smallest``
-    voxels)."""
+    voxels in ``[0.25, 1e9]``, 0 elsewhere (0 everywhere if no component has ``smallest``
+    voxels; ANTs, reproduced: 1 everywhere): ``(data, notices)``."""
 
 def ants_distance_map(a: np.ndarray, spacing: list[float]) -> np.ndarray:
     """ImageMath ``D``: ITK's Danielsson distance map to the non-zero voxels (mm)."""
@@ -476,10 +520,10 @@ def ants_maurer_distance(
     ``foreground`` (mm, negative inside)."""
 
 def ants_extract_contours(
-    a: np.ndarray, fully_connected: bool = True, n_threads: int = 1
-) -> np.ndarray:
+    a: np.ndarray, fully_connected: bool = True, n_threads: int = 1, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[Notice]]:
     """ImageMath ``ExtractContours``: the voxels of each integer label (values truncated)
-    that touch another label, keeping their label; 0 elsewhere."""
+    that touch another label, keeping their label; 0 elsewhere: ``(data, notices)``."""
 
 def ants_threshold_at_mean(a: np.ndarray, fraction: float = 1.0, n_threads: int = 1) -> np.ndarray:
     """ImageMath ``ThresholdAtMean``: 1 where ``mean · fraction ≤ v ≤ max``, else 0."""

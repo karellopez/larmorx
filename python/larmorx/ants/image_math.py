@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, parse_line, warn
 from larmorx.ants._filters import float_input, mask_input, memory_image, result
 from larmorx.image import Image
 
@@ -55,7 +56,13 @@ def _operand(value: Any, index: int, inputs: dict[str, Any]) -> str:
     return name
 
 
-def image_math(operation: str, *operands: Any, dimension: int = 3, n_threads: int = 1) -> Image:
+def image_math(
+    operation: str,
+    *operands: Any,
+    dimension: int = 3,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """Run ImageMath ``operation`` on ``operands``, as
     ``ImageMath <dimension> <output> <operation> <operands...>`` does.
 
@@ -68,11 +75,25 @@ def image_math(operation: str, *operands: Any, dimension: int = 3, n_threads: in
     Returns the image the operation writes (in the type ANTs writes, usually float32), with
     the geometry ANTs gives it. Raises :class:`ImageMathError` with the program's messages
     when it fails or writes nothing. See :func:`image_math_operations` for the operations.
+
+    ANTs' defects are corrected as on the command line; ``upstream_defects="reproduce"`` gives
+    ANTs' result (``LARMORX_UPSTREAM_DEFECTS=reproduce``), and an
+    :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result
+    (``docs/api/ants-image-math.md``).
     """
+    check(upstream_defects)
     inputs: dict[str, Any] = {}
     args = [str(int(dimension)), _OUTPUT, operation]
     args += [_operand(v, i, inputs) for i, v in enumerate(operands)]
-    code, out, err, outputs = _core.ants_program("ImageMath", args, inputs, [_OUTPUT], n_threads)
+    code, out, err, outputs = _core.ants_program(
+        "ImageMath", args, inputs, [_OUTPUT], n_threads, upstream_defects
+    )
+    for line in err.splitlines():
+        warning = parse_line(line)
+        if warning is not None:
+            import warnings
+
+            warnings.warn(warning, stacklevel=2)
     if code != 0 or _OUTPUT not in outputs:
         message = "\n".join(s for s in (err.strip(), out.strip()) if s)
         raise ImageMathError(message or f"ImageMath {operation} wrote no image")
@@ -113,39 +134,66 @@ def _op_name(operation: str) -> str:
 
 
 def image_arithmetic(
-    image: Any, operation: str, operand: Any = 1.0, *, n_threads: int = 1
+    image: Any,
+    operation: str,
+    operand: Any = 1.0,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """ImageMath's voxel-wise arithmetic (``m``, ``+``, ``-``, ``/``, ``^``, ``exp``, ``max``,
     ``abs``, ``addtozero``, ``overadd``, ``Decision``, ``total``, ``mean``), in float32 as
     ANTs computes it.
 
     ``operand`` is a number or an image. An image is read at ``image``'s voxel indices (its
-    geometry is ignored, as in ANTs), so it may be larger but not smaller. ANTs' quirks are
-    kept: ``divide`` keeps the previous voxel's value where the divisor is not positive;
-    ``total`` and ``mean`` return the running sum. The friendly names in :data:`ARITHMETIC`
-    work too.
+    geometry is ignored, as in ANTs), so it may be larger. ANTs' defects are corrected:
+    ``divide`` divides wherever the divisor is not 0 and gives 0 where it is (ANTS-08; ANTs
+    keeps the previous voxel's value where the divisor is not positive); ``total`` and ``mean``
+    fill the image with the total or the mean (ANTS-09; ANTs writes the running sum); a smaller
+    second image is an error (ANTS-07; ANTs reads outside it). ``upstream_defects="reproduce"``
+    gives ANTs' results. The friendly names in :data:`ARITHMETIC` work too.
     """
+    check(upstream_defects)
     op = _op_name(operation)
     a = float_input(image, n_threads)
     if isinstance(operand, (int, float, np.integer, np.floating)):
         b: Any = float(operand)
     else:
         b = np.asfortranarray(float_input(operand, n_threads).data)
-    data, _result, _count = _core.ants_arithmetic(op, np.asfortranarray(a.data), b, n_threads)
+    data, _result, _count, notices = _core.ants_arithmetic(
+        op, np.asfortranarray(a.data), b, n_threads, upstream_defects
+    )
+    warn(notices)
     return result(data, a)
 
 
-def add_to_zero(image: Any, other: Any, *, n_threads: int = 1) -> Image:
+def add_to_zero(
+    image: Any,
+    other: Any,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``ImageMath addtozero``: ``other`` added where ``image`` is zero (fMRIPrep combines
     brain-extraction masks this way)."""
-    return image_arithmetic(image, "addtozero", other, n_threads=n_threads)
+    return image_arithmetic(
+        image, "addtozero", other, n_threads=n_threads, upstream_defects=upstream_defects
+    )
 
 
-def negative_image(image: Any, *, n_threads: int = 1) -> Image:
-    """``ImageMath Neg``: ``max - v`` over the image's range, as ANTs computes it (including
-    the way it finds that range; see ``docs/api/ants-image-math.md``)."""
+def negative_image(
+    image: Any, *, n_threads: int = 1, upstream_defects: UpstreamDefectsName = "fix"
+) -> Image:
+    """``ImageMath Neg``: ``max - v`` over the image's range. ANTs finds the range with an
+    ``else if`` that can miss the minimum (ANTS-11, ``docs/api/ants-image-math.md``); larmorx
+    uses the true range unless ``upstream_defects="reproduce"``."""
+    check(upstream_defects)
     a = float_input(image, n_threads)
-    return result(_core.ants_negative_image(np.asfortranarray(a.data), n_threads), a)
+    data, notices = _core.ants_negative_image(
+        np.asfortranarray(a.data), n_threads, upstream_defects
+    )
+    warn(notices)
+    return result(data, a)
 
 
 # --- intensity ---------------------------------------------------------------------------------
@@ -159,39 +207,57 @@ def truncate_image_intensity(
     *,
     mask: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath TruncateImageIntensity``: clip the image to the quantiles of a ``bins``-bin
     histogram of its positive voxels (inside ``mask``, where its value is at least 1).
 
     ``upper_quantile`` defaults to ``1 - lower_quantile``. fMRIPrep uses
-    ``truncate_image_intensity(t1w, 0.01, 0.999, 256)``.
+    ``truncate_image_intensity(t1w, 0.01, 0.999, 256)``. The histogram covers the voxels'
+    true range; ANTs' can leave the brightest voxel out (ANTS-12), which
+    ``upstream_defects="reproduce"`` gives.
     """
+    check(upstream_defects)
     a = float_input(image, n_threads)
     m = None if mask is None else np.asfortranarray(mask_input(mask, a.data.shape, n_threads))
-    data, _lower, _upper = _core.ants_truncate_image_intensity(
+    data, _lower, _upper, notices = _core.ants_truncate_image_intensity(
         np.asfortranarray(a.data),
         float(lower_quantile),
         None if upper_quantile is None else float(upper_quantile),
         int(bins),
         m,
         n_threads,
+        upstream_defects,
     )
+    warn(notices)
     return result(data, a)
 
 
 def normalize_image(
-    image: Any, mask: Any = None, *, by_mean: bool = False, n_threads: int = 1
+    image: Any,
+    mask: Any = None,
+    *,
+    by_mean: bool = False,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath Normalize``: to ``[0, 1]`` over the image's range; divided by the mean of
     all voxels with ``by_mean``; or divided by the mean inside ``mask`` (voxels where it is
-    not zero)."""
+    not zero). The range is the image's true one; ANTs starts it from 0 and 1e9 (ANTS-13),
+    which ``upstream_defects="reproduce"`` gives."""
+    check(upstream_defects)
     a = float_input(image, n_threads)
     if mask is not None:
         m = np.asfortranarray(mask_input(mask, a.data.shape, n_threads).astype(np.float32))
-        data = _core.ants_normalize_image(np.asfortranarray(a.data), "mask", m, n_threads)
+        data, notices = _core.ants_normalize_image(
+            np.asfortranarray(a.data), "mask", m, n_threads, upstream_defects
+        )
     else:
         mode = "mean" if by_mean else "range"
-        data = _core.ants_normalize_image(np.asfortranarray(a.data), mode, None, n_threads)
+        data, notices = _core.ants_normalize_image(
+            np.asfortranarray(a.data), mode, None, n_threads, upstream_defects
+        )
+    warn(notices)
     return result(data, a)
 
 

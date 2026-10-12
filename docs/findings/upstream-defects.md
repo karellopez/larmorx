@@ -46,60 +46,62 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 |---|---|---|---|---|---|---|
 | ANTS-01 | ANTs parser | some bracket forms and non-integer values rejected | e | none | same rejections | – |
 | ANTS-02 | ANTs programs | crash or abort on missing files, missing arguments, text for numbers | a | none | refuses (exit 1) | – |
-| ANTS-03 | ANTs I/O | names of 3 characters or fewer not read or written, exit 0 | e | none | reproduces | **yes** |
-| ANTS-04 | ImageMath | exit 0 after a failed operation | e | hides failures | reproduces | **yes** |
-| ANTS-05 | ImageMath | operand parsing: `7 ` is a file, `1e` is 0, no operand is 1 | e | none | reproduces | **yes** |
-| ANTS-06 | ANTs programs | out-of-range float-to-integer conversions answered as x86-64 does (undefined) | a | none seen | reproduces x86-64 | decide |
-| ANTS-07 | ImageMath | a smaller second image read out of bounds | a | none | refuses | – |
-| ANTS-08 | ImageMath `/` | divisor ≤ 0: the previous voxel's result | c | none | reproduces | **yes** |
-| ANTS-09 | ImageMath `total`, `mean` | the image holds running sums | c | none | reproduces | **yes** |
-| ANTS-10 | ImageMath `vtotal` | all-zero output | c | none | reproduces | **yes** |
-| ANTS-11 | ImageMath `Neg` | range missed on increasing images | c | none | reproduces | **yes** |
-| ANTS-12 | ImageMath `TruncateImageIntensity` | brightest voxel can fall outside the histogram; 64 bins, usage says 65 | c, f | possible | reproduces | **yes** |
-| ANTS-13 | ImageMath `Normalize` | range starts at 0 and 1e9 | c | none | reproduces | **yes** |
-| ANTS-14 | ImageMath `G` (ITK) | variance above ≈709 voxels² gives NaN | c | none | reproduces | **yes** |
-| ANTS-15 | ImageMath `G`, SmoothImage | wrong number of sigmas: unchanged image or 1 mm, exit 0 | e | none | reproduces | **yes** |
-| ANTS-16 | ImageMath `Laplacian` | normalize flag read from the sigma argument | e | none (same result) | command line reproduces | **yes** |
+| ANTS-03 | ANTs I/O | names of 3 characters or fewer not read or written, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-04 | ImageMath | exit 0 after a failed operation | e | hides failures | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-05 | ImageMath | operand parsing: `7 ` is a file, `1e` is 0, no operand is 1 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-06 | ANTs programs | out-of-range float-to-integer conversions answered as x86-64 does (undefined) | a | none seen | clamps and warns by default; `reproduce` wraps as x86-64 does (2026-10-12) | – |
+| ANTS-07 | ImageMath | a smaller second image read out of bounds | a | none | refuses; `reproduce` reads inside the buffer, 0 beyond, and warns (2026-10-12) | – |
+| ANTS-08 | ImageMath `/` | divisor ≤ 0: the previous voxel's result | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-09 | ImageMath `total`, `mean` | the image holds running sums | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-10 | ImageMath `vtotal` | all-zero output | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-11 | ImageMath `Neg` | range missed on increasing images | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-12 | ImageMath `TruncateImageIntensity` | brightest voxel can fall outside the histogram; 64 bins, usage says 65 | c, f | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-13 | ImageMath `Normalize` | range starts at 0 and 1e9 | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-14 | ImageMath `G` (ITK) | variance above ≈709 voxels² gives NaN | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-15 | ImageMath `G`, SmoothImage | wrong number of sigmas: unchanged image or 1 mm, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-16 | ImageMath `Laplacian` | normalize flag read from the sigma argument | e | none (same result) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-17 | ImageMath `MO`, `ME` | `MO r 0` is a dilation of zeros; `ME` keeps other labels as 1 | c? | none | reproduces | decide |
 | ANTS-18 | ImageMath `GD`, `GC` (ITK) | sign of a zero extreme depends on threads | b | none | defined signs | – |
-| ANTS-19 | ImageMath `FillHoles` | `holeparam ≤ 1` reads outside the image | a | none | reproduces the reads inside the buffer | **yes** |
-| ANTS-20 | ImageMath `GetLargestComponent` | nothing kept: every voxel becomes 1 | c | possible | reproduces | **yes** |
+| ANTS-19 | ImageMath `FillHoles` | `holeparam ≤ 1` reads outside the image | a | none | outside neighbours not counted by default; `reproduce` reads inside the buffer as ANTs, background beyond (2026-10-12) | – |
+| ANTS-20 | ImageMath `GetLargestComponent` | nothing kept: every voxel becomes 1 | c | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-21 | ImageMath `ClusterThresholdVariate` | reads outside the image | a | none | not ported | – |
 | ANTS-22 | ImageMath `PadImage` | fractional pad grows by ⌊2p⌋, shifts by ⌊p⌋ | c? | none | reproduces | decide |
 | ANTS-23 | ImageMath `ExtractContours` | labels are truncated values | c? | none | reproduces | decide |
-| ANTS-24 | ThresholdImage | unknown mode names become thresholds at 0; sixth argument read as a file | e, f | none | reproduces | **yes** |
-| ANTS-25 | ThresholdImage Otsu with a mask | range from the smallest positive float, `else if` | c | none | reproduces | **yes** |
+| ANTS-24 | ThresholdImage | unknown mode names become thresholds at 0; sixth argument read as a file | e, f | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-25 | ThresholdImage Otsu with a mask | range from the smallest positive float, `else if` | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-26 | ThresholdImage `Otsu 0` | never returns | a | none | refuses | – |
-| ANTS-27 | MultiplyImages | unreadable second file multiplies by 0, silently | e | possible | command line reproduces | **yes** |
-| ANTS-28 | ResampleImageBySpacing, ResampleImage, SmoothImage | uninitialised values reach the output | a | none | refuses | – |
-| ANTS-29 | ResampleImage | size 1: infinite spacing, a zero image, exit 0 | c | none | refuses | decide |
-| ANTS-30 | ResampleImage | seventh argument read twice | e | none | command line reproduces | **yes** |
-| ANTS-31 | ResampleImageBySpacing | `nn` read from the wrong argument; dimension 5 does nothing | e | none | reproduces | **yes** |
+| ANTS-27 | MultiplyImages | unreadable second file multiplies by 0, silently | e | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-28 | ResampleImageBySpacing, ResampleImage, SmoothImage | uninitialised values reach the output | a | none | refuses; `reproduce` fills the unwritten buffer with zeros and warns (2026-10-12) | – |
+| ANTS-29 | ResampleImage | size 1: infinite spacing, a zero image, exit 0 | c | none | refuses; `reproduce` writes ANTs' image byte for byte (2026-10-12) | – |
+| ANTS-30 | ResampleImage | seventh argument read twice | e | none | corrected by default (`upstream_defects`, 2026-10-12); the command-line design awaits review | – |
+| ANTS-31 | ResampleImageBySpacing | `nn` read from the wrong argument; dimension 5 does nothing | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-32 | ResampleImageBySpacing | sigma `out/in − 1` taken in mm; outside points get the value at index 1 | c? | none | reproduces | decide |
-| ANTS-33 | antsApplyTransforms | unknown `-u` ignored; interpolator parameters ignored | e | none | reproduces | **yes** |
+| ANTS-33 | antsApplyTransforms | unknown `-u` ignored; interpolator parameters ignored | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-34 | antsApplyTransforms `GenericLabel` (ITK) | never finishes on intensity images | a | none | neighbour labels only, same result | – |
-| ANTS-35 | N4BiasFieldCorrection | `-c`, `-b`, `-t` without brackets set nothing | e | none | reproduces | **yes** |
-| ANTS-36 | N4BiasFieldCorrection | unreadable mask becomes ones; `-r` without a mask does nothing | e | `-r` has no effect | reproduces | **yes** |
+| ANTS-35 | N4BiasFieldCorrection | `-c`, `-b`, `-t` without brackets set nothing | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-36 | N4BiasFieldCorrection | unreadable mask becomes ones; `-r` without a mask does nothing | e | `-r` has no effect | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-37 | N4 (ITK) | result depends on the thread count | b | anatomical N4s | single-thread result | – |
-| ANTS-38 | N4 (ITK) | histogram range `else if`: a first-voxel minimum is dropped | c | possible, every N4 | reproduces | **yes** |
-| ANTS-39 | N4 (ITK) | 256 bins give a 1024-point FFT | c | none | reproduces | **yes** |
+| ANTS-38 | N4 (ITK) | histogram range `else if`: a first-voxel minimum is dropped | c | possible, every N4 | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-39 | N4 (ITK) | 256 bins give a 1024-point FFT | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-40 | N4 (ITK) | zero and negative values stay in the log image | c? | unmasked N4s | reproduces | decide |
 | ANTS-41 | ANTs built by GCC 11.4 / 12.3 (compiler bug, not ANTs) | two float roundings of N4's fit dropped (GCC bug 110182) | d | none (fMRIPrep's build follows the source) | follows the source | – (rule 8) |
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
-| ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | possible | reproduces | **yes** |
+| ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | sMRIPrep's T1w (7-8 % of voxels) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
 | ANTS-45 | N4, DenoiseImage | errors explained only with `-v` | f | none | always explained | – |
 | ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | c? | every run | not ported (A4) | open |
-| ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | reproduces | **yes** |
-| ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | reproduces | **yes** |
-| ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | reproduces | **yes** |
+| ANTS-47 | DenoiseImage | an unreadable mask is no mask, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-04 | ITK Danielsson map | approximate, order-dependent distances | d | none | reproduces | – (D11) |
 | ITK-05 | ITK `vnl_erf` | relative error 3e-7 in Gaussian weights | d | Gaussian interpolation | reproduces | – (D11) |
 | ITK-06 | nifti_clib | NaN and ±inf read as 0 | c? | none seen | reproduces | decide |
 | ITK-07 | ITK NIfTI reader | integer data scaled in float32 | d | scaled inputs | reproduces | – |
-| ITK-08 | nifti_clib | asked for `x.nii.gz`, opens `x.nii` | e | none | opens the named file | decide |
+| ITK-08 | nifti_clib | asked for `x.nii.gz`, opens `x.nii` | e | none | opens the named file; `reproduce` reads nifti_clib's (2026-10-12) | – |
 | ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical | – |
-| ITK-10 | ITK `Versor<float>` | a versor axis of norm ≥ 1 can fail to load in float (`--float 1`) | c | none seen | reproduces (refuses) | **yes** |
+| ITK-10 | ITK `Versor<float>` | a versor axis of norm ≥ 1 can fail to load in float (`--float 1`) | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ITK-11 | ITK `GaussianOperator` | Bessel coefficients inaccurate for variances above about 50 voxels² | d | none | reproduces (finite kernels) | – (D11) |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
 | PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -116,7 +118,7 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
-| SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | reproduces x86-64 | decide |
+| SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
@@ -166,26 +168,28 @@ still to do; – = nothing to do. How the switch works: [api/upstream-defects.md
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (121 entries; an entry with two classes counts under its first):
+**Counts** (123 entries; an entry with two classes counts under its first):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 13 | |
 | (b) race, nondeterminism | 6 | |
 | (c) deterministic bug that changes results | 55 | 15 |
-| (d) imprecision | 16 | |
-| (e) command-line or parsing quirk | 25 | |
+| (d) imprecision | 17 | |
+| (e) command-line or parsing quirk | 26 | |
 | (f) documentation or message only | 6 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
-column (after the first D13 switches, 2026-10-11; ITK-10 added later that day): 29 **yes**, 6 replica, 25 decide, 1 rule 8, 1
-open; 13 entries switched to corrected by default.
+column (after D13 part 1, 2026-10-12): no **yes** left, 6 replica, 21 decide, 1 rule 8, 1 open.
+The first D13 switches (2026-10-11) corrected 13 entries; part 1 (2026-10-12) the 29 ANTs and
+ITK entries marked **yes**, ANTS-06 and SCI-02 (decided), ANTS-47 (new), and gave ANTS-07,
+-19, -28, -29 and ITK-08 a compatibility switch (Decisions, item 5).
 
 ## D13 gaps: what the next task switches to "correct by default"
 
-The class (c) and (e) defects, and one class (a) read, that larmorx reproduces by default
-today. For each: the larmorx code path the fix touches. Every fix needs, per the [porting
+The class (c) and (e) defects, and one class (a) read, that larmorx reproduced by default
+before D13. For each: the larmorx code path the fix touches. Every fix needs, per the [porting
 guide](../porting-guide.md) §8: the corrected default, a warning when the original's result
 would have differed, the compatibility switch, a parity run with the switch (bit for bit as
 today) and one with the default (the fix's effect reported), and re-recorded golden checksums
@@ -193,14 +197,17 @@ for the outputs that change ([validation/golden.md](../validation/golden.md), "R
 The proposed fix is in each entry; "(to confirm)" marks a fix whose intended behaviour the
 upstream does not state.
 
-**Status (2026-10-11).** The shared switch is in place (`upstream_defects=`,
+**Status (2026-10-12).** The shared switch is in place (`upstream_defects=`,
 `LARMORX_UPSTREAM_DEFECTS`, `larmorx_core::defects`; [api/upstream-defects.md](../api/upstream-defects.md)).
-Done: fMRIPrep's libraries and SciPy (PIPE-03, PIPE-04, SCI-03), head-motion correction (every
-FSL entry below; FSL-02 measured, opt-in), and the slice-timing original (AFNI-01, -02, -03,
--05, -07; AFNI-08 needs its trigger, see below). Still to do: the ANTs and ITK entries, and the
-3dTshift replica's switch.
+Done: fMRIPrep's libraries and SciPy (PIPE-03, PIPE-04, SCI-03; SCI-02 with part 1),
+head-motion correction (every FSL entry below; FSL-02 measured, opt-in), the slice-timing
+original (AFNI-01, -02, -03, -05, -07; AFNI-08 needs its trigger, see below), and (part 1,
+2026-10-12) every ANTs and ITK entry below, with ANTS-06, ANTS-07, ANTS-19, ANTS-28, ANTS-29,
+ANTS-47, ITK-08 and SCI-02. What each correction changed in the parity cases is in the
+records' "D13 fix pass" lines ([ants-image-math.md](../validation/ants-image-math.md) and the
+other ANTs records). Still to do: the 3dTshift replica's switch.
 
-**Main package (`crates/`, `python/larmorx/`), ANTs and ITK:**
+**Main package (`crates/`, `python/larmorx/`), ANTs and ITK** (done 2026-10-12):
 
 | ID | Defect | Code path | fMRIPrep |
 |---|---|---|---|
@@ -215,7 +222,7 @@ FSL entry below; FSL-02 measured, opt-in), and the slice-timing original (AFNI-0
 | ANTS-14 | `G`: NaN kernel above ≈709 voxels² | `larmorx_image::discrete_gaussian` (Bessel kernel) | none |
 | ANTS-25 | Otsu with a mask: range from `FLT_MIN`, `else if` | `larmorx_ants::threshold_image` (`threshold_image.rs:106`; CLI and `lx.ants.otsu_threshold`) | none |
 | ANTS-39 | N4: 256 bins → 1024-point FFT | `larmorx_image::n4` (padded size, `n4.rs:157`) | none (200 bins) |
-| ITK-01 | `Math::Floor` of tiny negatives | `larmorx_image::grid::{vnl_floor_f32, itk_floor_f64}` in the 4D paths of `larmorx_ants::resample` | none seen |
+| ITK-01 | `Math::Floor` of tiny negatives | `larmorx_core::IndexFloor` in the 4D paths of `larmorx_ants::resample`, the field and sinc lookups | none seen |
 | ITK-02 | extra dimensions read with an identity direction | `larmorx_ants::image::from_itk` (`image.rs:407`) | none seen |
 | ITK-03 | float labels stop at 2^24 | `larmorx_ants::image_math::morphology::float_labels` | latent |
 | ANTS-04 | ImageMath exits 0 after a failure | `larmorx_ants::cli::image_math` (dispatch, `OpError`) | hides failed steps |
@@ -227,7 +234,7 @@ FSL entry below; FSL-02 measured, opt-in), and the slice-timing original (AFNI-0
 | ANTS-03 | names of 3 characters or fewer | `larmorx_ants::image` (`image.rs:384`, `:398`), the ImageMath writers (`output.len() > 3`) | none |
 | ANTS-05 | ImageMath operand parsing | `larmorx_ants::cli::cstd::from_string_f32` | none |
 | ANTS-24 | ThresholdImage mode names | `larmorx_ants::cli::threshold_image` | none |
-| ANTS-30 | ResampleImage's seventh argument (needs a design) | `larmorx_ants::cli::resample_image` | none |
+| ANTS-30 | ResampleImage's seventh argument (designed: [api/ants-resample-image.md](../api/ants-resample-image.md), "The seventh argument") | `larmorx_ants::cli::resample_image` | none |
 | ANTS-31 | ResampleImageBySpacing's arguments | `larmorx_ants::cli::resample_image_by_spacing` | none |
 | ANTS-33 | antsApplyTransforms: `-u`, ignored interpolator parameters | `larmorx_ants::cli::apply_transforms`, `OutputType::from_name` | none |
 
@@ -277,7 +284,7 @@ task:
 
 **Decided by the user on 2026-10-11** (decision log, "D13's details"):
 - Item 1, undefined conversions: **clamp and warn by default**; the compatibility switch
-  reproduces x86-64's wraparound.
+  reproduces x86-64's wraparound. **Done 2026-10-12** (ANTS-06, SCI-02).
 - Item 3, replicas: **the same corrected default as the originals**; the compatibility switch
   must give **exactly the original program's result**.
 - Item 4, FSL-02: **measure first** (against mcflirt's band and the synthetic ground truth),
@@ -292,10 +299,16 @@ task:
   depends on memory contents and changes from run to run (an unfilled buffer, an out-of-bounds
   read), no program can reproduce it, not even the original. There the switch reproduces
   everything defined (exit code, files, headers), fills the undefined part deterministically
-  and warns that it does.
+  and warns that it does. **Done 2026-10-12** for the ANTs and ITK entries: ANTS-29 and ITK-08
+  exactly; ANTS-07, ANTS-19 and ANTS-28 with the undefined reads or buffer as 0 (their parity
+  cases compare everything but the values). ANTS-02 and ANTS-26 (crashes and a hang) and
+  ResampleImage's wrong-length spacing list (an abort after an uninitialised read) define
+  nothing beyond the failure: exit 1 in both modes.
 - Items 2, 6 and 7, defaults until decided otherwise: questionable behaviours stay faithful
   and documented until evidence shows a bug; pipeline choices are made with larmorprepx;
-  ResampleImage's corrected command line is designed by the implementer and reviewed.
+  ResampleImage's corrected command line is designed by the implementer and reviewed. Item 7's
+  design (2026-10-12, to review): [api/ants-resample-image.md](../api/ants-resample-image.md),
+  "The seventh argument".
 
 The original proposals, for the record:
 
@@ -371,9 +384,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   program exits 0.
 - **Evidence:** read: `Utilities/ReadWriteData.h:204,227,526`, `ImageMath_Templates.hxx:5755,8281`.
 - **fMRIPrep:** none (nipype's names are long).
-- **larmorx:** reproduces (`larmorx_ants::image`, `image.rs:384,398`; ImageMath's writers).
-- **D13 / gap:** read and write any non-empty name; warn when ANTs would not have; switch.
-  **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): any non-empty name is read and written
+  (`larmorx_ants::image::{read_with, write_with}`, ImageMath's `Context::write_if_long`,
+  `PadImage`); the warning comes when such a file was read or written. `reproduce` skips them
+  as ANTs does (and exits 1 where ANTs' `PadImage` crashes on the null image).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-04 ImageMath exits 0 after a failed operation — (e)
 - **What:** the dispatch tables return `EXIT_SUCCESS` whatever the operation returned, so an
@@ -381,8 +396,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `ComponentToVector` excepted).
 - **Evidence:** read: `ImageMath_Templates.hxx:14892-15435`; verified.
 - **fMRIPrep:** a failed ImageMath step goes unnoticed until a later node misses its file.
-- **larmorx:** exit 0 where ANTs returns normally (`larmorx_ants::cli::image_math`).
-- **D13 / gap:** exit 1 when no output was written; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): exit 1 after an operation that reports a failure and writes
+  nothing (`larmorx_ants::cli::image_math`, `OpError::Reported`); `reproduce` exits 0. None of
+  the operations ported so far reports one (their failures are ANTS-02 crashes, exit 1 in both
+  modes), so the switch waits for the operations that do.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-05 ImageMath's operand parsing — (e)
 - **What:** `from_string<float>` decides between a number and an image: `7 ` (trailing space)
@@ -391,9 +409,13 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `ImageMath_Templates.hxx:212` (libstdc++'s `num_get`); validated
   (`arithmetic/operand-*`).
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::cli::cstd::from_string_f32`).
-- **D13 / gap:** a malformed number is an error; what a missing operand means is decided per
-  operation (to confirm); switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12) (`larmorx_ants::cli::image_math::arithmetic`,
+  `cstd::strict_f32`): an operand that is exactly a decimal number is a number, a malformed or
+  out-of-range one (`1e`, `-`, `1e40`) is an error, anything else an image (`7 ` with a blank
+  stays a file name, as in ANTs); no operand is an error except for `abs`, `exp`, `total`,
+  `mean` and `vtotal`, where ANTs' implicit 1 means the image alone. The warning comes where
+  ANTs' reading differs.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-06 Out-of-range conversions to integers — (a)
 - **What:** C++ leaves the conversion of an out-of-range or NaN floating value to an integer
@@ -407,11 +429,13 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** verified on x86-64 (`-u uchar`, `-u char`); validated (ResampleImage
   `pixel-type/*`, DenoiseImage masks, `extract-contours`).
 - **fMRIPrep:** none seen; ANTs' results differ between x86-64 and ARM machines here.
-- **larmorx:** the command lines reproduce x86-64 on every platform (decided 2026-10-09);
-  `lx.ants.apply_transforms(dtype=...)` and head-motion correction saturate; a negative
-  morphology radius is refused.
-- **D13 / gap:** D13 never reproduces undefined behaviour; this conflicts with the 2026-10-09
-  decision. **Decide** (Decisions, item 1).
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12), as decided (Decisions, item 1): out-of-range values clamp to
+  the type's range and NaN becomes 0, with a warning that counts them, in every conversion
+  above (`larmorx_ants::image::convert_voxels` for the readers, `cli::apply_transforms::cast_output`
+  and `lx.ants.apply_transforms(dtype=...)`, ResampleImage's sizes, `extract_contours`);
+  `reproduce` gives x86-64's wrap on every platform. A negative morphology radius stays an
+  error in both modes (it is a parameter, and ANTs aborts on it).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-07 A smaller operand image is read out of bounds — (a)
 - **What:** ImageMath's voxel-wise operations read the second image at the first image's
@@ -419,8 +443,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   ignored even when it is larger.)
 - **Evidence:** read: `ImageMath_Templates.hxx:5583-5762`; validated (`arithmetic/larger-operand`).
 - **fMRIPrep:** none.
-- **larmorx:** a larger operand as ANTs; a smaller one is an error.
-- **D13 / gap:** never reproduced. No gap.
+- **larmorx:** a larger operand as ANTs; a smaller one is an error by default. `reproduce`
+  (Decisions, item 5) reads it as ANTs does, at the first image's indices with the second's
+  strides, where the reads stay inside its buffer, and takes the reads beyond it as 0, with a
+  warning that counts them (`larmorx_ants::image_math::arithmetic::operand_values`).
+- **D13 / gap:** done (2026-10-12). No gap.
 
 ### ANTS-08 ImageMath `/` keeps the previous voxel's result — (c)
 - **What:** the quotient is computed only where the divisor is positive; every other voxel
@@ -428,26 +455,27 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   is not reset.
 - **Evidence:** read: `ImageMath_Templates.hxx:5583-5762`; validated (`arithmetic//-*`).
 - **fMRIPrep:** none (not used).
-- **larmorx:** reproduces (`larmorx_ants::image_math::arithmetic`, the command line and
-  `lx.ants.image_arithmetic`).
-- **D13 / gap:** divide wherever the divisor is not 0, and write 0 where it is (to confirm);
-  warn; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the quotient wherever the divisor is not 0, 0 where it is
+  (`larmorx_ants::image_math::arithmetic`, the command line and `lx.ants.image_arithmetic`);
+  the warning counts the voxels that change.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-09 ImageMath `total` and `mean` write running sums — (c)
 - **What:** the printed total and mean are right, but every voxel of the written image holds
   the running sum at that voxel.
 - **Evidence:** read: `ImageMath_Templates.hxx:5583-5762`; validated.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::image_math::arithmetic`).
-- **D13 / gap:** write the final value (to confirm); switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): every voxel holds the printed value, the total or the mean
+  (`larmorx_ants::image_math::arithmetic`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-10 ImageMath `vtotal` writes zeros — (c)
 - **What:** `vtotal` is dispatched to the arithmetic function, which has no branch for it: the
   output is all zeros, exit 0.
 - **Evidence:** read; validated.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces.
-- **D13 / gap:** refuse with a message (ANTs never implemented it); switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an error (exit 1); `reproduce` writes the zeros.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-11 ImageMath `Neg` misses the range — (c)
 - **What:** the range is found with `if (v > max) max = v; else if (v < min) min = v;` from
@@ -456,9 +484,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   errors of about 1e-4.
 - **Evidence:** read: `ImageMath_Templates.hxx:7495`; validated.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::image_math::arithmetic::negative`).
-- **D13 / gap:** compare every voxel with both bounds; warn when the range differs; switch.
-  **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range (`larmorx_ants::image_math::arithmetic::negative`);
+  the warning comes when ANTs' range differs.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-12 `TruncateImageIntensity`'s histogram range — (c), (f)
 - **What:** the range is found with `if (v < min) ... else if (v > max)`: if the first
@@ -469,16 +497,18 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   (`truncate/first-voxel-max`, fMRIPrep's `0.01 0.999 256`).
 - **fMRIPrep:** sMRIPrep truncates the T1w twice (stages A03, A10); it matters only when the
   first positive voxel is the brightest (not on ds000005).
-- **larmorx:** reproduces (`larmorx_ants::image_math::intensity::truncate_image_intensity`).
-- **D13 / gap:** the true range; warn; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range of the counted voxels
+  (`larmorx_ants::image_math::intensity::truncate_image_intensity`); the warning comes when
+  ANTs' range differs. The usage's 65 bins (f) is not D13.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-13 ImageMath `Normalize`'s range starts at 0 and 1e9 — (c)
 - **What:** range mode starts from `max = 0` and `min = 1e9`: an image without a positive
   value keeps the maximum 0, an image whose values all exceed 1e9 keeps the minimum 1e9.
 - **Evidence:** read: `ImageMath_Templates.hxx:9099-9118`; validated.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::image_math::intensity::normalize`).
-- **D13 / gap:** the true range; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range (`larmorx_ants::image_math::intensity::normalize`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-14 ImageMath `G` gives NaN for large variances — (c)
 - **What:** ITK's `GaussianOperator` computes `e^t` in the Bessel function `I_0`; above a
@@ -486,8 +516,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   NaN (`G img 41` on 1.5 mm voxels).
 - **Evidence:** read: `itkGaussianOperator.hxx:25-199`; validated (`G/huge-variance`).
 - **fMRIPrep:** none (not used).
-- **larmorx:** reproduces (`larmorx_image::discrete_gaussian`).
-- **D13 / gap:** compute `e^{−t} I_k(t)` without overflow; warn; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): where ITK's coefficients are not finite, the kernel of
+  `e^{−t} I_k(t)`, computed with exponentially scaled Bessel functions and a Miller recurrence
+  started above both `k` and `t` (ITK's start is too low for such `t`, ITK-11); elsewhere
+  ITK's kernel bit for bit (`larmorx_image::discrete_gaussian::gaussian_kernel_corrected`,
+  `DiscreteGaussianOptions::upstream_defects`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-15 A wrong number of sigmas is not an error — (e)
 - **What:** ImageMath `G` with a sigma count other than 1 or the dimension prints "Incorrect
@@ -496,8 +530,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `ImageMath_Templates.hxx:8161-8211`, `SmoothImage.cxx`; validated
   (`G/no-sigma`, `G/wrong-length`, `gaussian/wrong-length`).
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::cli::image_math::gaussian`, `larmorx_ants::cli::smooth_image`).
-- **D13 / gap:** exit 1; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): exit 1 with the message (`larmorx_ants::cli::image_math::gaussian`,
+  `larmorx_ants::cli::smooth_image`); Python's functions raise `ValueError` in both modes.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-16 `Laplacian` reads its flag from the sigma — (e)
 - **What:** `LaplacianImage` does not advance past the sigma, so `sig = atof(argv[5])` and
@@ -506,10 +541,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `ImageMath_Templates.hxx:9235-9285` (9244-9257); validated
   (`laplacian/*`).
 - **fMRIPrep:** `Laplacian img 1.5 1` normalises either way: same result.
-- **larmorx:** the command line reproduces it (`larmorx_ants::cli::image_math::gaussian`);
-  `lx.ants.laplacian(img, sigma, normalize=...)` takes them separately.
-- **D13 / gap:** read the flag from its own argument, as `Grad` does; warn when the two
-  readings differ; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the flag from its own argument (`argv[6]`), as `Grad` reads
+  it (`larmorx_ants::cli::image_math::gaussian`); the warning comes when the two readings
+  differ. `lx.ants.laplacian(img, sigma, normalize=...)` takes them separately anyway.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-17 `MO` with value 0, `ME` on label maps — (c?)
 - **What:** ITK's binary opening erodes with its own background value, 0 by default, so
@@ -539,11 +574,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   whatever memory is there.
 - **Evidence:** read: `ImageMath_Templates.hxx:8996`; verified (ANTs exits 0 with some output).
 - **fMRIPrep:** none (fMRIPrep and sMRIPrep call `FillHoles 2`).
-- **larmorx:** reproduces the reads that wrap inside the buffer and refuses the others
-  (`larmorx_ants::image_math::morphology::fill_holes`; expected divergence
-  `fill-holes/hole-first-slice-0.5`).
-- **D13 / gap:** reads outside the image are never reproduced, not even those that land inside
-  the buffer; decide what an outside neighbour counts as (proposal: it is not counted). **Gap.**
+- **larmorx:** corrected by default (2026-10-12): a neighbour outside the image is not
+  counted (`larmorx_ants::image_math::morphology::fill_holes`). `reproduce` (Decisions, item 5)
+  reads the neighbours that land inside the buffer as ANTs does and takes those beyond it as
+  background, with a warning; ANTs' own result there depends on memory, so the parity case
+  `fill-holes/hole-first-slice-0.5` compares everything but the values.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-20 `GetLargestComponent` turns an empty result into a full image — (c)
 - **What:** each kept component's voxels get the component's size; the largest value is found
@@ -555,8 +591,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** sMRIPrep's brain extraction calls it four times with the default 50 (the
   dilated brain mask, the WM and GM classes, a final cleanup): a class with no component of 50
   voxels would become the whole image.
-- **larmorx:** reproduces (`larmorx_ants::image_math::components::largest_component`).
-- **D13 / gap:** an all-zero mask when nothing is kept; warn; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an all-zero image when nothing is kept
+  (`larmorx_ants::image_math::components::largest_component`, `lx.ants.largest_component`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-21 `ClusterThresholdVariate` reads outside the image — (a)
 - **What:** after its histogram loop it reads the mask at the iterator's index, which is
@@ -590,8 +627,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   " file 255 does not exist . " before using 255.
 - **Evidence:** read: `ThresholdImage.cxx:431`; verified; validated.
 - **fMRIPrep:** none (a range threshold with numbers).
-- **larmorx:** reproduces (`larmorx_ants::cli::threshold_image`).
-- **D13 / gap:** refuse a lower bound that is not a number; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): a lower bound must be text that `strtod` reads entirely
+  (decimal, hexadecimal, `inf`, `nan`); anything else is an error
+  (`larmorx_ants::cli::threshold_image`, `cstd::strtod_reads_all`). The (f) message is kept.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-25 ThresholdImage Otsu with a mask: its range — (c)
 - **What:** ANTs' own masked Otsu starts the maximum at `NumericTraits<float>::min()`, which is
@@ -600,9 +639,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   is never a candidate for the minimum.
 - **Evidence:** read: `ThresholdImage.cxx:152-262` (`:186`); validated.
 - **fMRIPrep:** none (not used).
-- **larmorx:** reproduces (`larmorx_ants::threshold_image`, `threshold_image.rs:106`; the command
-  line and `lx.ants.otsu_threshold`).
-- **D13 / gap:** the true range; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range of the voxels in the mask
+  (`larmorx_ants::threshold_image`; the command line and `lx.ants.otsu_threshold`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-26 `Otsu 0` never returns — (a)
 - **What:** with zero thresholds, `IncrementThresholds` never returns false.
@@ -617,10 +656,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `MultiplyImages.cxx:80-86`; verified.
 - **fMRIPrep:** sMRIPrep's brain extraction multiplies two images (node `08_mult_gm`); a
   missing file would zero the result silently.
-- **larmorx:** the command line reproduces (`larmorx_ants::cli::multiply_images`);
-  `lx.ants.multiply_images` raises `FileNotFoundError`.
-- **D13 / gap:** refuse an argument that is neither a readable image nor a number; switch.
-  **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an argument that is neither a readable image nor a number is an
+  error (`larmorx_ants::cli::multiply_images`); `lx.ants.multiply_images` raises
+  `FileNotFoundError` in both modes.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-28 Uninitialised memory reaches the output — (a)
 - **What:** ResampleImageBySpacing with a smoothed axis of fewer than 4 voxels catches ITK's
@@ -630,8 +669,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   list of the wrong length leaves the radius uninitialised.
 - **Evidence:** verified (three runs, three outputs); read.
 - **fMRIPrep:** none.
-- **larmorx:** refuses with ITK's message (expected divergence `errors/thin-smoothed-axis`).
-- **D13 / gap:** never reproduced. No gap.
+- **larmorx:** refuses with ITK's message by default. `reproduce` (Decisions, item 5):
+  ResampleImageBySpacing prints what ANTs prints (ITK's two addresses and build directory as
+  `0x0` and `<ITK source>`), resamples the buffer filled with zeros, writes the same file and
+  exits 0, with a warning; SmoothImage's median uses radius 0. The parity case
+  `errors/thin-smoothed-axis` compares everything but the values.
+- **D13 / gap:** done (2026-10-12). No gap.
 
 ### ANTS-29 ResampleImage to size 1 — (c)
 - **What:** by size, the spacing is `old · (n − 1) / (size − 1)`: for size 1 it is infinite;
@@ -639,8 +682,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   spacing, exit 0.
 - **Evidence:** read: `ResampleImage.cxx:136`; verified.
 - **fMRIPrep:** none.
-- **larmorx:** refuses sizes below 2 (expected divergence `errors/size-1`).
-- **D13 / gap:** **decide** (Decisions, item 5: no switch proposed).
+- **larmorx:** refuses sizes below 2 by default; `reproduce` (Decisions, item 5) writes ANTs'
+  image byte for byte: spacing `inf`, origin NaN (`origin + D · diag(s) · 0`, as ITK's writer
+  computes it), voxels 0 (`larmorx_ants::resample_image::output_geometry`); parity case
+  `errors/size-1`.
+- **D13 / gap:** done (2026-10-12). No gap.
 
 ### ANTS-30 ResampleImage reads its seventh argument twice — (e)
 - **What:** `std::stoi(argv[7])` is the pixel type, and the same text is the interpolator's
@@ -649,9 +695,14 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   default Hamming window is reachable; `b` would be a second Lanczos anyway (line 76).
 - **Evidence:** read: `ResampleImage.cxx:331-334`, `:144-236`; validated (`interpolation/*`).
 - **fMRIPrep:** none.
-- **larmorx:** the command line reproduces (`larmorx_ants::cli::resample_image`).
-- **D13 / gap:** the usage text documents no position for the parameter, so the corrected
-  command line needs a design (Decisions, item 7); switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12) (`larmorx_ants::cli::resample_image`), with the design of
+  [api/ants-resample-image.md](../api/ants-resample-image.md), "The seventh argument": each
+  interpolator's parameters follow it where ANTs reads them (Gaussian sigma and alpha in
+  arguments 7 and 8, the window letter or the B-spline order in 7), and the pixel type comes
+  after them (argument 7 for linear and nearest neighbour, as in ANTs; 8 for windowed sinc and
+  B-spline; 9 for Gaussian). The window `b` is Blackman, as the usage says (ANTs' code builds
+  a second Lanczos). The warning comes when the two readings differ.
+- **D13 / gap:** done; the design awaits the user's review. No gap.
 
 ### ANTS-31 ResampleImageBySpacing's arguments — (e)
 - **What:** in 2D the `nn` flag is read from the `addvox` argument whenever an eighth argument
@@ -659,8 +710,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   dimension other than 2, 3 or 4 does nothing and exits 0.
 - **Evidence:** read: `ResampleImageBySpacing.cxx:130,393`; validated.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces (`larmorx_ants::cli::resample_image_by_spacing`).
-- **D13 / gap:** each value from its own argument; other dimensions refused; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): `nn` from its own argument in 2D and 4D, other dimensions an
+  error (`larmorx_ants::cli::resample_image_by_spacing`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-32 ResampleImageBySpacing's smoothing and outside value — (c?)
 - **What:** the smoothing sigma is `out/in − 1`, a ratio, which ITK takes in millimetres and
@@ -676,10 +728,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   ignores alpha (always 4.0); `GenericLabel[...]` ignores its parameter (always linear).
 - **Evidence:** read: `antsApplyTransforms.cxx:1453-1600`, `make_interpolator_snip.tmpl:127`.
 - **fMRIPrep:** none (no alpha, known types).
-- **larmorx:** reproduces (`larmorx_ants::cli::apply_transforms`; `OutputType::from_name`
-  returns nothing and the default applies).
-- **D13 / gap:** refuse an unknown type; honour the documented alpha (`MultiLabel[<sigma>,<alpha=4.0>]`
-  in the usage) or warn; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an unknown `-u` type is an error; `MultiLabel`'s alpha is used;
+  `GenericLabel[Linear]` and `GenericLabel[NearestNeighbor]` are honoured, any other parameter
+  is an error (`larmorx_ants::cli::apply_transforms`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-34 `GenericLabel` never finishes on intensity images — (a)
 - **What:** ITK's `LabelImageGenericInterpolateImageFunction` interpolates every distinct
@@ -697,8 +749,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `N4BiasFieldCorrection.cxx:196-227,241-335,389-407`; validated
   (`options/no-brackets`).
 - **fMRIPrep:** none (nipype writes brackets).
-- **larmorx:** reproduces (`larmorx_ants::cli::n4_bias_field_correction`).
-- **D13 / gap:** honour the unbracketed value or refuse it; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an unbracketed value is the option's first parameter
+  (`-c 50x50` is `-c [50x50]`; `larmorx_ants::cli::n4_bias_field_correction`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-36 N4's mask and rescaling — (e)
 - **What:** a mask that cannot be read is replaced by an image of ones ("Mask not read") and
@@ -706,9 +759,9 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   and `-r 1` is the same as nothing.
 - **Evidence:** read: `N4BiasFieldCorrection.cxx:113-134,495-532`; validated (`options/missing-mask`).
 - **fMRIPrep:** the BOLD reference's N4 passes `-r` without `-x`: it does nothing.
-- **larmorx:** reproduces (`larmorx_ants::cli::n4_bias_field_correction`).
-- **D13 / gap:** refuse an unreadable mask; warn that `-r` has no effect without a mask;
-  switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an unreadable mask is an error; `-r` without a mask does
+  nothing in both modes, and a warning says so (`larmorx_ants::cli::n4_bias_field_correction`).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-37 N4 depends on the thread count — (b)
 - **What:** ITK's B-spline fit splits the points among work units and sums per-unit lattices;
@@ -730,10 +783,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   memory order, the minimum is never set at all.
 - **Evidence:** read: `itkN4BiasFieldCorrectionImageFilter.hxx:285-294`; validated (`inputs/ramp`).
 - **fMRIPrep:** every N4 run, when the first included voxel of the log image is its unique
-  minimum (with a mask: the first voxel of the mask in memory order).
-- **larmorx:** reproduces (`larmorx_image::n4::sharpen`).
-- **D13 / gap:** the true range; warn when the first voxel was the unique minimum; switch.
-  **Gap.**
+  minimum (with a mask: the first voxel of the mask in memory order). None of the fMRIPrep,
+  sMRIPrep and sdcflows command lines of the parity suite meets it (2026-10-12); 3 masked
+  cases on a generated phantom and the `inputs/ramp` case do, by up to 3.9e3.
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the true range (`larmorx_image::n4::sharpen`,
+  `N4Parameters::upstream_defects`); the warning comes when ITK's range differs.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-39 N4's FFT size for 256 bins — (c)
 - **What:** the histogram is padded to `2^(ceil(logf(bins) / log(2.0)) + 1)`, a float log
@@ -742,8 +797,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `itkN4BiasFieldCorrectionImageFilter.hxx:331-343`; verified
   (`options/histogram-256`).
 - **fMRIPrep:** none (200 bins).
-- **larmorx:** reproduces (`larmorx_image::n4`, `n4.rs:157`).
-- **D13 / gap:** an exact power-of-two test; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): `2^(ceil(log2(bins)) + 1)` points (`larmorx_image::n4::padding_exponent`).
+  Both sizes are enough for the convolution, so they differ only in the FFTs' rounding: the
+  sharpening is computed with both sizes when they differ, and the warning comes only where a
+  voxel's sharpened value changes (rare: no golden or parity case so far).
+- **D13 / gap:** done. No gap.
 
 ### ANTS-40 N4 keeps zero and negative values in the log image — (c?)
 - **What:** an included voxel is replaced by `logf(v)` only if `v > 0`; 0 stays 0 (the log of
@@ -795,10 +853,27 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **What:** for a high SNR, the correction factor's `float(I₀)` overflows while `expf`
   underflows; `0 · ∞` is NaN, which passes both range comparisons, and the bias, NaN, becomes 0.
 - **Evidence:** read: `itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx:397-494` (`:482`).
-- **fMRIPrep:** sMRIPrep's denoising runs with the Rician model; the effect on a T1w has not
-  been measured.
-- **larmorx:** reproduces (`larmorx_image::adaptive_denoising`).
-- **D13 / gap:** evaluate the correction factor without overflow; warn; switch. **Gap.**
+- **fMRIPrep:** sMRIPrep's denoising runs with the Rician model, and meets it. Measured
+  2026-10-12 on sMRIPrep's command (one thread's result): on ds000005's and ds000210's raw
+  T1w the factor is NaN in 7.4 % and 8.4 % of the voxels, and the corrected bias lowers them
+  by a median of 0.58 and 2.9, at most 2.8 and 17.7 (0.7 % of each image's 99th percentile);
+  ANTs' own result moves by up to 271 between thread counts on such an image (ANTS-42). In the
+  parity suite the correction changes 25 of 40 compared cases.
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the factor computed in double with exponentially scaled Bessel
+  functions, then ITK's range checks (`larmorx_image::adaptive_denoising`,
+  `AdaptiveNlmParameters::upstream_defects`); the warning counts the voxels whose factor ITK
+  makes NaN.
+- **D13 / gap:** done. No gap.
+
+### ANTS-47 DenoiseImage takes an unreadable mask for no mask — (e)
+- **What:** a mask file that cannot be read (missing, misspelt) leaves the mask null, and the
+  filter then runs on every voxel, exit 0; only `ReadImage`'s " file … does not exist . " says
+  anything.
+- **Evidence:** read: `DenoiseImage.cxx:184-195`; validated (`options/missing-mask`).
+- **fMRIPrep:** none (sMRIPrep gives no mask).
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an error (`larmorx_ants::cli::denoise_image`); `reproduce` denoises
+  the whole image, with a warning.
+- **D13 / gap:** done. No gap.
 
 ### ANTS-44 DenoiseImage's bias outside the mask — (c?)
 - **What:** where the smoothed bias is not positive, or outside the mask, the bias keeps its
@@ -833,12 +908,14 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   with a tiny negative weight.
 - **Evidence:** read: `itkMathDetail.h:414-422`; verified (the last 7 voxels of a 4D case).
 - **fMRIPrep:** none seen.
-- **larmorx:** reproduces (`larmorx_image::grid::{vnl_floor_f32, itk_floor_f64}`, used by the
-  4D paths of `larmorx_ants::resample`). Since 2026-10-11 also in antsApplyTransforms'
-  displacement-field lookup and windowed-sinc base index, in both precisions
-  (`larmorx_core::ItkReal::itk_floor`; [ants-float.md](ants-float.md)), where larmorx used the
-  true floor before; no parity or golden case changed.
-- **D13 / gap:** the true floor; switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the exact floor (`larmorx_core::IndexFloor`, in the 4D linear
+  paths of `larmorx_ants::resample`, antsApplyTransforms' displacement-field and windowed-sinc
+  lookups, and DenoiseImage's noise resampling). The two floors differ in the last bits of a
+  value at most, and mostly not at all once it is stored, so each output voxel that met a
+  differing floor is computed again with the other one, and the warning counts the voxels
+  whose stored value changed. `reproduce` takes ITK's floor
+  (`larmorx_image::grid::{vnl_floor_f32, itk_floor_f64}`, `ItkReal::itk_floor`).
+- **D13 / gap:** done. No gap.
 
 ### ITK-02 Extra dimensions are read with an identity direction — (c)
 - **What:** a file with more dimensions than the program's `D` is read as its first
@@ -848,17 +925,20 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `itkImageFileReader.hxx` (`GenerateOutputInformation`); validated
   (`arithmetic/dim3-of-4d`, N4 `inputs/dim3-of-4d`).
 - **fMRIPrep:** none seen.
-- **larmorx:** reproduces (`larmorx_ants::image::from_itk`).
-- **D13 / gap:** keep the top-left `D × D` block of the file's direction (to confirm); warn;
-  switch. **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the top-left `D × D` block of the file's direction, where the
+  first `D` axes do not reach into the others (every NIfTI time series read in 3D); where they
+  do (an oblique 3D file read in 2D) no `D`-dimensional direction describes the block, and
+  ITK's identity is kept in both modes (`larmorx_ants::image::from_itk`).
+- **D13 / gap:** done. No gap.
 
 ### ITK-03 Float labels stop at 2^24 — (c), latent
 - **What:** `RelabelComponentImageFilter` counts the new labels in the output pixel type; with
   a `float` output, as in ANTs, `label + 1` stops growing at 2^24.
 - **Evidence:** read: `itkRelabelComponentImageFilter.hxx`.
 - **fMRIPrep:** latent (16.7 million components).
-- **larmorx:** reproduces (`larmorx_ants::image_math::morphology::float_labels`).
-- **D13 / gap:** count in integers; switch. **Gap** (latent).
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): labels counted in integers
+  (`larmorx_ants::image_math::components::cluster_sizes`, `GetLargestComponent`).
+- **D13 / gap:** done. No gap.
 
 ### ITK-04 Danielsson's distance map is approximate — (d)
 - **What:** offsets propagate through axis neighbours only, so distances are not exactly
@@ -893,12 +973,17 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **D13 / gap:** not D13.
 
 ### ITK-08 nifti_clib opens a different file — (e)
-- **What:** asked for `x.nii.gz`, a reader built on nifti_clib opens `x.nii` instead if both
-  exist.
-- **Evidence:** verified with SimpleITK (it corrupted an early benchmark).
+- **What:** asked for `x.nii.gz`, a reader built on nifti_clib reads the header from
+  `x.nii.gz` and the voxels from `x.nii` when both exist (`nifti_findimgname` tries `.nii`
+  before `.nii.gz`).
+- **Evidence:** verified with SimpleITK (it corrupted an early benchmark) and with the ANTs
+  2.6.5 oracle (ImageMath on `x.nii.gz` with a different `x.nii` beside it, 2026-10-12).
 - **fMRIPrep:** none.
-- **larmorx:** opens exactly the path given.
-- **D13 / gap:** **decide** (Decisions, item 5: no switch proposed).
+- **larmorx:** opens exactly the path given, by default; `reproduce` (Decisions, item 5) reads
+  the voxels from the file nifti_clib picks (`larmorx_io::nifti::NiftiPaths::nifti_clib_image_path`,
+  the ANTs programs' readers). Where such a file is beside the named one, both are read, and
+  the warning comes when their voxels differ (2026-10-12).
+- **D13 / gap:** done. No gap.
 
 ### ITK-10 A versor axis of norm ≥ 1 can fail to load in float — (c)
 - **What:** `VersorRigid3DTransform<float>::SetParameters` (and `Similarity3DTransform<float>`)
@@ -912,10 +997,25 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   (`Set(const VectorType &)`); verified: parameters `-0.7041559 0.63925344 0.3665738 1 2 3`,
   ANTs 2.6.5 exits 0 with `--float 0` and 1 with `--float 1` ([ants-float.md](ants-float.md)).
 - **fMRIPrep:** none seen (fMRIPrep's float transforms are affines).
-- **larmorx:** reproduces: the transform is refused in float ("invalid transform: versor with
-  magnitude greater than 1").
-- **D13 / gap:** read it (e.g. as in double, or with the axis renormalised in float); switch.
-  **Gap.**
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): the versor is computed in double and stored as float, so the
+  transform loads (`larmorx_transform::linear::versor`, `TransformChain::prepare`);
+  `reproduce` refuses it as ITK does ("versor with magnitude greater than 1 in single
+  precision").
+- **D13 / gap:** done. No gap.
+
+### ITK-11 `GaussianOperator`'s Bessel functions lose accuracy for large variances — (d)
+- **What:** the discrete Gaussian kernel's coefficients `e^{−t} I_k(t)` use Numerical Recipes'
+  `bessi`, whose Miller recurrence starts at order `2(k + √(40k))` whatever `t` is; for `t` well
+  above that start the ratios `I_k / I_0` are wrong. Against `scipy.special.ive`, the largest
+  relative error of a coefficient (k ≤ 32) is 1e-7 up to a variance of 25 voxels², 1.4e-5 at
+  50, 1.5e-3 at 100, 5 % at 200 and 52 % at 700, always at k ≈ 3 (the coefficients are then
+  normalised, so the kernel keeps its sum but not its shape).
+- **Evidence:** read: `itkGaussianOperator.hxx` (`ModifiedBesselI`); measured (the recurrence
+  replayed in Python, 2026-10-12).
+- **fMRIPrep:** none (`G` is not used).
+- **larmorx:** reproduces ITK's kernel bit for bit wherever it is finite; the kernel that
+  corrects ANTS-14 (variances above about 709) starts the recurrence above `k + t`.
+- **D13 / gap:** not D13 (an imprecision); an accurate kernel is a D11 option.
 
 ### ITK-09 ITK's HDF5 writer is not byte-reproducible — (b)
 - **What:** ITK stores object modification times, so writing the same transform twice gives
@@ -1120,8 +1220,11 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   `INT32_MIN` for int32, `INT64_MIN` for int64.
 - **Evidence:** read; verified.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces x86-64 on every platform (`larmorx_interp::ndimage`).
-- **D13 / gap:** **decide**, with ANTS-06.
+- **larmorx:** corrected by default (`upstream_defects`, 2026-10-12), as decided with ANTS-06: NaN results become 0 in signed integer
+  outputs, and a `cval` that an integer input type cannot hold is clamped (NaN to 0), with a
+  warning that counts them (`larmorx_interp::ndimage`); `reproduce` gives x86-64's answers on
+  every platform.
+- **D13 / gap:** done. No gap.
 
 ### SCI-03 `reflect` splines do not interpolate on short axes — (c)
 - **What:** with `reflect` or `grid-mirror`, `map_coordinates` at integer coordinates misses

@@ -16,6 +16,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 from larmorx.ants._filters import float_input, result
 from larmorx.image import Image
 
@@ -29,18 +30,29 @@ __all__ = [
 ]
 
 
-def largest_component(image: Any, min_size: int = 50, *, n_threads: int = 1) -> Image:
+def largest_component(
+    image: Any,
+    min_size: int = 50,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``ImageMath d out GetLargestComponent in min_size``: 1 in the largest face-connected
     component of the voxels in ``[0.25, 1e9]``, 0 elsewhere.
 
     Components smaller than ``min_size`` voxels are dropped first (0 keeps every component).
-    As in ANTs, every component of the largest size is kept (ties keep all of them), and **if
-    no component is left, every voxel becomes 1**.
+    As in ANTs, every component of the largest size is kept (ties keep all of them). If no
+    component is left, every voxel is 0; **ANTs makes every voxel 1** there (ANTS-20), which
+    ``upstream_defects="reproduce"`` gives.
     """
+    check(upstream_defects)
     if int(min_size) != min_size or min_size < 0:
         raise ValueError(f"min_size is a number of voxels (0 or more), not {min_size!r}")
     a = float_input(image, n_threads)
-    data = _core.ants_largest_component(np.asfortranarray(a.data), int(min_size), n_threads)
+    data, notices = _core.ants_largest_component(
+        np.asfortranarray(a.data), int(min_size), n_threads, upstream_defects
+    )
+    warn(notices)
     return result(data, a)
 
 
@@ -69,14 +81,26 @@ def maurer_distance(image: Any, foreground: float = 1.0, *, n_threads: int = 1) 
     return result(data, a)
 
 
-def extract_contours(image: Any, fully_connected: bool = True, *, n_threads: int = 1) -> Image:
+def extract_contours(
+    image: Any,
+    fully_connected: bool = True,
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """``ImageMath d out ExtractContours in fully_connected``: ITK's
     ``LabelContourImageFilter``. Each voxel's label is its value truncated to an unsigned
     integer (so 1.7 is 1 and 0.6 is 0: contours of probability maps vanish); voxels of a
     non-zero label that touch another label (through a face, or anywhere in the ``3^D``
-    neighbourhood when ``fully_connected``) keep their label, the others become 0."""
+    neighbourhood when ``fully_connected``) keep their label, the others become 0. A negative
+    value is background; ANTs on x86-64 wraps it to a label near 2^64 (ANTS-06), which
+    ``upstream_defects="reproduce"`` gives."""
+    check(upstream_defects)
     a = float_input(image, n_threads)
-    data = _core.ants_extract_contours(np.asfortranarray(a.data), bool(fully_connected), n_threads)
+    data, notices = _core.ants_extract_contours(
+        np.asfortranarray(a.data), bool(fully_connected), n_threads, upstream_defects
+    )
+    warn(notices)
     return result(data, a)
 
 

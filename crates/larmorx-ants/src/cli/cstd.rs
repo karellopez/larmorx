@@ -70,6 +70,101 @@ pub fn from_string_f32(s: &str) -> StreamFloat {
     }
 }
 
+/// A command-line number read strictly ([`strict_f32`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StrictNumber {
+    /// A decimal number within `float`'s range.
+    Number(f32),
+    /// A decimal number beyond `float`'s range (`1e40`).
+    OutOfRange,
+    /// Not a decimal number.
+    NotANumber,
+}
+
+/// `s` read strictly as a `float`: optional blanks, an optional sign, decimal digits with at
+/// most one point (at least one digit), an optional exponent (`e` or `E`, an optional sign,
+/// digits), optional blanks, and nothing else. The value is the correctly rounded `float`
+/// (as `strtof` gives it). larmorx's reading of numeric operands where ANTs' own readings
+/// take malformed text (ANTS-05).
+pub fn strict_f32(s: &str) -> StrictNumber {
+    let t = s.trim_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']);
+    let b = t.as_bytes();
+    let mut i = usize::from(matches!(b.first(), Some(b'+' | b'-')));
+    let mut digits = 0;
+    while b.get(i).is_some_and(u8::is_ascii_digit) {
+        i += 1;
+        digits += 1;
+    }
+    if b.get(i) == Some(&b'.') {
+        i += 1;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+            digits += 1;
+        }
+    }
+    if digits == 0 {
+        return StrictNumber::NotANumber;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        let from = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        if i == from {
+            return StrictNumber::NotANumber;
+        }
+    }
+    if i != b.len() {
+        return StrictNumber::NotANumber;
+    }
+    // Rust's parser takes this grammar except a point without digits before or after it.
+    let text = t.replace(".e", ".0e").replace(".E", ".0E");
+    let text = if text.ends_with('.') {
+        format!("{text}0")
+    } else {
+        text
+    };
+    match text.parse::<f32>() {
+        Ok(v) if v.is_finite() => StrictNumber::Number(v),
+        Ok(_) => StrictNumber::OutOfRange,
+        Err(_) => StrictNumber::NotANumber,
+    }
+}
+
+/// Whether `strtod` reads all of `s` (but blanks around it) as a number: a decimal number
+/// ([`strict_f32`]'s grammar, any magnitude), `inf`, `infinity` or `nan` in any case, or a
+/// hexadecimal float (`0x1.8p3`), each with an optional sign. ThresholdImage's lower bound
+/// must be one where ANTs would read a prefix with `atof` (ANTS-24).
+pub fn strtod_reads_all(s: &str) -> bool {
+    let t = s.trim_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']);
+    if strict_f32(t) != StrictNumber::NotANumber {
+        return true;
+    }
+    let body = t.strip_prefix(['+', '-']).unwrap_or(t);
+    let lower = body.to_ascii_lowercase();
+    if matches!(lower.as_str(), "inf" | "infinity" | "nan") {
+        return true;
+    }
+    let Some(hex) = lower.strip_prefix("0x") else {
+        return false;
+    };
+    let (mantissa, exponent) = match hex.split_once('p') {
+        Some((m, e)) => (m, Some(e)),
+        None => (hex, None),
+    };
+    let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let hex_digits = |x: &str| x.bytes().all(|c| c.is_ascii_hexdigit());
+    let exponent_ok = exponent.is_none_or(|e| {
+        let e = e.strip_prefix(['+', '-']).unwrap_or(e);
+        !e.is_empty() && e.bytes().all(|c| c.is_ascii_digit())
+    });
+    !(int.is_empty() && frac.is_empty()) && hex_digits(int) && hex_digits(frac) && exponent_ok
+}
+
 /// [`from_string_f32`] for `double` (`istringstream >> double`, converted as `strtod`):
 /// `(is_number, value)`, the value `None` when untouched.
 pub fn from_string_f64(s: &str) -> (bool, Option<f64>) {
@@ -600,5 +695,43 @@ mod tests {
         assert_eq!(format_g(f64::INFINITY), "inf");
         assert_eq!(format_g(1e100), "1e+100");
         assert_eq!(format_g(999999.5), "1e+06");
+    }
+
+    #[test]
+    fn strict_numbers() {
+        use StrictNumber::*;
+        assert_eq!(strict_f32("7"), Number(7.0));
+        assert_eq!(strict_f32(" 7 "), Number(7.0));
+        assert_eq!(strict_f32("-2.5e1"), Number(-25.0));
+        assert_eq!(strict_f32(".5"), Number(0.5));
+        assert_eq!(strict_f32("5."), Number(5.0));
+        assert_eq!(strict_f32("+5.e1"), Number(50.0));
+        assert_eq!(strict_f32("0.1"), Number(0.1));
+        assert_eq!(strict_f32("1e40"), OutOfRange);
+        assert_eq!(strict_f32("-1e39"), OutOfRange);
+        for text in [
+            "", " ", "-", "1e", "1e+", ".", "1.5x", "abc", "inf", "nan", "0x10", "1 2",
+        ] {
+            assert_eq!(strict_f32(text), NotANumber, "{text:?}");
+        }
+        for text in [
+            "7",
+            "7 ",
+            " -2.5e1",
+            "1e40",
+            "inf",
+            "-Infinity",
+            "NaN",
+            "0x10",
+            "-0x1.8p3",
+            "0X.8P-1",
+        ] {
+            assert!(strtod_reads_all(text), "{text:?}");
+        }
+        for text in [
+            "", "otsu", "1.5x", "0x", "0xp3", "0x1p", "infinit", "1 2", "0x1g",
+        ] {
+            assert!(!strtod_reads_all(text), "{text:?}");
+        }
     }
 }

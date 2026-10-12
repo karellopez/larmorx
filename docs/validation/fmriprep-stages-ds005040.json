@@ -1,0 +1,7068 @@
+{
+ "record": "fmriprep-stages-ds005040",
+ "generated": "2026-10-12",
+ "command": "python -m larmorx_validation pipeline-stages --oracle <workspace>/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall --out docs/validation --reuse --name fmriprep-stages-ds005040",
+ "oracle": {
+  "run": "ds005040-sub-002-noreconall",
+  "fmriprep": "25.2.6",
+  "image": "nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e",
+  "arguments": "/data /out participant --participant-label 002 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 8 --omp-nthreads 8 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall",
+  "tools": {
+   "python": "3.12.11",
+   "fmriprep": "25.2.6",
+   "smriprep": "0.19.2",
+   "niworkflows": "1.15.2",
+   "sdcflows": "2.15.1",
+   "nipype": "1.12.0",
+   "nitransforms": "25.1.0",
+   "nibabel": "5.3.2",
+   "numpy": "2.2.6",
+   "scipy": "1.15.2",
+   "ants": "2.6.2 (build h5f726e6_2)",
+   "fsl-bet2": "2111.8 (build h982b8fd_3)",
+   "fsl-fast4": "2111.3 (build h982b8fd_6)",
+   "fsl-flirt": "2111.4 (build h982b8fd_0)",
+   "fsl-mcflirt": "2111.0 (build h982b8fd_8)",
+   "fsl-miscmaths": "2412.4 (build h982b8fd_0)",
+   "fsl-newimage": "2501.4 (build h500b71b_0)",
+   "libitk": "5.4.4 (build h8db0697_0)",
+   "libopenblas": "0.3.30 (build pthreads_h94d23a6_2)",
+   "ants_version": "ANTs Version: 2.6.2.dev1-gff61a3d",
+   "afni": "++ 3dvolreg: AFNI version=AFNI_25.2.09 (Aug 24 2025) [64-bit]",
+   "glibc": "ldd (Ubuntu GLIBC 2.35-0ubuntu3.10) 2.35"
+  }
+ },
+ "stages": [
+  {
+   "id": "A01",
+   "group": "anatomical",
+   "title": "Denoise the T1w (`DenoiseImage -n Rician`)",
+   "tool": "lx.ants.denoise_image",
+   "threshold": "n4-denoise",
+   "absent": ""
+  },
+  {
+   "id": "A02",
+   "group": "anatomical",
+   "title": "N4 before the anatomical template (ANTs defaults)",
+   "tool": "lx.ants.n4_bias_field_correction",
+   "threshold": "n4-denoise",
+   "absent": "runs only with more than one T1w; this subject has one"
+  },
+  {
+   "id": "A03",
+   "group": "anatomical",
+   "title": "Brain extraction: truncate intensities (`TruncateImageIntensity`)",
+   "tool": "lx.ants.image_math",
+   "threshold": "arithmetic",
+   "absent": ""
+  },
+  {
+   "id": "A04",
+   "group": "anatomical",
+   "title": "Brain extraction: N4, first pass",
+   "tool": "lx.ants.n4_bias_field_correction",
+   "threshold": "n4-denoise",
+   "absent": ""
+  },
+  {
+   "id": "A05",
+   "group": "anatomical",
+   "title": "Brain extraction: Laplacian of the T1w and the template",
+   "tool": "lx.ants.image_math",
+   "threshold": "arithmetic",
+   "absent": ""
+  },
+  {
+   "id": "A06",
+   "group": "anatomical",
+   "title": "Brain extraction: template priors to the T1w (Gaussian, inverse warp)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "A07",
+   "group": "anatomical",
+   "title": "Brain extraction: threshold the brain prior (`ThresholdImage`)",
+   "tool": "lx.ants.threshold_image",
+   "threshold": "masks",
+   "absent": ""
+  },
+  {
+   "id": "A08",
+   "group": "anatomical",
+   "title": "Brain extraction: mask and label morphology (`ImageMath` MD/ME/GetLargestComponent/FillHoles/PadImage/addtozero, `MultiplyImages`)",
+   "tool": "lx.ants.image_math",
+   "threshold": "masks",
+   "absent": ""
+  },
+  {
+   "id": "A09",
+   "group": "anatomical",
+   "title": "Brain extraction: final N4 (weighted by the WM posterior)",
+   "tool": "lx.ants.n4_bias_field_correction",
+   "threshold": "n4-denoise",
+   "absent": ""
+  },
+  {
+   "id": "A10",
+   "group": "anatomical",
+   "title": "Normalisation: truncate the moving T1w",
+   "tool": "lx.ants.image_math",
+   "threshold": "arithmetic",
+   "absent": ""
+  },
+  {
+   "id": "A11",
+   "group": "anatomical",
+   "title": "Anatomical outputs to MNI (`.h5` composite; Lanczos, MultiLabel, Gaussian)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "S01",
+   "group": "fieldmap",
+   "title": "Field map: N4 of the field-map reference (sdcflows' brain extraction)",
+   "tool": "lx.ants.n4_bias_field_correction",
+   "threshold": "n4-denoise",
+   "absent": "no field map estimated (no estimator assigned to a BOLD run)"
+  },
+  {
+   "id": "S02",
+   "group": "fieldmap",
+   "title": "Unwarp the HMC boldref for coregistration (`ResampleSeries` with the field map)",
+   "tool": "lx.transforms.resample_series",
+   "threshold": "scipy-interpolation",
+   "absent": "no field map applied to a BOLD run"
+  },
+  {
+   "id": "S03",
+   "group": "fieldmap",
+   "title": "Field-map report: the field map and its reference to the boldref (Lanczos, `--float 1`)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": "no field map applied to a BOLD run"
+  },
+  {
+   "id": "F01",
+   "group": "functional",
+   "title": "Head-motion estimation (mcflirt on the raw BOLD, to the HMC boldref)",
+   "tool": "lx.mri.hmc",
+   "threshold": "motion",
+   "absent": ""
+  },
+  {
+   "id": "F02",
+   "group": "functional",
+   "title": "Slice-timing correction (`3dTshift`)",
+   "tool": "lx.afni.tshift",
+   "threshold": "tshift",
+   "absent": "no `SliceTiming` in the BOLD runs' metadata, so fMRIPrep skips it"
+  },
+  {
+   "id": "F03",
+   "group": "functional",
+   "title": "Coregistration reference: N4 of the HMC boldref",
+   "tool": "lx.ants.n4_bias_field_correction",
+   "threshold": "n4-denoise",
+   "absent": ""
+  },
+  {
+   "id": "F04",
+   "group": "functional",
+   "title": "Coregistration reference: MNI brain prior to the boldref (Linear)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F05",
+   "group": "functional",
+   "title": "One-shot resampling to the boldref (HMC)",
+   "tool": "lx.transforms.resample_series",
+   "threshold": "scipy-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F06",
+   "group": "functional",
+   "title": "One-shot resampling to T1w (HMC + coregistration)",
+   "tool": "lx.transforms.resample_series",
+   "threshold": "scipy-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F07",
+   "group": "functional",
+   "title": "One-shot resampling to MNI res-2 (HMC + coregistration + `.h5` warp)",
+   "tool": "lx.transforms.resample_series",
+   "threshold": "scipy-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F08",
+   "group": "functional",
+   "title": "boldref and BOLD mask to T1w (Lanczos, MultiLabel)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F09",
+   "group": "functional",
+   "title": "boldref and BOLD mask to MNI (Lanczos, MultiLabel, `.h5`)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F10",
+   "group": "functional",
+   "title": "Confound masks to the boldref (Gaussian, MultiLabel, inverse)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F11",
+   "group": "functional",
+   "title": "Carpet-plot segmentation to the boldref (MultiLabel, `.h5`, `-u int`)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  },
+  {
+   "id": "F12",
+   "group": "functional",
+   "title": "Report: T1w and WM mask to the boldref (Lanczos, NearestNeighbor)",
+   "tool": "lx.ants.apply_transforms",
+   "threshold": "itk-interpolation",
+   "absent": ""
+  }
+ ],
+ "select": [],
+ "started": "2026-10-12T20:23:48+0200",
+ "finished": "2026-10-12T20:36:34+0200",
+ "load_before": [
+  1.77392578125,
+  4.9501953125,
+  5.67626953125
+ ],
+ "load_after": [
+  4.453125,
+  3.76416015625,
+  4.3701171875
+ ],
+ "busy": [],
+ "environment": {
+  "larmorx": "0.0.1",
+  "larmorx_commit": "58230ae137bd",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "python": "3.12.10",
+  "platform": "Linux x86_64",
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "logical_cpus": 12,
+  "packages": {
+   "numpy": "2.3.5",
+   "nibabel": "5.4.2",
+   "scipy": "1.15.3",
+   "pandas": "3.0.6"
+  }
+ },
+ "results": [
+  {
+   "stage": "A01",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0",
+   "name": "denoise",
+   "keys": {
+    "subject": "002",
+    "item": "_denoise0"
+   },
+   "program": "DenoiseImage",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 66.365273,
+   "command": "DenoiseImage -i /data/sub-002/anat/sub-002_T1w.nii.gz -n Rician -o sub-002_T1w_noise_corrected.nii.gz -s 1",
+   "larmorx_threads": 8,
+   "larmorx_seconds": 4.382239859551191,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 4395882,
+      "max_abs": 6693.466244071722,
+      "max_rel": 0.0757342752114586,
+      "max_rel_voxel": 13661356.0,
+      "ncc": 0.9999893022288934,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 4046357,
+       "1e-05": 3583285,
+       "0.0001": 2083060
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 5205,
+      "max_abs": 0.015869140625,
+      "max_rel": 1.7958214053954652e-07,
+      "max_rel_voxel": 9.582908126810456e-05,
+      "ncc": 0.9999999999999999,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 4394997,
+        "max_abs": 6693.466244071722,
+        "max_rel": 0.0757342752114586,
+        "max_rel_voxel": 13661356.0,
+        "ncc": 0.9999893022288744,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 4046355,
+         "1e-05": 3583287,
+         "0.0001": 2083060
+        }
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 5205,
+        "max_abs": 0.015869140625,
+        "max_rel": 1.7958214053954652e-07,
+        "max_rel_voxel": 9.582908126810456e-05,
+        "ncc": 0.9999999999999999,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "threads",
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 49.12978720664978,
+   "status": "explained",
+   "harness_seconds": 62.18576101027429
+  },
+  {
+   "stage": "A03",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0",
+   "name": "truncate_images",
+   "keys": {
+    "subject": "002",
+    "item": "_truncate_images0"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.512377,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths.nii.gz TruncateImageIntensity /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-002_T1w_noise_corrected.nii.gz 0.01 0.999 256",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.2040636781603098,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 2.653127670288086,
+   "status": "identical",
+   "harness_seconds": 6.234305331483483
+  },
+  {
+   "stage": "A04",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "name": "inu_n4",
+   "keys": {
+    "subject": "002",
+    "item": "_inu_n40"
+   },
+   "program": "N4BiasFieldCorrection",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 55.248901,
+   "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-002_T1w_noise_corrected_maths.nii.gz --convergence [ 50x50x50x50, 1e-07 ] --output sub-002_T1w_noise_corrected_maths_corrected.nii.gz --shrink-factor 4",
+   "larmorx_threads": 8,
+   "larmorx_seconds": 8.942736038938165,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 15837135,
+      "max_abs": 0.3828125,
+      "max_rel": 5.578340737347356e-06,
+      "max_rel_voxel": 7.065604068958222e-06,
+      "ncc": 0.9999999999994108,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 3170991,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 15842295,
+      "max_abs": 0.3359375,
+      "max_rel": 4.895307585836942e-06,
+      "max_rel_voxel": 5.714611583208138e-06,
+      "ncc": 0.9999999999997167,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 4005744,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 15842304,
+        "max_abs": 0.48046875,
+        "max_rel": 7.001386843813518e-06,
+        "max_rel_voxel": 1.1876682797555844e-05,
+        "ncc": 0.9999999999993522,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 4839031,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 15842295,
+        "max_abs": 0.3359375,
+        "max_rel": 4.895307585836942e-06,
+        "max_rel_voxel": 5.714611583208138e-06,
+        "ncc": 0.9999999999997167,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 4005744,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "threads",
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 36.062580585479736,
+   "status": "explained",
+   "harness_seconds": 56.62781639583409
+  },
+  {
+   "stage": "A05",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/lap_target",
+   "name": "lap_target",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 7.912373,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_maths.nii.gz Laplacian /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40/sub-002_T1w_noise_corrected_maths_corrected.nii.gz 1.5 1",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 2.011919692158699,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 6.1115639209747314,
+   "status": "identical",
+   "harness_seconds": 10.967609452083707
+  },
+  {
+   "stage": "A05",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/lap_tmpl",
+   "name": "lap_tmpl",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 10.672939,
+   "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_T1w_maths.nii.gz Laplacian /templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz 1.5 1",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.905399989336729,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_T1w_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       216,
+       291,
+       256
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 16091136,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       216,
+       291,
+       256
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 16091136,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 6.4432268142700195,
+   "status": "identical",
+   "harness_seconds": 11.072926986962557
+  },
+  {
+   "stage": "A06",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/map_brainmask",
+   "name": "map_brainmask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 21.171776,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_label-brain_probseg.nii.gz --interpolation Gaussian --output tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-002_T1w_noise_corrected.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template0GenericAffine.mat, 1 ] --transform /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template1InverseWarp.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 20.392984617501497,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 4369,
+      "max_abs": 6.661338147750939e-16,
+      "max_rel": 6.661338147750939e-16,
+      "max_rel_voxel": 9.089965959534818e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 4369,
+      "max_abs": 6.661338147750939e-16,
+      "max_rel": 6.661338147750939e-16,
+      "max_rel_voxel": 9.089965959534818e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 4369,
+        "max_abs": 6.661338147750939e-16,
+        "max_rel": 6.661338147750939e-16,
+        "max_rel_voxel": 9.089965959534818e-16,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 20.53683638572693,
+   "status": "explained",
+   "harness_seconds": 50.282424952834845
+  },
+  {
+   "stage": "A06",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/map_wmmask",
+   "name": "map_wmmask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 21.428598,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/full_wm/summap.nii.gz --interpolation Gaussian --output summap_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-002_T1w_noise_corrected.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template0GenericAffine.mat, 1 ] --transform /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/norm/anat_to_template1InverseWarp.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 20.301113039255142,
+   "outputs": [
+    {
+     "output": "summap_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 7254,
+      "max_abs": 7.771561172376096e-16,
+      "max_rel": 7.771561172376096e-16,
+      "max_rel_voxel": 9.104231359114057e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 15842304,
+      "differing": 7254,
+      "max_abs": 7.771561172376096e-16,
+      "max_rel": 7.771561172376096e-16,
+      "max_rel_voxel": 9.104231359114057e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 7254,
+        "max_abs": 7.771561172376096e-16,
+        "max_rel": 7.771561172376096e-16,
+        "max_rel_voxel": 9.104231359114057e-16,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 18.92436122894287,
+   "status": "explained",
+   "harness_seconds": 49.0313013009727
+  },
+  {
+   "stage": "A07",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/thr_brainmask",
+   "name": "thr_brainmask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ThresholdImage",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.055696,
+   "command": "ThresholdImage 3 /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/map_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans.nii.gz tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 0.500000 1.000000 1.000000 0.000000",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.348584184423089,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.0800902843475342,
+   "status": "identical",
+   "harness_seconds": 4.103668712079525
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/02_pad_segm",
+   "name": "02_pad_segm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.943622,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/01_atropos/sub-002_T1w_noise_corrected_maths_corrected_labeled.nii.gz 10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.5154033843427896,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.1630971431732178,
+   "status": "identical",
+   "harness_seconds": 5.291840199381113
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/03_pad_mask",
+   "name": "03_pad_mask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.731073,
+   "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/thr_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.40825288370251656,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.1055595874786377,
+   "status": "identical",
+   "harness_seconds": 5.1738690584897995
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/05_get_wm",
+   "name": "05_get_wm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.4977230000000001,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-03.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.33974770084023476,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.5179994106292725,
+   "status": "identical",
+   "harness_seconds": 5.374079832807183
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/06_get_gm",
+   "name": "06_get_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.6668150000000002,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.35032632015645504,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.5070266723632812,
+   "status": "identical",
+   "harness_seconds": 5.365808814764023
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/07_fill_gm",
+   "name": "07_fill_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 11.339742,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz FillHoles /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/06_get_gm/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz 2",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4644105639308691,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 11.24738335609436,
+   "status": "identical",
+   "harness_seconds": 15.19194490276277
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/08_mult_gm",
+   "name": "08_mult_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "MultiplyImages",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.996243,
+   "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/06_get_gm/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths.nii.gz /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/07_fill_gm/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-02_maths_maths.nii.gz 08_mult_gm.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4231571312993765,
+   "outputs": [
+    {
+     "output": "08_mult_gm.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.2979686260223389,
+   "status": "identical",
+   "harness_seconds": 5.424863530322909
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/09_relabel_wm",
+   "name": "09_relabel_wm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "MultiplyImages",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.834403,
+   "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/05_get_wm/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-03_maths.nii.gz 3.0 09_relabel_wm.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.31121442653238773,
+   "outputs": [
+    {
+     "output": "09_relabel_wm.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.0074381828308105,
+   "status": "identical",
+   "harness_seconds": 4.94214385561645
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/10_me_csf",
+   "name": "10_me_csf",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 4.354458,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01.nii.gz 10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.07047825679183,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 4.181935787200928,
+   "status": "identical",
+   "harness_seconds": 8.482571631669998
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/11_add_gm",
+   "name": "11_add_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.7163119999999998,
+   "command": "ImageMath 3 08_mult_gm_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/08_mult_gm/08_mult_gm.nii.gz /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/10_me_csf/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4362813029438257,
+   "outputs": [
+    {
+     "output": "08_mult_gm_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.6480450630187988,
+   "status": "identical",
+   "harness_seconds": 5.626793701201677
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/12_relabel_gm",
+   "name": "12_relabel_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "MultiplyImages",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.810468,
+   "command": "MultiplyImages 3 /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/11_add_gm/08_mult_gm_maths.nii.gz 2.0 12_relabel_gm.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.3143131621181965,
+   "outputs": [
+    {
+     "output": "12_relabel_gm.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 0.965965747833252,
+   "status": "identical",
+   "harness_seconds": 4.944022390991449
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/13_add_gm_wm",
+   "name": "13_add_gm_wm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.771467,
+   "command": "ImageMath 3 09_relabel_wm_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/09_relabel_wm/09_relabel_wm.nii.gz /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/12_relabel_gm/12_relabel_gm.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.46846238896250725,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.6713361740112305,
+   "status": "identical",
+   "harness_seconds": 5.6361306216567755
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/15_add_7",
+   "name": "15_add_7",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.464803,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/14_sel_labels2/09_relabel_wm_maths_class-03.nii.gz /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/14_sel_labels2/09_relabel_wm_maths_class-02.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.3561748117208481,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.5232691764831543,
+   "status": "identical",
+   "harness_seconds": 5.453673398122191
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/16_me_7",
+   "name": "16_me_7",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.09641,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/15_add_7/09_relabel_wm_maths_class-03_maths.nii.gz 2",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.0998903308063745,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 2.9673585891723633,
+   "status": "identical",
+   "harness_seconds": 7.686482964083552
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/17_comp_7",
+   "name": "17_comp_7",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.628329,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/16_me_7/09_relabel_wm_maths_class-03_maths_maths.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.37208580784499645,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.6247749328613281,
+   "status": "identical",
+   "harness_seconds": 5.557594820857048
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/18_md_7",
+   "name": "18_md_7",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.739539,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/17_comp_7/09_relabel_wm_maths_class-03_maths_maths_maths.nii.gz 4",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.5679485872387886,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.6650903224945068,
+   "status": "identical",
+   "harness_seconds": 5.757801396772265
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/19_fill_7",
+   "name": "19_fill_7",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 10.683077,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz FillHoles /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/18_md_7/09_relabel_wm_maths_class-03_maths_maths_maths_maths.nii.gz 2",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4328974764794111,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 10.628550291061401,
+   "status": "identical",
+   "harness_seconds": 14.60035284794867
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/20_add_7_2",
+   "name": "20_add_7_2",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.767601,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz addtozero /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/19_fill_7/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths.nii.gz /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/03_pad_mask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.43281647004187107,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.5651254653930664,
+   "status": "identical",
+   "harness_seconds": 5.577486800029874
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/21_md_7_2",
+   "name": "21_md_7_2",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.7694480000000001,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/20_add_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths.nii.gz 5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.610167283564806,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.62998628616333,
+   "status": "identical",
+   "harness_seconds": 5.770620703697205
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/22_me_7_2",
+   "name": "22_me_7_2",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.118598,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz ME /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/21_md_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths.nii.gz 5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.0723247770220041,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       211,
+       308,
+       308
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 20016304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 2.897571086883545,
+   "status": "identical",
+   "harness_seconds": 7.581527557224035
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/23_depad_mask",
+   "name": "23_depad_mask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.74881,
+   "command": "ImageMath 3 09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/22_me_7_2/09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz -10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4483847040683031,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_class-03_maths_maths_maths_maths_maths_maths_maths_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.0748770236968994,
+   "status": "identical",
+   "harness_seconds": 4.316921165212989
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/24_depad_segm",
+   "name": "24_depad_segm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.817795,
+   "command": "ImageMath 3 09_relabel_wm_maths_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/13_add_gm_wm/09_relabel_wm_maths.nii.gz -10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.484618840739131,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.1295058727264404,
+   "status": "identical",
+   "harness_seconds": 4.402439698576927
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/25_depad_gm",
+   "name": "25_depad_gm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.91208,
+   "command": "ImageMath 3 12_relabel_gm_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/12_relabel_gm/12_relabel_gm.nii.gz -10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.46860870346426964,
+   "outputs": [
+    {
+     "output": "12_relabel_gm_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.1621477603912354,
+   "status": "identical",
+   "harness_seconds": 4.475880106911063
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/26_depad_wm",
+   "name": "26_depad_wm",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.951954,
+   "command": "ImageMath 3 09_relabel_wm_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/09_relabel_wm/09_relabel_wm.nii.gz -10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.45190385170280933,
+   "outputs": [
+    {
+     "output": "09_relabel_wm_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.2088429927825928,
+   "status": "identical",
+   "harness_seconds": 4.414549874141812
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/27_depad_csf",
+   "name": "27_depad_csf",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.706398,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz PadImage /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/04_sel_labels/sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01.nii.gz -10",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4124325457960367,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_maths_corrected_labeled_maths_class-01_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.0516178607940674,
+   "status": "identical",
+   "harness_seconds": 4.298845954239368
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/dil_brainmask",
+   "name": "dil_brainmask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.369405,
+   "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz MD /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/thr_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled.nii.gz 2",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.4589743800461292,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.4102494716644287,
+   "status": "identical",
+   "harness_seconds": 4.5867977272719145
+  },
+  {
+   "stage": "A08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/get_brainmask",
+   "name": "get_brainmask",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.302939,
+   "command": "ImageMath 3 tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths_maths.nii.gz GetLargestComponent /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/dil_brainmask/tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.319785138592124,
+   "outputs": [
+    {
+     "output": "tpl-OASIS30ANTs_res-01_label-brain_probseg_trans_resampled_maths_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.383176326751709,
+   "status": "identical",
+   "harness_seconds": 4.426402499899268
+  },
+  {
+   "stage": "A09",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "name": "inu_n4_final",
+   "keys": {
+    "subject": "002",
+    "item": "_inu_n4_final0"
+   },
+   "program": "N4BiasFieldCorrection",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 20.503103,
+   "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-002_T1w_noise_corrected.nii.gz --convergence [ 50x50x50x50x50, 1e-07 ] --output [ sub-002_T1w_noise_corrected_corrected.nii.gz, sub-002_T1w_noise_corrected_bias.nii.gz ] -r --shrink-factor 4 --weight-image /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+   "larmorx_threads": 8,
+   "larmorx_seconds": 2.91890518181026,
+   "outputs": [
+    {
+     "output": "corrected",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 6404151,
+      "max_abs": 1.75,
+      "max_rel": 6.627927221098302e-06,
+      "max_rel_voxel": 9.219529484230345e-06,
+      "ncc": 0.9999999999995938,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 3452114,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 6301102,
+      "max_abs": 0.421875,
+      "max_rel": 1.597791780746041e-06,
+      "max_rel_voxel": 2.6289906983387993e-06,
+      "ncc": 0.9999999999992315,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 22665,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 6397878,
+        "max_abs": 2.03125,
+        "max_rel": 7.693129810203386e-06,
+        "max_rel_voxel": 8.731351837639904e-06,
+        "ncc": 0.999999999999378,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 3437494,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 6301102,
+        "max_abs": 0.421875,
+        "max_rel": 1.597791780746041e-06,
+        "max_rel_voxel": 2.6289906983387993e-06,
+        "ncc": 0.9999999999992315,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 22665,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "threads",
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    },
+    {
+     "output": "bias field",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 15841685,
+      "max_abs": 4.410743713378906e-06,
+      "max_rel": 4.368632275691395e-06,
+      "max_rel_voxel": 9.189454873779556e-06,
+      "ncc": 0.9999999999926457,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 13247259,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 15735809,
+      "max_abs": 1.2516975402832031e-06,
+      "max_rel": 1.2397483145621663e-06,
+      "max_rel_voxel": 2.654304815449627e-06,
+      "ncc": 0.9999999999981936,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 58936,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 15581672,
+        "max_abs": 3.933906555175781e-06,
+        "max_rel": 3.89634770534638e-06,
+        "max_rel_voxel": 8.707573778928909e-06,
+        "ncc": 0.9999999999924439,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 11616311,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 15735809,
+        "max_abs": 1.2516975402832031e-06,
+        "max_rel": 1.2397483145621663e-06,
+        "max_rel_voxel": 2.654304815449627e-06,
+        "ncc": 0.9999999999981936,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 58936,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         191,
+         288,
+         288
+        ],
+        "dtype_ref": "float32",
+        "dtype_test": "float32",
+        "voxels": 15842304,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "threads",
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 17.78255295753479,
+   "status": "explained",
+   "harness_seconds": 45.389020934700966
+  },
+  {
+   "stage": "A10",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/register_template_wf/_template_MNI152NLin2009cAsym/trunc_mov",
+   "name": "trunc_mov",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym"
+   },
+   "program": "ImageMath",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.411934,
+   "command": "ImageMath 3 sub-002_T1w_noise_corrected_corrected_xform_maths.nii.gz TruncateImageIntensity /work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/copy_xform/sub-002_T1w_noise_corrected_corrected_xform.nii.gz 0.01 0.999 256",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.5822450052946806,
+   "outputs": [
+    {
+     "output": "sub-002_T1w_noise_corrected_corrected_xform_maths.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       191,
+       288,
+       288
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 15842304,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 2.6209192276000977,
+   "status": "identical",
+   "harness_seconds": 6.916125537827611
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_reports_wf/_in_tuple_MNI152NLin2009cAsym.res2/mask_std",
+   "name": "mask_std",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 9.836715,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-002_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 8.68810742907226,
+   "outputs": [
+    {
+     "output": "sub-002_desc-brain_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 6.776336669921875,
+   "status": "identical",
+   "harness_seconds": 15.86950470879674
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_reports_wf/_in_tuple_MNI152NLin2009cAsym.res2/t1w_std",
+   "name": "t1w_std",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 5.672305,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-002_desc-preproc_T1w_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 2.412479069083929,
+   "outputs": [
+    {
+     "output": "sub-002_desc-preproc_T1w_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 3.9569404125213623,
+   "status": "identical",
+   "harness_seconds": 6.9818748049438
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_dseg",
+   "name": "anat2std_dseg",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 9.03761,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/anat/sub-002_dseg.nii.gz --interpolation MultiLabel --output sub-002_dseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 6.44422254525125,
+   "outputs": [
+    {
+     "output": "sub-002_dseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_dseg.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "int16",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0
+      },
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 7.402673244476318,
+   "status": "identical",
+   "harness_seconds": 14.484543304890394
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_mask",
+   "name": "anat2std_mask",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 8.367795,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/anat/sub-002_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-002_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 5.661687768995762,
+   "outputs": [
+    {
+     "output": "sub-002_desc-brain_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "uint8",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 6.201830148696899,
+   "status": "identical",
+   "harness_seconds": 12.457532957196236
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_t1w",
+   "name": "anat2std_t1w",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 6.031221,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /work/fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/mask_anat/sub-002_desc-preproc_T1w_masked.nii.gz --interpolation LanczosWindowedSinc --output sub-002_desc-preproc_T1w_masked_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.9557176157832146,
+   "outputs": [
+    {
+     "output": "sub-002_desc-preproc_T1w_masked_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_desc-preproc_T1w.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 4.038541793823242,
+   "status": "identical",
+   "harness_seconds": 6.569537496194243
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_tpms/mapflow/_anat2std_tpms0",
+   "name": "anat2std_tpms",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2",
+    "item": "_anat2std_tpms0"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.9974499999999997,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_label-GM_probseg.nii.gz --interpolation Gaussian --output sub-002_label-GM_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.931167433038354,
+   "outputs": [
+    {
+     "output": "sub-002_label-GM_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_label-GM_probseg.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 2.3468687534332275,
+   "status": "identical",
+   "harness_seconds": 4.833395879715681
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_tpms/mapflow/_anat2std_tpms1",
+   "name": "anat2std_tpms",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2",
+    "item": "_anat2std_tpms1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.498258,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_label-WM_probseg.nii.gz --interpolation Gaussian --output sub-002_label-WM_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.9120416436344385,
+   "outputs": [
+    {
+     "output": "sub-002_label-WM_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_label-WM_probseg.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 2.407078504562378,
+   "status": "identical",
+   "harness_seconds": 4.835328817367554
+  },
+  {
+   "stage": "A11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/ds_std_volumes_wf/_in_tuple_MNI152NLin2009cAsym.res2/anat2std_tpms/mapflow/_anat2std_tpms2",
+   "name": "anat2std_tpms",
+   "keys": {
+    "subject": "002",
+    "space": "MNI152NLin2009cAsym.res2",
+    "item": "_anat2std_tpms2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 2.656981,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-002_label-CSF_probseg_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.9354319889098406,
+   "outputs": [
+    {
+     "output": "sub-002_label-CSF_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/anat/sub-002_space-MNI152NLin2009cAsym_res-2_label-CSF_probseg.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 2.397143602371216,
+   "status": "identical",
+   "harness_seconds": 4.876392960548401
+  },
+  {
+   "stage": "S01",
+   "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/n4",
+   "name": "n4",
+   "keys": {
+    "subject": "002"
+   },
+   "program": "N4BiasFieldCorrection",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 1.104201,
+   "command": "N4BiasFieldCorrection -d 3 --input-image /work/fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence [ 50x50x50x50x50, 1e-07 ] --output clipped_corrected.nii.gz --shrink-factor 4",
+   "larmorx_threads": 8,
+   "larmorx_seconds": 0.2594305891543627,
+   "nipype_copy_header": {
+    "input": "/work/fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/clipper_pre/clipped.nii.gz",
+    "input_dtype": "int16",
+    "outputs": [
+     "clipped_corrected.nii.gz"
+    ]
+   },
+   "outputs": [
+    {
+     "output": "clipped_corrected.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 98545,
+      "max_abs": 0.004175768466666341,
+      "max_rel": 1.9849704359588585e-05,
+      "max_rel_voxel": 0.00473357928950901,
+      "ncc": 0.9999999999706093,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 49000,
+       "1e-05": 1868,
+       "0.0001": 0
+      }
+     },
+     "raw_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 98545,
+      "max_abs": 0.004037410486489534,
+      "max_rel": 1.919201344012725e-05,
+      "max_rel_voxel": 0.003020991869160354,
+      "ncc": 0.9999999998671806,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 85742,
+       "1e-05": 655,
+       "0.0001": 0
+      }
+     },
+     "raw_stored": {
+      "dtype": [
+       "int16",
+       "float32"
+      ],
+      "scl_slope": [
+       0.003210029797628522,
+       1.0
+      ],
+      "scl_inter": [
+       105.1862564086914,
+       0.0
+      ]
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 98545,
+        "max_abs": 0.004175768466666341,
+        "max_rel": 1.9849704359588585e-05,
+        "max_rel_voxel": 0.00473357928950901,
+        "ncc": 0.9999999999706093,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 49000,
+         "1e-05": 1868,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "threads"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 1.2038753032684326,
+   "status": "explained",
+   "harness_seconds": 12.655219135805964
+  },
+  {
+   "stage": "S02",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/unwarp_boldref",
+   "name": "unwarp_boldref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "resampling",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 0.171409,
+   "command": null,
+   "inputs": {
+    "in_file": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct/sub-002_task-clip_run-1_desc-hmc_boldref_corrected.nii.gz",
+    "ref_file": "/out/sub-002/func/sub-002_task-clip_run-1_desc-hmc_boldref.nii.gz",
+    "transforms": null,
+    "inverse": false,
+    "pe_dir": "j",
+    "ro_time": 0.0137951,
+    "jacobian": true,
+    "order": 3,
+    "mode": "grid-constant",
+    "cval": 0.0,
+    "prefilter": true,
+    "output_dtype": "float32"
+   },
+   "larmorx_seconds": 0.11027489975094795,
+   "larmorx_threads": 8,
+   "larmorx_write_seconds": 0.01436397060751915,
+   "outputs": [
+    {
+     "output": "preprocessed BOLD",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative_dtype": "float32"
+    }
+   ],
+   "status": "identical",
+   "fieldmap": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/boldref_fmap/sub-002_fmapid-auto00000_desc-coeff_fieldmaprec.nii.gz",
+   "jacobian_fix": {
+    "jacobian": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz",
+    "seconds": 0.11122143268585205,
+    "notices": [],
+    "fix_vs_reproduce": {
+     "shape": [
+      64,
+      64,
+      40
+     ],
+     "dtype_ref": "float32",
+     "dtype_test": "float32",
+     "voxels": 163840,
+     "differing": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "max_rel_voxel": 0.0,
+     "ncc": 1.0,
+     "affine_diff": 0.0,
+     "kind": "intensity"
+    },
+    "factors": {
+     "fmriprep_range": [
+      0.39533352851867676,
+      1.6856355667114258
+     ],
+     "larmorx_range": [
+      0.39533352851867676,
+      1.6856355667114258
+     ],
+     "over": {
+      "0.001": 0.0,
+      "0.01": 0.0,
+      "0.05": 0.0,
+      "0.2": 0.0
+     },
+     "median_gap": 0.0,
+     "max_gap": 0.0
+    }
+   },
+   "container_seconds": 1.5588492639362812,
+   "rerun_identical": true,
+   "harness_seconds": 11.208025507628918,
+   "larmorx_total_seconds": 0.1246388703584671
+  },
+  {
+   "stage": "S03",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/func_fit_reports_wf/fmap_boldref",
+   "name": "fmap_boldref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.866091,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/boldref_fmap/sub-002_fmapid-auto00000_desc-coeff_fieldmaprec.nii.gz --interpolation LanczosWindowedSinc --output sub-002_fmapid-auto00000_desc-coeff_fieldmaprec_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-auto00000_mode-image_desc-fmap_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.2581781279295683,
+   "outputs": [
+    {
+     "output": "sub-002_fmapid-auto00000_desc-coeff_fieldmaprec_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 1.181424856185913,
+   "status": "identical",
+   "harness_seconds": 1.688634181395173
+  },
+  {
+   "stage": "S03",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/func_fit_reports_wf/fmapref_boldref",
+   "name": "fmapref_boldref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.883064,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/fmap/sub-002_fmapid-auto00000_desc-epi_fieldmap.nii.gz --interpolation LanczosWindowedSinc --output sub-002_fmapid-auto00000_desc-epi_fieldmap_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-auto00000_mode-image_desc-fmap_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.273539911955595,
+   "outputs": [
+    {
+     "output": "sub-002_fmapid-auto00000_desc-epi_fieldmap_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 1.1421637535095215,
+   "status": "identical",
+   "harness_seconds": 1.6956121269613504
+  },
+  {
+   "stage": "F01",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_hmc_wf/mcflirt",
+   "name": "mcflirt",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "mcflirt",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 7.984605,
+   "command": "mcflirt -in /data/sub-002/func/sub-002_task-clip_run-1_bold.nii.gz -out /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_hmc_wf/mcflirt/sub-002_task-clip_run-1_bold_mcf.nii.gz -reffile /out/sub-002/func/sub-002_task-clip_run-1_desc-hmc_boldref.nii.gz -mats",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 7.974670324474573,
+   "matrices": {
+    "volumes": 63,
+    "rms_median_mm": 0.013119856952931077,
+    "rms_p95_mm": 0.022942574570442745,
+    "rms_max_mm": 0.03482664436323184,
+    "median_mm": 0.0019281500009356023,
+    "median_deg": 0.0037815198927360722,
+    "max_mm": 0.017636549783347277,
+    "max_deg": 0.03271588261198042,
+    "identical_volumes": 0
+   },
+   "api_seconds": 6.063326928764582,
+   "api_threads": 1,
+   "api_seconds_all": 1.3195741903036833,
+   "api_threads_all": 12,
+   "confounds": {
+    "tsv": "out/sub-002/func/sub-002_task-clip_run-1_desc-confounds_timeseries.tsv",
+    "check": {
+     "median_mm": 0.0,
+     "max_mm": 3.3881317890172014e-21,
+     "median_deg": 0.0,
+     "max_deg": 6.066426623274835e-21,
+     "fd_r": 1.0,
+     "fd_max_diff": 0.0,
+     "fd_mean_ref": 0.08657019031514857,
+     "fd_mean_test": 0.08657019031514857,
+     "rmsd_max_diff": 0.0,
+     "identical": false
+    },
+    "larmorx": {
+     "median_mm": 0.0012943217376815003,
+     "max_mm": 0.01651105301074544,
+     "median_deg": 0.003752157153922082,
+     "max_deg": 0.03271238348099703,
+     "fd_r": 0.768065433054515,
+     "fd_max_diff": 0.04913094076239451,
+     "fd_mean_ref": 0.08657019031514857,
+     "fd_mean_test": 0.08520509370901289,
+     "rmsd_max_diff": 0.026555367042045305,
+     "identical": false
+    }
+   },
+   "fd_max_fmriprep": 0.1672938811729307,
+   "band": {
+    "rms_median": 0.015955802713535066,
+    "rms_p95": 0.025712145154768436,
+    "rms_max": 0.03637111798438455,
+    "param_mm_median": 0.0038204000520920545,
+    "param_deg_median": 0.004698253897364523,
+    "fd_r": 0.8238183710980022
+   },
+   "itk": {
+    "derivative": "out/sub-002/func/sub-002_task-clip_run-1_from-orig_to-boldref_mode-image_desc-hmc_xfm.txt",
+    "check_identical": true,
+    "larmorx_max_abs": 0.02265957,
+    "own_vs_nitransforms_max_abs": 9.079055425539016e-05
+   },
+   "container_seconds": 8.209288835525513,
+   "rerun": {
+    "volumes": 63,
+    "rms_median_mm": 8.18767603288447e-15,
+    "rms_p95_mm": 2.3733451576675214e-14,
+    "rms_max_mm": 2.776979358463554e-14,
+    "median_mm": 0.0,
+    "median_deg": 0.0,
+    "max_mm": 0.0,
+    "max_deg": 0.0,
+    "identical_volumes": 63
+   },
+   "host_fsl": {
+    "volumes": 63,
+    "rms_median_mm": 8.18767603288447e-15,
+    "rms_p95_mm": 2.3733451576675214e-14,
+    "rms_max_mm": 2.776979358463554e-14,
+    "median_mm": 0.0,
+    "median_deg": 0.0,
+    "max_mm": 0.0,
+    "max_deg": 0.0,
+    "identical_volumes": 63,
+    "version": "6.0.7.17",
+    "larmorx_vs": {
+     "volumes": 63,
+     "rms_median_mm": 0.013119856952931077,
+     "rms_p95_mm": 0.022942574570442745,
+     "rms_max_mm": 0.03482664436323184,
+     "median_mm": 0.0019281500009356023,
+     "median_deg": 0.0037815198927360722,
+     "max_mm": 0.017636549783347277,
+     "max_deg": 0.03271588261198042,
+     "identical_volumes": 0
+    }
+   },
+   "status": "compared",
+   "harness_seconds": 50.74011170864105
+  },
+  {
+   "stage": "F02",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/slice_timing_correction",
+   "name": "slice_timing_correction",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "3dTshift",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.394295,
+   "command": "3dTshift -ignore 0 -prefix sub-002_task-clip_run-1_bold_tshift.nii.gz -tpattern @slice_timing.1D -TR 2s -tzero 0.975 /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/slice_timing_correction/sub-002_task-clip_run-1_bold.nii.gz",
+   "argv": [
+    "3dTshift",
+    "-ignore",
+    "0",
+    "-prefix",
+    "sub-002_task-clip_run-1_bold_tshift.nii.gz",
+    "-tpattern",
+    "@slice_timing.1D",
+    "-TR",
+    "2s",
+    "-tzero",
+    "0.975",
+    "/data/sub-002/func/sub-002_task-clip_run-1_bold.nii.gz"
+   ],
+   "files": {
+    "slice_timing.1D": "0.0\t0.05\t0.1\t0.15\t0.2\t0.25\t0.3\t0.35\t0.4\t0.45\t0.5\t0.55\t0.6\t0.65\t0.7\t0.75\t0.8\t0.85\t0.9\t0.95\t1.0\t1.05\t1.1\t1.15\t1.2\t1.25\t1.3\t1.35\t1.4\t1.45\t1.5\t1.55\t1.6\t1.65\t1.7\t1.75\t1.8\t1.85\t1.9\t1.95"
+   },
+   "larmorx_threads": 1,
+   "larmorx_replica_seconds": 0.7498026769608259,
+   "larmorx_original_seconds": 0.6563478652387857,
+   "larmorx_seconds": 0.7498026769608259,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_bold_tshift.nii.gz",
+     "implementation": "replica",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 10321920,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "header_vs_fmriprep": {
+      "identical": false,
+      "fields": [
+       "vox_offset"
+      ],
+      "extension_codes": [
+       [
+        4
+       ],
+       []
+      ],
+      "extensions_identical": false
+     },
+     "stored_vs_fmriprep": {
+      "dtype": [
+       "int16",
+       "int16"
+      ],
+      "scl_slope": [
+       47.666343688964844,
+       47.666343688964844
+      ],
+      "scl_inter": [
+       0.0,
+       0.0
+      ],
+      "differing": 0,
+      "max_abs": 0,
+      "values": 10321920
+     },
+     "within": [
+      true,
+      "bit-identical"
+     ],
+     "fix": {
+      "vs_reproduce": {
+       "shape": [
+        64,
+        64,
+        40,
+        63
+       ],
+       "dtype_ref": "float64",
+       "dtype_test": "float64",
+       "voxels": 10321920,
+       "differing": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0,
+       "max_rel_voxel": 0.0,
+       "ncc": 1.0,
+       "affine_diff": 0.0,
+       "kind": "intensity"
+      },
+      "header": {
+       "identical": true,
+       "fields": [],
+       "extension_codes": [
+        [],
+        []
+       ],
+       "extensions_identical": true
+      },
+      "notices": []
+     },
+     "vs_afni_oracle": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 10321920,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    },
+    {
+     "output": "sub-002_task-clip_run-1_bold_tshift.nii.gz",
+     "implementation": "original",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 10321920,
+      "differing": 189,
+      "max_abs": 47.666343688964844,
+      "max_rel": 0.0002442002442002442,
+      "max_rel_voxel": 0.043478260869565216,
+      "ncc": 0.999999999974433,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "bold": {
+       "mask_voxels": 51080,
+       "mean_ncc": 0.9999999999964697,
+       "tsnr_r": 0.9999999817713555,
+       "timeseries_r_median": 1.0
+      }
+     },
+     "header_vs_fmriprep": {
+      "identical": false,
+      "fields": [
+       "vox_offset"
+      ],
+      "extension_codes": [
+       [
+        4
+       ],
+       []
+      ],
+      "extensions_identical": false
+     },
+     "stored_vs_fmriprep": {
+      "dtype": [
+       "int16",
+       "int16"
+      ],
+      "scl_slope": [
+       47.666343688964844,
+       47.666343688964844
+      ],
+      "scl_inter": [
+       0.0,
+       0.0
+      ],
+      "differing": 189,
+      "max_abs": 1,
+      "values": 10321920
+     },
+     "within": [
+      true,
+      "int16: 189 of 10,321,920 stored values differ, max |diff| 1 unit"
+     ],
+     "fix": {
+      "vs_reproduce": {
+       "shape": [
+        64,
+        64,
+        40,
+        63
+       ],
+       "dtype_ref": "float64",
+       "dtype_test": "float64",
+       "voxels": 10321920,
+       "differing": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0,
+       "max_rel_voxel": 0.0,
+       "ncc": 1.0,
+       "affine_diff": 0.0,
+       "kind": "intensity"
+      },
+      "header": {
+       "identical": true,
+       "fields": [],
+       "extension_codes": [
+        [],
+        []
+       ],
+       "extensions_identical": true
+      },
+      "notices": []
+     },
+     "vs_afni_oracle": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 10321920,
+      "differing": 189,
+      "max_abs": 47.666343688964844,
+      "max_rel": 0.0002442002442002442,
+      "max_rel_voxel": 0.043478260869565216,
+      "ncc": 0.999999999974433,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "bold": {
+       "mask_voxels": 51080,
+       "mean_ncc": 0.9999999999964697,
+       "tsnr_r": 0.9999999817713555,
+       "timeseries_r_median": 1.0
+      }
+     }
+    }
+   ],
+   "container_seconds": 2.7086477279663086,
+   "rerun_vs_fmriprep": {
+    "shape": [
+     64,
+     64,
+     40,
+     63
+    ],
+    "dtype_ref": "float64",
+    "dtype_test": "float64",
+    "voxels": 10321920,
+    "differing": 0,
+    "max_abs": 0.0,
+    "max_rel": 0.0,
+    "max_rel_voxel": 0.0,
+    "ncc": 1.0,
+    "affine_diff": 0.0,
+    "kind": "intensity"
+   },
+   "afni_oracle_vs_fmriprep": {
+    "shape": [
+     64,
+     64,
+     40,
+     63
+    ],
+    "dtype_ref": "float64",
+    "dtype_test": "float64",
+    "voxels": 10321920,
+    "differing": 0,
+    "max_abs": 0.0,
+    "max_rel": 0.0,
+    "max_rel_voxel": 0.0,
+    "ncc": 1.0,
+    "affine_diff": 0.0,
+    "kind": "intensity"
+   },
+   "afni_oracle_header_vs_fmriprep": {
+    "identical": false,
+    "fields": [
+     "vox_offset"
+    ],
+    "extension_codes": [
+     [
+      4
+     ],
+     [
+      4
+     ]
+    ],
+    "extensions_identical": false
+   },
+   "original_vs_replica": {
+    "shape": [
+     64,
+     64,
+     40,
+     63
+    ],
+    "dtype_ref": "float64",
+    "dtype_test": "float64",
+    "voxels": 10321920,
+    "differing": 189,
+    "max_abs": 47.666343688964844,
+    "max_rel": 0.0002442002442002442,
+    "max_rel_voxel": 0.043478260869565216,
+    "ncc": 0.999999999974433,
+    "affine_diff": 0.0,
+    "kind": "intensity",
+    "bold": {
+     "mask_voxels": 51080,
+     "mean_ncc": 0.9999999999964697,
+     "tsnr_r": 0.9999999817713555,
+     "timeseries_r_median": 1.0
+    }
+   },
+   "status": "explained",
+   "harness_seconds": 15.061438277363777
+  },
+  {
+   "stage": "F03",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "name": "n4_correct",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "N4BiasFieldCorrection",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.709422,
+   "command": "N4BiasFieldCorrection --bspline-fitting [ 200 ] -d 3 --input-image /out/sub-002/func/sub-002_task-clip_run-1_desc-hmc_boldref.nii.gz --output sub-002_task-clip_run-1_desc-hmc_boldref_corrected.nii.gz -r --weight-image /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.1322072334587574,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_desc-hmc_boldref_corrected.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 1.160085916519165,
+   "status": "identical",
+   "harness_seconds": 1.5648358277976513
+  },
+  {
+   "stage": "F04",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/map_brainmask",
+   "name": "map_brainmask",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.463407,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg.nii.gz --interpolation Linear --output tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-hmc_boldref.nii.gz --transform [ /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/norm/transform0GenericAffine.mat, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.09013799764215946,
+   "outputs": [
+    {
+     "output": "tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 0.5746912956237793,
+   "status": "identical",
+   "harness_seconds": 0.9455009829252958
+  },
+  {
+   "stage": "F05",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/boldref_bold",
+   "name": "boldref_bold",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "resampling",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 3.359015,
+   "command": null,
+   "inputs": {
+    "in_file": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/copy_xform/sub-002_task-clip_run-1_bold_tshift_xform.nii.gz",
+    "ref_file": "/out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz",
+    "transforms": [
+     "/out/sub-002/func/sub-002_task-clip_run-1_from-orig_to-boldref_mode-image_desc-hmc_xfm.txt"
+    ],
+    "inverse": [
+     false
+    ],
+    "pe_dir": "j",
+    "ro_time": 0.0137951,
+    "jacobian": true,
+    "order": 3,
+    "mode": "grid-constant",
+    "cval": 0.0,
+    "prefilter": true,
+    "output_dtype": "float32"
+   },
+   "larmorx_seconds": 0.5785318166017532,
+   "larmorx_threads": 8,
+   "larmorx_write_seconds": 0.2557327635586262,
+   "outputs": [
+    {
+     "output": "preprocessed BOLD",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 10321920,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_desc-preproc_bold.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       64,
+       64,
+       40,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 10321920,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative_dtype": "float32"
+    }
+   ],
+   "status": "identical",
+   "fieldmap": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/boldref_fmap/sub-002_fmapid-auto00000_desc-coeff_fieldmaprec.nii.gz",
+   "jacobian_fix": {
+    "jacobian": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz",
+    "seconds": 0.4914574157446623,
+    "notices": [],
+    "fix_vs_reproduce": {
+     "shape": [
+      64,
+      64,
+      40,
+      63
+     ],
+     "dtype_ref": "float32",
+     "dtype_test": "float32",
+     "voxels": 10321920,
+     "differing": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "max_rel_voxel": 0.0,
+     "ncc": 1.0,
+     "affine_diff": 0.0,
+     "kind": "intensity"
+    },
+    "factors": {
+     "fmriprep_range": [
+      0.39533352851867676,
+      1.6856355667114258
+     ],
+     "larmorx_range": [
+      0.39533352851867676,
+      1.6856355667114258
+     ],
+     "over": {
+      "0.001": 0.0,
+      "0.01": 0.0,
+      "0.05": 0.0,
+      "0.2": 0.0
+     },
+     "median_gap": 0.0,
+     "max_gap": 0.0
+    }
+   },
+   "container_seconds": 4.354729266837239,
+   "rerun_identical": true,
+   "harness_seconds": 17.736166652292013,
+   "larmorx_total_seconds": 0.8342645801603794
+  },
+  {
+   "stage": "F06",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/resample",
+   "name": "resample",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "resampling",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 3.087265,
+   "command": null,
+   "inputs": {
+    "in_file": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/copy_xform/sub-002_task-clip_run-1_bold_tshift_xform.nii.gz",
+    "ref_file": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/gen_ref/sub-002_desc-preproc_T1w_reference.nii.gz",
+    "transforms": [
+     "/out/sub-002/func/sub-002_task-clip_run-1_from-orig_to-boldref_mode-image_desc-hmc_xfm.txt",
+     "/out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt"
+    ],
+    "inverse": [
+     false,
+     false
+    ],
+    "pe_dir": "j",
+    "ro_time": 0.0137951,
+    "jacobian": true,
+    "order": 3,
+    "mode": "grid-constant",
+    "cval": 0.0,
+    "prefilter": true,
+    "output_dtype": "float32"
+   },
+   "larmorx_seconds": 0.4441666956990957,
+   "larmorx_threads": 8,
+   "larmorx_write_seconds": 0.2056616898626089,
+   "outputs": [
+    {
+     "output": "preprocessed BOLD",
+     "vs_fmriprep": {
+      "shape": [
+       50,
+       62,
+       44,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 8593200,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-T1w_desc-preproc_bold.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       50,
+       62,
+       44,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 8593200,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative_dtype": "float32"
+    }
+   ],
+   "status": "identical",
+   "fieldmap": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/fmap_recon/sub-002_fmapid-auto00000_desc-coeff_fieldmaprec.nii.gz",
+   "jacobian_fix": {
+    "jacobian": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_space-T1w_desc-brain_mask.nii.gz",
+    "seconds": 0.4370134975761175,
+    "notices": [
+     "PIPE-03"
+    ],
+    "fix_vs_reproduce": {
+     "shape": [
+      50,
+      62,
+      44,
+      63
+     ],
+     "dtype_ref": "float32",
+     "dtype_test": "float32",
+     "voxels": 8593200,
+     "differing": 7731423,
+     "max_abs": 8181.87890625,
+     "max_rel": 0.039073799031945675,
+     "max_rel_voxel": 58.202661403174574,
+     "ncc": 0.999979440262103,
+     "affine_diff": 0.0,
+     "kind": "intensity",
+     "bold": {
+      "mask_voxels": 50732,
+      "mean_ncc": 0.9998449118649949,
+      "tsnr_r": 0.9999999999990413,
+      "timeseries_r_median": 0.9999999999951639
+     }
+    },
+    "change": {
+     "brain_voxels": 51660,
+     "over": {
+      "0.001": 0.7881920247773906,
+      "0.01": 0.028358497870692993,
+      "0.05": 0.0003097173828881146,
+      "0.2": 0.0
+     },
+     "abs_percentiles": {
+      "50": 0.0025185418050859085,
+      "90": 0.00665519660817637,
+      "99": 0.014283158554107972,
+      "99.9": 0.033930548698951735
+     },
+     "max_abs": 0.06766849847084731,
+     "signed_range": [
+      -0.023874273041560493,
+      0.06766849847084731
+     ],
+     "signed_median": 0.0009707921158849174,
+     "max_at_mm": [
+      54.8,
+      5.4,
+      14.9
+     ],
+     "clusters_over_1pct": [
+      {
+       "voxels": 322,
+       "centroid_mm": [
+        -3.2,
+        68.2,
+        29.1
+       ],
+       "max_abs": 0.03328827424022728
+      },
+      {
+       "voxels": 172,
+       "centroid_mm": [
+        -48.2,
+        8.6,
+        8.4
+       ],
+       "max_abs": 0.05914398764142875
+      },
+      {
+       "voxels": 159,
+       "centroid_mm": [
+        50.1,
+        2.3,
+        18.0
+       ],
+       "max_abs": 0.06766849847084731
+      }
+     ],
+     "clusters_count": 140
+    },
+    "factors": {
+     "fmriprep_range": [
+      0.37593603134155273,
+      1.6327028274536133
+     ],
+     "larmorx_range": [
+      0.38583463430404663,
+      1.6491581201553345
+     ],
+     "over": {
+      "0.001": 0.7899728997289973,
+      "0.01": 0.028184281842818428,
+      "0.05": 0.0,
+      "0.2": 0.0
+     },
+     "median_gap": 0.002538055181503296,
+     "max_gap": 0.0474621057510376
+    }
+   },
+   "container_seconds": 3.5751237366348505,
+   "rerun_identical": true,
+   "harness_seconds": 16.50598630309105,
+   "larmorx_total_seconds": 0.6498283855617046
+  },
+  {
+   "stage": "F07",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/resample",
+   "name": "resample",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "resampling",
+   "fmriprep_threads": 8,
+   "fmriprep_seconds": 22.615927,
+   "command": null,
+   "inputs": {
+    "in_file": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/copy_xform/sub-002_task-clip_run-1_bold_tshift_xform.nii.gz",
+    "ref_file": "/templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+    "transforms": [
+     "/out/sub-002/func/sub-002_task-clip_run-1_from-orig_to-boldref_mode-image_desc-hmc_xfm.txt",
+     "/out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+     "/out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+    ],
+    "inverse": [
+     false,
+     false,
+     false
+    ],
+    "pe_dir": "j",
+    "ro_time": 0.0137951,
+    "jacobian": true,
+    "order": 3,
+    "mode": "grid-constant",
+    "cval": 0.0,
+    "prefilter": true,
+    "output_dtype": "float32"
+   },
+   "larmorx_seconds": 5.19147096760571,
+   "larmorx_threads": 8,
+   "larmorx_write_seconds": 1.5533041879534721,
+   "outputs": [
+    {
+     "output": "preprocessed BOLD",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 68168205,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97,
+       63
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 68168205,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative_dtype": "float32"
+    }
+   ],
+   "status": "identical",
+   "fieldmap": "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/fmap_recon/sub-002_fmapid-auto00000_desc-coeff_fieldmaprec.nii.gz",
+   "jacobian_fix": {
+    "jacobian": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+    "seconds": 5.130149768665433,
+    "notices": [
+     "PIPE-03"
+    ],
+    "fix_vs_reproduce": {
+     "shape": [
+      97,
+      115,
+      97,
+      63
+     ],
+     "dtype_ref": "float32",
+     "dtype_test": "float32",
+     "voxels": 68168205,
+     "differing": 48792240,
+     "max_abs": 153528.03125,
+     "max_rel": 0.6907879464326515,
+     "max_rel_voxel": 1390.9028591200895,
+     "ncc": 0.9988004591526903,
+     "affine_diff": 0.0,
+     "kind": "intensity",
+     "bold": {
+      "mask_voxels": 245569,
+      "mean_ncc": 0.9921624268555712,
+      "tsnr_r": 0.9997918854120816,
+      "timeseries_r_median": 0.9999999999949918
+     }
+    },
+    "change": {
+     "brain_voxels": 254305,
+     "over": {
+      "0.001": 0.9558011049723757,
+      "0.01": 0.5950728455987888,
+      "0.05": 0.05570083167849629,
+      "0.2": 0.0025481213503470244
+     },
+     "abs_percentiles": {
+      "50": 0.012808882063380045,
+      "90": 0.038127263522539444,
+      "99": 0.11281192076974003,
+      "99.9": 0.2627290269790106
+     },
+     "max_abs": 0.5560992068536835,
+     "signed_range": [
+      -0.5560992068536835,
+      0.4035288548556238
+     ],
+     "signed_median": 0.004797059918790094,
+     "max_at_mm": [
+      59.5,
+      -18.5,
+      -28.5
+     ],
+     "clusters_over_1pct": [
+      {
+       "voxels": 149930,
+       "centroid_mm": [
+        -1.6,
+        -19.7,
+        10.5
+       ],
+       "max_abs": 0.5560992068536835
+      },
+      {
+       "voxels": 47,
+       "centroid_mm": [
+        -57.4,
+        -5.1,
+        17.2
+       ],
+       "max_abs": 0.023344021639476867
+      },
+      {
+       "voxels": 41,
+       "centroid_mm": [
+        25.1,
+        30.6,
+        37.5
+       ],
+       "max_abs": 0.020271771296626374
+      }
+     ],
+     "clusters_count": 455
+    },
+    "factors": {
+     "fmriprep_range": [
+      0.4637176990509033,
+      1.472992181777954
+     ],
+     "larmorx_range": [
+      0.33068984746932983,
+      1.774189829826355
+     ],
+     "over": {
+      "0.001": 0.9558482924047895,
+      "0.01": 0.595882896521893,
+      "0.05": 0.05577161282711705,
+      "0.2": 0.0022846581860364525
+     },
+     "median_gap": 0.012843310832977295,
+     "max_gap": 0.41695699095726013
+    }
+   },
+   "container_seconds": 21.721155343577266,
+   "rerun_identical": true,
+   "harness_seconds": 67.12381376512349,
+   "larmorx_total_seconds": 6.744775155559182
+  },
+  {
+   "stage": "F08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/ds_bold_t1_wf/resample_mask",
+   "name": "resample_mask",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.8083460000000002,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-002_task-clip_run-1_desc-brain_mask_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/gen_ref/sub-002_desc-preproc_T1w_reference.nii.gz --transform /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.6162296198308468,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_desc-brain_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-T1w_desc-brain_mask.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "uint8",
+      "dtype_test": "float64",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.061692714691162,
+   "status": "identical",
+   "harness_seconds": 1.9532512240111828
+  },
+  {
+   "stage": "F08",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/ds_bold_t1_wf/resample_ref",
+   "name": "resample_ref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.911416,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-002_task-clip_run-1_desc-coreg_boldref_trans.nii.gz --reference-image /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/gen_ref/sub-002_desc-preproc_T1w_reference.nii.gz --transform /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.20143354125320911,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_desc-coreg_boldref_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-T1w_boldref.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       50,
+       62,
+       44
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 136400,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 0.9605550765991211,
+   "status": "identical",
+   "harness_seconds": 1.488387992605567
+  },
+  {
+   "stage": "F09",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/ds_bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/resample_mask",
+   "name": "resample_mask",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 6.54346,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-002_task-clip_run-1_desc-brain_mask_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 4.9692127369344234,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_desc-brain_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "uint8",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 5.130095481872559,
+   "status": "identical",
+   "harness_seconds": 10.634699085727334
+  },
+  {
+   "stage": "F09",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/ds_bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/resample_ref",
+   "name": "resample_ref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "space": "MNI152NLin2009cAsym.res2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 5.686986,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --interpolation LanczosWindowedSinc --output sub-002_task-clip_run-1_desc-coreg_boldref_trans.nii.gz --reference-image /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz --transform /out/sub-002/anat/sub-002_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 --transform /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.645378326997161,
+   "outputs": [
+    {
+     "output": "sub-002_task-clip_run-1_desc-coreg_boldref_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "derivative": "out/sub-002/func/sub-002_task-clip_run-1_space-MNI152NLin2009cAsym_res-2_boldref.nii.gz",
+     "vs_derivative": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       97,
+       115,
+       97
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 1082035,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 4.128667831420898,
+   "status": "identical",
+   "harness_seconds": 6.526445519179106
+  },
+  {
+   "stage": "F10",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_msk_tfm/mapflow/_acc_msk_tfm0",
+   "name": "acc_msk_tfm",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "item": "_acc_msk_tfm0"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.160226,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/anat/sub-002_label-CSF_probseg.nii.gz --interpolation Gaussian --output sub-002_label-CSF_probseg_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.27550444565713406,
+   "outputs": [
+    {
+     "output": "sub-002_label-CSF_probseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 101,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 6.03741171621896e-16,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 101,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 6.03741171621896e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 7.152557373046875e-07,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 101,
+        "max_abs": 2.220446049250313e-16,
+        "max_rel": 2.220446049250313e-16,
+        "max_rel_voxel": 6.03741171621896e-16,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 0.8537745475769043,
+   "status": "explained",
+   "harness_seconds": 1.6508321650326252
+  },
+  {
+   "stage": "F10",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_msk_tfm/mapflow/_acc_msk_tfm1",
+   "name": "acc_msk_tfm",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "item": "_acc_msk_tfm1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.849085,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_masks/acompcor_wm.nii.gz --interpolation Gaussian --output acompcor_wm_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.32341552898287773,
+   "outputs": [
+    {
+     "output": "acompcor_wm_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 13,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 3.8618372146812267e-16,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 13,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 3.8618372146812267e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 7.152557373046875e-07,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 13,
+        "max_abs": 2.220446049250313e-16,
+        "max_rel": 2.220446049250313e-16,
+        "max_rel_voxel": 3.8618372146812267e-16,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 0.7901058197021484,
+   "status": "explained",
+   "harness_seconds": 1.5041775535792112
+  },
+  {
+   "stage": "F10",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_msk_tfm/mapflow/_acc_msk_tfm2",
+   "name": "acc_msk_tfm",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1",
+    "item": "_acc_msk_tfm2"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 0.894215,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_masks/acompcor_wmcsf.nii.gz --interpolation Gaussian --output acompcor_wmcsf_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.3270426355302334,
+   "outputs": [
+    {
+     "output": "acompcor_wmcsf_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 16,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 3.8618372146812267e-16,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "vs_ants_as_built": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 16,
+      "max_abs": 2.220446049250313e-16,
+      "max_rel": 2.220446049250313e-16,
+      "max_rel_voxel": 3.8618372146812267e-16,
+      "ncc": 1.0,
+      "affine_diff": 0.0,
+      "kind": "intensity",
+      "over": {
+       "1e-06": 0,
+       "1e-05": 0,
+       "0.0001": 0
+      }
+     },
+     "chain": [
+      {
+       "from": "fmriprep",
+       "to": "container-1t",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 7.152557373046875e-07,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "container-1t",
+       "to": "container-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 16,
+        "max_abs": 2.220446049250313e-16,
+        "max_rel": 2.220446049250313e-16,
+        "max_rel_voxel": 3.8618372146812267e-16,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity",
+        "over": {
+         "1e-06": 0,
+         "1e-05": 0,
+         "0.0001": 0
+        }
+       }
+      },
+      {
+       "from": "container-1t-cr",
+       "to": "ants-2.6.5-1t-cr",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      },
+      {
+       "from": "ants-2.6.5-1t-cr",
+       "to": "larmorx",
+       "diff": {
+        "shape": [
+         64,
+         64,
+         40
+        ],
+        "dtype_ref": "float64",
+        "dtype_test": "float64",
+        "voxels": 163840,
+        "differing": 0,
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "max_rel_voxel": 0.0,
+        "ncc": 1.0,
+        "affine_diff": 0.0,
+        "kind": "intensity"
+       }
+      }
+     ],
+     "cause": {
+      "causes": [
+       "glibc maths"
+      ],
+      "explained": true,
+      "complete": true
+     }
+    }
+   ],
+   "container_seconds": 0.7779581546783447,
+   "status": "explained",
+   "harness_seconds": 1.5829760544002056
+  },
+  {
+   "stage": "F10",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/t1w_mask_tfm",
+   "name": "t1w_mask_tfm",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.655957,
+   "command": "antsApplyTransforms --default-value 0 --float 0 --input /out/sub-002/anat/sub-002_desc-brain_mask.nii.gz --interpolation MultiLabel --output sub-002_desc-brain_mask_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.8203433286398649,
+   "outputs": [
+    {
+     "output": "sub-002_desc-brain_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 1.4651329517364502,
+   "status": "identical",
+   "harness_seconds": 2.532837901264429
+  },
+  {
+   "stage": "F11",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/carpetplot_wf/resample_parc",
+   "name": "resample_parc",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 4.059163,
+   "command": "antsApplyTransforms -u int --default-value 0 --dimensionality 3 --float 0 --input /templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg.nii.gz --interpolation MultiLabel --output tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ] --transform /out/sub-002/anat/sub-002_from-MNI152NLin2009cAsym_to-T1w_mode-image_xfm.h5",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 1.7422726098448038,
+   "outputs": [
+    {
+     "output": "tpl-MNI152NLin2009cAsym_res-01_desc-carpet_dseg_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "int32",
+      "dtype_test": "int32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0,
+       "4": 1.0,
+       "5": 1.0,
+       "34": 1.0,
+       "35": 1.0,
+       "36": 1.0,
+       "37": 1.0,
+       "39": 1.0,
+       "40": 1.0,
+       "41": 1.0,
+       "45": 1.0,
+       "46": 1.0,
+       "47": 1.0,
+       "48": 1.0,
+       "49": 1.0,
+       "50": 1.0,
+       "51": 1.0,
+       "101": 1.0,
+       "102": 1.0,
+       "103": 1.0,
+       "104": 1.0,
+       "105": 1.0,
+       "106": 1.0,
+       "107": 1.0,
+       "108": 1.0,
+       "109": 1.0,
+       "110": 1.0,
+       "111": 1.0,
+       "112": 1.0,
+       "113": 1.0,
+       "114": 1.0,
+       "115": 1.0,
+       "116": 1.0,
+       "117": 1.0,
+       "118": 1.0,
+       "119": 1.0,
+       "120": 1.0,
+       "121": 1.0,
+       "122": 1.0,
+       "123": 1.0,
+       "124": 1.0,
+       "125": 1.0,
+       "126": 1.0,
+       "127": 1.0,
+       "128": 1.0,
+       "129": 1.0,
+       "130": 1.0,
+       "131": 1.0,
+       "132": 1.0,
+       "133": 1.0,
+       "134": 1.0,
+       "135": 1.0,
+       "136": 1.0,
+       "137": 1.0,
+       "138": 1.0,
+       "139": 1.0,
+       "140": 1.0,
+       "141": 1.0,
+       "142": 1.0,
+       "143": 1.0,
+       "144": 1.0,
+       "145": 1.0,
+       "146": 1.0,
+       "147": 1.0,
+       "148": 1.0,
+       "149": 1.0,
+       "150": 1.0,
+       "151": 1.0,
+       "152": 1.0,
+       "153": 1.0,
+       "154": 1.0,
+       "155": 1.0,
+       "156": 1.0,
+       "157": 1.0,
+       "158": 1.0,
+       "159": 1.0,
+       "160": 1.0,
+       "161": 1.0,
+       "162": 1.0,
+       "163": 1.0,
+       "164": 1.0,
+       "165": 1.0,
+       "166": 1.0,
+       "167": 1.0,
+       "168": 1.0,
+       "169": 1.0,
+       "170": 1.0,
+       "171": 1.0,
+       "172": 1.0,
+       "173": 1.0,
+       "174": 1.0,
+       "175": 1.0,
+       "176": 1.0,
+       "177": 1.0,
+       "178": 1.0,
+       "179": 1.0,
+       "180": 1.0,
+       "181": 1.0,
+       "182": 1.0,
+       "183": 1.0,
+       "184": 1.0,
+       "185": 1.0,
+       "186": 1.0,
+       "187": 1.0,
+       "188": 1.0,
+       "189": 1.0,
+       "190": 1.0,
+       "191": 1.0,
+       "192": 1.0,
+       "193": 1.0,
+       "194": 1.0,
+       "195": 1.0,
+       "196": 1.0,
+       "255": 1.0
+      },
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "int32",
+      "dtype_test": "int32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "dice_labels": {
+       "1": 1.0,
+       "2": 1.0,
+       "3": 1.0,
+       "4": 1.0,
+       "5": 1.0,
+       "34": 1.0,
+       "35": 1.0,
+       "36": 1.0,
+       "37": 1.0,
+       "39": 1.0,
+       "40": 1.0,
+       "41": 1.0,
+       "45": 1.0,
+       "46": 1.0,
+       "47": 1.0,
+       "48": 1.0,
+       "49": 1.0,
+       "50": 1.0,
+       "51": 1.0,
+       "101": 1.0,
+       "102": 1.0,
+       "103": 1.0,
+       "104": 1.0,
+       "105": 1.0,
+       "106": 1.0,
+       "107": 1.0,
+       "108": 1.0,
+       "109": 1.0,
+       "110": 1.0,
+       "111": 1.0,
+       "112": 1.0,
+       "113": 1.0,
+       "114": 1.0,
+       "115": 1.0,
+       "116": 1.0,
+       "117": 1.0,
+       "118": 1.0,
+       "119": 1.0,
+       "120": 1.0,
+       "121": 1.0,
+       "122": 1.0,
+       "123": 1.0,
+       "124": 1.0,
+       "125": 1.0,
+       "126": 1.0,
+       "127": 1.0,
+       "128": 1.0,
+       "129": 1.0,
+       "130": 1.0,
+       "131": 1.0,
+       "132": 1.0,
+       "133": 1.0,
+       "134": 1.0,
+       "135": 1.0,
+       "136": 1.0,
+       "137": 1.0,
+       "138": 1.0,
+       "139": 1.0,
+       "140": 1.0,
+       "141": 1.0,
+       "142": 1.0,
+       "143": 1.0,
+       "144": 1.0,
+       "145": 1.0,
+       "146": 1.0,
+       "147": 1.0,
+       "148": 1.0,
+       "149": 1.0,
+       "150": 1.0,
+       "151": 1.0,
+       "152": 1.0,
+       "153": 1.0,
+       "154": 1.0,
+       "155": 1.0,
+       "156": 1.0,
+       "157": 1.0,
+       "158": 1.0,
+       "159": 1.0,
+       "160": 1.0,
+       "161": 1.0,
+       "162": 1.0,
+       "163": 1.0,
+       "164": 1.0,
+       "165": 1.0,
+       "166": 1.0,
+       "167": 1.0,
+       "168": 1.0,
+       "169": 1.0,
+       "170": 1.0,
+       "171": 1.0,
+       "172": 1.0,
+       "173": 1.0,
+       "174": 1.0,
+       "175": 1.0,
+       "176": 1.0,
+       "177": 1.0,
+       "178": 1.0,
+       "179": 1.0,
+       "180": 1.0,
+       "181": 1.0,
+       "182": 1.0,
+       "183": 1.0,
+       "184": 1.0,
+       "185": 1.0,
+       "186": 1.0,
+       "187": 1.0,
+       "188": 1.0,
+       "189": 1.0,
+       "190": 1.0,
+       "191": 1.0,
+       "192": 1.0,
+       "193": 1.0,
+       "194": 1.0,
+       "195": 1.0,
+       "196": 1.0,
+       "255": 1.0
+      },
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 2.125669479370117,
+   "status": "identical",
+   "harness_seconds": 4.114936741068959
+  },
+  {
+   "stage": "F12",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/func_fit_reports_wf/boldref_wm",
+   "name": "boldref_wm",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 1.65551,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 0 --input /work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/func_fit_reports_wf/t1w_wm/sub-002_dseg_mask.nii.gz --interpolation NearestNeighbor --output sub-002_dseg_mask_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.1040235199034214,
+   "outputs": [
+    {
+     "output": "sub-002_dseg_mask_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float64",
+      "dtype_test": "float64",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "labels",
+      "dice": 1.0,
+      "changed": 0
+     }
+    }
+   ],
+   "container_seconds": 0.5399584770202637,
+   "status": "identical",
+   "harness_seconds": 0.8855272810906172
+  },
+  {
+   "stage": "F12",
+   "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/func_fit_reports_wf/t1w_boldref",
+   "name": "t1w_boldref",
+   "keys": {
+    "subject": "002",
+    "run": "task_clip_run_1"
+   },
+   "program": "antsApplyTransforms",
+   "fmriprep_threads": 1,
+   "fmriprep_seconds": 3.486657,
+   "command": "antsApplyTransforms --default-value 0 --dimensionality 3 --float 1 --input /out/sub-002/anat/sub-002_desc-preproc_T1w.nii.gz --interpolation LanczosWindowedSinc --output sub-002_desc-preproc_T1w_trans.nii.gz --reference-image /out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz --transform [ /out/sub-002/func/sub-002_task-clip_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt, 1 ]",
+   "larmorx_threads": 1,
+   "larmorx_seconds": 0.3696084748953581,
+   "outputs": [
+    {
+     "output": "sub-002_desc-preproc_T1w_trans.nii.gz",
+     "vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     },
+     "rerun_vs_fmriprep": {
+      "shape": [
+       64,
+       64,
+       40
+      ],
+      "dtype_ref": "float32",
+      "dtype_test": "float32",
+      "voxels": 163840,
+      "differing": 0,
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "max_rel_voxel": 0.0,
+      "ncc": 1.0,
+      "affine_diff": 7.152557373046875e-07,
+      "kind": "intensity"
+     }
+    }
+   ],
+   "container_seconds": 1.202082872390747,
+   "status": "identical",
+   "harness_seconds": 1.8310846723616123
+  }
+ ],
+ "missing": {
+  "Atropos": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/01_atropos",
+    "program": "Atropos",
+    "seconds": 36.090967,
+    "threads": 8
+   }
+  ],
+  "antsAI": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/init_aff",
+    "program": "antsAI",
+    "seconds": 25.776357,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/init_aff",
+    "program": "antsAI",
+    "seconds": 37.324239,
+    "threads": 8
+   }
+  ],
+  "antsRegistration": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/norm",
+    "program": "antsRegistration",
+    "seconds": 523.257067,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/register_template_wf/_template_MNI152NLin2009cAsym/registration",
+    "program": "antsRegistration",
+    "seconds": 1805.653893,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/norm",
+    "program": "antsRegistration",
+    "seconds": 0.484085,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/fmapreg_wf/coregister",
+    "program": "antsRegistration",
+    "seconds": 0.622927,
+    "threads": 8
+   }
+  ],
+  "FAST": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/fast",
+    "program": "fast",
+    "seconds": 119.900991,
+    "threads": 1
+   }
+  ],
+  "field-map preparation": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/distortion_params",
+    "program": null,
+    "seconds": 0.000149,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/distortion_params",
+    "program": null,
+    "seconds": 0.002156,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/distortion_params",
+    "program": null,
+    "seconds": 0.000177,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_std_wf/distortion_params",
+    "program": null,
+    "seconds": 0.000153,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/clipper_post",
+    "program": null,
+    "seconds": 0.170187,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/clipper_pre",
+    "program": null,
+    "seconds": 0.336907,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/masker",
+    "program": null,
+    "seconds": 1.041843,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/concat_blips",
+    "program": null,
+    "seconds": 0.050575,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/from_las",
+    "program": null,
+    "seconds": 0.0763,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/from_las_fmap",
+    "program": null,
+    "seconds": 0.040422,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/pad_blip_slices",
+    "program": null,
+    "seconds": 0.006926,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/readout_time",
+    "program": null,
+    "seconds": null,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/ref_average",
+    "program": null,
+    "seconds": 1.875241,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/regrid",
+    "program": null,
+    "seconds": 0.01635,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/runwise_avg",
+    "program": null,
+    "seconds": null,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/setwise_avg",
+    "program": null,
+    "seconds": 1.923726,
+    "threads": 8
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/sort_pe_blips",
+    "program": null,
+    "seconds": 0.000173,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/to_las",
+    "program": null,
+    "seconds": 0.012374,
+    "threads": 1
+   }
+  ],
+  "field-map B-splines": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_anat_wf/fmap_recon",
+    "program": null,
+    "seconds": 0.490671,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/boldref_fmap",
+    "program": null,
+    "seconds": 0.187766,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/boldref_fmap",
+    "program": null,
+    "seconds": 0.238682,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/fmap_recon",
+    "program": null,
+    "seconds": 10.035524,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/fix_coeff",
+    "program": null,
+    "seconds": 0.052045,
+    "threads": 1
+   }
+  ],
+  "confounds": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acc_masks",
+    "program": null,
+    "seconds": 2.87821,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/acompcor",
+    "program": null,
+    "seconds": 0.398427,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/crowncompcor",
+    "program": null,
+    "seconds": 0.798229,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/dvars",
+    "program": null,
+    "seconds": 7.53049,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/fdisp",
+    "program": null,
+    "seconds": 0.018049,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/model_expansion",
+    "program": null,
+    "seconds": 0.089017,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/motion_params",
+    "program": null,
+    "seconds": 0.076947,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/rmsd",
+    "program": null,
+    "seconds": 0.049047,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/signals",
+    "program": null,
+    "seconds": 0.360181,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/spike_regressors",
+    "program": null,
+    "seconds": 0.0315,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_confounds_wf/tcompcor",
+    "program": null,
+    "seconds": 0.520566,
+    "threads": 1
+   }
+  ],
+  "FLIRT-BBR": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_reg_wf/fsl_bbr_wf/flt_bbr",
+    "program": "flirt",
+    "seconds": 91.49752,
+    "threads": 1
+   }
+  ],
+  "lta_convert": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_reg_wf/fsl_bbr_wf/fsl_to_lta/mapflow/_fsl_to_lta0",
+    "program": "lta_convert",
+    "seconds": 0.087257,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_reg_wf/fsl_bbr_wf/fsl_to_lta/mapflow/_fsl_to_lta1",
+    "program": "lta_convert",
+    "seconds": 0.119366,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_reg_wf/fsl_bbr_wf/lta_to_fsl",
+    "program": "lta_convert",
+    "seconds": 0.098861,
+    "threads": 1
+   }
+  ],
+  "mri_coreg": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/bold_reg_wf/fsl_bbr_wf/mri_coreg",
+    "program": "mri_coreg",
+    "seconds": 39.984982,
+    "threads": 8
+   }
+  ],
+  "fslmaths": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/combine_masks",
+    "program": "fslmaths",
+    "seconds": 0.104464,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/skullstrip_bold_wf/combine_masks",
+    "program": "fslmaths",
+    "seconds": 0.069575,
+    "threads": 1
+   }
+  ],
+  "BET": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/skullstrip_first_pass",
+    "program": "bet",
+    "seconds": 1.323064,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/skullstrip_bold_wf/skullstrip_first_pass",
+    "program": "bet",
+    "seconds": 1.217724,
+    "threads": 1
+   }
+  ],
+  "3dAutomask": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/skullstrip_second_pass",
+    "program": "3dAutomask",
+    "seconds": 0.08967,
+    "threads": 1
+   },
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/skullstrip_bold_wf/skullstrip_second_pass",
+    "program": "3dAutomask",
+    "seconds": 0.131903,
+    "threads": 1
+   }
+  ],
+  "3dUnifize": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/unifize",
+    "program": "3dUnifize",
+    "seconds": 91.29541,
+    "threads": 1
+   }
+  ],
+  "3dvolreg": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/hmc_boldref_wf/gen_avg",
+    "program": null,
+    "seconds": 22.406556,
+    "threads": 1
+   }
+  ],
+  "topup": [
+   {
+    "node": "fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/topup",
+    "program": "topup",
+    "seconds": 61.982481,
+    "threads": 1
+   }
+  ]
+ }
+}

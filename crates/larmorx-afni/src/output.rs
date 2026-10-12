@@ -27,10 +27,16 @@ pub fn refused(name: &str, arbitrary: bool) -> bool {
         .any(|b| b < 32 || b == 127 || b > 127 || b" !\"&'()*;<>?[]{}|".contains(&b))
 }
 
+/// The directory separators of this system: `/`, and on Windows `\` too (AFNI, a Unix
+/// program, knows only `/`).
+fn is_separator(c: char) -> bool {
+    c == '/' || (cfg!(windows) && c == '\\')
+}
+
 /// The name AFNI writes for a `-prefix`: the prefix when it contains a `/`, else `./` and the
 /// prefix.
 pub fn afni_name(prefix: &str) -> String {
-    if prefix.contains('/') {
+    if prefix.contains(is_separator) {
         prefix.to_owned()
     } else {
         format!("./{prefix}")
@@ -45,7 +51,7 @@ pub fn refused_when_written(name: &str, arbitrary: bool) -> bool {
 /// The last component of a path (AFNI's conflict messages name the file without its
 /// directory).
 pub fn file_name(prefix: &str) -> &str {
-    prefix.rsplit('/').next().unwrap_or(prefix)
+    prefix.rsplit(is_separator).next().unwrap_or(prefix)
 }
 
 /// `prefix` split before its `.nii` or `.nii.gz` (any case).

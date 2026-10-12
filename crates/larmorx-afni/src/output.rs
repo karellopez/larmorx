@@ -99,6 +99,11 @@ pub fn renamed(prefix: &str) -> Option<String> {
 /// path through a file, a directory of the output's name, no permission, a read-only file
 /// system.
 fn refuses(e: &std::io::Error) -> bool {
+    // On Windows, ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33) mean that another
+    // program holds the file open, not that it may not be written: the write waits for it.
+    if cfg!(windows) && matches!(e.raw_os_error(), Some(32 | 33)) {
+        return false;
+    }
     matches!(
         e.kind(),
         ErrorKind::NotFound

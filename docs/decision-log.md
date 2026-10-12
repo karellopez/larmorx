@@ -702,6 +702,13 @@ Decided by the user on the questions the defect register raised
   AFNI-11, AFNI-12 and AFNI-03 when the output becomes a copy. Found: AFNI-17 (an
   imprecision), and that AFNI takes global options anywhere on the command line
   (`-overwrite`, `-Dname=value`), which neither implementation accepts (a known difference).
+  Records from `966bd98`, standard tier, 251 cases each (6 new): the replica 231 of 231
+  compared cases bit-identical to AFNI in `reproduce`; its default agrees with the original's
+  on all 24 cases where a correction applies, `geometry/slightly-oblique` now included, but
+  AFNI-08's copy, where the original does not follow AFNI yet. The original is unchanged where
+  compared (222 pass, 162 bit-identical); its 12 expected divergences are the spec additions'
+  behaviours. GPL golden: two new cases (`3dTshift.linear.float32-nearly-plumb` and
+  `.reproduce`), no checksum changed.
 
 ## Open decisions (PLAN.md §16)
 

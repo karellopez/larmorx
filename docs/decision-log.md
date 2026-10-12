@@ -876,6 +876,27 @@ Decided by the user on the questions the defect register raised
   `larmorx` binary checks `-overwrite` and `-D` on every platform, with paths that have blanks
   and non-ASCII characters (and, on Windows, an output held open for 0.5 s).
 
+## 2026-10-12: Full completeness for every tool; one agent at a time; A4 after the stage comparisons
+
+**Asked:** the user asked why progress on new tools is slow and when porting resumes. The
+answer given: about 10 of the ~25 programs of fMRIPrep's `--fs-no-reconall` path are done
+(the ANTs image tools, 3dTshift in both implementations, the head-motion original, fMRIPrep's
+resampler); `antsRegistration`, `antsAI`, Atropos, FAST, FLIRT-BBR, BET, 3dUnifize,
+3dAutomask, topup, the confounds and larmorprepx are not started. The causes: the bar per tool
+(3dTshift's global options, variables, messages, x87 rounding and failure cases took about two
+days beyond its port, for 26 registered defects that change nothing fMRIPrep does), the two
+tracks of licence-restricted tools, one agent at a time with a blocking verification per merge,
+and investigations (GCC, glibc, BLAS, fMRIPrep's defects). Proposed: an "fMRIPrep path first"
+scope for new tools, a second agent for A4 beside the stage comparisons, non-blocking
+verification.
+
+**Decided by the user:**
+- **Full completeness** for every tool, as 3dTshift: every option, message and failure case,
+  D13 switches included, not only the code paths fMRIPrep uses.
+- **One agent at a time** stays. **A4** (rigid and affine `antsRegistration`, `antsAI`,
+  `antsAffineInitializer`, histogram matching) starts when the stage comparisons on the
+  field-map runs finish.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

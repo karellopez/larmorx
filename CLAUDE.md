@@ -90,6 +90,7 @@ All three finished on 2026-10-11 with exit status 0 (`oracles/logs/fmriprep-25.2
   - When the licence restricts it (AFNI's MCW code, Workbench, FSL), make **both**: a bit-exact replica in that licence family's package, and a clean-room original in the main package (rule 1, `docs/licensing.md`).
   - MSM: a clean-room original only, in the surfaces track, after a patent check.
 - **Each tool gets its own Python wrapper**, so other developers can build on the library.
+- **Full completeness for every tool** (user, 2026-10-12, asked whether to scope new tools to fMRIPrep's code paths first): every option, message and failure case, with D13 switches, as for 3dTshift. One agent at a time; A4 after the stage comparisons (decision log 2026-10-12).
 
 ## Workspace layout
 ```

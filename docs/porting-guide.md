@@ -62,8 +62,8 @@ learns from black-box runs goes back into the spec, marked (observed). The model
 record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../crates/larmorx-afni/PROVENANCE.md).
 
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
-(3dTshift: 217 of 217 cases); the original keeps the main package Apache-2.0 at the cost of
-last bits wherever the upstream's own numerics decide them (3dTshift: 158 of 217
+(3dTshift: 225 of 225 cases); the original keeps the main package Apache-2.0 at the cost of
+last bits wherever the upstream's own numerics decide them (3dTshift: 162 of 222
 bit-identical, all within thresholds). `implementation="auto"` runs the replica when it is
 installed, as a separate program, never imported ([architecture.md](architecture.md),
 "Adding a replica").
@@ -350,7 +350,11 @@ with the classes of the [defect register](findings/upstream-defects.md):
   details"). `implementation="auto"` picks the replica whenever it is installed, so a fix that
   only the original made would disappear on installation. The replica program reads the same
   `LARMORX_UPSTREAM_DEFECTS`, and with `reproduce` gives exactly the original program's
-  result.
+  result. The replica's parity suite checks the shared default: on every case where a
+  correction applies, it compares the replica's default output with the clean-room original's
+  (`D13 defaults: replica = original` in [afni-tshift-replica.md](validation/afni-tshift-replica.md)),
+  with the thresholds that compare the original with the upstream. Where they disagree, find
+  which follows the upstream's intent and record it in both records.
 - **How parity uses the switch.** The bit-for-bit comparison runs larmorx with the switch.
   A second pass runs larmorx's default on the same cases, and the record reports, per defect,
   which cases the fix changes and by how much, next to the band. A test checks that the

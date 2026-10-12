@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "2ef5e9cc3613-dirty",
+  "larmorx_commit": "15b7d73271ba",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,7 +22,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.142,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -32,7 +32,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -42,7 +42,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -52,7 +52,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -62,7 +62,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -72,7 +72,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -82,7 +82,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -102,7 +102,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -112,7 +112,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -122,7 +122,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -162,7 +162,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -182,7 +182,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -202,7 +202,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -232,7 +232,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -252,7 +252,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -262,7 +262,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -272,7 +272,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -282,7 +282,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -292,7 +292,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -302,7 +302,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.098,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.105,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -322,7 +322,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.115,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -332,7 +332,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.142,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -342,7 +342,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.274,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -352,7 +352,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -362,7 +362,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -372,7 +372,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -382,7 +382,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -392,7 +392,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -402,7 +402,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -412,7 +412,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -422,7 +422,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -432,7 +432,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -442,7 +442,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -452,7 +452,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -462,7 +462,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -472,7 +472,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -482,7 +482,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -492,7 +492,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -502,7 +502,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -512,7 +512,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -522,7 +522,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.059,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -532,7 +532,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -542,7 +542,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -552,7 +552,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -562,7 +562,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -572,7 +572,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -582,7 +582,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -592,7 +592,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -602,7 +602,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -612,7 +612,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -632,7 +632,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -642,7 +642,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -652,7 +652,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -662,7 +662,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -672,7 +672,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -682,7 +682,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -692,7 +692,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -702,7 +702,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -712,7 +712,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -722,7 +722,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -732,7 +732,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -742,7 +742,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -752,7 +752,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -762,7 +762,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -782,7 +782,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -792,7 +792,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -802,7 +802,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -812,7 +812,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -822,7 +822,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -832,7 +832,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -842,7 +842,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -852,7 +852,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -862,7 +862,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -872,7 +872,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -882,7 +882,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -892,7 +892,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -902,7 +902,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -912,7 +912,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -922,7 +922,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -932,7 +932,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -942,7 +942,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -952,7 +952,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -962,7 +962,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -972,7 +972,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -982,7 +982,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -992,7 +992,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1002,7 +1002,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1012,7 +1012,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1022,7 +1022,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1032,7 +1032,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1042,7 +1042,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1052,7 +1052,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1062,7 +1062,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1072,7 +1072,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1082,7 +1082,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1092,7 +1092,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1102,7 +1102,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1112,7 +1112,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1122,7 +1122,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1132,7 +1132,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1142,7 +1142,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1152,7 +1152,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1162,7 +1162,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1172,7 +1172,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1182,7 +1182,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1192,7 +1192,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1202,7 +1202,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1212,7 +1212,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.03,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1222,7 +1222,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1232,7 +1232,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1242,7 +1242,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1252,7 +1252,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1262,7 +1262,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1272,7 +1272,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1282,7 +1282,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1292,7 +1292,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1302,7 +1302,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1322,7 +1322,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1332,7 +1332,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1342,7 +1342,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1352,7 +1352,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1362,7 +1362,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1372,7 +1372,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1382,7 +1382,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1392,7 +1392,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1402,7 +1402,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1412,7 +1412,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1422,7 +1422,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1442,7 +1442,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1462,7 +1462,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1472,7 +1472,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1482,7 +1482,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1492,7 +1492,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1502,7 +1502,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1512,7 +1512,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1522,7 +1522,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1532,7 +1532,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1542,7 +1542,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1552,7 +1552,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1562,7 +1562,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1572,7 +1572,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1582,7 +1582,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1592,7 +1592,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.042,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1602,7 +1602,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.044,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1612,7 +1612,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1622,7 +1622,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1632,7 +1632,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1642,7 +1642,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1652,7 +1652,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1662,7 +1662,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.058,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1672,7 +1672,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1682,7 +1682,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1692,7 +1692,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1702,7 +1702,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.031,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1712,7 +1712,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.036,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1722,7 +1722,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.032,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1732,7 +1732,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1742,7 +1742,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1752,7 +1752,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.035,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1762,7 +1762,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1772,7 +1772,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.029,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1782,7 +1782,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.027,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1792,7 +1792,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1802,7 +1802,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1812,7 +1812,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1822,7 +1822,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1832,7 +1832,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1842,7 +1842,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1852,7 +1852,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1862,7 +1862,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1872,7 +1872,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1882,7 +1882,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1892,7 +1892,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.019,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1902,7 +1902,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1912,7 +1912,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1922,7 +1922,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1932,7 +1932,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.022,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1952,7 +1952,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1962,7 +1962,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1972,8 +1972,73 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.02,
    "status": "pass"
+  },
+  {
+   "case": "defects/oblique-metre",
+   "category": "defects",
+   "checks_passed": 10,
+   "checks_total": 11,
+   "failed_checks": [
+    {
+     "detail": "",
+     "metric": "max |diff| (mm)",
+     "name": "geometry (sform)",
+     "passed": false,
+     "threshold": "1e-06",
+     "value": "3.2e+00"
+    }
+   ],
+   "reason": "AFNI writes an oblique sform in metres as it is (only the voxel sizes are converted); the original converts its linear part to millimetres in reproduce mode too (AFNI-07). Its default, which converts the whole matrix, is the replica's",
+   "seconds": 0.019,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "defects/tiny-offsets-copy",
+   "category": "defects",
+   "checks_passed": 10,
+   "checks_total": 11,
+   "failed_checks": [
+    {
+     "detail": "slice_code: AFNI 0, larmorx 1; slice_end: AFNI 0, larmorx 3; slice_duration: AFNI 0.0, larmorx 0.0005000000237487257",
+     "metric": "exact",
+     "name": "header fields (scaling, timing, slice fields, units, xform codes)",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "AFNI writes slice_end 0 (AFNI-08) and derives the slice code and duration from the kept slice times, all within 3 ms of 0: none; the original keeps the header's code 1, duration 0.0005 and slice_end 3, and has no switch for AFNI-08",
+   "seconds": 0.018,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "geometry/slightly-oblique",
+   "category": "geometry",
+   "checks_passed": 9,
+   "checks_total": 11,
+   "failed_checks": [
+    {
+     "detail": "",
+     "metric": "max |diff| (mm)",
+     "name": "geometry (sform)",
+     "passed": false,
+     "threshold": "1e-06",
+     "value": "4.0e-04"
+    },
+    {
+     "detail": "",
+     "metric": "max |diff| (mm)",
+     "name": "geometry (qform)",
+     "passed": false,
+     "threshold": "1e-06",
+     "value": "4.0e-04"
+    }
+   ],
+   "reason": "AFNI writes the plumb matrix of a grid less than about 0.014\u00b0 from plumb (its 0.01\u00b0 test, in float); the original keeps the input's matrix (4e-4 mm apart here)",
+   "seconds": 0.02,
+   "status": "expected-divergence"
   },
   {
    "case": "copy/no-timing-int16",
@@ -1982,7 +2047,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1992,7 +2057,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2002,7 +2067,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2012,7 +2077,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -2022,7 +2087,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2032,7 +2097,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -2132,7 +2197,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: illegal value 'abc' after -TR!; larmorx: ** FATAL ERROR: illegal value 'abc' after -TR!",
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -2142,7 +2207,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D: can't read 1D file <tmp>/none.1D: No such file or directory (os error 2)",
-   "seconds": 0.037,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -2152,7 +2217,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but the dataset has 4 slices",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -2162,7 +2227,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -2172,7 +2237,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -2182,7 +2247,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D: 1D text <tmp>/st.1D: 'abc' is not a number",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -2192,7 +2257,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii': <generated>/does-not-exist.nii: No such file or directory (os error 2)",
-   "seconds": 0.003,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -2202,8 +2267,35 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** FATAL ERROR: output dataset name '<tmp>/out.nii' conflicts with existing file",
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "both-error"
+  },
+  {
+   "case": "errors/prefix-with-blank",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 2,
+   "failed_checks": [
+    {
+     "detail": "AFNI exit 1: ** FATAL ERROR: illegal value '<tmp>/afni-out put.nii' after -prefix; larmorx exit 0: ",
+     "metric": "exact",
+     "name": "both succeed",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    },
+    {
+     "detail": "expected an error from both",
+     "metric": "exact",
+     "name": "both reject the arguments",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "AFNI refuses a -prefix with a blank; the original accepts it in reproduce mode too (no switch for AFNI-12)",
+   "seconds": 0.003,
+   "status": "expected-divergence"
   },
   {
    "case": "divergence/afni-format-output",
@@ -2212,7 +2304,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format.",
-   "seconds": 0.038,
+   "seconds": 0.374,
    "status": "expected-divergence"
   },
   {
@@ -2222,7 +2314,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "-voxshift is not supported by larmorx (fMRIPrep does not use it).",
-   "seconds": 0.015,
+   "seconds": 0.014,
    "status": "expected-divergence"
   },
   {
@@ -2232,7 +2324,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.545,
+   "seconds": 1.404,
    "status": "pass"
   },
   {
@@ -2242,7 +2334,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.029,
+   "seconds": 1.359,
    "status": "pass"
   },
   {
@@ -2252,7 +2344,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.626,
+   "seconds": 1.719,
    "status": "pass"
   },
   {
@@ -2262,7 +2354,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.851,
+   "seconds": 3.644,
    "status": "pass"
   },
   {
@@ -2272,7 +2364,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 21.605,
+   "seconds": 12.52,
    "status": "pass"
   },
   {
@@ -2282,7 +2374,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 20.21,
+   "seconds": 12.51,
    "status": "pass"
   },
   {
@@ -2292,7 +2384,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 22.005,
+   "seconds": 12.539,
    "status": "pass"
   },
   {
@@ -2302,7 +2394,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 15.593,
+   "seconds": 8.038,
    "status": "pass"
   },
   {
@@ -2312,7 +2404,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 61.458,
+   "seconds": 36.717,
    "status": "pass"
   },
   {
@@ -2322,7 +2414,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 20.335,
+   "seconds": 11.887,
    "status": "pass"
   },
   {
@@ -2332,7 +2424,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 362.22,
+   "seconds": 279.074,
    "status": "pass"
   },
   {
@@ -2342,7 +2434,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 14.912,
+   "seconds": 12.845,
    "status": "pass"
   },
   {
@@ -2352,7 +2444,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.23,
+   "seconds": 9.846,
    "status": "pass"
   },
   {
@@ -2362,7 +2454,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.518,
+   "seconds": 13.533,
    "status": "pass"
   },
   {
@@ -2372,7 +2464,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.363,
+   "seconds": 10.27,
    "status": "pass"
   },
   {
@@ -2382,7 +2474,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.136,
+   "seconds": 11.342,
    "status": "pass"
   },
   {
@@ -2392,7 +2484,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.449,
+   "seconds": 12.776,
    "status": "pass"
   },
   {
@@ -2402,7 +2494,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.657,
+   "seconds": 11.865,
    "status": "pass"
   },
   {
@@ -2412,7 +2504,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.016,
+   "seconds": 8.992,
    "status": "pass"
   },
   {
@@ -2422,14 +2514,14 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.084,
+   "seconds": 0.052,
    "status": "pass"
   }
  ],
  "suite": "afni-tshift",
  "summary": {
   "both-error": 17,
-  "expected-divergence": 2,
+  "expected-divergence": 6,
   "fail": 0,
   "pass": 222,
   "skipped": 0

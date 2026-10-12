@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 97 cases, 395 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 8 cases, 16 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 97 cases, 395 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 15 cases, 30 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |
@@ -38,7 +38,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `lx.transforms` | 7 | ITK files written and read (text, MATLAB, HDF5); `load_itk_linear`, `load_itk_composite`, `load_transforms`, and a composite of 11 transforms in both orders (PIPE-04); `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction (also with `upstream_defects="reproduce"`) |
 | `lx.ndimage` | 3 | `map_coordinates` with each spline order (0-5) and each boundary mode, an integer input; `spline_filter`, `spline_filter1d`; the reflect modes with `upstream_defects="reproduce"` |
 | I/O (`lx`, `lx.io`) | 4 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel` |
-| `larmorx-gpl afni 3dTshift` | 8 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms |
+| `larmorx-gpl afni 3dTshift` | 15 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms; AFNI's defects corrected (the default) and, in 4 `*.reproduce` cases, reproduced: a negative scale factor (AFNI-01), float32 with a slope and an intercept in an oblique sform in metres with header slice code 2 (AFNI-02, -03, -07), a copy keeping slice times within 3 ms of 0 (AFNI-08), `-no_detrend` (AFNI-05); each case also checks the defects named on standard error |
 
 What the coverage test enumerates:
 
@@ -64,7 +64,10 @@ their checksums equal those the default cases had before D13 (2026-10-11; for th
 cases, before D13 part 1, 2026-10-12: `cli.ants.ImageMath.reproduce`,
 `cli.ants.ImageMath.vtotal.reproduce`, `cli.ants.N4BiasFieldCorrection.reproduce`,
 `cli.ants.DenoiseImage.reproduce`, `py.ants.arithmetic.reproduce`, `py.ants.n4.reproduce`,
-`py.ants.denoise_image.reproduce`).
+`py.ants.denoise_image.reproduce`). The replica's cases set `LARMORX_UPSTREAM_DEFECTS` the
+same way; its `3dTshift.heptic.uint8.no_detrend.reproduce` data equal those the default case
+had before D13 part 2b (2026-10-12), and every header changed then, because the replica now
+writes AFNI's header bytes (`regular = 'r'`, the plumb matrix's signed zeros).
 
 ## How inputs are made
 

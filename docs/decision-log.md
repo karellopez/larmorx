@@ -625,6 +625,62 @@ Decided by the user on the questions the defect register raised
   variances above about 50 voxels² (Numerical Recipes' Miller start ignores the argument: 1.5e-3
   relative at 100, 52 % at 700), an imprecision, not D13; ANTS-47.
 
+## 2026-10-12: D13 part 2b, the 3dTshift replica corrected by default
+- **The replica shares the original's corrected default** (decided 2026-10-11, "D13's
+  details"): `larmorx-gpl afni 3dTshift` corrects AFNI-01, -02, -03, -05 and -07 by default, as
+  the clean-room original does, and names each in a warning on standard error
+  (`*+ WARNING: upstream defect ...`, which `lx.afni.tshift` turns into
+  `lx.UpstreamDefectWarning`). With `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output
+  bytes ("the switch should give the same result as the source one").
+- **AFNI-08's trigger found** in AFNI's source, where black-box runs had not found it: slice
+  times all within 3 ms of 0 (AFNI's `min_timing_diff`) kept in a copy of the input, which
+  happens when they lie beyond a shorter TR (header slice code 1, 0.5 ms apart, TR 1 ms).
+  Confirmed with the oracle. The replica corrects it by default (no slice code,
+  `slice_end` = nz − 1) and reproduces it with the switch.
+- **Failures get a switch too** (item 5 of "D13's details") for the replica's AFNI-11 (an
+  existing output: AFNI writes nothing and exits 0) and AFNI-12 (AFNI refuses a `-prefix` with
+  blanks or non-ASCII characters): `reproduce` does what AFNI does with its environment
+  variables unset.
+- **The replica's own bug fixed:** it wrote a metre or micrometre input's sform unconverted.
+  The cause was wider: AFNI writes, for a grid it considers plumb, the cardinal matrix of its
+  axes (`THD_set_dataset_attributes`), not the matrix it read; the replica now translates the
+  axes, the obliquity test, the cardinal matrix and NIfTI's quaternion. So a plumb metre grid
+  comes out with its linear part in millimetres and its origin in metres, an oblique one with
+  its whole sform in metres, and a grid less than about 0.014° from plumb exactly plumb (a new
+  register entry, AFNI-16, questionable, reproduced in both modes). The replica's headers are
+  now AFNI's byte for byte, the AFNI extension aside (`regular`, signed zeros, the
+  quaternion), and the two unit cases no longer need an expected divergence.
+- **Defaults compared:** the replica's parity suite compares its default output with the
+  clean-room original's wherever a correction applies (`D13 defaults: replica = original`).
+  They agree in every header field, the geometry and the scaling, and in the values within the
+  original's thresholds (its Fourier and other last bits), except where the original does not
+  follow AFNI yet: a grid less than about 0.014° from plumb (AFNI-16) and AFNI-08's copy (the
+  original copies the input header's slice code and duration; AFNI derives them from the
+  times). Neither is on fMRIPrep's path.
+- **For the clean-room original (not changed; reported):** its `reproduce` does not give
+  AFNI's result for AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12 and AFNI-16; each is
+  an expected divergence in its record (new cases `defects/oblique-metre`,
+  `defects/tiny-offsets-copy`, `geometry/slightly-oblique`, `errors/prefix-with-blank`), and
+  `specs/3dTshift.md` §6 needs the observed behaviours before the original can follow.
+- **Records:** standard tier, against the AFNI 25.2.09 oracle, from `15b7d73271ba`
+  ([afni-tshift-replica.md](validation/afni-tshift-replica.md),
+  [afni-tshift.md](validation/afni-tshift.md); 245 cases each, 4 of them new).
+  - Replica, `reproduce`: 225 of 225 compared cases bit-identical to AFNI (Fourier 101 of 101),
+    the two unit cases included; 18 rejected by both; 2 expected divergences (AFNI's own format,
+    `-voxshift`). Python API: 191 of 191 identical to the command line, 146 of 146 from memory.
+  - Replica, fix pass: AFNI-01 changes 7 cases (int16 with a negative slope; values up to
+    8.5e3 stored units apart), AFNI-03 1, AFNI-05 4 (up to 122), AFNI-02 2 (`scl_slope`),
+    AFNI-07 3 (the sform and qform origin), AFNI-08 1 (`slice_end`); each named exactly where
+    the output changed.
+  - Replica default against the original's: 20 cases, 15 bit-identical, 3 within the
+    thresholds, 2 known differences (above), none disagreeing.
+  - Original: unchanged where it was compared (222 pass, 162 bit-identical); the 4 new cases it
+    does not follow are expected divergences.
+- **Golden:** the replica's golden cases record the defaults (every header changed: AFNI's
+  header bytes; `-no_detrend`'s data, AFNI-05) and seven new cases cover the defect paths,
+  four of them `*.reproduce`; `3dTshift.heptic.uint8.no_detrend.reproduce` has the data
+  checksum the default case had before.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

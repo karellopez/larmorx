@@ -25,7 +25,16 @@
 //!
 //! Pairs are independent, so they run in parallel; the result does not depend on the number
 //! of threads.
+//!
+//! **Upstream defects (D13).** Two of these steps are defects that larmorx-gpl corrects by
+//! default ([`TshiftParams::upstream_defects`], `docs/findings/upstream-defects.md`): a
+//! negative brick factor is not applied in step 1 but is divided by in step 7, so the shifted
+//! slices come out sign-flipped and scaled (AFNI-01); and `-no_detrend` de-means the first
+//! voxel of each pair twice and the second not at all (AFNI-05). Corrected, a non-zero factor
+//! is applied in step 1 and each voxel has its own mean removed and restored.
+//! [`UpstreamDefects::Reproduce`] gives AFNI's result.
 
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::parallel::{self, ThreadPoolError};
 use rayon::prelude::*;
 
@@ -66,6 +75,8 @@ pub struct TshiftParams {
     pub bad: bool,
     /// Worker threads (0 = all logical CPUs). The result does not depend on it.
     pub n_threads: usize,
+    /// D13: correct AFNI-01 and AFNI-05 (the default) or reproduce them.
+    pub upstream_defects: UpstreamDefects,
 }
 
 /// [`tshift`] could not run.
@@ -126,8 +137,9 @@ pub fn byteize(xx: f32) -> u8 {
     }
 }
 
-/// Runs 3dTshift's shifting loop on `ds` in place.
-pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
+/// Runs 3dTshift's shifting loop on `ds` in place. Returns a notice for each upstream defect
+/// that changed the result (or, reproduced, would have been corrected).
+pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<Vec<Notice>, TshiftError> {
     let [nx, ny, nz] = ds.nxyz;
     let ntt = ds.nvals;
     if p.tpat.len() != nz {
@@ -147,6 +159,7 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
     let nvox = nxy * nz;
     let need = ds.need_brick_factor();
     let factors = ds.factors.clone();
+    let fix = p.upstream_defects.fix();
     let mut slice = vec![0.0f32; nxy * ntt];
     let data = &mut ds.data;
     parallel::with_threads(p.n_threads, || {
@@ -157,9 +170,9 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
             }
             let base = kk * nxy;
             match &*data {
-                BrickData::Byte(a) => extract(a, &factors, need, base, nvox, &mut slice),
-                BrickData::Short(a) => extract(a, &factors, need, base, nvox, &mut slice),
-                BrickData::Float(a) => extract(a, &factors, need, base, nvox, &mut slice),
+                BrickData::Byte(a) => extract(a, &factors, need, fix, base, nvox, &mut slice),
+                BrickData::Short(a) => extract(a, &factors, need, fix, base, nvox, &mut slice),
+                BrickData::Float(a) => extract(a, &factors, need, fix, base, nvox, &mut slice),
             }
             slice.par_chunks_mut(2 * ntt).with_min_len(8).for_each_init(
                 ShiftWork::default,
@@ -176,7 +189,50 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<(), TshiftError> {
             }
         }
     })?;
-    Ok(())
+    Ok(notices(ds, p))
+}
+
+/// The notices of [`tshift`]: AFNI-01 when a slice with a negative brick factor is shifted,
+/// AFNI-05 when `-no_detrend` pairs voxels.
+fn notices(ds: &Dataset, p: &TshiftParams) -> Vec<Notice> {
+    let [nx, ny, nz] = ds.nxyz;
+    let mode = p.upstream_defects;
+    let shifted = (0..nz)
+        .filter(|&kk| !skipped(p, slice_shift(p, kk)))
+        .count();
+    let mut out = Vec::new();
+    if shifted == 0 {
+        return out;
+    }
+    let negative = ds.factors.iter().copied().find(|&f| f < 0.0);
+    if let (true, Some(f)) = (ds.need_brick_factor(), negative) {
+        let f = crate::cnum::fmt_g(f64::from(f));
+        let detail = match mode {
+            UpstreamDefects::Fix => format!(
+                "the negative scale factor {f} (scl_slope) is applied to the {shifted} shifted \
+                 slices; AFNI applies it on output only, flipping their sign"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the negative scale factor {f} (scl_slope) is applied on output only, as AFNI \
+                 does: the {shifted} shifted slices come out sign-flipped and scaled"
+            ),
+        };
+        out.push(Notice::new(&defects::AFNI_01, mode, detail));
+    }
+    if !p.detrend && nx * ny >= 2 {
+        let detail = match mode {
+            UpstreamDefects::Fix => "-no_detrend: every voxel has its mean removed and restored; \
+                 AFNI does that to the first voxel of each pair only, twice, and shifts the \
+                 second as raw values"
+                .to_owned(),
+            UpstreamDefects::Reproduce => "-no_detrend: as AFNI does, the first voxel of each \
+                 pair (in index order within a slice) has its mean removed twice and restored \
+                 once; the second is shifted as raw values"
+                .to_owned(),
+        };
+        out.push(Notice::new(&defects::AFNI_05, mode, detail));
+    }
+    out
 }
 
 /// A stored value as float (byte and short convert exactly).
@@ -208,10 +264,13 @@ impl Stored for f32 {
 /// and the factor is positive, and set to 0 if that is not finite (`MRI_floatscan`). The loops
 /// run over the sub-bricks outside, so the dataset is read a row at a time; each value is
 /// computed exactly as AFNI computes it.
+///
+/// With `fix` (AFNI-01 corrected) a negative factor is applied too, as [`insert`] divides by it.
 fn extract<T: Stored>(
     data: &[T],
     factors: &[f32],
     need: bool,
+    fix: bool,
     base: usize,
     nvox: usize,
     slice: &mut [f32],
@@ -219,7 +278,7 @@ fn extract<T: Stored>(
     let ntt = factors.len();
     let nxy = slice.len() / ntt;
     for (t, &fac) in factors.iter().enumerate() {
-        let scale = need && f64::from(fac) > 0.0;
+        let scale = need && (f64::from(fac) > 0.0 || (fix && fac != 0.0));
         let row = &data[base + t * nvox..base + t * nvox + nxy];
         for (v, &x) in row.iter().enumerate() {
             let x = x.to_f32();
@@ -321,10 +380,13 @@ fn shift_pair(
         let g_full = full(gar);
         let g_trend = if p.detrend {
             linear_detrend(&mut gar[ig..]).unwrap_or((0.0, 0.0))
+        } else if p.upstream_defects.fix() {
+            // AFNI-05 corrected: the second voxel's own mean.
+            (const_detrend(&mut gar[ig..]).unwrap_or(0.0), 0.0)
         } else {
             // 3dTshift.c:632-633: `THD_const_detrend( ntt-ignore , far+ignore , &g0 )`: the
             // first voxel is de-meaned again, its new mean (about 0) becomes g0, and the second
-            // voxel keeps its mean.
+            // voxel keeps its mean (AFNI-05).
             (const_detrend(&mut far[ig..]).unwrap_or(0.0), 0.0)
         };
         Prep {
@@ -377,6 +439,7 @@ fn restore(x: &mut [f32], s: &Prep, rlt: Rlt) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::axes::Axes;
     use crate::dataset::Geometry;
 
     #[test]
@@ -405,10 +468,19 @@ mod tests {
             factors: vec![0.0; nt],
             taxis: None,
             geometry: Geometry {
-                matrix: [[0.0; 4]; 4],
-                steps: [1.0; 3],
+                axes: Axes {
+                    real: [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                    ],
+                    orient: Some([0, 3, 4]),
+                    del: [1.0; 3],
+                    org: [0.0; 3],
+                },
                 code: 1,
             },
+            seq_dec: None,
         }
     }
 
@@ -423,6 +495,7 @@ mod tests {
             detrend: true,
             bad: false,
             n_threads,
+            upstream_defects: UpstreamDefects::Reproduce,
         }
     }
 

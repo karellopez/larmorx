@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Karel Lopez Vilaret.
-//! Bit-identity with AFNI's own 3dTshift, when the oracle is available.
+//! Bit-identity with AFNI's own 3dTshift, when the oracle is available: the replica with
+//! `LARMORX_UPSTREAM_DEFECTS=reproduce` writes AFNI's data and its 348-byte header (`vox_offset`
+//! aside: AFNI adds its history extension).
 //!
 //! The oracle is `LARMORX_AFNI_BIN` (the binary or its directory), else the workspace's
 //! `oracles/afni-25.2.09/bin/3dTshift` (built by `scripts/build_afni_oracle.sh`). Without it the
@@ -78,8 +80,11 @@ fn bit_identical_to_afni() {
             assert!(a.status.success(), "AFNI {kind} {args:?}: {a:?}");
             let mut gpl_args = vec!["afni".to_owned(), "3dTshift".to_owned()];
             gpl_args.extend(tail(&outs[1]));
-            let refs: Vec<&str> = gpl_args.iter().map(String::as_str).collect();
-            let g = common::run(EXE, &refs);
+            let g = std::process::Command::new(EXE)
+                .args(&gpl_args)
+                .env("LARMORX_UPSTREAM_DEFECTS", "reproduce")
+                .output()
+                .unwrap();
             assert!(g.status.success(), "larmorx-gpl {kind} {args:?}: {g:?}");
             let (ab, ah) = common::read(&outs[0]);
             let (gb, gh) = common::read(&outs[1]);
@@ -91,6 +96,13 @@ fn bit_identical_to_afni() {
             );
             let differ = ab.iter().zip(&gb).filter(|(x, y)| x != y).count();
             assert!(ab == gb, "{kind} {args:?}: {differ} bytes differ");
+            // The header, byte for byte, but `vox_offset` (bytes 108-111).
+            let (ra, rg) = (
+                std::fs::read(&outs[0]).unwrap(),
+                std::fs::read(&outs[1]).unwrap(),
+            );
+            let header = |r: &[u8]| [&r[..108], &r[112..348]].concat();
+            assert_eq!(header(&ra), header(&rg), "{kind} {args:?}: header");
             n += 1;
         }
     }

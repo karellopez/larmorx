@@ -11,6 +11,12 @@
 >
 > Each entry says what the replica does. The original's differences are in its validation
 > record (`docs/validation/afni-tshift.md`).
+>
+> **D13 (2026-10-12).** The replica corrects AFNI's deterministic defects by default, as the
+> original does, and gives AFNI's output bytes with `LARMORX_UPSTREAM_DEFECTS=reproduce`
+> (register entries AFNI-01, -02, -03, -05, -07, -08, -11 and -12 in
+> [upstream-defects.md](upstream-defects.md)). "The replica reproduces" below means: with the
+> switch.
 
 Slice-timing correction in fMRIPrep (`fmriprep/workflows/bold/stc.py`), run as
 `3dTshift -ignore <dummies> -tzero <t0> -TR <TR>s -tpattern @<slice times> -prefix out in`
@@ -94,8 +100,9 @@ is a hard error here, while a header pattern outside it only causes a warning an
 **A negative `scl_slope` corrupts the data.** Extraction applies the brick factor only when
 it is positive (`thd_dsetto1D.c`: `if( DSET_BRICK_FACTOR > 0.0 )`). Insertion always divides
 by it (`thd_1Dtodset.c`). So int16 data with slope −0.5 come out sign-flipped and doubled.
-*Verified:* the scaled mean went from 942 in to −1884 out. A port that matches AFNI must
-reproduce this. larmorx's `lx.afni.tshift` warns about it.
+*Verified:* the scaled mean went from 942 in to −1884 out (AFNI-01). Both implementations
+apply the factor when reading too by default; the replica reproduces AFNI with the switch, and
+both warn.
 
 **The brick factors are the ones set when the header is opened, the values the ones set when
 the data are loaded.** 3dTshift works on `EDIT_full_copy` of the input, and
@@ -113,7 +120,8 @@ Two consequences, both *verified* with the oracle (2026-10-10):
   and int16 with both are converted to float at open time and get no factor; they are scaled
   once.) The test data have no such file.
 
-larmorx-gpl reproduces both. The header fields are read as `nifti_image_read` leaves them:
+larmorx-gpl reproduces both; by default it scales such float32 data once and writes no factor
+(AFNI-02, as the original does). The header fields are read as `nifti_image_read` leaves them:
 non-finite `scl_slope`, `scl_inter`, `toffset` and `slice_duration` become 0 (`FIXED_FLOAT`,
 `nifti2_io.c:4886-4909`), and a zero or non-finite `pixdim[i]` within `dim[0]` becomes 1
 (`:4744-4746`), so a 4D file with `pixdim[4] = 0` has a TR of 1 (0.001 s if its unit is ms).
@@ -126,27 +134,65 @@ each step is a double sum rounded to float, not a float sum. For `slice_code = 2
 (sequential decreasing) the loop is `for( kk=slice_end ; kk >= slice_end ; kk-- )`
 (`:653`): only `slice_end` is visited, every offset stays 0, and 3dTshift warns "input has
 only 1 time offset, 0" and shifts nothing. *Read*, and *validated*
-(`header-timing/code2-seq-dec`).
+(`header-timing/code2-seq-dec`). By default larmorx-gpl visits `slice_end` down to
+`slice_start`, as NIfTI defines the code (AFNI-03).
 
 **When the output keeps slice offsets** (the "copy of input" cases), `populate_nifti_image`
 derives `slice_code`, `slice_start`, `slice_end` and `slice_duration` from them with
 `get_slice_timing_pattern` (`thd_niftiwrite.c:519-594`), which sorts the times and accepts
-spacings equal within 0.003. Its "all zeros" test (`sfirst == slast &&
-MYFPEQ(tlist[sfirst],0.0)`, `:543`) can never be true, so a list of zeros finds no pattern
-and gets `slice_end = 0`. *Read.* larmorx-gpl translates this function.
+spacings equal within 0.003 (`min_timing_diff`, `:19`). Its "all zeros" test (`sfirst == slast
+&& MYFPEQ(tlist[sfirst],0.0)`, `:543`) can never be true, so a list of zeros (every time within
+0.003 of 0) finds no pattern and gets `slice_end = 0` (AFNI-08). *Read.* Such a list reaches
+the writer only in a copy of the input whose times lie beyond the TR: header slice code 1 with
+a 0.5 ms duration and a 1 ms TR over 4 slices (times 0 to 1.5 ms) is copied with slice code 0,
+duration 0 and `slice_end` 0. *Verified* (2026-10-12). larmorx-gpl translates the function;
+by default it makes the test what it meant (no time away from 0), which gives the defaults
+(no code, no duration, `slice_end = nz − 1`).
 
 **Milliseconds become seconds when the dataset is written** (`DSET_UNMSEC`,
 `thd_writedset.c:134`): the TR and the time origin are multiplied by 0.001 in double and
 stored as float. With `-TR 2000ms -tzero 500` the output has TR 2 and `toffset` 0.5. *Read*,
 *validated* (`options/*-TR-msec`).
 
-**Geometry.** The output sform is the matrix AFNI took from the header (the sform when both
-are set, AFNI's default `AFNI_NIFTI_PRIORITY`), stored as float. It is not rescaled when the
-header's spatial unit is metres or microns, although the voxel sizes written to `pixdim` are
-(×1000 or ×0.001), so such files come out inconsistent. With neither form, the output is
-`diag(dx, dy, dz)` at the origin 0. The xform codes become 1, except 3 for codes 3 and 5 and
-4 for code 4. *Verified* (2026-10-10) with oblique qform-only, sform-only (code 4), both,
-metre-unit and form-less inputs: larmorx-gpl's sform and qform agree with AFNI's exactly.
+**Geometry.** AFNI keeps two descriptions of the grid (`THD_open_nifti`,
+`thd_niftiread.c:258-593`): the matrix it took from the header (the sform when both are set,
+AFNI's default `AFNI_NIFTI_PRIORITY`; else the qform; else the voxel sizes) as
+`ijk_to_dicom_real`, a float matrix in DICOM coordinates (x and y negated); and the axes, each
+with an orientation (the signed permutation nearest to the matrix: `THD_matrix_to_orientation`
+for the qform, `nifti_dmat44_to_orientation` for the sform), a step (the column's length) and
+an origin (the matrix's offset), floats. When the dataset is written,
+`THD_set_dataset_attributes` (`thd_dsetatr.c:167-180`, called by `THD_write_3dim_dataset`)
+replaces `ijk_to_dicom_real` by the cardinal matrix of the axes (`THD_dicom_card_xform`,
+`thd_coords.c:567`) whenever `THD_compute_oblique_angle` (`:717`) gives 0. `populate_nifti_image`
+then writes that matrix, x and y negated back, as the sform; its quaternion
+(`nifti_dmat44_to_quatern`) with the axes' origins as the qform (`thd_niftiwrite.c:387-389`);
+the axes' steps as `pixdim`; and `regular = 'r'`. Consequences, each *verified* with the oracle
+(2026-10-12):
+
+- **A grid nearly plumb comes out plumb.** The angle test is 0.01°, but on a float cosine: a
+  matrix whose cosine rounds to 1 in float (about 0.014° or less) is written as the plumb
+  matrix of its axes (AFNI-16). An sform 0.006° from plumb came out plumb (its entries up
+  to 4e-4 from the input's), one 0.017° from plumb as it was.
+- **Plumb outputs carry signed zeros:** the cardinal matrix's zeros are +0 in DICOM, so the
+  sform's x and y rows hold −0 (`srow_x = [3, -0, -0, …]`), and the quaternion of such a matrix
+  has `quatern_c = −0`.
+- **Metre and micrometre units** (AFNI-07): the steps are converted to millimetres on reading
+  (`thd_niftiread.c:357-360`, `:466-470`), the origins and `ijk_to_dicom_real` are not. A plumb
+  grid comes out with its linear part in millimetres and its origin in metres; an oblique grid
+  with its whole sform in metres (only `pixdim` in millimetres); the qform's origin is in metres
+  in both.
+- **With neither form**, the axes are L, P, I with the voxel sizes as steps and the origin 0,
+  so the output is `diag(dx, dy, dz)` with −0 off the diagonal and as the x and y offsets.
+
+The xform codes become 1, except 3 for codes 3 and 5 and 4 for code 4. larmorx-gpl translates
+the axes, the obliquity test, the cardinal matrix and the quaternion (`axes.rs`; the quaternion
+in double where AFNI forms a few quotients in x87 extended precision, which the float32 header
+fields almost never show), and gives AFNI's header bytes, the AFNI extension aside, on every
+case tried: plumb, oblique, nearly plumb, qform-only, sform-only, form-less, metre and
+micrometre inputs, and five real BOLD runs (one AFNI-written, with its extension). Before 2026-10-12 it wrote the matrix as read (the record of 2026-10-10
+covered qform-only metre inputs only), which differed from AFNI for plumb metre and micrometre
+sforms and nearly plumb grids. By default larmorx-gpl converts the matrix and the origins of a
+metre or micrometre header to millimetres too (AFNI-07), as the original does.
 
 **AFNI's own header extension overrides the NIfTI header.** Files AFNI wrote carry an
 extension (code 4) with the dataset's AFNI attributes as NIML text, numbers printed with 7
@@ -255,11 +301,19 @@ covers the whole path, directories included, so an output in `C:\Users\Jane Doe\
 directory with accented letters is refused. *Read.*
 
 What larmorx does (2026-10-11): both implementations accept any path, as AFNI does with
-`AFNI_ALLOW_ARBITRARY_FILENAMES` set. The replica keeps the translated check only to say, with
-`-verbose`, that AFNI would refuse the name. Before, the replica refused such names, so
-installing it would have broken outputs in paths with blanks once `larmorx afni 3dTshift` ran
-it by default (`implementation="auto"`). The Python wrapper also runs the replica in a
-temporary directory with a relative `-prefix`, so it never depended on this.
+`AFNI_ALLOW_ARBITRARY_FILENAMES` set. Before, the replica refused such names, so installing it
+would have broken outputs in paths with blanks once `larmorx afni 3dTshift` ran it by default
+(`implementation="auto"`). The Python wrapper also runs the replica in a temporary directory
+with a relative `-prefix`, so it never depended on this. Since 2026-10-12 (D13, AFNI-12) the
+replica names the defect when it accepts a name AFNI refuses, and with
+`LARMORX_UPSTREAM_DEFECTS=reproduce` refuses it as AFNI does ("illegal value '...' after
+-prefix", exit 1). AFNI's environment variables are not read: `reproduce` is AFNI with them
+unset.
+
+**An existing output** (AFNI-11): AFNI finds out when it writes (`thd_writedset.c:149-162`),
+after all the work: "output dataset name '...' conflicts with existing file" (the name without
+its directory), "dataset NOT written to disk!", and 3dTshift exits 0. larmorx refuses before
+the work (exit 1); the replica's `reproduce` does what AFNI does.
 
 ## Bugs worth knowing
 
@@ -269,7 +323,8 @@ temporary directory with a relative `-prefix`, so it never depended on this.
   de-meaned twice. fMRIPrep does not use `-no_detrend`. *Read.* The order matters for the
   last bits: the first voxel's clipping range is recorded between its two de-meanings, and
   the second de-meaning's mean (about 0, not exactly) is what is added back to the second
-  voxel. larmorx-gpl reproduces this; *validated* (`options/*-no-detrend`).
+  voxel. larmorx-gpl reproduces this with the switch; *validated* (`options/*-no-detrend`). By
+  default each voxel has its own mean removed and restored (AFNI-05).
 - **A shift larger than the series crashes on odd slices.** When both shifts exceed the
   series length, `fft_shift2` writes `f[ii] = g[ii] = 0.0` (`thd_shift2.c:80`) even when
   `g` is NULL, which it is for the last voxel of a slice with an odd number of voxels. That

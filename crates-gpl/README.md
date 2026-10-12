@@ -25,7 +25,7 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 
 | Crate | What |
 |---|---|
-| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules and 1D reader, and a port of glibc's `sinf`/`cosf`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
+| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`) and 1D reader, and a port of glibc's `sinf`/`cosf`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
 | `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl afni 3dTshift <AFNI's arguments>` |
 | `larmorx-gpl-afni/tools/csfft-verify` | compares the FFT with AFNI's compiled code, bit for bit (needs the AFNI oracle build) |
 | `larmorx-gpl-afni/tools/sincosf-verify` | compares the `sinf`/`cosf` port with the C library, on all 2^32 inputs |
@@ -89,6 +89,23 @@ pip install --find-links dist "larmorx[exact]"      # the exact extra pulls in l
 `3dTshift`, and writes the same NIfTI output as AFNI, with the larmorx conventions (NIfTI
 output only; an existing output file is an error; any `-prefix` path is accepted). With
 `-verbose`, its first line names the implementation and its version.
+
+**AFNI's defects** (D13, `docs/api/upstream-defects.md`): like the clean-room original, the
+replica corrects AFNI's deterministic defects by default (a negative `scl_slope`, float32
+data scaled twice, header slice code 2, `-no_detrend`'s voxel pairs, metre and micrometre
+units, slice times all within 3 ms of 0 in a copy, an existing output, refused output names;
+register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12 in
+`docs/findings/upstream-defects.md`) and names each one that changed the output in a warning
+on standard error (`*+ WARNING: upstream defect AFNI-01 (3dTshift) corrected: ...`), which
+the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
+`LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension
+aside (AFNI's environment variables unset); any value other than `fix`, `reproduce` or empty
+exits with status 2:
+
+```bash
+larmorx-gpl afni 3dTshift -tpattern alt+z -prefix out.nii in.nii                 # corrected
+LARMORX_UPSTREAM_DEFECTS=reproduce larmorx-gpl afni 3dTshift -tpattern alt+z -prefix afni.nii in.nii
+```
 
 Users seldom call it directly. When it is installed, `larmorx afni 3dTshift` and
 `lx.afni.tshift(..., implementation="auto")` run it as a separate process

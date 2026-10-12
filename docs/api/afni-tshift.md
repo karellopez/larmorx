@@ -9,16 +9,17 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
 **Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 236 cases:
+[validation record](../validation/afni-tshift.md)). The record covers 245 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
-  input" cases and 17 errors both must raise;
+  input" cases, AFNI's defects (D13) and 18 error cases;
 - 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
   with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift.
 
-All 236 agree, and 158 of the 217 compared are byte-identical. The Lagrange and
-weighted-sinc methods and the copies give **the same bytes** as AFNI (117 of 120). The
+All 245 agree, 6 of them as documented divergences, and 162 of the 222 compared are
+byte-identical. The Lagrange and weighted-sinc methods and the copies give **the same bytes**
+as AFNI (120 of 123). The
 Fourier method (the default) differs in the last float32 bits, at most 4.3e-7 of the largest
 value, because AFNI's FFT is float32 and larmorx's is double; integer outputs then differ by
 at most 1, in a few values per million on the real runs (up to 0.2 % on a synthetic series
@@ -27,8 +28,10 @@ built to clip). The known last-bit differences are listed at the end of this pag
 **Bit-exact replica.** `larmorx-gpl afni 3dTshift` (package `larmorx-gpl`, `crates-gpl/`,
 GPL-3.0-or-later) is a translation of AFNI's own source, with AFNI's float32 FFT and a port of
 glibc's `sinf`/`cosf`. It takes the same arguments as `larmorx afni 3dTshift`, follows the
-same conventions (NIfTI output only, an existing output is an error), and gives AFNI's output
-bytes on every compared parity case ([replica record](../validation/afni-tshift-replica.md)).
+same conventions (NIfTI output only, an existing output is an error), corrects the same AFNI
+defects by default, and with `LARMORX_UPSTREAM_DEFECTS=reproduce` gives AFNI's output bytes
+on every compared parity case ([replica record](../validation/afni-tshift-replica.md); see
+[Upstream defects](#upstream-defects-d13)).
 It is a separate program because of its licence ([licensing](../licensing.md)). When it is
 installed, `lx.afni.tshift` and `larmorx afni 3dTshift` run it by default (see
 [Choosing the implementation](#choosing-the-implementation)).
@@ -166,13 +169,17 @@ an intercept (AFNI-02) and metre or micron units (AFNI-07); see below.
 The output header is NIfTI-1 with qform and sform both from AFNI's matrix (the sform if
 `sform_code > 0`, else the qform), codes mapped 1, 2 → 1, 3, 5 → 3, 4 → 4, the slice axis
 third (`dim_info` 48) and slice range `0..nz−1`; AFNI's history extension is not written.
+AFNI writes a grid less than about 0.014° from plumb as exactly plumb (AFNI-16, a questionable
+behaviour kept in both modes): the replica does the same, the clean-room original keeps the
+input's matrix (sform entries 4e-4 apart on the parity case `geometry/slightly-oblique`).
 
 ## Upstream defects (D13)
 
-larmorx corrects five of 3dTshift's defects by default and reproduces them with
-`upstream_defects="reproduce"` (command line: `LARMORX_UPSTREAM_DEFECTS=reproduce`); a warning
-names each one that changed the output, in both modes ([upstream-defects.md](upstream-defects.md),
-register entries in [findings/upstream-defects.md](../findings/upstream-defects.md)):
+larmorx corrects 3dTshift's defects by default, in both implementations, and reproduces them
+with `upstream_defects="reproduce"` (command line: `LARMORX_UPSTREAM_DEFECTS=reproduce`); a
+warning names each one that changed the output, in both modes
+([upstream-defects.md](upstream-defects.md), register entries in
+[findings/upstream-defects.md](../findings/upstream-defects.md)):
 
 | ID | AFNI 25.2.09 | larmorx by default | Where |
 |---|---|---|---|
@@ -180,15 +187,31 @@ register entries in [findings/upstream-defects.md](../findings/upstream-defects.
 | AFNI-02 | float32 data with a slope and an intercept are scaled when read, and the slope is also kept as the output's `scl_slope`: the output reads back scaled twice | scaled once, written without a factor | float32 files with both fields set |
 | AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
 | AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
-| AFNI-07 | metre and micron units: the voxel sizes and directions are converted to millimetres, the origin is not | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
+| AFNI-07 | metre and micron units: the voxel sizes are converted to millimetres, the origin is not (a plumb grid), or the whole sform is not (an oblique grid) | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
+| AFNI-08 | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | no slice code, `slice_end` = nz − 1 | the command line: header slice times beyond the TR, e.g. 0.5 ms apart with a 1 ms TR |
+| AFNI-11 | an existing output is not written, and the exit status is 0 | an error (exit 1) | the command line |
+| AFNI-12 | a `-prefix` with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused | written (the replica names the defect) | the command line |
 
 On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
-`-no_detrend`) none of them applies, so the default output is AFNI's. The register's AFNI-08 (an
-all-zero slice-time list writes `slice_end` 0) has no switch: no black-box run found an input
-that makes AFNI do it, and larmorx writes `nz − 1` (`specs/3dTshift.md` §6). The replica
-(`larmorx-gpl`) receives the choice as `LARMORX_UPSTREAM_DEFECTS`; its corrections are a
-separate task, and until then it gives AFNI's output in both modes. The parity record's "D13 fix
-pass" lists what the corrections change, case by case.
+`-no_detrend`, fresh output names) none of them applies, so the default output is AFNI's. The
+parity records' "D13 fix pass" lists what the corrections change, case by case.
+
+**The two implementations.** The replica (`larmorx-gpl`) receives the choice as
+`LARMORX_UPSTREAM_DEFECTS` and corrects the same defects by default (since 2026-10-12), so
+`implementation="auto"` gives the corrected output whichever runs. The replica's record
+compares its default with the original's on every case where a correction applies: they agree
+in every header field, the geometry and the scaling, and in the values up to the last bits
+where the original's own numerics differ from AFNI's (Fourier, quintic, heptic, weighted sinc,
+`-no_detrend`). Two differences remain, both where the original does not follow AFNI yet: a
+grid less than about 0.014° from plumb (above), and AFNI-08's copy, whose slice code and
+duration the replica derives from the times (none: they are all within 3 ms of 0) and the
+original copies from the input header. With `reproduce`, the replica gives AFNI's output bytes;
+the original gives AFNI's output within its thresholds, except for AFNI-08, AFNI-11 and AFNI-12,
+which it has no switch for, AFNI-07 on an oblique grid, where it converts the sform's linear
+part, and the nearly plumb grid (expected divergences in
+[its record](../validation/afni-tshift.md); spec additions pending). AFNI's environment
+variables (`AFNI_DECONFLICT`, `AFNI_ALLOW_ARBITRARY_FILENAMES`, ...) are not read:
+`reproduce` is AFNI with them unset.
 
 ## Behaviour found by black-box runs
 
@@ -221,10 +244,12 @@ The spec left these open; each was settled by running AFNI 25.2.09 (details in
 ## Deliberate differences
 
 - Output is NIfTI only (`-prefix` must end in `.nii` or `.nii.gz`); an existing output is an
-  error (AFNI warns and exits 0 without writing).
+  error (AFNI warns and exits 0 without writing; AFNI-11, which the replica reproduces with
+  `LARMORX_UPSTREAM_DEFECTS=reproduce`).
 - Any `-prefix` path is accepted; AFNI refuses names with blanks, shell metacharacters or
-  non-ASCII characters ("illegal value ... after -prefix"). The replica follows larmorx here
-  too, and says with `-verbose` when AFNI would have refused the name.
+  non-ASCII characters ("illegal value ... after -prefix"; AFNI-12). The replica follows
+  larmorx here too, names the defect when it accepts such a name, and refuses it with
+  `LARMORX_UPSTREAM_DEFECTS=reproduce`.
 - `-voxshift`, AFNI's own formats, sub-brick selectors and 1D selectors (`file[2]`,
   `file'`) are not supported; hexadecimal numbers in 1D files are rejected.
 - The Fourier method uses larmorx's own FFT in double precision (AFNI uses float32): float32

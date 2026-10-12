@@ -823,6 +823,59 @@ Decided by the user on the questions the defect register raised
   receives `afni_settings` and none of the environment's AFNI variables; the original raises
   `NotImplementedError` for the variables it does not read.
 
+## 2026-10-12: Completing 3dTshift, part 2b: the clean-room original follows the spec's §6-7
+- **Done** (clean-room implementer, from `specs/3dTshift.md`, black-box runs of AFNI 25.2.09
+  and of the replica program, never their source): the original (`crates/larmorx-afni`)
+  implements §6.1 to §6.5 and §7.1, so with `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives
+  AFNI's output everywhere the spec describes it, and its defaults are the replica's.
+  - **Geometry (§6.1):** AFNI's matrix in float32, its steps, its single-precision plumb test,
+    the cardinal matrix with AFNI's signed zeros, the quaternion by the NIfTI reference
+    library's method in double, with the steps AFNI's x86-64 build carries out in x87
+    extended precision (the quotients, `1 + r11 + r22 + r33`, and the qform's matrix) emulated
+    with integer arithmetic (`larmorx_afni::x87`, checked against 6 million operations of
+    GCC's `long double`), so NIfTI-2 headers are AFNI's on every platform. `reproduce` keeps an
+    oblique sform in metres whole (AFNI-07) and writes nearly plumb grids plumb (AFNI-16).
+  - **Copies (§6.2), output names (§6.3), AFNI-03's notice (§6.4)**, with the switch:
+    AFNI-08, AFNI-11, AFNI-12, and the slice fields AFNI derives from a copy's times (AFNI-17).
+  - **AFNI's global options and variables (§7.1)**, as the replica has them: a table of
+    settings read once from the environment, never changed; `-overwrite`, `-Dname=value`
+    (AFNI-22), `-ok_1D_text`, `-skip_afnirc` wherever they stand; every variable of the
+    spec's table with AFNI's effects and messages (AFNI-18, -19, -20, -21, -23); `-overwrite`
+    and `AFNI_DECONFLICT` writing through a temporary file renamed over the output, retried
+    on Windows for about 2 s. The messages are AFNI's, in AFNI's order, with larmorx's own
+    lines added; their wording follows the replica's.
+  - **The Python API:** `lx.afni.tshift(..., implementation="original", afni_settings=...)`
+    applies `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_SCALE`, `AFNI_NIFTI_VIEW`,
+    `AFNI_DEFAULT_STD_SPACE`, `AFNI_NIFTI_WRITE_TYPE` and `AFNI_NOREALPATH` instead of raising
+    `NotImplementedError`; it still never reads the environment.
+- **Found by black-box runs and added to the spec, marked observed:** the messages of a run
+  (what goes to standard output, the order of the checks, `-verbose`'s `Wrote output` labelled
+  after a copy and plain after a shift), AFNI's lenient 1D parsing (`2x` is 2, `*` is 0, colons
+  separate values; inline `1D:` strings are strict), AFNI-18's list split at blanks and `~`,
+  the template-space codes this oracle gives (the table's), the plumb boundary of a 0.8 mm
+  column (0.000172633489 the last plumb value). Two AFNI behaviours for the register (they
+  were not in it): AFNI crashes on `-ignore` without a value (class a), and exits 0 after an
+  output it could not write (like AFNI-11); larmorx refuses with exit 1 in both modes.
+- **Records** (standard tier, against the AFNI 25.2.09 oracle, 311 cases each):
+  - Original: 279 pass, 29 rejected by both, 3 expected divergences (AFNI's own format,
+    `-voxshift`, AFNI-20's one-row text file, as for the replica), 0 failures; the 71 expected
+    divergences of before (69 of them the spec's missing behaviours) all pass. 176 of 279
+    compared cases bit-identical (data), every header field, file, exit status and message
+    otherwise AFNI's: the 60 cases of the global options and variables identical, messages
+    byte for byte. The whole-file case (`AFNI_NIFTI_NOEXT`) compares the original's header
+    byte for byte and its data with the thresholds (its Fourier method differs in the last
+    bits). Python API with `afni_settings`: 28 of 28 cases give the command line's output.
+  - Replica: unchanged (279 of 279 bit-identical); "D13 defaults: replica = original" agrees
+    on every case, AFNI-08's copy now bit-identical.
+- **Golden:** five new cases for the original's new paths (the metre grid in both modes, a
+  copy keeping slice times in both modes, `AFNI_NIFTI_SCALE=NO` in three paths, the global
+  options with NIfTI-2 and renaming, `afni_settings` in Python); the existing 3dTshift cases'
+  header checksums re-recorded (the original now writes AFNI's header bytes: `regular` `r`,
+  the cardinal matrix's signed zeros, nifti_clib's quaternion) and the command line's standard
+  output (`++ updating time offset to ...`); their data checksums unchanged. A Rust test of the
+  `larmorx` binary checks `-overwrite` and `-D` on every platform, with paths that have blanks
+  and non-ASCII characters (and, on Windows, an output held open for 0.5 s).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

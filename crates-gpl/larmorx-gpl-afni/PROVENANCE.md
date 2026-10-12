@@ -80,10 +80,12 @@ Changes from the originals are listed below and in each module's documentation.
 | `tshift` | `src/mrilib.h` | `SHORTIZE`, `BYTEIZE` | MCW 1994-2000 |
 | `cli::tshift` | `src/3dTshift.c` | `main` (option scan, checks, messages), `TS_copy_input_to_output` | MCW 1994-2000 |
 | `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (to name AFNI-12, and to refuse a `-prefix` when it is reproduced) | MCW 1994-2000 |
+| `cli::tshift` | `src/nifti/nifti2/nifti2_io.c` | the message of `nifti_image_write_engine` when the output cannot be opened (AFNI-26, reproduced) | NIH, public domain |
 
 Not translations (written for larmorx-gpl, GPL-3.0-or-later): `x87` (the arithmetic of x86-64's
 `long double`, for the formulas of `nifti2_io.c` that use it) and `cli::output` (writing the
-output through a temporary file and a rename).
+output through a temporary file and a rename; `openable`, whether AFNI's NIfTI writer could
+open the output, for AFNI-26).
 
 ## glibc files translated (`glibc_sincosf`)
 

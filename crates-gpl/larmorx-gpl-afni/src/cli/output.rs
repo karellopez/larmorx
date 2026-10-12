@@ -91,9 +91,44 @@ pub fn replace_atomically<E: std::fmt::Display>(
     Ok(())
 }
 
+/// Whether AFNI's NIfTI writer could open `target` (`znzopen(name, "wb")` in
+/// `nifti_image_write_engine`, `nifti2_io.c:7908`): an existing file must be writable, a new
+/// one creatable in its directory. Nothing changes: an existing file is opened without
+/// truncation, and a new one is removed again. Used to reproduce AFNI-26, where AFNI writes
+/// nothing and exits with status 0.
+pub fn openable(target: &Path) -> std::io::Result<()> {
+    if target.exists() {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(target)
+            .map(drop)
+    } else {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(target)?;
+        std::fs::remove_file(target)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn openable_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let new = dir.path().join("sübject out.nii");
+        openable(&new).unwrap();
+        assert!(!new.exists(), "the probe's file is removed again");
+        let old = dir.path().join("old.nii");
+        std::fs::write(&old, "kept").unwrap();
+        openable(&old).unwrap();
+        assert_eq!(std::fs::read(&old).unwrap(), b"kept", "not truncated");
+        let missing = dir.path().join("no such directory").join("out.nii");
+        assert!(openable(&missing).is_err());
+        assert!(!dir.path().join("no such directory").exists());
+    }
 
     #[test]
     fn temporary_names_keep_the_suffix_and_the_directory() {

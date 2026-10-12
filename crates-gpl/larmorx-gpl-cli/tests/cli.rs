@@ -214,6 +214,32 @@ fn tshift_upstream_defects_switch() {
     assert!(err.contains("upstream defect AFNI-12 (3dTshift) corrected"));
     assert!(dir.path().join("3dcalc a b.nii").exists());
 
+    // AFNI-26: an output in a missing directory. AFNI's NIfTI writer cannot open it; AFNI
+    // writes nothing and exits 0, larmorx's default is an error.
+    let (code, err) = run("nodir/out.nii", Some("reproduce"));
+    assert_eq!(code, Some(0), "{err}");
+    assert!(
+        err.contains(
+            "** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'"
+        ),
+        "{err}"
+    );
+    assert!(
+        err.contains("upstream defect AFNI-26 (3dTshift) reproduced"),
+        "{err}"
+    );
+    let (code, err) = run("nodir/out.nii", None);
+    assert_eq!(code, Some(1), "{err}");
+    assert!(
+        err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+        "{err}"
+    );
+    assert!(!dir.path().join("nodir").exists());
+    // Only an output that cannot be opened: a writable one is written as before.
+    let (code, err) = run("plain-reproduced.nii", Some("reproduce"));
+    assert_eq!(code, Some(0), "{err}");
+    assert!(dir.path().join("plain-reproduced.nii").exists());
+
     // A plain run names nothing, in either mode.
     for mode in [None, Some("fix"), Some("reproduce"), Some("")] {
         let name = format!("plain-{}.nii", mode.unwrap_or("unset"));

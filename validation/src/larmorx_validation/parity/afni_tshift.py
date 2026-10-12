@@ -817,6 +817,18 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         ),
     ]:
         separate(f"environment/{cid}", desc, args, image, **kw)
+    # A failed write (AFNI-26): an output in a missing directory. AFNI prints the NIfTI
+    # library's error, writes nothing and exits 0; larmorx's default is an error (exit 1).
+    for cid, desc, args in [
+        ("missing-directory", "an output in a missing directory: nothing written, exit 0", tz),
+        ("missing-directory-copy", "the same for a copy of the input", ()),
+        (
+            "missing-directory-verbose",
+            "the same with -verbose, whose last line names the file not written",
+            ("-verbose", *tz),
+        ),
+    ]:
+        separate(f"errors/{cid}", f"{desc} (AFNI-26)", args, output="nodir/out.nii", expect="error")
     # The -D form of the variables that change the output.
     for cid, image, setting in [
         ("nifti-priority-Q", "gen:sq", "AFNI_NIFTI_PRIORITY=Q"),
@@ -1298,7 +1310,18 @@ _ONE_ROW = (
 #: the old list is kept in ``_ORIGINAL_BEFORE_PART_2B`` for the record.
 DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
     "replica": {"environment/one-row-dataset": _ONE_ROW},
-    "original": {"environment/one-row-dataset": _ONE_ROW},
+    "original": {
+        "environment/one-row-dataset": _ONE_ROW,
+        **{
+            f"errors/missing-directory{v}": (
+                frozenset({"exit status", "messages: AFNI's, byte for byte"}),
+                "AFNI writes nothing and exits 0 after its NIfTI writer fails to open the "
+                "output (AFNI-26); the original exits 1 in reproduce mode too, until it has the "
+                'switch (spec §7.1, "A failed write")',
+            )
+            for v in ("", "-copy", "-verbose")
+        },
+    },
 }
 
 #: The clean-room original's expected divergences before part 2b (2026-10-12), which it has met

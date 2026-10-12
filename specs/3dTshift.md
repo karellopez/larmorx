@@ -1053,8 +1053,10 @@ output cannot be created (its directory does not exist, or cannot be written), A
 name is the one `-verbose` prints, AFNI's name for the output (§7.1): `./out.nii` for
 `-prefix out.nii`, `./d/out.nii` for `-prefix ./d/out.nii`, an absolute path as given; for a
 `.hdr`/`.img` pair, the `.hdr`. Shifts and copies alike, `.nii` and `.nii.gz` alike (observed
-2026-10-12). larmorx fails with a message and exit status 1 in both modes; no switch
-reproduces it yet.
+2026-10-12). larmorx fails with a message and exit status 1 by default (naming AFNI-26);
+`reproduce` gives AFNI's result: the message, nothing written, `-verbose`'s line, exit status 0.
+Only the case where the file cannot be opened is reproduced; a write that fails later (a full
+disk) stays an error.
 
 **The defaults and the notices** (as §6.5, for this section; AFNI-11 and AFNI-12 are in §6.5):
 

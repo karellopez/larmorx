@@ -82,7 +82,7 @@ use crate::shift::Method;
 use crate::tpattern::{TpatternError, parse_tpattern};
 use crate::tshift::{Rlt, TshiftParams, fft_length, slice_shift, tshift};
 
-use super::output::replace_atomically;
+use super::output::{openable, replace_atomically};
 use super::threads;
 
 /// The first `-verbose` line: which implementation runs (larmorx's addition, not AFNI's).
@@ -683,7 +683,9 @@ impl Output {
 /// ([`Deconflict`]); refused, AFNI writes nothing, prints two errors and the run ends with
 /// status 0 (AFNI-11 reproduced), and the dataset keeps the free name AFNI found for it. With
 /// AFNI-12 reproduced, a name that `THD_write_nifti` refuses ([`output_name_ok`]) is not
-/// written either.
+/// written either. A file that cannot be written is an error by default; AFNI ignores the
+/// write's result and exits with status 0 (AFNI-26), which `reproduce` gives where AFNI's
+/// writer cannot open the file ([`openable`]): its message, nothing written.
 fn write(
     out: &Output,
     ds: &Dataset,
@@ -753,6 +755,25 @@ fn write(
         );
         written = false;
     }
+    if written
+        && notices.reproduce()
+        && let Err(e) = openable(&target)
+    {
+        // `nifti_image_write_engine` (`nifti2_io.c:7908-7912`, `LNI_FERR`, a plain `fprintf`);
+        // `THD_write_nifti` returns the failure and 3dTshift ignores it (`3dTshift.c:696`,
+        // `:709`).
+        io.raw(format!(
+            "** ERROR (nifti_image_write_engine): cannot open output file '{shown}'\n"
+        ));
+        notices.add(
+            &defects::AFNI_26,
+            format!(
+                "the output '{shown}' cannot be written ({e}): nothing is written and the exit \
+                 status is 0, as AFNI does"
+            ),
+        );
+        written = false;
+    }
     if written {
         let mut messages = Vec::new();
         let result = replace_atomically(&target, |tmp| {
@@ -761,7 +782,17 @@ fn write(
         for m in messages {
             io.message(m);
         }
-        result.map_err(|e| Fail::Fatal(format!("can't write output dataset: {e}")))?;
+        if let Err(e) = result {
+            if notices.fix() {
+                io.notice(&Notice::new(
+                    &defects::AFNI_26,
+                    notices.mode(),
+                    "the output cannot be written: an error (exit status 1); AFNI writes \
+                     nothing and exits with status 0",
+                ));
+            }
+            return Err(Fail::Fatal(format!("can't write output dataset: {e}")));
+        }
     }
     for n in notices.as_slice() {
         io.notice(n);

@@ -678,6 +678,13 @@ def compare_hmc(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
         band = _mcflirt_band(s)
         if band:
             res["band"] = band
+        # Where PLAN.md §11.3's FD correlation applies and larmorx misses it, mcflirt's own
+        # band on this very run decides (porting guide §3, §7).
+        if (
+            res["fd_max_fmriprep"] >= HMC_FD_MIN_MM
+            and res["confounds"]["larmorx"]["fd_r"] <= HMC_FD_R
+        ):
+            res["node_band"] = _node_band(s, node, base, source, reference, table)
         if hmc_xfm is not None:
             fx = cmp.read_itk_affines(hmc_xfm)
             res["itk"] = {
@@ -708,6 +715,76 @@ def compare_hmc(s: rn.Settings, node: Node, stage: Stage) -> dict[str, Any]:
         )
     res["status"] = "compared"
     return res
+
+
+#: PLAN.md §11.3's FD correlation, required where fMRIPrep's largest FD reaches 0.5 mm
+#: (specs/mcflirt.md §14; record.FD_MIN_MM, record.FD_R).
+HMC_FD_MIN_MM = 0.5
+HMC_FD_R = 0.99
+
+#: The perturbations of the node band: the threshold perturbations of the mri-hmc band
+#: (``larmorx_validation.parity.mri_hmc_band``), which leave the geometry unchanged.
+NODE_BAND_PERTURBATIONS = ("noise", "noise2", "noise3", "reverse")
+
+
+def _node_band(
+    s: rn.Settings, node: Node, base: Path, source: str, reference: str, table
+) -> dict[str, Any]:
+    """mcflirt's own variability on this node: FSL 6.0.7's mcflirt (which reproduces
+    fMRIPrep's matrices bit for bit), black-box runs with fMRIPrep's arguments on the series
+    perturbed as the mri-hmc band perturbs it (noise of ±0.5 of a stored unit, three
+    realisations; the volumes reversed), and fMRIPrep's own confound code on each, against
+    fMRIPrep's confounds file, as larmorx's matrices are compared."""
+    import subprocess
+
+    from larmorx_validation.parity.mri_hmc_band import SEED, _perturb
+
+    exe = rn.host_mcflirt()
+    if exe is None:
+        return {"error": "FSL 6.0.7's mcflirt was not found"}
+    env = {
+        "HOME": os.environ.get("HOME", ""),
+        "PATH": "/usr/bin:/bin",
+        "FSLDIR": str(exe.resolve().parents[1]),
+        "FSLOUTPUTTYPE": "NIFTI_GZ",
+        "OMP_NUM_THREADS": "1",
+    }
+    out: dict[str, Any] = {"mcflirt": rn.fsl_version(exe), "seed": SEED, "perturbations": {}}
+    for kind in NODE_BAND_PERTURBATIONS:
+        d = base / f"band-{kind}"
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True)
+        made = _perturb(kind, Path(s.run.host(source)), Path(s.run.host(reference)), d)
+        if made is None:
+            continue
+        series, ref = made
+        p = subprocess.run(
+            [str(exe), "-in", str(series), "-out", str(d / "out_mcf.nii.gz")]
+            + (["-reffile", str(ref)] if ref is not None else [])
+            + ["-mats"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        mats = d / "out_mcf.nii.gz.mat"
+        if p.returncode != 0 or not mats.is_dir():
+            out["perturbations"][kind] = {"error": p.stderr[-300:]}
+            continue
+        if kind == "reverse":
+            # MAT_i of the reversed series is volume n-1-i
+            names = sorted(mats.glob("MAT_*"), key=lambda q: int(q.name[4:]))
+            ordered = d / "ordered.mat"
+            ordered.mkdir()
+            for i, q in enumerate(names):
+                shutil.copyfile(q, ordered / f"MAT_{len(names) - 1 - i:04d}")
+            mats = ordered
+        conf = _confounds(s, d / "confounds", mats, source, reference)
+        out["perturbations"][kind] = _confound_diff(table, conf["table"])
+    fd = [v["fd_r"] for v in out["perturbations"].values() if "fd_r" in v]
+    if fd:
+        out["fd_r"] = min(fd)
+    return out
 
 
 def _mcflirt_band(s: rn.Settings) -> dict[str, float] | None:

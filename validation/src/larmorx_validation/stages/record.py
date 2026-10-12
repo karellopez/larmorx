@@ -105,9 +105,14 @@ def assess_hmc(r: dict) -> tuple[bool, str]:
     c = r.get("confounds", {}).get("larmorx")
     if c:
         fd_max = r.get("fd_max_fmriprep", 0.0)
+        band = (r.get("node_band") or {}).get("fd_r")
         if fd_max >= FD_MIN_MM:
-            ok = ok and c["fd_r"] > FD_R
+            # the threshold, widened by mcflirt's own band on this run where it was measured
+            limit = FD_R if band is None else min(FD_R, band)
+            ok = ok and c["fd_r"] > limit
             text += f"; FD r {c['fd_r']:.4f}"
+            if band is not None:
+                text += f" (mcflirt's own band on this run: {band:.4f})"
         else:
             text += f"; FD r {c['fd_r']:.4f} (reported: max FD {fd_max:.2f} mm < {FD_MIN_MM})"
     return ok, text
@@ -338,7 +343,10 @@ def _threshold_text(stage: Stage, s: dict) -> str:
     value = THRESHOLDS[stage.threshold][2]
     mark = "pass" if s["passes"] else "**fail**"
     if stage.kind == "hmc":
-        return f"{mark} (≤ {MEDIAN_MM} mm / {MEDIAN_DEG}°; FD r > {FD_R} where max FD ≥ {FD_MIN_MM} mm)"
+        return (
+            f"{mark} (≤ {MEDIAN_MM} mm / {MEDIAN_DEG}°; FD r > {FD_R} where max FD ≥ "
+            f"{FD_MIN_MM} mm, or mcflirt's own band on the run)"
+        )
     if stage.kind == "tshift":
         return (
             f"{mark} (float32 max rel ≤ 1e-05, integers ≤ 1 stored unit, the same type and "
@@ -873,6 +881,7 @@ def _details(st: Stage, results: list[dict]) -> list[str]:
 def _hmc_details(results: list[dict]) -> list[str]:
     rows = []
     conf = []
+    bands: list[tuple] = []
     times = []
     for r in results:
         label = _node_label(r)
@@ -898,13 +907,31 @@ def _hmc_details(results: list[dict]) -> list[str]:
         itk = r.get("itk", {})
         if lx_c:
             band = r.get("band", {})
+            node_band = r.get("node_band") or {}
+            if node_band.get("perturbations"):
+                for kind, b in node_band["perturbations"].items():
+                    if "fd_r" in b:
+                        bands.append(
+                            (
+                                label,
+                                kind,
+                                f"{b['median_mm']:.4f} / {b['median_deg']:.4f}",
+                                f"{b['max_mm']:.4f} / {b['max_deg']:.4f}",
+                                f"{b['fd_r']:.4f}",
+                                _g(b["fd_max_diff"]),
+                            )
+                        )
             conf.append(
                 (
                     label,
                     f"{lx_c['median_mm']:.4f} / {lx_c['median_deg']:.4f}",
                     f"{lx_c['max_mm']:.4f} / {lx_c['max_deg']:.4f}",
                     f"{lx_c['fd_r']:.4f}"
-                    + (f" (band {band['fd_r']:.4f})" if band.get("fd_r") else ""),
+                    + (
+                        f" (band on this run {node_band['fd_r']:.4f})"
+                        if node_band.get("fd_r") is not None
+                        else (f" (testdata's band {band['fd_r']:.4f})" if band.get("fd_r") else "")
+                    ),
                     f"{r.get('fd_max_fmriprep', float('nan')):.3f}",
                     f"{lx_c['fd_mean_ref']:.4f} / {lx_c['fd_mean_test']:.4f}",
                     _g(lx_c["rmsd_max_diff"]),
@@ -952,8 +979,10 @@ def _hmc_details(results: list[dict]) -> list[str]:
             "`FSLRMSDeviation`) from larmorx's matrices, against the confounds file fMRIPrep wrote "
             "(`desc-confounds_timeseries.tsv`) and its `desc-hmc_xfm.txt`. The same code on "
             "mcflirt's matrices reproduces fMRIPrep's file (last column). mcflirt's band is its own "
-            "lowest FD correlation when its input is perturbed slightly "
-            "([mri-hmc](mri-hmc.md), from the testdata's ds000005 HMC reference):",
+            "lowest FD correlation when its input is perturbed slightly: on this run, where "
+            "PLAN.md §11.3's FD correlation applies and larmorx misses it (below), else the "
+            "[mri-hmc](mri-hmc.md) band of the dataset's testdata case, where there is one "
+            "(another series of the dataset, so for information only):",
             "",
             table(
                 (
@@ -968,6 +997,29 @@ def _hmc_details(results: list[dict]) -> list[str]:
                     "Check: mcflirt's matrices",
                 ),
                 conf,
+            ),
+            "",
+        ]
+    if bands:
+        lines += [
+            "**mcflirt's own band on these runs**: FSL 6.0.7's mcflirt (which reproduces "
+            "fMRIPrep's matrices bit for bit) with fMRIPrep's arguments on the series perturbed "
+            "as the [mri-hmc](mri-hmc.md) band perturbs it (uniform noise of ±0.5 of a stored "
+            "unit, three realisations; the volumes in reverse order), each through fMRIPrep's "
+            "own confound code, against fMRIPrep's confounds file, exactly as larmorx's "
+            "matrices above. The FD threshold is widened to the lowest of these (porting guide "
+            "§7):",
+            "",
+            table(
+                (
+                    "Run",
+                    "Perturbation",
+                    "Median Δ motion params (mm / °)",
+                    "Max Δ (mm / °)",
+                    "FD r",
+                    "Max Δ FD (mm)",
+                ),
+                bands,
             ),
             "",
         ]

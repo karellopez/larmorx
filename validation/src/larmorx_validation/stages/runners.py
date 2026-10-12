@@ -146,6 +146,46 @@ def reference_outputs(run: OracleRun, node: Node, outputs: Sequence[str]) -> lis
     return [Path(run.host(o)) if os.path.isabs(o) else run.node_dir(node) / o for o in outputs]
 
 
+def prepare_inputs(run: OracleRun, node: Node, argv: Sequence[str]) -> tuple[list[str], dict]:
+    """The node's command line as it can run again, and the files it needs in its working
+    directory (``{name: text}``).
+
+    nipype links some inputs into the node directory before the run and removes them after
+    (3dTshift's ``in_file``, ``copyfile=False``): those arguments are replaced by the files'
+    original paths, from the node's hash file (:attr:`Node.hashed`). nipype's ``TShift``
+    writes the slice times it is given into ``slice_timing.1D`` in the node directory
+    (``nipype/interfaces/afni/preprocess.py``, ``TShift._write_slice_timing``: the times
+    joined by tabs as ``str`` writes them, reversed when ``slice_encoding_direction`` ends
+    with ``-``, no final newline) and removes it after the run; it is written again here,
+    byte for byte."""
+    import ast
+
+    out = list(argv)
+    node_dir = f"/work/{node.path}"
+    for value in node.hashed.values():
+        if not isinstance(value, str) or not value.startswith("/"):
+            continue
+        linked = f"{node_dir}/{os.path.basename(value)}"
+        if linked == value or os.path.exists(run.host(linked)):
+            continue
+        out = [a.replace(linked, value) for a in out]
+    files: dict[str, str] = {}
+    if node.program == "3dTshift":
+        pattern = _option(out, ("-tpattern",))
+        times = node.inputs.get("slice_timing", "")
+        if pattern == "@slice_timing.1D" and times.startswith("["):
+            values = [float(t) for t in ast.literal_eval(times)]  # traits.Float
+            if str(node.inputs.get("slice_encoding_direction", "k")).endswith("-"):
+                values.reverse()
+            files["slice_timing.1D"] = "\t".join(map(str, values))
+    return out, files
+
+
+def _write_files(directory: Path, files: dict | None) -> None:
+    for name, text in (files or {}).items():
+        (directory / name).write_text(text, encoding="utf-8")
+
+
 # ------------------------------------------------------------------------------------------------
 # Run bookkeeping
 
@@ -178,10 +218,26 @@ def _reusable(directory: Path, argv: Sequence[str], threads: int) -> dict | None
 
 
 def run_larmorx(
-    s: Settings, node: Node, argv: Sequence[str], directory: Path, threads: int
+    s: Settings,
+    node: Node,
+    argv: Sequence[str],
+    directory: Path,
+    threads: int,
+    *,
+    mode: str = "reproduce",
+    implementation: str | None = None,
+    files: dict | None = None,
 ) -> RunResult:
     """``larmorx <family> <program> <args>`` in-process (the Python console entry point, as a
-    user runs it), in ``directory``, with ``threads`` threads."""
+    user runs it), in ``directory``, with ``threads`` threads.
+
+    ``mode`` is D13's ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` (fMRIPrep's programs as they
+    ran, their defects reproduced) or ``fix`` (larmorx's default). ``implementation`` chooses
+    between a tool's replica and its clean-room original (``LARMORX_IMPLEMENTATION``; the
+    replica is the ``larmorx-gpl`` program of this repository's ``crates-gpl`` build, given
+    by ``LARMORX_GPL_BIN``). AFNI's programs run as fMRIPrep's image runs them: no AFNI
+    variable from this process, ``HOME`` an empty directory (no ``~/.afnirc``). ``files`` are
+    written into ``directory`` first (:func:`prepare_inputs`)."""
     from larmorx.cli import run as cli_run
 
     program = os.path.basename(argv[0])
@@ -190,17 +246,37 @@ def run_larmorx(
     family = CLI_PROGRAMS.get(program, "mri" if program == "mcflirt" else "")
     name = "hmc" if program == "mcflirt" else program
     _fresh(directory)
-    # D13: fMRIPrep's programs as they ran, so their defects reproduced.
+    _write_files(directory, files)
     env = {
         "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads),
         "OMP_NUM_THREADS": str(threads),
-        "LARMORX_UPSTREAM_DEFECTS": "reproduce",
+        "LARMORX_UPSTREAM_DEFECTS": mode,
     }
     if program == "mcflirt":
         env["FSLOUTPUTTYPE"] = node.inputs.get("output_type", "NIFTI_GZ") or "NIFTI_GZ"
-    saved = {k: os.environ.get(k) for k in env}
+    removed: list[str] = []
+    if family == "afni":
+        home = s.compare / ".home"
+        home.mkdir(parents=True, exist_ok=True)
+        env["HOME"] = str(home)
+        env["AFNI_IMSAVE_WARNINGS"] = "NO"
+        removed = [
+            k for k in os.environ if k.upper().startswith(("AFNI_", "NIML_")) and k not in env
+        ]
+    if implementation is not None:
+        env["LARMORX_IMPLEMENTATION"] = implementation
+        if implementation == "replica":
+            from larmorx_validation.parity.afni_tshift import replica_binary
+
+            binary = replica_binary()
+            if binary is None:
+                raise FileNotFoundError("the larmorx-gpl program (crates-gpl build) is missing")
+            env["LARMORX_GPL_BIN"] = binary
+    saved = {k: os.environ.get(k) for k in [*env, *removed]}
     cwd = os.getcwd()
     out, err = io.StringIO(), io.StringIO()
+    for k in removed:
+        os.environ.pop(k, None)
     os.environ.update(env)
     try:
         os.chdir(directory)
@@ -215,20 +291,23 @@ def run_larmorx(
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
-    files = [directory / os.path.basename(o) for o in outputs]
+    produced = [directory / os.path.basename(o) for o in outputs]
+    variant = "larmorx" + (f"-{implementation}" if implementation else "")
     _record(
         directory,
         {
-            "variant": "larmorx",
+            "variant": variant,
             "argv": ["larmorx", family, name, *host],
             "threads": threads,
             "env": env,
+            "removed_env": removed,
+            "files": files or {},
             "code": code,
             "seconds": seconds,
             "stderr": err.getvalue()[-2000:],
         },
     )
-    return RunResult("larmorx", directory, code, seconds, files, threads, err.getvalue()[-500:])
+    return RunResult(variant, directory, code, seconds, produced, threads, err.getvalue()[-2000:])
 
 
 # ------------------------------------------------------------------------------------------------
@@ -277,21 +356,22 @@ def run_container(
     *,
     timed: bool = False,
     correctly_rounded: bool = False,
+    files: dict | None = None,
 ) -> RunResult | None:
     """The node's program, as fMRIPrep ran it, in fMRIPrep's own image, with ``threads``
     threads (``NSLOTS``, as nipype sets it); with ``correctly_rounded``, with CORE-MATH's
     functions preloaded (the image has the same glibc as this machine). A ``timed`` run (its
     time is reported) is never reused from an earlier invocation. ``None`` when the preload
-    is missing."""
+    is missing. ``files`` are written into the working directory first."""
     from larmorx_validation.parity.ants_programs import crmath_preload
 
     outputs = output_names(argv)
     args = _redirect_outputs(argv, outputs)
     variant = f"container-{threads}t" + ("-cr" if correctly_rounded else "")
-    files = [directory / os.path.basename(o) for o in outputs]
+    produced = [directory / os.path.basename(o) for o in outputs]
     reuse = s.reuse and not timed
-    if reuse and (rec := _reusable(directory, args, threads)) and all(f.exists() for f in files):
-        return RunResult(variant, directory, 0, rec["seconds"], files, threads, reused=True)
+    if reuse and (rec := _reusable(directory, args, threads)) and all(f.exists() for f in produced):
+        return RunResult(variant, directory, 0, rec["seconds"], produced, threads, reused=True)
     env = {"NSLOTS": str(threads), "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
     binds: list[tuple[Path, str]] = []
     if correctly_rounded:
@@ -301,8 +381,12 @@ def run_container(
         binds.append((lib.parent, "/crmath"))
         env["LD_PRELOAD"] = f"/crmath/{lib.name}"
     _fresh(directory)
+    _write_files(directory, files)
     if node.program == "mcflirt" or node.program in ("fslmaths", "bet", "flirt"):
         env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    if node.program == "3dTshift":
+        # as nipype's AFNI interfaces run in fMRIPrep's image (the node's environment)
+        env["AFNI_IMSAVE_WARNINGS"] = "NO"
     p = subprocess.run(
         container_command(s, directory, args, env, binds),
         capture_output=True,
@@ -334,7 +418,7 @@ def run_container(
             "stderr": stderr[-2000:],
         },
     )
-    return RunResult(variant, directory, p.returncode, seconds, files, threads, stderr[-500:])
+    return RunResult(variant, directory, p.returncode, seconds, produced, threads, stderr[-500:])
 
 
 def run_container_python(
@@ -422,6 +506,59 @@ def run_ants_oracle(
         },
     )
     return RunResult(variant, directory, p.returncode, seconds, files, 1, p.stderr[-500:])
+
+
+def run_afni_oracle(
+    s: Settings, argv: Sequence[str], directory: Path, files: dict | None = None
+) -> RunResult | None:
+    """The AFNI 25.2.09 oracle build of this machine (``scripts/build_afni_oracle.sh``), one
+    thread, with fMRIPrep's arguments, in a clean AFNI environment (no AFNI variable of this
+    process, ``HOME`` an empty directory, as the 3dTshift parity suite runs it). ``None`` when
+    the build is missing."""
+    from larmorx_validation.parity.afni_tshift import _environment, afni_binary
+
+    program = os.path.basename(argv[0])
+    binary = afni_binary() if program == "3dTshift" else None
+    if binary is None:
+        return None
+    outputs = output_names(argv)
+    args = [s.run.host_text(t) for t in _redirect_outputs(argv, outputs)[1:]]
+    produced = [directory / os.path.basename(o) for o in outputs]
+    if (
+        s.reuse
+        and (rec := _reusable(directory, [program, *args], 1))
+        and all(f.exists() for f in produced)
+    ):
+        return RunResult("afni-oracle", directory, 0, rec["seconds"], produced, 1, reused=True)
+    _fresh(directory)
+    _write_files(directory, files)
+    env = _environment()
+    env.update(OMP_NUM_THREADS="1", AFNI_IMSAVE_WARNINGS="NO")
+    t0 = time.perf_counter()
+    p = subprocess.run(
+        [binary, *args],
+        cwd=directory,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=7200,
+    )
+    seconds = time.perf_counter() - t0
+    _record(
+        directory,
+        {
+            "variant": "afni-oracle",
+            "argv": [program, *args],
+            "threads": 1,
+            "binary": binary,
+            "code": p.returncode,
+            "seconds": seconds,
+            "stderr": p.stderr[-2000:],
+        },
+    )
+    return RunResult("afni-oracle", directory, p.returncode, seconds, produced, 1, p.stderr[-500:])
 
 
 def host_mcflirt() -> Path | None:
@@ -537,7 +674,9 @@ __all__ = [
     "container_versions",
     "host_mcflirt",
     "output_names",
+    "prepare_inputs",
     "reference_outputs",
+    "run_afni_oracle",
     "run_ants_oracle",
     "run_container",
     "run_container_python",

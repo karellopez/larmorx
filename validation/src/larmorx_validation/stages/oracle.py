@@ -4,8 +4,10 @@
 A run directory holds ``RUN_INFO.txt`` (image, digest, version, arguments, threads), ``out/``
 (the derivatives), ``work/`` (nipype's working directory) and ``fmriprep.log``. Every nipype
 node directory in ``work/`` has ``_report/report.rst``, which lists the node's inputs and
-outputs, its run time and its environment; command-line nodes also have ``command.txt``. Only
-these text files are read, never nipype's pickles.
+outputs, its run time and its environment; command-line nodes also have ``command.txt``, and
+every node its input hash file ``_0x<hash>.json`` (the inputs as they were before nipype
+copied or linked any file into the node directory). Only these text files are read, never
+nipype's pickles.
 
 fMRIPrep ran in a container, so the paths it recorded are the container's (``/data``,
 ``/out``, ``/work``, ``/templateflow``). :class:`OracleRun` maps them back to this machine.
@@ -42,6 +44,10 @@ class Node:
     environment: dict[str, str]
     #: ``command.txt``, when the node ran a program.
     command: str | None = None
+    #: The inputs of the node's hash file ``_0x<hash>.json``: files as their original paths
+    #: (nipype's report shows a file it linked into the node directory, which it removes
+    #: after the run, at its place in the node directory).
+    hashed: dict[str, object] = field(default_factory=dict)
 
     @property
     def program(self) -> str | None:
@@ -104,6 +110,34 @@ def _items(lines: list[str]) -> dict[str, str]:
     return items
 
 
+def _hashed_inputs(directory: Path) -> dict[str, object]:
+    """The inputs of a node's hash file (``_0x<hash>.json``): ``[[name, value], ...]``, a
+    file as ``[path, hash]``."""
+    import json
+
+    files = sorted(directory.glob("_0x*.json"))
+    if not files:
+        return {}
+    try:
+        pairs = json.loads(files[0].read_text(encoding="utf-8"))
+    except ValueError:
+        return {}
+    out: dict[str, object] = {}
+    for item in pairs:
+        if isinstance(item, list) and len(item) == 2 and isinstance(item[0], str):
+            name, value = item
+            if (
+                isinstance(value, list)
+                and len(value) == 2
+                and isinstance(value[0], str)
+                and value[0].startswith("/")
+                and isinstance(value[1], str)
+            ):
+                value = value[0]
+            out[name] = value
+    return out
+
+
 def read_node(work: Path, directory: Path) -> Node:
     """The node in ``directory`` (which has ``_report/report.rst``)."""
     text = (directory / "_report" / "report.rst").read_text(encoding="utf-8", errors="replace")
@@ -128,6 +162,7 @@ def read_node(work: Path, directory: Path) -> Node:
         runtime=runtime,
         environment=_items(sections.get("Environment", [])),
         command=command,
+        hashed=_hashed_inputs(directory),
     )
 
 

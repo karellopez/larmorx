@@ -12,7 +12,7 @@
 - Lagrange and weighted-sinc methods and copies: 132 of 132 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 - Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
-- Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if they reached the replica (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
+- Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if the call read the environment (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
 - **AFNI's global options and environment variables** (categories `global` and `environment`, 60 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 60 of 60 identical.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
@@ -25,8 +25,7 @@
   - AFNI-19: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (toffset): `environment/allow-milliseconds`
   - AFNI-22: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `global/D-message-prefix-with-blank`
   - AFNI-23: 4 case(s) named it, 1 with changed values (largest difference 2.34e+03), 4 with other changes (datatype, scl_slope; scl_inter): `environment/nifti-scale-no`, `environment/nifti-scale-no-copy`, `environment/nifti-scale-no-rlt-ignore`, `global/D-nifti-scale-no`
-- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 24 cases where a correction applies or that test one): 16 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 1 where the original is known to diverge from AFNI, 0 disagreeing.
-  - `defects/tiny-offsets-copy`: known (the original diverges from AFNI here): differ: header fields (scaling, timing, slice fields, units, xform codes): slice_code: replica 0, original 1; slice_duration: replica 0.0, original 0.0005000000237487257
+- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 24 cases where a correction applies or that test one): 17 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 0 where the original is known to diverge from AFNI, 0 disagreeing.
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|
@@ -116,7 +115,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (c479c1ae933e) |
+| larmorx | 0.0.1 (4c6cd3ac13dc) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

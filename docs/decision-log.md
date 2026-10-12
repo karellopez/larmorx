@@ -856,13 +856,13 @@ Decided by the user on the questions the defect register raised
   column (0.000172633489 the last plumb value). Two AFNI behaviours for the register (they
   were not in it): AFNI crashes on `-ignore` without a value (class a), and exits 0 after an
   output it could not write (like AFNI-11); larmorx refuses with exit 1 in both modes.
-- **Records** (standard tier, against the AFNI 25.2.09 oracle, 311 cases each):
+- **Records** from `4c6cd3a` (standard tier, against the AFNI 25.2.09 oracle, 311 cases each):
   - Original: 279 pass, 29 rejected by both, 3 expected divergences (AFNI's own format,
     `-voxshift`, AFNI-20's one-row text file, as for the replica), 0 failures; the 71 expected
     divergences of before (69 of them the spec's missing behaviours) all pass. 176 of 279
-    compared cases bit-identical (data), every header field, file, exit status and message
-    otherwise AFNI's: the 60 cases of the global options and variables identical, messages
-    byte for byte. The whole-file case (`AFNI_NIFTI_NOEXT`) compares the original's header
+    compared cases bit-identical (data); header fields identical and the geometry within
+    1e-6 mm in every compared case; the 60 cases of the global options and variables
+    identical in exit status and both output streams, byte for byte. The whole-file case (`AFNI_NIFTI_NOEXT`) compares the original's header
     byte for byte and its data with the thresholds (its Fourier method differs in the last
     bits). Python API with `afni_settings`: 28 of 28 cases give the command line's output.
   - Replica: unchanged (279 of 279 bit-identical); "D13 defaults: replica = original" agrees

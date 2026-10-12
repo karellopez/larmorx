@@ -22,9 +22,11 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 All 311 agree: 279 compared, 29 rejected by both, and 3 documented divergences (AFNI's own
 output format and `-voxshift`, which larmorx does not support, and a dataset of one row,
 which AFNI writes as a text file with a random identifier, AFNI-20). 176 of the 279 compared
-are byte-identical in their data, and every header field, file name, exit status and message
-is AFNI's (all 60 cases of the global options and variables identical, messages included;
-2026-10-12, completing 3dTshift, part 2b). The Lagrange and weighted-sinc methods and the
+are byte-identical in their data; in every compared case the header fields are AFNI's and the
+geometry agrees to 1e-6 mm (the whole header byte for byte where the record compares it), and
+in the 60 cases of the global options and variables, where exit statuses and both output
+streams are compared byte for byte too, all 60 are identical (2026-10-12, completing
+3dTshift, part 2b). The Lagrange and weighted-sinc methods and the
 copies give **the same bytes** as AFNI (129 of 132). The Fourier method (the default) differs
 in the last float32 bits, at most 4.3e-7 of the largest value, because AFNI's FFT is float32
 and larmorx's is double; integer outputs then differ by at most 1, in a few values per million
@@ -225,8 +227,9 @@ parity records' "D13 fix pass" lists what the corrections change, case by case.
 `reproduce`, give AFNI's output: the replica (`larmorx-gpl`, which receives the choice as
 `LARMORX_UPSTREAM_DEFECTS`) byte for byte, the clean-room original within its thresholds for
 the values (the last bits of its Fourier, quintic, heptic, weighted-sinc and `-no_detrend`
-numerics) and byte for byte in everything else it writes or prints: header fields, geometry,
-file names, exit statuses and messages. So `implementation="auto"` gives the corrected output
+numerics) and as AFNI otherwise: identical header fields and file names, the geometry to
+1e-6 mm (byte for byte where the header is compared whole), and exit statuses and messages
+byte for byte in the cases of AFNI's global options and variables. So `implementation="auto"` gives the corrected output
 whichever runs. The replica's record compares its default with the original's on every case
 where a correction applies: they agree in every header field, the geometry, the scaling and
 the slice fields of copies (AFNI-08's included), and in the values up to those last bits. The

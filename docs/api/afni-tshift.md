@@ -9,17 +9,17 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
 **Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 308 cases:
+[validation record](../validation/afni-tshift.md)). The record covers 311 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
   input" cases, AFNI's defects (D13) and 18 error cases;
 - 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
   with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift;
-- AFNI's global options and environment variables (57 cases, 2026-10-12), which the replica
+- AFNI's global options and environment variables (60 cases, 2026-10-12), which the replica
   implements and the original does not yet (expected divergences until it does).
 
-All 308 agree, 68 of them as documented divergences (56 of those the global options and
+All 311 agree, 71 of them as documented divergences (59 of those the global options and
 variables), and 163 of the 223 compared are byte-identical. The Lagrange and weighted-sinc
 methods and the copies give **the same bytes** as AFNI (121 of 124). The
 Fourier method (the default) differs in the last float32 bits, at most 4.3e-7 of the largest

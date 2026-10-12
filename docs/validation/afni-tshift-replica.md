@@ -1,18 +1,19 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 308 cases on the `standard` tier: 276 pass, 29 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 311 cases on the `standard` tier: 279 pass, 29 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
 - **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 
-**Bit-identical: 276 of 276 passing cases** produce exactly the bytes of AFNI's output data.
-- Fourier: 145 of 145 bit-identical.
-- Lagrange and weighted-sinc methods and copies: 131 of 131 bit-identical.
+**Bit-identical: 279 of 279 passing cases** produce exactly the bytes of AFNI's output data.
+- Fourier: 147 of 147 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 132 of 132 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 - Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
-- **AFNI's global options and environment variables** (categories `global` and `environment`, 57 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 57 of 57 identical.
+- Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if they reached the replica (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
+- **AFNI's global options and environment variables** (categories `global` and `environment`, 60 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 60 of 60 identical.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
@@ -23,6 +24,7 @@
   - AFNI-16: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (header qoffset_x, srow_x; header srow_x): `geometry/slightly-oblique`, `geometry/slightly-oblique-qform`, `geometry/slightly-oblique-metre`
   - AFNI-19: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (toffset): `environment/allow-milliseconds`
   - AFNI-22: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `global/D-message-prefix-with-blank`
+  - AFNI-23: 4 case(s) named it, 1 with changed values (largest difference 2.34e+03), 4 with other changes (datatype, scl_slope; scl_inter): `environment/nifti-scale-no`, `environment/nifti-scale-no-copy`, `environment/nifti-scale-no-rlt-ignore`, `global/D-nifti-scale-no`
 - **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 24 cases where a correction applies or that test one): 16 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 1 where the original is known to diverge from AFNI, 0 disagreeing.
   - `defects/tiny-offsets-copy`: known (the original diverges from AFNI here): differ: header fields (scaling, timing, slice fields, units, xform codes): slice_code: replica 0, original 1; slice_duration: replica 0.0, original 0.0005000000237487257
 
@@ -30,7 +32,7 @@
 |---|---|---|---|---|---|
 | copy | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
 | defects | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
-| environment | 26 | 26 | 0.0e+00 | 0 | 0.0e+00 |
+| environment | 29 | 29 | 0.0e+00 | 0 | 0.0e+00 |
 | geometry | 3 | 3 | 0.0e+00 | – | 0.0e+00 |
 | global | 19 | 19 | 0.0e+00 | 0 | 0.0e+00 |
 | header-timing | 13 | 13 | 0.0e+00 | – | 0.0e+00 |
@@ -57,7 +59,7 @@
 | copy | 8 | 8 | 0 | 0 | 0 |
 | defects | 8 | 8 | 0 | 0 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
-| environment | 31 | 26 | 4 | 1 | 0 |
+| environment | 34 | 29 | 4 | 1 | 0 |
 | errors | 18 | 0 | 18 | 0 | 0 |
 | geometry | 3 | 3 | 0 | 0 | 0 |
 | global | 26 | 19 | 7 | 0 | 0 |
@@ -114,7 +116,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4aaad72f285c) |
+| larmorx | 0.0.1 (c479c1ae933e) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -364,13 +366,13 @@ Both programs read the same files with the same arguments; outputs are read with
 | `global/overwrite-copy` | pass | 15/15 | -overwrite on a copy of the input (no slice timing) |
 | `global/overwrite-no-existing-file` | pass | 15/15 | -overwrite with no output to replace |
 | `global/overwrite-then-D` | pass | 15/15 | -overwrite, then -DAFNI_DECONFLICT=YES: the later one wins (out_AA1.nii) |
-| `global/D-deconflict-yes` | pass | 15/15 | -DAFNI_DECONFLICT=YES: an existing output makes the run write out_AA1.nii |
+| `global/D-deconflict-yes` | pass | 16/16 | -DAFNI_DECONFLICT=YES: an existing output makes the run write out_AA1.nii |
 | `global/D-deconflict-no` | both-error | 2/2 | -DAFNI_DECONFLICT=NO: an existing output stops the shift before the work (exit 1) |
-| `global/D-wins-over-environment` | pass | 15/15 | -DAFNI_DECONFLICT=OVERWRITE over AFNI_DECONFLICT=YES in the environment |
-| `global/D-arbitrary-filenames` | pass | 15/15 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
+| `global/D-wins-over-environment` | pass | 16/16 | -DAFNI_DECONFLICT=OVERWRITE over AFNI_DECONFLICT=YES in the environment |
+| `global/D-arbitrary-filenames` | pass | 16/16 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
 | `global/D-after-dataset` | pass | 15/15 | -D after the dataset applies too |
 | `global/D-as-option-value` | pass | 15/15 | -D where -tpattern's value stands: taken out first |
-| `global/D-value-with-blank` | pass | 15/15 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES: AFNI sets 'Y=ES', still YES |
+| `global/D-value-with-blank` | pass | 16/16 | -DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES: AFNI sets 'Y=ES', still YES |
 | `global/D-blank-before-value` | both-error | 2/2 | -DAFNI_ALLOW_ARBITRARY_FILENAMES= YES: AFNI sets '=YES', not YES: refused |
 | `global/D-empty-value` | both-error | 2/2 | -DAFNI_ALLOW_ARBITRARY_FILENAMES= (no value) sets nothing: refused |
 | `global/D-empty-name` | both-error | 2/2 | -D=YES (no name) sets nothing |
@@ -381,41 +383,44 @@ Both programs read the same files with the same arguments; outputs are read with
 | `global/D-unknown-variable` | pass | 15/15 | -D of a variable 3dTshift does not read: no effect |
 | `global/ok-1D-text` | pass | 15/15 | -ok_1D_text: text in the -tpattern file is read as 0 |
 | `global/skip-afnirc` | pass | 15/15 | -skip_afnirc: accepted |
-| `environment/deconflict-overwrite` | pass | 15/15 | AFNI_DECONFLICT=OVERWRITE: an existing output is replaced, with AFNI's warning |
-| `environment/deconflict-yes` | pass | 15/15 | AFNI_DECONFLICT=YES: the output goes to out_AA1.nii |
+| `environment/deconflict-overwrite` | pass | 16/16 | AFNI_DECONFLICT=OVERWRITE: an existing output is replaced, with AFNI's warning |
+| `environment/deconflict-yes` | pass | 16/16 | AFNI_DECONFLICT=YES: the output goes to out_AA1.nii |
 | `environment/deconflict-no-copy` | both-error | 2/2 | AFNI_DECONFLICT=NO on a copy: AFNI finds the output after the work, exit 0 (AFNI-11) |
-| `environment/arbitrary-filenames` | pass | 15/15 | AFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
+| `environment/arbitrary-filenames` | pass | 16/16 | AFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written |
 | `environment/input-with-blank` | both-error | 2/2 | an input in a directory with a blank: AFNI reads a list of datasets and fails (AFNI-18) |
 | `environment/path-spaces-ok` | pass | 15/15 | AFNI_PATH_SPACES_OK=YES: an input in a directory with a blank is one file |
-| `environment/nifti-priority-Q` | pass | 15/15 | AFNI_NIFTI_PRIORITY=Q: the qform rather than the sform (they differ) |
-| `environment/nifti-priority-illegal` | pass | 15/15 | AFNI_NIFTI_PRIORITY=X: AFNI's warning, the sform |
-| `environment/nifti-scale-no` | pass | 15/15 | AFNI_NIFTI_SCALE=NO: int16 with a slope and an intercept stays int16 (slope kept) |
-| `environment/type-warn-default` | pass | 15/15 | AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines |
-| `environment/type-warn-yes` | pass | 15/15 | AFNI_NIFTI_TYPE_WARN=YES: the conversion message alone |
-| `environment/nifti-view-tlrc` | pass | 15/15 | AFNI_NIFTI_VIEW=TLRC: sform code 2 is the tlrc view, so code 3 |
-| `environment/default-std-space` | pass | 15/15 | AFNI_DEFAULT_STD_SPACE=MNI: sform code 5 gives code 4 |
-| `environment/sform-code-7` | pass | 15/15 | sform code 7: AFNI's warning; AFNI_NIFTI_VIEW=tlrc makes it code 3 |
-| `environment/write-type-2` | pass | 15/15 | AFNI_NIFTI_WRITE_TYPE=2: a NIfTI-2 output |
+| `environment/nifti-priority-Q` | pass | 16/16 | AFNI_NIFTI_PRIORITY=Q: the qform rather than the sform (they differ) |
+| `environment/nifti-priority-illegal` | pass | 16/16 | AFNI_NIFTI_PRIORITY=X: AFNI's warning, the sform |
+| `environment/nifti-scale-no` | pass | 16/16 | AFNI_NIFTI_SCALE=NO: int16 with a slope and an intercept stays int16 (slope kept) |
+| `environment/nifti-scale-no-copy` | pass | 15/15 | AFNI_NIFTI_SCALE=NO on a copy of the input: the intercept dropped (AFNI-23) |
+| `environment/nifti-scale-no-rlt` | pass | 16/16 | AFNI_NIFTI_SCALE=NO with -rlt: the trend takes the intercept away, nothing to correct |
+| `environment/nifti-scale-no-rlt-ignore` | pass | 16/16 | AFNI_NIFTI_SCALE=NO with -rlt -ignore 2: the ignored volumes lose the intercept (AFNI-23; corrected, read as without th… |
+| `environment/type-warn-default` | pass | 16/16 | AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines |
+| `environment/type-warn-yes` | pass | 16/16 | AFNI_NIFTI_TYPE_WARN=YES: the conversion message alone |
+| `environment/nifti-view-tlrc` | pass | 16/16 | AFNI_NIFTI_VIEW=TLRC: sform code 2 is the tlrc view, so code 3 |
+| `environment/default-std-space` | pass | 16/16 | AFNI_DEFAULT_STD_SPACE=MNI: sform code 5 gives code 4 |
+| `environment/sform-code-7` | pass | 16/16 | sform code 7: AFNI's warning; AFNI_NIFTI_VIEW=tlrc makes it code 3 |
+| `environment/write-type-2` | pass | 16/16 | AFNI_NIFTI_WRITE_TYPE=2: a NIfTI-2 output |
 | `environment/allow-milliseconds` | pass | 15/15 | AFNI_ALLOW_MILLISECONDS=YES with -TR 2000ms: toffset written in ms (AFNI-19) |
 | `environment/1D-zero-text` | pass | 15/15 | AFNI_1D_ZERO_TEXT=YES: text in the -tpattern file is read as 0 |
 | `environment/1D-text-error` | both-error | 2/2 | text in the -tpattern file: AFNI's parse error |
 | `environment/use-fgets` | both-error | 2/2 | AFNI_USE_FGETS=YES: a file with CR line ends is one row, of 8 values (9 > TR) |
 | `environment/cr-line-ends` | pass | 15/15 | a file with CR line ends: four rows of two columns, read column by column |
-| `environment/realpath` | pass | 15/15 | a conversion message names the input by its real path ('..' resolved) |
-| `environment/norealpath` | pass | 15/15 | AFNI_NOREALPATH=YES: the message names the input as given |
-| `environment/oblique-warning` | pass | 15/15 | an oblique input: AFNI's obliquity report |
+| `environment/realpath` | pass | 16/16 | a conversion message names the input by its real path ('..' resolved) |
+| `environment/norealpath` | pass | 16/16 | AFNI_NOREALPATH=YES: the message names the input as given |
+| `environment/oblique-warning` | pass | 16/16 | an oblique input: AFNI's obliquity report |
 | `environment/no-oblique-warning` | pass | 15/15 | AFNI_NO_OBLIQUE_WARNING=YES: no obliquity report |
 | `environment/message-prefix` | pass | 15/15 | AFNI_MESSAGE_PREFIX: on every labelled message |
 | `environment/message-colorize-no` | pass | 15/15 | AFNI_MESSAGE_COLORIZE=NO: labels without terminal escape codes |
 | `environment/echo-commandline` | pass | 15/15 | AFNI_ECHO_COMMANDLINE=YES (and a log file): the command line is echoed |
-| `environment/quiet-startup` | pass | 15/15 | AFNI_QUIET_STARTUP=YES: no version banner (larmorx prints none) |
-| `environment/nifti-noext` | pass | 16/16 | AFNI_NIFTI_NOEXT=YES: AFNI writes no header extension, as larmorx: the whole file |
+| `environment/quiet-startup` | pass | 16/16 | AFNI_QUIET_STARTUP=YES: no version banner (larmorx prints none) |
+| `environment/nifti-noext` | pass | 17/17 | AFNI_NIFTI_NOEXT=YES: AFNI writes no header extension, as larmorx: the whole file |
 | `environment/one-row-dataset` | expected-divergence | 3/4 | a dataset of one row: AFNI writes a 1D text file under the NIfTI name (AFNI-20) |
-| `environment/write-1D-as-prefix` | pass | 15/15 | AFNI_WRITE_1D_AS_PREFIX=YES: a dataset of one row is written as NIfTI |
-| `global/D-nifti-priority-Q` | pass | 15/15 | -DAFNI_NIFTI_PRIORITY=Q: as the environment variable |
-| `global/D-nifti-view-tlrc` | pass | 15/15 | -DAFNI_NIFTI_VIEW=TLRC: as the environment variable |
-| `global/D-write-type-2` | pass | 15/15 | -DAFNI_NIFTI_WRITE_TYPE=2: as the environment variable |
-| `global/D-nifti-scale-no` | pass | 15/15 | -DAFNI_NIFTI_SCALE=NO: as the environment variable |
+| `environment/write-1D-as-prefix` | pass | 16/16 | AFNI_WRITE_1D_AS_PREFIX=YES: a dataset of one row is written as NIfTI |
+| `global/D-nifti-priority-Q` | pass | 16/16 | -DAFNI_NIFTI_PRIORITY=Q: as the environment variable |
+| `global/D-nifti-view-tlrc` | pass | 16/16 | -DAFNI_NIFTI_VIEW=TLRC: as the environment variable |
+| `global/D-write-type-2` | pass | 16/16 | -DAFNI_NIFTI_WRITE_TYPE=2: as the environment variable |
+| `global/D-nifti-scale-no` | pass | 16/16 | -DAFNI_NIFTI_SCALE=NO: as the environment variable |
 | `divergence/afni-format-output` | expected-divergence | 1/1 | -prefix without .nii: AFNI writes its own BRIK/HEAD format |
 | `divergence/voxshift` | expected-divergence | 1/1 | -voxshift: per-voxel shifts from a dataset |
 | `real/ds001600-acq-v4` | pass | 14/14 | fMRIPrep's call (-ignore 0 -tzero -TR -tpattern @file) on sub-1_task-rest_acq-v4_bold |

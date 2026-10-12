@@ -802,6 +802,28 @@ Decided by the user on the questions the defect register raised
   clean-room original does not read them yet and raises `NotImplementedError` naming them
   (part 2b adds them); the rest change nothing a call returns and are accepted. The pattern is
   in `docs/porting-guide.md` §9.1.
+- **Records** from `c479c1a`, standard tier, against the AFNI 25.2.09 oracle, 311 cases each
+  (3 new: `environment/nifti-scale-no-copy`, `-rlt`, `-rlt-ignore`):
+  - Replica, `reproduce`: 279 of 279 compared cases bit-identical to AFNI, the 4 AFNI-23 cases
+    included; the 60 cases of AFNI's global options and variables identical in exit status
+    and messages too. Fix pass: AFNI-23 named in 4 cases (`environment/nifti-scale-no`,
+    `-copy`, `-rlt-ignore`, `global/D-nifti-scale-no`), the header's `scl_inter` changed
+    (and in `-rlt-ignore` the type, float32), not in `-rlt`, where the outputs are the same.
+    By hand on int16 and uint8 inputs (slope 1 included, every restore mode, `-no_detrend`,
+    `-tpattern zero`, a copy): the default reads back within half a stored unit of the run
+    without the variable (at most 0.185, 0.25, 0.5), and the `-rlt -ignore` default is AFNI's
+    output without the variable byte for byte.
+  - Python API with `afni_settings`: on the 28 cases of AFNI's variables and global options
+    it can express, the command line's output bit for bit, with `AFNI_NIFTI_WRITE_TYPE=2`,
+    `AFNI_NIFTI_SCALE=NO`, `AFNI_NIFTI_VIEW=tlrc` and `AFNI_NIFTI_PRIORITY=Q` in the process
+    environment (any of which would change the output if it reached the replica).
+  - Original: unchanged where compared (223 pass, 163 bit-identical); the 3 new cases are
+    expected divergences (it does not read AFNI's variables yet).
+- **Golden:** three new GPL cases (`3dTshift.linear.int16-intercept.nifti-scale-no`, its
+  `.reproduce`, and `.rlt-ignore`; the first two have the same data checksum, only the header
+  differs); no checksum changed. Python tests on all six platforms: a stand-in replica program
+  receives `afni_settings` and none of the environment's AFNI variables; the original raises
+  `NotImplementedError` for the variables it does not read.
 
 ## Open decisions (PLAN.md §16)
 

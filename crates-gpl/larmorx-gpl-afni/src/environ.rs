@@ -385,9 +385,9 @@ pub struct Prefiltered {
 ///
 /// - `-Dname=value` (any argument that starts with `-D` and contains `=`): sets `name`. In
 ///   `reproduce` mode as AFNI parses it ([`afni_setenv`]); by default the value is the text
-///   after the first `=`, as written ([`plain_setenv`]), and AFNI-22 is named when AFNI would
-///   have set something else. One that sets nothing is dropped, as AFNI drops it (with a
-///   warning by default);
+///   after the first `=`, as written ([`plain_setenv`]), and AFNI-22 is named when AFNI's
+///   reading would have changed what a variable 3dTshift reads does ([`same_effect`]). One that
+///   sets nothing is dropped, as AFNI drops it (with a warning by default);
 /// - `-overwrite`: `AFNI_DECONFLICT=OVERWRITE`, and no "Over-writing dataset" warning;
 /// - `-ok_1D_text`: `AFNI_1D_ZERO_TEXT=YES`;
 /// - `-skip_afnirc`: nothing (larmorx reads no `.afnirc`).
@@ -395,62 +395,109 @@ pub struct Prefiltered {
 /// A `-D` of a variable 3dTshift does not consult is applied too, with a warning that it has no
 /// effect. AFNI's other global options (`-Vname=`, `-echo_edu`, `-pif`, `-np`, `-all_opts`,
 /// `-h_view`, `<<` inclusions, ...) are not taken out: 3dTshift's scan reports them as unknown.
-pub fn prefilter(args: &[String], mut settings: Settings, mode: UpstreamDefects) -> Prefiltered {
+pub fn prefilter(args: &[String], settings: Settings, mode: UpstreamDefects) -> Prefiltered {
     let mut kept = Vec::with_capacity(args.len());
     let mut quiet_overwrite = false;
-    let mut notices = Vec::new();
     let mut warnings = Vec::new();
+    // Both readings of the -D options, to tell whether AFNI's would change anything.
+    let (mut plain_table, mut afni_table) = (settings.clone(), settings);
+    let mut mangled = Vec::new();
     for arg in args {
         if let Some(cmd) = arg.strip_prefix("-D").filter(|c| c.contains('=')) {
             let afni = afni_setenv(cmd);
             let plain = plain_setenv(cmd);
-            let chosen = if mode.fix() { &plain } else { &afni };
             if afni != plain {
-                let show = |s: &Option<(String, String)>| match s {
-                    Some((n, v)) => format!("sets {n} to '{v}'"),
-                    None => "sets nothing".to_owned(),
-                };
-                let detail = if mode.fix() {
-                    format!("'{arg}' {}; AFNI {}", show(&plain), show(&afni))
-                } else {
-                    format!("'{arg}' {}, as AFNI does", show(&afni))
-                };
-                defects::push_once(&mut notices, Notice::new(&defects::AFNI_22, mode, detail));
+                mangled.push((arg.clone(), plain.clone(), afni.clone()));
             }
-            match chosen {
-                Some((name, value)) => {
-                    if consulted(name).is_none() {
-                        warnings.push(format!(
-                            "{arg} has no effect: 3dTshift does not read {name} (larmorx)"
-                        ));
-                    }
-                    settings.set(name.clone(), value.clone());
-                }
-                None if mode.fix() => {
-                    warnings.push(format!(
-                        "{arg} sets nothing (a name and a value are needed), as in AFNI (larmorx)"
-                    ));
-                }
-                None => {}
+            if let Some((name, value)) = &afni {
+                afni_table.set(name.clone(), value.clone());
+            }
+            if let Some((name, value)) = &plain {
+                plain_table.set(name.clone(), value.clone());
+            }
+            match if mode.fix() { &plain } else { &afni } {
+                Some((name, _)) if consulted(name).is_none() => warnings.push(format!(
+                    "{arg} has no effect: 3dTshift does not read {name} (larmorx)"
+                )),
+                None if mode.fix() => warnings.push(format!(
+                    "{arg} sets nothing (a name and a value are needed), as in AFNI (larmorx)"
+                )),
+                _ => {}
             }
             continue;
         }
         match arg.as_str() {
             "-overwrite" => {
-                settings.set("AFNI_DECONFLICT", "OVERWRITE");
+                for table in [&mut plain_table, &mut afni_table] {
+                    table.set("AFNI_DECONFLICT", "OVERWRITE");
+                }
                 quiet_overwrite = true;
             }
-            "-ok_1D_text" => settings.set("AFNI_1D_ZERO_TEXT", "YES"),
+            "-ok_1D_text" => {
+                for table in [&mut plain_table, &mut afni_table] {
+                    table.set("AFNI_1D_ZERO_TEXT", "YES");
+                }
+            }
             "-skip_afnirc" => {}
             _ => kept.push(arg.clone()),
         }
     }
+    let mut notices = Vec::new();
+    let differing: Vec<&str> = CONSULTED
+        .iter()
+        .filter(|(name, u)| {
+            *u == Use::Applied && !same_effect(name, plain_table.get(name), afni_table.get(name))
+        })
+        .map(|(name, _)| *name)
+        .collect();
+    if !differing.is_empty() {
+        let show = |s: &Option<(String, String)>| match s {
+            Some((n, v)) => format!("sets {n} to '{v}'"),
+            None => "sets nothing".to_owned(),
+        };
+        let shown: Vec<String> = mangled
+            .iter()
+            .map(|(arg, plain, afni)| {
+                if mode.fix() {
+                    format!("'{arg}' {}; AFNI's reading {}", show(plain), show(afni))
+                } else {
+                    format!("'{arg}' {}, as AFNI reads it", show(afni))
+                }
+            })
+            .collect();
+        notices.push(Notice::new(&defects::AFNI_22, mode, shown.join(", ")));
+    }
     Prefiltered {
         args: kept,
-        settings,
+        settings: if mode.fix() { plain_table } else { afni_table },
         quiet_overwrite,
         notices,
         warnings,
+    }
+}
+
+/// Whether two values of the variable `name` make 3dTshift do the same: for the variables it
+/// tests with `YESSISH`/`NOISH` (`AFNI_yesenv`, `AFNI_noenv`), the same answers to both tests;
+/// for the others, the same value.
+pub fn same_effect(name: &str, a: Option<&str>, b: Option<&str>) -> bool {
+    const FLAGS: &[&str] = &[
+        "AFNI_ALLOW_ARBITRARY_FILENAMES",
+        "AFNI_PATH_SPACES_OK",
+        "AFNI_NOREALPATH",
+        "AFNI_NIFTI_SCALE",
+        "AFNI_NIFTI_TYPE_WARN",
+        "AFNI_NO_OBLIQUE_WARNING",
+        "AFNI_1D_ZERO_TEXT",
+        "AFNI_USE_FGETS",
+        "AFNI_ALLOW_MILLISECONDS",
+        "AFNI_MESSAGE_COLORIZE",
+        "AFNI_ECHO_COMMANDLINE",
+        "AFNI_DONT_LOGFILE",
+    ];
+    if FLAGS.contains(&name) {
+        (yessish(a), noish(a)) == (yessish(b), noish(b))
+    } else {
+        a == b
     }
 }
 
@@ -567,6 +614,17 @@ mod tests {
             UpstreamDefects::Fix,
         );
         assert!(ok.notices.is_empty() && ok.warnings.is_empty());
+        // Nor one AFNI reads otherwise to the same effect: 'Y ES' and 'Y=ES' are both YES.
+        let same = prefilter(
+            &s(&["-DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES"]),
+            Settings::empty(),
+            UpstreamDefects::Fix,
+        );
+        assert!(same.notices.is_empty());
+        assert_eq!(
+            same.settings.get("AFNI_ALLOW_ARBITRARY_FILENAMES"),
+            Some("Y ES")
+        );
     }
 
     #[test]

@@ -47,6 +47,7 @@ import shutil
 import subprocess
 import tempfile
 import warnings
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -140,6 +141,19 @@ class Scenario:
     suffix: str = ".nii"
     files: tuple[tuple[str, str], ...] = ()  # (name, text) written to {tmp} first
     output: str | None = None  # the output's file name in {tmp} (default: <tool><suffix>)
+    #: AFNI's environment variables for both programs (None removes one), over the suite's
+    #: (:func:`_environment`).
+    env: tuple[tuple[str, str | None], ...] = ()
+    #: Each program runs in a directory of its own (``{tmp}/afni``, ``{tmp}/larmorx``), with
+    #: ``files`` written to each and the output named relative to it (``output`` or
+    #: ``out.nii``), and their messages are compared too (:func:`_run_separately`). The
+    #: arguments are complete when they contain ``{input}`` (the dataset); otherwise
+    #: ``-prefix <output> <input>`` is appended.
+    separate: bool = False
+    #: The file the run writes when it is not the ``-prefix`` (``AFNI_DECONFLICT=YES``).
+    written: str | None = None
+    #: Compare the whole output file byte for byte, AFNI's header extension included.
+    whole_file: bool = False
 
 
 def _scenarios() -> list[tuple[str, str, str, Scenario]]:
@@ -417,6 +431,384 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         Scenario(F32, ("-tpattern", "alt+z"), expect="error", output="out put.nii"),
     )
 
+    # AFNI's global options and environment variables (specs/3dTshift.md §7.1). Each program
+    # runs in a directory of its own, with the same files and environment, and their messages
+    # are compared too.
+    def separate(cid: str, desc: str, args: tuple[str, ...] = (), image: str = F32, **kw) -> None:
+        category = cid.split("/")[0]
+        add(cid, category, desc, Scenario(image, args, separate=True, **kw))
+
+    taken = (("out.nii", "taken"),)
+    blank = "out put.nii"
+    tz = ("-tpattern", "alt+z")
+    text_1d = (("st.1D", "0 1 abc 1.5\n"),)
+    for cid, desc, args, kw in [
+        (
+            "overwrite-after-dataset",
+            "-overwrite after the dataset replaces an existing output",
+            (*tz, "-prefix", "out.nii", "{input}", "-overwrite"),
+            {"files": taken},
+        ),
+        (
+            "overwrite-as-option-value",
+            "-overwrite where -tpattern's value stands: taken out first, -tpattern reads alt+z",
+            ("-tpattern", "-overwrite", "alt+z", "-prefix", "out.nii", "{input}"),
+            {"files": taken},
+        ),
+        (
+            "overwrite-copy",
+            "-overwrite on a copy of the input (no slice timing)",
+            ("-overwrite",),
+            {"files": taken},
+        ),
+        (
+            "overwrite-no-existing-file",
+            "-overwrite with no output to replace",
+            ("-overwrite", *tz),
+            {},
+        ),
+        (
+            "overwrite-then-D",
+            "-overwrite, then -DAFNI_DECONFLICT=YES: the later one wins (out_AA1.nii)",
+            ("-overwrite", "-DAFNI_DECONFLICT=YES", *tz),
+            {"files": taken, "written": "out_AA1.nii"},
+        ),
+        (
+            "D-deconflict-yes",
+            "-DAFNI_DECONFLICT=YES: an existing output makes the run write out_AA1.nii",
+            ("-DAFNI_DECONFLICT=YES", *tz),
+            {"files": taken, "written": "out_AA1.nii"},
+        ),
+        (
+            "D-deconflict-no",
+            "-DAFNI_DECONFLICT=NO: an existing output stops the shift before the work (exit 1)",
+            ("-DAFNI_DECONFLICT=NO", *tz),
+            {"files": taken, "expect": "error"},
+        ),
+        (
+            "D-wins-over-environment",
+            "-DAFNI_DECONFLICT=OVERWRITE over AFNI_DECONFLICT=YES in the environment",
+            ("-DAFNI_DECONFLICT=OVERWRITE", *tz),
+            {"files": taken, "env": (("AFNI_DECONFLICT", "YES"),)},
+        ),
+        (
+            "D-arbitrary-filenames",
+            "-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written",
+            ("-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES", *tz),
+            {"output": blank},
+        ),
+        (
+            "D-after-dataset",
+            "-D after the dataset applies too",
+            (*tz, "-prefix", blank, "{input}", "-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES"),
+            {"output": blank},
+        ),
+        (
+            "D-as-option-value",
+            "-D where -tpattern's value stands: taken out first",
+            (
+                "-tpattern",
+                "-DAFNI_ALLOW_ARBITRARY_FILENAMES=YES",
+                "alt+z",
+                "-prefix",
+                blank,
+                "{input}",
+            ),
+            {"output": blank},
+        ),
+        (
+            "D-value-with-blank",
+            "-DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES: AFNI sets 'Y=ES', still YES",
+            ("-DAFNI_ALLOW_ARBITRARY_FILENAMES=Y ES", *tz),
+            {"output": blank},
+        ),
+        (
+            "D-blank-before-value",
+            "-DAFNI_ALLOW_ARBITRARY_FILENAMES= YES: AFNI sets '=YES', not YES: refused",
+            ("-DAFNI_ALLOW_ARBITRARY_FILENAMES= YES", *tz),
+            {"output": blank, "expect": "error"},
+        ),
+        (
+            "D-empty-value",
+            "-DAFNI_ALLOW_ARBITRARY_FILENAMES= (no value) sets nothing: refused",
+            ("-DAFNI_ALLOW_ARBITRARY_FILENAMES=", *tz),
+            {"output": blank, "expect": "error"},
+        ),
+        (
+            "D-empty-name",
+            "-D=YES (no name) sets nothing",
+            ("-D=YES", *tz),
+            {"output": blank, "expect": "error"},
+        ),
+        (
+            "D-without-equals",
+            "-DAFNI_ALLOW_ARBITRARY_FILENAMES (no '='): an unknown option",
+            ("-DAFNI_ALLOW_ARBITRARY_FILENAMES", *tz),
+            {"expect": "error"},
+        ),
+        ("D-alone", "-D alone: an unknown option", ("-D", *tz), {"expect": "error"}),
+        (
+            "D-lowercase",
+            "-d...=YES: not a global option, an unknown option",
+            ("-dAFNI_ALLOW_ARBITRARY_FILENAMES=YES", *tz),
+            {"expect": "error"},
+        ),
+        (
+            "D-message-prefix-with-blank",
+            "-DAFNI_MESSAGE_PREFIX=a b: AFNI's messages start with 'a=b::' (AFNI-22)",
+            ("-DAFNI_MESSAGE_PREFIX=a b",),
+            {},
+        ),
+        (
+            "D-unknown-variable",
+            "-D of a variable 3dTshift does not read: no effect",
+            ("-DAFNI_NOT_A_VARIABLE=1", *tz),
+            {},
+        ),
+        (
+            "ok-1D-text",
+            "-ok_1D_text: text in the -tpattern file is read as 0",
+            ("-ok_1D_text", "-tpattern", "@st.1D"),
+            {"files": text_1d},
+        ),
+        ("skip-afnirc", "-skip_afnirc: accepted", ("-skip_afnirc", *tz), {}),
+    ]:
+        separate(f"global/{cid}", desc, args, **kw)
+
+    i16_si = f"{S}/dtypes/int16-slope-inter.nii.gz"
+    f64 = f"{S}/dtypes/float64.nii.gz"
+    for cid, desc, image, args, kw in [
+        (
+            "deconflict-overwrite",
+            "AFNI_DECONFLICT=OVERWRITE: an existing output is replaced, with AFNI's warning",
+            F32,
+            tz,
+            {"files": taken, "env": (("AFNI_DECONFLICT", "OVERWRITE"),)},
+        ),
+        (
+            "deconflict-yes",
+            "AFNI_DECONFLICT=YES: the output goes to out_AA1.nii",
+            F32,
+            tz,
+            {"files": taken, "env": (("AFNI_DECONFLICT", "YES"),), "written": "out_AA1.nii"},
+        ),
+        (
+            "deconflict-no-copy",
+            "AFNI_DECONFLICT=NO on a copy: AFNI finds the output after the work, exit 0 (AFNI-11)",
+            F32,
+            (),
+            {"files": taken, "env": (("AFNI_DECONFLICT", "NO"),), "expect": "error"},
+        ),
+        (
+            "arbitrary-filenames",
+            "AFNI_ALLOW_ARBITRARY_FILENAMES=YES: a -prefix with a blank is written",
+            F32,
+            tz,
+            {"output": blank, "env": (("AFNI_ALLOW_ARBITRARY_FILENAMES", "YES"),)},
+        ),
+        (
+            "input-with-blank",
+            "an input in a directory with a blank: AFNI reads a list of datasets and fails (AFNI-18)",
+            "gen:blank-dir",
+            tz,
+            {"expect": "error"},
+        ),
+        (
+            "path-spaces-ok",
+            "AFNI_PATH_SPACES_OK=YES: an input in a directory with a blank is one file",
+            "gen:blank-dir",
+            tz,
+            {"env": (("AFNI_PATH_SPACES_OK", "YES"),)},
+        ),
+        (
+            "nifti-priority-Q",
+            "AFNI_NIFTI_PRIORITY=Q: the qform rather than the sform (they differ)",
+            "gen:sq",
+            tz,
+            {"env": (("AFNI_NIFTI_PRIORITY", "Q"),)},
+        ),
+        (
+            "nifti-priority-illegal",
+            "AFNI_NIFTI_PRIORITY=X: AFNI's warning, the sform",
+            "gen:sq",
+            tz,
+            {"env": (("AFNI_NIFTI_PRIORITY", "X"),)},
+        ),
+        (
+            "nifti-scale-no",
+            "AFNI_NIFTI_SCALE=NO: int16 with a slope and an intercept stays int16 (slope kept)",
+            i16_si,
+            tz,
+            {"env": (("AFNI_NIFTI_SCALE", "NO"),)},
+        ),
+        (
+            "type-warn-default",
+            "AFNI_NIFTI_TYPE_WARN unset: AFNI's conversion message, with the muting lines",
+            f64,
+            tz,
+            {"env": (("AFNI_NIFTI_TYPE_WARN", None),)},
+        ),
+        (
+            "type-warn-yes",
+            "AFNI_NIFTI_TYPE_WARN=YES: the conversion message alone",
+            f64,
+            tz,
+            {"env": (("AFNI_NIFTI_TYPE_WARN", "YES"),)},
+        ),
+        (
+            "nifti-view-tlrc",
+            "AFNI_NIFTI_VIEW=TLRC: sform code 2 is the tlrc view, so code 3",
+            "gen:code2",
+            tz,
+            {"env": (("AFNI_NIFTI_VIEW", "TLRC"),)},
+        ),
+        (
+            "default-std-space",
+            "AFNI_DEFAULT_STD_SPACE=MNI: sform code 5 gives code 4",
+            "gen:code5",
+            tz,
+            {"env": (("AFNI_DEFAULT_STD_SPACE", "MNI"),)},
+        ),
+        (
+            "sform-code-7",
+            "sform code 7: AFNI's warning; AFNI_NIFTI_VIEW=tlrc makes it code 3",
+            "gen:code7",
+            tz,
+            {"env": (("AFNI_NIFTI_VIEW", "tlrc"),)},
+        ),
+        (
+            "write-type-2",
+            "AFNI_NIFTI_WRITE_TYPE=2: a NIfTI-2 output",
+            F32,
+            tz,
+            {"env": (("AFNI_NIFTI_WRITE_TYPE", "2"),)},
+        ),
+        (
+            "allow-milliseconds",
+            "AFNI_ALLOW_MILLISECONDS=YES with -TR 2000ms: toffset written in ms (AFNI-19)",
+            F32,
+            (*tz, "-TR", "2000ms"),
+            {"env": (("AFNI_ALLOW_MILLISECONDS", "YES"),)},
+        ),
+        (
+            "1D-zero-text",
+            "AFNI_1D_ZERO_TEXT=YES: text in the -tpattern file is read as 0",
+            F32,
+            ("-tpattern", "@st.1D"),
+            {"files": text_1d, "env": (("AFNI_1D_ZERO_TEXT", "YES"),)},
+        ),
+        (
+            "1D-text-error",
+            "text in the -tpattern file: AFNI's parse error",
+            F32,
+            ("-tpattern", "@st.1D"),
+            {"files": text_1d, "expect": "error"},
+        ),
+        (
+            "use-fgets",
+            "AFNI_USE_FGETS=YES: a file with CR line ends is one row, of 8 values (9 > TR)",
+            F32,
+            ("-tpattern", "@st.1D"),
+            {
+                "files": (("st.1D", "0 9\r1.5 9\r0.5 9\r1 9\r"),),
+                "env": (("AFNI_USE_FGETS", "YES"),),
+                "expect": "error",
+            },
+        ),
+        (
+            "cr-line-ends",
+            "a file with CR line ends: four rows of two columns, read column by column",
+            F32,
+            ("-tpattern", "@st.1D"),
+            {"files": (("st.1D", "0 9\r1.5 9\r0.5 9\r1 9\r"),)},
+        ),
+        (
+            "realpath",
+            "a conversion message names the input by its real path ('..' resolved)",
+            "gen:dotdot-float64",
+            tz,
+            {"env": (("AFNI_NIFTI_TYPE_WARN", "YES"),)},
+        ),
+        (
+            "norealpath",
+            "AFNI_NOREALPATH=YES: the message names the input as given",
+            "gen:dotdot-float64",
+            tz,
+            {"env": (("AFNI_NIFTI_TYPE_WARN", "YES"), ("AFNI_NOREALPATH", "YES"))},
+        ),
+        ("oblique-warning", "an oblique input: AFNI's obliquity report", "gen:oblique", tz, {}),
+        (
+            "no-oblique-warning",
+            "AFNI_NO_OBLIQUE_WARNING=YES: no obliquity report",
+            "gen:oblique",
+            tz,
+            {"env": (("AFNI_NO_OBLIQUE_WARNING", "YES"),)},
+        ),
+        (
+            "message-prefix",
+            "AFNI_MESSAGE_PREFIX: on every labelled message",
+            F32,
+            ("-verbose",),
+            {"env": (("AFNI_MESSAGE_PREFIX", "run1"),)},
+        ),
+        (
+            "message-colorize-no",
+            "AFNI_MESSAGE_COLORIZE=NO: labels without terminal escape codes",
+            F32,
+            (),
+            {"env": (("AFNI_MESSAGE_COLORIZE", "NO"),)},
+        ),
+        (
+            "echo-commandline",
+            "AFNI_ECHO_COMMANDLINE=YES (and a log file): the command line is echoed",
+            F32,
+            tz,
+            {"env": (("AFNI_ECHO_COMMANDLINE", "YES"), ("AFNI_DONT_LOGFILE", None))},
+        ),
+        (
+            "quiet-startup",
+            "AFNI_QUIET_STARTUP=YES: no version banner (larmorx prints none)",
+            F32,
+            tz,
+            {"env": (("AFNI_QUIET_STARTUP", "YES"),)},
+        ),
+        (
+            "nifti-noext",
+            "AFNI_NIFTI_NOEXT=YES: AFNI writes no header extension, as larmorx: the whole file",
+            F32,
+            tz,
+            {"env": (("AFNI_NIFTI_NOEXT", "YES"),), "whole_file": True},
+        ),
+        (
+            "one-row-dataset",
+            "a dataset of one row: AFNI writes a 1D text file under the NIfTI name (AFNI-20)",
+            "gen:one-row",
+            tz,
+            {},
+        ),
+        (
+            "write-1D-as-prefix",
+            "AFNI_WRITE_1D_AS_PREFIX=YES: a dataset of one row is written as NIfTI",
+            "gen:one-row",
+            tz,
+            {"env": (("AFNI_WRITE_1D_AS_PREFIX", "YES"),)},
+        ),
+    ]:
+        separate(f"environment/{cid}", desc, args, image, **kw)
+    # The -D form of the variables that change the output.
+    for cid, image, setting in [
+        ("nifti-priority-Q", "gen:sq", "AFNI_NIFTI_PRIORITY=Q"),
+        ("nifti-view-tlrc", "gen:code2", "AFNI_NIFTI_VIEW=TLRC"),
+        ("write-type-2", F32, "AFNI_NIFTI_WRITE_TYPE=2"),
+        ("nifti-scale-no", i16_si, "AFNI_NIFTI_SCALE=NO"),
+    ]:
+        separate(
+            f"global/D-{cid}",
+            f"-D{setting}: as the environment variable",
+            (f"-D{setting}", *tz),
+            image,
+        )
+
     # Deliberate differences.
     add(
         "divergence/afni-format-output",
@@ -596,6 +988,22 @@ def _generated(name: str) -> Path:
         return path
     if name.startswith("d13-"):
         return _generated_d13(name, data, src, path)
+    if name in ("sq", "code2", "code5", "code7", "oblique", "one-row"):
+        return _generated_env(name, data, src, path)
+    if name == "blank-dir":  # an input in a directory whose name has a blank
+        target = _generated_dir() / "with blank" / "in.nii"
+        target.parent.mkdir(exist_ok=True)
+        if not target.exists():
+            nib.Nifti1Image(np.asarray(data, np.float32), src.affine, src.header).to_filename(
+                target
+            )
+        return target
+    if name == "dotdot-float64":  # a float64 input named through 'sub/..'
+        target = _generated_dir() / "float64.nii"
+        if not target.exists():
+            nib.load(td.get(f"{S}/dtypes/float64.nii.gz")).to_filename(target)
+        (_generated_dir() / "sub").mkdir(exist_ok=True)
+        return _generated_dir() / "sub" / ".." / "float64.nii"
     img = nib.Nifti1Image(data, src.affine, src.header)
     h = img.header
     code = int(name[4])
@@ -670,6 +1078,41 @@ def _generated_d13(name: str, data: np.ndarray, src, path: Path) -> Path:  # typ
     return path
 
 
+def _generated_env(name: str, data: np.ndarray, src, path: Path) -> Path:  # type: ignore[no-untyped-def]
+    """Inputs for AFNI's environment variables, from the float32 file: a qform and an sform of
+    different handedness (``sq``), sform codes 2, 5 and 7 (``code<n>``), an oblique sform in
+    millimetres, and a dataset of one row (``one-row``)."""
+    import nibabel as nib
+
+    values = np.asarray(data, np.float32)
+    affine = src.affine.copy()
+    if name == "one-row":
+        values = values[:, :1, :1, :]
+    if name == "oblique":  # a rotation about y with cos 0.8, sin 0.6
+        rotation = np.array([[0.8, 0.0, -0.6], [0.0, 1.0, 0.0], [0.6, 0.0, 0.8]])
+        affine[:3, :3] = rotation @ affine[:3, :3]
+    img = nib.Nifti1Image(values, affine)
+    h = img.header
+    if name == "sq":  # the qform flips x and moves the origin: the two differ
+        q = affine.copy()
+        q[0, :3] = -q[0, :3]
+        q[:3, 3] += (10.0, 20.0, 30.0)
+        h.set_qform(q, 1)
+        h.set_sform(affine, 1)
+    elif name.startswith("code"):
+        code = int(name[4:])
+        h.set_qform(affine, 0)
+        h.set_sform(affine, min(code, 4) if code > 5 else code)
+        h["sform_code"] = code  # nibabel does not take code 7
+    else:
+        h.set_qform(affine, 1)
+        h.set_sform(affine, 1)
+    h["pixdim"][4] = src.header["pixdim"][4]
+    h.set_xyzt_units("mm", "sec")
+    img.to_filename(path)
+    return path
+
+
 def _image_path(image: str) -> Path:
     if image.startswith("gen:"):
         return _generated(image.removeprefix("gen:"))
@@ -706,30 +1149,93 @@ def _args(s: Scenario, tmp: Path) -> list[str]:
     return args
 
 
-def _run_afni(args: list[str]) -> tuple[int, str]:
-    env = {**os.environ, "AFNI_DONT_LOGFILE": "YES", "AFNI_NIFTI_TYPE_WARN": "NO"}
+@functools.cache
+def _home() -> Path:
+    """An empty home directory for both programs: AFNI reads no ``.afnirc`` from it."""
+    home = _generated_dir() / "home"
+    home.mkdir(exist_ok=True)
+    return home
+
+
+def _environment(s: Scenario | None = None) -> dict[str, str]:
+    """The environment both programs run in: this process's without AFNI's variables, with
+    ``HOME`` an empty directory (no ``.afnirc``), AFNI's log file and its conversion messages
+    off, then the scenario's variables (``None`` removes one)."""
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))}
+    env.update(HOME=str(_home()), AFNI_DONT_LOGFILE="YES", AFNI_NIFTI_TYPE_WARN="NO")
+    for name, value in s.env if s else ():
+        if value is None:
+            env.pop(name, None)
+        else:
+            env[name] = value
+    return env
+
+
+@contextlib.contextmanager
+def _process_environment(env: dict[str, str], cwd: Path | None = None) -> Iterator[None]:
+    """This process's environment (and working directory) for an in-process larmorx run, which
+    starts the replica's program with them; restored after."""
+    saved, saved_cwd = dict(os.environ), os.getcwd()
+    os.environ.clear()
+    os.environ.update(env)
+    if cwd is not None:
+        os.chdir(cwd)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+        os.chdir(saved_cwd)
+
+
+def _run_afni_streams(
+    args: list[str], env: dict[str, str], cwd: Path | None = None
+) -> tuple[int, str, str]:
     p = subprocess.run(
-        [afni_binary(), *args], capture_output=True, text=True, encoding="utf-8", env=env
+        [afni_binary(), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        cwd=cwd,
     )
-    return p.returncode, (p.stdout + p.stderr).strip()
+    return p.returncode, p.stdout, p.stderr
 
 
-def _run_larmorx(
-    args: list[str], implementation: str = "original", mode: str = defects.REPRODUCE
-) -> tuple[int, str]:
+def _run_afni(args: list[str]) -> tuple[int, str]:
+    code, out, err = _run_afni_streams(args, _environment())
+    return code, (out + err).strip()
+
+
+def _run_larmorx_streams(
+    args: list[str],
+    implementation: str,
+    mode: str,
+    env: dict[str, str],
+    cwd: Path | None = None,
+) -> tuple[int, str, str]:
     """``larmorx afni 3dTshift`` in process, with the implementation forced: the original, or
     the replica's program, which larmorx runs as a separate process. ``mode`` is D13's
     ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with AFNI."""
     from larmorx.cli import run
 
-    err = io.StringIO()
+    out, err = io.StringIO(), io.StringIO()
     with (
+        _process_environment(env, cwd),
         defects.mode(mode),
         contextlib.redirect_stderr(err),
-        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stdout(out),
     ):
         code = run(["larmorx", "afni", "3dTshift", *args], implementation=implementation)
-    return code, err.getvalue().strip()
+    return code, out.getvalue(), err.getvalue()
+
+
+def _run_larmorx(
+    args: list[str], implementation: str = "original", mode: str = defects.REPRODUCE
+) -> tuple[int, str]:
+    code, _, err = _run_larmorx_streams(args, implementation, mode, _environment())
+    return code, err.strip()
 
 
 @contextlib.contextmanager
@@ -760,7 +1266,15 @@ REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
 #: 25.2.09 on D13's cases (2026-10-12); the spec describes them since 2026-10-12 (§6.1-6.4), for
 #: the original to follow.
 DIVERGENCES: dict[str, dict[str, tuple[frozenset[str], str]]] = {
-    "replica": {},
+    "replica": {
+        "environment/one-row-dataset": (
+            frozenset({"AFNI's output is NIfTI"}),
+            "AFNI writes a dataset of one row as a 1D text file under the NIfTI name, with a "
+            "random identifier (AFNI-20, unless AFNI_WRITE_1D_AS_PREFIX is YES); larmorx writes "
+            "NIfTI in both modes, as AFNI does with that variable set "
+            "(environment/write-1D-as-prefix)",
+        ),
+    },
     "original": {
         "defects/oblique-metre": (
             frozenset({"geometry (sform)"}),
@@ -854,11 +1368,25 @@ def _last_error(log: str, tmp: Path) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", line)
 
 
+#: The categories of AFNI's global options and environment variables, which the clean-room
+#: original does not follow yet (completing 3dTshift, part 2b): any failure there is an expected
+#: divergence of the original's.
+PENDING_FOR_ORIGINAL = ("global/", "environment/")
+PENDING_REASON = (
+    "the clean-room original does not take AFNI's global options (-overwrite, -Dname=value) "
+    "or read AFNI's environment variables yet: specs/3dTshift.md §7.1 describes them for it "
+    "(completing 3dTshift, part 2b)"
+)
+
+
 def _expected_divergence(checks: CheckList, case_id: str, implementation: str) -> None:
-    """Ends the case as an expected divergence when exactly its known checks failed."""
+    """Ends the case as an expected divergence when exactly its known checks failed (any check,
+    for the ``*`` of the original's pending categories)."""
     known = DIVERGENCES.get(implementation, {}).get(case_id)
+    if known is None and implementation == "original" and case_id.startswith(PENDING_FOR_ORIGINAL):
+        known = (frozenset({"*"}), PENDING_REASON)
     failed = {c.name for c in checks.checks if not c.passed}
-    if known and failed and failed <= known[0]:
+    if known and failed and ("*" in known[0] or failed <= known[0]):
         raise Outcome(EXPECTED, known[1])
 
 
@@ -1003,6 +1531,205 @@ def _method_of(args: list[str]) -> str:
     return method
 
 
+#: AFNI's lines that name its build, not what it does: the version banner and the compile date
+#: it prints after a fatal error (larmorx prints neither).
+_AFNI_BUILD_LINES = re.compile(
+    r"^(?:[^\n]*::)?\+\+ 3dTshift: AFNI version=[^\n]*\n|^\*\* Program compile date = [^\n]*\n",
+    re.M,
+)
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+#: The name of the check that compares the messages.
+MESSAGES = "messages: AFNI's, byte for byte"
+
+
+def _larmorx_own(line: str) -> bool:
+    """A line larmorx adds to AFNI's messages: an upstream-defect notice, ``-verbose``'s lines
+    on the implementation, or a note on a global option (ending in ``(larmorx)``)."""
+    plain = _ANSI.sub("", line).rstrip()
+    return (
+        "upstream defect " in plain
+        or "++ implementation: " in plain
+        or "++ upstream defects: " in plain
+        or plain.endswith("(larmorx)")
+    )
+
+
+def _afni_lines(text: str) -> str:
+    return _AFNI_BUILD_LINES.sub("", text)
+
+
+def _larmorx_lines(text: str) -> str:
+    return "".join(line for line in text.splitlines(keepends=True) if not _larmorx_own(line))
+
+
+def _first_difference(a: str, b: str) -> str:
+    xs, ys = a.splitlines(), b.splitlines()
+    k = next((i for i, (x, y) in enumerate(zip(xs, ys, strict=False)) if x != y), None)
+    if k is None:
+        k = min(len(xs), len(ys))
+    x = xs[k] if k < len(xs) else "(nothing)"
+    y = ys[k] if k < len(ys) else "(nothing)"
+    return f"line {k + 1}: AFNI {x!r}, larmorx {y!r}"
+
+
+def _check_messages(
+    checks: CheckList, afni: tuple[str, str], ours: tuple[str, str], tmp: Path
+) -> None:
+    """AFNI's standard output and error, byte for byte (colour codes included), against
+    larmorx's, without AFNI's build lines and larmorx's own lines."""
+    (a_out, a_err), (l_out, l_err) = afni, ours
+    a_err, l_err = _afni_lines(a_err), _larmorx_lines(l_err)
+    detail = "identical"
+    if a_out != l_out:
+        detail = "stdout " + _first_difference(a_out, l_out)
+    elif a_err != l_err:
+        detail = "stderr " + _first_difference(a_err, l_err)
+    checks(
+        MESSAGES,
+        a_out == l_out and a_err == l_err,
+        detail=detail.replace(str(tmp), "<tmp>").replace(str(_generated_dir()), "<generated>"),
+    )
+
+
+def _is_nifti(path: Path) -> bool:
+    head = path.read_bytes()[:4]
+    return head in (b"\x5c\x01\x00\x00", b"\x1c\x02\x00\x00") or head[:2] == b"\x1f\x8b"
+
+
+def _run_separately(
+    case: Case, s: Scenario, checks: CheckList, tmp: Path, implementation: str
+) -> None:
+    """A case of AFNI's global options and environment variables: each program in a directory
+    of its own (``files`` written to each, the output named relative to it), in the same
+    environment (:func:`_environment`); exit statuses, messages and outputs compared, then the
+    fix pass."""
+    image = _image_path(s.image)
+    env = _environment(s)
+    output = s.output or "out.nii"
+    written = s.written or output
+    before = dict(s.files)
+
+    def setup(d: Path) -> list[str]:
+        d.mkdir()
+        for name, text in s.files:
+            (d / name).parent.mkdir(parents=True, exist_ok=True)
+            (d / name).write_text(text, encoding="utf-8")
+        args = [str(image) if a == "{input}" else a for a in s.args]
+        if "{input}" not in s.args:
+            args += ["-prefix", output, str(image)]
+        return args
+
+    def produced(code: int, d: Path) -> Path | None:
+        f = d / written
+        if code != 0 or not f.is_file():
+            return None
+        if written in before and f.read_bytes() == before[written].encode():
+            return None
+        return f
+
+    runs = {}
+    args: list[str] = []
+    for tool in ("afni", "larmorx"):
+        d = tmp / tool
+        args = setup(d)
+        if tool == "afni":
+            code, out, err = _run_afni_streams(args, env, d)
+        else:
+            code, out, err = _run_larmorx_streams(args, implementation, defects.REPRODUCE, env, d)
+        runs[tool] = (code, out, err, produced(code, d))
+    (ca, oa, ea, pa), (cl, ol, el, pl) = runs["afni"], runs["larmorx"]
+    checks("exit status", ca == cl, metric="exit status", value=cl, threshold=ca)
+    _check_messages(checks, (oa, ea), (ol, el), tmp)
+    if pa is None and pl is None:
+        _expected_divergence(checks, case.id, implementation)
+        if all(c.passed for c in checks.checks):
+            raise Outcome(
+                BOTH_ERROR,
+                f"AFNI exit {ca}: {_last_error(ea, tmp)}; larmorx exit {cl}: "
+                f"{_last_error(el, tmp)} (the same messages)",
+            )
+        return
+    checks(
+        "both succeed",
+        pa is not None and pl is not None,
+        detail=f"AFNI exit {ca}: {_last_error(ea, tmp)}; larmorx exit {cl}: {_last_error(el, tmp)}",
+    )
+    if s.expect == "error":
+        checks("both reject the arguments", False, detail="expected an error from both")
+    _expected_divergence(checks, case.id, implementation)
+    if pa is None or pl is None:
+        return
+    nifti = _is_nifti(pa)
+    checks(
+        "AFNI's output is NIfTI",
+        nifti,
+        detail="" if nifti else f"it starts with {pa.read_bytes()[:30]!r}",
+    )
+    _expected_divergence(checks, case.id, implementation)
+    copy = "just a copy of input" in el
+    checks.add(
+        Check(
+            "method",
+            True,
+            metric="interpolation",
+            value="copy" if copy else _method_of(args),
+            threshold="reported",
+        )
+    )
+    _compare(checks, pa, pl)
+    if s.whole_file:
+        checks(
+            "the whole file, byte for byte",
+            pa.read_bytes() == pl.read_bytes(),
+            detail=f"AFNI {pa.stat().st_size} bytes, larmorx {pl.stat().st_size}",
+        )
+    _expected_divergence(checks, case.id, implementation)
+    if s.expect != "pass":
+        return
+    # The fix pass: larmorx's default on the same arguments, in a directory of its own.
+    import nibabel as nib
+
+    d = tmp / "fix"
+    args = setup(d)
+    code, out, err = _run_larmorx_streams(args, implementation, defects.FIX, env, d)
+    target = d / written
+    if code != 0 or not target.is_file():
+        checks(defects.FIX_PASS, False, detail=f"the fix pass failed (exit {code})")
+        return
+    a, b = nib.load(target), nib.load(pl)
+    change = defects.Change.of(
+        np.asanyarray(a.dataobj.get_unscaled()), np.asanyarray(b.dataobj.get_unscaled())
+    )
+    ha, hb = a.header, b.header
+    other = [] if type(ha) is type(hb) else ["the NIfTI version"]
+    fields = ("dim", "datatype", "pixdim", "toffset", "qform_code", "sform_code", "qoffset_x")
+    fields += ("srow_x", "srow_y", "srow_z", "slice_code", "slice_start", "slice_end")
+    other += [
+        f
+        for f in fields
+        if not np.array_equal(np.nan_to_num(np.asarray(ha[f])), np.nan_to_num(np.asarray(hb[f])))
+    ]
+    for f in ("slope", "inter"):
+        if not np.array_equal(
+            np.nan_to_num(float(getattr(a.dataobj, f))), np.nan_to_num(float(getattr(b.dataobj, f)))
+        ):
+            other.append(f"scl_{f}")
+    plain = [_ANSI.sub("", _larmorx_lines(x)) for x in (out + err, ol + el)]
+    if plain[0] != plain[1]:
+        other.append("messages")
+    entries = defects.notices_in(err)
+    defects.add_fix_check(checks, entries, change, other_changes=", ".join(other))
+    reproduced_entries = defects.notices_in(el)
+    if entries != reproduced_entries:
+        checks(
+            "D13 notices in both modes",
+            False,
+            detail=f"fix: {entries}; reproduce: {reproduced_entries}",
+        )
+    _expected_divergence(checks, case.id, implementation)
+
+
 def _produced(code: int, target: Path, occupied: bool) -> bool:
     """Whether a run wrote its output (NIfTI, or AFNI's own format for a bare prefix)."""
     if code != 0:
@@ -1141,6 +1868,9 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
         tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name,
     ):
         tmp = Path(tmp_name)
+        if s.separate:
+            _run_separately(case, s, checks, tmp, implementation)
+            return
         for name, text in s.files:
             (tmp / name).write_text(text, encoding="utf-8")
         occupied = any(name == "out.nii" for name, _ in s.files)
@@ -1374,6 +2104,15 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
         f"for bit (data and header). From an image in memory: {memory_ok} of {memory_n} give "
         "the same values."
     )
+    messages = [c for r in results for c in r.checks if c.name == MESSAGES]
+    if messages:
+        lines.append(
+            "- **AFNI's global options and environment variables** (categories `global` and "
+            f"`environment`, {len(messages)} cases): exit status and messages compared too, "
+            "standard output and error byte for byte (colour codes included; AFNI's version "
+            "banner and compile date, and larmorx's own lines, set aside): "
+            f"{sum(c.passed for c in messages)} of {len(messages)} identical."
+        )
     lines += defects.summary(results)
     if implementation == "replica":
         lines += _defaults_summary(results)
@@ -1482,6 +2221,10 @@ def suite(implementation: str = "original") -> Suite:
             "options in seconds; not the header's timing, AFNI 1D files or copies of the input) "
             "and must give the command line's output: the same values and the same header bytes "
             "(`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs "
-            "on the image loaded in memory."
+            "on the image loaded in memory. Both programs run without AFNI's environment "
+            "variables of this process and with `HOME` an empty directory (no `.afnirc`), "
+            "`AFNI_DONT_LOGFILE=YES` and `AFNI_NIFTI_TYPE_WARN=NO`, plus each case's variables. "
+            "The cases of AFNI's global options and environment variables run each program in a "
+            "directory of its own and compare exit statuses and messages too."
         ),
     )

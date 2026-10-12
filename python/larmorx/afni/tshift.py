@@ -55,14 +55,16 @@ _METHOD_OPTIONS = {m: "-Fourier" if m == "fourier" else f"-{m}" for m in METHODS
 _RESTORE_OPTIONS = {"trend": [], "none": ["-rlt"], "intercept": ["-rlt+"]}
 
 #: AFNI's environment for the replica, over this process's: the input is a path, never a list
-#: of datasets separated by blanks (AFNI-18), and its messages are plain text without a prefix,
-#: as this wrapper reads them. AFNI's other variables are passed on, so that the replica reads
-#: the input and writes its output as the command line would.
+#: of datasets separated by blanks (AFNI-18); its messages are plain text without a prefix, as
+#: this wrapper reads them, and without AFNI's report on oblique inputs (advice for AFNI's own
+#: programs, not a warning about this result). AFNI's other variables are passed on, so that
+#: the replica reads the input and writes its output as the command line would.
 _REPLICA_ENV = {
     "AFNI_PATH_SPACES_OK": "YES",
     "AFNI_MESSAGE_COLORIZE": "NO",
     "AFNI_MESSAGE_PREFIX": None,
     "AFNI_ECHO_COMMANDLINE": None,
+    "AFNI_NO_OBLIQUE_WARNING": "YES",
 }
 
 
@@ -136,9 +138,9 @@ def tshift(
         temporary NIfTI files (``docs/licensing.md``). The two differ only in the last bits of
         some values (``docs/validation/afni-tshift.md``). The replica reads AFNI's environment
         variables (``AFNI_NIFTI_PRIORITY``, ``AFNI_NIFTI_VIEW``, ...) as the command line
-        does, except that a path with blanks is always one file (``AFNI_PATH_SPACES_OK=YES``)
-        and its messages are plain text (``docs/api/afni-tshift.md``, "AFNI's global options
-        and environment variables").
+        does, except that a path with blanks is always one file (``AFNI_PATH_SPACES_OK=YES``),
+        its messages are plain text and an oblique input is not reported
+        (``docs/api/afni-tshift.md``, "AFNI's global options and environment variables").
     upstream_defects
         ``"fix"`` (default) corrects AFNI's defects AFNI-01, -02, -05 and -07;
         ``"reproduce"`` gives AFNI's output. A :class:`~larmorx.UpstreamDefectWarning` names

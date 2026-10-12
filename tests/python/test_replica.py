@@ -226,6 +226,7 @@ def test_afni_global_options_and_variables_reach_the_replica(scripts, monkeypatc
     assert env["AFNI_PATH_SPACES_OK"] == "YES"  # a path is one file
     assert env["AFNI_MESSAGE_COLORIZE"] == "NO"  # plain messages, read as warnings
     assert "AFNI_MESSAGE_PREFIX" not in env
+    assert env["AFNI_NO_OBLIQUE_WARNING"] == "YES"  # AFNI's advice, not a warning here
 
 
 def test_a_failing_replica_raises_and_never_falls_back(scripts, tmp_path):

@@ -757,7 +757,51 @@ Decided by the user on the questions the defect register raised
   `AFNI_PATH_SPACES_OK=YES` for its temporary paths and keeps AFNI's message prefix, colours,
   echoed command line and oblique report out of its warnings. To review: whether the Python
   API should read AFNI's variables at all (rule 6, no global configuration); the original
-  should do whatever is decided.
+  should do whatever is decided. (Decided the same day, below: it does not.)
+
+## 2026-10-12: AFNI-23 corrected by default; the Python API takes AFNI's settings explicitly
+- **User decisions:**
+  1. **AFNI-23 is fixed by default.** With `AFNI_NIFTI_SCALE=NO`, AFNI keeps an integer image's
+     slope but drops its intercept, so the values are off by it. larmorx's default keeps the
+     values right; a notice names AFNI-23 where AFNI would have dropped it;
+     `LARMORX_UPSTREAM_DEFECTS=reproduce` gives AFNI's bytes.
+  2. **The Python API never reads the process environment** (CLAUDE.md rule 6). AFNI's
+     variables are explicit settings of the call; the command line keeps reading the
+     environment, as AFNI does.
+- **What `AFNI_NIFTI_SCALE=NO` is for** (replica author, from AFNI's source and history;
+  register AFNI-23). It is undocumented and read in one place, where it turns off the
+  conversion of uint8 and int16 data with a slope and an intercept to scaled float32. Until
+  AFNI 20.3 no scale factor was set when a file was opened, so it meant "do not scale": the
+  stored integers, slope and intercept ignored. In 2021 AFNI began keeping scaled integers as
+  integers wherever a scale factor can carry the scaling (a slope alone), set when the file is
+  opened; since then the variable no longer stops the slope, and its only effect is to keep
+  data with an intercept as integers, losing the intercept. The defect is the interaction of
+  the two changes.
+- **The choice:** keep what the variable still does (integers stay integers), and keep both
+  scalings in the header: the output has AFNI's stored integers and `scl_slope` (1 where AFNI
+  writes none), with the input's intercept as `scl_inter`. 3dTshift's operations carry a
+  constant offset through (the trend absorbs it and is restored), so the output reads back as
+  the run without the variable, to within half a stored unit, and only the header differs from
+  AFNI's output. Two cases follow from what `-rlt` does: it removes the trend, the intercept
+  with it, so without `-ignore` AFNI's output is already right (nothing changes, nothing is
+  named); with `-ignore` the ignored volumes keep the intercept and the others do not, which
+  one `scl_inter` cannot describe, so the data are read as without the variable (float32,
+  `slope·x + inter`). Applying both scalings in every case (always float32) was the
+  alternative; it would have made the variable do nothing. Implemented in the replica;
+  `specs/3dTshift.md` §7.1 describes AFNI's behaviour (observed) and the correction for the
+  clean-room original.
+- **The Python API:** `lx.afni.tshift(..., afni_settings={"AFNI_NIFTI_PRIORITY": "Q"})`, a
+  `Mapping[str, str] | None` (the same shape as the command line's environment; AFNI's values
+  are strings with AFNI's own tests). The replica runs with exactly these, every AFNI
+  variable of the caller's environment removed, as environment variables (values as written;
+  a `-D` would be read with AFNI-22's quirks in `reproduce`), plus the five the wrapper fixes
+  for its own use (a path is one file, plain messages, no oblique report), which cannot be
+  given. Names are checked (a name 3dTshift does not read, or an empty value, is a
+  `ValueError`). Six variables change what a call returns (`AFNI_NIFTI_PRIORITY`, `_SCALE`,
+  `_VIEW`, `AFNI_DEFAULT_STD_SPACE`, `AFNI_NIFTI_WRITE_TYPE`, `AFNI_NOREALPATH`); the
+  clean-room original does not read them yet and raises `NotImplementedError` naming them
+  (part 2b adds them); the rest change nothing a call returns and are accepted. The pattern is
+  in `docs/porting-guide.md` §9.1.
 
 ## Open decisions (PLAN.md §16)
 

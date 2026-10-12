@@ -14,9 +14,9 @@
 >
 > **D13 (2026-10-12).** The replica corrects AFNI's deterministic defects by default, as the
 > original does, and gives AFNI's output bytes with `LARMORX_UPSTREAM_DEFECTS=reproduce`
-> (register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12 and, since the user's decision
-> of 2026-10-12, -16 in [upstream-defects.md](upstream-defects.md); AFNI-06 is kept, its help
-> text being the error). "The replica reproduces" below means: with the switch. The
+> (register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12 and, since the user's decisions
+> of 2026-10-12, -16 and -23 in [upstream-defects.md](upstream-defects.md); AFNI-06 is kept,
+> its help text being the error). "The replica reproduces" below means: with the switch. The
 > behaviours the clean-room original needs are described, in behaviour terms only, in
 > `specs/3dTshift.md` §6.1 to §6.5 and §7.1 (2026-10-12).
 
@@ -422,6 +422,28 @@ variables 3dTshift consults. The replica does so since 2026-10-12
   The real path: `THD_open_nifti` names the input by `realpath` unless `AFNI_NOREALPATH` is
   yes or the file is a symbolic link, and says ` + reading x.nii.gz instead of non-existing
   x.nii` only when it uses the name as given.
+- **`AFNI_NIFTI_SCALE`** (AFNI-23; decided 2026-10-12). `THD_open_nifti` reads it right after
+  deciding `scale_data` (`thd_niftiread.c:133-151`): no-ish sets `scale_data = 0`, so uint8 and
+  int16 data with a slope and an intercept keep their datum (`:161-166`) and get the slope as
+  brick factor (`:720-722`, set at open time since 8 March 2021), while `THD_load_nifti`
+  computes its own `scale_data`, without the variable (`:1068-1088`), and scales only float
+  and complex bricks: the shorts are left as stored and the intercept is lost. Read nowhere
+  else in AFNI 25.2.09, and documented nowhere. AFNI 16.0.00 and 20.3.03 (fetched from AFNI's
+  GitHub, `src/thd_niftiread.c` at those tags) have the same test but set no brick factor
+  when opening a file, so the variable then meant "read uint8 and int16 as stored, slope and
+  intercept ignored"; AFNI's history (`afni_history_rickr.c`: 26 Jan 2021 "do not convert
+  NIFTI scaled shorts to float", 8 Mar 2021 "applying NIFTI scale_slope to dset must be
+  after setting ADN_datum") explains the change. Verified with the oracle: the values off by
+  the intercept (to half a stored unit) in every restore mode but `-rlt`, which removes it with
+  the trend, leaving only the `-ignore` volumes off; float32, int32 and float64 unchanged. The
+  replica keeps AFNI's integers and writes the intercept as `scl_inter` by default
+  (`dataset::write`), and with `-rlt -ignore` reads the data as without the variable
+  (`cli::tshift::rlt_dropped_intercept`); `reproduce` gives AFNI's bytes.
+- **The Python API never reads the environment** (decided 2026-10-12, CLAUDE.md rule 6).
+  `lx.afni.tshift(afni_settings=...)` passes AFNI's variables explicitly; the replica runs
+  with those and the wrapper's fixed ones (`AFNI_PATH_SPACES_OK=YES`, plain messages, no
+  oblique report), every AFNI variable of the caller's environment removed
+  (`_replica.run(exclude=...)`). The command line reads the environment, as AFNI does.
 - **x87 extended precision** (AFNI-24): `nifti2_io.c`'s quaternion routines mix `long double`
   constants into double formulas. The replica computes the same doubles with integer
   arithmetic (`larmorx_gpl_afni::x87`): checked against GCC's `long double` on 5 million

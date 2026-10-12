@@ -159,7 +159,7 @@ to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.m
 | AFNI-20 † | 3dTshift | a one-row dataset written as a 1D text file under the NIfTI name (unless `AFNI_WRITE_1D_AS_PREFIX`) | c | none | NIfTI in both implementations and both modes, the decision named (AFNI's file has a random identifier) | – |
 | AFNI-21 † | 3dTshift | warning and error labels in terminal colour codes, also in files and pipes | f | log files | the replica's `reproduce` writes them; plain labels by default | – |
 | AFNI-22 † | 3dTshift | `-Dname=value` with blanks or a blank around `=` sets another value (`-DX=a b` sets `a=b`) | e | none | the replica reads the value as written by default, as AFNI in `reproduce` (2026-10-12; spec §7.1) | original |
-| AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept | c? | none | reproduced in both modes (spec §7.1) | decide |
+| AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in the replica (decided 2026-10-12): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1). The original does not read the variable yet (the Python API refuses it there) | original |
 | AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | the replica gives x86-64's results on every platform (2026-10-12) | – |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
@@ -186,17 +186,18 @@ to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.m
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 13 | |
 | (b) race, nondeterminism | 6 | |
-| (c) deterministic bug that changes results | 58 | 15 |
+| (c) deterministic bug that changes results | 58 | 14 |
 | (d) imprecision | 19 | |
 | (e) command-line or parsing quirk | 28 | |
 | (f) documentation or message only | 8 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
-column (after completing 3dTshift, part 2a, 2026-10-12): no **yes** and no **replica** left, 8
-original (AFNI-07, -08, -11, -12, -16, -18, -19, -22; the spec describes each since
-2026-10-12), 19 decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept) and AFNI-16 (a defect, corrected by
-default) on 2026-10-12; AFNI-17 (an imprecision) was added the same day. The first D13
+column (after AFNI-23 was decided, 2026-10-12): no **yes** and no **replica** left, 9
+original (AFNI-07, -08, -11, -12, -16, -18, -19, -22, -23; the spec describes each since
+2026-10-12), 18 decide, 1 rule 8, 1 open. AFNI-06 was decided (class f, kept), AFNI-16 (a
+defect, corrected by default) and AFNI-23 (a defect, corrected by default) on 2026-10-12;
+AFNI-17 (an imprecision) was added the same day. The first D13
 switches (2026-10-11) corrected 13 entries; part 1 (2026-10-12) the 29 ANTs and ITK entries
 marked **yes**, ANTS-06 and SCI-02 (decided), ANTS-47 (new), and gave ANTS-07, -19, -28, -29
 and ITK-08 a compatibility switch (Decisions, item 5);
@@ -206,7 +207,8 @@ added AFNI-16; completing 3dTshift, part 1 (2026-10-12), changed the replica's d
 AFNI-16 and its `reproduce` for AFNI-12's second check, and wrote the spec additions the
 clean-room original needs (`specs/3dTshift.md` §6.1 to §6.5); part 2a (2026-10-12) gave the
 replica AFNI's global options and environment variables (spec §7.1), corrected AFNI-11 and
-AFNI-12 for them, and added AFNI-18 to AFNI-24.
+AFNI-12 for them, and added AFNI-18 to AFNI-24; AFNI-23, decided the same day, is corrected by
+default in the replica.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -231,11 +233,11 @@ other ANTs records). Part 2b (2026-10-12) did the 3dTshift replica's switch
 ([afni-tshift-replica.md](../validation/afni-tshift-replica.md)), and (2026-10-12, completing
 3dTshift, part 1) the replica's AFNI-16 default and the spec additions
 (`specs/3dTshift.md` §6.1 to §6.5), and (part 2a) AFNI's global options and environment
-variables in the replica, with AFNI-18, -19 and -22 (spec §7.1). Left for the clean-room
-original: `reproduce` for AFNI-07 on oblique grids, AFNI-08, AFNI-11, AFNI-12, AFNI-16,
-AFNI-18, AFNI-19 and AFNI-22, AFNI-03's notice when the corrected times make the output a
-copy (its defaults already agree with the replica's), and the global options and variables
-themselves (§7.1).
+variables in the replica, with AFNI-18, -19 and -22 (spec §7.1), and AFNI-23 corrected by
+default (decided 2026-10-12). Left for the clean-room original: `reproduce` for AFNI-07 on
+oblique grids, AFNI-08, AFNI-11, AFNI-12, AFNI-16, AFNI-18, AFNI-19 and AFNI-22, AFNI-03's
+notice when the corrected times make the output a copy (its defaults already agree with the
+replica's), and the global options and variables themselves (§7.1), AFNI-23 with them.
 
 **Main package (`crates/`, `python/larmorx/`), ANTs and ITK** (done 2026-10-12):
 
@@ -316,6 +318,7 @@ the oracle, and AFNI-11 and AFNI-12 given a switch:
 | AFNI-11, AFNI-12 | existing output; refused names | the replica's command line (switch); the original's, per spec §6.3 (2026-10-12) | paths with blanks |
 | AFNI-16 | a nearly plumb matrix written plumb | the replica's writer (default changed 2026-10-12); the original's writer per spec §6.1 | slightly oblique inputs |
 | AFNI-18, AFNI-19, AFNI-22 | an input name with a blank; `AFNI_ALLOW_MILLISECONDS`; `-D` values | the replica's input opening, writer and global options (2026-10-12); the original's, per spec §7.1 | paths with blanks |
+| AFNI-23 | `AFNI_NIFTI_SCALE=NO` drops the intercept | the replica's reader, writer and `-rlt` path (2026-10-12); the original's, per spec §7.1 | none |
 
 ### Decisions needed before switching
 
@@ -358,7 +361,7 @@ The original proposals, for the record:
    already does) and warns; the compatibility switch keeps the x86-64 answers.
 2. **Questionable behaviours (c?)**: is each a bug? ANTS-17, ANTS-22, ANTS-23, ANTS-32,
    ANTS-40, ANTS-44, ITK-06, PIPE-05, PIPE-07, AFNI-06 (decided 2026-10-12: kept, class f),
-   AFNI-23 (added 2026-10-12), FSL-15, FSL-18. ANTS-40 (N4's
+   AFNI-23 (decided 2026-10-12: a defect, corrected by default), FSL-15, FSL-18. ANTS-40 (N4's
    non-positive log values) and PIPE-05 (no displacement beyond the field) change every run
    they touch, so a fix would move many results.
 3. **D13 for replicas.** `implementation="auto"` runs the replica whenever it is installed. If
@@ -1775,19 +1778,46 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   dropped in both modes, with a warning by default.
 - **D13 / gap:** the original's (spec §7.1).
 
-### AFNI-23 † `AFNI_NIFTI_SCALE=NO` keeps the slope and drops the intercept — (c?)
+### AFNI-23 † `AFNI_NIFTI_SCALE=NO` keeps the slope and drops the intercept — (c; c? until 2026-10-12)
 - **What:** with the variable starting with `N` or `n` (`thd_niftiread.c:149-150`), uint8 and
   int16 data with both a slope and an intercept are no longer converted to float32; they
   stay integers with the slope as AFNI's scale factor (`:720-722`) and the intercept is
-  dropped (AFNI's scale factors have no offset). The values 3dTshift shifts are then neither
-  the stored integers nor the scaled values. The variable is not in AFNI's documentation
-  (`README.environment`); it may be meant as "do not scale", which the slope contradicts.
-- **Evidence:** read; verified 2026-10-12 (`environment/nifti-scale-no`,
-  `global/D-nifti-scale-no`).
+  dropped (AFNI's scale factors have no offset; `THD_load_nifti` scales only float bricks,
+  `:1068-1088`). The values 3dTshift shifts, and writes, are then the true values minus the
+  intercept: neither the stored integers nor the scaled values.
+- **What the variable is for:** it is in no AFNI documentation (`README.environment`) and
+  appears nowhere else in the source. It sets `THD_open_nifti`'s `scale_data` ("convert to
+  float and apply `scl_slope`/`scl_inter`") to 0. Until AFNI 20.3 (checked in
+  `AFNI_20.3.03`'s and `AFNI_16.0.00`'s `thd_niftiread.c`, the same code) no scale factor was set
+  when a file was opened, so the variable made uint8 and int16 data be read as stored, slope
+  and intercept both ignored: "do not scale". The changes of 26 January 2021 ("do not convert
+  NIFTI scaled shorts to float": a slope alone becomes the brick factor) and 8 March 2021 (the
+  factor set at open time) made AFNI keep scaled integers as integers wherever a brick factor
+  can carry the scaling. Since then the variable no longer stops the slope (for data with a
+  slope alone it changes nothing), and its only remaining effect is to keep integers with an
+  intercept as integers, which loses the intercept. Neither "do not scale" nor "keep the
+  integers" asks for values off by the intercept: the interaction of the two changes is the
+  defect.
+- **Evidence:** read; verified 2026-10-12 (`environment/nifti-scale-no`, `-copy`, `-rlt`,
+  `-rlt-ignore`, `global/D-nifti-scale-no`; by hand on int16 and uint8 inputs, slope 1
+  included, every restore mode, `-ignore`, `-no_detrend`, `-tpattern zero`: the values off by
+  the intercept to within half a stored unit, except where `-rlt` removes it with the trend;
+  int32 and float32 unchanged).
 - **fMRIPrep:** none (it does not set the variable).
-- **larmorx:** the replica reproduces it in both modes; the spec describes it (§7.1), so the
-  original will too.
-- **D13 / gap:** decide (questionable: an undocumented debugging switch, or a bug?).
+- **larmorx:** decided by the user (2026-10-12): corrected by default, the values kept right.
+  The variable's remaining purpose, integer data kept as integers, is kept too: the replica
+  (`dataset::DroppedIntercept`, `dataset::write`, `cli::tshift::rlt_dropped_intercept`) reads
+  the data as AFNI does and writes AFNI's stored values and `scl_slope` (1 where AFNI writes 0)
+  with the input's intercept as `scl_inter`, so the output reads back as the run without the
+  variable, to within half a stored unit (at most 0.185, 0.25 and 0.5 on the inputs above).
+  `-rlt` without `-ignore` leaves nothing to correct (AFNI's output is right); with `-ignore`
+  the ignored volumes need the intercept and the others do not, so the data are read as
+  without the variable (byte for byte the run without it). Named in both modes where the two
+  outputs differ; `reproduce` gives AFNI's bytes. Applying both slope and intercept in every
+  case (float32 output, the run without the variable) was the alternative; it would make the
+  variable do nothing at all. The clean-room original does not read the variable yet; spec
+  §7.1 describes the behaviour and the correction.
+- **D13 / gap:** the original's (spec §7.1).
 
 ### AFNI-24 † NIfTI quaternions depend on the build's `long double` — (d)
 - **What:** `nifti_dmat44_to_quatern` and `nifti_quatern_to_dmat44`

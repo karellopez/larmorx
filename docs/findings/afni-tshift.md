@@ -171,8 +171,8 @@ the axes' steps as `pixdim`; and `regular = 'r'`. Consequences, each *verified* 
 
 - **A grid nearly plumb comes out plumb.** The angle test is 0.01°, but on a float cosine: a
   matrix whose cosine rounds to 1 in float (about 0.014° or less) is written as the plumb
-  matrix of its axes (AFNI-16). An sform 0.006° from plumb came out plumb (4e-4 mm from the
-  input's at the corners), one 0.017° from plumb as it was.
+  matrix of its axes (AFNI-16). An sform 0.006° from plumb came out plumb (its entries up
+  to 4e-4 from the input's), one 0.017° from plumb as it was.
 - **Plumb outputs carry signed zeros:** the cardinal matrix's zeros are +0 in DICOM, so the
   sform's x and y rows hold −0 (`srow_x = [3, -0, -0, …]`), and the quaternion of such a matrix
   has `quatern_c = −0`.
@@ -186,10 +186,10 @@ the axes' steps as `pixdim`; and `regular = 'r'`. Consequences, each *verified* 
 
 The xform codes become 1, except 3 for codes 3 and 5 and 4 for code 4. larmorx-gpl translates
 the axes, the obliquity test, the cardinal matrix and the quaternion (`axes.rs`; the quaternion
-in double where AFNI forms three quotients in x87 extended precision, which the float32 header
+in double where AFNI forms a few quotients in x87 extended precision, which the float32 header
 fields almost never show), and gives AFNI's header bytes, the AFNI extension aside, on every
 case tried: plumb, oblique, nearly plumb, qform-only, sform-only, form-less, metre and
-micrometre inputs. Before 2026-10-12 it wrote the matrix as read (the record of 2026-10-10
+micrometre inputs, and five real BOLD runs (one AFNI-written, with its extension). Before 2026-10-12 it wrote the matrix as read (the record of 2026-10-10
 covered qform-only metre inputs only), which differed from AFNI for plumb metre and micrometre
 sforms and nearly plumb grids. By default larmorx-gpl converts the matrix and the origins of a
 metre or micrometre header to millimetres too (AFNI-07), as the original does.

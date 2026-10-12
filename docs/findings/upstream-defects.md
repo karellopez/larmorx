@@ -1581,8 +1581,8 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   obliquity is discarded: its sform and qform come out exactly plumb, with the axes' steps and
   origins. Deliberate in AFNI (it avoids calling float noise oblique); questionable because it
   moves the grid by up to 0.014° (0.024 mm at 100 mm from the origin).
-- **Evidence:** read; verified (2026-10-12: an sform 0.006° from plumb comes out plumb, 4e-4 mm
-  from the input's at the parity case's corners; one 0.017° from plumb is kept).
+- **Evidence:** read; verified (2026-10-12: an sform 0.006° from plumb comes out plumb, its
+  entries up to 4e-4 from the input's; one 0.017° from plumb is kept).
 - **fMRIPrep:** inputs with tiny rotations in their header (scanner rounding); 3dTshift's output
   geometry then differs from its input's by that much.
 - **larmorx:** the replica reproduces it in both modes (`larmorx_gpl_afni::axes::is_plumb`,

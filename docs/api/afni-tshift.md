@@ -9,16 +9,17 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
 **Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 236 cases:
+[validation record](../validation/afni-tshift.md)). The record covers 245 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
-  input" cases and 17 errors both must raise;
+  input" cases, AFNI's defects (D13) and 18 error cases;
 - 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
   with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift.
 
-All 236 agree, and 158 of the 217 compared are byte-identical. The Lagrange and
-weighted-sinc methods and the copies give **the same bytes** as AFNI (117 of 120). The
+All 245 agree, 6 of them as documented divergences, and 162 of the 222 compared are
+byte-identical. The Lagrange and weighted-sinc methods and the copies give **the same bytes**
+as AFNI (120 of 123). The
 Fourier method (the default) differs in the last float32 bits, at most 4.3e-7 of the largest
 value, because AFNI's FFT is float32 and larmorx's is double; integer outputs then differ by
 at most 1, in a few values per million on the real runs (up to 0.2 % on a synthetic series
@@ -170,7 +171,7 @@ The output header is NIfTI-1 with qform and sform both from AFNI's matrix (the s
 third (`dim_info` 48) and slice range `0..nz−1`; AFNI's history extension is not written.
 AFNI writes a grid less than about 0.014° from plumb as exactly plumb (AFNI-16, a questionable
 behaviour kept in both modes): the replica does the same, the clean-room original keeps the
-input's matrix (a difference of 4e-4 mm on the parity case `geometry/slightly-oblique`).
+input's matrix (sform entries 4e-4 apart on the parity case `geometry/slightly-oblique`).
 
 ## Upstream defects (D13)
 
@@ -189,7 +190,7 @@ warning names each one that changed the output, in both modes
 | AFNI-07 | metre and micron units: the voxel sizes are converted to millimetres, the origin is not (a plumb grid), or the whole sform is not (an oblique grid) | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
 | AFNI-08 | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | no slice code, `slice_end` = nz − 1 | the command line: header slice times beyond the TR, e.g. 0.5 ms apart with a 1 ms TR |
 | AFNI-11 | an existing output is not written, and the exit status is 0 | an error (exit 1) | the command line |
-| AFNI-12 | a `-prefix` with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused | written, with the warning | the command line |
+| AFNI-12 | a `-prefix` with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused | written (the replica names the defect) | the command line |
 
 On fMRIPrep's calls (int16 or float32 BOLD in millimetres, `-tpattern` from the sidecar, no
 `-no_detrend`, fresh output names) none of them applies, so the default output is AFNI's. The
@@ -205,8 +206,9 @@ where the original's own numerics differ from AFNI's (Fourier, quintic, heptic, 
 grid less than about 0.014° from plumb (above), and AFNI-08's copy, whose slice code and
 duration the replica derives from the times (none: they are all within 3 ms of 0) and the
 original copies from the input header. With `reproduce`, the replica gives AFNI's output bytes;
-the original does too except for AFNI-08, AFNI-11 and AFNI-12, which it has no switch for, and
-AFNI-07 on an oblique grid, where it converts the sform's linear part (expected divergences in
+the original gives AFNI's output within its thresholds, except for AFNI-08, AFNI-11 and AFNI-12,
+which it has no switch for, AFNI-07 on an oblique grid, where it converts the sform's linear
+part, and the nearly plumb grid (expected divergences in
 [its record](../validation/afni-tshift.md); spec additions pending). AFNI's environment
 variables (`AFNI_DECONFLICT`, `AFNI_ALLOW_ARBITRARY_FILENAMES`, ...) are not read:
 `reproduce` is AFNI with them unset.

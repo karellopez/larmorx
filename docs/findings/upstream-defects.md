@@ -119,6 +119,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | PIPE-13 | sMRIPrep | the report text prints a module | f | every report | – | – |
 | PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
+| PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect | decide |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -1077,8 +1078,8 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 
 ## fMRIPrep and its libraries
 
-fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2, nipype
-1.12.0, nitransforms 25.1.0. Details in [fmriprep-oracle.md](fmriprep-oracle.md),
+fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.2, sdcflows
+2.15.1, nipype 1.12.0, nitransforms 25.1.0. Details in [fmriprep-oracle.md](fmriprep-oracle.md),
 [fmriprep-resampling.md](fmriprep-resampling.md), [scipy-ndimage.md](scipy-ndimage.md) and
 `docs/analysis/01-04`.
 
@@ -1113,13 +1114,21 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   *source* grid on the *target* array. It is the right derivative only when the target's axes
   match the source's (the native boldref); in T1w or standard space it differentiates along
   whatever target axis has that index.
-- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`. Not yet exercised by an oracle run:
-  ds000005 has no field maps, and the ds001600 run (2026-10-11) processed its field maps but
-  skipped its four BOLD runs ("Too short BOLD series (<= 5 timepoints)"); measured instead on
-  real geometry with a synthetic field map (below).
-- **fMRIPrep:** the Jacobian is on by default for PEPOLAR field maps
-  (`fmriprep/workflows/base.py:878-887`); outputs in T1w and standard spaces whose axes are
-  ordered differently from the BOLD grid's.
+- **Evidence:** read: `fmriprep/interfaces/resampling.py:316`; verified on a real PEPOLAR run
+  (2026-10-12, below): the stage comparison of fMRIPrep 25.2.6's ds005040 run reproduces its
+  four field-map `ResampleSeries` outputs bit for bit with `upstream_defects="reproduce"`
+  ([fmriprep-stages-ds005040](../validation/fmriprep-stages-ds005040.md)). First measured on
+  real geometry with a synthetic field map (ds000005 has no field maps; the ds001600 run
+  skipped its BOLD runs).
+- **fMRIPrep:** the Jacobian is on by default for PEPOLAR field maps only
+  (`fmriprep/workflows/base.py:853-858` in 25.2.6; `_jacobian_for` at `21a490fb`), and with
+  `--force fmap-jacobian` for every kind; outputs in standard spaces (the derivative steps
+  over one target voxel, which in BOLD voxels is the wrong length and, when the grids are
+  rotated, the wrong direction: 0.57 BOLD voxels in MNI res-2 for ds005040's 3 mm BOLD, so 57 %
+  of the correction; 1.65 for ds005454's 1.4 mm BOLD, an amplified one), and in `space-T1w`
+  when the BOLD is acquired obliquely (fMRIPrep's `space-T1w` grid is the T1w's orientation at
+  the BOLD's voxel size, so only the angle between the grids matters there: 3° for ds005040,
+  25° for ds005454).
 - **larmorx:** corrected by default (2026-10-11): the Jacobian is `1 + ∇_t vsm · ∂t/∂s_pe`,
   the derivative along the phase-encoding direction mapped into the target grid (the Jacobian
   determinant of the corrected mapping relative to the uncorrected one, by the matrix
@@ -1137,7 +1146,28 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
   factor by more than 0.01 (1 % of the signal) in 40 % of brain voxels, by more than 0.05 in
   21 %, with a 99th-percentile error of 0.23. In MNI res-2: 33 % and 14 %, 99th percentile
   0.16. larmorx's factor is within 0.002 (T1w) and 0.008 (MNI) of the exact one at the 99th
-  percentile.
+  percentile. (fMRIPrep's own `space-T1w` BOLD is not on the 1 mm T1w grid used there but at
+  the BOLD's voxel size; on that grid ds000005's 31° angle between the BOLD's `j` axis and the
+  T1w's still separates the factors by more than 0.01 in 36 % of brain voxels.)
+- **Measured on fMRIPrep's own field maps** (2026-10-12,
+  [validation/resample-series-jacobian.md](../validation/resample-series-jacobian.md), "On
+  fMRIPrep's own field maps", and the stage records). ds005040 sub-002 (PEPOLAR with `topup`,
+  3×3×3.3 mm BOLD, Jacobian on as fMRIPrep runs it): on the boldref grid (`desc-preproc_bold`
+  and the unwarped boldref) larmorx's default is fMRIPrep's output bit for bit; in `space-T1w`
+  (3 mm) it changes 78.8 % of brain voxels by more than 0.1 % and 2.8 % by more than 1 %
+  (99th percentile 1.4 %, largest 6.8 %); in MNI res-2, 95.6 % by more than 0.1 %, 59.5 % by
+  more than 1 %, 5.6 % by more than 5 % (99th percentile 11 %, largest 56 %), the changes above
+  10 % almost all (94 %) below z = −10 mm, mostly lateral: the inferior temporal lobes,
+  where the field is steepest. Against the factor on the BOLD's own grid carried to each output
+  grid (a reference with no choice of axis), fMRIPrep's MNI factor is off by 0.012 (median),
+  0.10 (99th percentile), larmorx's by 0.005 and 0.063 (the reference's own error, from 3 mm
+  central differences, is part of both). ds005454 sub-16 (`phasediff`, oblique 1.4 mm BOLD:
+  fMRIPrep runs it without the Jacobian, so larmorx's default leaves its outputs unchanged;
+  with the Jacobian forced on): fMRIPrep's factor is off the reference by 0.031 / 0.39 (median
+  / 99th percentile) in `space-T1w` and 0.021 / 0.26 in MNI, larmorx's by 0.0006 / 0.007 and
+  0.0011 / 0.016; larmorx's default would change 79 % (`space-T1w`) and 71 % (MNI) of brain
+  voxels by more than 1 %. ds005752's field map is not used by fMRIPrep (no `IntendedFor`), so
+  it does not reach `ResampleSeries`.
 - **D13 / gap:** done.
 
 ### PIPE-04 `.h5` composites read in name order — (c), latent
@@ -1252,6 +1282,32 @@ fMRIPrep 25.2.6 (the oracle run) or its source at `21a490fb`, niworkflows 1.15.2
 - **fMRIPrep:** none (it uses neither).
 - **larmorx:** `larmorx mri hmc` rejects `-edge` and writes mcflirt's names, as mcflirt does.
 - **D13 / gap:** nipype's defect; the names are FSL-08's gap.
+
+### PIPE-16 nipype writes N4's corrected image in the input's data type — (c?)
+- **What:** nipype's `N4BiasFieldCorrection` interface, with `copy_header=True`, copies the
+  input's header onto the outputs after ANTs has written them, and for the corrected image
+  keeps **the input's data type** (`_copy_header_map = {"output_image": ("input_image",
+  False), ...}`, `keep_dtype=False`; `nipype.utils.imagemanip.copy_header`). When the input is
+  an integer image, nibabel re-quantizes N4's float32 result to that type with a scale factor
+  of its choosing. sdcflows' brain extraction of the field-map reference (`fmap_preproc_wf/
+  <estimator>/brainextraction_wf/n4`) runs N4 with `copy_header=True` on its clipped
+  reference, which is int16 (`clipper_pre`): fMRIPrep's corrected reference is N4's output
+  rounded to int16 with `scl_slope` 0.0032 and `scl_inter` 105.19 (ds005040).
+- **Evidence:** read: nipype 1.12.0 `interfaces/ants/segmentation.py:503-506`,
+  `interfaces/mixins/fixheader.py:117-134`, `utils/imagemanip.py:6-20`; sdcflows 2.15.1
+  `workflows/ancillary.py:86-91`; verified (fMRIPrep 25.2.6's ds005040 run: the node's output
+  is int16 with a scale factor; ANTs' own output, re-run in fMRIPrep's image at the node's 8
+  threads, is float32 and differs from it in all 98,545 nonzero voxels, by up to 1.6e-3
+  (3e-3 relative at the dimmest voxels, median 1.8e-5); after nipype's own `copy_header` on
+  that re-run, bit-identical to fMRIPrep's output).
+- **fMRIPrep:** every field-map estimation whose reference is clipped to an integer image
+  (sdcflows' `BrainExtraction` mask comes from it); the brain-extraction N4s of the T1w and
+  the BOLD reference have float32 inputs, so their data are unchanged.
+- **larmorx:** not a tool defect: `larmorx ants N4BiasFieldCorrection` writes float32, as ANTs
+  does. The stage comparison runs nipype's own `copy_header` on every run before comparing
+  (`larmorx_validation.stages.nodes._NipypePost`).
+- **D13 / gap:** **decide** for larmorprepx: keep N4's float32 output (the default larmorprepx
+  would take), or write the input's type as fMRIPrep does.
 
 ### SCI-01 `map_coordinates` reads outside its array — (a)
 - **What:** coordinates go through `(npy_intp)floor(cc)`, undefined for NaN and beyond ±2^63; on

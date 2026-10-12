@@ -176,9 +176,38 @@ def measure_oracle(root: Path) -> list[dict[str, Any]]:
                     },
                     "err_fmriprep": _errors(er),
                     "err_larmorx": _errors(ef),
+                    "fmriprep_step": _fmriprep_step(run, inputs, txfms, tinv, img),
                 }
             )
     return rows
+
+
+def _fmriprep_step(run, inputs: dict, transforms: list[str], inverse, img) -> dict[str, float]:
+    """What fMRIPrep's derivative steps over, at the centre of the output grid: one voxel along
+    the output axis that has the BOLD's phase-encoding index, mapped into the BOLD's voxels
+    (after sdcflows' ``ensure_positive_cosines``): its length in BOLD voxels and its angle to
+    the phase-encoding axis. The right step is one BOLD voxel along that axis (length 1,
+    angle 0); fMRIPrep's factor departs from the Jacobian as the two differ."""
+    import nibabel as nib
+
+    import larmorx as lx
+    from larmorx.transforms.resample import ensure_positive_cosines
+
+    src = nib.load(run.host(inputs["in_file"]))
+    _, src_affine, _ = ensure_positive_cosines(np.zeros(src.shape[:3], np.float32), src.affine)
+    pe = "ijk".index(str(inputs["pe_dir"])[0])
+    centre = (np.array(img.shape[:3], float) - 1) / 2
+    vox = np.array([centre, centre + np.eye(3)[pe]])
+    world = vox @ img.affine[:3, :3].T + img.affine[:3, 3]
+    if transforms:
+        world = lx.transforms.load_transforms(transforms, inverse).map(world, n_threads=1)
+    src_vox = np.c_[world, np.ones(2)] @ np.linalg.inv(src_affine).T
+    d = src_vox[1, :3] - src_vox[0, :3]
+    length = float(np.linalg.norm(d))
+    return {
+        "length": length,
+        "angle_deg": float(np.degrees(np.arccos(min(1.0, abs(d[pe]) / length)))),
+    }
 
 
 def _errors(e: np.ndarray) -> dict[str, float]:
@@ -213,19 +242,24 @@ def report_oracle(runs: dict[str, list[dict[str, Any]]]) -> list[str]:
         "against it there is the reference's own error. Brain voxels: fMRIPrep's "
         "BOLD brain mask on each grid. fMRIPrep's `space-T1w` grid is the T1w's orientation at "
         "the BOLD's voxel size (`gen_ref`, `keep_native`), not the 1 mm grid of the synthetic "
-        "study above.",
+        "study above. fMRIPrep's step: what its derivative steps over, at the centre of the "
+        "output grid (one voxel along the output axis that has the BOLD's phase-encoding "
+        "index, mapped into the BOLD's voxels); the Jacobian needs one BOLD voxel along the "
+        "phase-encoding axis (1 / 0°). A shorter step shrinks the correction in proportion; "
+        "an angle takes the field's slope along another direction.",
         "",
-        "| Oracle run | BOLD run | Output grid | Shape | Voxel size (mm) | Jacobian in "
-        "fMRIPrep's run | Brain voxels | fMRIPrep's factor | larmorx's factor | Reference | "
-        "Factors differ by > 0.01 | Error, fMRIPrep (median / 99th pct / > 0.01) | "
+        "| Oracle run | BOLD run | Output grid | Shape | Voxel size (mm) | fMRIPrep's step "
+        "(BOLD voxels / angle to the PE axis) | Jacobian in fMRIPrep's run | Brain voxels | "
+        "fMRIPrep's factor | larmorx's factor | Reference | Factors differ by > 0.01 | "
+        "Error, fMRIPrep (median / 99th pct / > 0.01) | "
         "Error, larmorx (median / 99th pct / > 0.01) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for oracle, rows in runs.items():
         for r in rows:
             if r["grid"].startswith("native"):
                 lines.append(
-                    f"| {oracle} | {r['run']} | {r['grid']} | {r['shape']} | – | "
+                    f"| {oracle} | {r['run']} | {r['grid']} | {r['shape']} | – | 1 / 0° | "
                     f"{'on' if r['jacobian_in_run'] else 'off'} | {r['voxels']:,} | "
                     f"{r['fmriprep_range'][0]:.3f} to {r['fmriprep_range'][1]:.3f} | "
                     f"{'the same, bit for bit' if r['native_identical'] else '**differs**'} | "
@@ -233,8 +267,10 @@ def report_oracle(runs: dict[str, list[dict[str, Any]]]) -> list[str]:
                 )
                 continue
             ef, el = r["err_fmriprep"], r["err_larmorx"]
+            step = r["fmriprep_step"]
             lines.append(
                 f"| {oracle} | {r['run']} | {r['grid']} | {r['shape']} | {r['zooms']} | "
+                f"{step['length']:.2f} / {step['angle_deg']:.0f}° | "
                 f"{'on' if r['jacobian_in_run'] else 'off'} | {r['voxels']:,} | "
                 f"{r['fmriprep_range'][0]:.3f} to {r['fmriprep_range'][1]:.3f} | "
                 f"{r['larmorx_range'][0]:.3f} to {r['larmorx_range'][1]:.3f} | "

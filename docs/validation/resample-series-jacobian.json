@@ -5,6 +5,7 @@
    "target": "native (BOLD reference)",
    "shape": "64\u00d764\u00d734",
    "zooms": "3.12\u00d73.12\u00d74",
+   "step": "1.00 / 0\u00b0",
    "voxels": 32069,
    "fix_range": [
     0.5839770436286926,
@@ -37,6 +38,7 @@
    "target": "T1w",
    "shape": "160\u00d7192\u00d7192",
    "zooms": "1\u00d71.33\u00d71.33",
+   "step": "0.39 / 31\u00b0",
    "voxels": 763153,
    "fix_range": [
     0.5753025412559509,
@@ -66,9 +68,43 @@
    ]
   },
   {
+   "target": "T1w at the BOLD's voxel size (fMRIPrep's `space-T1w` BOLD)",
+   "shape": "50\u00d754\u00d739",
+   "zooms": "3.12\u00d73.12\u00d74",
+   "step": "0.92 / 31\u00b0",
+   "voxels": 31731,
+   "fix_range": [
+    0.5870009064674377,
+    1.423937201499939
+   ],
+   "fmriprep_range": [
+    0.581602156162262,
+    1.4202110767364502
+   ],
+   "identical": 1352,
+   "over_001": 0.35838769657432795,
+   "over_005": 0.15413948504616937,
+   "over_02": 0.0072169172102990765,
+   "median_diff": 0.0024774670600891113,
+   "max_diff": 0.26878392696380615,
+   "exact_range": [
+    0.5784476878159575,
+    1.431920678363353
+   ],
+   "err_fix": [
+    0.00019789186108132295,
+    0.007585033670603741
+   ],
+   "err_fmriprep": [
+    0.0029449049576510955,
+    0.1920403966948162
+   ]
+  },
+  {
    "target": "MNI152NLin2009cAsym res-2",
    "shape": "97\u00d7115\u00d797",
    "zooms": "2\u00d72\u00d72",
+   "step": "0.47 / 19\u00b0",
    "voxels": 219326,
    "fix_range": [
     0.5086075663566589,
@@ -97,5 +133,213 @@
     0.16311528185061003
    ]
   }
- ]
+ ],
+ "oracle": {
+  "ds005040-sub-002-noreconall": [
+   {
+    "run": "task_clip_run_1",
+    "grid": "native (BOLD reference)",
+    "shape": "64\u00d764\u00d740",
+    "jacobian_in_run": true,
+    "pe_dir": "j",
+    "ro_time": 0.0137951,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_desc-brain_mask.nii.gz",
+    "voxels": 51891,
+    "fmriprep_range": [
+     0.39533352851867676,
+     1.6856355667114258
+    ],
+    "larmorx_range": [
+     0.39533352851867676,
+     1.6856355667114258
+    ],
+    "native_identical": true
+   },
+   {
+    "run": "task_clip_run_1",
+    "grid": "T1w",
+    "shape": "50\u00d762\u00d744",
+    "zooms": "3\u00d73\u00d73.3",
+    "jacobian_in_run": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_space-T1w_desc-brain_mask.nii.gz",
+    "voxels": 51660,
+    "fmriprep_range": [
+     0.37593603134155273,
+     1.6327028274536133
+    ],
+    "larmorx_range": [
+     0.38583463430404663,
+     1.6491581201553345
+    ],
+    "reference_range": [
+     0.3756609857082367,
+     1.6469539403915405
+    ],
+    "gap_over": {
+     "0.01": 0.028184281842818428,
+     "0.05": 0.0
+    },
+    "err_fmriprep": {
+     "median": 0.003199636936187744,
+     "p99": 0.021674699783325008,
+     "over_0.01": 0.08193960511033682,
+     "over_0.05": 0.0013937282229965157
+    },
+    "err_larmorx": {
+     "median": 0.0013677477836608887,
+     "p99": 0.01534774899482726,
+     "over_0.01": 0.02853271389856756,
+     "over_0.05": 0.0012582268679829655
+    },
+    "fmriprep_step": {
+     "length": 0.999760700802237,
+     "angle_deg": 2.777767856919244
+    }
+   },
+   {
+    "run": "task_clip_run_1",
+    "grid": "MNI152NLin2009cAsym res-2",
+    "shape": "97\u00d7115\u00d797",
+    "zooms": "2\u00d72\u00d72",
+    "jacobian_in_run": true,
+    "mask": "out/sub-002/func/sub-002_task-clip_run-1_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+    "voxels": 254305,
+    "fmriprep_range": [
+     0.4637176990509033,
+     1.472992181777954
+    ],
+    "larmorx_range": [
+     0.33068984746932983,
+     1.774189829826355
+    ],
+    "reference_range": [
+     0.35539713501930237,
+     1.7122435569763184
+    ],
+    "gap_over": {
+     "0.01": 0.595882896521893,
+     "0.05": 0.05577161282711705
+    },
+    "err_fmriprep": {
+     "median": 0.012433886528015137,
+     "p99": 0.10141517400741537,
+     "over_0.01": 0.5834843986551582,
+     "over_0.05": 0.04550441399107371
+    },
+    "err_larmorx": {
+     "median": 0.005081832408905029,
+     "p99": 0.06297305107116692,
+     "over_0.01": 0.26776901751833426,
+     "over_0.05": 0.016374039047600323
+    },
+    "fmriprep_step": {
+     "length": 0.5718995662685719,
+     "angle_deg": 7.168355228425196
+    }
+   }
+  ],
+  "ds005454-sub-16-noreconall": [
+   {
+    "run": "task_rest",
+    "grid": "native (BOLD reference)",
+    "shape": "160\u00d7160\u00d796",
+    "jacobian_in_run": false,
+    "pe_dir": "j-",
+    "ro_time": 0.0429303,
+    "mask": "out/sub-16/func/sub-16_task-rest_desc-brain_mask.nii.gz",
+    "voxels": 436984,
+    "fmriprep_range": [
+     -0.4875938892364502,
+     2.3909246921539307
+    ],
+    "larmorx_range": [
+     -0.4875938892364502,
+     2.3909246921539307
+    ],
+    "native_identical": true
+   },
+   {
+    "run": "task_rest",
+    "grid": "T1w",
+    "shape": "98\u00d7121\u00d799",
+    "zooms": "1.4\u00d71.4\u00d71.4",
+    "jacobian_in_run": false,
+    "mask": "out/sub-16/func/sub-16_task-rest_space-T1w_desc-brain_mask.nii.gz",
+    "voxels": 436285,
+    "fmriprep_range": [
+     -0.5343959331512451,
+     2.264068603515625
+    ],
+    "larmorx_range": [
+     -0.48680707812309265,
+     2.3786768913269043
+    ],
+    "reference_range": [
+     -0.48691660165786743,
+     2.39101243019104
+    ],
+    "gap_over": {
+     "0.01": 0.7893395372291049,
+     "0.05": 0.3412769176111945
+    },
+    "err_fmriprep": {
+     "median": 0.030652105808258057,
+     "p99": 0.3892314529418942,
+     "over_0.01": 0.789667304628855,
+     "over_0.05": 0.34318622001673216
+    },
+    "err_larmorx": {
+     "median": 0.0005970597267150879,
+     "p99": 0.006629962921142575,
+     "over_0.01": 0.001771777622425708,
+     "over_0.05": 0.0
+    },
+    "fmriprep_step": {
+     "length": 1.0000000319690048,
+     "angle_deg": 24.54332106667193
+    }
+   },
+   {
+    "run": "task_rest",
+    "grid": "MNI152NLin2009cAsym res-2",
+    "shape": "97\u00d7115\u00d797",
+    "zooms": "2\u00d72\u00d72",
+    "jacobian_in_run": false,
+    "mask": "out/sub-16/func/sub-16_task-rest_space-MNI152NLin2009cAsym_res-2_desc-brain_mask.nii.gz",
+    "voxels": 233871,
+    "fmriprep_range": [
+     -1.259110450744629,
+     2.6933302879333496
+    ],
+    "larmorx_range": [
+     -0.4766072928905487,
+     2.409952163696289
+    ],
+    "reference_range": [
+     -0.482322633266449,
+     2.3976681232452393
+    ],
+    "gap_over": {
+     "0.01": 0.7088565918818494,
+     "0.05": 0.2348816227749486
+    },
+    "err_fmriprep": {
+     "median": 0.020650029182434082,
+     "p99": 0.2646849393844604,
+     "over_0.01": 0.7056625233568933,
+     "over_0.05": 0.22941707180454182
+    },
+    "err_larmorx": {
+     "median": 0.0011392831802368164,
+     "p99": 0.016201460361480673,
+     "over_0.01": 0.030700685420595113,
+     "over_0.05": 0.0001282758443757456
+    },
+    "fmriprep_step": {
+     "length": 1.6498624643100708,
+     "angle_deg": 5.03774880986849
+    }
+   }
+  ]
+ }
 }

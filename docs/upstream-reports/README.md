@@ -12,4 +12,4 @@ the project.
 | Report | Project | Register | Status |
 |---|---|---|---|
 | [fmriprep-resampler-openblas-race.md](fmriprep-resampler-openblas-race.md) | fMRIPrep | PIPE-02 | draft, not yet filed |
-| [fmriprep-jacobian-wrong-axis.md](fmriprep-jacobian-wrong-axis.md) | fMRIPrep | PIPE-03 | draft, not yet filed; to confirm on a real PEPOLAR run (ds005040) |
+| [fmriprep-jacobian-wrong-axis.md](fmriprep-jacobian-wrong-axis.md) | fMRIPrep | PIPE-03 | draft, not yet filed; confirmed on a real PEPOLAR run (ds005040) and a phase-difference run with the Jacobian forced (ds005454), 2026-10-12 |

@@ -208,22 +208,30 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 
 ## Against a real fMRIPrep run
 
-[fmriprep-stages](validation/fmriprep-stages.md) (2026-10-11) gives larmorx's tools the inputs
-and parameters fMRIPrep 25.2.6 itself used at each step of a real run (ds000005 sub-01, read
-from nipype's working directory) and compares their outputs with fMRIPrep's own for that step:
+[fmriprep-stages](validation/fmriprep-stages.md) (regenerated 2026-10-12) gives larmorx's tools
+the inputs and parameters fMRIPrep 25.2.6 itself used at each step of a real run (ds000005
+sub-01, read from nipype's working directory) and compares their outputs with fMRIPrep's own
+for that step:
 
-- **61 of 92 steps are bit-identical to fMRIPrep as it ran**: every ImageMath,
+- **75 of 92 steps are bit-identical to fMRIPrep as it ran**: every ImageMath,
   ThresholdImage and MultiplyImages step of brain extraction, the nine one-shot BOLD
-  resamplings (boldref, T1w and MNI space), and the antsApplyTransforms calls with linear,
-  MultiLabel and nearest-neighbour interpolation.
-- **The other 31 are explained**, each taken apart by re-running the step in fMRIPrep's image
+  resamplings (boldref, T1w and MNI space), and every antsApplyTransforms call but the Gaussian
+  ones of the brain-extraction priors and the confound masks, the 14 `--float 1` calls
+  included.
+- **The other 17 are explained**, each taken apart by re-running the step in fMRIPrep's image
   and with the oracle builds: fMRIPrep's thread count (DenoiseImage and the anatomical N4s ran
-  with 8 threads; DenoiseImage at 8 threads does not even reproduce itself), glibc's
-  not-correctly-rounded maths, and the ANTs build. The exception is larmorx's own: 14
-  `antsApplyTransforms --float 1` calls, which ANTs computes in single precision and larmorx in
-  double (known since A1; ANTs in double precision, rounded to float32, is larmorx's output bit
-  for bit). Because of it, three probability maps miss the interpolation threshold of PLAN.md
-  §11.3 in at most 6 of 1.08 million voxels.
+  with 8 threads; DenoiseImage at 8 threads does not even reproduce itself) and glibc's
+  not-correctly-rounded maths. (On 2026-10-11, 61 of 92: larmorx then computed `--float 1` in
+  double precision, and the repository's ANTs oracle was a miscompiled GCC 11 build.)
+- **Three runs with field maps** (2026-10-12; [ds005040](validation/fmriprep-stages-ds005040.md)
+  PEPOLAR with slice timing, [ds005454](validation/fmriprep-stages-ds005454.md) `phasediff`
+  with two T1w and 280 volumes, [ds005752](validation/fmriprep-stages-ds005752.md) two runs
+  with slice timing): 56 of 65, 55 of 68 and 65 of 78 steps bit-identical, the rest
+  explained the same way. The 3dTshift replica reproduces all four slice-timing steps bit for
+  bit, the clean-room original within its thresholds (one stored unit in at most 1,808 of 688
+  million values). With fMRIPrep's own PEPOLAR field map, larmorx's corrected Jacobian
+  (PIPE-03) changes fMRIPrep's MNI-space BOLD by more than 1 % in 60 % of brain voxels
+  ([validation/resample-series-jacobian.md](validation/resample-series-jacobian.md)).
 - **Head-motion correction** (clean-room): against mcflirt, median parameter differences of at
   most 0.0025 mm and 0.0036° (threshold 0.05) and a 95th-percentile RMS deviation of at most
   0.023 mm; fMRIPrep's own confound code on larmorx's matrices gives FD correlations of

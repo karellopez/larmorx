@@ -34,12 +34,14 @@ Paths below are under `work/fmriprep_25_2_wf/sub_01_wf/`; `<run>` is
   correctly rounded maths, is bit-identical to fMRIPrep's N4 binary in all 45 cases of the N4
   parity suite and in all six N4 outputs of this run (below); the oracle is rebuilt by a fixed
   compiler.
-- **61 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran**, on the steps'
-  own inputs and parameters: every ImageMath, ThresholdImage and MultiplyImages step, the
-  one-shot resampling in all three spaces, and the antsApplyTransforms calls with linear,
-  MultiLabel or nearest-neighbour interpolation in double precision. The others are explained
-  by the thread count, glibc's maths or the ANTs build, except the 14 calls with `--float 1`,
-  which ANTs computes in single precision and larmorx in double (the record).
+- **75 of the 92 nodes larmorx can run are bit-identical to fMRIPrep as it ran** (record
+  regenerated 2026-10-12; 61 on 2026-10-11), on the steps' own inputs and parameters: every
+  ImageMath, ThresholdImage and MultiplyImages step, the one-shot resampling in all three
+  spaces, and every antsApplyTransforms call but the Gaussian ones of A06 and F10 (glibc's
+  `exp`), the 14 with `--float 1` included (larmorx computes them in single precision as ANTs
+  does since 2026-10-11). The other 17 are explained by the thread count and glibc's maths
+  alone: with the GCC 14.3 oracle, the ANTs build no longer separates anything (the record).
+  The field-map runs are below.
 - **Parameters differ from the analysis in two places**: the BOLD reference's antsAI uses
   `Affine[0.1]`, not `Rigid[0.1]`; and the BOLD reference's N4 runs with ANTs' default shrink
   factor (4), because `shrink_factor=2` is given to nipype's `Node`, not to the interface (as

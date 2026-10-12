@@ -17,6 +17,9 @@
 //!   detrending ([`detrend`]), and a port of glibc's `sinf`/`cosf` ([`glibc_sincosf`]) for the
 //!   weighted-sinc method.
 //! - Inputs: slice patterns ([`tpattern`]) and AFNI's 1D text files ([`oned`]).
+//! - AFNI's environment variables and global options (`-Dname=value`, `-overwrite`), as a
+//!   settings table that never changes the process environment ([`environ`]), and AFNI's
+//!   messages ([`message`]).
 #![forbid(unsafe_code)]
 
 pub mod afni_ext;
@@ -26,7 +29,9 @@ pub mod cnum;
 pub mod csfft;
 pub mod dataset;
 pub mod detrend;
+pub mod environ;
 pub mod glibc_sincosf;
+pub mod message;
 pub mod oned;
 pub mod shift;
 pub mod tpattern;

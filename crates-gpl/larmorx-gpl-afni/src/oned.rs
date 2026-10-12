@@ -26,10 +26,17 @@
 //!
 //! Not supported (an error): `.tsv` and `.csv` tables, standard input, `jRandom1D:` and `3D:`
 //! inputs, and the `[...]`/`{...}` selectors.
+//!
+//! Two environment variables change the reading ([`Settings`]): `AFNI_1D_ZERO_TEXT` (also set
+//! by the global option `-ok_1D_text`) reads text as 0 instead of failing, and
+//! `AFNI_USE_FGETS` ends lines at LF only (a file with CR line ends is then one line). The
+//! messages AFNI prints on the way are added to a list of [`Message`]s.
 
 use std::path::Path;
 
 use crate::cnum::{is_space, scan_int, scanf_f32, strtod};
+use crate::environ::Settings;
+use crate::message::Message;
 
 /// A matrix AFNI read from 1D text: `nx` rows (values per column) and `ny` columns, stored
 /// column by column (`data[x + y*nx]`, an `MRI_IMAGE` of floats).
@@ -76,8 +83,13 @@ pub enum OneDError {
     Unsupported(String),
 }
 
-/// `mri_read_1D(fname)` for files and `1D:` strings.
-pub fn read_1d(fname: &str) -> Result<OneD, OneDError> {
+/// `mri_read_1D(fname)` for files and `1D:` strings, with AFNI's environment `settings`; the
+/// messages AFNI prints are added to `messages`.
+pub fn read_1d(
+    fname: &str,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+) -> Result<OneD, OneDError> {
     let lower = fname.to_ascii_lowercase();
     let table = |ext: &str| {
         lower
@@ -100,9 +112,13 @@ pub fn read_1d(fname: &str) -> Result<OneD, OneDError> {
         None => (fname, false),
     };
     if let Some(s) = dname.strip_prefix("1D:") {
-        let im = from_string(s).map_err(|e| match e {
-            OneDError::IllegalValue(_) | OneDError::EmptyString => e,
-            _ => OneDError::String(dname.to_owned()),
+        let im = from_string(s).map_err(|e| {
+            // mri_1D_fromstring's error, then mri_read_1D's.
+            messages.push(Message::Error(e.to_string()));
+            messages.push(Message::Error(format!(
+                "mri_read_1D: can't read from string '{dname}'"
+            )));
+            OneDError::String(dname.to_owned())
         })?;
         return Ok(if flip { im.transpose() } else { im });
     }
@@ -111,7 +127,7 @@ pub fn read_1d(fname: &str) -> Result<OneD, OneDError> {
             "{fname}: sub-vector selectors"
         )));
     }
-    let im = read_ascii(dname)?.transpose();
+    let im = read_ascii(dname, settings, messages)?.transpose();
     Ok(if flip { im.transpose() } else { im })
 }
 
@@ -185,7 +201,7 @@ fn scanf_prefix(s: &str) -> Option<(f32, usize)> {
 
 /// `NI_decode_string_list(ss, sep)`: substrings separated by a character of `sep` or by white
 /// space; empty substrings are skipped.
-fn decode_string_list(ss: &str, sep: &[u8]) -> Vec<String> {
+pub(crate) fn decode_string_list(ss: &str, sep: &[u8]) -> Vec<String> {
     let b = ss.as_bytes();
     let mut out = Vec::new();
     let mut id = 0;
@@ -211,8 +227,16 @@ fn decode_string_list(ss: &str, sep: &[u8]) -> Vec<String> {
 }
 
 /// `afni_fgets`: the lines of a text, each ending at LF, CR, CR+LF or LF+CR (the line end is
-/// dropped).
-fn afni_lines(text: &[u8]) -> Vec<&[u8]> {
+/// dropped). With `AFNI_USE_FGETS` (`use_fgets`), the C library's `fgets`: lines end at LF
+/// only, and a CR stays in the line (as white space).
+fn afni_lines(text: &[u8], use_fgets: bool) -> Vec<&[u8]> {
+    if use_fgets {
+        let mut lines: Vec<&[u8]> = text.split(|&c| c == b'\n').collect();
+        if lines.last().is_some_and(|l| l.is_empty()) {
+            lines.pop();
+        }
+        return lines;
+    }
     let mut lines = Vec::new();
     let mut start = 0;
     let mut i = 0;
@@ -238,9 +262,9 @@ fn afni_lines(text: &[u8]) -> Vec<&[u8]> {
 
 /// `my_fgets`: the logical lines, without leading and trailing white space, skipping blank
 /// lines and comments (`#`, `//`), joining lines that end in `\`.
-fn logical_lines(text: &[u8]) -> Vec<Vec<u8>> {
+fn logical_lines(text: &[u8], use_fgets: bool) -> Vec<Vec<u8>> {
     let mut out = Vec::new();
-    let mut lines = afni_lines(text).into_iter();
+    let mut lines = afni_lines(text, use_fgets).into_iter();
     loop {
         let mut buf: Vec<u8> = Vec::new();
         let mut cflag = false;
@@ -318,9 +342,18 @@ enum Line {
     Died,
 }
 
-/// `decode_linebuf(buf)` with `lbfill = 0` and `oktext = 0` (`AFNI_1D_ZERO_TEXT` unset).
-fn decode_linebuf(line: &[u8]) -> Line {
+/// `decode_linebuf(buf)` with `lbfill = 0`: the values of a line, and the line as the routine
+/// leaves it (commas, colons and complex `i`s turned into blanks), which AFNI's error messages
+/// show. `oktext` (`AFNI_1D_ZERO_TEXT`) reads a value that starts with any other character as
+/// 0 (a word or `*` as 0, anything else as what `sscanf("%f")` reads, 0 when nothing) instead
+/// of failing.
+fn decode_linebuf(line: &[u8], oktext: bool) -> (Line, Vec<u8>) {
     let mut buf = line.to_vec();
+    let line = decode_values(&mut buf, oktext);
+    (line, buf)
+}
+
+fn decode_values(buf: &mut [u8], oktext: bool) -> Line {
     let blen = buf.len();
     let mut slowmo = false;
     // Commas, colons and complex 'i's become blanks, unless inside a run of letters.
@@ -338,8 +371,7 @@ fn decode_linebuf(line: &[u8]) -> Line {
                 ii = jj;
             }
         }
-        if incr == 0
-            && (buf[temppos] == b',' || is_complex_i(&buf, temppos) || buf[temppos] == b':')
+        if incr == 0 && (buf[temppos] == b',' || is_complex_i(buf, temppos) || buf[temppos] == b':')
         {
             buf[temppos] = b' ';
         }
@@ -348,7 +380,7 @@ fn decode_linebuf(line: &[u8]) -> Line {
         }
         ii += 1;
     }
-    let text = String::from_utf8_lossy(&buf).into_owned();
+    let text = String::from_utf8_lossy(buf).into_owned();
     let b = text.as_bytes();
     let mut values = Vec::new();
     let mut bpos = 0;
@@ -369,7 +401,7 @@ fn decode_linebuf(line: &[u8]) -> Line {
                 end += 1;
             }
             let vbuf = &text[bpos..end];
-            if iznogood(b, bpos) {
+            if !oktext && iznogood(b, bpos) {
                 if !vbuf.starts_with('#') {
                     return Line::Died;
                 }
@@ -409,37 +441,74 @@ fn decode_linebuf(line: &[u8]) -> Line {
     Line::Values(values)
 }
 
+/// The message `mri_read_ascii` prints (`fprintf`) when row `row` of `fname` has text: the
+/// file name cut at 44 bytes, the row as `decode_linebuf` left it, cut at 64 characters (the
+/// last four ` ...`), and, the first time (3dTshift reads one file), how to read text as 0.
+fn parse_failure(row: usize, fname: &str, buf: &[u8]) -> String {
+    let mut shown = buf.to_vec();
+    if shown.len() > 64 {
+        shown.truncate(64);
+        shown[60..].copy_from_slice(b" ...");
+    }
+    let name = &fname.as_bytes()[..fname.len().min(44)];
+    format!(
+        "\n** Error: Failed parsing data row {row} of 1D file '{}'\n          Check for illegal \
+         non-numeric characters in:\n          '{}'\n          You can have text entries set \
+         to 0 with -ok_1D_text or by \n          setting environment variable AFNI_1D_ZERO_TEXT \
+         to YES.\n",
+        String::from_utf8_lossy(name),
+        String::from_utf8_lossy(&shown)
+    )
+}
+
 /// `mri_read_ascii(fname)`: the matrix of a text file, `ncol` values per row (from the first
-/// line), as an image with `nx = ncol` and `ny` = the number of rows.
-fn read_ascii(fname: &str) -> Result<OneD, OneDError> {
+/// line), as an image with `nx = ncol` and `ny` = the number of rows. `AFNI_USE_FGETS` and
+/// `AFNI_1D_ZERO_TEXT` come from `settings`; AFNI's messages go to `messages`.
+fn read_ascii(
+    fname: &str,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+) -> Result<OneD, OneDError> {
     if let Some(s) = fname.strip_prefix("1D:") {
         return Ok(from_string(s)?.transpose());
     }
-    let text = std::fs::read(Path::new(fname)).map_err(|_| OneDError::Open(fname.to_owned()))?;
-    let lines = logical_lines(&text);
+    let Ok(text) = std::fs::read(Path::new(fname)) else {
+        messages.push(Message::Error(format!(
+            "mri_read_ascii: couldn't open file {fname}"
+        )));
+        return Err(OneDError::Open(fname.to_owned()));
+    };
+    let oktext = settings.yes("AFNI_1D_ZERO_TEXT");
+    let lines = logical_lines(&text, settings.yes("AFNI_USE_FGETS"));
     let Some(first) = lines.first() else {
+        messages.push(Message::Error(format!(
+            "mri_read_ascii: can't read any valid data from file {fname}"
+        )));
         return Err(OneDError::NoData(fname.to_owned()));
     };
-    let ncol = match decode_linebuf(first) {
-        Line::Values(v) if !v.is_empty() => v.len(),
-        Line::Died => {
+    let ncol = match decode_linebuf(first, oktext) {
+        (Line::Values(v), _) if !v.is_empty() => v.len(),
+        (Line::Died, buf) => {
+            messages.push(Message::Raw(parse_failure(0, fname, &buf)));
             return Err(OneDError::Text {
                 row: 0,
                 file: fname.to_owned(),
             });
         }
-        Line::Values(_) => return Err(OneDError::NoData(fname.to_owned())),
+        // No value and no text: AFNI says nothing.
+        (Line::Values(_), _) => return Err(OneDError::NoData(fname.to_owned())),
     };
     let mut data = Vec::new();
     let mut nrow = 0;
     for line in &lines {
-        match decode_linebuf(line) {
-            Line::Values(v) if !v.is_empty() => {
+        match decode_linebuf(line, oktext) {
+            (Line::Values(v), _) if !v.is_empty() => {
                 data.extend((0..ncol).map(|i| v.get(i).copied().unwrap_or(0.0)));
                 nrow += 1;
             }
-            Line::Values(_) => break,
-            Line::Died => {
+            (Line::Values(_), _) => break,
+            (Line::Died, buf) => {
+                messages.push(Message::Raw(parse_failure(nrow, fname, &buf)));
                 return Err(OneDError::Text {
                     row: nrow,
                     file: fname.to_owned(),
@@ -488,7 +557,7 @@ mod tests {
             ("1 2 \\\n 3\n", vec![1.0, 2.0, 3.0], 1, 3),
         ] {
             let (_d, p) = file(text);
-            let im = read_1d(&p).unwrap();
+            let im = read_1d(&p, &Settings::empty(), &mut Vec::new()).unwrap();
             assert_eq!((im.nx, im.ny), (nx, ny), "{text:?}");
             assert_eq!(im.data, want, "{text:?}");
         }
@@ -497,27 +566,83 @@ mod tests {
     #[test]
     fn text_is_an_error() {
         let (_d, p) = file("0 1 abc 1.5\n");
-        assert!(matches!(read_1d(&p), Err(OneDError::Text { row: 0, .. })));
-        let (_d, p) = file("# nothing\n\n");
-        assert!(matches!(read_1d(&p), Err(OneDError::NoData(_))));
         assert!(matches!(
-            read_1d("/no/such/file.1D"),
+            read_1d(&p, &Settings::empty(), &mut Vec::new()),
+            Err(OneDError::Text { row: 0, .. })
+        ));
+        let (_d, p) = file("# nothing\n\n");
+        assert!(matches!(
+            read_1d(&p, &Settings::empty(), &mut Vec::new()),
+            Err(OneDError::NoData(_))
+        ));
+        assert!(matches!(
+            read_1d("/no/such/file.1D", &Settings::empty(), &mut Vec::new()),
             Err(OneDError::Open(_))
         ));
     }
 
     #[test]
     fn strings() {
-        let im = read_1d("1D: 0 1 0.5 1.5").unwrap();
+        let im = read_1d("1D: 0 1 0.5 1.5", &Settings::empty(), &mut Vec::new()).unwrap();
         assert_eq!((im.nx, im.ny), (4, 1));
         assert_eq!(im.data, [0.0, 1.0, 0.5, 1.5]);
-        let im = read_1d("1D: 3@2,1 | 5").unwrap();
+        let im = read_1d("1D: 3@2,1 | 5", &Settings::empty(), &mut Vec::new()).unwrap();
         assert_eq!((im.nx, im.ny), (4, 2));
         assert_eq!(im.data, [2.0, 2.0, 2.0, 1.0, 5.0, 0.0, 0.0, 0.0]);
-        let im = read_1d("1D: 3%1%0.5").unwrap();
+        let im = read_1d("1D: 3%1%0.5", &Settings::empty(), &mut Vec::new()).unwrap();
         assert_eq!(im.data, [1.0, 1.5, 2.0]);
-        assert!(read_1d("1D: abc").is_err());
-        let im = read_1d("1D: 1 2'").unwrap();
+        assert!(read_1d("1D: abc", &Settings::empty(), &mut Vec::new()).is_err());
+        let im = read_1d("1D: 1 2'", &Settings::empty(), &mut Vec::new()).unwrap();
         assert_eq!((im.nx, im.ny), (1, 2));
+        // AFNI's two error messages.
+        let mut messages = Vec::new();
+        assert!(read_1d("1D: 0 1 abc", &Settings::empty(), &mut messages).is_err());
+        assert_eq!(
+            messages,
+            [
+                Message::Error("Illegal 1D: value 'abc'".into()),
+                Message::Error("mri_read_1D: can't read from string '1D: 0 1 abc'".into())
+            ]
+        );
+    }
+
+    #[test]
+    fn environment_variables() {
+        let mut zero_text = Settings::empty();
+        zero_text.set("AFNI_1D_ZERO_TEXT", "YES");
+        // Text becomes 0; a text line sets the number of columns like any other.
+        let (_d, p) = file("0 1 abc 1.5\n");
+        let mut messages = Vec::new();
+        let im = read_1d(&p, &zero_text, &mut messages).unwrap();
+        assert_eq!(im.data, [0.0, 1.0, 0.0, 1.5]);
+        assert!(messages.is_empty());
+        let (_d, p) = file("slice times\n0 1 0.5 1.5\n");
+        assert_eq!(
+            read_1d(&p, &zero_text, &mut Vec::new()).unwrap().data,
+            [0.0, 0.0, 0.0, 1.0]
+        );
+        // Without it, AFNI's message, the row as decode_linebuf left it (commas blanked).
+        let mut messages = Vec::new();
+        let (_d, p) = file("0, 1, abc\n");
+        assert!(read_1d(&p, &Settings::empty(), &mut messages).is_err());
+        let [Message::Raw(text)] = messages.as_slice() else {
+            panic!("{messages:?}")
+        };
+        assert!(
+            text.contains("row 0 of 1D file") && text.contains("'0  1  abc'"),
+            "{text}"
+        );
+        assert!(text.ends_with("AFNI_1D_ZERO_TEXT to YES.\n"));
+        // AFNI_USE_FGETS: lines end at LF only, so CR-only lines are one row.
+        let mut fgets = Settings::empty();
+        fgets.set("AFNI_USE_FGETS", "YES");
+        let (_d, p) = file("0 9\r1.5 9\r");
+        assert_eq!(
+            (read_1d(&p, &Settings::empty(), &mut Vec::new()).unwrap()).nx,
+            2
+        );
+        let one_row = read_1d(&p, &fgets, &mut Vec::new()).unwrap();
+        assert_eq!((one_row.nx, one_row.ny), (1, 4));
+        assert_eq!(one_row.data, [0.0, 9.0, 1.5, 9.0]);
     }
 }

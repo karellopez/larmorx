@@ -10,6 +10,8 @@
 //! `[0, TR]` there is an error.
 
 use crate::cnum::fmt_g;
+use crate::environ::Settings;
+use crate::message::Message;
 use crate::oned;
 
 /// Why a pattern was refused. The messages are AFNI's.
@@ -35,8 +37,16 @@ pub enum TpatternError {
     NoSlices,
 }
 
-/// `TS_parse_tpattern(nzz, TR, tpattern)`: the time offset of each of `nzz` slices.
-pub fn parse_tpattern(nzz: usize, tr: f32, tpattern: &str) -> Result<Vec<f32>, TpatternError> {
+/// `TS_parse_tpattern(nzz, TR, tpattern)`: the time offset of each of `nzz` slices. A file is
+/// read with AFNI's environment `settings` (`AFNI_1D_ZERO_TEXT`, `AFNI_USE_FGETS`); the
+/// messages the 1D reader prints go to `messages`.
+pub fn parse_tpattern(
+    nzz: usize,
+    tr: f32,
+    tpattern: &str,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+) -> Result<Vec<f32>, TpatternError> {
     if nzz < 1 {
         return Err(TpatternError::NoSlices);
     }
@@ -61,10 +71,11 @@ pub fn parse_tpattern(nzz: usize, tr: f32, tpattern: &str) -> Result<Vec<f32>, T
     {
         // all zeros
     } else if let Some(file) = tpattern.strip_prefix('@') {
-        let tim = oned::read_1d(file).map_err(|source| TpatternError::Read {
-            file: file.to_owned(),
-            source,
-        })?;
+        let tim =
+            oned::read_1d(file, settings, messages).map_err(|source| TpatternError::Read {
+                file: file.to_owned(),
+                source,
+            })?;
         if tim.nx < nzz && tim.ny < nzz && tim.nx * tim.ny < nzz {
             let mut nv = tim.nx * tim.ny;
             if nv == 0 {
@@ -122,18 +133,21 @@ mod tests {
             ("seqplus", [0.0, 0.2, 0.4, 0.6, 0.8]),
             ("seqminus", [0.8, 0.6, 0.4, 0.2, 0.0]),
         ] {
-            let t = parse_tpattern(5, 1.0, name).unwrap();
+            let t = parse_tpattern(5, 1.0, name, &Settings::empty(), &mut Vec::new()).unwrap();
             for (a, b) in t.iter().zip(want) {
                 assert!((a - b).abs() < 1e-6, "{name}: {t:?}");
             }
         }
-        assert_eq!(parse_tpattern(3, 2.0, "SIMULT").unwrap(), [0.0; 3]);
+        assert_eq!(
+            parse_tpattern(3, 2.0, "SIMULT", &Settings::empty(), &mut Vec::new()).unwrap(),
+            [0.0; 3]
+        );
         assert!(matches!(
-            parse_tpattern(3, 2.0, "ALT+Z"),
+            parse_tpattern(3, 2.0, "ALT+Z", &Settings::empty(), &mut Vec::new()),
             Err(TpatternError::Unknown(_))
         ));
         // The step is added in float, slice after slice.
-        let t = parse_tpattern(33, 2.0, "seq+z").unwrap();
+        let t = parse_tpattern(33, 2.0, "seq+z", &Settings::empty(), &mut Vec::new()).unwrap();
         let mut s = 0.0f32;
         for v in t {
             assert_eq!(v.to_bits(), s.to_bits());
@@ -144,18 +158,26 @@ mod tests {
     #[test]
     fn files_are_checked() {
         assert_eq!(
-            parse_tpattern(3, 2.0, "@1D: 0 1 0.5 1.5").unwrap(),
+            parse_tpattern(
+                3,
+                2.0,
+                "@1D: 0 1 0.5 1.5",
+                &Settings::empty(),
+                &mut Vec::new()
+            )
+            .unwrap(),
             [0.0, 1.0, 0.5]
         );
         assert!(matches!(
-            parse_tpattern(3, 2.0, "@1D: 0 1"),
+            parse_tpattern(3, 2.0, "@1D: 0 1", &Settings::empty(), &mut Vec::new()),
             Err(TpatternError::TooShort { nv: 2, .. })
         ));
-        let e = parse_tpattern(3, 2.0, "@1D: 0 2.5 1").unwrap_err();
+        let e = parse_tpattern(3, 2.0, "@1D: 0 2.5 1", &Settings::empty(), &mut Vec::new())
+            .unwrap_err();
         assert_eq!(
             e.to_string(),
             "Illegal value 2.5 in tpattern file 1D: 0 2.5 1"
         );
-        assert!(parse_tpattern(3, 2.0, "@1D: 0 2 1").is_ok());
+        assert!(parse_tpattern(3, 2.0, "@1D: 0 2 1", &Settings::empty(), &mut Vec::new()).is_ok());
     }
 }

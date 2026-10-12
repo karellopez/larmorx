@@ -299,6 +299,13 @@ fn max3<T: PartialOrd + Copy>(a: T, b: T, c: T) -> T {
 /// length just below a power of 2) to 0.0242° (a power of 2), about 0.014° (`√(2⁻²⁴)` radians)
 /// for most lengths (`specs/3dTshift.md` §6.1, observed at the float32 boundary).
 pub fn is_plumb(real: &[[f32; 4]; 3]) -> bool {
+    // Not below 1: 1 or more, or NaN.
+    fig_merit(real).partial_cmp(&1.0) != Some(std::cmp::Ordering::Less)
+}
+
+/// `THD_compute_oblique_angle`'s `fig_merit`: the smallest, over the columns, of the largest
+/// absolute entry over the column's length, in float.
+fn fig_merit(real: &[[f32; 4]; 3]) -> f32 {
     let column = |j: usize| {
         let (a, b, c) = (real[0][j], real[1][j], real[2][j]);
         // `sqrt(m0*m0 + m1*m1 + m2*m2)`: float products and sums, a double root, stored as float.
@@ -306,9 +313,21 @@ pub fn is_plumb(real: &[[f32; 4]; 3]) -> bool {
         let largest = max3(f64::from(a).abs(), f64::from(b).abs(), f64::from(c).abs());
         (largest / f64::from(len)) as f32
     };
-    let fig_merit = min3(column(0), column(1), column(2));
-    // Not below 1: 1 or more, or NaN.
-    fig_merit.partial_cmp(&1.0) != Some(std::cmp::Ordering::Less)
+    min3(column(0), column(1), column(2))
+}
+
+/// `THD_compute_oblique_angle(real)`: `acos(fig_merit)` in degrees (`* 180.0 / 3.141592653`, in
+/// double, stored as float), or 0 when that is not above 0.01. AFNI reports it, when it is not
+/// 0, as `Oblique dataset: ... is %f degrees from plumb.` The arc cosine is the `libm` crate's
+/// (`larmorx_core::math` has none yet); the angle is only printed, with 6 decimals.
+#[allow(clippy::approx_constant)] // AFNI's own value of pi
+pub fn oblique_angle(real: &[[f32; 4]; 3]) -> f32 {
+    let angle = (libm::acos(f64::from(fig_merit(real))) * 180.0 / 3.141592653) as f32;
+    if f64::from(angle).abs() > 0.01 {
+        angle
+    } else {
+        0.0
+    }
 }
 
 /// `THD_dicom_card_xform`: the cardinal (non-oblique) voxel-to-DICOM matrix of the axes, each

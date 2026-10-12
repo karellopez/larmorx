@@ -37,7 +37,13 @@
 //!
 //! An AFNI header extension (code 4) in the input replaces the time axis, the matrix and the
 //! space, as AFNI applies it ([`crate::afni_ext`]); its other attributes are ignored, and no
-//! extension is written. The `AFNI_NIFTI_*` environment variables are not read.
+//! extension is written (as AFNI writes with `AFNI_NIFTI_NOEXT=YES`).
+//!
+//! **AFNI's environment variables** come from the [`Settings`] table ([`crate::environ`]):
+//! reading follows `AFNI_NOREALPATH` (the file names in messages), `AFNI_NIFTI_SCALE`,
+//! `AFNI_NIFTI_TYPE_WARN`, `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_VIEW`, `AFNI_DEFAULT_STD_SPACE`
+//! and `AFNI_NO_OBLIQUE_WARNING`; writing follows `AFNI_NIFTI_WRITE_TYPE` and
+//! `AFNI_ALLOW_MILLISECONDS` (AFNI-19).
 //!
 //! **Upstream defects (D13).** Five of AFNI's reading and writing rules are defects that
 //! larmorx-gpl corrects by default and reproduces with [`UpstreamDefects::Reproduce`]
@@ -59,6 +65,8 @@ use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, ReadOptions, Scaling, W
 use crate::afni_ext;
 use crate::axes::{self, Axes, ORI_I2S, ORI_L2R, ORI_P2A};
 use crate::cnum::fmt_g;
+use crate::environ::Settings;
+use crate::message::Message;
 
 /// The voxels of a dataset in one of AFNI's storage types (`MRI_byte`, `MRI_short`,
 /// `MRI_float`), x fastest, then y, z and the sub-brick (time point).
@@ -369,14 +377,52 @@ impl Nim {
     }
 }
 
-/// `NIFTI_code_to_view` + `NIFTI_code_to_space` + `space_to_NIFTI_code`, for a header without
-/// an AFNI extension: TLRC space (code 3, and code 5, whose view is +tlrc) gives 3, MNI (4)
-/// gives 4, every other code (orig view, ORIG space) gives 1 (`NIFTI_XFORM_SCANNER_ANAT`).
-fn output_code(form_code: i32) -> i32 {
+/// AFNI's views (`VIEW_ORIGINAL_TYPE`, `VIEW_ACPCALIGNED_TYPE`, `VIEW_TALAIRACH_TYPE`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum View {
+    Orig,
+    Acpc,
+    Tlrc,
+}
+
+/// `NIFTI_default_view`: `AFNI_NIFTI_VIEW` (`tlrc`, `orig` or `acpc`, any case), else orig.
+fn default_view(settings: &Settings) -> View {
+    match settings.get("AFNI_NIFTI_VIEW") {
+        Some(v) if v.eq_ignore_ascii_case("TLRC") => View::Tlrc,
+        Some(v) if v.eq_ignore_ascii_case("ACPC") => View::Acpc,
+        _ => View::Orig,
+    }
+}
+
+/// The template space `THD_open_nifti` gives a dataset whose transform has `form_code` (0 when
+/// it has none): `NIFTI_code_to_view` for its view, then `NIFTI_code_to_space`. Codes 3 and 4
+/// are TLRC and MNI; codes 0 and 1 the orig view, so ORIG; code 5 the tlrc view; code 2 and
+/// the codes NIfTI does not define (with a warning) the view `AFNI_NIFTI_VIEW` names (orig by
+/// default). A tlrc view's space is `AFNI_DEFAULT_STD_SPACE` (`TT_whereami_default_spc_name`,
+/// TLRC by default), an acpc view's ACPC.
+fn form_space(form_code: i32, settings: &Settings, messages: &mut Vec<Message>) -> String {
+    let view = match form_code {
+        3..=5 => View::Tlrc,
+        0 | 1 => View::Orig,
+        2 => default_view(settings),
+        code => {
+            messages.push(Message::Warning(format!(
+                "I don't think this sform code '{code}' is allowed!"
+            )));
+            default_view(settings)
+        }
+    };
     match form_code {
-        3 | 5 => 3,
-        4 => 4,
-        _ => 1,
+        3 => "TLRC".to_owned(),
+        4 => "MNI".to_owned(),
+        _ => match view {
+            View::Orig => "ORIG".to_owned(),
+            View::Acpc => "ACPC".to_owned(),
+            View::Tlrc => settings
+                .get("AFNI_DEFAULT_STD_SPACE")
+                .unwrap_or("TLRC")
+                .to_owned(),
+        },
     }
 }
 
@@ -398,10 +444,15 @@ fn millimetres_per_unit(nim: &Nim) -> f64 {
 /// origin unconverted, an oblique one with its whole sform unconverted ([`crate::axes`]):
 /// AFNI-07, reproduced by [`UpstreamDefects::Reproduce`]. [`UpstreamDefects::Fix`] converts the
 /// matrix and the origins too, in double before they are rounded to float.
+///
+/// With both a qform and an sform, `priority` (`b'S'`, AFNI's default, or `b'Q'`, from
+/// `AFNI_NIFTI_PRIORITY`) chooses. The code is that of the template space ([`form_space`]).
 fn geometry(
     nim: &Nim,
     defects: UpstreamDefects,
-    warnings: &mut Vec<String>,
+    priority: u8,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
     path: &str,
 ) -> Geometry {
     let unit = millimetres_per_unit(nim);
@@ -409,17 +460,24 @@ fn geometry(
     let convert = if defects.fix() { unit } else { 1.0 };
     let scaled = |v: f64| if convert == 1.0 { v } else { v * convert };
     let (use_q, use_s) = match (nim.qform_code > 0, nim.sform_code > 0) {
-        // Both present: the sform wins (AFNI's default `form_priority = 'S'`).
-        (true, true) => (false, true),
+        (true, true) => (priority == b'Q', priority != b'Q'),
         (true, false) => (true, false),
         (false, true) => (false, true),
         (false, false) => {
-            warnings.push(format!(
+            messages.push(Message::Warning(format!(
                 "NO spatial transform (neither qform nor sform), in NIfTI file '{path}'"
-            ));
+            )));
             (false, false)
         }
     };
+    let form_code = if use_q {
+        nim.qform_code
+    } else if use_s {
+        nim.sform_code
+    } else {
+        0
+    };
+    let code = space_code(&form_space(form_code, settings, messages));
     // `ijk_to_dicom44`: x and y negated (AFNI works in DICOM's RAI coordinates).
     let dicom = |m: &[[f64; 4]; 4]| -> [[f32; 4]; 3] {
         let row = |r: usize, sign: f64| m[r].map(|v| scaled(sign * v) as f32);
@@ -473,7 +531,7 @@ fn geometry(
                 del: signed(orient, steps),
                 org: origins(m, orient),
             },
-            code: output_code(nim.qform_code),
+            code,
         }
     } else if use_s {
         let m = &nim.sto_xyz;
@@ -494,7 +552,7 @@ fn geometry(
                 del: signed(orient, steps),
                 org: origins(m, orient),
             },
-            code: output_code(nim.sform_code),
+            code,
         }
     } else {
         // No transform: orientation LPI, the voxel sizes as steps (1 if not positive), the
@@ -524,7 +582,7 @@ fn geometry(
                 del: signed(orient, [dx, dy, dz]),
                 org: [0.0; 3],
             },
-            code: output_code(0),
+            code,
         }
     }
 }
@@ -572,14 +630,76 @@ fn slice_offsets(nim: &Nim, nz: i64, duration: f64, defects: UpstreamDefects) ->
     Some(toff)
 }
 
+/// `THD_is_symlink`: whether `path` itself is a symbolic link.
+fn is_symlink(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink())
+}
+
+/// `realpath(path)`: the absolute name of the file, with symbolic links, `.` and `..` resolved.
+/// On Windows the `\\?\` prefix of such names is dropped where a plain name means the same.
+fn realpath(path: &Path) -> std::io::Result<String> {
+    let real = std::fs::canonicalize(path)?.display().to_string();
+    Ok(if let Some(rest) = real.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = real
+        .strip_prefix(r"\\?\")
+        .filter(|r| r.as_bytes().get(1) == Some(&b':'))
+    {
+        rest.to_owned()
+    } else {
+        real
+    })
+}
+
+/// The file `THD_open_nifti` opens for `path`, and the name it uses for it in its messages
+/// (`pathnew`): `path`, or `path.gz` when only that exists (unless `path` contains `.gz`);
+/// then its real path ([`realpath`]) unless `AFNI_NOREALPATH` is YES or the file is a symbolic
+/// link. "reading X instead of non-existing Y" is printed only when the name is not replaced
+/// by its real path.
+fn nifti_file(
+    path: &str,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+) -> Result<(PathBuf, String), ReadError> {
+    let mut file = PathBuf::from(path);
+    let mut gz = false;
+    if !file.is_file() && !path.contains(".gz") {
+        let candidate = PathBuf::from(format!("{path}.gz"));
+        if candidate.is_file() {
+            file = candidate;
+            gz = true;
+        }
+    }
+    if !file.is_file() {
+        // Opening it gives the reason (missing, a directory, ...).
+        nifti::read_header(&file)?;
+    }
+    if !settings.yes("AFNI_NOREALPATH") && !is_symlink(&file) {
+        let shown = realpath(&file).map_err(|e| nifti::Error::Io {
+            path: file.clone(),
+            source: e,
+        })?;
+        return Ok((file, shown));
+    }
+    let shown = file.display().to_string();
+    if gz {
+        messages.push(Message::InInfo(format!(
+            "reading {shown} instead of non-existing {path}"
+        )));
+    }
+    Ok((file, shown))
+}
+
 /// Reads a NIfTI file as 3dTshift gets it: `THD_open_dataset` + `EDIT_full_copy` (see the
-/// module documentation). Messages AFNI prints while reading are added to `warnings`, and the
-/// upstream defects that change how the file is read (AFNI-02, AFNI-07) to `notices`, whose
-/// mode chooses between AFNI's behaviour and the correction.
+/// module documentation). The messages AFNI prints while reading are added to `messages`, and
+/// the upstream defects that change how the file is read (AFNI-02, AFNI-07) to `notices`, whose
+/// mode chooses between AFNI's behaviour and the correction. AFNI's environment variables come
+/// from `settings`.
 pub fn read(
     path: &str,
     n_threads: usize,
-    warnings: &mut Vec<String>,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
     notices: &mut Notices,
 ) -> Result<Dataset, ReadError> {
     let mode = notices.mode();
@@ -589,20 +709,8 @@ pub fn read(
             "{path}: larmorx-gpl reads NIfTI files (.nii, .nii.gz) only"
         )));
     }
-    // THD_open_nifti: a missing `x.nii` is read as `x.nii.gz` if that exists.
-    let mut file = PathBuf::from(path);
-    if !file.is_file() && !path.contains(".gz") {
-        let gz = PathBuf::from(format!("{path}.gz"));
-        if gz.is_file() {
-            warnings.push(format!(
-                "reading {} instead of non-existing {path}",
-                gz.display()
-            ));
-            file = gz;
-        }
-    }
+    let (file, shown) = nifti_file(path, settings, messages)?;
     let header = nifti::read_header(&file)?;
-    let shown = file.display().to_string();
     let nim = Nim::from_header(&header).map_err(|m| ReadError::Afni(format!("{shown}: {m}")))?;
 
     // 4th dimension = time; 5th = bucket: mutually exclusive in AFNI.
@@ -628,19 +736,15 @@ pub fn read(
     }
     let _ = nbuc;
 
-    // The datum, chosen when the header is opened.
-    let scale_open = nim.scl_slope != 0.0 && nim.scl_inter != 0.0;
+    // The datum, chosen when the header is opened. `AFNI_NIFTI_SCALE=NO` keeps uint8 and int16
+    // data with a slope and an intercept as they are stored: the slope becomes their scale
+    // factor and the intercept is dropped.
+    let scale_open =
+        nim.scl_slope != 0.0 && nim.scl_inter != 0.0 && !settings.no("AFNI_NIFTI_SCALE");
     let (float_datum, xform_data) = match nim.datatype {
         dt::UINT8 | dt::INT16 => (scale_open, scale_open),
         dt::FLOAT32 => (true, false),
-        dt::INT8 | dt::UINT16 | dt::INT32 | dt::UINT32 | dt::FLOAT64 => {
-            warnings.push(format!(
-                "AFNI converts NIFTI_datatype={} ({}) in file {shown} to FLOAT32",
-                nim.datatype,
-                datatype_string(nim.datatype)
-            ));
-            (true, true)
-        }
+        dt::INT8 | dt::UINT16 | dt::INT32 | dt::UINT32 | dt::FLOAT64 => (true, true),
         dt::COMPLEX64 | dt::RGB24 => {
             return Err(ReadError::Unsupported(format!(
                 "{shown}: NIfTI datatype {} ({})",
@@ -655,6 +759,50 @@ pub fn read(
             )));
         }
     };
+    // The conversion to float is announced unless AFNI_NIFTI_TYPE_WARN is NO; with YES without
+    // the lines that say further ones are muted. (AFNI mutes them after the first file it
+    // opens; 3dTshift opens one.)
+    if xform_data && !settings.no("AFNI_NIFTI_TYPE_WARN") {
+        let mut text = format!(
+            "** AFNI converts NIFTI_datatype={} ({}) in file {shown} to FLOAT32\n",
+            nim.datatype,
+            datatype_string(nim.datatype)
+        );
+        if !settings.yes("AFNI_NIFTI_TYPE_WARN") {
+            text.push_str(
+                "     Warnings of this type will be muted for this session.\n     Set \
+                 AFNI_NIFTI_TYPE_WARN to YES to see them all, NO to see none.\n",
+            );
+        }
+        messages.push(Message::Raw(text));
+    }
+
+    // `AFNI_NIFTI_PRIORITY`: the qform (Q) or the sform (S, the default) when both are set.
+    let mut priority = b'S';
+    if let Some(p) = settings.get("AFNI_NIFTI_PRIORITY") {
+        match p.as_bytes().first().map(u8::to_ascii_uppercase) {
+            Some(c @ (b'S' | b'Q')) => priority = c,
+            _ => messages.push(Message::Warning(format!(
+                "Illegal AFNI_NIFTI_PRIORITY='{p}'"
+            ))),
+        }
+    }
+    if nim.qform_code > 0 && nim.sform_code > 0 {
+        // MAT_DET of the two 3x3 matrices, rounded to float (THD_mat33).
+        let det = |m: &[[f64; 4]; 4]| {
+            let a = |i: usize, j: usize| m[i][j] as f32;
+            a(0, 0) * a(1, 1) * a(2, 2) - a(0, 0) * a(1, 2) * a(2, 1) - a(1, 0) * a(0, 1) * a(2, 2)
+                + a(1, 0) * a(0, 2) * a(2, 1)
+                + a(2, 0) * a(0, 1) * a(1, 2)
+                - a(2, 0) * a(0, 2) * a(1, 1)
+        };
+        if det(&nim.qto_xyz) * det(&nim.sto_xyz) < 0.0 {
+            messages.push(Message::Warning(format!(
+                "NIfTI('{shown}'): Qform/Sform handedness differ; {} wins!",
+                priority as char
+            )));
+        }
+    }
     // The brick factors of the copy: set at open time, before loading.
     let mut factor = if !xform_data && nim.scl_slope != 0.0 && nim.scl_slope != 1.0 {
         nim.scl_slope as f32
@@ -692,9 +840,9 @@ pub fn read(
         } else {
             UpstreamDefects::Fix
         };
-        geometry(&nim, other, &mut Vec::new(), &shown)
+        geometry(&nim, other, priority, settings, &mut Vec::new(), &shown)
     });
-    let mut geometry = geometry(&nim, mode, warnings, &shown);
+    let mut geometry = geometry(&nim, mode, priority, settings, messages, &shown);
     let mut seq_dec = None;
     let mut taxis = (ntt > 1).then(|| {
         let (mut dtt, mut toffset, mut duration) = (nim.pixdim[4], nim.toffset, nim.slice_duration);
@@ -731,7 +879,7 @@ pub fn read(
         .collect();
     if let Some(ext) = afni_ext::parse(&extensions) {
         let before = taxis.clone();
-        apply_afni_ext(&ext, &nim, &shown, &mut geometry, &mut taxis, warnings);
+        apply_afni_ext(&ext, &nim, &shown, &mut geometry, &mut taxis, messages);
         if let Some(other) = &mut other_geometry {
             apply_afni_ext(&ext, &nim, &shown, other, &mut None, &mut Vec::new());
         }
@@ -743,6 +891,28 @@ pub fn read(
         && let Some(detail) = units_detail(&nim, &geometry, other, mode)
     {
         notices.add(&defects::AFNI_07, detail);
+    }
+
+    // THD_report_obliquity, when THD_open_dataset has opened the file: an oblique matrix (as
+    // AFNI reads it, in the file's units) is reported unless AFNI_NO_OBLIQUE_WARNING is YES.
+    if !settings.yes("AFNI_NO_OBLIQUE_WARNING") {
+        let as_read = match (&other_geometry, mode.fix()) {
+            (Some(other), true) => &other.axes.real,
+            _ => &geometry.axes.real,
+        };
+        let angle = axes::oblique_angle(as_read);
+        if angle != 0.0 {
+            messages.push(Message::Warning(format!(
+                "  If you are performing spatial transformations on an oblique dset,\n  such \
+                 as {shown},\n  or viewing/combining it with volumes of differing obliquity,\n  \
+                 you should consider running: \n     3dWarp -deoblique \n  on this and  other \
+                 oblique datasets in the same session.\n See 3dWarp -help for details.\n"
+            )));
+            messages.push(Message::Info(format!(
+                "Oblique dataset:{shown} is {:.6} degrees from plumb.\n",
+                f64::from(angle)
+            )));
+        }
     }
 
     // THD_load_nifti.
@@ -893,7 +1063,7 @@ fn apply_afni_ext(
     path: &str,
     geometry: &mut Geometry,
     taxis: &mut Option<TimeAxis>,
-    warnings: &mut Vec<String>,
+    messages: &mut Vec<Message>,
 ) {
     if let Some(nums) = &ext.nifti_nums {
         let now = format!(
@@ -901,9 +1071,11 @@ fn apply_afni_ext(
             nim.dim[1], nim.dim[2], nim.dim[3], nim.dim[4], nim.dim[5], nim.datatype
         );
         if &now != nums {
-            warnings.push(format!(
-                "NIfTI file {path} dimensions altered since AFNI extension was added"
-            ));
+            // fprintf(stderr), after a blank line the first time.
+            messages.push(Message::Raw(format!(
+                "\n** WARNING: NIfTI file {path} dimensions altered since AFNI extension was \
+                 added\n"
+            )));
         }
     }
     if let Some(m) = ext.floats("IJK_TO_DICOM_REAL").filter(|m| m.len() >= 12) {
@@ -1098,31 +1270,88 @@ pub fn slice_fields(tlist: &[f32], defects: UpstreamDefects) -> (i32, i64, i64, 
 /// dataset's axes ([`axes::written`]), and the slice fields what `populate_nifti_image` derives
 /// from the slice times it keeps ([`slice_fields`]); both follow `notices`' mode (AFNI-16 and
 /// AFNI-08), which is noted when the two modes write different fields.
+///
+/// From `settings`: `AFNI_NIFTI_WRITE_TYPE` 2 writes NIfTI-2, 1 NIfTI-1 (with a warning, added
+/// to `messages`, when a dimension needs NIfTI-2), anything else NIfTI-1 unless a dimension
+/// exceeds 32767; `AFNI_ALLOW_MILLISECONDS` YES keeps a millisecond time axis, of which AFNI
+/// then writes the TR in seconds but the time offset in milliseconds (AFNI-19, corrected by
+/// default).
 pub fn write(
     path: &Path,
     ds: &Dataset,
     n_threads: usize,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
     notices: &mut Notices,
 ) -> Result<(), nifti::Error> {
-    // DSET_UNMSEC: milliseconds become seconds (`*= 0.001` in double, stored as float).
+    let mode = notices.mode();
+    let ms = |v: f32| (f64::from(v) * 0.001) as f32;
     let taxis = ds.taxis.as_ref().map(|t| {
-        if t.units == TimeUnits::Msec {
-            let ms = |v: f32| (f64::from(v) * 0.001) as f32;
-            TimeAxis {
-                ttdel: ms(t.ttdel),
-                ttorg: ms(t.ttorg),
-                units: TimeUnits::Sec,
-                toff_sl: t
-                    .toff_sl
-                    .as_ref()
-                    .map(|v| v.iter().map(|&x| ms(x)).collect()),
-            }
-        } else {
-            t.clone()
+        if t.units != TimeUnits::Msec {
+            return t.clone();
         }
+        // DSET_UNMSEC: milliseconds become seconds (`*= 0.001` in double, stored as float).
+        let unmsec = TimeAxis {
+            ttdel: ms(t.ttdel),
+            ttorg: ms(t.ttorg),
+            units: TimeUnits::Sec,
+            toff_sl: t
+                .toff_sl
+                .as_ref()
+                .map(|v| v.iter().map(|&x| ms(x)).collect()),
+        };
+        if !settings.yes("AFNI_ALLOW_MILLISECONDS") {
+            return unmsec;
+        }
+        // AFNI_ALLOW_MILLISECONDS: no DSET_UNMSEC; populate_nifti_image converts the TR
+        // (`TR *= 0.001`) but writes the time origin and the slice times as they are, all
+        // labelled seconds (AFNI-19).
+        let kept = TimeAxis {
+            ttdel: ms(t.ttdel),
+            ttorg: t.ttorg,
+            units: TimeUnits::Sec,
+            toff_sl: t.toff_sl.clone(),
+        };
+        if kept != unmsec {
+            let toffset = |a: &TimeAxis| fmt_g(f64::from(a.ttorg));
+            notices.add(
+                &defects::AFNI_19,
+                if mode.fix() {
+                    format!(
+                        "AFNI_ALLOW_MILLISECONDS is set and the TR is in milliseconds: the time \
+                         offset is written in seconds ({}), with the TR; AFNI writes it in \
+                         milliseconds ({}) and labels it seconds",
+                        toffset(&unmsec),
+                        toffset(&kept)
+                    )
+                } else {
+                    format!(
+                        "AFNI_ALLOW_MILLISECONDS is set and the TR is in milliseconds: the time \
+                         offset is written in milliseconds ({}) and labelled seconds, as AFNI \
+                         does",
+                        toffset(&kept)
+                    )
+                },
+            );
+        }
+        if mode.fix() { unmsec } else { kept }
     });
     let [nx, ny, nz] = ds.nxyz;
     let nvals = ds.nvals;
+    // AFNI-20: AFNI writes a dataset of one row as a 1D text file, under the output's name,
+    // unless AFNI_WRITE_1D_AS_PREFIX is YES. larmorx writes NIfTI in both modes: AFNI's text
+    // file carries a random identifier, so it cannot be reproduced.
+    if ny == 1 && nz == 1 && !settings.yes("AFNI_WRITE_1D_AS_PREFIX") {
+        notices.extend([defects::Notice::new(
+            &defects::AFNI_20,
+            UpstreamDefects::Fix,
+            format!(
+                "the dataset has one row ({nx} x 1 x 1 voxels): written as NIfTI, in both modes; \
+                 AFNI writes a 1D text file under that name (unless AFNI_WRITE_1D_AS_PREFIX is \
+                 YES), with a random identifier"
+            ),
+        )]);
+    }
     // `nt = DSET_NUM_TIMES` when there is a time axis, else the sub-bricks go to `nu`.
     let time = taxis.is_some();
     let shape: Vec<usize> = if nvals > 1 {
@@ -1138,7 +1367,21 @@ pub fn write(
     } else {
         vec![nx]
     };
-    let version = if [nx, ny, nz, nvals].iter().any(|&d| d > i16::MAX as usize) {
+    // NIfTI-2 when a dimension exceeds a signed 16-bit integer, or AFNI_NIFTI_WRITE_TYPE says
+    // so (`AFNI_numenv`, then converted to int).
+    let needs_nifti2 = shape.iter().any(|&d| d > i16::MAX as usize);
+    let write_type = settings.num("AFNI_NIFTI_WRITE_TYPE") as i32;
+    if write_type == 1 && needs_nifti2 {
+        messages.push(Message::Warning(
+            "will try to write as NIFTI-1, though NIFTI-2 seems necessary".to_owned(),
+        ));
+    }
+    let nifti2 = match write_type {
+        2 => true,
+        1 => false,
+        _ => needs_nifti2,
+    };
+    let version = if nifti2 {
         NiftiVersion::V2
     } else {
         NiftiVersion::V1

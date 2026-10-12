@@ -64,12 +64,18 @@ struct Case {
     mode: &'static str,
     /// The upstream defects the run must name on standard error, and no other.
     named: &'static [&'static str],
+    /// AFNI's environment variables set for the run.
+    env: &'static [(&'static str, &'static str)],
+    /// Whether a file of the output's name exists before the run.
+    existing: bool,
 }
 
 const CASES: &[Case] = &[
     Case {
         id: "3dTshift.fourier.int16",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -78,6 +84,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.fourier.float32.ignore",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -86,6 +94,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.linear.float32",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -94,6 +104,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.cubic.int16.rlt+",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -102,6 +114,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.quintic.float32.tzero",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -110,6 +124,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.heptic.uint8.no_detrend",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-05"],
         mode: "fix",
         input: Input::Uint8,
@@ -118,6 +134,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.wsinc5.float32.rlt",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -135,6 +153,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.wsinc9.int16.slice",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -143,6 +163,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.linear.int16-negative-slope",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-01"],
         mode: "fix",
         input: Input::Int16Negative,
@@ -151,6 +173,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.cubic.float32-defects",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-02", "AFNI-07", "AFNI-03"],
         mode: "fix",
         input: Input::Float32Defects,
@@ -159,6 +183,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.copy.float32-tiny-offsets",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-08"],
         mode: "fix",
         input: Input::Float32TinyOffsets,
@@ -167,6 +193,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.linear.float32-nearly-plumb",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-16"],
         mode: "fix",
         input: Input::Float32NearlyPlumb,
@@ -175,6 +203,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.heptic.uint8.no_detrend.reproduce",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-05"],
         mode: "reproduce",
         input: Input::Uint8,
@@ -183,6 +213,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.linear.int16-negative-slope.reproduce",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-01"],
         mode: "reproduce",
         input: Input::Int16Negative,
@@ -191,6 +223,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.cubic.float32-defects.reproduce",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-02", "AFNI-07", "AFNI-03"],
         mode: "reproduce",
         input: Input::Float32Defects,
@@ -199,6 +233,8 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.copy.float32-tiny-offsets.reproduce",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-08"],
         mode: "reproduce",
         input: Input::Float32TinyOffsets,
@@ -207,10 +243,76 @@ const CASES: &[Case] = &[
     Case {
         id: "3dTshift.linear.float32-nearly-plumb.reproduce",
         tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
         named: &["AFNI-16"],
         mode: "reproduce",
         input: Input::Float32NearlyPlumb,
         args: &["-tpattern", "seq+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.float32.overwrite",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: true,
+        named: &[],
+        mode: "fix",
+        input: Input::Float32,
+        args: &["-tpattern", "seq+z", "-overwrite", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.float32.nifti2",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &[],
+        mode: "fix",
+        input: Input::Float32,
+        args: &["-DAFNI_NIFTI_WRITE_TYPE=2", "-tpattern", "seq+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.float32.nifti2-environment",
+        tool: "afni 3dTshift",
+        env: &[("AFNI_NIFTI_WRITE_TYPE", "2")],
+        existing: false,
+        named: &[],
+        mode: "fix",
+        input: Input::Float32,
+        args: &["-tpattern", "seq+z", "-linear"],
+    },
+    Case {
+        id: "3dTshift.linear.float32.msec",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &["AFNI-19"],
+        mode: "fix",
+        input: Input::Float32,
+        args: &[
+            "-TR",
+            "2000ms",
+            "-tpattern",
+            "seq+z",
+            "-linear",
+            "-DAFNI_ALLOW_MILLISECONDS=YES",
+        ],
+    },
+    Case {
+        id: "3dTshift.linear.float32.msec.reproduce",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        named: &["AFNI-19"],
+        mode: "reproduce",
+        input: Input::Float32,
+        args: &[
+            "-TR",
+            "2000ms",
+            "-tpattern",
+            "seq+z",
+            "-linear",
+            "-DAFNI_ALLOW_MILLISECONDS=YES",
+        ],
     },
 ];
 
@@ -380,17 +482,21 @@ fn dtype_name(code: i16) -> (&'static str, usize) {
     }
 }
 
-/// `header` (the bytes before the data) and `data` fingerprints of a NIfTI-1 file.
+/// `header` (the bytes before the data) and `data` fingerprints of a little-endian NIfTI-1 or
+/// NIfTI-2 file.
 fn nifti_fingerprints(path: &Path) -> BTreeMap<&'static str, Fingerprint> {
     let raw = std::fs::read(path).unwrap();
-    assert_eq!(
-        &raw[0..4],
-        &348i32.to_le_bytes(),
-        "{}: not little-endian NIfTI-1",
-        path.display()
-    );
-    let datatype = i16::from_le_bytes([raw[70], raw[71]]);
-    let offset = f32::from_le_bytes(raw[108..112].try_into().unwrap()) as usize;
+    let (datatype, offset) = match i32::from_le_bytes(raw[0..4].try_into().unwrap()) {
+        348 => (
+            i16::from_le_bytes([raw[70], raw[71]]),
+            f32::from_le_bytes(raw[108..112].try_into().unwrap()) as usize,
+        ),
+        540 => (
+            i16::from_le_bytes([raw[12], raw[13]]),
+            i64::from_le_bytes(raw[168..176].try_into().unwrap()) as usize,
+        ),
+        _ => panic!("{}: not little-endian NIfTI-1 or NIfTI-2", path.display()),
+    };
     let (name, size) = dtype_name(datatype);
     let data = &raw[offset..];
     let n = data.len() / size;
@@ -612,12 +718,18 @@ fn golden() {
         // cannot make the -prefix one AFNI refuses (AFNI-12).
         args.extend(["-prefix".into(), format!("{}.nii", case.id)]);
         args.push(input.display().to_string());
-        let out = Command::new(EXE)
+        if case.existing {
+            std::fs::write(&output, "taken").unwrap();
+        }
+        let mut command = Command::new(EXE);
+        command
             .args(&args)
             .current_dir(dir.path())
-            .env("LARMORX_UPSTREAM_DEFECTS", case.mode)
-            .output()
-            .unwrap();
+            .env("LARMORX_UPSTREAM_DEFECTS", case.mode);
+        for (name, value) in case.env {
+            command.env(name, value);
+        }
+        let out = command.output().unwrap();
         assert!(out.status.success(), "{}: {out:?}", case.id);
         // The notices (`*+ WARNING: upstream defect <ID> (3dTshift) corrected: ...`).
         let stderr = String::from_utf8_lossy(&out.stderr);

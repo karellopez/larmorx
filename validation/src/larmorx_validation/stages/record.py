@@ -1139,7 +1139,18 @@ def _jacobian_rows(results: list[dict]) -> tuple[list[tuple], list[tuple]]:
         on = "on" if jf["jacobian"] else "off (forced on here)"
         if d.identical or c is None:
             change_rows.append(
-                (label, on, "×".join(map(str, d.shape)), "bit-identical", "", "", "", "", "", "")
+                (
+                    label,
+                    on,
+                    "×".join(map(str, d.shape)),
+                    "–",
+                    "none: bit-identical",
+                    "0 %",
+                    "0 %",
+                    "0",
+                    "–",
+                    "–",
+                )
             )
         else:
             pc = c["abs_percentiles"]
@@ -1195,8 +1206,10 @@ def _jacobian_lines(results: list[dict]) -> list[str]:
         "with the Jacobian is the ratio of the two factors. Where fMRIPrep ran without the "
         "Jacobian (its default for field maps other than PEPOLAR), larmorx's default leaves "
         "the output unchanged (checked), and both runs are repeated with the Jacobian on, as "
-        "`--force fmap-jacobian` would run them. Coordinates are world mm of the output grid "
-        "(MNI for the standard space); clusters are 6-connected voxels changed by more than 1 %:",
+        "`--force fmap-jacobian` would run them. Where fMRIPrep's factor is close to 0 (a "
+        "fold of the distortion), the relative change is huge and says little; the "
+        "percentiles describe the bulk. Coordinates are world mm of the output grid (MNI for "
+        "the standard space); clusters are 6-connected voxels changed by more than 1 %:",
         "",
         table(
             (

@@ -97,6 +97,29 @@ random seeding). With A4-A6, sMRIPrep's brain extraction and MNI normalisation r
 - Coverage: a copy of ds005752 with `IntendedFor` added, so the direct-`fieldmap` path is
   covered (fMRIPrep ignored its field map); ds001600's four field-map N4s.
 
+## Before the first release on PyPI
+
+Checked 2026-10-13: the binaries need no other library than the system's own (on Linux:
+`libc`, `libgcc_s`, and for `larmorx-gpl` glibc's `libm`, `libpthread`, `libdl`, `librt`).
+Still to do:
+- **Windows' C runtime:** nothing sets `+crt-static`, so the `.exe` programs (`larmorx-gpl`,
+  the standalone `larmorx`) need `vcruntime140.dll`. Python's own copy serves the extension,
+  but a separate program may not find one on a clean Windows. Link the C runtime statically
+  for the Windows MSVC targets (`.cargo/config.toml`, both workspaces). CI cannot show the
+  problem: GitHub's runners have the runtime installed.
+- **Size:** `strip`, LTO and `codegen-units = 1` in the release profile (stripping alone takes
+  the extension from 24 to 15 MB).
+- **Python dependencies:** drop h5py once A4 part 1 reads HDF5 in Rust (numpy is then the only
+  one); check that every `[prep]` dependency has wheels for all six platforms, Windows arm64
+  included. Linux wheels are manylinux_2_28 (glibc 2.28 or newer); decide whether to add
+  musllinux wheels (Alpine).
+- **Publishing:** a release workflow (on a version tag: the six wheels and the sdist of each
+  package, the golden tests, upload by PyPI Trusted Publishing; standalone binaries to GitHub
+  Releases); reserve the names `larmorx`, `larmorx-gpl`, `larmorx-nc`, `larmorx-freesurfer`,
+  `larmorprepx` (all free on 2026-10-13; needs the user's PyPI account); the licence checks for
+  publishing `larmorx-nc` (FSL) and `larmorx-freesurfer` on PyPI; the first release's scope
+  (D10) and version numbering.
+
 ## Waiting for the user
 
 - **PIPE-16** (for larmorprepx): nipype's N4 interface writes the corrected field-map

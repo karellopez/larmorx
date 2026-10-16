@@ -44,10 +44,39 @@ impl Buffers {
     }
 }
 
+/// A voxel type lines are filtered in: read into double, written back with one rounding
+/// (`float`), or as is (`double`).
+pub(crate) trait LinePixel: Copy + Send + Sync {
+    fn to_f64(self) -> f64;
+    fn from_f64(v: f64) -> Self;
+}
+
+impl LinePixel for f32 {
+    #[inline]
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    #[inline]
+    fn from_f64(v: f64) -> f32 {
+        v as f32
+    }
+}
+
+impl LinePixel for f64 {
+    #[inline]
+    fn to_f64(self) -> f64 {
+        self
+    }
+    #[inline]
+    fn from_f64(v: f64) -> f64 {
+        v
+    }
+}
+
 /// Filters every line of `data` (an image of `size`, Fortran order) along `axis` with
 /// `filter`, in place.
-pub(crate) fn filter_lines<F: LineFilter>(
-    data: &mut [f32],
+pub(crate) fn filter_lines<T: LinePixel, F: LineFilter>(
+    data: &mut [T],
     size: &[usize],
     axis: usize,
     filter: &F,
@@ -69,7 +98,7 @@ pub(crate) fn filter_lines<F: LineFilter>(
                     let len = n * w;
                     for (l, line) in lines.chunks_exact(n).enumerate() {
                         for (i, &v) in line.iter().enumerate() {
-                            b.input[i * w + l] = f64::from(v);
+                            b.input[i * w + l] = v.to_f64();
                         }
                     }
                     filter.filter(
@@ -81,7 +110,7 @@ pub(crate) fn filter_lines<F: LineFilter>(
                     );
                     for (l, line) in lines.chunks_exact_mut(n).enumerate() {
                         for (i, v) in line.iter_mut().enumerate() {
-                            *v = b.output[i * w + l] as f32;
+                            *v = T::from_f64(b.output[i * w + l]);
                         }
                     }
                 },
@@ -89,7 +118,7 @@ pub(crate) fn filter_lines<F: LineFilter>(
         } else {
             // Strided lines: each task owns the pieces of `w ≤ LANES` neighbouring lines, one
             // piece per position along the axis.
-            let mut tasks: Vec<Vec<&mut [f32]>> = Vec::new();
+            let mut tasks: Vec<Vec<&mut [T]>> = Vec::new();
             for block in data.chunks_mut(inner * n) {
                 let first = tasks.len();
                 tasks.extend((0..inner.div_ceil(LANES)).map(|_| Vec::with_capacity(n)));
@@ -106,7 +135,7 @@ pub(crate) fn filter_lines<F: LineFilter>(
                     let len = n * w;
                     for (i, row) in rows.iter().enumerate() {
                         for (x, &v) in b.input[i * w..(i + 1) * w].iter_mut().zip(row.iter()) {
-                            *x = f64::from(v);
+                            *x = v.to_f64();
                         }
                     }
                     filter.filter(
@@ -118,7 +147,7 @@ pub(crate) fn filter_lines<F: LineFilter>(
                     );
                     for (i, row) in rows.iter_mut().enumerate() {
                         for (v, &x) in row.iter_mut().zip(b.output[i * w..(i + 1) * w].iter()) {
-                            *v = x as f32;
+                            *v = T::from_f64(x);
                         }
                     }
                 },

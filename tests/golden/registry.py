@@ -1065,6 +1065,49 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.ants.antsRegistration", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Two linear registrations of ``anat2`` onto ``anat``: a rigid stage with Mattes mutual
+    information on regularly sampled points over two levels (shrunk and smoothed), collapsed
+    to ``0GenericAffine.mat``, with the warped image; and an affine stage in float with mean
+    squares on random points, written as a composite. The sampling seeds are fixed."""
+    prefix = ctx.out("rigid_")
+    warped = ctx.out("warped.nii")
+    cli(
+        "ants",
+        "antsRegistration",
+        "-d", "3",
+        "-o", f"[{prefix},{warped}]",
+        "-t", "Rigid[0.1]",
+        "-m", f"Mattes[{ctx.file('anat.nii')},{ctx.file('anat2.nii')},1,16,Regular,0.5]",
+        "-c", "[6x4,1e-6,3]",
+        "-f", "2x1",
+        "-s", "1x0vox",
+        "--random-seed", "7",
+    )  # fmt: skip
+    affine = ctx.out("affine_")
+    cli(
+        "ants",
+        "antsRegistration",
+        "-d", "3",
+        "--float", "1",
+        "-a", "1",
+        "-o", affine,
+        "-t", "Affine[0.2]",
+        "-m", f"MeanSquares[{ctx.file('anat.nii')},{ctx.file('anat2.nii')},1,0,Random,0.4]",
+        "-c", "[5,1e-6,3]",
+        "-f", "1",
+        "-s", "0.5mm",
+        "--random-seed", "11",
+    )  # fmt: skip
+    return {
+        "rigid": File(prefix + "0GenericAffine.mat"),
+        "warped": Nifti(warped),
+        "composite": File(affine + "Composite.h5"),
+        "inverse": File(affine + "InverseComposite.h5"),
+    }
+
+
 @case("cli.ants.antsApplyTransforms.outputs", covers=("cli:ants antsApplyTransforms",))
 def _(ctx: Context) -> dict[str, Any]:
     """The transform outputs: the chain collapsed to one affine (text) and inverted (MATLAB),

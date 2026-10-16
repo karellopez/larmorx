@@ -54,6 +54,9 @@ pub struct OptionSpec {
 #[derive(Clone, Debug, Default)]
 pub struct Parsed {
     values: Vec<(&'static str, Vec<OptionValue>)>,
+    /// For each value, its argument order (`AddFunction`'s `order`: one count per value, over
+    /// every option), in the same layout as `values`.
+    orders: Vec<(&'static str, Vec<usize>)>,
 }
 
 impl Parsed {
@@ -63,6 +66,29 @@ impl Parsed {
             .iter()
             .find(|(name, _)| *name == long)
             .map_or(&[], |(_, v)| v.as_slice())
+    }
+
+    /// The stage of each value of an option, in command-line order, as ANTs's
+    /// `CommandLineParser::AssignStages` numbers them: the **last** value is stage 0, and each
+    /// earlier value keeps the stage of the value after it when the two were given next to
+    /// each other (consecutive argument orders, `-m A B` or `-m A -m B` with nothing between)
+    /// and takes the next stage otherwise.
+    pub fn stage_ids(&self, long: &str) -> Vec<usize> {
+        let orders = self
+            .orders
+            .iter()
+            .find(|(name, _)| *name == long)
+            .map_or(&[][..], |(_, v)| v.as_slice());
+        let mut out = vec![0; orders.len()];
+        for k in (0..orders.len().saturating_sub(1)).rev() {
+            // `orders[k + 1]` is the value ANTs visits just before `orders[k]`.
+            out[k] = if orders[k + 1] == orders[k] + 1 {
+                out[k + 1]
+            } else {
+                out[k + 1] + 1
+            };
+        }
+        out
     }
 
     /// The value ANTs reads for a single-valued option (`GetFunction(0)`: the last one given).
@@ -193,7 +219,8 @@ fn hex_float(s: &str) -> f64 {
     value
 }
 
-/// ANTs' `RegroupCommandLineArguments`: joins bracketed values split across words.
+/// ANTs' `RegroupCommandLineArguments`: joins bracketed values split across words. The error
+/// is the description of the exception ANTs throws (`antsCommandLineParser.cxx:238-284`).
 fn regroup(args: &[String]) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     let mut current = String::new();
@@ -212,15 +239,19 @@ fn regroup(args: &[String]) -> Result<Vec<String>, String> {
         }
         let a: String = a.into_iter().collect();
         let (left, right) = (a.find('['), a.find(']'));
-        let bad = || format!("Incorrect command line specification: {a}");
+        let bad = || format!("Incorrect command line specification. {a}");
         if open {
             if left.is_some() {
-                return Err(bad());
+                return Err(format!(
+                    "Incorrect command line specification. Missing leftDelimiterPosition? {a}"
+                ));
             }
             current.push_str(&a);
             if let Some(r) = right {
                 if r + 1 < a.len() {
-                    return Err(bad());
+                    return Err(format!(
+                        "Incorrect command line specification. Missing rightDelimiterPosition? {a}"
+                    ));
                 }
                 out.push(std::mem::take(&mut current));
                 open = false;
@@ -247,13 +278,35 @@ fn regroup(args: &[String]) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// Parses `args` (without the program name) for a tool accepting `specs`.
+/// Why ANTs' parser rejects a command line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ParseFailure {
+    /// `RegroupCommandLineArguments` throws: the exception's description.
+    Regroup(String),
+    /// Flags no option has, in command-line order (`ValidateFlag` prints each one).
+    InvalidFlags(Vec<String>),
+}
+
+/// Parses `args` (without the program name) for a tool accepting `specs`; the error is a
+/// one-line explanation.
 pub fn parse(args: &[String], specs: &[OptionSpec]) -> Result<Parsed, String> {
-    let args = regroup(args)?;
+    parse_ants(args, specs).map_err(|e| match e {
+        ParseFailure::Regroup(message) => message,
+        ParseFailure::InvalidFlags(flags) => {
+            format!("Invalid flag provided: {}", flags.join(", "))
+        }
+    })
+}
+
+/// [`parse`], with ANTs' reasons for a rejection kept apart (`CommandLineParser::Parse`).
+pub fn parse_ants(args: &[String], specs: &[OptionSpec]) -> Result<Parsed, ParseFailure> {
+    let args = regroup(args).map_err(ParseFailure::Regroup)?;
     let mut parsed = Parsed {
         values: specs.iter().map(|s| (s.long, Vec::new())).collect(),
+        orders: specs.iter().map(|s| (s.long, Vec::new())).collect(),
     };
     let mut invalid = Vec::new();
+    let mut order = 0;
     let mut n = 0;
     while n < args.len() {
         let argument = &args[n];
@@ -288,8 +341,16 @@ pub fn parse(args: &[String], specs: &[OptionSpec]) -> Result<Parsed, String> {
         if values.is_empty() {
             values.push(OptionValue::parse("1"));
         }
+        let first = order;
+        order += values.len();
         match spec {
             Some(spec) => {
+                let slot = parsed
+                    .orders
+                    .iter_mut()
+                    .find(|(long, _)| *long == spec.long)
+                    .expect("one slot per spec");
+                slot.1.extend(first..order);
                 let slot = parsed
                     .values
                     .iter_mut()
@@ -303,7 +364,7 @@ pub fn parse(args: &[String], specs: &[OptionSpec]) -> Result<Parsed, String> {
     if invalid.is_empty() {
         Ok(parsed)
     } else {
-        Err(format!("Invalid flag provided: {}", invalid.join(", ")))
+        Err(ParseFailure::InvalidFlags(invalid))
     }
 }
 

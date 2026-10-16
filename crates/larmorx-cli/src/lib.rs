@@ -413,10 +413,10 @@ mod tests {
             "{err}"
         );
 
-        let (code, _, err) = run_capture(&["lx", "ants", "antsRegistration"]);
+        let (code, _, err) = run_capture(&["lx", "ants", "Atropos"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(
-            err.starts_with("error: unknown ants tool 'antsRegistration'"),
+            err.starts_with("error: unknown ants tool 'Atropos'"),
             "{err}"
         );
 

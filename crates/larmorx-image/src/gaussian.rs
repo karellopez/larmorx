@@ -350,9 +350,9 @@ fn check(input: &VolumeRef<'_, f32>) -> Result<usize, FilterError> {
 
 /// One recursive pass along `axis`, in place on `data` (`float → float`), an image with the
 /// size and spacing of `shape`.
-fn pass(
-    data: &mut [f32],
-    shape: VolumeRef<'_, f32>,
+fn pass<T: crate::lines::LinePixel, S>(
+    data: &mut [T],
+    shape: VolumeRef<'_, S>,
     axis: usize,
     sigma: f64,
     order: GaussianOrder,
@@ -447,6 +447,70 @@ pub fn smoothing_recursive_gaussian(
         )?;
     }
     Ok(out)
+}
+
+/// [`smoothing_recursive_gaussian`] for a `double` image
+/// (`SmoothingRecursiveGaussianImageFilter<Image<double>, Image<double>>`). Its intermediate
+/// images are `NumericTraits<double>::FloatType`, which is `float`: the first pass (along the
+/// last axis) reads the double voxels and stores float, the other passes are float to float,
+/// and the result is cast back to double.
+pub fn smoothing_recursive_gaussian_f64(
+    input: VolumeRef<'_, f64>,
+    sigma: &[f64],
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<f64>, FilterError> {
+    let d = input.dim();
+    if d == 0 {
+        return Err(FilterError::invalid("the image has no dimensions"));
+    }
+    if sigma.len() != d {
+        return Err(FilterError::invalid(format!(
+            "{} sigmas for a {d}-dimensional image",
+            sigma.len()
+        )));
+    }
+    let order = std::iter::once(d - 1).chain(0..d - 1);
+    for axis in order.clone() {
+        RecursiveCoefficients::new(
+            sigma[axis],
+            input.spacing[axis],
+            GaussianOrder::Zero,
+            normalize_across_scale,
+        )?;
+    }
+    for (axis, &n) in input.size.iter().enumerate() {
+        if n < 4 {
+            return Err(FilterError::invalid(format!(
+                "The number of pixels along dimension {axis} is less than 4. This filter \
+                 requires a minimum of four pixels along the dimension to be processed."
+            )));
+        }
+    }
+    let mut first = input.data.to_vec();
+    pass(
+        &mut first,
+        input,
+        d - 1,
+        sigma[d - 1],
+        GaussianOrder::Zero,
+        normalize_across_scale,
+        n_threads,
+    )?;
+    let mut out: Vec<f32> = first.iter().map(|&v| v as f32).collect();
+    drop(first);
+    for (axis, &s) in sigma.iter().enumerate().take(d - 1) {
+        pass(
+            &mut out,
+            input,
+            axis,
+            s,
+            GaussianOrder::Zero,
+            normalize_across_scale,
+            n_threads,
+        )?;
+    }
+    Ok(out.into_iter().map(f64::from).collect())
 }
 
 /// For each axis `dim`: the derivative of order `order` along `dim`, then smoothing along the

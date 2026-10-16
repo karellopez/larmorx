@@ -12,9 +12,11 @@ pub mod apply_transforms;
 pub mod cstd;
 pub mod denoise_image;
 pub mod image_math;
+pub mod menu;
 pub mod multiply_images;
 pub mod n4_bias_field_correction;
 pub mod parser;
+pub mod registration;
 pub mod resample_image;
 pub mod resample_image_by_spacing;
 pub mod smooth_image;
@@ -66,6 +68,7 @@ impl TransformLoader for FileLoader {
 /// The ANTs tools on the command line.
 pub const TOOLS: &[&str] = &[
     "antsApplyTransforms",
+    "antsRegistration",
     "DenoiseImage",
     "ImageMath",
     "MultiplyImages",
@@ -87,6 +90,7 @@ pub fn run(
 ) -> Option<u8> {
     match tool {
         "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
+        "antsRegistration" => Some(registration::main(args, loader, out, err)),
         "DenoiseImage" => Some(denoise_image::main(args, out, err)),
         "ImageMath" => Some(image_math::main(args, out, err)),
         "MultiplyImages" => Some(multiply_images::main(args, out, err)),

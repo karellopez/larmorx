@@ -84,18 +84,25 @@ The file is laid out exactly as ITK 5.4.5 on HDF5 1.12.1 lays it out: `/ITKVersi
 `TransformType` (a variable-length ASCII string), and for every transform but a composite
 `TransformFixedParameters` (float64, contiguous) and `TransformParameters` (float32 or float64
 as stored). The bytes are HDF5 1.12.1's for the same calls, superblock, object headers,
-global heap, chunk B-tree, dense groups and free-space included. Two things differ from a file
-ITK writes for the same transforms:
+global heap, chunk B-tree, dense groups and free-space included. Only these bytes differ from
+a file ITK writes for the same transforms (with the four strings below set to ITK's):
 
-- **Object times.** ITK records the time of writing in every object header (access,
-  modification, change and birth); larmorx records `Hdf5WriteOptions.time`, 0 by default, so
-  the same transforms always give the same bytes (ITK-09).
+- **Object times.** ITK records the second of writing in every object header (access,
+  modification, change and birth time); larmorx writes a fixed value, `Hdf5WriteOptions.time`,
+  0 by default, so the same transforms always give the same bytes (ITK-09), never the current
+  time. With the times, each object header's checksum (its last four bytes, Jenkins' lookup3)
+  differs.
 - **Compressed chunks.** Both decompress to the same bytes, but larmorx compresses with zlib-rs
   where ITK's HDF5 calls zlib-ng 2.1.6, whose output itself depends on the CPU (its hash is
   CRC-32C with SSE4.2, CRC-32 on Arm, multiplicative elsewhere). Small chunks, such as an
-  affine's 96 bytes, come out identical; a large field's chunk can differ by a few bytes, and
-  then so do the addresses after it. larmorx's own output is the same on every platform
-  (golden case `py.transforms.write_h5`).
+  affine's 96 bytes, come out identical; a large field's chunk can be a few bytes longer or
+  shorter. Then its size in the chunk B-tree differs, everything allocated after it moves by
+  that many bytes, and so do the addresses that point there (links, layout messages, B-tree
+  nodes, continuation blocks), the checksums of the object headers that hold them, and the
+  superblock's end-of-file address and checksum. Given ITK's compressed chunks, larmorx's
+  writer gives ITK's file byte for byte ([validation](../validation/itk-hdf5.md)). larmorx's own
+  output is the same on every platform (golden case `py.transforms.write_h5` fingerprints a
+  compressed file's bytes).
 
 A group of 38 or more transforms is the one layout larmorx does not replay: HDF5 gives the
 group's fractal heap an indirect block there; larmorx stores the links as link messages,

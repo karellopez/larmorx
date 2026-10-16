@@ -719,6 +719,20 @@ WRITES: dict[str, tuple[str, tuple[str, ...], tuple[str, ...], str, str]] = {
         "standard",
         "CompositeTransformUtil --assemble (itk::ants::WriteTransform)",
     ),
+    "assemble-field-first": (
+        "CompositeTransformUtil",
+        (
+            "--assemble",
+            "{out}",
+            "{t:warp-lps-vector.nii.gz}",
+            "{t:affine-centered.mat}",
+            "{t:euler-centered.mat}",
+        ),
+        ("{t:warp-lps-vector.nii.gz}", "{t:affine-centered.mat}", "{t:euler-centered.mat}"),
+        "standard",
+        "CompositeTransformUtil --assemble: a field, then two linear transforms (objects "
+        "allocated after the compressed chunk)",
+    ),
     "fmriprep-rewritten": (
         "antsApplyTransforms",
         (
@@ -1645,14 +1659,29 @@ def suite() -> Suite:
         highlights=_highlights,
         notes=(
             "larmorx reads in `reproduce` mode for the comparisons (ITK's defects reproduced, D13), "
-            "and a fix pass reports what the default changes. ITK records the time of writing in "
-            "every object header; larmorx writes 0 unless told otherwise, so the byte comparisons "
-            "give larmorx ITK's time and set each object's times alike on both sides. The "
-            "compressed chunks are the only bytes larmorx's own output may change: zlib-ng 2.1.6 "
-            "(ITK's) hashes with CRC-32C on x86-64 CPUs with SSE4.2, CRC-32 on Arm with the CRC "
+            "and a fix pass reports what the default changes. "
+            "**The bytes in which larmorx's own files differ from ITK's, and no others:** "
+            "(1) the four times of every version-2 object header (access, modification, change "
+            "and birth time: ITK's HDF5 records the second of writing; larmorx writes the fixed "
+            "value 0, so its files do not depend on when they were written, "
+            "`Hdf5WriteOptions.time` sets another) and with them each object header's checksum "
+            "(Jenkins' lookup3, its last four bytes); "
+            "(2) the compressed chunk streams, where larmorx's deflate (zlib-rs) chooses other "
+            "matches than ITK's (zlib-ng 2.1.6, level 5): a differing stream also changes its "
+            "size, recorded in the chunk B-tree's key, and moves everything allocated after it by "
+            "the difference, so every address of something allocated after it changes too "
+            "(links to later groups and datasets, later B-tree nodes and chunks in layout "
+            "messages and B-tree nodes, continuation blocks, global heap collections), with the "
+            "checksums of the object headers that hold them, and the superblock's end-of-file "
+            "address with the superblock's checksum. "
+            "The byte comparisons therefore give larmorx ITK's time and set each object's times "
+            "alike on both sides, and compare once with ITK's own compressed chunks (every byte "
+            "must then be ITK's) and once with larmorx's deflate (the chunks that differ are "
+            "listed with their sizes). Decompressed, every chunk is identical. zlib-ng 2.1.6 "
+            "hashes with CRC-32C on x86-64 CPUs with SSE4.2, CRC-32 on Arm with the CRC "
             "extension, and multiplicatively elsewhere, so ITK's own compressed bytes depend on "
-            "the CPU; larmorx's deflate (zlib-rs) gives the same bytes on every platform "
-            "(golden case `py.transforms.write_h5`)."
+            "the CPU; larmorx's deflate gives the same bytes on every platform (golden case "
+            "`py.transforms.write_h5`, which also fingerprints a compressed file's bytes)."
         ),
     )
 

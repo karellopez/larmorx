@@ -68,12 +68,14 @@ are at the pinned tags (`tags/ITK-v5.4.5`, `tags/ANTs-v2.6.5`). *larmorx:* crate
   for <file> caught an ITK exception:" and the exception (`itkantsReadWriteTransform.h`).
   *Verified.* *larmorx:* the same text, the exception's addresses as `0x0`, ITK's source tree
   as `<ITK source>`, HDF5's stack abridged to the API call and the cause.
-- **A null variable-length `TransformType`** (an HDF5 nil string) makes ITK build a
-  `std::string` from a null pointer: undefined behaviour, a crash (**ITK-16**). *Read.*
-  *larmorx:* refuses the file.
-- **A composite whose components have another dimension** (a 2-D transform in a 3-D file)
-  would be `static_cast` to the reader's dimension by ANTs: undefined behaviour (**ITK-17**).
-  *Read, not verified.* *larmorx:* refuses transform names of another dimension.
+- **A null variable-length `TransformType`** (an HDF5 nil string) makes ITK's C++ binding
+  build a `std::string` from a null pointer (`c++/src/H5DataSet.cpp:761`): undefined
+  behaviour (**ITK-16**). *Read.* *larmorx:* refuses the file.
+- **A composite whose components have another dimension** (a 2-D transform in a 3-D file): each
+  component is `static_cast` to the composite's dimension
+  (`itkCompositeTransformIOHelper.cxx:205`), undefined behaviour; antsApplyTransforms runs on
+  and exits 0 (**ITK-17**). *Read; verified.* *larmorx:* refuses a transform whose name gives
+  another dimension (`LinearTransform::from_itk`).
 
 ## Writing (`HDF5TransformIOTemplate<T>::Write`, lines 409-465)
 

@@ -238,6 +238,19 @@ def _h5py_file(path: Path, recipe: str) -> None:
             ]
         ),
         "lzf": lambda: write([comp, ("1", affine())], chunks=(6,), compression="lzf"),
+        "mixed-dimension": lambda: write(
+            [
+                comp,
+                (
+                    "1",
+                    affine(
+                        t="AffineTransform_double_2_2",
+                        params=np.array([1.0, 0, 0, 1, 2, 3]),
+                        fixed=np.zeros(2),
+                    ),
+                ),
+            ]
+        ),
     }
     if recipe == "compact":
         # A compact dataset needs the low-level API in h5py.
@@ -308,7 +321,15 @@ H5PY_ERRORS = (
     "not-hdf5",
     "truncated",
     "superblock3-chunked",
+    "mixed-dimension",
 )
+#: Files ITK reads with undefined behaviour that larmorx refuses (class (a), never reproduced).
+ERROR_DIVERGENCES = {
+    "mixed-dimension": (
+        "ITK-17: ITK casts the 2-D component to a 3-D transform (undefined behaviour) and "
+        "antsApplyTransforms exits 0; larmorx refuses the file"
+    ),
+}
 SMOKE_H5PY = ("composite", "superblock3", "misspelt-itk4", "dense-11", "fixed-string")
 #: Files h5py reads and larmorx, like ITK's HDF5 1.12, refuses: LZF (a filter of h5py's own),
 #: and a chunked dataset of HDF5 2.0's newest format (layout message version 5: h5py's HDF5
@@ -1051,8 +1072,15 @@ def _fix_read(checks: CheckList, path: Path) -> None:
 
 
 def _run_error(case: Case, checks: CheckList, path: Path, tmp: Path) -> None:
-
     _compare_with_h5py(checks, path)
+    divergence = ERROR_DIVERGENCES.get(path.stem)
+    if divergence is not None:
+        a_code, l_code, _, l_err = _image_route(checks, path, tmp)
+        checks("larmorx refuses the file", l_code != 0, detail=l_err.strip()[-200:])
+        checks("ANTs runs on", True, metric="report", detail=f"exit {a_code}")
+        if l_code != 0:
+            raise Outcome(EXPECTED, divergence)
+        return
     a_code, l_code, a_err, l_err = _image_route(checks, path, tmp)
     checks("exit status", (a_code == 0) == (l_code == 0), detail=f"ANTs {a_code}, larmorx {l_code}")
     if a_code != 0:

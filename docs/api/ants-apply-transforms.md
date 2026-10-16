@@ -119,7 +119,7 @@ nests the ones after it. `lx.transforms.write(path, transforms)` writes them.
 |---|---|---|
 | ITK text `.txt`, `.tfm` | ✓ | linear transforms |
 | MATLAB `.mat` (ANTs' `*GenericAffine.mat`) | ✓ | one linear transform |
-| HDF5 `.h5` (fMRIPrep's `*_xfm.h5`) | ✓ (h5py) | ✓, composites and fields included; ANTs reads what larmorx writes |
+| HDF5 `.h5` (fMRIPrep's `*_xfm.h5`) | ✓, in Rust (Python and command line) | ✓, composites and fields included, laid out as ITK 5.4.5 lays them out ([transforms-hdf5.md](transforms-hdf5.md)) |
 | Displacement field `.nii`, `.nii.gz` | ✓ (LPS vectors; RAS→LPS for intent DISPVECT, as ITK) | – |
 
 Linear classes: `AffineTransform`, `MatrixOffsetTransformBase`, `Rigid3DTransform`,

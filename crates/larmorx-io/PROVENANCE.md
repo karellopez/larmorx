@@ -80,5 +80,20 @@ ITK's byte for byte.
 - the displacement-field reading path of ANTs v2.6.5's `itk::ants::ReadTransform`
   (`Utilities/itkantsReadWriteTransform.h`).
 
-HDF5 (`.h5`) files follow ITK's `itkHDF5TransformIO` layout and are read and written by the
-Python layer with h5py (`python/larmorx/transforms.py`).
+## ITK's HDF5 transform files (`src/itk_hdf5.rs`, `src/itk_transform_names.rs`)
+
+**Ported** (logic re-expressed in Rust) from ITK v5.4.5 (Apache-2.0), on the HDF5 layer of
+crate `larmorx-hdf5`:
+- `Modules/IO/TransformHDF5/src/itkHDF5TransformIO.cxx` (`CanReadFile`, `CanWriteFile`, `Read`,
+  `ReadParameters`, `ReadFixedParameters`, `Write`, `WriteOneTransform`, `WriteParameters`,
+  `WriteFixedParameters`, `WriteString`; the exception lines quoted in messages);
+- `Modules/IO/TransformBase/include/itkTransformIOBase.h` (`CorrectTransformPrecisionType`),
+  `src/itkTransformIOBase.cxx` (`CreateTransform`), `src/itkTransformFileReader.cxx`
+  (`Update`: the IO search and its messages), `src/itkCompositeTransformIOHelper.cxx`;
+- `Modules/Core/Common/src/itkExceptionObject.cxx` (`Print`, the report's layout);
+- ANTs v2.6.5 `Utilities/itkantsReadWriteTransform.h` (`ReadTransform`, `WriteTransform`: the
+  messages and the composite flattening) and `Examples/antsApplyTransforms.cxx:536-539` (the
+  `MatrixOffsetTransformBase` it registers).
+
+`itk_transform_names.rs` lists the transform classes registered with ITK's factory in the ANTs
+2.6.5 build, copied from the oracle's own message for an unknown class.

@@ -27,6 +27,20 @@ sdcflows' field-map estimation, the confounds, larmorprepx; FreeSurfer is a sepa
 
 ## 1. A4, part 1: ITK's HDF5 transform files in Rust
 
+**Done 2026-10-16** (agent branch `worktree-agent-a5b5185d32a7fb70f`, to merge): crate
+`larmorx-hdf5` (a reader of HDF5's format, and a writer replaying HDF5 1.12.1's layout),
+`larmorx_io::itk_hdf5` (ITK's reading and writing, ANTs' messages, ITK-12 to ITK-17, HDF-01),
+`-t x.h5` on the command line, `lx.transforms.read`/`write`/`load_itk_composite` in Rust (PIPE-17),
+h5py dropped. Validation [itk-hdf5](validation/itk-hdf5.md); API
+[transforms-hdf5](api/transforms-hdf5.md); findings [itk-hdf5](findings/itk-hdf5.md).
+**Left for later:** antsApplyTransforms' transform outputs (`-o Linear[...]`,
+`-o CompositeTransform[...]`, `-o DisplacementField[...]`, refused today: they need ANTs'
+linear collapse and `TransformToDisplacementFieldFilter`; the HDF5 writer is ready); reading
+the n-bit and scale-offset filters, extensible-array chunk indices and virtual datasets
+(ITK's HDF5 reads them; no transform file uses them); a fractal heap's indirect blocks in the
+writer (a composite of 38 or more transforms is written compactly instead); the read benchmark
+against h5py and ANTs (pending a quiet machine).
+
 **Why first:** `larmorx ants antsApplyTransforms` refuses `.h5` transforms (only
 `lx.transforms` reads them, through h5py), so the command line cannot take fMRIPrep's
 composites; `antsRegistration` writes them (`--write-composite-transform`) and reads them as
@@ -109,8 +123,7 @@ Still to do:
   problem: GitHub's runners have the runtime installed.
 - **Size:** `strip`, LTO and `codegen-units = 1` in the release profile (stripping alone takes
   the extension from 24 to 15 MB).
-- **Python dependencies:** drop h5py once A4 part 1 reads HDF5 in Rust (numpy is then the only
-  one); check that every `[prep]` dependency has wheels for all six platforms, Windows arm64
+- **Python dependencies:** h5py dropped (A4 part 1, 2026-10-16: numpy is the only one); check that every `[prep]` dependency has wheels for all six platforms, Windows arm64
   included. Linux wheels are manylinux_2_28 (glibc 2.28 or newer); decide whether to add
   musllinux wheels (Alpine).
 - **Publishing:** a release workflow (on a version tag: the six wheels and the sdist of each

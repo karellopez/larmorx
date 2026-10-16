@@ -32,6 +32,7 @@ sections marked restricted ([porting guide](../porting-guide.md) §1).
 | [upstream-defects.md](upstream-defects.md) | the register of every defect found in the originals and pipelines, by class, with what larmorx does and the D13 gaps (its AFNI and FSL sections are **forbidden to clean-room implementers**) |
 | [afni-tshift.md](afni-tshift.md) | AFNI 3dTshift: slice-timing correction as fMRIPrep runs it, AFNI's FFT (source-derived; **forbidden to clean-room implementers**) |
 | [fsl-mcflirt.md](fsl-mcflirt.md) | FSL mcflirt: head-motion correction as fMRIPrep runs it (source-derived; **forbidden to clean-room implementers**) |
+| [itk-hdf5.md](itk-hdf5.md) | ITK's HDF5 transform files: what ITK reads and refuses, what it writes, what HDF5 1.12.1 makes of it byte for byte (file space, object headers, dense groups), zlib-ng's CPU-dependent compression, h5py and nitransforms as readers |
 | [ants-cli.md](ants-cli.md) | ANTs command lines: argument parser, `antsApplyTransforms` options and outputs |
 | [ants-image-programs.md](ants-image-programs.md) | ImageMath, ThresholdImage, MultiplyImages: dispatch, exit codes, operands, quirks of each operation |
 | [ants-gaussian-filters.md](ants-gaussian-filters.md) | ITK's recursive and discrete Gaussian filters; ImageMath `G`, `Laplacian`, `Grad`, `UnsharpMask`; SmoothImage; ResampleImageBySpacing; ResampleImage (pixel types, interpolators, argument quirks) |

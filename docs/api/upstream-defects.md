@@ -78,6 +78,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
 |---|---|---|---|---|
 | PIPE-03 | fMRIPrep `ResampleSeries` | `lx.transforms.resample_series` | the field map's Jacobian is the gradient along the *target* axis with the source's phase-encoding index, in target voxels: right only when the target's axes are the source's (the native boldref) | `1 + ∇vsm · ∂t/∂s_pe`: the derivative along the phase-encoding direction mapped into the target grid; on the source's own grid, fMRIPrep's value bit for bit ([resample-series.md](resample-series.md)) |
 | PIPE-04 | nitransforms | `lx.transforms.load_itk_composite`, `load_transforms`, `resample_series` | a composite `.h5` file's transforms are read in name order (`"10"` before `"2"`) | numeric order |
+| PIPE-17 | nitransforms | `lx.transforms.load_itk_composite`, `load_transforms` | the first group of an `.h5` file is skipped as if it were the composite: a file of one transform fails, one of several without a composite loses its first, an empty composite fails | the first group read when it is not a composite; an empty composite is the identity |
+| HDF-01 | HDF5 1.12 | `lx.transforms.read`, `-t x.h5` (non-native floating-point parameters) | conversion state carried from one element to the next (denormals) | each element converted on its own ([transforms-hdf5.md](transforms-hdf5.md)) |
 | SCI-03 | SciPy `ndimage` | `lx.ndimage.*`, `resample_series(mode=...)` | the spline prefilter's reflect boundary (modes `reflect`, `grid-mirror`, `nearest`) reads a coefficient it has already updated: the splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: splines through the samples |
 | AFNI-01 | 3dTshift | `lx.afni.tshift`, `larmorx afni 3dTshift` (both implementations) | a negative `scl_slope` is applied on output only: shifted slices come out sign-flipped and scaled | the factor is applied on input too |
 | AFNI-02 | 3dTshift | same | float32 data with a slope and an intercept are scaled, and the slope is kept as a scale factor: scaled twice | scaled once, no factor |
@@ -152,6 +154,10 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
 | ITK-08 | nifti_clib | asked for `x.nii.gz`, the voxels of `x.nii` | the named file (`reproduce`: nifti_clib's) |
 | ITK-10 | ITK `Versor<float>` | `--float 1` refuses some valid versors | they load |
+| ITK-12 | ITK HDF5 reader | a fixed-length `TransformType` string is refused | read |
+| ITK-13 | ITK HDF5 reader | messages that name `TransformType` for any dataset and miss a blank | the dataset named |
+| ITK-14 | ITK HDF5 reader | parameters wider than 8 bytes read through float | read in the reader's precision |
+| ITK-15 | ITK HDF5 writer | a transform without parameters cannot be written with compression; a file ITK cannot read is left | its empty parameters stored uncompressed (`reproduce`: ITK's error and file) |
 
 **Not the default yet:**
 

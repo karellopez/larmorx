@@ -24,7 +24,7 @@ pub trait Problem<R: Real> {
     /// `GetParameters()` (of the optimised transform).
     fn parameters(&self) -> Vec<R>;
     /// `SetParameters`.
-    fn set_parameters(&mut self, p: &[R]);
+    fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException>;
     /// `UpdateTransformParameters(update, 1)`.
     fn update(&mut self, update: &[R]) -> Result<(), ItkException>;
     /// `RegistrationParameterScalesFromPhysicalShift::EstimateScales`.
@@ -216,7 +216,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
     ) -> Result<Outcome<R>, ItkException> {
         loop {
             if run.current_iteration >= self.number_of_iterations {
-                self.stop(problem, run);
+                self.stop(problem, run)?;
                 return Ok(Outcome {
                     stop: StopCondition::MaximumNumberOfIterations,
                     iterations: run.current_iteration,
@@ -230,7 +230,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             run.monitor.add(value.to_f64());
             run.convergence = R::from_f64(run.monitor.value());
             if run.convergence <= self.minimum_convergence_value {
-                self.stop(problem, run);
+                self.stop(problem, run)?;
                 return Ok(Outcome {
                     stop: StopCondition::ConvergenceCheckerPassed,
                     iterations: run.current_iteration,
@@ -249,9 +249,14 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
 
     /// `StopOptimization()` (`ReturnBestParametersAndValue` on): the best parameters back
     /// into the transform.
-    fn stop<P: Problem<R> + ?Sized>(&self, problem: &mut P, run: &mut Run<R>) {
-        problem.set_parameters(&run.best_parameters);
+    fn stop<P: Problem<R> + ?Sized>(
+        &self,
+        problem: &mut P,
+        run: &mut Run<R>,
+    ) -> Result<(), ItkException> {
+        problem.set_parameters(&run.best_parameters)?;
         run.value = run.best_value;
+        Ok(())
     }
 
     /// `ModifyGradientByScales()`.
@@ -400,7 +405,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
                 .collect();
             problem.update(&step)?;
             let mx = problem.value()?;
-            problem.set_parameters(&base_parameters);
+            problem.set_parameters(&base_parameters)?;
             run.gradient = base_gradient.clone();
             if metricb == R::MAX {
                 self.learning_rate = b;
@@ -411,7 +416,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
                     .collect();
                 problem.update(&step)?;
                 metricb = problem.value()?;
-                problem.set_parameters(&base_parameters);
+                problem.set_parameters(&base_parameters)?;
                 run.gradient = base_gradient;
                 self.learning_rate = base_lr;
             }

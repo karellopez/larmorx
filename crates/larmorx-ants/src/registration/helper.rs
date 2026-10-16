@@ -821,6 +821,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             (XfrmMethod::Rigid, 3) => linear(Kind::Euler3D { zyx: false }),
             (XfrmMethod::Rigid, 2) => linear(Kind::Euler2D),
             (XfrmMethod::Similarity, 2) => linear(Kind::Similarity2D),
+            (XfrmMethod::Similarity, 3) => linear(Kind::Similarity3D),
+            (XfrmMethod::CompositeAffine, 2) => linear(Kind::AntsCenteredAffine2D),
+            (XfrmMethod::CompositeAffine, 3) => linear(Kind::AntsAffine3D),
             (XfrmMethod::Affine, _) => linear(Kind::Affine),
             (XfrmMethod::Rigid | XfrmMethod::Similarity | XfrmMethod::CompositeAffine, 4) => {
                 linear(Kind::Affine)

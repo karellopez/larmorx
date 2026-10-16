@@ -131,8 +131,8 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
         self.moving.active().parameters()
     }
 
-    fn set_parameters(&mut self, p: &[R]) {
-        self.moving.active_mut().set_parameters(p);
+    fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException> {
+        self.moving.active_mut().set_parameters(p)
     }
 
     fn update(&mut self, update: &[R]) -> Result<(), ItkException> {

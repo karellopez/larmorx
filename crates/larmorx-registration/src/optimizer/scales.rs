@@ -57,7 +57,7 @@ fn sample_shifts<R: Real, const D: usize>(
             R::from_f64(sum.sqrt())
         })
         .collect();
-    transform.active_mut().set_parameters(&old_parameters);
+    transform.active_mut().set_parameters(&old_parameters)?;
     Ok(shifts)
 }
 

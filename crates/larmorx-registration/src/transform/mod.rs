@@ -95,11 +95,12 @@ impl<R: Real, const D: usize> Xfm<R, D> {
     }
 
     /// `SetParameters`.
-    pub fn set_parameters(&mut self, p: &[R]) {
+    pub fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException> {
         match self {
-            Xfm::Identity => {}
+            Xfm::Identity => Ok(()),
             Xfm::Translation { offset } => {
                 offset[..D].copy_from_slice(&p[..D]);
+                Ok(())
             }
             Xfm::Linear(l) => l.set_parameters(p),
         }

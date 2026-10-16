@@ -152,6 +152,9 @@ pub struct ItkException {
     pub class: &'static str,
     /// The description after ITK's `ITK ERROR: Class(0x..): ` prefix.
     pub description: String,
+    /// `GetLocation()`: `"unknown"` (`ITK_LOCATION`) for `itkExceptionMacro`, else what the
+    /// thrower set.
+    pub location: &'static str,
 }
 
 impl ItkException {
@@ -166,6 +169,19 @@ impl ItkException {
             line,
             class,
             description: description.into(),
+            location: "unknown",
+        }
+    }
+
+    /// An `ExceptionObject` built empty and given a description and a location (no file, line
+    /// 0, no class prefix), as `itk::Versor` throws.
+    pub fn located(location: &'static str, description: impl Into<String>) -> Self {
+        ItkException {
+            file: "",
+            line: 0,
+            class: "",
+            description: description.into(),
+            location,
         }
     }
 
@@ -179,8 +195,8 @@ impl ItkException {
             format!("ITK ERROR: {}(0x0): {}", self.class, self.description)
         };
         format!(
-            "\nitk::ExceptionObject (0x0)\nLocation: \"unknown\" \nFile: {}\nLine: {}\nDescription: {}\n\n",
-            self.file, self.line, description
+            "\nitk::ExceptionObject (0x0)\nLocation: \"{}\" \nFile: {}\nLine: {}\nDescription: {}\n\n",
+            self.location, self.file, self.line, description
         )
     }
 }

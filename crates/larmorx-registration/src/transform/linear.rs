@@ -19,6 +19,14 @@ pub enum Kind {
     Euler2D,
     /// `Similarity2DTransform`: the scale, the angle, then the translation.
     Similarity2D,
+    /// `Similarity3DTransform`: the versor's vector part, the translation, the scale.
+    Similarity3D,
+    /// ANTs' `ANTSAffine3DTransform`: the quaternion (x, y, z, r), the scales S1-S3, the
+    /// shears K1-K3, the translation.
+    AntsAffine3D,
+    /// ANTs' `ANTSCenteredAffine2DTransform`: the angle, the scales S1 and S2, the shear K,
+    /// the centre, the translation.
+    AntsCenteredAffine2D,
     /// Another linear class, read from a file and never optimised: its own name, parameters
     /// and fixed parameters as stored.
     Other {
@@ -37,6 +45,9 @@ impl Kind {
             Kind::Euler3D { .. } => "Euler3DTransform",
             Kind::Euler2D => "Euler2DTransform",
             Kind::Similarity2D => "Similarity2DTransform",
+            Kind::Similarity3D => "Similarity3DTransform",
+            Kind::AntsAffine3D => "ANTSAffine3DTransform",
+            Kind::AntsCenteredAffine2D => "ANTSCenteredAffine2DTransform",
             Kind::Other { class, .. } => {
                 // The class names a file can hold are a closed set; keep them static.
                 match class.as_str() {
@@ -66,9 +77,130 @@ impl Kind {
             Kind::Euler3D { .. } => 6,
             Kind::Euler2D => 3,
             Kind::Similarity2D => 4,
+            Kind::Similarity3D => 7,
+            Kind::AntsAffine3D => 13,
+            Kind::AntsCenteredAffine2D => 8,
             Kind::Other { parameters, .. } => parameters.len(),
         }
     }
+}
+
+/// `itk::Math::FloatAlmostEqual<R>(x, 0.0)` with its defaults (4 ulps, an absolute
+/// difference of `0.1·ε`).
+fn float_almost_zero<R: Real>(x: R) -> bool {
+    let max_abs = R::from_f64(0.1 * R::EPSILON.to_f64());
+    if x.abs() <= max_abs {
+        return true;
+    }
+    if x.to_f64().is_sign_negative() {
+        return false;
+    }
+    // Same sign as +0: the ulp distance is the bit pattern itself.
+    match R::PRECISION {
+        larmorx_core::Precision::Double => x.to_f64().to_bits() <= 4,
+        larmorx_core::Precision::Float => (x.to_f64() as f32).to_bits() <= 4,
+    }
+}
+
+/// `Vector<R, 3>::GetNorm()`: the squares summed in double, `sqrt` in double.
+fn vector_norm<R: Real>(v: &[R; 3]) -> f64 {
+    let mut sum = 0.0f64;
+    for &c in v {
+        let value = c.to_f64();
+        sum += value * value;
+    }
+    sum.sqrt()
+}
+
+/// `Versor<R>::Set(const VectorType & axis)`: the vector part as given, `w = sqrt(1 − |v|²)`;
+/// ITK throws for a vector longer than 1.
+fn versor_from_vector<R: Real>(axis: [R; 3]) -> Result<[R; 4], ItkException> {
+    let sinangle2 = R::from_f64(vector_norm(&axis));
+    if sinangle2 > R::ONE {
+        return Err(ItkException::located(
+            "itk::Versor::Set( const VectorType )",
+            "Trying to initialize a Versor with a vector whose magnitude is greater than 1",
+        ));
+    }
+    let cosangle2 = R::from_f64((1.0 - (sinangle2 * sinangle2).to_f64()).sqrt());
+    Ok([axis[0], axis[1], axis[2], cosangle2])
+}
+
+/// `Versor<R>::Set(const VectorType & axis, ValueType angle)`.
+fn versor_from_axis_angle<R: Real>(axis: [R; 3], angle: R) -> Result<[R; 4], ItkException> {
+    let vector_norm = vector_norm(&axis);
+    if float_almost_zero(R::from_f64(vector_norm)) {
+        // ITK sets the location to `__FILE__`, the header's path where ITK was built.
+        return Err(ItkException::located(
+            "Modules/Core/Common/include/itkVersor.hxx",
+            "Attempt to set rotation axis with zero norm",
+        ));
+    }
+    let half = angle.to_f64() / 2.0;
+    let cosangle2 = larmorx_core::math::cos(half);
+    let sinangle2 = larmorx_core::math::sin(half);
+    let factor = sinangle2 / vector_norm;
+    Ok([
+        R::from_f64(axis[0].to_f64() * factor),
+        R::from_f64(axis[1].to_f64() * factor),
+        R::from_f64(axis[2].to_f64() * factor),
+        R::from_f64(cosangle2),
+    ])
+}
+
+/// `Versor<R>::operator*`: each product in `R`, summed left to right.
+fn versor_product<R: Real>(a: &[R; 4], b: &[R; 4]) -> [R; 4] {
+    let [ax, ay, az, aw] = *a;
+    let [bx, by, bz, bw] = *b;
+    [
+        aw * bx - az * by + ay * bz + ax * bw,
+        az * bx + aw * by - ax * bz + ay * bw,
+        -ay * bx + ax * by + aw * bz + az * bw,
+        -ax * bx - ay * by - az * bz + aw * bw,
+    ]
+}
+
+/// `Versor<R>::GetMatrix()`: the products in `R`, the entries in double.
+fn versor_matrix<R: Real>(v: &[R; 4]) -> [[R; 3]; 3] {
+    let [x, y, z, w] = *v;
+    let f = |a: R, b: R| (a * b).to_f64();
+    let (xx, yy, zz) = (f(x, x), f(y, y), f(z, z));
+    let (xy, xz, xw) = (f(x, y), f(x, z), f(x, w));
+    let (yz, yw, zw) = (f(y, z), f(y, w), f(z, w));
+    let r = R::from_f64;
+    [
+        [
+            r(1.0 - 2.0 * (yy + zz)),
+            r(2.0 * (xy - zw)),
+            r(2.0 * (xz + yw)),
+        ],
+        [
+            r(2.0 * (xy + zw)),
+            r(1.0 - 2.0 * (xx + zz)),
+            r(2.0 * (yz - xw)),
+        ],
+        [
+            r(2.0 * (xz - yw)),
+            r(2.0 * (yz + xw)),
+            r(1.0 - 2.0 * (xx + yy)),
+        ],
+    ]
+}
+
+/// `vnl_quaternion<R>::rotation_matrix_transpose()` of the conjugate of `(x, y, z, r)`, in
+/// `R`.
+fn quaternion_conjugate_matrix<R: Real>(q: &[R; 4]) -> [[R; 3]; 3] {
+    let (x, y, z, r) = (-q[0], -q[1], -q[2], q[3]);
+    let (x2, xy, rx) = (x * x, x * y, r * x);
+    let (y2, yz, ry) = (y * y, y * z, r * y);
+    let (z2, zx, rz) = (z * z, z * x, r * z);
+    let r2 = r * r;
+    let two = R::from_f64(2.0);
+    [
+        [r2 + x2 - y2 - z2, two * (xy + rz), two * (zx - ry)],
+        [two * (xy - rz), r2 - x2 + y2 - z2, two * (yz + rx)],
+        [two * (zx + ry), two * (yz - rx), r2 - x2 - y2 + z2],
+    ]
 }
 
 /// A matrix-offset transform in the computation type `R`.
@@ -81,8 +213,14 @@ pub struct LinearXfm<R, const D: usize> {
     pub translation: [R; D],
     /// Euler angles (`Euler3DTransform`: x, y, z; the 2D classes: the angle first).
     pub angles: [R; 3],
-    /// `Similarity2DTransform`'s scale.
+    /// The similarity transforms' scale.
     pub scale: R,
+    /// `Similarity3DTransform`'s versor (x, y, z, w); `ANTSAffine3DTransform`'s quaternion
+    /// (x, y, z, r).
+    pub versor: [R; 4],
+    /// The ANTs affine classes' scales (S1, S2, S3) and shears (K1, K2, K3; 2D: K).
+    pub scales: [R; 3],
+    pub shears: [R; 3],
 }
 
 /// `vnl_matrix_fixed` product in `R`: each entry starts from the first product.
@@ -114,6 +252,9 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
             translation: [R::ZERO; D],
             angles: [R::ZERO; 3],
             scale: R::ONE,
+            versor: [R::ZERO, R::ZERO, R::ZERO, R::ONE],
+            scales: [R::ONE; 3],
+            shears: [R::ZERO; 3],
         }
     }
 
@@ -273,6 +414,46 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 self.matrix[1][0] = sa;
                 self.matrix[1][1] = ca;
             }
+            Kind::Similarity3D => {
+                // VersorTransform::ComputeMatrix, then `matrix *= m_Scale` in R.
+                let m = versor_matrix(&self.versor);
+                for i in 0..3 {
+                    for j in 0..3 {
+                        self.matrix[i][j] = m[i][j] * self.scale;
+                    }
+                }
+            }
+            Kind::AntsAffine3D => {
+                // R·S·K: the conjugate's transposed rotation matrix, the scales, the shears.
+                let r = quaternion_conjugate_matrix(&self.versor);
+                let (o, z) = (R::ONE, R::ZERO);
+                let [s1, s2, s3] = self.scales;
+                let [k1, k2, k3] = self.shears;
+                let s = [[s1, z, z], [z, s2, z], [z, z, s3]];
+                let k = [[o, k1, k2], [z, o, k3], [z, z, o]];
+                let m = mat_mat_r(&mat_mat_r(&r, &s), &k);
+                for i in 0..3 {
+                    for j in 0..3 {
+                        self.matrix[i][j] = m[i][j];
+                    }
+                }
+            }
+            Kind::AntsCenteredAffine2D => {
+                // The cosine and sine of the angle in R (`std::cos(m_Angle)`), then
+                // rotation·scale·shear in R.
+                let ca = self.angles[0].cos();
+                let sa = self.angles[0].sin();
+                let (o, z) = (R::ONE, R::ZERO);
+                let rot = [[ca, -sa], [sa, ca]];
+                let scale = [[self.scales[0], z], [z, self.scales[1]]];
+                let shear = [[o, self.shears[0]], [z, o]];
+                let m = mat_mat_r(&mat_mat_r(&rot, &scale), &shear);
+                for i in 0..2 {
+                    for j in 0..2 {
+                        self.matrix[i][j] = m[i][j];
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -300,12 +481,37 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 p.extend_from_slice(&self.translation);
                 p
             }
+            Kind::Similarity3D => {
+                let mut p = self.versor[..3].to_vec();
+                p.extend_from_slice(&self.translation);
+                p.push(self.scale);
+                p
+            }
+            Kind::AntsAffine3D => {
+                let mut p = self.versor.to_vec();
+                p.extend_from_slice(&self.scales);
+                p.extend_from_slice(&self.shears);
+                p.extend_from_slice(&self.translation);
+                p
+            }
+            Kind::AntsCenteredAffine2D => {
+                let mut p = vec![
+                    self.angles[0],
+                    self.scales[0],
+                    self.scales[1],
+                    self.shears[0],
+                ];
+                p.extend_from_slice(&self.center);
+                p.extend_from_slice(&self.translation);
+                p
+            }
             Kind::Other { parameters, .. } => parameters.iter().map(|&v| R::from_f64(v)).collect(),
         }
     }
 
-    /// `SetParameters`.
-    pub fn set_parameters(&mut self, p: &[R]) {
+    /// `SetParameters`. `Similarity3DTransform`'s throws where ITK's versor does (a vector
+    /// part longer than 1 after its normalisation, possible in float).
+    pub fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException> {
         match &self.kind {
             Kind::Affine | Kind::MatrixOffset => {
                 let mut k = 0;
@@ -346,8 +552,56 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 self.compute_matrix();
                 self.compute_offset();
             }
+            Kind::Similarity3D => {
+                // The squares in R, their sum in double; a vector part of norm 1 or more is
+                // scaled by 1/(norm·(1 + 1e-10)) in double.
+                let mut axis = [p[0], p[1], p[2]];
+                let mut norm = (p[0] * p[0]).to_f64();
+                norm += (p[1] * p[1]).to_f64();
+                norm += (p[2] * p[2]).to_f64();
+                if norm > 0.0 {
+                    norm = norm.sqrt();
+                }
+                let epsilon = 1e-10;
+                if norm >= 1.0 - epsilon {
+                    let divisor = norm + epsilon * norm;
+                    for a in &mut axis {
+                        *a = R::from_f64(a.to_f64() / divisor);
+                    }
+                }
+                self.versor = versor_from_vector(axis)?;
+                self.scale = p[6];
+                self.compute_matrix();
+                for i in 0..D {
+                    self.translation[i] = p[3 + i];
+                }
+                self.compute_offset();
+            }
+            Kind::AntsAffine3D => {
+                self.versor = [p[0], p[1], p[2], p[3]];
+                self.scales = [p[4], p[5], p[6]];
+                self.shears = [p[7], p[8], p[9]];
+                self.compute_matrix();
+                for i in 0..D {
+                    self.translation[i] = p[10 + i];
+                }
+                self.compute_offset();
+            }
+            Kind::AntsCenteredAffine2D => {
+                self.angles[0] = p[0];
+                self.scales[0] = p[1];
+                self.scales[1] = p[2];
+                self.shears[0] = p[3];
+                for i in 0..D {
+                    self.center[i] = p[4 + i];
+                    self.translation[i] = p[6 + i];
+                }
+                self.compute_matrix();
+                self.compute_offset();
+            }
             Kind::Other { .. } => {}
         }
+        Ok(())
     }
 
     /// `GetFixedParameters()`: the centre (`Euler3DTransform`: and its ZYX flag), or the
@@ -364,14 +618,22 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
         }
     }
 
-    /// `UpdateTransformParameters` (`Transform`'s: `GetParameters`, `+= update·factor`,
-    /// `SetParameters`).
+    /// `UpdateTransformParameters`: `Transform`'s (`GetParameters`, `+= update·factor`,
+    /// `SetParameters`), or `VersorRigid3DTransform`'s for `Similarity3DTransform` (the
+    /// rotation composed with the update's rotation, the rest added).
     pub fn update(&mut self, update: &[R], factor: R) -> Result<(), ItkException> {
         let n = self.kind.number_of_parameters(D);
         if update.len() != n {
+            let (file, line) = match self.kind {
+                Kind::Similarity3D => (
+                    "Modules/Core/Transform/include/itkVersorRigid3DTransform.hxx",
+                    131,
+                ),
+                _ => ("Modules/Core/Transform/include/itkTransform.hxx", 76),
+            };
             return Err(ItkException::new(
-                "Modules/Core/Transform/include/itkTransform.hxx",
-                76,
+                file,
+                line,
                 self.kind.class(),
                 format!(
                     "Parameter update size, {}, must  be same as transform parameter size, {n}\n",
@@ -380,6 +642,23 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
             ));
         }
         let mut p = self.parameters();
+        if self.kind == Kind::Similarity3D {
+            let current = versor_from_vector([p[0], p[1], p[2]])?;
+            let mut axis = [update[0], update[1], update[2]];
+            let norm = R::from_f64(vector_norm(&axis));
+            let gradient = if float_almost_zero(norm) {
+                axis[2] = R::ONE;
+                versor_from_axis_angle(axis, R::ZERO)?
+            } else {
+                versor_from_axis_angle(axis, factor * norm)?
+            };
+            let rotation = versor_product(&current, &gradient);
+            p[..3].copy_from_slice(&rotation[..3]);
+            for k in 3..n {
+                p[k] = p[k] + update[k] * factor;
+            }
+            return self.set_parameters(&p);
+        }
         if factor == R::ONE {
             for k in 0..n {
                 p[k] = p[k] + update[k];
@@ -389,15 +668,117 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 p[k] = p[k] + update[k] * factor;
             }
         }
-        self.set_parameters(&p);
-        Ok(())
+        self.set_parameters(&p)
     }
 
     /// `ComputeJacobianWithRespectToParameters`, `D` rows of `n` values.
     pub fn jacobian_parameters(&self, p: &[R; D], out: &mut [R]) {
         out.fill(R::ZERO);
         let n = self.kind.number_of_parameters(D);
+        let j = |r: usize, c: usize| r * n + c;
         match &self.kind {
+            Kind::Similarity3D => {
+                // `Similarity3DTransform::ComputeJacobianWithRespectToParameters`: the versor's
+                // products in R widened, the rest in double; the scale column is
+                // `(M·(p − c)) / s` in R.
+                let [vx, vy, vz, vw] = self.versor;
+                let pp: [R; 3] = std::array::from_fn(|i| p[i] - self.center[i]);
+                let (px, py, pz) = (pp[0].to_f64(), pp[1].to_f64(), pp[2].to_f64());
+                let f = |a: R, b: R| (a * b).to_f64();
+                let (vxx, vyy, vzz, vww) = (f(vx, vx), f(vy, vy), f(vz, vz), f(vw, vw));
+                let (vxy, vxz, vxw) = (f(vx, vy), f(vx, vz), f(vx, vw));
+                let (vyz, vyw, vzw) = (f(vy, vz), f(vy, vw), f(vz, vw));
+                let s2 = self.scale.to_f64() * 2.0;
+                let w = vw.to_f64();
+                let r = R::from_f64;
+                out[j(0, 0)] = r(s2 * ((vyw + vxz) * py + (vzw - vxy) * pz) / w);
+                out[j(1, 0)] = r(s2 * ((vyw - vxz) * px - 2.0 * vxw * py + (vxx - vww) * pz) / w);
+                out[j(2, 0)] = r(s2 * ((vzw + vxy) * px + (vww - vxx) * py - 2.0 * vxw * pz) / w);
+                out[j(0, 1)] = r(s2 * (-2.0 * vyw * px + (vxw + vyz) * py + (vww - vyy) * pz) / w);
+                out[j(1, 1)] = r(s2 * ((vxw - vyz) * px + (vzw + vxy) * pz) / w);
+                out[j(2, 1)] = r(s2 * ((vyy - vww) * px + (vzw - vxy) * py - 2.0 * vyw * pz) / w);
+                out[j(0, 2)] = r(s2 * (-2.0 * vzw * px + (vzz - vww) * py + (vxw - vyz) * pz) / w);
+                out[j(1, 2)] = r(s2 * ((vww - vzz) * px - 2.0 * vzw * py + (vyw + vxz) * pz) / w);
+                out[j(2, 2)] = r(s2 * ((vxw + vyz) * px + (vyw - vxz) * py) / w);
+                out[j(0, 3)] = R::ONE;
+                out[j(1, 4)] = R::ONE;
+                out[j(2, 5)] = R::ONE;
+                for row in 0..3 {
+                    let mut sum = R::ZERO;
+                    for c in 0..3 {
+                        sum = sum + self.matrix[row][c] * pp[c];
+                    }
+                    out[j(row, 6)] = sum / self.scale;
+                }
+            }
+            Kind::AntsAffine3D => {
+                // `ANTSAffine3DTransform::ComputeJacobianWithRespectToParameters`, all in R.
+                let [c1, c2, c3] = [self.center[0], self.center[1], self.center[2]];
+                let [s1, s2, s3] = self.scales;
+                let [k1, k2, k3] = self.shears;
+                let [x1, x2, x3] = [p[0], p[1], p[2]];
+                let w1 = (x1 - c1) + k1 * (x2 - c2) + k2 * (x3 - c3);
+                let w2 = (x2 - c2) + k3 * (x3 - c3);
+                let w3 = x3 - c3;
+                let (z1, z2, z3) = (s1 * w1, s2 * w2, s3 * w3);
+                let [qx, qy, qz, qr] = self.versor;
+                let two = R::from_f64(2.0);
+                let j00 = two * (qx * z1 + qy * z2 + qz * z3);
+                let j01 = two * (-qy * z1 + qx * z2 + qr * z3);
+                let j02 = two * (-qz * z1 - qr * z2 + qx * z3);
+                let j03 = -two * (-qr * z1 + qz * z2 - qy * z3);
+                out[j(0, 0)] = j00;
+                out[j(0, 1)] = j01;
+                out[j(0, 2)] = j02;
+                out[j(0, 3)] = j03;
+                out[j(1, 0)] = -j01;
+                out[j(1, 1)] = j00;
+                out[j(1, 2)] = j03;
+                out[j(1, 3)] = -j02;
+                out[j(2, 0)] = -j02;
+                out[j(2, 1)] = -j03;
+                out[j(2, 2)] = j00;
+                out[j(2, 3)] = j01;
+                let m = quaternion_conjugate_matrix(&self.versor);
+                let w = [w1, w2, w3];
+                for row in 0..3 {
+                    for col in 0..3 {
+                        out[j(row, 4 + col)] = m[row][col] * w[col];
+                    }
+                    out[j(row, 7)] = m[row][0] * s1 * (x2 - c2);
+                    out[j(row, 8)] = m[row][0] * s1 * (x3 - c3);
+                    out[j(row, 9)] = m[row][1] * s2 * (x3 - c3);
+                    out[j(row, 10 + row)] = R::ONE;
+                }
+            }
+            Kind::AntsCenteredAffine2D => {
+                // `ANTSCenteredAffine2DTransform::ComputeJacobianWithRespectToParameters`: the
+                // cosine and sine in R, everything else in double.
+                let ca = self.angles[0].cos().to_f64();
+                let sa = self.angles[0].sin().to_f64();
+                let s1 = self.scales[0].to_f64();
+                let s2 = self.scales[1].to_f64();
+                let k = self.shears[0].to_f64();
+                let cx = self.center[0].to_f64();
+                let cy = self.center[1].to_f64();
+                let pxoff = (p[0].to_f64() - cx) + k * (p[1].to_f64() - cy);
+                let pyoff = p[1].to_f64() - cy;
+                let r = R::from_f64;
+                out[j(0, 0)] = r(s1 * pxoff * (-sa) + s2 * pyoff * (-ca));
+                out[j(1, 0)] = r(s1 * pxoff * ca + s2 * pyoff * (-sa));
+                out[j(0, 1)] = r(ca * pxoff);
+                out[j(0, 2)] = r(-sa * pyoff);
+                out[j(1, 1)] = r(sa * pxoff);
+                out[j(1, 2)] = r(ca * pyoff);
+                out[j(0, 3)] = r(ca * s1 * pyoff);
+                out[j(1, 3)] = r(sa * s1 * pyoff);
+                out[j(0, 4)] = r(-s1 * ca + 1.0);
+                out[j(0, 5)] = r(-(k * s1 * ca - s2 * sa));
+                out[j(1, 4)] = r(-s1 * sa);
+                out[j(1, 5)] = r(-(k * s1 * sa + s2 * ca) + 1.0);
+                out[j(0, 6)] = R::ONE;
+                out[j(1, 7)] = R::ONE;
+            }
             Kind::Affine | Kind::MatrixOffset | Kind::Other { .. } => {
                 // Blocks of diagonal matrices: row `block`, columns `block·D + dim`, hold
                 // `v[dim]`, `v = p − center` in R; the translation block is the identity.

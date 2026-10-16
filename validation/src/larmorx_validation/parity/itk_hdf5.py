@@ -1848,10 +1848,15 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     lines.append(
         f"nitransforms' chain, bit for bit: {sum(1 for x in nit if x)} of {sum(1 for x in nit if x is not None)} files"
     )
-    errs = [r for r in results if r.case.startswith("errors/")]
+    errs = [r for r in results if r.case.startswith("errors/") and r.status != EXPECTED]
     lines.append(
         f"Files ITK refuses: {sum(1 for r in errs if r.status in (BOTH_ERROR,))} of {len(errs)} refused alike "
         "(exit status and messages)"
+    )
+    read_by_itk = [r for r in results if r.case.startswith("errors/") and r.status == EXPECTED]
+    lines.append(
+        f"Files ITK reads and larmorx refuses (expected divergences): {len(read_by_itk)} "
+        "(ITK-17's undefined cast; data stored in other files)"
     )
     with_chunks = [
         r

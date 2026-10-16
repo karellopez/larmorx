@@ -11,13 +11,14 @@ library and no h5py.
 the [validation record](../validation/itk-hdf5.md)):
 - **reading:** every `.h5` transform file at hand, written by ITK 4.11 to 5.4.5 on HDF5 1.8.17 to
   1.14.6 (fMRIPrep 25.2.6's runs, the test data, TemplateFlow, the oracle) and by h5py in every
-  way HDF5 allows: every dataset as h5py reads it, the transforms as ITK reads them (in double
-  and float), the chain nitransforms loads, all bit for bit; files ITK refuses are refused
-  with ITK's messages;
+  way HDF5 can store data within one file: every dataset as h5py reads it, the transforms as
+  ITK reads them (in double and float), the chain nitransforms loads, all bit for bit; files
+  ITK refuses are refused with ITK's messages. Data stored in other files (external raw files,
+  external links, virtual datasets) are refused, where ITK's HDF5 follows them;
 - **writing:** every file the oracle writes (composites, `-o Linear[...]`, float parameters,
   displacement fields, dense groups, `CompositeTransformUtil`) is written by larmorx byte for
-  byte, given ITK's object time and ITK's compressed chunks; ANTs, h5py and nitransforms read
-  larmorx's files as ITK's.
+  byte, given ITK's object times and ITK's compressed chunks, except a group of 38 or more
+  transforms (below); ANTs, h5py and nitransforms read larmorx's files as ITK's.
 
 How ITK reads and writes these files, and what HDF5 makes of it byte by byte:
 [itk-hdf5.md](../findings/itk-hdf5.md).

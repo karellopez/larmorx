@@ -46,9 +46,11 @@ pub enum MetricKind {
         bins: usize,
     },
     MeanSquares,
-    /// Joint-histogram mutual information (ANTs' `MI`) with this many bins.
+    /// Joint-histogram mutual information (ANTs' `MI`) with this many bins; ITK's swapped
+    /// marginals corrected or not (ITK-18).
     Mi {
         bins: usize,
+        correct_marginals: bool,
     },
     /// Global correlation (`CorrelationImageToImageMetricv4`, ANTs' `GC`).
     Gc,
@@ -118,9 +120,14 @@ impl<R: Real> LevelMetric<R> {
         Ok(match kind {
             MetricKind::Mattes { bins } => LevelMetric::Mattes(Mattes::initialize(bins, metric)?),
             MetricKind::MeanSquares => LevelMetric::MeanSquares,
-            MetricKind::Mi { bins } => {
-                LevelMetric::Mi(Box::new(JointHistogramMi::initialize(bins, metric)?))
-            }
+            MetricKind::Mi {
+                bins,
+                correct_marginals,
+            } => LevelMetric::Mi(Box::new(JointHistogramMi::initialize(
+                bins,
+                metric,
+                correct_marginals,
+            )?)),
             MetricKind::Gc => LevelMetric::Gc,
             MetricKind::Cc { radius } => LevelMetric::Cc(NeighborhoodCorrelation { radius }),
             MetricKind::Demons => {

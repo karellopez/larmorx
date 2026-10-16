@@ -198,6 +198,8 @@ defects! {
         "Math::Floor gives 0 instead of -1 for negative values closer to 0 than 2^-26 (float) or 2^-55 (double)";
     ITK_02 = "ITK-02", "ITK", true,
         "a file with more dimensions than the program reads is read with an identity direction";
+    ITK_18 = "ITK-18", "ITK", true,
+        "the joint-histogram mutual information (ANTs' MI) swaps its marginal densities: each image's marginal is the other's";
     ITK_03 = "ITK-03", "ITK", true,
         "components relabelled in a float image stop getting new labels at 2^24";
     ITK_08 = "ITK-08", "nifti_clib", true,

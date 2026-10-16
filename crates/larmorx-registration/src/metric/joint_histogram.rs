@@ -13,10 +13,11 @@
 //! projected on the transform's Jacobian, by finite differences of the joint and marginal
 //! densities, interpolated linearly.
 //!
-//! **ITK's marginals are swapped.** The marginal ITK calls the fixed image's sums the joint
-//! density over its first index, which is the fixed bin: it is the moving image's marginal,
-//! and the other way round. The value and the derivative use them under their names. larmorx
-//! computes what the source defines (rule 8); the defect is in the register.
+//! **ITK's marginals are swapped (ITK-18).** The marginal ITK calls the fixed image's sums the
+//! joint density over its first index, which is the fixed bin: it is the moving image's
+//! marginal, and the other way round. The value and the derivative use them under their
+//! names. `correct_marginals` (the default, D13) gives each image its own marginal;
+//! without it larmorx computes what ITK's source defines.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -46,6 +47,8 @@ pub struct JointHistogramMi<R> {
     marginal_space: Space<1>,
     /// The kernel of the joint density's smoothing.
     kernel: Vec<f64>,
+    /// Whether each image gets its own marginal (ITK-18 corrected).
+    correct_marginals: bool,
     /// `m_Value` (as f64 bits), which `GetValue` returns unchanged when no point is valid.
     value: AtomicU64,
 }
@@ -121,6 +124,7 @@ impl<R: Real> JointHistogramMi<R> {
     pub fn initialize<const D: usize>(
         bins: usize,
         m: &ImageMetricv4<R, D>,
+        correct_marginals: bool,
     ) -> Result<Self, ItkException> {
         let (fixed_min, fixed_max) = extremes(&m.fixed, m.fixed_mask.as_ref());
         let (moving_min, moving_max) = extremes(&m.moving, m.moving_mask.as_ref());
@@ -150,6 +154,7 @@ impl<R: Real> JointHistogramMi<R> {
             joint_space,
             marginal_space,
             kernel,
+            correct_marginals,
             value: AtomicU64::new(0.0f64.to_bits()),
         })
     }
@@ -228,6 +233,9 @@ impl<R: Real> JointHistogramMi<R> {
                 sum.add(joint[k + j * bins].to_f64());
             }
             *out = R::from_f64(sum.sum());
+        }
+        if self.correct_marginals {
+            std::mem::swap(&mut fixed_marginal, &mut moving_marginal);
         }
         Ok(Densities {
             joint,

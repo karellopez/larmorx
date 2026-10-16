@@ -582,8 +582,22 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "  using the joint histogram MI metric (number of bins = {}, weight = {weight}, use gradient filter = {gradient})\n",
                             m.number_of_bins
                         ));
+                        let correct_marginals = self.upstream_defects.fix();
+                        push_once(
+                            &mut self.notices,
+                            Notice::new(
+                                &defects::ITK_18,
+                                self.upstream_defects,
+                                if correct_marginals {
+                                    "each image's marginal density is its own; ANTs swaps them"
+                                } else {
+                                    "the marginal densities are swapped, as in ANTs"
+                                },
+                            ),
+                        );
                         MethodMetric::Mi {
                             bins: m.number_of_bins.max(0) as usize,
+                            correct_marginals,
                         }
                     }
                     Some(MetricKind::MeanSquares) => {

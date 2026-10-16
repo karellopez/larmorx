@@ -181,6 +181,9 @@ pub struct RegistrationHelper<R, const D: usize> {
     pub initialize_transforms_per_stage: bool,
     /// `m_CompositeTransform`: the initial moving transforms, then each stage's result.
     pub composite: Option<Vec<Xfm<R, D>>>,
+    /// Where each transform of `composite` comes from: `None` for an initial one, else the
+    /// stage that computed it (a stage started from the previous transform replaces it).
+    pub origins: Vec<Option<usize>>,
     /// `m_FixedInitialTransform`.
     pub fixed_initial: Option<Vec<Xfm<R, D>>>,
     pub fixed_masks: Vec<Option<Mask<D>>>,
@@ -217,6 +220,7 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
             write_interval_volumes: 0,
             initialize_transforms_per_stage: false,
             composite: None,
+            origins: Vec::new(),
             fixed_initial: None,
             fixed_masks: Vec::new(),
             moving_masks: Vec::new(),
@@ -595,6 +599,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         if self.composite.is_none() {
             self.composite = Some(Vec::new());
         }
+        let initial = self.composite.as_ref().map_or(0, |c| c.len());
+        self.origins.resize(initial, None);
         if self.fixed_initial.is_none() {
             self.fixed_initial = Some(Vec::new());
         }
@@ -857,6 +863,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     if initialize_with_previous(log, queue.last(), &name, &mut output) {
                         log.logger("Registration process is run using direct initialization!\n");
                         queue.pop();
+                        self.origins.pop();
                     }
                 }
             }
@@ -905,6 +912,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             match result {
                 Ok((t, _)) => {
                     self.composite.as_mut().expect("set above").push(t);
+                    self.origins.push(Some(stage));
                 }
                 Err(e) => {
                     // AddLinearTransformToCompositeTransform logs the exception and returns

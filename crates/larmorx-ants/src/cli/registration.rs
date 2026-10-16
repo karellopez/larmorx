@@ -885,7 +885,19 @@ fn do_registration<R: Compute, const D: usize>(
             );
             return Err(1);
         }
-        return Err(refuse(log, "--restore-state is not supported yet"));
+        // SetRestoreStateTransform: without SyN's four displacement fields at its end, the
+        // state's transforms become the initial moving transforms.
+        if log.verbose {
+            log.cout("Restoring previous registration state\n");
+        }
+        let (restored, _) = initial_composite::<R, D>(&mut ctx, log, "restore-state")?;
+        if log.verbose {
+            log.cout("+\n");
+        }
+        helper.composite = Some(restored.into_iter().map(|i| i.transform).collect());
+        if log.verbose {
+            log.cout("+\n");
+        }
     }
     // Masks: the functions oldest first.
     if p.has("masks") {
@@ -1531,10 +1543,28 @@ fn write_outputs<R: Compute, const D: usize>(
             .map_err(|e| refuse(log, &e))?;
         }
     }
-    if p.has("save-state") {
+    if let Some(state) = p.last("save-state") {
         // ANTs sets the registration state in SyN stages only: after linear stages it finds
-        // none and returns EXIT_FAILURE, writing no transform.
-        return Err(1);
+        // none and returns EXIT_FAILURE, writing no transform (ANTS-50). Corrected, the state
+        // is the composite of every transform, as the option's description says.
+        if ctx.notices.reproduce() {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_50,
+                "no state after linear stages: exit 1, no transform written, as in ANTs",
+            );
+            return Err(1);
+        }
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_50,
+            "the state is written (every transform of the registration); ANTs exits 1 here",
+        );
+        let mut parts = vec![ItkTransformParts {
+            name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
+            parameters: Parameters::F64(Vec::new()),
+            fixed_parameters: Vec::new(),
+        }];
+        parts.extend(queue.iter().map(xfm_parts));
+        write_transform_file(log, ctx.notices, &state.name, &parts);
     }
     if minc {
         return Err(refuse(
@@ -1580,15 +1610,61 @@ fn write_outputs<R: Compute, const D: usize>(
                 &parts,
             );
         }
+    } else if collapse {
+        let name = format!("{prefix}0{}", file_suffix("genericaffine"));
+        write_transform_file(log, ctx.notices, &name, &[xfm_parts(&to_write[0])]);
     } else {
-        let start = if collapse { 0 } else { moving_initial_count };
+        // ANTs: skip as many transforms as there are -r options, then name each file after
+        // the next stage (ANTS-51). Corrected: every transform a stage computed, named after
+        // that stage.
+        let mut ants_files = Vec::new();
         let mut names = std::collections::VecDeque::from(names);
-        for (i, t) in to_write.iter().enumerate().skip(start) {
-            let Some(kind) = names.pop_front() else {
-                break;
-            };
-            let name = format!("{prefix}{i}{}", file_suffix(&kind));
-            write_transform_file(log, ctx.notices, &name, &[xfm_parts(t)]);
+        let mut runs_out = false;
+        for i in moving_initial_count..to_write.len() {
+            match names.pop_front() {
+                Some(kind) => ants_files.push((i, kind)),
+                None => {
+                    runs_out = true;
+                    break;
+                }
+            }
+        }
+        let fixed_files: Vec<(usize, String)> = helper
+            .origins
+            .iter()
+            .enumerate()
+            .filter_map(|(i, o)| {
+                o.map(|s| (i, helper.transforms[s].method.as_str().to_lowercase()))
+            })
+            .collect();
+        let differs = runs_out || ants_files != fixed_files;
+        let files = if ctx.notices.reproduce() {
+            if differs {
+                ctx.notices.add(
+                    &larmorx_core::defects::ANTS_51,
+                    "the transform files are named and chosen as in ANTs",
+                );
+            }
+            ants_files
+        } else {
+            if differs {
+                ctx.notices.add(
+                    &larmorx_core::defects::ANTS_51,
+                    "each transform a stage computed is written, named after that stage",
+                );
+            }
+            fixed_files
+        };
+        for (i, kind) in &files {
+            let name = format!("{prefix}{i}{}", file_suffix(kind));
+            write_transform_file(log, ctx.notices, &name, &[xfm_parts(&to_write[*i])]);
+        }
+        if runs_out && ctx.notices.reproduce() {
+            log.cerr(
+                "larmorx: antsRegistration: ANTs runs out of transform names here and reads past \
+                 the end of its list (a file name of garbage, then a crash); stopped (ANTS-51)\n",
+            );
+            return Err(1);
         }
     }
     Ok(0)

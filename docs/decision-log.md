@@ -938,6 +938,17 @@ work, validated by compressing many buffers and comparing bytes with the oracle'
 give byte-identical compressed streams for that one build only, with the object-header times
 still different. Listed under "Deferred" in `docs/next-steps.md`.
 
+**Checked the same day** (that nothing depends on the compressed bytes, and that larmorx's own
+are stable): reading needs only inflate, which the format defines exactly, so any correct
+decoder returns the same data whatever compressor wrote the file. larmorx's compressor
+(zlib-rs 0.6.8 through flate2 1.1.10, with runtime CPU detection) has no CPU-dependent hash (a
+fixed multiplicative hash; the CPU-specific code paths are `slide_hash` and `compare256`, which
+return the same results either way). Measured on this machine (AVX2): the same five inputs
+(random bytes, a smooth float64 field, zeros, a repeating pattern, a 4 KB block) compressed at
+levels 0 to 9 by a build with the AVX2 paths and by a build with only the generic paths: all 50
+outputs byte-for-byte identical. The NEON paths (aarch64) were not run here. Golden cases of
+`.h5` files fingerprint the decoded content, not the file's bytes.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

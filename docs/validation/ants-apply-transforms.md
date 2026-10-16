@@ -1,14 +1,14 @@
 # Parity: antsApplyTransforms
 
-**All cases agree.** 166 cases on the `standard` tier: 158 pass, 8 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 182 cases on the `standard` tier: 174 pass, 8 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
 - **Reference:** antsApplyTransforms from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with 4 threads
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
+- **Generated:** 2026-10-16 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
 
-**Bit-identical to the unmodified antsApplyTransforms, all cases: 144 of 158** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 158 of 158.
-**Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 81 of 81** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 81 of 81.
+**Bit-identical to the unmodified antsApplyTransforms, all cases: 160 of 174** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 174 of 174.
+**Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 89 of 89** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 89 of 89.
 Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `sincos`, `sinf`, `cosf` or `sincosf` (bit-identical with CORE-MATH preloaded; Gaussian and windowed-sinc weights, Euler and versor matrices; docs/findings/platform-math.md): `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `time-series/LanczosWindowedSinc`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-06: 4 case(s) named it, 4 with changed values (largest difference 255): `output/-u-char`, `output/-u-uchar`, `float/output/-u-char`, `float/output/-u-uchar`
@@ -30,13 +30,13 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | errors | 4 | 0 | 4 | 0 | 0 |
-| float | 83 | 79 | 4 | 0 | 0 |
+| float | 91 | 87 | 4 | 0 | 0 |
 | fmriprep | 7 | 7 | 0 | 0 | 0 |
 | geometry | 13 | 13 | 0 | 0 | 0 |
 | interpolation | 20 | 20 | 0 | 0 | 0 |
 | output | 9 | 9 | 0 | 0 | 0 |
 | time-series | 5 | 5 | 0 | 0 | 0 |
-| transform | 25 | 25 | 0 | 0 | 0 |
+| transform | 33 | 33 | 0 | 0 | 0 |
 
 ## Rejected by both
 
@@ -44,18 +44,18 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-uke90v87/missing.mat: /tmp/lx-aat-uke90v87/missing.mat: No such file or directory (os error 2) |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4so_9vi5/missing.mat |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `float/errors/4d-as-scalar` | --float 1: a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `float/errors/invert-field` | --float 1: inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Can't read initial transform /tmp/lx-aat-zq0dcc4y/missing.mat: /tmp/lx-aat-zq0dcc4y/missing.mat: No such file or directory (os error 2) |
+| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-k2tcia93/missing.mat |
 | `float/errors/unknown-interpolator` | --float 1: -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (50509e30b3e8) |
+| larmorx | 0.0.1 (be0c0eb89fde) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -63,11 +63,10 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 | numpy | 2.3.5 |
 | antspyx | 0.6.3 |
 | nibabel | 5.4.2 |
-| h5py | 3.16.0 |
 
 ## Notes
 
-Both programs read the same files with the same arguments; the outputs are read with nibabel. larmorx runs through its Python console entry point, so `.h5` transforms are read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported yet), the same bits on every platform, which can differ from glibc in the last bit (docs/findings/platform-math.md). With `--float 1` both compute in single precision as ITK's float instantiation defines it (docs/findings/ants-float.md).
+Both programs read the same files with the same arguments; the outputs are read with nibabel. larmorx runs through its Python console entry point; its command line reads `.h5` transforms in Rust (crate larmorx-hdf5). Where ITK calls the platform's transcendental functions, larmorx uses correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported yet), the same bits on every platform, which can differ from glibc in the last bit (docs/findings/platform-math.md). With `--float 1` both compute in single precision as ITK's float instantiation defines it (docs/findings/ants-float.md).
 
 ## All cases
 
@@ -118,6 +117,14 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `transform/chain-identity-keyword` | pass | 8/8 | -t identity: ANTs' keyword |
 | `transform/chain-none` | pass | 8/8 | no -t at all: identity |
 | `transform/chain-larmorx-written-h5` | pass | 8/8 | the composite rewritten by lx.transforms.write: ANTs must read larmorx's .h5 |
+| `transform/chain-h5-itk-linear` | pass | 8/8 | -t linear.h5: an affine ITK wrote (-o Linear[...]) |
+| `transform/chain-h5-itk-linear-inverse` | pass | 8/8 | -t [linear.h5,1]: the inverse of an affine ITK wrote |
+| `transform/chain-h5-itk-linear-float` | pass | 8/8 | -t linear-float.h5: float parameters (ITK's --float 1 -o Linear[...]) |
+| `transform/chain-h5-itk-types` | pass | 8/8 | -t composite.h5: six transform types in one composite ITK wrote |
+| `transform/chain-h5-itk-types-inverse` | pass | 8/8 | -t [composite.h5,1]: the inverse of a composite of six linear transforms |
+| `transform/chain-h5-itk-dense` | pass | 8/8 | -t composite.h5: nine affines ITK wrote (a dense group: fractal heap, v2 B-tree) |
+| `transform/chain-h5-itk-warp-float` | pass | 8/8 | -t composite.h5: a field and an affine in float (ITK's --float 1 output) |
+| `transform/chain-h5-larmorx-dense` | pass | 8/8 | the nine-affine composite rewritten by lx.transforms.write (dense) |
 | `geometry/oblique-to-axial` | pass | 8/8 | oblique anisotropic input onto an axis-aligned grid |
 | `geometry/oblique-to-axial-lanczos` | pass | 8/8 | oblique anisotropic input, Lanczos |
 | `geometry/scaled-int16-las` | pass | 8/8 | int16 LAS image with scl_slope/scl_inter (ITK rescales through float32) |
@@ -201,6 +208,14 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `float/transform/chain-identity-keyword` | pass | 8/8 | --float 1: -t identity: ANTs' keyword |
 | `float/transform/chain-none` | pass | 8/8 | --float 1: no -t at all: identity |
 | `float/transform/chain-larmorx-written-h5` | pass | 8/8 | --float 1: the composite rewritten by lx.transforms.write: ANTs must read larmorx's .h5 |
+| `float/transform/chain-h5-itk-linear` | pass | 8/8 | --float 1: -t linear.h5: an affine ITK wrote (-o Linear[...]) |
+| `float/transform/chain-h5-itk-linear-inverse` | pass | 8/8 | --float 1: -t [linear.h5,1]: the inverse of an affine ITK wrote |
+| `float/transform/chain-h5-itk-linear-float` | pass | 8/8 | --float 1: -t linear-float.h5: float parameters (ITK's --float 1 -o Linear[...]) |
+| `float/transform/chain-h5-itk-types` | pass | 8/8 | --float 1: -t composite.h5: six transform types in one composite ITK wrote |
+| `float/transform/chain-h5-itk-types-inverse` | pass | 8/8 | --float 1: -t [composite.h5,1]: the inverse of a composite of six linear transforms |
+| `float/transform/chain-h5-itk-dense` | pass | 8/8 | --float 1: -t composite.h5: nine affines ITK wrote (a dense group: fractal heap, v2 B-tree) |
+| `float/transform/chain-h5-itk-warp-float` | pass | 8/8 | --float 1: -t composite.h5: a field and an affine in float (ITK's --float 1 output) |
+| `float/transform/chain-h5-larmorx-dense` | pass | 8/8 | --float 1: the nine-affine composite rewritten by lx.transforms.write (dense) |
 | `float/geometry/oblique-to-axial` | pass | 8/8 | --float 1: oblique anisotropic input onto an axis-aligned grid |
 | `float/geometry/oblique-to-axial-lanczos` | pass | 8/8 | --float 1: oblique anisotropic input, Lanczos |
 | `float/geometry/scaled-int16-las` | pass | 8/8 | --float 1: int16 LAS image with scl_slope/scl_inter (ITK rescales through float32) |

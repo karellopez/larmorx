@@ -42,7 +42,8 @@ use super::menu::{MenuOption, print_menu};
 use super::parser::{self, OptionValue, ParseFailure, Parsed};
 use crate::image::{AntsImage, FileStore, ImageStore, ReadError, read_with, write_with};
 use crate::registration::helper::{
-    Compute, Log, Metric, RegistrationFailed, RegistrationHelper, Sampling, TransformMethod,
+    Compute, IntervalSink, Log, Metric, RegistrationFailed, RegistrationHelper, Sampling,
+    TransformMethod,
 };
 use crate::registration::{MetricKind, XfrmMethod};
 use larmorx_io::itk_transform::{
@@ -1146,7 +1147,23 @@ fn do_registration<R: Compute, const D: usize>(
     }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());
-    let done = helper.do_registration(log, &floor);
+    if helper.write_interval_volumes != 0 && D != 3 {
+        return Err(refuse(
+            log,
+            &format!("--write-interval-volumes in {D} dimensions is not supported yet"),
+        ));
+    }
+    let done = match (&helper.metrics[0].fixed, &helper.metrics[0].moving) {
+        (Some(f), Some(m)) if helper.write_interval_volumes != 0 => {
+            let mut sink = IntervalVolumes {
+                ctx: &mut ctx,
+                fixed: Arc::clone(f),
+                moving: Arc::clone(m),
+            };
+            helper.do_registration(log, &floor, Some(&mut sink))
+        }
+        _ => helper.do_registration(log, &floor, None),
+    };
     ctx.notices.extend(std::mem::take(&mut helper.notices));
     if let Err(RegistrationFailed(_)) = done {
         floor.notice(ctx.notices, "interpolated values");
@@ -1444,6 +1461,38 @@ fn resample<R: Compute, const D: usize>(
 }
 
 /// An image to write with the reference's geometry.
+/// `--write-interval-volumes`' writer: `WriteIntervalVolumes` resamples the original moving
+/// image onto the original fixed image's grid with the moving transforms only (the fixed
+/// initial transform is not applied), linearly, default value 0, and writes it; a write
+/// error prints ANTs' messages on standard output and the registration goes on.
+struct IntervalVolumes<'c, 'x, 'n, R, const D: usize> {
+    ctx: &'c mut Context<'x, 'n>,
+    fixed: Arc<Image<R, D>>,
+    moving: Arc<Image<R, D>>,
+}
+
+impl<R: Compute, const D: usize> IntervalSink<R, D> for IntervalVolumes<'_, '_, '_, R, D> {
+    fn write_interval_volume(&mut self, log: &mut Log<'_>, name: &str, moving: &[Xfm<R, D>]) {
+        let linear = larmorx_interp::Interpolation::Linear;
+        let written =
+            resample(&self.moving, &self.fixed, moving, &linear, self.ctx).and_then(|data| {
+                let image = output_image(&self.fixed, data);
+                write_with(
+                    self.ctx.store,
+                    name,
+                    R::output(image),
+                    self.ctx.n_threads,
+                    self.ctx.notices,
+                )
+            });
+        if let Err(e) = written {
+            log.cout(&format!(
+                "Can't write warped image {name}\nException Object caught: \n{e}\n"
+            ));
+        }
+    }
+}
+
 fn output_image<R: Compute, const D: usize>(reference: &Image<R, D>, data: Vec<R>) -> AntsImage<R> {
     let s = &reference.space;
     AntsImage {

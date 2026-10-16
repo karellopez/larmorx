@@ -395,6 +395,42 @@ fn gradient_image<R: Real, const D: usize>(
     Ok(Image::new(space.clone(), data))
 }
 
+/// The observer's full-scale similarity (`UpdateFullScaleMetricValue`):
+/// `ANTSNeighborhoodCorrelationImageToImageMetricv4` of radius 4 between the original
+/// (unprocessed, full-resolution) images, on the fixed image's grid, every voxel, no mask, no
+/// gradient filter, with the level's fixed and moving transforms. The "no valid points"
+/// warning goes to `warnings`.
+pub fn full_scale_cc<R: Real, const D: usize>(
+    fixed: &Arc<Image<R, D>>,
+    moving: &Arc<Image<R, D>>,
+    fixed_transform: Option<Composite<R, D>>,
+    moving_transform: &Composite<R, D>,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+) -> Result<R, ItkException> {
+    let metric = ImageMetricv4 {
+        fixed: Arc::clone(fixed),
+        moving: Arc::clone(moving),
+        fixed_mask: None,
+        moving_mask: None,
+        fixed_transform,
+        virtual_space: fixed.space.clone(),
+        samples: None,
+        fixed_gradient_image: None,
+        moving_gradient_image: None,
+    };
+    let r =
+        NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
+    if r.no_valid_points {
+        warnings.push(no_valid_points_warning(
+            VERIFY_FILE,
+            544,
+            "ANTSNeighborhoodCorrelationImageToImageMetricv4",
+        ));
+    }
+    Ok(r.value)
+}
+
 /// Runs a stage: returns the optimised transform and each level's outcome.
 pub fn run_stage<R: Real, const D: usize, O>(
     stage: &Stage<R, D>,

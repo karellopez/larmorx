@@ -424,18 +424,40 @@ pub fn itk_image_print<R: Compute, const D: usize>(image: &Image<R, D>) -> Strin
     out
 }
 
+/// Where `--write-interval-volumes` writes (the command line's image store): the original moving
+/// image resampled onto the original fixed image's grid by the moving transforms, linearly,
+/// written as `name`; ANTs' messages if it cannot be written.
+pub trait IntervalSink<R, const D: usize> {
+    fn write_interval_volume(&mut self, log: &mut Log<'_>, name: &str, moving: &[Xfm<R, D>]);
+}
+
+/// The full-scale similarity's inputs (`--print-similarity-measure-interval`).
+struct FullScale<R, const D: usize> {
+    interval: u32,
+    fixed: Arc<Image<R, D>>,
+    moving: Arc<Image<R, D>>,
+}
+
 /// ANTs' iteration observer of a linear stage (`antsRegistrationOptimizerCommandIterationUpdate`).
-struct IterationObserver<'l, 'a, R> {
+struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     log: &'l mut Log<'a>,
     iterations: Vec<u32>,
     current_level: usize,
     clock: Instant,
     last: f64,
-    _r: std::marker::PhantomData<R>,
+    full_scale: Option<FullScale<R, D>>,
+    /// `--write-interval-volumes` (0: off), the stage, the output prefix and the writer.
+    write_interval: u32,
+    stage: usize,
+    prefix: String,
+    sink: Option<&'s mut (dyn IntervalSink<R, D> + 'k)>,
+    fixed_initial: Option<Composite<R, D>>,
+    floor: &'s IndexFloor,
+    warnings: Vec<String>,
 }
 
 impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
-    for IterationObserver<'_, '_, R>
+    for IterationObserver<'_, '_, '_, '_, R, D>
 {
     fn iteration(
         &mut self,
@@ -447,12 +469,63 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
         if current == 1 {
             *number_of_iterations = self.iterations[self.current_level] as usize;
             self.current_level += 1;
-            self.log.logger(
-                "DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST\n",
-            );
+            match &self.full_scale {
+                Some(f) => self.log.logger(&format!(
+                    "DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST,FullScaleCCInterval={}\n",
+                    f.interval
+                )),
+                None => self.log.logger(
+                    "DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST\n",
+                ),
+            }
+        }
+        // ITK's output window prints the metric's warnings as they happen.
+        for w in _problem.warnings.drain(..) {
+            self.log.cerr(&w);
+            self.warnings.push(w);
         }
         let now = self.clock.elapsed().as_secs_f64();
-        self.log.logger(" ");
+        let last_iteration = *number_of_iterations as u32;
+        let current32 = current as u32;
+        let due = |interval: u32| {
+            interval != 0
+                && (current32 == 1
+                    || current32.is_multiple_of(interval)
+                    || current32 == last_iteration)
+        };
+        let mut full_scale_value = R::ZERO;
+        if let Some(f) = &self.full_scale
+            && due(f.interval)
+        {
+            let mut printed = Vec::new();
+            full_scale_value = larmorx_registration::method::full_scale_cc(
+                &f.fixed,
+                &f.moving,
+                self.fixed_initial.clone(),
+                &_problem.moving,
+                self.floor,
+                &mut printed,
+            )?;
+            for w in printed {
+                self.log.cerr(&w);
+                self.warnings.push(w);
+            }
+        }
+        if due(self.write_interval) {
+            let name = format!(
+                "{}Stage{}_level{}_Iter{:04}.nii.gz",
+                self.prefix,
+                self.stage + 1,
+                self.current_level,
+                current
+            );
+            self.log.cout(&format!("*{name}\n"));
+            if let Some(sink) = self.sink.as_deref_mut() {
+                sink.write_interval_volume(self.log, &name, &_problem.moving.transforms);
+            }
+        } else {
+            self.log.logger(" ");
+        }
         let sci12 = OStream {
             scientific: true,
             precision: 12,
@@ -461,14 +534,18 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             scientific: true,
             precision: 4,
         };
-        let line = format!(
-            "2DIAGNOSTIC, {:>5}, {}, {}, {}, {}, \n",
+        let mut line = format!(
+            "2DIAGNOSTIC, {:>5}, {}, {}, {}, {}, ",
             current,
             sci12.float(state.value.to_f64()),
             sci12.float(state.convergence.to_f64()),
             sci4.float(now),
             sci4.float(now - self.last)
         );
+        if self.full_scale.is_some() && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64() {
+            line.push_str(&sci12.float(full_scale_value.to_f64()));
+        }
+        line.push('\n');
         self.log.logger(&line);
         if self.log.verbose {
             self.log.cout = sci4;
@@ -590,6 +667,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         &mut self,
         log: &mut Log<'_>,
         floor: &IndexFloor,
+        mut sink: Option<&mut dyn IntervalSink<R, D>>,
     ) -> Result<(), RegistrationFailed> {
         let total = Instant::now();
         self.validate(log)?;
@@ -888,13 +966,33 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 n_threads: self.n_threads,
             };
             log.logger(&format!("\n*** Running {class} registration ***\n\n"));
-            let mut observer = IterationObserver::<R> {
+            // SetOrigFixedImage/SetOrigMovingImage: the first metric's images, as read.
+            let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
+                (Some(f), Some(m)) => Some((Arc::clone(f), Arc::clone(m))),
+                _ => None,
+            };
+            let full_scale = match (&originals, self.print_similarity_measure_interval) {
+                (Some((f, m)), interval) if interval != 0 => Some(FullScale {
+                    interval,
+                    fixed: Arc::clone(f),
+                    moving: Arc::clone(m),
+                }),
+                _ => None,
+            };
+            let mut observer = IterationObserver::<R, D> {
                 log,
                 iterations: iterations.clone(),
                 current_level: 0,
                 clock: Instant::now(),
                 last: 0.0,
-                _r: std::marker::PhantomData,
+                full_scale,
+                write_interval: self.write_interval_volumes,
+                stage,
+                prefix: self.output_prefix.clone(),
+                sink: sink.as_deref_mut(),
+                fixed_initial: stage_spec.fixed_initial.clone(),
+                floor,
+                warnings: Vec::new(),
             };
             let mut warnings = Vec::new();
             let result = method::run_stage(
@@ -905,9 +1003,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 floor,
                 &mut warnings,
             );
+            let observed = std::mem::take(&mut observer.warnings);
             for w in &warnings {
                 log.cerr(w);
             }
+            self.warnings.extend(observed);
             self.warnings.extend(warnings);
             match result {
                 Ok((t, _)) => {

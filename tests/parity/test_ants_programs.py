@@ -25,6 +25,7 @@ SUITES = (
     "ants_resample_image",
     "ants_n4",
     "ants_denoise",
+    "ants_registration",
 )
 TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
 

@@ -1100,12 +1100,87 @@ def _(ctx: Context) -> dict[str, Any]:
         "-s", "0.5mm",
         "--random-seed", "11",
     )  # fmt: skip
+    out: dict[str, Any] = {"rigid": File(prefix + "0GenericAffine.mat"), "warped": Nifti(warped)}
+    for key, name in (("composite", "Composite.h5"), ("inverse", "InverseComposite.h5")):
+        structure, values = _h5_structure(affine + name)
+        out[f"{key}.structure"] = structure
+        out[f"{key}.values"] = values
+    return out
+
+
+@case("cli.ants.antsRegistration.metrics", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The other metrics, in one affine stage of three (neighbourhood correlation on sampled
+    points, joint-histogram MI with its marginals corrected, global correlation, weighed and
+    normalised), then a composite-affine stage (``ANTSAffine3DTransform``) with the gradient
+    filter, not collapsed, from an initial centre-of-mass alignment."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    prefix = ctx.out("metrics_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-z", "0", "-o", prefix,
+        "-r", f"[{a},{b},1]",
+        "-t", "Affine[0.2]",
+        "-m", f"CC[{a},{b},0.5,2,Regular,0.5]",
+        "-m", f"MI2[{a},{b},1,12,Regular,0.5]",
+        "-m", f"GC[{a},{b},0.25,0,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "CompositeAffine[0.1]",
+        "-m", f"Mattes[{a},{b},1,12,Random,0.6,1]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "1vox",
+        "--random-seed", "5",
+    )  # fmt: skip
     return {
-        "rigid": File(prefix + "0GenericAffine.mat"),
-        "warped": Nifti(warped),
-        "composite": File(affine + "Composite.h5"),
-        "inverse": File(affine + "InverseComposite.h5"),
+        "derived": File(prefix + "0DerivedInitialMovingTranslation.mat"),
+        "affine": File(prefix + "1Affine.mat"),
+        "composite_affine": File(prefix + "2Affine.mat"),
     }
+
+
+@case("cli.ants.antsRegistration.dimensions", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """2D: a similarity then an ``ANTSCenteredAffine2DTransform`` (mean squares, dense); 4D: a
+    translation then an affine (4D interpolation's general path), collapsed."""
+    p2 = ctx.out("plane_")
+    plane = ctx.file("plane.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", p2, "-z", "0",
+        "-r", f"[{plane},{plane},2]",
+        "-t", "Similarity[0.1]", "-m", f"MeanSquares[{plane},{plane},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "CompositeAffine[0.1]", "-m", f"Mattes[{plane},{plane},1,10,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "2", "-s", "1vox", "--random-seed", "3",
+    )  # fmt: skip
+    p4 = ctx.out("bold_")
+    bold = ctx.file("bold.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "4", "-o", p4,
+        "-t", "Translation[0.1]", "-m", f"MeanSquares[{bold},{bold},1,0,Random,0.5]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "Affine[0.1]", "-m", f"Mattes[{bold},{bold},1,8,Regular,0.5]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "9",
+    )  # fmt: skip
+    return {
+        "2d.similarity": File(p2 + "1Similarity.mat"),
+        "2d.composite_affine": File(p2 + "2Affine.mat"),
+        "4d.affine": File(p4 + "0GenericAffine.mat"),
+    }
+
+
+@case("cli.ants.antsRegistration.reproduce", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defects reproduced: the joint-histogram MI's swapped marginals (ITK-18), and a
+    Demons stage that throws and is dropped (ANTS-49), the run going on."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    prefix = ctx.out("rep_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", prefix,
+        "-t", "Rigid[0.1]", "-m", f"MI2[{a},{b},1,12,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "Rigid[0.1]", "-m", f"Demons[{a},{b},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "2",
+        upstream_defects="reproduce",
+    )  # fmt: skip
+    return {"rigid": File(prefix + "0GenericAffine.mat")}
 
 
 @case("cli.ants.antsApplyTransforms.outputs", covers=("cli:ants antsApplyTransforms",))
@@ -1175,6 +1250,38 @@ def _(ctx: Context) -> dict[str, Any]:
         out[f"{key}.names"] = "\n".join(t.name for t in xfms)
         out[f"{key}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
         out[f"{key}.fixed"] = np.concatenate([t.fixed_parameters for t in xfms])
+    return out
+
+
+@case("py.ants.registration", covers=("lx.ants.registration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.registration``: an in-memory moving image, an initial centre alignment, a
+    rigid stage with a fixed mask then an affine stage, not collapsed, with the warped images
+    and the parsed iterations."""
+    stage = lx.ants.RegistrationStage
+    metric = lx.ants.RegistrationMetric
+    a = ctx.file("anat.nii")
+    res = lx.ants.registration(
+        [
+            stage("Rigid", 0.1, metric("Mattes", a, anat2(), bins=12, sampling="Regular",
+                                       sampling_percentage=0.5),
+                  iterations=[3, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+                  convergence_window=3, masks=ctx.file("mask.nii")),
+            stage("Affine", 0.1, metric("MeanSquares", a, anat2(), sampling="Random",
+                                        sampling_percentage=0.5),
+                  iterations=[3], shrink_factors=[1], smoothing_sigmas=[0], convergence_window=3),
+        ],
+        initial_moving_transforms=[lx.ants.AlignCenters(a, anat2(), "geometry")],
+        collapse_output_transforms=False, warped=True, inverse_warped=True, random_seed=4,
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "files": "\n".join(sorted(res.files)),
+        "warped": res.warped.data,
+        "inverse_warped": res.inverse_warped.data,
+        "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
+    }
+    for name, xfms in res.files.items():
+        out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
     return out
 
 

@@ -75,10 +75,14 @@ def test_the_registry_lists_the_ants_entries():
         "ANTS-38",
         "ANTS-43",
         "ANTS-47",
+        "ANTS-49",
+        "ANTS-50",
+        "ANTS-51",
         "ITK-01",
         "ITK-02",
         "ITK-08",
         "ITK-10",
+        "ITK-18",
         "SCI-02",
     ):
         assert entry in ids, entry

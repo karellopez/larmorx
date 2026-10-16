@@ -149,6 +149,9 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-39 | N4 (ITK) | 64, 128 or 256 bins padded to twice the FFT size needed | the exact size |
 | ANTS-43 | DenoiseImage (ITK) | the Rician correction is NaN, and the bias 0, at a high SNR | a finite factor |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask | an error |
+| ANTS-49 | antsRegistration | a linear stage that throws is dropped, exit 0 | an error |
+| ANTS-50 | antsRegistration | `--save-state` after linear stages: exit 1, nothing written | the state is written |
+| ANTS-51 | antsRegistration | `-z 0`: files misnamed, then a read past the end of the names (crash) | every computed transform under its stage's name (`reproduce`: ANTs' files up to the crash, then an error) |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -158,6 +161,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-13 | ITK HDF5 reader | messages that name `TransformType` for any dataset and miss a blank | the dataset named |
 | ITK-14 | ITK HDF5 reader | parameters wider than 8 bytes read through float | read in the reader's precision |
 | ITK-15 | ITK HDF5 writer | a transform without parameters cannot be written with compression; a file ITK cannot read is left | its empty parameters stored uncompressed (`reproduce`: ITK's error and file) |
+| ITK-18 | ITK joint-histogram MI (`MI2`) | the marginal densities swapped | each image's own marginal |
 
 **Not the default yet:**
 

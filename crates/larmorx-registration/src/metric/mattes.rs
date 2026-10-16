@@ -286,7 +286,7 @@ impl<R: Real> Mattes<R> {
         if valid == 0 {
             return Err(ItkException::new(
                 FILE,
-                279,
+                307,
                 CLASS,
                 "All samples map outside moving image buffer. The images do not sufficiently \
                  overlap. They need to be initialized to have more overlap before this metric \
@@ -296,7 +296,7 @@ impl<R: Real> Mattes<R> {
         if joint_sum < R::EPSILON {
             return Err(ItkException::new(
                 FILE,
-                287,
+                315,
                 CLASS,
                 "Joint PDF summed to zero",
             ));

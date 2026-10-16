@@ -85,6 +85,18 @@ impl<R: Real, const D: usize> Xfm<R, D> {
         }
     }
 
+    /// `Clone()` (`Transform::InternalClone`): a new object given this one's fixed parameters,
+    /// then its parameters, which recomputes what they define. An inverse's offset, set
+    /// directly by `GetInverse`, becomes the one `ComputeOffset` derives from its translation.
+    pub fn itk_clone(&self) -> Result<Self, ItkException> {
+        let mut out = self.clone();
+        if let Xfm::Linear(l) = &mut out {
+            let p = l.parameters();
+            l.set_parameters(&p)?;
+        }
+        Ok(out)
+    }
+
     /// `GetParameters()`.
     pub fn parameters(&self) -> Vec<R> {
         match self {

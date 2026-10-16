@@ -221,6 +221,10 @@ pub struct LinearXfm<R, const D: usize> {
     /// The ANTs affine classes' scales (S1, S2, S3) and shears (K1, K2, K3; 2D: K).
     pub scales: [R; 3],
     pub shears: [R; 3],
+    /// Fixed parameters after the centre that `m_FixedParameters` keeps: an inverse made by
+    /// `GetInverse` takes its source's fixed parameters (an `Euler3DTransform`'s four, the
+    /// ZYX flag last), and `GetFixedParameters` overwrites only the centre.
+    pub extra_fixed: Vec<f64>,
 }
 
 /// `vnl_matrix_fixed` product in `R`: each entry starts from the first product.
@@ -255,6 +259,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
             versor: [R::ZERO, R::ZERO, R::ZERO, R::ONE],
             scales: [R::ONE; 3],
             shears: [R::ZERO; 3],
+            extra_fixed: Vec::new(),
         }
     }
 
@@ -352,6 +357,11 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
             _ => Kind::MatrixOffset,
         };
         let mut out = LinearXfm::new(kind);
+        out.extra_fixed = self
+            .fixed_parameters()
+            .get(D..)
+            .unwrap_or_default()
+            .to_vec();
         out.center = self.center;
         out.matrix = inv;
         out.offset = std::array::from_fn(|i| -mv[i]);
@@ -614,7 +624,11 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 f.push(if *zyx { 1.0 } else { 0.0 });
                 f
             }
-            _ => self.center.iter().map(|v| v.to_f64()).collect(),
+            _ => {
+                let mut f: Vec<f64> = self.center.iter().map(|v| v.to_f64()).collect();
+                f.extend_from_slice(&self.extra_fixed);
+                f
+            }
         }
     }
 

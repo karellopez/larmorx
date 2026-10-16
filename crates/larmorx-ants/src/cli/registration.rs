@@ -261,7 +261,16 @@ pub fn run_store(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
-    run(args, store, &super::FileLoader, n_threads, mode, None, out, err)
+    run(
+        args,
+        store,
+        &super::FileLoader,
+        n_threads,
+        mode,
+        None,
+        out,
+        err,
+    )
 }
 
 /// `antsRegistration`'s `main` (`antsRegistration.cxx`, from `Parse` on).
@@ -742,20 +751,36 @@ fn flatten<R: Compute, const D: usize>(
                 });
                 return Ok(());
             }
-            out.push(Xfm::Linear(LinearXfm::frozen(
+            let mut x = LinearXfm::frozen(
                 o.class,
                 o.parameters,
                 o.fixed_parameters,
                 std::array::from_fn(|i| std::array::from_fn(|j| state.matrix[i][j])),
                 std::array::from_fn(|i| state.offset[i]),
                 std::array::from_fn(|i| state.center[i]),
-            )));
+            );
+            // `m_Translation` as the reader set it (not recomputed from the offset).
+            x.translation = std::array::from_fn(|i| state.translation[i]);
+            out.push(Xfm::Linear(x));
             Ok(())
         }
     }
 }
 
 /// `GetInverseTransform()` of an initial transform.
+/// `CompositeTransform::Clone()` of the initial transforms (ANTs' `SetMovingInitialTransform`,
+/// `SetFixedInitialTransform`, `SetRestoreStateTransform`): each transform cloned through its
+/// parameters ([`Xfm::itk_clone`]).
+fn itk_clones<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    queue: Vec<Xfm<R, D>>,
+) -> Result<Vec<Xfm<R, D>>, Exit> {
+    queue
+        .iter()
+        .map(|t| t.itk_clone().map_err(|e| caught(log, &e)))
+        .collect()
+}
+
 fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
     match t {
         Xfm::Identity => Some(Xfm::Identity),
@@ -880,7 +905,9 @@ fn do_registration<R: Compute, const D: usize>(
         if !collapse {
             write_derived(&mut ctx, log, &prefix, "Moving", &queue, &derived, minc)?;
         }
-        helper.composite = Some(queue);
+        // SetMovingInitialTransform clones the composite, each transform through its
+        // parameters.
+        helper.composite = Some(itk_clones(log, queue)?);
     }
     if p.has("initial-fixed-transform") {
         let (initial, derived) =
@@ -889,7 +916,7 @@ fn do_registration<R: Compute, const D: usize>(
         if !collapse {
             write_derived(&mut ctx, log, &prefix, "Fixed", &queue, &derived, minc)?;
         }
-        helper.fixed_initial = Some(queue);
+        helper.fixed_initial = Some(itk_clones(log, queue)?);
     }
     if p.has("restore-state") {
         if p.has("initial-moving-transform") || p.has("initial-fixed-transform") {
@@ -908,7 +935,10 @@ fn do_registration<R: Compute, const D: usize>(
         if log.verbose {
             log.cout("+\n");
         }
-        helper.composite = Some(restored.into_iter().map(|i| i.transform).collect());
+        helper.composite = Some(itk_clones(
+            log,
+            restored.into_iter().map(|i| i.transform).collect(),
+        )?);
         if log.verbose {
             log.cout("+\n");
         }
@@ -1406,12 +1436,15 @@ fn chain_of<R: Compute, const D: usize>(
                 Vec::new(),
             ),
             Xfm::Linear(l) => {
+                // The transform maps with its matrix and offset as they are (`m_Offset`, which
+                // an inverse sets directly): given with a centre of 0, the reader's offset is
+                // the translation, exactly.
                 let mut p: Vec<f64> = l.matrix.iter().flatten().map(|v| v.to_f64()).collect();
-                p.extend(l.translation.iter().map(|v| v.to_f64()));
+                p.extend(l.offset.iter().map(|v| v.to_f64()));
                 (
                     "MatrixOffsetTransformBase_double_3_3".to_owned(),
                     p,
-                    l.center.iter().map(|v| v.to_f64()).collect(),
+                    vec![0.0; D],
                 )
             }
         };

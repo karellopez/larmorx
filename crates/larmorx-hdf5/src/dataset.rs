@@ -14,7 +14,7 @@ use crate::file::File;
 use crate::filters;
 use crate::message::{self, ChunkIndex, Dataspace, FillValue, Filter, Layout};
 use crate::object::{ObjectHeader, flag, msg};
-use crate::source::{Cursor, UNDEF, verify_checksum};
+use crate::source::{Cursor, UNDEF, log2_gen, verify_checksum};
 
 /// What a dataset's object header says about it.
 #[derive(Clone, Debug)]
@@ -442,16 +442,347 @@ fn list_chunks(
             Ok(out)
         }
         ChunkIndex::ExtensibleArray { .. } => {
-            let _ = info;
-            Err(unsupported(
-                "chunked datasets with an unlimited dimension (extensible array chunk index)",
-            ))
+            extensible_array(file, info, idx_addr, cdims, chunk_bytes, filtered)
         }
     }
 }
 
 /// Bytes encoding a filtered chunk's size: one more than its unfiltered size needs, at most 8
 /// (`H5D__farray_idx_create`, `H5D__bt2_idx_create`).
+/// The chunks of an extensible-array index (`src/H5Dearray.c`, `src/H5EA*.c`): element `i` of
+/// the array is the chunk whose coordinates, with the unlimited dimension moved first
+/// ("swizzled", `H5VM_swizzle_coords`), have the linear index `i`. The array keeps its first
+/// elements in the index block, then data blocks of growing size, the first ones addressed from
+/// the index block, the others through super blocks; large data blocks are split into pages.
+/// Elements up to the largest index set are listed (`H5D__earray_idx_iterate`).
+fn extensible_array(
+    file: &File,
+    info: &DatasetInfo,
+    addr: u64,
+    cdims: &[u64],
+    chunk_bytes: usize,
+    filtered: bool,
+) -> Result<Vec<Chunk>> {
+    let sb = file.superblock();
+    let (a, s) = (sb.sizeof_addr, sb.sizeof_size);
+    let ea = ExtensibleArray::open(file, addr, filtered, a, s)?;
+    // The grid of chunks, the unlimited dimension first.
+    let rank = cdims.len();
+    let (dims, max_dims) = match &info.space {
+        Dataspace::Simple { dims, max_dims } => (
+            dims.clone(),
+            max_dims.clone().unwrap_or_else(|| dims.clone()),
+        ),
+        _ => {
+            return Err(corrupt(
+                "extensible array index of a dataset without dimensions",
+            ));
+        }
+    };
+    let unlim = max_dims
+        .iter()
+        .position(|&m| m == UNDEF)
+        .ok_or_else(|| corrupt("extensible array index without an unlimited dimension"))?;
+    let mut order: Vec<usize> = (0..rank).collect();
+    order.remove(unlim);
+    order.insert(0, unlim);
+    let mut down = vec![1u64; rank];
+    for k in (0..rank.saturating_sub(1)).rev() {
+        let d = order[k + 1];
+        down[k] = down[k + 1].saturating_mul(max_dims[d].div_ceil(cdims[d]));
+    }
+    let grid: Vec<u64> = dims
+        .iter()
+        .zip(cdims)
+        .map(|(&d, &c)| d.div_ceil(c))
+        .collect();
+    let csl = chunk_size_len(chunk_bytes);
+    let mut out = Vec::new();
+    let mut cache = EaCache::default();
+    for idx in 0..ea.max_idx_set {
+        let Some(raw) = ea.element(file, idx, &mut cache)? else {
+            continue;
+        };
+        let mut c = Cursor::new(&raw, a, s, "an extensible array element");
+        let caddr = c.addr()?;
+        if caddr == UNDEF {
+            continue;
+        }
+        let (size, mask) = if filtered {
+            (c.uvar(csl)?, c.u32()?)
+        } else {
+            (chunk_bytes as u64, 0)
+        };
+        let mut swizzled = vec![0u64; rank];
+        let mut rest = idx;
+        for k in 0..rank {
+            swizzled[k] = rest / down[k];
+            rest %= down[k];
+        }
+        let mut scaled = vec![0u64; rank];
+        for (k, &d) in order.iter().enumerate() {
+            scaled[d] = swizzled[k];
+        }
+        if scaled.iter().zip(&grid).all(|(s, g)| s < g) {
+            out.push(Chunk {
+                scaled,
+                addr: caddr,
+                size,
+                mask,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// An extensible array's header and index block (`H5EA__cache_hdr_deserialize`,
+/// `H5EA__hdr_init`, `H5EA__cache_iblock_deserialize`).
+struct ExtensibleArray {
+    addr: u64,
+    sizeof_addr: u8,
+    sizeof_size: u8,
+    elsize: usize,
+    idx_blk_elmts: u64,
+    data_blk_min_elmts: u64,
+    page_nelmts: u64,
+    arr_off_size: usize,
+    max_idx_set: u64,
+    /// Per super block: (number of data blocks, elements per data block, first element,
+    /// first data block).
+    sblk: Vec<(u64, u64, u64, u64)>,
+    /// Super blocks whose data blocks the index block addresses.
+    ib_nsblks: usize,
+    iblock_elmts: Vec<u8>,
+    dblk_addrs: Vec<u64>,
+    sblk_addrs: Vec<u64>,
+}
+
+/// Blocks read once each: data blocks and pages by address (`None`: a page never
+/// written), super blocks by index (their data block addresses and page-init bits).
+#[derive(Default)]
+struct EaCache {
+    blocks: std::collections::HashMap<u64, Option<Vec<u8>>>,
+    sblocks: std::collections::HashMap<usize, (Vec<u64>, Vec<u8>)>,
+}
+
+impl ExtensibleArray {
+    fn open(file: &File, addr: u64, filtered: bool, a: u8, s: u8) -> Result<ExtensibleArray> {
+        let (au, su) = (usize::from(a), usize::from(s));
+        let hsize = 4 + 1 + 1 + 6 + 6 * su + au + 4;
+        let image = file.read_at(addr, hsize)?;
+        verify_checksum(&image, "extensible array header")?;
+        let mut c = Cursor::new(&image, a, s, "an extensible array header");
+        c.magic(b"EAHD")?;
+        if c.u8()? != 0 {
+            return Err(corrupt("wrong extensible array header version"));
+        }
+        if c.u8()? != u8::from(filtered) {
+            return Err(corrupt("extensible array class does not match the filters"));
+        }
+        let elsize = usize::from(c.u8()?);
+        let max_nelmts_bits = u32::from(c.u8()?);
+        let idx_blk_elmts = u64::from(c.u8()?);
+        let data_blk_min_elmts = u64::from(c.u8()?);
+        let sup_blk_min_data_ptrs = u64::from(c.u8()?);
+        let page_bits = u32::from(c.u8()?);
+        for _ in 0..4 {
+            c.length()?;
+        }
+        let max_idx_set = c.length()?;
+        c.length()?;
+        let iblock_addr = c.addr()?;
+        if !data_blk_min_elmts.is_power_of_two()
+            || !sup_blk_min_data_ptrs.is_power_of_two()
+            || max_nelmts_bits >= 64
+            || page_bits >= 32
+            || data_blk_min_elmts.ilog2() > max_nelmts_bits
+            || elsize < au
+        {
+            return Err(corrupt("invalid extensible array creation parameter"));
+        }
+        let nsblks = 1 + (max_nelmts_bits - data_blk_min_elmts.ilog2()) as usize;
+        let mut sblk = Vec::with_capacity(nsblks);
+        let (mut start_idx, mut start_dblk) = (0u64, 0u64);
+        for u in 0..nsblks {
+            let ndblks = 1u64 << (u / 2);
+            let dblk_nelmts = (1u64 << u.div_ceil(2)) * data_blk_min_elmts;
+            sblk.push((ndblks, dblk_nelmts, start_idx, start_dblk));
+            start_idx = start_idx.saturating_add(ndblks.saturating_mul(dblk_nelmts));
+            start_dblk += ndblks;
+        }
+        let ib_nsblks = 2 * sup_blk_min_data_ptrs.ilog2() as usize;
+        let ndblk_addrs = 2 * (sup_blk_min_data_ptrs as usize - 1);
+        let nsblk_addrs = nsblks.saturating_sub(ib_nsblks);
+        let mut ea = ExtensibleArray {
+            addr,
+            sizeof_addr: a,
+            sizeof_size: s,
+            elsize,
+            idx_blk_elmts,
+            data_blk_min_elmts,
+            page_nelmts: 1u64 << page_bits,
+            arr_off_size: max_nelmts_bits.div_ceil(8) as usize,
+            max_idx_set,
+            sblk,
+            ib_nsblks,
+            iblock_elmts: Vec::new(),
+            dblk_addrs: Vec::new(),
+            sblk_addrs: Vec::new(),
+        };
+        if iblock_addr == UNDEF {
+            ea.max_idx_set = 0;
+            return Ok(ea);
+        }
+        let size = 6 + au + idx_blk_elmts as usize * elsize + (ndblk_addrs + nsblk_addrs) * au + 4;
+        let image = file.read_at(iblock_addr, size)?;
+        verify_checksum(&image, "extensible array index block")?;
+        let mut c = Cursor::new(&image, a, s, "an extensible array index block");
+        c.magic(b"EAIB")?;
+        c.skip(2)?;
+        if c.addr()? != addr {
+            return Err(corrupt("extensible array index block of another array"));
+        }
+        ea.iblock_elmts = c.bytes(idx_blk_elmts as usize * elsize)?.to_vec();
+        for _ in 0..ndblk_addrs {
+            ea.dblk_addrs.push(c.addr()?);
+        }
+        for _ in 0..nsblk_addrs {
+            ea.sblk_addrs.push(c.addr()?);
+        }
+        Ok(ea)
+    }
+
+    fn dblock_prefix(&self) -> usize {
+        6 + usize::from(self.sizeof_addr) + self.arr_off_size + 4
+    }
+
+    /// A data block's elements (`H5EA__cache_dblock_deserialize`, unpaged).
+    fn read_dblock(&self, file: &File, at: u64, nelmts: u64) -> Result<Vec<u8>> {
+        let prefix = self.dblock_prefix() - 4;
+        let len = prefix + nelmts as usize * self.elsize;
+        let image = file.read_at(at, len + 4)?;
+        verify_checksum(&image, "extensible array data block")?;
+        let mut c = Cursor::new(
+            &image,
+            self.sizeof_addr,
+            self.sizeof_size,
+            "an extensible array data block",
+        );
+        c.magic(b"EADB")?;
+        c.skip(2)?;
+        if c.addr()? != self.addr {
+            return Err(corrupt("extensible array data block of another array"));
+        }
+        Ok(image[prefix..len].to_vec())
+    }
+
+    /// Element `idx` as stored, or `None` where nothing was ever stored (`H5EA__lookup_elmt`
+    /// with read-only access).
+    fn element(&self, file: &File, idx: u64, cache: &mut EaCache) -> Result<Option<Vec<u8>>> {
+        let e = self.elsize;
+        if idx < self.idx_blk_elmts {
+            let i = idx as usize;
+            return Ok(Some(self.iblock_elmts[i * e..(i + 1) * e].to_vec()));
+        }
+        let rel = idx - self.idx_blk_elmts;
+        let si = log2_gen(rel / self.data_blk_min_elmts + 1) as usize;
+        let (ndblks, dblk_nelmts, sstart, sdblk) = *self
+            .sblk
+            .get(si)
+            .ok_or_else(|| corrupt("extensible array index beyond its super blocks"))?;
+        let elmt = rel - sstart;
+        let k = elmt / dblk_nelmts;
+        let within = elmt % dblk_nelmts;
+        let (block_at, offset) = if si < self.ib_nsblks {
+            let at = *self
+                .dblk_addrs
+                .get((sdblk + k) as usize)
+                .ok_or_else(|| corrupt("extensible array data block beyond the index block"))?;
+            if at == UNDEF {
+                return Ok(None);
+            }
+            if dblk_nelmts > self.page_nelmts {
+                return Err(unsupported(
+                    "paged extensible array data blocks addressed by the index block",
+                ));
+            }
+            if let std::collections::hash_map::Entry::Vacant(v) = cache.blocks.entry(at) {
+                v.insert(Some(self.read_dblock(file, at, dblk_nelmts)?));
+            }
+            (at, within)
+        } else {
+            let saddr = self.sblk_addrs[si - self.ib_nsblks];
+            if saddr == UNDEF {
+                return Ok(None);
+            }
+            let npages = if dblk_nelmts > self.page_nelmts {
+                dblk_nelmts / self.page_nelmts
+            } else {
+                0
+            };
+            if let std::collections::hash_map::Entry::Vacant(v) = cache.sblocks.entry(si) {
+                // H5EA__cache_sblock_deserialize.
+                let init_size = (npages as usize).div_ceil(8);
+                let au = usize::from(self.sizeof_addr);
+                let size = 6 + au + self.arr_off_size + ndblks as usize * (init_size + au) + 4;
+                let image = file.read_at(saddr, size)?;
+                verify_checksum(&image, "extensible array super block")?;
+                let mut c = Cursor::new(
+                    &image,
+                    self.sizeof_addr,
+                    self.sizeof_size,
+                    "an extensible array super block",
+                );
+                c.magic(b"EASB")?;
+                c.skip(2)?;
+                if c.addr()? != self.addr {
+                    return Err(corrupt("extensible array super block of another array"));
+                }
+                c.skip(self.arr_off_size)?;
+                let init = c.bytes(ndblks as usize * init_size)?.to_vec();
+                let mut addrs = Vec::with_capacity(ndblks as usize);
+                for _ in 0..ndblks {
+                    addrs.push(c.addr()?);
+                }
+                v.insert((addrs, init));
+            }
+            let (addrs, init) = &cache.sblocks[&si];
+            let at = addrs[k as usize];
+            if at == UNDEF {
+                return Ok(None);
+            }
+            if npages == 0 {
+                if let std::collections::hash_map::Entry::Vacant(v) = cache.blocks.entry(at) {
+                    v.insert(Some(self.read_dblock(file, at, dblk_nelmts)?));
+                }
+                (at, within)
+            } else {
+                let page = within / self.page_nelmts;
+                // H5VM_bit_get over the super block's whole bitmask.
+                let bit = k as usize * npages as usize + page as usize;
+                let page_size = self.page_nelmts * e as u64 + 4;
+                let page_at = at + self.dblock_prefix() as u64 + page * page_size;
+                let initialised = init[bit / 8] & (0x80 >> (bit % 8)) != 0;
+                if let std::collections::hash_map::Entry::Vacant(v) = cache.blocks.entry(page_at) {
+                    let b = if initialised {
+                        let image = file.read_at(page_at, page_size as usize)?;
+                        verify_checksum(&image, "extensible array data block page")?;
+                        Some(image[..image.len() - 4].to_vec())
+                    } else {
+                        None
+                    };
+                    v.insert(b);
+                }
+                (page_at, within % self.page_nelmts)
+            }
+        };
+        Ok(cache.blocks[&block_at].as_ref().map(|b| {
+            let o = offset as usize;
+            b[o * e..(o + 1) * e].to_vec()
+        }))
+    }
+}
+
 fn chunk_size_len(chunk_bytes: usize) -> usize {
     (1 + ((crate::source::log2_gen(chunk_bytes as u64) + 8) / 8) as usize).min(8)
 }

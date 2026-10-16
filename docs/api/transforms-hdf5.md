@@ -57,16 +57,15 @@ not widened in memory; ITK widens them exactly.
 What the reader covers: superblocks 0 to 3; version-1 and version-2 object headers,
 continuation chunks; symbol-table, compact and dense groups (fractal heaps with direct,
 indirect, huge and tiny objects; version-1 and version-2 B-trees); soft links; compact,
-contiguous and chunked datasets with every chunk index of HDF5 1.12 but the extensible array
-(version-1 and version-2 B-trees, single chunk, implicit, fixed array); the deflate, shuffle
-and Fletcher-32 filters; floating-point data of any size and byte order (half, single, double,
-x87 extended, quadruple; converted as HDF5 1.12.1's `H5Dread` converts them to the reader's
-precision); fixed- and variable-length strings; fill values. Refused, as ITK's HDF5 refuses them: the
-szip filter and filter plugins (LZF), and HDF5 2.0's layout message version 5. **Not covered
-yet, though ITK reads them:** the n-bit and scale-offset filters, extensible-array chunk
-indices (chunked datasets with an unlimited dimension in the newest file format) and virtual
-datasets; no transform file written by ITK, ANTs or fMRIPrep uses them. Chunks are decompressed
-in parallel; the result does not depend on the thread count.
+contiguous and chunked datasets with every chunk index of HDF5 1.12 (version-1 B-tree, single
+chunk, implicit, fixed array, extensible array, version-2 B-tree); the deflate, shuffle,
+Fletcher-32, n-bit and scale-offset filters; floating-point data of any size, layout and byte
+order (half, single, double, x87 extended, quadruple, n-bit formats; converted as HDF5 1.12.1's
+`H5Dread` converts them to the reader's precision); fixed- and variable-length strings; fill
+values. Refused, as ITK's HDF5 refuses them: the szip filter and filter plugins (LZF), and
+HDF5 2.0's layout message version 5. **Not covered:** virtual datasets (their data live in
+other files), which no transform file uses. Chunks are decompressed in parallel; the result
+does not depend on the thread count.
 
 On the command line and with `precision="float32"` (`lx.ants.apply_transforms`), the file is
 read as ITK's reader of that precision reads it: the precision in a transform's name is

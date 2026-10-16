@@ -306,14 +306,16 @@ pub(crate) fn layout(c: &mut Cursor) -> Result<Layout> {
             for _ in 0..ndims {
                 dims.push(c.uvar(enc)?);
             }
+            // H5D_chunk_index_t: 0 v1 B-tree, 1 single, 2 none (implicit), 3 fixed array,
+            // 4 extensible array, 5 v2 B-tree.
             let index = match c.u8()? {
-                1 => {
+                0 => {
                     return Err(corrupt(
                         "v1 B-tree index type should never be in a v4 layout message",
                     ));
                 }
                 2 => ChunkIndex::Implicit,
-                3 => {
+                1 => {
                     let filtered = if flags & 0x02 != 0 {
                         Some((c.length()?, c.u32()?))
                     } else {
@@ -321,14 +323,14 @@ pub(crate) fn layout(c: &mut Cursor) -> Result<Layout> {
                     };
                     ChunkIndex::Single { filtered }
                 }
-                4 => {
+                3 => {
                     let page_bits = c.u8()?;
                     if page_bits == 0 {
                         return Err(corrupt("invalid fixed array creation parameter"));
                     }
                     ChunkIndex::FixedArray { page_bits }
                 }
-                5 => {
+                4 => {
                     let p = [c.u8()?, c.u8()?, c.u8()?, c.u8()?, c.u8()?];
                     if p.contains(&0) {
                         return Err(corrupt("invalid extensible array creation parameter"));
@@ -341,12 +343,12 @@ pub(crate) fn layout(c: &mut Cursor) -> Result<Layout> {
                         max_dblk_page_nelmts_bits: p[4],
                     }
                 }
-                6 => ChunkIndex::BTreeV2 {
+                5 => ChunkIndex::BTreeV2 {
                     node_size: c.u32()?,
                     split_percent: c.u8()?,
                     merge_percent: c.u8()?,
                 },
-                _ => return Err(corrupt("invalid chunk index type")),
+                _ => return Err(corrupt("unknown chunk index type")),
             };
             Layout::Chunked {
                 version,

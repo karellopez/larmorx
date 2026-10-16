@@ -142,9 +142,9 @@ fn hdf5_group_members<'py>(
 
 /// Every dataset of the file, depth first in name order (as h5py's `visititems` visits them),
 /// as `(path, datatype, shape, value)`: the datatype as `"string"`, `"float<bytes>"`,
-/// `"integer<bytes>"` or `"class<n>"`, and the value as [`hdf5_group_members`] reads it
-/// (`None` where larmorx does not read the class). Groups are listed with the datatype
-/// `"group"`.
+/// `"integer<bytes>"` or `"class<n>"`, and the value as [`hdf5_group_members`] reads it,
+/// integers as their stored bytes (filters undone, no conversion), `None` for other classes.
+/// Groups are listed with the datatype `"group"`.
 #[pyfunction]
 fn hdf5_datasets<'py>(py: Python<'py>, path: PathBuf) -> PyResult<Bound<'py, PyList>> {
     let file = open(&path)?;
@@ -185,6 +185,10 @@ fn hdf5_datasets<'py>(py: Python<'py>, path: PathBuf) -> PyResult<Bound<'py, PyL
                 };
                 let value = if kind == "string" || kind.starts_with("float") {
                     dataset_value(py, &file, &path, &info)?
+                } else if kind.starts_with("integer") {
+                    // The stored bytes, filters undone (no conversion).
+                    let raw = file.read_raw(&info, 1).map_err(|e| h5_err(&path, e))?;
+                    PyBytes::new(py, &raw).into_any()
                 } else {
                     py.None().into_bound(py)
                 };

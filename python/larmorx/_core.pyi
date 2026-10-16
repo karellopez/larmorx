@@ -125,6 +125,11 @@ def hdf5_group_members(path: str, group: str) -> list[tuple[str, dict[str, Any]]
     float64 arrays. ``KeyError`` if the group does not exist, ``OSError`` if the file is not
     HDF5."""
 
+def hdf5_datasets(path: str) -> list[tuple[str, str, list[int], Any]]:
+    """Every group and dataset of an HDF5 file, depth first in name order, as ``(path,
+    datatype, shape, value)``: strings as ``list[bytes | None]``, floats as float32/float64
+    arrays, integers as their stored bytes, ``None`` otherwise."""
+
 def itk_h5_replay(path: str) -> dict[str, Any]:
     """Replay an ITK-written HDF5 transform file through larmorx's writer with the file's own
     time, strings and compression, and compare the bytes (validation suite ``itk-hdf5``)."""

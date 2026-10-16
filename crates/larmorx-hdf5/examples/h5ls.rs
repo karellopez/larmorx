@@ -59,6 +59,18 @@ fn walk(f: &File, addr: u64, path: &str) {
                             .collect();
                         println!("{p}: string {:?} {s:?}", info.space.dims());
                     }
+                    Datatype::Integer { size, .. } => {
+                        let raw = f.read_raw(&info, 0).expect("read");
+                        let h = raw.iter().fold(0xcbf29ce484222325u64, |h, &b| {
+                            (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
+                        });
+                        println!(
+                            "{p}: integer{} {:?} {:?} raw fnv={h:016x}",
+                            size * 8,
+                            info.space.dims(),
+                            info.layout_kind()
+                        );
+                    }
                     other => println!("{p}: {other:?}"),
                 }
             }

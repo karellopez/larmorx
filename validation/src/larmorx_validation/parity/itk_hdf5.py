@@ -98,6 +98,11 @@ AFFINE = np.array(
 CENTER = np.array([0.35, -1.2, 2.4], dtype="f8")
 
 
+#: HDF5 1.10's file format: h5py's ``libver="latest"`` is HDF5 2.0's on h5py 3.16, which ITK's
+#: HDF5 1.12 cannot read.
+V110 = ("v110", "v112")
+
+
 def _h5py_file(path: Path, recipe: str) -> None:
     """Writes the h5py-made file ``recipe`` at ``path``."""
     import h5py
@@ -138,6 +143,70 @@ def _h5py_file(path: Path, recipe: str) -> None:
         }
 
     comp = ("0", {"TransformType": "CompositeTransform_double_3_3"})
+
+    def stored(how):
+        """A dataset callback: the parameters stored as ``how`` says (file format 1.10)."""
+
+        def make(g, n, value):
+            value = np.asarray(value)
+            if how == "farray":
+                g.create_dataset(n, data=value, chunks=(5,))
+            elif how == "farray-paged":
+                g.create_dataset(n, data=value, chunks=(1,), compression="gzip")
+            elif how == "earray":
+                g.create_dataset(n, data=value, chunks=(4,), maxshape=(None,), compression="gzip")
+            elif how == "single":
+                g.create_dataset(
+                    n, data=value, chunks=value.shape, compression="gzip", shuffle=True
+                )
+            elif how == "implicit":
+                dcpl = h5py.h5p.create(h5py.h5p.DATASET_CREATE)
+                dcpl.set_chunk((4,))
+                dcpl.set_alloc_time(h5py.h5d.ALLOC_TIME_EARLY)
+                tid = h5py.h5t.py_create(value.dtype)
+                dset = h5py.h5d.create(
+                    g.id, n.encode(), tid, h5py.h5s.create_simple(value.shape), dcpl=dcpl
+                )
+                dset.write(h5py.h5s.ALL, h5py.h5s.ALL, np.ascontiguousarray(value))
+            elif how == "scaleoffset":
+                g.create_dataset(n, data=value, chunks=(6,), scaleoffset=6)
+            elif how == "nbit":
+                tid = h5py.h5t.IEEE_F64LE.copy()
+                tid.set_fields(55, 44, 11, 4, 40)
+                tid.set_offset(4)
+                tid.set_precision(52)
+                tid.set_size(8)
+                tid.set_ebias(1023)
+                dcpl = h5py.h5p.create(h5py.h5p.DATASET_CREATE)
+                dcpl.set_chunk((6,))
+                dcpl.set_filter(5, h5py.h5z.FLAG_OPTIONAL)
+                dset = h5py.h5d.create(
+                    g.id, n.encode(), tid, h5py.h5s.create_simple(value.shape), dcpl=dcpl
+                )
+                dset.write(h5py.h5s.ALL, h5py.h5s.ALL, np.ascontiguousarray(value, dtype="f8"))
+
+        return make
+
+    def field(how):
+        """A displacement field of 4 × 5 × 6 vectors with its parameters stored as ``how``."""
+        n = 4 * 5 * 6
+        vectors = (np.arange(3 * n) % 17 - 8) / 4.0
+        fixed = np.array(
+            [4, 5, 6, -3.0, -4.0, -5.0, 2.0, 2.0, 2.0, 1, 0, 0, 0, 1, 0, 0, 0, 1], float
+        )
+        return {
+            "TransformType": "DisplacementFieldTransform_double_3_3",
+            "TransformParameters": lambda g, name: stored(how)(g, name, vectors),
+            "TransformFixedParameters": fixed,
+        }
+
+    def affine_stored(how):
+        return {
+            "TransformType": "AffineTransform_double_3_3",
+            "TransformParameters": lambda g, name: stored(how)(g, name, AFFINE),
+            "TransformFixedParameters": CENTER,
+        }
+
     many = [comp] + [(str(i), affine(params=AFFINE + i)) for i in range(1, 12)]
     recipes: dict[str, Callable[[], None]] = {
         "single": lambda: write([("0", affine())]),
@@ -176,6 +245,13 @@ def _h5py_file(path: Path, recipe: str) -> None:
             ]
         ),
         "dense-11": lambda: write(many),
+        "farray": lambda: write([comp, ("1", affine_stored("farray"))], libver=V110),
+        "farray-paged": lambda: write([comp, ("1", field("farray-paged"))], libver=V110),
+        "earray": lambda: write([comp, ("1", field("earray"))], libver=V110),
+        "single-chunk": lambda: write([comp, ("1", affine_stored("single"))], libver=V110),
+        "implicit": lambda: write([comp, ("1", affine_stored("implicit"))], libver=V110),
+        "scaleoffset": lambda: write([comp, ("1", affine_stored("scaleoffset"))]),
+        "nbit": lambda: write([comp, ("1", affine_stored("nbit"))]),
         "dense-11-superblock3": lambda: write(many, libver="latest"),
         "composite-second": lambda: write(
             [("0", affine()), ("1", {"TransformType": "CompositeTransform_double_3_3"})]
@@ -300,6 +376,13 @@ H5PY_READ = (
     "scalar-type",
     "dense-11",
     "dense-11-superblock3",
+    "farray",
+    "farray-paged",
+    "earray",
+    "single-chunk",
+    "implicit",
+    "scaleoffset",
+    "nbit",
     "empty-composite",
     "two-linear",
     "composite-second",
@@ -338,6 +421,122 @@ H5PY_ONLY = {
     "lzf": "a filter only h5py has",
     "superblock3-chunked": "HDF5 2.0's layout message version 5, newer than ITK's HDF5 1.12.1",
 }
+
+
+# ------------------------------------------------------------------------------------------------
+# HDF5's storage features, in files that are not transform files (compared with h5py only)
+
+
+def _feature_file(path: Path, recipe: str) -> None:
+    """Writes one dataset ``x`` with h5py in the storage ``recipe`` names: every chunk index of
+    file format 1.10 (single chunk, implicit, fixed array paged or not, extensible array
+    through its index block, data blocks, super blocks and pages, with the unlimited dimension
+    first or not, version-2 B-tree), and the n-bit and scale-offset filters on floating-point
+    and integer data."""
+    import h5py
+
+    rng = np.random.default_rng(sum(map(ord, recipe)))
+    kind, _, rest = recipe.partition(":")
+    if kind == "index":
+        shapes = {
+            "single": ((7, 9), None, (7, 9), None, False),
+            "single-filtered": ((7, 9), None, (7, 9), "gzip", False),
+            "implicit": ((20, 9), None, (4, 3), None, True),
+            "farray": ((40, 9), None, (4, 3), None, False),
+            "farray-paged": ((5000,), None, (1,), None, False),
+            "farray-paged-filtered": ((3000,), None, (2,), "gzip", False),
+            "earray-small": ((10,), (None,), (4,), None, False),
+            "earray-dblocks": ((300,), (None,), (2,), None, False),
+            "earray-sblocks": ((6000,), (None,), (1,), None, False),
+            "earray-paged": ((70000,), (None,), (1,), None, False),
+            "earray-filtered": ((3000,), (None,), (3,), "gzip", False),
+            "earray-2d-swizzled": ((5, 700), (5, None), (2, 3), None, False),
+            "earray-3d-swizzled": ((4, 3, 90), (4, 3, None), (3, 2, 4), "gzip", False),
+            "bt2": ((30, 20), (None, None), (4, 3), None, False),
+            "bt2-filtered": ((300, 20), (None, None), (4, 3), "gzip", False),
+        }
+        shape, maxshape, chunks, comp, early = shapes[rest]
+        data = rng.standard_normal(shape)
+        with h5py.File(path, "w", libver=V110) as f:
+            if early:
+                dcpl = h5py.h5p.create(h5py.h5p.DATASET_CREATE)
+                dcpl.set_chunk(chunks)
+                dcpl.set_alloc_time(h5py.h5d.ALLOC_TIME_EARLY)
+                dset = h5py.h5d.create(
+                    f.id, b"x", h5py.h5t.IEEE_F64LE, h5py.h5s.create_simple(shape), dcpl=dcpl
+                )
+                dset.write(h5py.h5s.ALL, h5py.h5s.ALL, data)
+            else:
+                d = f.create_dataset(
+                    "x", shape=shape, maxshape=maxshape, chunks=chunks, dtype="f8", compression=comp
+                )
+                d[...] = data
+                if rest == "earray-sblocks":
+                    d.resize((6500,))  # chunks never written: the fill value
+        return
+    data = rng.standard_normal(1000) * 100.0
+    ints = rng.integers(-500, 500, 1000).astype("i4")
+    with h5py.File(path, "w") as f:
+        if kind == "scaleoffset":
+            dtype, factor, fill = rest.split(",")
+            v = (
+                data.astype(dtype)
+                if dtype.lstrip("<>").startswith("f")
+                else (
+                    ints.astype(dtype)
+                    if dtype.lstrip("<>").startswith("i") and dtype[-1] != "1"
+                    else (ints % 100).astype(dtype)
+                )
+            )
+            kw = {"fillvalue": np.array(fill, dtype=dtype)[()]} if fill else {}
+            d = f.create_dataset(
+                "x", shape=v.shape, dtype=dtype, chunks=(300,), scaleoffset=int(factor), **kw
+            )
+            if fill:
+                d[100:900] = v[100:900]
+            else:
+                d[...] = v
+        elif kind == "nbit":
+            if rest == "float":
+                tid = h5py.h5t.IEEE_F32LE.copy()
+                tid.set_fields(26, 20, 6, 7, 13)
+                tid.set_offset(7)
+                tid.set_precision(20)
+                tid.set_size(4)
+                tid.set_ebias(31)
+                values = (data / 10.0).astype("f4")
+            else:
+                tid = (h5py.h5t.STD_I32BE if rest == "int-be" else h5py.h5t.STD_I32LE).copy()
+                tid.set_precision(12)
+                tid.set_offset(4)
+                values = (ints % 2000).astype("i4")
+            dcpl = h5py.h5p.create(h5py.h5p.DATASET_CREATE)
+            dcpl.set_chunk((250,))
+            dcpl.set_filter(5, h5py.h5z.FLAG_OPTIONAL)
+            dset = h5py.h5d.create(f.id, b"x", tid, h5py.h5s.create_simple((1000,)), dcpl=dcpl)
+            dset.write(h5py.h5s.ALL, h5py.h5s.ALL, values, mtype=h5py.h5t.py_create(values.dtype))
+
+
+FEATURES = (
+    *(
+        f"index:{n}"
+        for n in (
+            "single", "single-filtered", "implicit", "farray", "farray-paged",
+            "farray-paged-filtered", "earray-small", "earray-dblocks", "earray-sblocks",
+            "earray-paged", "earray-filtered", "earray-2d-swizzled", "earray-3d-swizzled",
+            "bt2", "bt2-filtered",
+        )
+    ),
+    *(f"scaleoffset:{t},{d}," for t in ("f4", "f8") for d in (0, 2, 6)),
+    "scaleoffset:f4,2,-7.5",
+    "scaleoffset:>f8,3,",
+    *(f"scaleoffset:{t},0," for t in ("i1", "i2", "i4", "i8", "u1", "u2", "u4", "u8")),
+    "scaleoffset:i4,0,12345",
+    "nbit:float",
+    "nbit:int",
+    "nbit:int-be",
+)  # fmt: skip
+SMOKE_FEATURES = ("index:farray", "index:earray-sblocks", "scaleoffset:f8,2,", "nbit:float")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -568,6 +767,13 @@ def cases(tier: str) -> list[Case]:
             f"written by h5py, refused by ITK: {recipe}",
             Spec("error", f"h5py:{recipe}", "smoke" if recipe in SMOKE_H5PY else "standard"),
         )
+    for recipe in FEATURES:
+        add(
+            f"hdf5/{recipe.replace(':', '/')}",
+            "hdf5",
+            f"an HDF5 storage feature written by h5py: {recipe}",
+            Spec("feature", recipe, "smoke" if recipe in SMOKE_FEATURES else "standard"),
+        )
     for entry in td.select(tier="full"):
         if entry.name.endswith(".h5"):
             add(
@@ -729,15 +935,19 @@ def diag_messages(text: str) -> list[str]:
     return msgs
 
 
-def _kind(dtype: np.dtype) -> str:
+def _kind(obj: Any) -> str:
+    """A dataset's datatype as ``larmorx._core.hdf5_datasets`` names it: the class and the
+    size in the file (h5py widens types numpy does not have, such as 5-byte floats)."""
     import h5py
 
+    dtype = obj.dtype
+    size = obj.id.get_type().get_size()
     if h5py.check_string_dtype(dtype) is not None or dtype.kind == "S":
         return "string"
     if dtype.kind == "f":
-        return f"float{dtype.itemsize}"
+        return f"float{size}"
     if dtype.kind in "iu":
-        return f"integer{dtype.itemsize}"
+        return f"integer{size}"
     return f"other:{dtype}"
 
 
@@ -752,7 +962,7 @@ def h5py_datasets(path: Path) -> list[tuple[str, str, list[int], Any]]:
         if isinstance(obj, h5py.Group):
             out.append((name, "group", [], None))
             return
-        kind = _kind(obj.dtype)
+        kind = _kind(obj)
         value: Any = None
         if kind == "string":
             raw = obj[()]
@@ -760,6 +970,13 @@ def h5py_datasets(path: Path) -> list[tuple[str, str, list[int], Any]]:
             value = [None if v is None else bytes(v) for v in items]
         elif kind.startswith("float"):
             value = np.asarray(obj[()]).astype(np.float64).ravel()
+        elif kind.startswith("integer"):
+            # The stored bytes: read in the file's own type, without conversion.
+            ftype = obj.id.get_type()
+            buf = np.zeros(obj.size * ftype.get_size(), dtype=np.uint8)
+            if obj.size:
+                obj.id.read(h5py.h5s.ALL, h5py.h5s.ALL, buf, mtype=ftype)
+            value = buf.tobytes()
         out.append((name, kind, list(obj.shape), value))
 
     with h5py.File(path, "r") as f:
@@ -772,6 +989,8 @@ def _same_value(a: Any, b: Any) -> bool:
         return a is None and b is None
     if isinstance(a, list):
         return list(a) == list(b)
+    if isinstance(a, bytes):
+        return a == b
     a = np.asarray(a, dtype=np.float64).ravel()
     b = np.asarray(b, dtype=np.float64).ravel()
     return a.shape == b.shape and bool(np.array_equal(a.view(np.int64), b.view(np.int64)))
@@ -787,7 +1006,7 @@ def compare_datasets(checks: CheckList, name: str, ours: list, theirs: list) -> 
     for (n, k1, s1, v1), (_, k2, s2, v2) in zip(ours, theirs, strict=True):
         if k1 != k2 or list(s1) != list(s2):
             bad.append(f"{n}: {k1}{list(s1)} / {k2}{list(s2)}")
-        elif (k1 == "string" or k1.startswith("float")) and not _same_value(v1, v2):
+        elif k1.startswith(("string", "float", "integer")) and not _same_value(v1, v2):
             bad.append(f"{n}: values differ")
     checks(
         f"{name}: every dataset (names, types, shapes, values bit for bit)",
@@ -992,6 +1211,13 @@ def run_case(case: Case, checks: CheckList) -> None:
         tmp = Path(tmp_name)
         if spec.kind == "partial":
             _run_partial(checks, tmp)
+            return
+        if spec.kind == "feature":
+            path = tmp / "feature.h5"
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                _feature_file(path, spec.source)
+            _compare_with_h5py(checks, path)
             return
         path = _source(spec, tmp)
         if spec.kind == "read":

@@ -36,8 +36,7 @@ h5py dropped. Validation [itk-hdf5](validation/itk-hdf5.md); API
 **Left for later:** antsApplyTransforms' transform outputs (`-o Linear[...]`,
 `-o CompositeTransform[...]`, `-o DisplacementField[...]`, refused today: they need ANTs'
 linear collapse and `TransformToDisplacementFieldFilter`; the HDF5 writer is ready); reading
-the n-bit and scale-offset filters, extensible-array chunk indices and virtual datasets
-(ITK's HDF5 reads them; no transform file uses them); a fractal heap's indirect blocks in the
+virtual datasets (their data live in other files; no transform file uses them); a fractal heap's indirect blocks in the
 writer (a composite of 38 or more transforms is written compactly instead); the read benchmark
 against h5py and ANTs (pending a quiet machine).
 

@@ -897,6 +897,22 @@ verification.
   `antsAffineInitializer`, histogram matching) starts when the stage comparisons on the
   field-map runs finish.
 
+## 2026-10-16: Port every tool first; one install command for everything
+
+**Decided by the user:**
+- **Port every remaining tool first, compare with fMRIPrep at the end.** Each port is still
+  validated against its own original program (parity, golden tests); the stage-by-stage and
+  end-to-end comparisons with fMRIPrep wait until all tools are ported.
+- **Distribution: companion wheels with an `[all]` extra** (asked: one single wheel, or
+  separate wheels per licence family). `pip install larmorx` stays Apache-only;
+  `pip install "larmorx[all]"` also installs `larmorx-gpl`, `larmorx-nc` and
+  `larmorx-freesurfer`. One `import larmorx` and one `larmorx` command either way; every tool
+  with two implementations takes `implementation="auto" | "replica" | "original"`
+  (`LARMORX_IMPLEMENTATION` on the command line), as 3dTshift does. One wheel was possible (the
+  replicas are separate programs, so shipping them together is aggregation) but would give
+  every user the GPL and non-commercial components and a mixed licence.
+- CI stays as it is (the question of Actions credits was a misunderstanding).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

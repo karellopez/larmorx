@@ -64,6 +64,7 @@ pip install "larmorx[prep]"          # + what the larmorprepx pipeline needs
 pip install "larmorx[exact]"         # + larmorx-gpl: exact AFNI/Workbench replicas
 pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)
 pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
+pip install "larmorx[all]"           # everything: every replica package too (decided 2026-10-16)
 larmorprepx /data/bids /data/derivatives participant --participant-label 01
 ```
 

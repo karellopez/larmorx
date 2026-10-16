@@ -115,6 +115,9 @@ Still to do:
   one); check that every `[prep]` dependency has wheels for all six platforms, Windows arm64
   included. Linux wheels are manylinux_2_28 (glibc 2.28 or newer); decide whether to add
   musllinux wheels (Alpine).
+- **The `[all]` extra** (decided 2026-10-16): `larmorx-gpl`, `larmorx-nc` and `larmorx-freesurfer`,
+  added to `pyproject.toml` once those packages exist (an extra naming a missing package breaks
+  `pip install`).
 - **Publishing:** a release workflow (on a version tag: the six wheels and the sdist of each
   package, the golden tests, upload by PyPI Trusted Publishing; standalone binaries to GitHub
   Releases); reserve the names `larmorx`, `larmorx-gpl`, `larmorx-nc`, `larmorx-freesurfer`,

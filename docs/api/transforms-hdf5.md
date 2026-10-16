@@ -56,7 +56,8 @@ not widened in memory; ITK widens them exactly.
 
 What the reader covers: superblocks 0 to 3; version-1 and version-2 object headers,
 continuation chunks; symbol-table, compact and dense groups (fractal heaps with direct,
-indirect, huge and tiny objects; version-1 and version-2 B-trees); soft links; compact,
+indirect, huge and tiny objects, filtered or not; links indexed by name and by creation order;
+version-1 and version-2 B-trees); soft links; compact,
 contiguous and chunked datasets with every chunk index of HDF5 1.12 (version-1 B-tree, single
 chunk, implicit, fixed array, extensible array, version-2 B-tree); the deflate, shuffle,
 Fletcher-32, n-bit and scale-offset filters; floating-point data of any size, layout and byte

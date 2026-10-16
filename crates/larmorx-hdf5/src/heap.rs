@@ -2,11 +2,14 @@
 //! Heaps, read only: local heaps (old-style group names, `src/H5HLcache.c`), global heap
 //! collections (variable-length data, `src/H5HGcache.c`), and fractal heaps (dense groups'
 //! links: `src/H5HFcache.c`, `src/H5HFdtable.c`, `src/H5HFdblock.c`, `src/H5HFman.c`,
-//! `src/H5HFhuge.c`, `src/H5HFtiny.c`), as in HDF5 1.12.1.
+//! `src/H5HFhuge.c`, `src/H5HFtiny.c`, `src/H5HFbtree2.c`; filtered heaps, those of a group
+//! created with I/O filters, included), as in HDF5 1.12.1.
 
 use crate::btree;
-use crate::error::{Result, corrupt, unsupported};
+use crate::error::{Result, corrupt};
 use crate::file::File;
+use crate::filters;
+use crate::message::{self, Filter};
 use crate::source::{Cursor, UNDEF, log2_gen, verify_checksum};
 
 /// A local heap's data segment.
@@ -95,6 +98,10 @@ pub(crate) fn global_object(file: &File, collection: u64, index: u32) -> Result<
 pub(crate) struct FractalHeap {
     id_len: usize,
     filter_len: usize,
+    /// The I/O filters of a filtered heap (direct blocks and huge objects pass through them).
+    pipeline: Vec<Filter>,
+    /// A filtered heap's root direct block: its size in the file and its filter mask.
+    root_filtered: (u64, u32),
     checksum_dblocks: bool,
     max_man_size: u64,
     huge_bt2_addr: u64,
@@ -157,6 +164,15 @@ impl FractalHeap {
         let _start_root_rows = c.u16()?;
         let root = c.addr()?;
         let curr_root_rows = u64::from(c.u16()?);
+        let (root_filtered, pipeline) = if filter_len > 0 {
+            let size = c.length()?;
+            let mask = c.u32()?;
+            let info = c.bytes(filter_len)?;
+            let mut p = Cursor::new(info, a, s, "a fractal heap's I/O filters");
+            ((size, mask), message::pipeline(&mut p)?)
+        } else {
+            ((0, 0), Vec::new())
+        };
         if width == 0 || !width.is_power_of_two() {
             return Err(corrupt("fractal heap table width is not a power of two"));
         }
@@ -180,6 +196,8 @@ impl FractalHeap {
         Ok(FractalHeap {
             id_len,
             filter_len,
+            pipeline,
+            root_filtered,
             checksum_dblocks: flags & 0x02 != 0,
             max_man_size,
             huge_bt2_addr,
@@ -254,11 +272,8 @@ impl FractalHeap {
         if len > self.max_man_size {
             return Err(corrupt("fractal heap object too large"));
         }
-        if self.filter_len > 0 {
-            return Err(unsupported("filtered fractal heaps"));
-        }
-        let (dblock, block_off, _block_size) = if self.curr_root_rows == 0 {
-            (self.root, 0u64, self.start_block_size)
+        let (dblock, block_off, block_size, filtered) = if self.curr_root_rows == 0 {
+            (self.root, 0u64, self.start_block_size, self.root_filtered)
         } else {
             self.locate(file, off)?
         };
@@ -276,20 +291,47 @@ impl FractalHeap {
         if rel < prefix {
             return Err(corrupt("fractal heap object inside a block header"));
         }
+        let len = usize::try_from(len).map_err(|_| corrupt("bad fractal heap object length"))?;
+        if self.filter_len > 0 {
+            // A filtered heap's direct block is read whole and passed through the filters
+            // (`H5HF__cache_dblock_verify_chksum`, `H5HF__cache_dblock_deserialize`).
+            let size = usize::try_from(filtered.0)
+                .map_err(|_| corrupt("bad filtered direct block size"))?;
+            let stored = file.read_at(dblock, size)?;
+            let mut block = filters::unfilter(&self.pipeline, filtered.1, stored)?;
+            if block.len() as u64 != block_size {
+                return Err(corrupt("filtered direct block of the wrong size"));
+            }
+            if block.get(..4) != Some(b"FHDB".as_slice()) {
+                return Err(corrupt("wrong fractal heap direct block signature"));
+            }
+            if self.checksum_dblocks {
+                let at = prefix as usize - 4;
+                let stored = u32::from_le_bytes(block[at..at + 4].try_into().expect("4 bytes"));
+                block[at..at + 4].fill(0);
+                if crate::checksum::metadata(&block) != stored {
+                    return Err(crate::error::Error::Checksum(
+                        "fractal heap direct block".to_string(),
+                    ));
+                }
+            }
+            let rel = rel as usize;
+            return block
+                .get(rel..rel + len)
+                .map(<[u8]>::to_vec)
+                .ok_or_else(|| corrupt("fractal heap object past its direct block"));
+        }
         // Check the direct block's signature, then read the object.
         let head = file.read_at(dblock, 4)?;
         if head != b"FHDB" {
             return Err(corrupt("wrong fractal heap direct block signature"));
         }
-        file.read_at(
-            dblock + rel,
-            usize::try_from(len).map_err(|_| corrupt("bad fractal heap object length"))?,
-        )
+        file.read_at(dblock + rel, len)
     }
 
-    /// The direct block holding heap offset `off`: its address, heap offset and size
-    /// (`H5HF__man_dblock_locate`).
-    fn locate(&self, file: &File, off: u64) -> Result<(u64, u64, u64)> {
+    /// The direct block holding heap offset `off`: its address, heap offset and size, and for a
+    /// filtered heap its size in the file and filter mask (`H5HF__man_dblock_locate`).
+    fn locate(&self, file: &File, off: u64) -> Result<(u64, u64, u64, (u64, u32))> {
         let sb = file.superblock();
         let (a, s) = (sb.sizeof_addr, sb.sizeof_size);
         let mut iblock_addr = self.root;
@@ -298,7 +340,22 @@ impl FractalHeap {
         let (mut row, mut col) = self.lookup(off);
         for _ in 0..64 {
             let nents = (nrows * self.width) as usize;
-            let size = 4 + 1 + usize::from(a) + self.heap_off_size + nents * usize::from(a) + 4;
+            // `H5HF_MAN_INDIRECT_SIZE`: a filtered heap's entries for direct blocks also hold
+            // the block's size in the file and its filter mask.
+            let dir_entry = usize::from(a)
+                + if self.filter_len > 0 {
+                    usize::from(s) + 4
+                } else {
+                    0
+                };
+            let ndirect = (nrows.min(self.max_direct_rows) * self.width) as usize;
+            let size = 4
+                + 1
+                + usize::from(a)
+                + self.heap_off_size
+                + ndirect * dir_entry
+                + (nents - ndirect) * usize::from(a)
+                + 4;
             let image = file.read_at(iblock_addr, size)?;
             verify_checksum(&image, "fractal heap indirect block")?;
             let mut c = Cursor::new(&image, a, s, "a fractal heap indirect block");
@@ -315,9 +372,18 @@ impl FractalHeap {
             if entry >= nents {
                 return Err(corrupt("fractal heap offset out of the indirect block"));
             }
-            c.skip(entry * usize::from(a))?;
+            if entry < ndirect {
+                c.skip(entry * dir_entry)?;
+            } else {
+                c.skip(ndirect * dir_entry + (entry - ndirect) * usize::from(a))?;
+            }
             let child = c.addr()?;
             if row < self.max_direct_rows {
+                let filtered = if self.filter_len > 0 {
+                    (c.length()?, c.u32()?)
+                } else {
+                    (0, 0)
+                };
                 let block_size = self.row_block_size[row as usize];
                 let block_off = iblock_off
                     + if row == 0 {
@@ -326,7 +392,7 @@ impl FractalHeap {
                         // row_block_off[row] = start * width * 2^(row - 1)
                         self.num_id_first_row * (1u64 << (row - 1)) + col * block_size
                     };
-                return Ok((child, block_off, block_size));
+                return Ok((child, block_off, block_size, filtered));
             }
             let child_size = self.row_block_size[row as usize];
             let child_rows = u64::from(log2_gen(child_size) - self.first_row_bits) + 1;
@@ -340,31 +406,53 @@ impl FractalHeap {
     }
 
     fn read_huge(&self, file: &File, rest: &[u8]) -> Result<Vec<u8>> {
-        // Huge objects are tracked by a v2 B-tree of type 1 (unfiltered, indirect IDs) or 3
-        // (filtered); with directly stored IDs (types 2 and 4) the address is in the ID.
+        // Huge objects are tracked by a v2 B-tree of type 1 (unfiltered, indirect IDs) or 2
+        // (filtered); with directly stored IDs (types 3 and 4) the address is in the ID
+        // (`H5HF__huge_init`, `H5HF__huge_op_real`).
         let sb = file.superblock();
         let (a, s) = (sb.sizeof_addr, sb.sizeof_size);
-        if self.filter_len > 0 {
-            return Err(unsupported("filtered fractal heaps"));
-        }
-        let direct = self.id_len >= 1 + usize::from(a) + usize::from(s);
+        let (au, su) = (usize::from(a), usize::from(s));
+        let filtered = self.filter_len > 0;
+        let id_room = self.id_len.saturating_sub(1);
+        let direct = if filtered {
+            id_room >= au + su + 4 + su
+        } else {
+            id_room >= au + su
+        };
         let mut c = Cursor::new(rest, a, s, "a huge heap ID");
-        if direct {
+        let (addr, len, mask) = if direct {
             let addr = c.addr()?;
             let len = c.length()?;
-            return file.read_at(addr, len as usize);
-        }
-        let id = c.uvar(self.id_len - 1)?;
-        let hdr = btree::v2_header(file, self.huge_bt2_addr, 1)?;
-        for rec in btree::v2_records(file, &hdr)? {
-            let mut r = Cursor::new(&rec, a, s, "a huge object record");
-            let addr = r.addr()?;
-            let len = r.length()?;
-            let rid = r.length()?;
-            if rid == id {
-                return file.read_at(addr, len as usize);
+            let mask = if filtered { c.u32()? } else { 0 };
+            (addr, len, mask)
+        } else {
+            let id = c.uvar(id_room.min(8))?;
+            let hdr = btree::v2_header(file, self.huge_bt2_addr, if filtered { 2 } else { 1 })?;
+            let mut found = None;
+            for rec in btree::v2_records(file, &hdr)? {
+                let mut r = Cursor::new(&rec, a, s, "a huge object record");
+                let addr = r.addr()?;
+                let len = r.length()?;
+                let mask = if filtered {
+                    let mask = r.u32()?;
+                    let _obj_size = r.length()?;
+                    mask
+                } else {
+                    0
+                };
+                if r.length()? == id {
+                    found = Some((addr, len, mask));
+                    break;
+                }
             }
+            found.ok_or_else(|| corrupt("can't find object in v2 B-tree"))?
+        };
+        let len = usize::try_from(len).map_err(|_| corrupt("bad huge object length"))?;
+        let data = file.read_at(addr, len)?;
+        if filtered {
+            filters::unfilter(&self.pipeline, mask, data)
+        } else {
+            Ok(data)
         }
-        Err(corrupt("huge fractal heap object not found"))
     }
 }

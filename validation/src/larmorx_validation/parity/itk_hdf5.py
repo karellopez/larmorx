@@ -4,7 +4,7 @@
 ``lx.transforms.load_itk_composite``) against ITK 5.4.5 on its HDF5 1.12.1 (the ANTs 2.6.5
 oracle's ``antsApplyTransforms`` and ``CompositeTransformUtil``), h5py and nitransforms.
 
-Three kinds of cases:
+The kinds of cases:
 
 - ``read/...``: every HDF5 transform file at hand, written by ITK 4.11 to 5.4.5 on HDF5 1.8.17
   to 1.14.6 (the ANTs oracle, fMRIPrep 25.2.6's runs, the test-data catalog, TemplateFlow),
@@ -22,6 +22,11 @@ Three kinds of cases:
   (zlib-rs, where ITK's HDF5 calls zlib-ng 2.1.6) the compressed streams may differ, and with
   them their sizes and the addresses after them. Then ANTs reads larmorx's file (the same
   output image as from ITK's file), and so do h5py and nitransforms.
+- ``errors/...``: files ITK refuses (through ``antsApplyTransforms``: exit status, messages).
+- ``hdf5/...``: HDF5's storage features that no transform writer uses but ITK's HDF5 reads,
+  written by h5py (every chunk index of file format 1.10, the n-bit and scale-offset filters,
+  dense groups in every fractal heap layout, with I/O filters or not): every dataset as h5py
+  reads it.
 - ``fix``: D13, larmorx's default reading and writing where ITK is defective.
 """
 
@@ -427,16 +432,81 @@ H5PY_ONLY = {
 # HDF5's storage features, in files that are not transform files (compared with h5py only)
 
 
+def _hdf5_library() -> Any:
+    """h5py's own HDF5 library through ctypes, for the property-list calls h5py does not wrap
+    (``H5Pset_link_phase_change``, filters on a group creation property list)."""
+    import ctypes
+    import glob
+
+    import h5py
+
+    here = Path(h5py.__file__).parent
+    found = [
+        p
+        for p in sorted(glob.glob(str(here.parent / "h5py.libs" / "libhdf5-*")))
+        + sorted(glob.glob(str(here / ".dylibs" / "libhdf5.*")))
+        if "_hl" not in Path(p).name
+    ]
+    if not found:
+        raise RuntimeError("h5py's HDF5 library not found")
+    lib = ctypes.CDLL(found[0])
+    lib.H5Pset_link_phase_change.argtypes = [ctypes.c_int64, ctypes.c_uint, ctypes.c_uint]
+    lib.H5Pset_deflate.argtypes = [ctypes.c_int64, ctypes.c_uint]
+    lib.H5Pset_filter.argtypes = [
+        ctypes.c_int64,
+        ctypes.c_int,
+        ctypes.c_uint,
+        ctypes.c_size_t,
+        ctypes.POINTER(ctypes.c_uint),
+    ]
+    return lib
+
+
+def _group_file(path: Path, rest: str, rng: np.random.Generator) -> None:
+    """A dense ``TransformGroup`` (a fractal heap of links and a v2 B-tree of names) in the
+    layout ``rest`` names: direct blocks only, indirect blocks (400 links), huge objects (names
+    of 70,000 characters, a v2 B-tree of huge objects), links indexed by creation order; and
+    the same with I/O filters on the group (a filtered heap: deflate, and deflate with
+    Fletcher-32)."""
+    import h5py
+
+    filtered, _, layout = rest.rpartition("-")
+    n, name_len = {"direct": (12, 8), "indirect": (400, 40), "huge": (10, 70000)}[layout]
+    fapl = h5py.h5p.create(h5py.h5p.FILE_ACCESS)
+    fapl.set_libver_bounds(h5py.h5f.LIBVER_LATEST, h5py.h5f.LIBVER_LATEST)
+    fid = h5py.h5f.create(str(path).encode(), h5py.h5f.ACC_TRUNC, fapl=fapl)
+    try:
+        gcpl = h5py.h5p.create(h5py.h5p.GROUP_CREATE)
+        lib = _hdf5_library()
+        if lib.H5Pset_link_phase_change(gcpl.id, 8, 6) < 0:
+            raise RuntimeError("H5Pset_link_phase_change failed")
+        if filtered == "order":
+            gcpl.set_link_creation_order(h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
+        if filtered.startswith("deflate") and lib.H5Pset_deflate(gcpl.id, 6) < 0:
+            raise RuntimeError("H5Pset_deflate failed")
+        if filtered == "deflate-fletcher32" and lib.H5Pset_filter(gcpl.id, 3, 0, 0, None) < 0:
+            raise RuntimeError("H5Pset_filter failed")
+        group = h5py.Group(h5py.h5g.create(fid, b"TransformGroup", gcpl=gcpl))
+        for i in range(n):
+            sub = group.create_group(str(i) + "x" * max(0, name_len - len(str(i))))
+            sub.create_dataset("v", data=rng.integers(0, 1000, size=3).astype("f8"))
+    finally:
+        fid.close()
+
+
 def _feature_file(path: Path, recipe: str) -> None:
     """Writes one dataset ``x`` with h5py in the storage ``recipe`` names: every chunk index of
     file format 1.10 (single chunk, implicit, fixed array paged or not, extensible array
     through its index block, data blocks, super blocks and pages, with the unlimited dimension
     first or not, version-2 B-tree), and the n-bit and scale-offset filters on floating-point
-    and integer data."""
+    and integer data; or a dense group in each fractal heap layout (``group:...``)."""
     import h5py
 
     rng = np.random.default_rng(sum(map(ord, recipe)))
     kind, _, rest = recipe.partition(":")
+    if kind == "group":
+        _group_file(path, rest, rng)
+        return
     if kind == "index":
         shapes = {
             "single": ((7, 9), None, (7, 9), None, False),
@@ -535,8 +605,20 @@ FEATURES = (
     "nbit:float",
     "nbit:int",
     "nbit:int-be",
+    *(
+        f"group:{f}-{layout}"
+        for f in ("plain", "deflate", "deflate-fletcher32")
+        for layout in ("direct", "indirect", "huge")
+    ),
+    "group:order-indirect",
 )  # fmt: skip
-SMOKE_FEATURES = ("index:farray", "index:earray-sblocks", "scaleoffset:f8,2,", "nbit:float")
+SMOKE_FEATURES = (
+    "index:farray",
+    "index:earray-sblocks",
+    "scaleoffset:f8,2,",
+    "nbit:float",
+    "group:deflate-indirect",
+)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1583,6 +1665,12 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     h5 = [passed(r, "h5py:") for r in reads + [r for r in results if r.case.startswith("errors/")]]
     lines.append(
         f"Datasets as h5py reads them, bit for bit: {sum(1 for x in h5 if x)} of {sum(1 for x in h5 if x is not None)} files"
+    )
+    feats = [passed(r, "h5py:") for r in results if r.case.startswith("hdf5/")]
+    lines.append(
+        f"HDF5 storage features (every chunk index, the n-bit and scale-offset filters, dense "
+        f"groups' fractal heaps, filtered or not) as h5py reads them, bit for bit: "
+        f"{sum(1 for x in feats if x)} of {sum(1 for x in feats if x is not None)} files"
     )
     itk = [passed(r, "ITK's reading:") for r in reads]
     lines.append(

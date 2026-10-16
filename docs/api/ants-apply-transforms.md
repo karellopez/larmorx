@@ -5,21 +5,25 @@ and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crate
 `larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
 
 **Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 182 cases:
+[validation record](../validation/ants-apply-transforms.md)). The record covers 220 cases:
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
   included;
 - awkward geometries, output types and time series;
 - real fMRIPrep derivatives;
-- all of them again with `--float 1`, ANTs' single-precision pipeline.
+- all of them again with `--float 1`, ANTs' single-precision pipeline;
+- the transform outputs, every form and format, and the errors around them.
 
-All 182 agree (8 of them errors both programs report). Of the 174 compared, 160 are
+All 220 agree (14 of them errors both programs report; 4 expected divergences, where ANTs
+crashes and larmorx refuses, ANTS-48). Of the 174 resampling cases compared, 160 are
 byte-identical to the unmodified ANTs program, among them all 89 `--float 1` cases; the other
 14 (two of them through fMRIPrep's `.h5` composite) differ only where ITK calls the platform's
 `exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc in double), by at most about 1e-15
 relative ([why](../findings/platform-math.md)). With correctly rounded maths preloaded into
-ANTs, all 174 are byte-identical. All 14 of fMRIPrep's
+ANTs, all 174 are byte-identical. The 28 transform-output cases (`-o Linear[...]`,
+`-o CompositeTransform[...]`, `-o DisplacementField[...]`) write ANTs's files: text and MATLAB
+byte for byte, NIfTI fields bit for bit, HDF5 dataset for dataset. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
 ([stage record](../validation/fmriprep-stages.md)). Compared with ANTs' defects reproduced
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's

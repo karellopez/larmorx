@@ -949,6 +949,15 @@ levels 0 to 9 by a build with the AVX2 paths and by a build with only the generi
 outputs byte-for-byte identical. The NEON paths (aarch64) were not run here. Golden cases of
 `.h5` files fingerprint the decoded content, not the file's bytes.
 
+## 2026-10-16: Tiny format fixtures allowed in the golden tests
+
+**Asked** (A4 part 1): some HDF5 reader paths (the extensible-array chunk index, the n-bit and
+scale-offset filters, filtered fractal heaps, shared-message heaps) need files that only the
+HDF5 C library writes, which CI does not have; they were checked only by the Linux parity
+suite. **Decided by the user:** commit tiny synthetic fixtures (a few KB, no image data) made
+by a committed deterministic script, read by golden cases on all six platforms; CLAUDE.md
+rule 10 has the exception.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

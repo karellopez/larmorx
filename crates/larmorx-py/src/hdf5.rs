@@ -74,6 +74,30 @@ fn dataset_value<'py>(
     }
 }
 
+/// [`dataset_value`] shaped as h5py gives it: float arrays with the dataset's dimensions, and
+/// a scalar dataset as a 0-d array (which, as in h5py, cannot be indexed).
+fn dataset_value_shaped<'py>(
+    py: Python<'py>,
+    file: &File,
+    path: &Path,
+    info: &larmorx_hdf5::DatasetInfo,
+) -> PyResult<Bound<'py, PyAny>> {
+    let value = dataset_value(py, file, path, info)?;
+    let dims: Vec<usize> = match &info.space {
+        larmorx_hdf5::Dataspace::Simple { dims, .. } => dims.iter().map(|&d| d as usize).collect(),
+        _ => Vec::new(),
+    };
+    let numpy = py.import("numpy")?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("dtype", py.import("builtins")?.getattr("object")?)?;
+    let array = if value.is_instance_of::<PyList>() {
+        numpy.call_method("array", (value,), Some(&kwargs))?
+    } else {
+        value
+    };
+    array.call_method1("reshape", (pyo3::types::PyTuple::new(py, dims)?,))
+}
+
 /// The members of the group at `group`, in h5py's order (by name, byte for byte), as
 /// `(name, datasets)`: `datasets` maps each dataset in the member (when it is a group) to its
 /// values, as h5py reads them. `KeyError` when the group does not exist.
@@ -108,12 +132,68 @@ fn hdf5_group_members<'py>(
                     continue;
                 }
                 let info = file.dataset(da).map_err(|e| h5_err(&path, e))?;
-                datasets.set_item(dname, dataset_value(py, &file, &path, &info)?)?;
+                datasets.set_item(dname, dataset_value_shaped(py, &file, &path, &info)?)?;
             }
         }
         out.push((name, datasets));
     }
     PyList::new(py, out)
+}
+
+/// Every dataset of the file, depth first in name order (as h5py's `visititems` visits them),
+/// as `(path, datatype, shape, value)`: the datatype as `"string"`, `"float<bytes>"`,
+/// `"integer<bytes>"` or `"class<n>"`, and the value as [`hdf5_group_members`] reads it
+/// (`None` where larmorx does not read the class). Groups are listed with the datatype
+/// `"group"`.
+#[pyfunction]
+fn hdf5_datasets<'py>(py: Python<'py>, path: PathBuf) -> PyResult<Bound<'py, PyList>> {
+    let file = open(&path)?;
+    let out = PyList::empty(py);
+    let mut stack = vec![(String::new(), file.root())];
+    while let Some((name, addr)) = stack.pop() {
+        match file.kind(addr).map_err(|e| h5_err(&path, e))? {
+            ObjectKind::Group => {
+                if !name.is_empty() {
+                    out.append((
+                        name.trim_start_matches('/').to_string(),
+                        "group",
+                        Vec::<u64>::new(),
+                        py.None(),
+                    ))?;
+                }
+                let links = file.links(addr).map_err(|e| h5_err(&path, e))?;
+                for link in links.into_iter().rev() {
+                    if let larmorx_hdf5::LinkTarget::Hard(t) = link.target {
+                        let child = format!("{name}/{}", String::from_utf8_lossy(&link.name));
+                        stack.push((child, t));
+                    }
+                }
+            }
+            ObjectKind::Dataset => {
+                let info = file.dataset(addr).map_err(|e| h5_err(&path, e))?;
+                let shape = match &info.space {
+                    larmorx_hdf5::Dataspace::Simple { dims, .. } => dims.clone(),
+                    _ => Vec::new(),
+                };
+                let kind = match &info.dtype {
+                    Datatype::String { .. } | Datatype::VarLen { string: true, .. } => {
+                        "string".to_string()
+                    }
+                    Datatype::Float(ft) => format!("float{}", ft.size),
+                    Datatype::Integer { size, .. } => format!("integer{size}"),
+                    other => format!("class{}", other.class()),
+                };
+                let value = if kind == "string" || kind.starts_with("float") {
+                    dataset_value(py, &file, &path, &info)?
+                } else {
+                    py.None().into_bound(py)
+                };
+                out.append((name.trim_start_matches('/').to_string(), kind, shape, value))?;
+            }
+            _ => {}
+        }
+    }
+    Ok(out)
 }
 
 fn string(file: &File, path: &Path, p: &str) -> PyResult<String> {
@@ -270,5 +350,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hdf5_group_members, m)?)?;
     m.add_function(wrap_pyfunction!(itk_h5_replay, m)?)?;
     m.add_function(wrap_pyfunction!(hdf5_set_times, m)?)?;
+    m.add_function(wrap_pyfunction!(hdf5_datasets, m)?)?;
     Ok(())
 }

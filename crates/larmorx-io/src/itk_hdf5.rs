@@ -309,7 +309,7 @@ fn read_open(
         open_group(file, name, &tname)?;
         let ttype = read_transform_type(file, name, &format!("{tname}/TransformType"), notices)?;
         let corrected = check_precision_name(name, &ttype, precision, notices)?;
-        check_registered(name, &corrected)?;
+        check_registered(name, &corrected, precision)?;
         if ttype.contains("CompositeTransform") {
             out.push(ItkTransformParts {
                 name: ttype,
@@ -444,15 +444,16 @@ fn check_precision_name(
 
 /// ITK's transform factory: the class names of the ANTs 2.6.5 build (the ones larmorx can use
 /// are a subset; others are refused later with larmorx's own message).
-fn check_registered(name: &str, ttype: &str) -> Result<(), ReadFailure> {
-    if REGISTERED.contains(&ttype) {
+fn check_registered(name: &str, ttype: &str, precision: Precision) -> Result<(), ReadFailure> {
+    let registered = registered(precision);
+    if registered.contains(&ttype) {
         return Ok(());
     }
     let mut description = format!(
         "Could not create an instance of \"{ttype}\"\nThe usual cause of this error is not \
          registering the transform with TransformFactory\nCurrently registered Transforms: \n"
     );
-    for r in REGISTERED {
+    for r in &registered {
         description.push_str(&format!("\t\"{r}\"\n"));
     }
     Err(failure(
@@ -462,6 +463,22 @@ fn check_registered(name: &str, ttype: &str) -> Result<(), ReadFailure> {
         None,
         format!("{name}: unknown transform type {ttype:?}"),
     ))
+}
+
+/// The transform classes ITK's factory knows in antsApplyTransforms for the computation type
+/// `precision`: ITK's own, and the `MatrixOffsetTransformBase` of that type, which
+/// antsApplyTransforms registers (`antsApplyTransforms.cxx:536-539`), in the factory's
+/// (alphabetical) order.
+pub fn registered(precision: Precision) -> Vec<&'static str> {
+    REGISTERED
+        .iter()
+        .map(|&r| match (r, precision) {
+            ("MatrixOffsetTransformBase_double_3_3", Precision::Float) => {
+                "MatrixOffsetTransformBase_float_3_3"
+            }
+            _ => r,
+        })
+        .collect()
 }
 
 /// The transforms registered with ITK's `TransformFactory` in the ANTs 2.6.5 oracle, in the
@@ -750,8 +767,10 @@ pub fn write_with_deflate(
         w.write_string(root, name, value.as_bytes())
             .map_err(hdf5_write_error)?;
     }
+    let names: Vec<String> = (0..parts.len()).map(|i| i.to_string()).collect();
+    let name_bytes: Vec<&[u8]> = names.iter().map(|n| n.as_bytes()).collect();
     let group = w
-        .create_group(root, "TransformGroup")
+        .create_group_for(root, "TransformGroup", &name_bytes)
         .map_err(hdf5_write_error)?;
     for (i, part) in parts.iter().enumerate() {
         let g = w

@@ -214,6 +214,8 @@ defects! {
         "the Jacobian of the field map is taken along the target grid's axis with the source's phase-encoding index, in target voxels";
     PIPE_04 = "PIPE-04", "nitransforms", true,
         "the transforms of an ITK composite .h5 file are read in name order, so a composite of 10 or more transforms is misordered";
+    PIPE_17 = "PIPE-17", "nitransforms", true,
+        "the first group of an ITK .h5 file is skipped as if it were a composite: a file of one transform cannot be loaded (IndexError), a file of several transforms without a composite loses its first, and an empty composite fails";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

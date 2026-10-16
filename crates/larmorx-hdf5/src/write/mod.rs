@@ -29,8 +29,9 @@ use crate::source::UNDEF;
 
 /// `H5O_MSG_FLAG_CONSTANT`.
 const CONSTANT: u8 = 0x01;
-/// `H5G_CRT_GINFO_MAX_COMPACT`.
+/// `H5G_CRT_GINFO_MAX_COMPACT`, `H5G_CRT_GINFO_MIN_DENSE`.
 const MAX_COMPACT: usize = 8;
+const MIN_DENSE: u16 = 6;
 /// `H5D_MINHDR_SIZE`.
 const DATASET_HEADER: usize = 256;
 /// `H5D_CHUNK_CACHE_NBYTES_DEFAULT`: chunks larger than this go straight to the file.
@@ -101,6 +102,8 @@ enum Kind {
     Group {
         linfo: usize,
         nlinks: usize,
+        /// The number of links stored as link messages before the group turns dense.
+        max_compact: usize,
         /// Index into `Writer::dense` once the group stores its links densely.
         dense: Option<usize>,
     },
@@ -148,7 +151,7 @@ impl Writer {
             dense: Vec::new(),
             deflate,
         };
-        w.new_group();
+        w.new_group(MAX_COMPACT);
         w
     }
 
@@ -158,10 +161,14 @@ impl Writer {
     }
 
     /// `H5G__obj_create_real` for a new-style group: a header sized for the link info, the
-    /// group info and four links of 8-character names.
-    fn new_group(&mut self) -> usize {
+    /// group info and four links of 8-character names. `max_compact` other than HDF5's
+    /// default (8) is stored in the group info (`H5Pset_link_phase_change`).
+    fn new_group(&mut self, max_compact: usize) -> usize {
+        let ginfo_msg = Native::GroupInfo {
+            phase: (max_compact != MAX_COMPACT).then_some((max_compact as u16, MIN_DENSE)),
+        };
         let linfo = empty_link_info().raw_size() + 4;
-        let ginfo = Native::GroupInfo.raw_size() + 4;
+        let ginfo = ginfo_msg.raw_size() + 4;
         let link = Native::Link {
             name: Vec::new(),
             addr: 0,
@@ -172,12 +179,13 @@ impl Writer {
         let hint = linfo + ginfo + 4 * link;
         let mut oh = ObjHeader::create(&mut self.space, hint, self.time);
         let li = oh.append(&mut self.space, empty_link_info(), 0);
-        oh.append(&mut self.space, Native::GroupInfo, CONSTANT);
+        oh.append(&mut self.space, ginfo_msg, CONSTANT);
         self.objs.push(Obj {
             oh,
             kind: Kind::Group {
                 linfo: li,
                 nlinks: 0,
+                max_compact,
                 dense: None,
             },
         });
@@ -192,6 +200,7 @@ impl Writer {
         let Kind::Group {
             linfo,
             nlinks,
+            max_compact,
             dense,
         } = self.objs[parent.0].kind
         else {
@@ -206,7 +215,7 @@ impl Writer {
                 self.dense[d].insert(&mut self.space, name.as_bytes(), &link.encode())?;
                 Some(d)
             }
-            None if nlinks < MAX_COMPACT => {
+            None if nlinks < max_compact => {
                 let p = &mut self.objs[parent.0];
                 p.oh.append(&mut self.space, link, 0);
                 p.oh.rewrite(linfo, empty_link_info());
@@ -241,6 +250,7 @@ impl Writer {
         p.kind = Kind::Group {
             linfo,
             nlinks: nlinks + 1,
+            max_compact,
             dense,
         };
         Ok(())
@@ -248,7 +258,33 @@ impl Writer {
 
     /// `H5Gcreate2`.
     pub fn create_group(&mut self, parent: GroupId, name: &str) -> Result<GroupId> {
-        let g = self.new_group();
+        let g = self.new_group(MAX_COMPACT);
+        self.link(parent, name, g)?;
+        Ok(GroupId(g))
+    }
+
+    /// `H5Gcreate2` for a group that will hold links of these names. When HDF5's dense
+    /// storage would need more than what the writer covers (a fractal heap's first direct
+    /// block, [`dense`]), the group keeps every link as a link message instead: its group info
+    /// stores a maximum of compact links equal to their number (`H5Pset_link_phase_change`),
+    /// a layout HDF5 writes for such a group creation property list.
+    pub fn create_group_for(
+        &mut self,
+        parent: GroupId,
+        name: &str,
+        links: &[&[u8]],
+    ) -> Result<GroupId> {
+        let max_compact = if links.len() <= MAX_COMPACT || Dense::holds(links) {
+            MAX_COMPACT
+        } else if links.len() <= usize::from(u16::MAX) {
+            links.len()
+        } else {
+            return Err(Error::Unsupported(
+                "a group of more than 65535 links whose names do not fit a fractal heap block"
+                    .into(),
+            ));
+        };
+        let g = self.new_group(max_compact);
         self.link(parent, name, g)?;
         Ok(GroupId(g))
     }

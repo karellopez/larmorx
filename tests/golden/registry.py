@@ -1055,7 +1055,7 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("cli.ants.antsApplyTransforms.4d", covers=("cli:ants antsApplyTransforms",))
 def _(ctx: Context) -> dict[str, Any]:
-    """A time series (``-e 3``) through an ``.h5`` composite (read with h5py), as float."""
+    """A time series (``-e 3``) through an ``.h5`` composite, as float."""
     out = ctx.out("out.nii")
     cli(
         "ants", "antsApplyTransforms", "-d", "3", "-e", "3", "--float",
@@ -1847,6 +1847,59 @@ def _(ctx: Context) -> dict[str, Any]:
         "fix": np.stack([s.matrix for s in fixed]),
         "reproduce": np.stack([s.matrix for s in named.steps()]),
     }
+
+
+def _h5_structure(path: str) -> tuple[str, np.ndarray]:
+    """What larmorx reads back from an HDF5 file: every group and dataset (name, datatype,
+    shape, and the strings), and the floating-point values in file order."""
+    lines, values = [], []
+    for name, kind, shape, value in _core.hdf5_datasets(path):
+        text = f"{name} {kind} {list(shape)}"
+        if kind == "string":
+            text += " " + repr(value)
+        elif kind.startswith("float"):
+            values.append(np.asarray(value, np.float64).ravel())
+        lines.append(text)
+    return "\n".join(lines), np.concatenate(values) if values else np.zeros(0)
+
+
+@case("py.transforms.write_h5", covers=("lx.transforms.write", "lx.transforms.read"))
+def _(ctx: Context) -> dict[str, Any]:
+    """ITK's HDF5 layout written in Rust: a composite of an affine and a displacement field
+    of 32³ vectors (deflate-compressed chunks: the whole file's bytes check that zlib-rs
+    compresses alike on every platform), the same uncompressed, and 11 affines (a dense
+    group: a fractal heap and a v2 B-tree). Each file is also fingerprinted by what is read
+    back (groups, datasets, types, shapes, strings, values)."""
+    n = 32**3
+    field = ItkTransform(
+        "DisplacementFieldTransform_double_3_3",
+        ints(41, (3 * n,), -48, 49) / 16,
+        np.array(
+            [32, 32, 32, -31.0, -30.0, -29.0, 2.0, 2.0, 2.0, 1, 0, 0, 0, 1, 0, 0, 0, 1], float
+        ),
+    )
+    composite = ItkTransform("CompositeTransform_double_3_3", np.zeros(0), np.zeros(0))
+    options = lx.transforms.Hdf5WriteOptions(os_version="golden")
+    comp, plain, dense = ctx.out("comp.h5"), ctx.out("plain.h5"), ctx.out("dense.h5")
+    lx.transforms.write(comp, [composite, AFFINE_XFM, field], hdf5=options)
+    lx.transforms.write(
+        plain,
+        [composite, AFFINE_XFM, field],
+        hdf5=lx.transforms.Hdf5WriteOptions(compression=False, os_version="golden"),
+    )
+    rows = [composite]
+    for i in range(1, 12):
+        params = np.array([1, 0, 0, 0, 1, 0, 0, 0, 1, i / 4, -i / 8, 0.0])
+        rows.append(ItkTransform("AffineTransform_double_3_3", params, np.zeros(3)))
+    lx.transforms.write(dense, rows, hdf5=options)
+    out: dict[str, Any] = {}
+    for key, path in (("comp", comp), ("plain", plain), ("dense", dense)):
+        structure, values = _h5_structure(path)
+        out[f"{key}.file"] = File(path)
+        out[f"{key}.structure"] = structure
+        out[f"{key}.values"] = values
+    out["read"] = np.concatenate([t.parameters for t in lx.transforms.read(comp)[1:]])
+    return out
 
 
 @case("py.transforms.ensure_positive_cosines", covers=("lx.transforms.ensure_positive_cosines",))

@@ -112,6 +112,15 @@ impl Dense {
         }
     }
 
+    /// Whether the links named `names` fit in what the writer covers: the heap's first
+    /// direct block and the B-tree's root leaf (hard links of one-byte name lengths).
+    pub(crate) fn holds(names: &[&[u8]]) -> bool {
+        let bytes: usize = names.iter().map(|n| 11 + n.len()).sum();
+        names.len() <= BT2_LEAF_MAX
+            && names.iter().all(|n| n.len() <= 255)
+            && bytes <= START_BLOCK - DBLOCK_OVERHEAD
+    }
+
     /// `H5G__dense_insert`: the encoded link message into the heap, then its record into the
     /// name index.
     pub(crate) fn insert(&mut self, space: &mut Space, name: &[u8], link: &[u8]) -> Result<()> {

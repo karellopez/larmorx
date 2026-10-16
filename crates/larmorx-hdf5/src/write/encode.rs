@@ -58,7 +58,11 @@ pub(crate) enum Native {
         fheap: u64,
         name_bt2: u64,
     },
-    GroupInfo,
+    /// Group info: the link phase change (maximum compact links, minimum dense links) when
+    /// not HDF5's defaults (8, 6).
+    GroupInfo {
+        phase: Option<(u16, u16)>,
+    },
     Link {
         name: Vec<u8>,
         addr: u64,
@@ -90,7 +94,7 @@ impl Native {
             Native::Fill { .. } => 0x05,
             Native::Link { .. } => 0x06,
             Native::Layout(_) => 0x08,
-            Native::GroupInfo => 0x0a,
+            Native::GroupInfo { .. } => 0x0a,
             Native::Pline { .. } => 0x0b,
             Native::Cont { .. } => 0x10,
         }
@@ -117,9 +121,16 @@ impl Native {
                 addr(&mut v, *fheap);
                 addr(&mut v, *name_bt2);
             }
-            Native::GroupInfo => {
+            Native::GroupInfo { phase } => {
                 v.push(0); // version
-                v.push(0); // flags: default phase change and estimates, not stored
+                match phase {
+                    None => v.push(0), // default phase change and estimates, not stored
+                    Some((max_compact, min_dense)) => {
+                        v.push(1); // the link phase change is stored
+                        v.extend_from_slice(&max_compact.to_le_bytes());
+                        v.extend_from_slice(&min_dense.to_le_bytes());
+                    }
+                }
             }
             Native::Link { name, addr: a } => {
                 v.push(1); // version

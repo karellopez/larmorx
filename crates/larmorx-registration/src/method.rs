@@ -363,6 +363,38 @@ pub fn sample_points<R: Real, const D: usize>(
     points
 }
 
+/// `ComputeMovingImageGradientFilterImage`: `GradientRecursiveGaussianImageFilter` with the
+/// largest spacing as sigma, normalised across scale, each vector then turned by the image's
+/// direction (`TransformLocalVectorToPhysicalVector`, each row summed from 0 in double).
+fn gradient_image<R: Real, const D: usize>(
+    image: &Image<R, D>,
+    n_threads: usize,
+) -> Result<Image<[f64; D], D>, ItkException> {
+    let space = &image.space;
+    let mut sigma = 0.0f64;
+    for &s in &space.spacing {
+        if s > sigma {
+            sigma = s;
+        }
+    }
+    let components = R::gradient(&image.data, &space.size, &space.spacing, sigma, n_threads)
+        .map_err(|e| {
+            ItkException::new(
+                "Modules/Filtering/ImageFilterBase/include/itkRecursiveSeparableImageFilter.hxx",
+                223,
+                "RecursiveGaussianImageFilter",
+                e.to_string(),
+            )
+        })?;
+    let data = (0..space.len())
+        .map(|o| {
+            let local: [f64; D] = std::array::from_fn(|k| components[k][o]);
+            space.local_to_physical_vector(&local)
+        })
+        .collect();
+    Ok(Image::new(space.clone(), data))
+}
+
 /// Runs a stage: returns the optimised transform and each level's outcome.
 pub fn run_stage<R: Real, const D: usize, O>(
     stage: &Stage<R, D>,
@@ -477,7 +509,7 @@ where
             }
         }
         let mut states = Vec::with_capacity(metrics.len());
-        for (m, sm) in metrics.iter().zip(&stage.metrics) {
+        for (m, sm) in metrics.iter_mut().zip(&stage.metrics) {
             let initialized = (|| {
                 if let Some(s) = &m.samples
                     && s.is_empty()
@@ -488,6 +520,14 @@ where
                         "ImageToImageMetricv4",
                         "VirtualSampledPointSet must have 1 or more points.",
                     ));
+                }
+                // Demons checks its transform before ImageToImageMetricv4::Initialize.
+                if sm.kind == MetricKind::Demons {
+                    return LevelMetric::initialize(sm.kind, m);
+                }
+                if sm.use_gradient_filter {
+                    m.moving_gradient_image =
+                        Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
                 }
                 LevelMetric::initialize(sm.kind, m)
             })();

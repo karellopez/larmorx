@@ -46,9 +46,10 @@ pub struct ImageMetricv4<R, const D: usize> {
     pub virtual_space: Space<D>,
     /// The sampled virtual points (`UseSampledPointSet`), or the whole domain when `None`.
     pub samples: Option<Arc<Vec<[f64; D]>>>,
-    /// Gradient images of the fixed and moving images (`useGradientFilter`), as `R`.
-    pub fixed_gradient_image: Option<Arc<Image<[R; D], D>>>,
-    pub moving_gradient_image: Option<Arc<Image<[R; D], D>>>,
+    /// Gradient images of the fixed and moving images (`useGradientFilter`):
+    /// `CovariantVector<double, D>` pixels.
+    pub fixed_gradient_image: Option<Arc<Image<[f64; D], D>>>,
+    pub moving_gradient_image: Option<Arc<Image<[f64; D], D>>>,
 }
 
 /// One virtual point as the metric sees it (`ProcessVirtualPoint`'s locals).
@@ -194,7 +195,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     fn gradient(
         &self,
         interp: &Linear<'_, R, D>,
-        image: &Option<Arc<Image<[R; D], D>>>,
+        image: &Option<Arc<Image<[f64; D], D>>>,
         p: &[R; D],
         floor: &IndexFloor,
     ) -> [R; D] {

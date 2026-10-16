@@ -582,6 +582,73 @@ pub fn laplacian_recursive_gaussian(
     )
 }
 
+/// `GradientRecursiveGaussianImageFilter` of a `T` image into `CovariantVector<double>` pixels,
+/// before its direction correction: for each axis `dim`, the first derivative along `dim`
+/// (the line read as double, the result stored as `float`, ITK's `InternalRealType`), then
+/// smoothing along the other axes in increasing order (`float → float`), each value then
+/// divided by the spacing along `dim` in double. One component image per axis.
+fn gradient_components<T: crate::lines::LinePixel>(
+    input: VolumeRef<'_, T>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    let d = input.dim();
+    if d == 0 {
+        return Err(FilterError::invalid("the image has no dimensions"));
+    }
+    let mut out = Vec::with_capacity(d);
+    for dim in 0..d {
+        let mut first: Vec<T> = input.data.to_vec();
+        pass(
+            &mut first,
+            input,
+            dim,
+            sigma,
+            GaussianOrder::First,
+            normalize_across_scale,
+            n_threads,
+        )?;
+        let mut work: Vec<f32> = first.iter().map(|v| v.to_f64() as f32).collect();
+        drop(first);
+        for axis in (0..d).filter(|&a| a != dim) {
+            pass(
+                &mut work,
+                input,
+                axis,
+                sigma,
+                GaussianOrder::Zero,
+                normalize_across_scale,
+                n_threads,
+            )?;
+        }
+        let spacing = input.spacing[dim];
+        out.push(work.iter().map(|&v| f64::from(v) / spacing).collect());
+    }
+    Ok(out)
+}
+
+/// [`gradient_components`] of a `float` image (`GradientRecursiveGaussianImageFilter<float>`).
+pub fn gradient_recursive_gaussian(
+    input: VolumeRef<'_, f32>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    gradient_components(input, sigma, normalize_across_scale, n_threads)
+}
+
+/// [`gradient_components`] of a `double` image (`GradientRecursiveGaussianImageFilter<double>`,
+/// whose intermediate images are `float` too).
+pub fn gradient_recursive_gaussian_f64(
+    input: VolumeRef<'_, f64>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    gradient_components(input, sigma, normalize_across_scale, n_threads)
+}
+
 /// `GradientMagnitudeRecursiveGaussianImageFilter<float, float>`: the square root of the sum
 /// over the axes of the squared first derivative along the axis (smoothed along the others)
 /// divided by the spacing: `cumulative = float(cumulative + (b / spacing)²)`, then

@@ -652,9 +652,6 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     );
                 }
                 log.logger(&preprocessing);
-                if m.use_gradient_filter {
-                    return self.unsupported(log, "useGradientFilter");
-                }
                 prepared.push(StageMetric {
                     kind,
                     fixed: Arc::new(fixed.with_data(pf)),

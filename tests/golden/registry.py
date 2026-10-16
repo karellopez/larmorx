@@ -1902,6 +1902,69 @@ def _(ctx: Context) -> dict[str, Any]:
     return out
 
 
+#: The HDF5 fixtures (``scripts/make_hdf5_fixtures.py``; ``docs/validation/golden.md``).
+HDF5_FIXTURES = Path(__file__).with_name("hdf5")
+
+
+def _h5_read_back(path: str) -> tuple[str, np.ndarray, bytes]:
+    """Every group and dataset larmorx reads in an HDF5 file: names, datatypes, shapes and
+    strings; the floating-point values (in float64) in file order; the integers' stored bytes
+    (filters undone)."""
+    lines, values, raw = [], [], []
+    for name, kind, shape, value in _core.hdf5_datasets(path):
+        text = f"{name} {kind} {list(shape)}"
+        if kind == "string":
+            text += " " + repr(value)
+        elif kind.startswith("float"):
+            values.append(np.asarray(value, np.float64).ravel())
+        elif kind.startswith("integer"):
+            raw.append(bytes(value))
+        lines.append(text)
+    floats = np.concatenate(values) if values else np.zeros(0)
+    return "\n".join(lines), floats, b"".join(raw)
+
+
+@case("hdf5.fixtures", covers=("lx.transforms.read",))
+def _(ctx: Context) -> dict[str, Any]:
+    """larmorx's HDF5 reader on the committed fixtures, which only the HDF5 C library writes:
+    superblocks 0, 1 and 3, version-1 object headers with a continuation, symbol-table groups,
+    every chunk index of file format 1.10 (single, implicit, fixed and extensible arrays,
+    paged or not, version-2 B-trees), the shuffle, Fletcher-32, n-bit and scale-offset
+    filters, half, x87 extended and quadruple floats, big-endian data, fixed-length strings,
+    dense groups with indirect blocks, huge objects and filtered heaps, creation-order
+    indexes, shared-message heaps (a list and a B-tree index), soft links and committed
+    datatypes. Each file is fingerprinted by what larmorx reads back; the soft links are
+    followed through ``hdf5_group_members``; the shared-message file is read as ITK reads
+    transforms."""
+    out: dict[str, Any] = {}
+    paths = {}
+    for fixture in sorted(HDF5_FIXTURES.glob("*.h5.gz")):
+        name = fixture.name.removesuffix(".h5.gz")
+        paths[name] = ctx.out(f"{name}.h5")
+        Path(paths[name]).write_bytes(gzip.decompress(fixture.read_bytes()))
+        structure, floats, integers = _h5_read_back(paths[name])
+        out[f"{name}.structure"] = structure
+        out[f"{name}.floats"] = floats
+        out[f"{name}.integers"] = integers
+    for name, group in (("sb0", "/"), ("sb3-datasets", "/"), ("sb3-groups", "/plain")):
+        lines, values = [], []
+        for member, datasets in _core.hdf5_group_members(paths[name], group):
+            lines.append(f"{member} {sorted(datasets)}")
+            for key in sorted(datasets):
+                value = datasets[key]
+                if not isinstance(value, list):
+                    values.append(np.asarray(value, np.float64).ravel())
+        out[f"{name}.members"] = "\n".join(lines)
+        out[f"{name}.member_values"] = np.concatenate(values) if values else np.zeros(0)
+    xfms = lx.transforms.read(paths["sohm"])
+    out["sohm.transforms"] = "\n".join(t.name for t in xfms)
+    out["sohm.parameters"] = np.concatenate(
+        [np.asarray(t.parameters, np.float64) for t in xfms]
+        + [np.asarray(t.fixed_parameters, np.float64) for t in xfms]
+    )
+    return out
+
+
 @case("py.transforms.ensure_positive_cosines", covers=("lx.transforms.ensure_positive_cosines",))
 def _(ctx: Context) -> dict[str, Any]:
     """Two axes against their world axes: the new affine's translation sums two rounded

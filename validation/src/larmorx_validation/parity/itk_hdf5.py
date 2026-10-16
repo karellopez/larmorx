@@ -33,6 +33,7 @@ The kinds of cases:
 from __future__ import annotations
 
 import contextlib
+import gzip
 import io
 import os
 import re
@@ -1000,6 +1001,14 @@ def cases(tier: str) -> list[Case]:
             f"an HDF5 storage feature written by h5py: {recipe}",
             Spec("feature", recipe, "smoke" if recipe in SMOKE_FEATURES else "standard"),
         )
+    for fixture in sorted(FIXTURES.glob("*.h5.gz")):
+        name = fixture.name.removesuffix(".h5.gz")
+        add(
+            f"hdf5/fixture/{name}",
+            "hdf5",
+            f"a golden-test fixture (tests/golden/hdf5/{fixture.name})",
+            Spec("fixture", name, "smoke"),
+        )
     for entry in td.select(tier="full"):
         if entry.name.endswith(".h5"):
             add(
@@ -1208,6 +1217,97 @@ def h5py_datasets(path: Path) -> list[tuple[str, str, list[int], Any]]:
     with h5py.File(path, "r") as f:
         f.visititems(visit)
     return out
+
+
+#: The HDF5 fixtures of the golden tests (``scripts/make_hdf5_fixtures.py``).
+FIXTURES = Path(__file__).resolve().parents[4] / "tests" / "golden" / "hdf5"
+
+
+def h5py_links(path: Path) -> list[tuple[str, str, list[int], Any]]:
+    """Every group and dataset h5py reaches through hard links, in the order and form of
+    ``larmorx._core.hdf5_datasets`` (depth first, names in byte order; an object linked
+    under several names is listed under each). Floating-point values are read through
+    HDF5's conversion to double, so that formats numpy has no type for (quadruple
+    precision) are compared too."""
+    import h5py
+
+    out: list[tuple[str, str, list[int], Any]] = []
+
+    def walk(group: Any, prefix: str) -> None:
+        for name in sorted(group.keys(), key=lambda n: n.encode("utf-8", "surrogateescape")):
+            if not isinstance(group.get(name, getlink=True), h5py.HardLink):
+                continue
+            obj = group[name]
+            full = f"{prefix}{name}"
+            if isinstance(obj, h5py.Group):
+                out.append((full, "group", [], None))
+                walk(obj, f"{full}/")
+                continue
+            if not isinstance(obj, h5py.Dataset):
+                continue
+            ftype = obj.id.get_type()
+            cls, size = ftype.get_class(), ftype.get_size()
+            value: Any = None
+            if cls == h5py.h5t.STRING:
+                kind = "string"
+                items = np.atleast_1d(np.asarray(obj[()], dtype=object)).ravel()
+                value = [None if v is None else bytes(v) for v in items]
+            elif cls == h5py.h5t.FLOAT:
+                kind = f"float{size}"
+                buf = np.zeros(obj.size, dtype=np.float64)
+                if obj.size:
+                    obj.id.read(h5py.h5s.ALL, h5py.h5s.ALL, buf, mtype=h5py.h5t.NATIVE_DOUBLE)
+                value = buf
+            elif cls == h5py.h5t.INTEGER:
+                kind = f"integer{size}"
+                buf = np.zeros(obj.size * size, dtype=np.uint8)
+                if obj.size:
+                    obj.id.read(h5py.h5s.ALL, h5py.h5s.ALL, buf, mtype=ftype)
+                value = buf.tobytes()
+            else:
+                kind = f"class{cls}"
+            out.append((full, kind, list(obj.shape), value))
+
+    with h5py.File(path, "r") as f:
+        walk(f, "")
+    return out
+
+
+def _fixture_file(name: str, tmp: Path) -> Path:
+    """A golden-test fixture, decompressed into ``tmp``."""
+    source = FIXTURES / f"{name}.h5.gz"
+    if not source.is_file():
+        raise Outcome(SKIPPED, f"{source} not found")
+    path = tmp / f"{name}.h5"
+    path.write_bytes(gzip.decompress(source.read_bytes()))
+    return path
+
+
+def _run_fixture(checks: CheckList, name: str, tmp: Path) -> None:
+    """A golden-test fixture: every dataset as h5py reads it, groups and members as h5py
+    lists them, and (a transform file) the transforms as ITK reads them."""
+    from larmorx import _core
+
+    path = _fixture_file(name, tmp)
+    compare_datasets(checks, "h5py", _core.hdf5_datasets(str(path)), h5py_links(path))
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        groups = [""] + [n for n, k, _, _ in h5py_links(path) if k == "group"]
+        bad = []
+        for g in groups:
+            theirs = sorted(f[g or "/"].keys(), key=lambda n: n.encode("utf-8", "surrogateescape"))
+            ours = [m for m, _ in _core.hdf5_group_members(str(path), f"/{g}")]
+            if ours != theirs:
+                bad.append(g or "/")
+    checks(
+        "h5py: every group's links (hard and soft), by name",
+        not bad,
+        detail=", ".join(bad[:5]) or f"{len(groups)} groups",
+    )
+    if name == "sohm":
+        _check_itk_view(checks, path, tmp, single=False)
+        _check_itk_view(checks, path, tmp, single=True)
 
 
 def _same_value(a: Any, b: Any) -> bool:
@@ -1437,6 +1537,9 @@ def run_case(case: Case, checks: CheckList) -> None:
         tmp = Path(tmp_name)
         if spec.kind == "partial":
             _run_partial(checks, tmp)
+            return
+        if spec.kind == "fixture":
+            _run_fixture(checks, spec.source, tmp)
             return
         if spec.kind == "feature":
             path = tmp / "feature.h5"

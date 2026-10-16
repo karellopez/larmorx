@@ -30,6 +30,7 @@ pub mod message;
 pub mod object;
 pub(crate) mod source;
 pub mod superblock;
+pub mod write;
 
 pub use dataset::DatasetInfo;
 pub use datatype::{Datatype, FloatType};

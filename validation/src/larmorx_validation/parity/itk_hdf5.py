@@ -266,6 +266,7 @@ def _h5py_file(path: Path, recipe: str) -> None:
         "fixed-string": lambda: write(
             [comp, ("1", affine())], string=h5py.string_dtype("ascii", 40)
         ),
+        "utf8-strings": lambda: write([comp, ("1", affine())], string=h5py.string_dtype("utf-8")),
         "two-strings": lambda: write(
             [
                 comp,
@@ -445,6 +446,7 @@ H5PY_READ = (
     "empty-composite",
     "two-linear",
     "composite-second",
+    "utf8-strings",
 )
 H5PY_ERRORS = (
     "fixed-string",

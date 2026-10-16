@@ -228,6 +228,81 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
     }
 }
 
+/// `InitializeWithPreviousLinearTransform`: the stage's transform `output` (class name without
+/// `Transform`: `name`) set from the composite's last transform where ANTs knows how
+/// (translation to translation, rigid or affine; rigid to rigid or affine; affine to affine);
+/// `false`, after ANTs' messages, otherwise.
+fn initialize_with_previous<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    previous: Option<&Xfm<R, D>>,
+    name: &str,
+    output: &mut Xfm<R, D>,
+) -> bool {
+    let Some(previous) = previous else {
+        log.logger("ERROR: INITIALIZATION RETURNS FALSE. Previous Linear Transform is Null\n");
+        return false;
+    };
+    let previous_class = previous.class();
+    log.logger(&format!(
+        "Try to initialize the current {name} from previous {previous_class}.\n"
+    ));
+    let failed = |log: &mut Log<'_>| {
+        log.logger("WARNING: Initialization Failed\n");
+        false
+    };
+    let rigid = matches!(previous_class, "Euler3DTransform" | "Euler2DTransform");
+    match (name, output) {
+        ("Translation", Xfm::Translation { offset }) => match previous {
+            Xfm::Translation { offset: o } if previous_class == "TranslationTransform" => {
+                *offset = *o;
+                true
+            }
+            _ => failed(log),
+        },
+        ("Euler2D" | "Euler3D", Xfm::Linear(out)) => {
+            *out = LinearXfm::new(out.kind.clone());
+            match previous {
+                Xfm::Translation { offset } => {
+                    out.set_offset(*offset);
+                    true
+                }
+                Xfm::Linear(prev) if rigid => {
+                    // SetFixedParameters (the centre, and Euler3D's ZYX flag), SetParameters.
+                    let fixed = previous.fixed_parameters();
+                    if let larmorx_registration::transform::Kind::Euler3D { zyx } = &mut out.kind {
+                        *zyx = fixed.get(3).is_some_and(|&v| v != 0.0);
+                    }
+                    out.set_center(std::array::from_fn(|i| R::r(fixed[i])));
+                    out.set_parameters(&prev.parameters()).is_ok()
+                }
+                _ => failed(log),
+            }
+        }
+        ("Affine", Xfm::Linear(out)) => {
+            *out = LinearXfm::new(out.kind.clone());
+            match previous {
+                Xfm::Translation { offset } => {
+                    out.set_offset(*offset);
+                    true
+                }
+                Xfm::Linear(prev) if rigid => {
+                    out.set_center(prev.center);
+                    out.set_matrix(prev.matrix);
+                    out.set_translation(prev.translation);
+                    true
+                }
+                Xfm::Linear(prev) if previous_class == "AffineTransform" => {
+                    let fixed = previous.fixed_parameters();
+                    out.set_center(std::array::from_fn(|i| R::r(fixed[i])));
+                    out.set_parameters(&prev.parameters()).is_ok()
+                }
+                _ => failed(log),
+            }
+        }
+        _ => failed(log),
+    }
+}
+
 /// The seed larmorx uses where ANTs, given no seed, seeds its sampling from the clock (its
 /// result then changes from run to run): the Mersenne twister's own default seed in ITK.
 pub const DEFAULT_SEED: i32 = 121_212;
@@ -736,7 +811,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             };
             let learning_rate = self.transforms[stage].gradient_step;
             let method = self.transforms[stage].method;
-            let output = match self.new_transform(method) {
+            let mut output = match self.new_transform(method) {
                 Some(t) => t,
                 None => return self.unsupported(log, &format!("{} stages", method.as_str())),
             };
@@ -765,11 +840,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 estimate_learning_rate_at_each_iteration: true,
                 estimate_learning_rate_once: false,
             };
+            // PrepareRegistrationMethod: with --initialize-transforms-per-stage, the stage starts
+            // from the last transform of the composite when it can, and that transform leaves
+            // the composite.
+            if self.initialize_transforms_per_stage {
+                let queue = self.composite.as_mut().expect("set above");
+                if !queue.is_empty() {
+                    log.logger(&format!(
+                        "Current number of transforms in the composite transform: {}\n",
+                        queue.len()
+                    ));
+                    for (i, t) in queue.iter().enumerate() {
+                        log.logger(&format!("{}) {}\n", i + 1, t.class()));
+                    }
+                    let name = class.replacen("Transform", "", 1);
+                    if initialize_with_previous(log, queue.last(), &name, &mut output) {
+                        log.logger("Registration process is run using direct initialization!\n");
+                        queue.pop();
+                    }
+                }
+            }
             let composite = self.composite.as_ref().expect("set above").clone();
             let fixed_initial = self.fixed_initial.as_ref().expect("set above").clone();
-            if self.initialize_transforms_per_stage && !composite.is_empty() {
-                return self.unsupported(log, "--initialize-transforms-per-stage");
-            }
             let seed = if self.random_seed != 0 {
                 self.random_seed
             } else {

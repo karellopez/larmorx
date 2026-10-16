@@ -25,8 +25,8 @@ The kinds of cases:
 - ``errors/...``: files ITK refuses (through ``antsApplyTransforms``: exit status, messages).
 - ``hdf5/...``: HDF5's storage features that no transform writer uses but ITK's HDF5 reads,
   written by h5py (every chunk index of file format 1.10, the n-bit and scale-offset filters,
-  dense groups in every fractal heap layout, with I/O filters or not): every dataset as h5py
-  reads it.
+  dense groups in every fractal heap layout, with I/O filters or not, messages shared in the
+  file's shared-message heaps): every dataset as h5py reads it.
 - ``fix``: D13, larmorx's default reading and writing where ITK is defective.
 """
 
@@ -361,7 +361,61 @@ def _h5py_file(path: Path, recipe: str) -> None:
         data = path.read_bytes()
         path.write_bytes(data[: len(data) // 2])
         return
+    if recipe in ELSEWHERE:
+        _elsewhere_file(path, recipe)
+        return
     recipes[recipe]()
+
+
+def _elsewhere_file(path: Path, recipe: str) -> None:
+    """A composite whose affine's parameters are not stored in the file's own dataset: in an
+    external raw file (``H5Pset_external``), behind an external link to another HDF5 file, or
+    in a virtual dataset mapping another dataset of the same file. Paths are absolute, so the
+    reader's working directory does not matter."""
+    import h5py
+
+    vlen = h5py.string_dtype("ascii")
+    with h5py.File(path, "w", libver=V110) as f:
+        tg = f.create_group("TransformGroup")
+        tg.create_group("0").create_dataset(
+            "TransformType",
+            data=np.array(["CompositeTransform_double_3_3"], dtype=object),
+            dtype=vlen,
+        )
+        if recipe == "external-link":
+            other = path.with_name(path.stem + "-target.h5")
+            with h5py.File(other, "w") as g:
+                one = g.create_group("affine")
+                one.create_dataset(
+                    "TransformType",
+                    data=np.array(["AffineTransform_double_3_3"], dtype=object),
+                    dtype=vlen,
+                )
+                one.create_dataset("TransformParameters", data=AFFINE)
+                one.create_dataset("TransformFixedParameters", data=CENTER)
+            tg["1"] = h5py.ExternalLink(str(other.resolve()), "/affine")
+            return
+        one = tg.create_group("1")
+        one.create_dataset(
+            "TransformType",
+            data=np.array(["AffineTransform_double_3_3"], dtype=object),
+            dtype=vlen,
+        )
+        one.create_dataset("TransformFixedParameters", data=CENTER)
+        if recipe == "external-storage":
+            raw = path.with_suffix(".raw")
+            raw.write_bytes(b"\0" * 16 + AFFINE.astype("<f8").tobytes())
+            one.create_dataset(
+                "TransformParameters",
+                shape=(12,),
+                dtype="<f8",
+                external=[(str(raw.resolve()), 16, 96)],
+            )
+            return
+        f.create_dataset("parameters-source", data=AFFINE)
+        layout = h5py.VirtualLayout(shape=(12,), dtype="f8")
+        layout[:] = h5py.VirtualSource(".", "/parameters-source", shape=(12,))
+        one.create_virtual_dataset("TransformParameters", layout)
 
 
 #: h5py recipes that ITK reads, and those it refuses.
@@ -422,6 +476,13 @@ SMOKE_H5PY = ("composite", "superblock3", "misspelt-itk4", "dense-11", "fixed-st
 #: Files h5py reads and larmorx, like ITK's HDF5 1.12, refuses: LZF (a filter of h5py's own),
 #: and a chunked dataset of HDF5 2.0's newest format (layout message version 5: h5py's HDF5
 #: 2.0 with ``libver="latest"``).
+#: Files whose data live elsewhere: ITK's HDF5 follows them (an external raw file, an
+#: external link, a virtual dataset); larmorx refuses them (docs/api/transforms-hdf5.md).
+ELSEWHERE = {
+    "external-storage": "parameters in an external raw file (H5Pset_external)",
+    "external-link": "a transform behind an external link to another HDF5 file",
+    "virtual": "parameters in a virtual dataset (mapping another dataset of the same file)",
+}
 H5PY_ONLY = {
     "lzf": "a filter only h5py has",
     "superblock3-chunked": "HDF5 2.0's layout message version 5, newer than ITK's HDF5 1.12.1",
@@ -451,6 +512,14 @@ def _hdf5_library() -> Any:
         raise RuntimeError("h5py's HDF5 library not found")
     lib = ctypes.CDLL(found[0])
     lib.H5Pset_link_phase_change.argtypes = [ctypes.c_int64, ctypes.c_uint, ctypes.c_uint]
+    lib.H5Pset_shared_mesg_nindexes.argtypes = [ctypes.c_int64, ctypes.c_uint]
+    lib.H5Pset_shared_mesg_index.argtypes = [
+        ctypes.c_int64,
+        ctypes.c_uint,
+        ctypes.c_uint,
+        ctypes.c_uint,
+    ]
+    lib.H5Pset_shared_mesg_phase_change.argtypes = [ctypes.c_int64, ctypes.c_uint, ctypes.c_uint]
     lib.H5Pset_deflate.argtypes = [ctypes.c_int64, ctypes.c_uint]
     lib.H5Pset_filter.argtypes = [
         ctypes.c_int64,
@@ -494,6 +563,53 @@ def _group_file(path: Path, rest: str, rng: np.random.Generator) -> None:
         fid.close()
 
 
+def _sohm_file(path: Path, rest: str, rng: np.random.Generator) -> None:
+    """A transform file whose datatype, dataspace, fill value and filter pipeline messages are
+    shared in the file's shared-message heaps (SOHM, ``H5Pset_shared_mesg_*``): one index for
+    every type, a list; two indexes; a B-tree index over 120 transforms of distinct sizes (a
+    heap with indirect blocks); superblock 2 (file format 1.8)."""
+    import h5py
+
+    sdspace, dtype, fill, pline, attr = 1 << 1, 1 << 3, 1 << 5, 1 << 11, 1 << 12
+    indexes, n, phase, low = {
+        "one-list": ([sdspace | dtype | fill | pline | attr], 6, (50, 40), h5py.h5f.LIBVER_V110),
+        "two-lists": ([dtype | sdspace, fill | pline], 6, (50, 40), h5py.h5f.LIBVER_V110),
+        "btree": ([sdspace | dtype | fill | pline], 120, (4, 2), h5py.h5f.LIBVER_V110),
+        "superblock2": ([dtype | pline], 6, (50, 40), h5py.h5f.LIBVER_V18),
+    }[rest]
+    lib = _hdf5_library()
+    fcpl = h5py.h5p.create(h5py.h5p.FILE_CREATE)
+    if lib.H5Pset_shared_mesg_nindexes(fcpl.id, len(indexes)) < 0:
+        raise RuntimeError("H5Pset_shared_mesg_nindexes failed")
+    for i, flags in enumerate(indexes):
+        if lib.H5Pset_shared_mesg_index(fcpl.id, i, flags, 0) < 0:
+            raise RuntimeError("H5Pset_shared_mesg_index failed")
+    if lib.H5Pset_shared_mesg_phase_change(fcpl.id, *phase) < 0:
+        raise RuntimeError("H5Pset_shared_mesg_phase_change failed")
+    fapl = h5py.h5p.create(h5py.h5p.FILE_ACCESS)
+    fapl.set_libver_bounds(low, h5py.h5f.LIBVER_V112)
+    fid = h5py.h5f.create(str(path).encode(), h5py.h5f.ACC_TRUNC, fcpl=fcpl, fapl=fapl)
+    with h5py.File(fid) as f:
+        g = f.create_group("TransformGroup")
+        for i in range(n):
+            sub = g.create_group(str(i))
+            sub.create_dataset(
+                "TransformType",
+                data=[b"AffineTransform_double_3_3"],
+                dtype=h5py.string_dtype("ascii"),
+            )
+            dt = ("<f8", ">f4", "<f4", ">f8")[i % 4]
+            sub.create_dataset(
+                "TransformParameters",
+                data=rng.standard_normal((12 + i,) if n > 20 else (12,)).astype(dt),
+                chunks=(6,),
+                compression="gzip" if i % 2 else None,
+                shuffle=i % 3 == 0,
+                fillvalue=np.array(i, dtype=dt)[()],
+            )
+            sub.create_dataset("TransformFixedParameters", data=rng.standard_normal(3))
+
+
 def _feature_file(path: Path, recipe: str) -> None:
     """Writes one dataset ``x`` with h5py in the storage ``recipe`` names: every chunk index of
     file format 1.10 (single chunk, implicit, fixed array paged or not, extensible array
@@ -506,6 +622,9 @@ def _feature_file(path: Path, recipe: str) -> None:
     kind, _, rest = recipe.partition(":")
     if kind == "group":
         _group_file(path, rest, rng)
+        return
+    if kind == "sohm":
+        _sohm_file(path, rest, rng)
         return
     if kind == "index":
         shapes = {
@@ -611,6 +730,7 @@ FEATURES = (
         for layout in ("direct", "indirect", "huge")
     ),
     "group:order-indirect",
+    *(f"sohm:{n}" for n in ("one-list", "two-lists", "btree", "superblock2")),
 )  # fmt: skip
 SMOKE_FEATURES = (
     "index:farray",
@@ -618,6 +738,7 @@ SMOKE_FEATURES = (
     "scaleoffset:f8,2,",
     "nbit:float",
     "group:deflate-indirect",
+    "sohm:one-list",
 )
 
 
@@ -862,6 +983,13 @@ def cases(tier: str) -> list[Case]:
             "errors",
             f"written by h5py, refused by ITK: {recipe}",
             Spec("error", f"h5py:{recipe}", "smoke" if recipe in SMOKE_H5PY else "standard"),
+        )
+    for recipe, what in ELSEWHERE.items():
+        add(
+            f"errors/h5py/{recipe}",
+            "errors",
+            f"written by h5py, read by ITK, refused by larmorx: {what}",
+            Spec("elsewhere", f"h5py:{recipe}", "standard"),
         )
     for recipe in FEATURES:
         add(
@@ -1320,6 +1448,8 @@ def run_case(case: Case, checks: CheckList) -> None:
             _run_read(case, checks, path, tmp)
         elif spec.kind == "error":
             _run_error(case, checks, path, tmp)
+        elif spec.kind == "elsewhere":
+            _run_elsewhere(case, checks, path, tmp)
         elif spec.kind == "write":
             _run_write(case, checks, path, tmp, spec)
 
@@ -1391,6 +1521,38 @@ def _fix_read(checks: CheckList, path: Path) -> None:
         same == (not named),
         detail=("unchanged" if same else "changed") + (f"; named {named}" if named else ""),
     )
+
+
+def _run_elsewhere(case: Case, checks: CheckList, path: Path, tmp: Path) -> None:
+    """A file whose data live elsewhere: h5py and ITK read it; larmorx refuses it, saying
+    why, on every route (an expected divergence)."""
+    import larmorx as lx
+    from larmorx import _core
+
+    theirs = h5py_datasets(path)
+    checks("h5py reads it", True, metric="report", detail=f"{len(theirs)} datasets")
+    try:
+        lx.transforms.read(path)
+        ours = None
+    except (ValueError, OSError) as e:
+        ours = str(e)
+    checks("lx.transforms.read refuses it", ours is not None, detail=(ours or "")[-200:])
+    if path.stem == "external-link":
+        # Listing a file's datasets visits its own objects (``H5Ovisit``): neither h5py nor
+        # larmorx follows the link there.
+        _compare_with_h5py(checks, path)
+    else:
+        try:
+            _core.hdf5_datasets(str(path))
+            ours = None
+        except (ValueError, OSError) as e:
+            ours = str(e)
+        checks("larmorx's HDF5 reader refuses it", ours is not None, detail=(ours or "")[-200:])
+    a_code, l_code, a_err, l_err = _image_route(checks, path, tmp)
+    checks("ANTs reads it", a_code == 0, detail=normalise(a_err)[-200:])
+    checks("larmorx ants antsApplyTransforms refuses it", l_code != 0, detail=l_err.strip()[-300:])
+    name = path.stem
+    raise Outcome(EXPECTED, f"{ELSEWHERE[name]}: ITK's HDF5 follows it; larmorx refuses the file")
 
 
 def _run_error(case: Case, checks: CheckList, path: Path, tmp: Path) -> None:
@@ -1669,7 +1831,7 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     feats = [passed(r, "h5py:") for r in results if r.case.startswith("hdf5/")]
     lines.append(
         f"HDF5 storage features (every chunk index, the n-bit and scale-offset filters, dense "
-        f"groups' fractal heaps, filtered or not) as h5py reads them, bit for bit: "
+        f"groups' fractal heaps, filtered or not, shared messages) as h5py reads them, bit for bit: "
         f"{sum(1 for x in feats if x)} of {sum(1 for x in feats if x is not None)} files"
     )
     itk = [passed(r, "ITK's reading:") for r in reads]

@@ -63,10 +63,14 @@ chunk, implicit, fixed array, extensible array, version-2 B-tree); the deflate, 
 Fletcher-32, n-bit and scale-offset filters; floating-point data of any size, layout and byte
 order (half, single, double, x87 extended, quadruple, n-bit formats; converted as HDF5 1.12.1's
 `H5Dread` converts them to the reader's precision); fixed- and variable-length strings; fill
-values. Refused, as ITK's HDF5 refuses them: the szip filter and filter plugins (LZF), and
-HDF5 2.0's layout message version 5. **Not covered:** virtual datasets (their data live in
-other files), which no transform file uses. Chunks are decompressed in parallel; the result
-does not depend on the thread count.
+values; committed datatypes and messages shared in the file's shared-message heaps (SOHM).
+Refused, as ITK's HDF5 refuses them: the szip filter and filter plugins (LZF), and HDF5 2.0's
+layout message version 5. **Not covered** (refused with "unsupported HDF5 feature: ...", in
+ITK's message form on the command line, where ITK's HDF5 follows them): data stored
+elsewhere, that is external raw files (`H5Pset_external`), external links to other HDF5 files
+and virtual datasets; no transform writer produces them (expected divergences in the
+[validation record](../validation/itk-hdf5.md)). Chunks are decompressed in parallel; the
+result does not depend on the thread count.
 
 On the command line and with `precision="float32"` (`lx.ants.apply_transforms`), the file is
 read as ITK's reader of that precision reads it: the precision in a transform's name is

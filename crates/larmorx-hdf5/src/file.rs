@@ -9,9 +9,9 @@ use crate::datatype::{self, Datatype, StrPad};
 use crate::error::{Error, Result, corrupt, unsupported};
 use crate::group::{self, Storage};
 use crate::heap;
-use crate::message::{Dataspace, Layout, Link, LinkTarget};
+use crate::message::{self, Dataspace, Layout, Link, LinkTarget};
 use crate::object::{self, ObjectHeader};
-use crate::source::{Cursor, Source};
+use crate::source::{Cursor, Source, UNDEF};
 use crate::superblock::{self, Superblock};
 
 /// What an object is (`H5O_type_t`).
@@ -82,6 +82,53 @@ impl File {
     }
 
     /// The object header at `addr`.
+    /// A message shared in the file's shared-message heap (SOHM), by its heap ID
+    /// (`H5O__shared_read`, `H5SM_get_fheap_addr`, `H5SM__cache_table_deserialize`): the
+    /// superblock extension's shared message table names the master table, whose first index
+    /// that takes messages of this type names the fractal heap that holds them.
+    pub(crate) fn shared_message(&self, type_id: u16, id: &[u8]) -> Result<Vec<u8>> {
+        let sb = self.superblock();
+        let (a, s) = (sb.sizeof_addr, sb.sizeof_size);
+        if sb.extension == UNDEF {
+            return Err(corrupt("unable to load SOHM master table"));
+        }
+        let ext = self.object_header(sb.extension)?;
+        let m = ext
+            .find(crate::object::msg::SHARED_TABLE)
+            .ok_or_else(|| corrupt("unable to load SOHM master table"))?;
+        let (table, nindexes) =
+            message::shared_table(&mut Cursor::new(&m.data, a, s, "a shared message table"))?;
+        let entry = 1 + 1 + 2 + 4 + 3 * 2 + 2 * usize::from(a);
+        let image = self.read_at(table, 4 + usize::from(nindexes) * entry + 4)?;
+        crate::source::verify_checksum(&image, "SOHM master table")?;
+        let mut c = Cursor::new(&image, a, s, "a SOHM master table");
+        if c.bytes(4)? != b"SMTB" {
+            return Err(corrupt("bad SOHM table signature"));
+        }
+        // `H5SM__type_to_flag`: the old fill value message shares the new one's index.
+        let flag_type = if type_id == crate::object::msg::FILL_OLD {
+            crate::object::msg::FILL
+        } else {
+            type_id
+        };
+        let flag = 1u32 << flag_type;
+        for _ in 0..nindexes {
+            if c.u8()? != 0 {
+                return Err(corrupt("bad shared message list version number"));
+            }
+            let _index_type = c.u8()?;
+            let types = u32::from(c.u16()?);
+            let _min_size = c.u32()?;
+            c.skip(6)?; // list cutoff, B-tree cutoff, number of messages
+            let _index = c.addr()?;
+            let heap = c.addr()?;
+            if types & flag != 0 {
+                return crate::heap::FractalHeap::open(self, heap)?.read(self, id);
+            }
+        }
+        Err(corrupt("unable to find correct SOHM index"))
+    }
+
     pub fn object_header(&self, addr: u64) -> Result<ObjectHeader> {
         object::read(self, addr)
     }

@@ -32,7 +32,7 @@ pub(crate) fn is_dataset(oh: &ObjectHeader) -> bool {
 }
 
 /// Decodes a message that may be shared (stored in another object header, as committed
-/// datatypes are).
+/// datatypes are, or in the file's shared-message heap).
 fn message_data(file: &File, oh: &ObjectHeader, type_id: u16) -> Result<Option<Vec<u8>>> {
     let Some(m) = oh.find(type_id) else {
         return Ok(None);
@@ -41,14 +41,18 @@ fn message_data(file: &File, oh: &ObjectHeader, type_id: u16) -> Result<Option<V
         return Ok(Some(m.data.clone()));
     }
     let sb = file.superblock();
-    let at = message::shared_location(&mut Cursor::new(
+    match message::shared_location(&mut Cursor::new(
         &m.data,
         sb.sizeof_addr,
         sb.sizeof_size,
         "a shared message",
-    ))?;
-    let other = file.object_header(at)?;
-    message_data(file, &other, type_id)
+    ))? {
+        message::SharedAt::Object(at) => {
+            let other = file.object_header(at)?;
+            message_data(file, &other, type_id)
+        }
+        message::SharedAt::Heap(id) => file.shared_message(type_id, &id).map(Some),
+    }
 }
 
 pub(crate) fn info(file: &File, oh: &ObjectHeader) -> Result<DatasetInfo> {

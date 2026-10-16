@@ -8,7 +8,7 @@
 //! `src/H5Oginfo.c`, `src/H5Ostab.c`, `src/H5Oshared.c`.
 
 use crate::datatype::Datatype;
-use crate::error::{Result, corrupt, unsupported};
+use crate::error::{Result, corrupt};
 use crate::source::{Cursor, UNDEF};
 
 /// A dataspace (`H5S_extent_t`).
@@ -599,8 +599,15 @@ pub(crate) fn symbol_table(c: &mut Cursor) -> Result<(u64, u64)> {
     Ok((c.addr()?, c.addr()?))
 }
 
-/// A shared message (`H5O__shared_decode`): the object header that holds the real message.
-pub(crate) fn shared_location(c: &mut Cursor) -> Result<u64> {
+/// Where a shared message is: in another object header (a committed datatype), or in the
+/// file's shared-message heap (SOHM), by its fractal heap ID.
+pub(crate) enum SharedAt {
+    Object(u64),
+    Heap(Vec<u8>),
+}
+
+/// A shared message (`H5O__shared_decode`): where the real message is.
+pub(crate) fn shared_location(c: &mut Cursor) -> Result<SharedAt> {
     let version = c.u8()?;
     if !(1..=3).contains(&version) {
         return Err(corrupt("bad version number for shared object message"));
@@ -614,14 +621,21 @@ pub(crate) fn shared_location(c: &mut Cursor) -> Result<u64> {
     if version == 1 {
         c.skip(6)?;
         c.length()?; // the local heap offset of a symbol table entry
-        return c.addr();
+        return Ok(SharedAt::Object(c.addr()?));
     }
     if kind == 1 && version >= 3 {
-        return Err(unsupported(
-            "messages shared in the file's shared-message heap (SOHM)",
-        ));
+        // `H5O_SHARE_TYPE_SOHM`: a heap ID of `H5O_FHEAP_ID_LEN` (8) bytes.
+        return Ok(SharedAt::Heap(c.bytes(8)?.to_vec()));
     }
-    c.addr()
+    Ok(SharedAt::Object(c.addr()?))
+}
+
+/// The shared message table message of the superblock extension (`H5O__shmesg_decode`): the
+/// master table's address and its number of indexes.
+pub(crate) fn shared_table(c: &mut Cursor) -> Result<(u64, u8)> {
+    let _version = c.u8()?;
+    let addr = c.addr()?;
+    Ok((addr, c.u8()?))
 }
 
 /// Decodes a datatype message, recursively (`H5O__dtype_decode_helper`).

@@ -3,11 +3,14 @@
 //! library).
 //!
 //! - **Reading** ([`File`]): superblocks 0 to 3; object headers 1 and 2 with continuation
-//!   chunks; old-style (symbol table), compact and dense groups; soft links; compact,
-//!   contiguous and chunked datasets (chunk indices: version-1 B-tree, single chunk, implicit,
-//!   fixed array, version-2 B-tree); the deflate, shuffle and Fletcher-32 filters; fill
-//!   values; committed (shared) datatypes; floating-point data of any layout converted as
-//!   HDF5 1.12.1's `H5Dread` converts it on x86-64; fixed- and variable-length strings.
+//!   chunks; old-style (symbol table), compact and dense groups (fractal heaps, filtered or
+//!   not); soft links; compact, contiguous and chunked datasets (every chunk index: version-1
+//!   B-tree, single chunk, implicit, fixed array, extensible array, version-2 B-tree); the
+//!   deflate, shuffle, Fletcher-32, n-bit and scale-offset filters; fill values; committed
+//!   datatypes and messages shared in the shared-message heaps (SOHM); floating-point data of
+//!   any layout converted as HDF5 1.12.1's `H5Dread` converts it on x86-64; fixed- and
+//!   variable-length strings. Not read: data stored elsewhere (external raw files, external
+//!   links, virtual datasets).
 //! - **Writing** ([`write`]): the subset of the HDF5 library ITK's transform writer uses
 //!   (libver bounds 1.8: superblock 2, version-2 object headers, compact groups, contiguous
 //!   and chunked deflated datasets, variable-length strings), laid out byte for byte as

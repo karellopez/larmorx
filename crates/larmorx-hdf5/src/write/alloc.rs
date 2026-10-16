@@ -452,7 +452,7 @@ impl Space {
     }
 
     /// `H5MF_free_aggrs`.
-    fn free_aggrs(&mut self) {
+    pub(crate) fn free_aggrs(&mut self) {
         let (ma, sa) = (self.meta.addr, self.sdata.addr);
         let first_raw = if ma != UNDEF && sa != UNDEF {
             ma < sa

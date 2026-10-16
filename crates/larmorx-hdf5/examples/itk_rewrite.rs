@@ -3,7 +3,7 @@
 //! storage read from it and the original's object time, and compares the bytes (a development
 //! aid: `cargo run -p larmorx-hdf5 --example itk_rewrite -- in.h5 [out.h5]`).
 
-use larmorx_hdf5::write::{Floats, Storage, Writer, zlib_rs_deflate};
+use larmorx_hdf5::write::{Floats, Storage, Writer};
 use larmorx_hdf5::{Datatype, File, Layout, LinkTarget};
 
 fn string(f: &File, path: &str) -> Vec<u8> {
@@ -19,7 +19,7 @@ fn main() {
     let f = File::open(input).unwrap();
     let root = f.object_header(f.root()).unwrap();
     let time = root.times.expect("times")[0];
-    let mut w = Writer::new(time, zlib_rs_deflate);
+    let mut w = Writer::new(time);
     let r = w.root();
     for name in ["ITKVersion", "HDFVersion", "OSName", "OSVersion"] {
         w.write_string(r, name, &string(&f, &format!("/{name}")))

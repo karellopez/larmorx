@@ -11,6 +11,7 @@ mod afni;
 mod ants;
 mod ants_filters;
 mod defects;
+mod hdf5;
 mod mri;
 mod ndimage;
 mod nifti;
@@ -68,6 +69,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ants_filters::register(m)?;
     afni::register(m)?;
     defects::register(m)?;
+    hdf5::register(m)?;
     mri::register(m)?;
     ndimage::register(m)?;
     replica::register(m)?;

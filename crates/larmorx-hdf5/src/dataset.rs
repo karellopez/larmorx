@@ -107,15 +107,87 @@ fn fill_element(info: &DatasetInfo, elem: usize) -> Vec<u8> {
     }
 }
 
-/// A chunk as an index lists it.
-#[derive(Clone, Debug)]
-struct Chunk {
+/// A chunk as the dataset's index lists it (`H5Dget_chunk_info`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Chunk {
     /// Scaled coordinates (offsets divided by the chunk dimensions).
-    scaled: Vec<u64>,
-    addr: u64,
-    /// Stored size in bytes.
-    size: u64,
-    mask: u32,
+    pub scaled: Vec<u64>,
+    /// Where the chunk is stored.
+    pub addr: u64,
+    /// Stored size in bytes (after the filters).
+    pub size: u64,
+    /// The filters skipped for this chunk (bit i: filter i).
+    pub mask: u32,
+}
+
+/// What reading a chunked dataset needs: its extent, the chunk dimensions and grid, the size
+/// of an unfiltered chunk.
+struct ChunkGeometry {
+    dims: Vec<u64>,
+    cdims: Vec<u64>,
+    grid: Vec<u64>,
+    chunk_bytes: usize,
+}
+
+fn chunk_geometry(info: &DatasetInfo, cdims_all: &[u64]) -> Result<ChunkGeometry> {
+    let elem = info.dtype.size();
+    let rank = info.space.rank();
+    let dims: Vec<u64> = match &info.space {
+        Dataspace::Simple { dims, .. } => dims.clone(),
+        _ => vec![1; rank],
+    };
+    if cdims_all.len() != rank + 1 {
+        return Err(corrupt(
+            "chunked layout's dimensionality does not match the dataspace",
+        ));
+    }
+    let cdims = &cdims_all[..rank];
+    if cdims_all[rank] as usize != elem {
+        // HDF5 checks the chunk's element dimension against the datatype size when the
+        // dataset is opened.
+        return Err(corrupt("chunk element size does not match the datatype"));
+    }
+    if cdims.contains(&0) {
+        return Err(corrupt("chunk dimension must be positive"));
+    }
+    let chunk_elems: u64 = cdims.iter().product();
+    let chunk_bytes =
+        usize::try_from(chunk_elems * elem as u64).map_err(|_| corrupt("chunk too large"))?;
+    let grid: Vec<u64> = dims
+        .iter()
+        .zip(cdims)
+        .map(|(&d, &c)| d.div_ceil(c))
+        .collect();
+    Ok(ChunkGeometry {
+        dims,
+        cdims: cdims.to_vec(),
+        grid,
+        chunk_bytes,
+    })
+}
+
+/// The stored chunks of a chunked dataset, as its index lists them (none for other layouts).
+pub(crate) fn chunks(file: &File, info: &DatasetInfo) -> Result<Vec<Chunk>> {
+    let Layout::Chunked {
+        dims, index, addr, ..
+    } = &info.layout
+    else {
+        return Ok(Vec::new());
+    };
+    let g = chunk_geometry(info, dims)?;
+    if g.dims.iter().product::<u64>() == 0 {
+        return Ok(Vec::new());
+    }
+    list_chunks(
+        file,
+        info,
+        index,
+        *addr,
+        &g.cdims,
+        &g.grid,
+        g.chunk_bytes,
+        !info.pipeline.is_empty(),
+    )
 }
 
 /// Every stored element of the dataset, row-major, `dtype.size()` bytes each.
@@ -159,33 +231,13 @@ fn read_chunked(
     n_threads: usize,
 ) -> Result<Vec<u8>> {
     let elem = info.dtype.size();
-    let rank = info.space.rank();
-    let dims: Vec<u64> = match &info.space {
-        Dataspace::Simple { dims, .. } => dims.clone(),
-        _ => vec![1; rank],
-    };
-    if cdims_all.len() != rank + 1 {
-        return Err(corrupt(
-            "chunked layout's dimensionality does not match the dataspace",
-        ));
-    }
-    let cdims = &cdims_all[..rank];
-    if cdims_all[rank] as usize != elem {
-        // HDF5 checks the chunk's element dimension against the datatype size when the
-        // dataset is opened.
-        return Err(corrupt("chunk element size does not match the datatype"));
-    }
-    if cdims.contains(&0) {
-        return Err(corrupt("chunk dimension must be positive"));
-    }
-    let chunk_elems: u64 = cdims.iter().product();
-    let chunk_bytes =
-        usize::try_from(chunk_elems * elem as u64).map_err(|_| corrupt("chunk too large"))?;
-    let grid: Vec<u64> = dims
-        .iter()
-        .zip(cdims)
-        .map(|(&d, &c)| d.div_ceil(c))
-        .collect();
+    let ChunkGeometry {
+        dims,
+        cdims,
+        grid,
+        chunk_bytes,
+    } = chunk_geometry(info, cdims_all)?;
+    let cdims = &cdims[..];
     let n = dims.iter().product::<u64>() as usize;
     let mut out = fill_element(info, elem).repeat(n);
     if n == 0 {

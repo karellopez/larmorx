@@ -6,17 +6,20 @@
 //!
 //! [`Writer`] replays HDF5's own sequence of allocations and object-header edits, so a file
 //! written with the same calls has the same bytes as HDF5's, given the same object time and
-//! the same compressed chunks. A group's ninth link would make HDF5 convert it to dense
-//! storage (a fractal heap and a version-2 B-tree); the writer refuses that for now.
+//! the same compressed chunks. A group's ninth link converts it to dense storage, as HDF5 does
+//! ([`dense`]): the links move to a fractal heap indexed by a version-2 B-tree, and the group's
+//! header is condensed.
 
 mod alloc;
 mod btree;
+mod dense;
 mod encode;
 mod gheap;
 mod ohdr;
 
 use alloc::{Mem, Space};
 use btree::{ChunkBTree, ChunkRecord};
+use dense::Dense;
 use encode::{Native, WLayout, WType, empty_link_info};
 use gheap::GlobalHeap;
 use ohdr::ObjHeader;
@@ -80,10 +83,12 @@ pub enum Storage {
     Chunked { chunk: u64, level: u32 },
 }
 
-/// Compresses one chunk as `compress2` does at a level (`H5Z_filter_deflate`).
-pub type Deflate = fn(&[u8], u32) -> Vec<u8>;
+/// Compresses one chunk into a zlib stream at a level, as `compress2` does for
+/// `H5Z_filter_deflate`.
+pub type Deflate = Box<dyn FnMut(&[u8], u32) -> Vec<u8>>;
 
-/// The deflate the writer uses unless told otherwise: zlib-rs through flate2.
+/// The deflate the writer uses unless told otherwise: zlib-rs through flate2. Its streams
+/// decompress to the same bytes as zlib-ng's (ITK's) but are not always the same streams.
 pub fn zlib_rs_deflate(data: &[u8], level: u32) -> Vec<u8> {
     use std::io::Write;
     let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(level));
@@ -93,7 +98,12 @@ pub fn zlib_rs_deflate(data: &[u8], level: u32) -> Vec<u8> {
 
 #[derive(Clone, Debug)]
 enum Kind {
-    Group { linfo: usize, nlinks: usize },
+    Group {
+        linfo: usize,
+        nlinks: usize,
+        /// Index into `Writer::dense` once the group stores its links densely.
+        dense: Option<usize>,
+    },
     Dataset,
 }
 
@@ -111,13 +121,20 @@ pub struct Writer {
     gheap: GlobalHeap,
     btrees: Vec<ChunkBTree>,
     raw: Vec<(u64, Vec<u8>)>,
+    dense: Vec<Dense>,
     deflate: Deflate,
 }
 
 impl Writer {
     /// `H5Fcreate` with library-version bounds 1.8: the superblock and the root group. Every
-    /// object header gets `time` as its access, modification, change and birth time.
-    pub fn new(time: u32, deflate: Deflate) -> Writer {
+    /// object header gets `time` as its access, modification, change and birth time. Chunks
+    /// are compressed by [`zlib_rs_deflate`].
+    pub fn new(time: u32) -> Writer {
+        Writer::with_deflate(time, Box::new(zlib_rs_deflate))
+    }
+
+    /// [`Writer::new`] with chunks compressed by `deflate`.
+    pub fn with_deflate(time: u32, deflate: Deflate) -> Writer {
         let mut space = Space::new();
         let sb = space.alloc(Mem::Super, SUPERBLOCK);
         debug_assert_eq!(sb, 0);
@@ -128,6 +145,7 @@ impl Writer {
             gheap: GlobalHeap::default(),
             btrees: Vec::new(),
             raw: Vec::new(),
+            dense: Vec::new(),
             deflate,
         };
         w.new_group();
@@ -160,35 +178,70 @@ impl Writer {
             kind: Kind::Group {
                 linfo: li,
                 nlinks: 0,
+                dense: None,
             },
         });
         self.objs.len() - 1
     }
 
-    /// `H5G_obj_insert` into a compact group: a link message, then the link info rewritten.
+    /// `H5G_obj_insert`: a link message in a compact group; the ninth link converts the
+    /// group to dense storage first (`H5G__dense_create`, every link message moved into it in
+    /// header order, `H5O_msg_remove`); then the link info is rewritten.
     fn link(&mut self, parent: GroupId, name: &str, target: usize) -> Result<()> {
         let addr = self.objs[target].oh.addr();
-        let p = &mut self.objs[parent.0];
-        let Kind::Group { linfo, nlinks } = p.kind else {
+        let Kind::Group {
+            linfo,
+            nlinks,
+            dense,
+        } = self.objs[parent.0].kind
+        else {
             return Err(Error::Write("not a group".into()));
         };
-        if nlinks >= MAX_COMPACT {
-            return Err(Error::Unsupported(
-                "a group of more than 8 links (HDF5 stores it densely)".into(),
-            ));
+        let link = Native::Link {
+            name: name.as_bytes().to_vec(),
+            addr,
+        };
+        let dense = match dense {
+            Some(d) => {
+                self.dense[d].insert(&mut self.space, name.as_bytes(), &link.encode())?;
+                Some(d)
+            }
+            None if nlinks < MAX_COMPACT => {
+                let p = &mut self.objs[parent.0];
+                p.oh.append(&mut self.space, link, 0);
+                p.oh.rewrite(linfo, empty_link_info());
+                None
+            }
+            None => {
+                let mut d = Dense::create(&mut self.space);
+                for (n, a) in self.objs[parent.0].oh.links() {
+                    let encoded = Native::Link {
+                        name: n.clone(),
+                        addr: a,
+                    }
+                    .encode();
+                    d.insert(&mut self.space, &n, &encoded)?;
+                }
+                self.objs[parent.0].oh.remove_links(&mut self.space);
+                d.insert(&mut self.space, name.as_bytes(), &link.encode())?;
+                self.dense.push(d);
+                Some(self.dense.len() - 1)
+            }
+        };
+        let p = &mut self.objs[parent.0];
+        if let Some(d) = dense {
+            p.oh.rewrite(
+                linfo,
+                Native::LinkInfo {
+                    fheap: self.dense[d].heap_addr,
+                    name_bt2: self.dense[d].bt2_addr,
+                },
+            );
         }
-        p.oh.append(
-            &mut self.space,
-            Native::Link {
-                name: name.as_bytes().to_vec(),
-                addr,
-            },
-            0,
-        );
-        p.oh.rewrite(linfo, empty_link_info());
         p.kind = Kind::Group {
             linfo,
             nlinks: nlinks + 1,
+            dense,
         };
         Ok(())
     }
@@ -333,14 +386,23 @@ impl Writer {
         Ok(())
     }
 
-    /// `H5D__chunk_flush_entry`: filter, allocate, write and index one chunk.
+    /// `H5D__chunk_flush_entry`: filter, allocate, write and index one chunk. The deflate
+    /// filter is optional (`H5Pset_deflate`): when the compressed chunk would not fit in the
+    /// buffer `H5Z__filter_deflate` gives `compress2` (`ceil(1.001 n) + 12` bytes), the filter
+    /// fails, and the chunk is stored as it is, its filter-mask bit set (`H5Z_pipeline`).
     fn flush_chunk(&mut self, tree: usize, k: usize, data: &[u8], level: u32) {
-        let z = (self.deflate)(data, level);
+        let compressed = (self.deflate)(data, level);
+        let room = (data.len() as f64 * 1.001).ceil() as usize + 12;
+        let (z, mask) = if compressed.len() > room {
+            (data.to_vec(), 1)
+        } else {
+            (compressed, 0)
+        };
         let addr = self.space.alloc(Mem::Draw, z.len() as u64);
         let rec = ChunkRecord {
             scaled: vec![k as u64, 0],
             nbytes: z.len() as u32,
-            mask: 0,
+            mask,
             addr,
         };
         self.raw.push((addr, z));
@@ -350,6 +412,19 @@ impl Writer {
     /// `H5Fclose`: releases the free space, then writes everything at its address. Returns
     /// the file's bytes.
     pub fn finish(mut self) -> Vec<u8> {
+        // H5F__flush_phase1 releases the aggregators; flushing the metadata cache then gives
+        // real file space to what has a temporary address: the free-space section infos (as
+        // their headers are flushed, in address order), then the heaps' direct blocks (at the
+        // top of the temporary space, the last created first).
+        self.space.free_aggrs();
+        let mut order: Vec<usize> = (0..self.dense.len()).collect();
+        order.sort_by_key(|&d| self.dense[d].fs_addr());
+        for d in order {
+            self.dense[d].place_sections(&mut self.space);
+        }
+        for d in (0..self.dense.len()).rev() {
+            self.dense[d].place_block(&mut self.space);
+        }
         self.space.close();
         let eoa = self.space.eoa;
         let mut out = vec![0u8; eoa as usize];
@@ -367,6 +442,11 @@ impl Writer {
         }
         for t in &self.btrees {
             for (addr, image) in t.serialize() {
+                put(addr, &image);
+            }
+        }
+        for d in &self.dense {
+            for (addr, image) in d.serialize() {
                 put(addr, &image);
             }
         }

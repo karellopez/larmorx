@@ -32,7 +32,7 @@ pub(crate) mod source;
 pub mod superblock;
 pub mod write;
 
-pub use dataset::DatasetInfo;
+pub use dataset::{Chunk, DatasetInfo};
 pub use datatype::{Datatype, FloatType};
 pub use error::{Error, Result};
 pub use file::{File, ObjectKind};

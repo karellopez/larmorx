@@ -17,7 +17,7 @@ use larmorx_io::nifti::itk::ItkVoxels;
 use larmorx_transform::{Transform, TransformChain};
 use numpy::ndarray::{Array2, ArrayD, IxDyn, ShapeBuilder};
 use numpy::{PyArray, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
@@ -247,41 +247,46 @@ fn transform_file_err(e: itk_transform::TransformFileError) -> PyErr {
     }
 }
 
-/// Writes linear transforms as an ITK text (`.txt`, `.tfm`) or MATLAB (`.mat`, one transform)
-/// file.
+/// Writes `(name, parameters, fixed)` tuples in ITK's format for the file name's extension
+/// (`larmorx_io::itk_transform::write_itk_transform_parts`): HDF5 (`.h5`, `.hdf5` and ITK's
+/// other HDF5 extensions; any transforms, as ITK's HDF5 writer with these options), ITK text
+/// (`.txt`, `.tfm`; linear transforms) or MATLAB (`.mat`; one linear transform). The version
+/// strings default to `larmorx_io::itk_hdf5::WriteOptions::default()`'s. Returns the
+/// notices.
 #[pyfunction]
-fn itk_transform_write(path: PathBuf, parts: &Bound<'_, PyAny>) -> PyResult<()> {
+#[pyo3(signature = (path, parts, compression = true, time = 0, itk_version = None, hdf_version = None, os_name = None, os_version = None, upstream_defects = "fix"))]
+#[allow(clippy::too_many_arguments)]
+fn itk_transform_write(
+    py: Python<'_>,
+    path: PathBuf,
+    parts: &Bound<'_, PyAny>,
+    compression: bool,
+    time: u32,
+    itk_version: Option<String>,
+    hdf_version: Option<String>,
+    os_name: Option<String>,
+    os_version: Option<String>,
+    upstream_defects: &str,
+) -> PyResult<Vec<crate::defects::PyNotice>> {
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
     let parts = parts_from_py(parts)?;
-    let linear = parts
-        .iter()
-        .map(|p| {
-            larmorx_transform::LinearTransform::from_itk(
-                &p.name,
-                &p.parameters.to_f64(),
-                &p.fixed_parameters,
-            )
-            .map_err(value_err)
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-    let name = path.to_string_lossy().to_ascii_lowercase();
-    let bytes = if name.ends_with(".mat") {
-        match linear.as_slice() {
-            [one] => itk_transform::write_itk_matlab(one),
-            _ => {
-                return Err(PyValueError::new_err(
-                    "a .mat file holds exactly one linear transform",
-                ));
-            }
-        }
-    } else if name.ends_with(".txt") || name.ends_with(".tfm") {
-        itk_transform::write_itk_text(&linear).into_bytes()
-    } else {
-        return Err(PyValueError::new_err(
-            "linear transforms are written as .txt, .tfm or .mat",
-        ));
+    let default = larmorx_io::itk_hdf5::WriteOptions::default();
+    let options = larmorx_io::itk_hdf5::WriteOptions {
+        compression,
+        time,
+        itk_version: itk_version.unwrap_or(default.itk_version),
+        hdf_version: hdf_version.unwrap_or(default.hdf_version),
+        os_name: os_name.unwrap_or(default.os_name),
+        os_version: os_version.unwrap_or(default.os_version),
     };
-    std::fs::write(&path, bytes)
-        .map_err(|e| PyRuntimeError::new_err(format!("{}: {e}", path.display())))
+    let notices = py
+        .detach(|| {
+            let mut notices = larmorx_core::defects::Notices::new(mode);
+            itk_transform::write_itk_transform_parts(&path, &parts, &options, &mut notices)
+                .map(|()| notices)
+        })
+        .map_err(transform_file_err)?;
+    Ok(crate::defects::notices_to_py(notices.into_vec()))
 }
 
 // ------------------------------------------------------------------------------------------------

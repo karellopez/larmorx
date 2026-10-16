@@ -133,9 +133,16 @@ impl std::fmt::Display for ReadFailure {
 /// prints it, addresses written as `0x0` and the ITK tree as `<ITK source>`.
 pub fn itk_exception(path: &str, site: ItkSite, description: &str) -> String {
     format!(
-        "Transform reader for {path} caught an ITK exception:\n\nitk::ExceptionObject (0x0)\n\
-         Location: \"unknown\" \nFile: <ITK source>/{}\nLine: {}\nDescription: ITK ERROR: {}(0x0): \
-         {description}\n\n",
+        "Transform reader for {path} caught an ITK exception:\n{}",
+        exception_print(site, description)
+    )
+}
+
+/// `ExceptionObject::Print` of an `itkExceptionMacro` raised at `site`.
+fn exception_print(site: ItkSite, description: &str) -> String {
+    format!(
+        "\nitk::ExceptionObject (0x0)\nLocation: \"unknown\" \nFile: <ITK source>/{}\nLine: {}\n\
+         Description: ITK ERROR: {}(0x0): {description}\n\n",
         site.file, site.line, site.class
     )
 }
@@ -565,4 +572,245 @@ fn read_floats(
         );
     }
     Ok(v)
+}
+
+// ------------------------------------------------------------------------------------------------
+// Writing
+
+/// `catch (const H5::Exception &)` in `Write()`: line 462.
+const SITE_WRITE_H5: ItkSite = ItkSite {
+    file: HDF5_IO,
+    line: 462,
+    class: "HDF5TransformIOTemplate",
+};
+/// `WriteOneTransform`: a composite after the first transform (line 390).
+const SITE_WRITE_COMPOSITE: ItkSite = ItkSite {
+    file: HDF5_IO,
+    line: 390,
+    class: "HDF5TransformIOTemplate",
+};
+
+/// `TransformParameters` are stored in chunks of at most this many values (1 Mi).
+pub const CHUNK_VALUES: u64 = 1024 * 1024;
+
+/// What ITK's HDF5 transform writer stores besides the transforms, and how it stores them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WriteOptions {
+    /// Store `TransformParameters` in chunks of at most [`CHUNK_VALUES`] values compressed by
+    /// deflate at level 5 (`TransformFileWriter::SetUseCompression`). ANTs always asks for it
+    /// (`itk::ants::WriteTransform`, antsApplyTransforms' transform outputs); ITK's default
+    /// is uncompressed, contiguous parameters.
+    pub compression: bool,
+    /// The time every object header records, in seconds since 1970-01-01 UTC. ITK records the
+    /// time of writing; larmorx's default, 0, makes the same transforms give the same bytes.
+    pub time: u32,
+    /// The `/ITKVersion` string (ITK: its version, `"5.4.5"`).
+    pub itk_version: String,
+    /// The `/HDFVersion` string (ITK: `H5_VERS_INFO`, `"HDF5 library version: 1.12.1"`).
+    pub hdf_version: String,
+    /// The `/OSName` string (ITK: the system's name, such as `"Linux"`).
+    pub os_name: String,
+    /// The `/OSVersion` string (ITK: the system's release, such as `"6.8.0-124-generic"`).
+    pub os_version: String,
+}
+
+impl Default for WriteOptions {
+    /// Compressed parameters as ANTs writes them, time 0, ITK 5.4.5's and HDF5 1.12.1's version
+    /// strings (the format larmorx writes), and `"larmorx"` with larmorx's version as the
+    /// system.
+    fn default() -> Self {
+        WriteOptions {
+            compression: true,
+            time: 0,
+            itk_version: "5.4.5".into(),
+            hdf_version: "HDF5 library version: 1.12.1".into(),
+            os_name: "larmorx".into(),
+            os_version: env!("CARGO_PKG_VERSION").into(),
+        }
+    }
+}
+
+/// Why ITK's writer fails, and what ANTs prints for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WriteFailure {
+    /// One line for a library user.
+    pub reason: String,
+    /// What ANTs's `itk::ants::WriteTransform` writes on standard error, the file's name
+    /// written as `<file>` (empty where ITK has no such failure).
+    pub ants_report: String,
+    /// The file ITK leaves behind, where larmorx reproduces it (`reproduce`): what was
+    /// written before the failure, closed.
+    pub partial: Option<Vec<u8>>,
+}
+
+impl std::fmt::Display for WriteFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.reason)
+    }
+}
+
+fn write_failure(
+    site: ItkSite,
+    description: &str,
+    diag: Option<&str>,
+    reason: String,
+) -> WriteFailure {
+    let mut ants_report = diag.unwrap_or_default().to_string();
+    ants_report.push_str("Can't write transform file <file>\nException Object caught: \n");
+    ants_report.push_str(&exception_print(site, description));
+    ants_report.push('\n');
+    WriteFailure {
+        reason,
+        ants_report,
+        partial: None,
+    }
+}
+
+fn hdf5_write_error(e: H5Error) -> WriteFailure {
+    WriteFailure {
+        reason: format!("HDF5 write failed: {e}"),
+        ants_report: String::new(),
+        partial: None,
+    }
+}
+
+/// Writes transforms as `HDF5TransformIOTemplate::Write` does, and returns the file's bytes:
+/// the strings `/ITKVersion`, `/HDFVersion`, `/OSName`, `/OSVersion`, then the group
+/// `/TransformGroup` with one group per transform (`0`, `1`, ...), each holding
+/// `TransformType` and, unless it is a composite, `TransformFixedParameters` (double,
+/// contiguous) and `TransformParameters` (float or double as the parameters are stored, and as
+/// [`WriteOptions::compression`] says). A composite may only come first: its components
+/// follow it (ITK's `CompositeTransformIOHelper`).
+///
+/// The file is laid out as HDF5 1.12.1 lays out ITK's file (`larmorx_hdf5::write`): with the
+/// same options and time, every byte is ITK's except those of the compressed chunks (deflate
+/// by zlib-rs, where ITK's HDF5 calls zlib-ng 2.1.6) and the addresses that follow from their
+/// sizes.
+///
+/// **Upstream defects (D13).** ITK-15: ITK cannot write a transform without parameters
+/// (`IdentityTransform`) with compression. larmorx stores its empty parameters contiguous, as
+/// ITK does without compression; `reproduce` fails as ITK does, with the file ITK leaves
+/// behind ([`WriteFailure::partial`]).
+pub fn write(
+    parts: &[ItkTransformParts],
+    options: &WriteOptions,
+    notices: &mut Notices,
+) -> Result<Vec<u8>, WriteFailure> {
+    write_with_deflate(
+        parts,
+        options,
+        notices,
+        Box::new(larmorx_hdf5::write::zlib_rs_deflate),
+    )
+}
+
+/// [`write`] with the chunks compressed by `deflate` (validation replays ITK's own compressed
+/// chunks through it, to show that every other byte is ITK's).
+pub fn write_with_deflate(
+    parts: &[ItkTransformParts],
+    options: &WriteOptions,
+    notices: &mut Notices,
+    deflate: larmorx_hdf5::write::Deflate,
+) -> Result<Vec<u8>, WriteFailure> {
+    use larmorx_hdf5::write::{Floats, Storage, Writer};
+
+    if parts.is_empty() {
+        return Err(WriteFailure {
+            reason: "no transform to write".into(),
+            ants_report: String::new(),
+            partial: None,
+        });
+    }
+    // ITK checks this in WriteOneTransform after writing the composite's group and type; its
+    // exception then leaves the file with what it holds. larmorx refuses before writing.
+    if let Some(i) = parts
+        .iter()
+        .skip(1)
+        .position(|p| p.name.contains("CompositeTransform"))
+    {
+        return Err(write_failure(
+            SITE_WRITE_COMPOSITE,
+            "Composite Transform can only be 1st transform in a file",
+            None,
+            format!(
+                "transform {} is a composite: a composite can only be the first transform of a \
+                 file",
+                i + 1
+            ),
+        ));
+    }
+    let mut w = Writer::with_deflate(options.time, deflate);
+    let root = w.root();
+    for (name, value) in [
+        ("ITKVersion", &options.itk_version),
+        ("HDFVersion", &options.hdf_version),
+        ("OSName", &options.os_name),
+        ("OSVersion", &options.os_version),
+    ] {
+        w.write_string(root, name, value.as_bytes())
+            .map_err(hdf5_write_error)?;
+    }
+    let group = w
+        .create_group(root, "TransformGroup")
+        .map_err(hdf5_write_error)?;
+    for (i, part) in parts.iter().enumerate() {
+        let g = w
+            .create_group(group, &i.to_string())
+            .map_err(hdf5_write_error)?;
+        w.write_string(g, "TransformType", part.name.as_bytes())
+            .map_err(hdf5_write_error)?;
+        if part.name.contains("CompositeTransform") {
+            continue;
+        }
+        w.write_floats(
+            g,
+            "TransformFixedParameters",
+            Floats::F64(&part.fixed_parameters),
+            Storage::Contiguous,
+        )
+        .map_err(hdf5_write_error)?;
+        let n = part.parameters.len() as u64;
+        let mut storage = if options.compression {
+            Storage::Chunked {
+                chunk: n.min(CHUNK_VALUES),
+                level: 5,
+            }
+        } else {
+            Storage::Contiguous
+        };
+        if n == 0 && options.compression {
+            if notices.reproduce() {
+                let mut f = write_failure(
+                    SITE_WRITE_H5,
+                    "H5Pset_chunk failed",
+                    Some(
+                        "HDF5-DIAG: Error detected in HDF5 (1.12.1) thread 0:\n  #000: in \
+                         H5Pset_chunk(): all chunk dimensions must be positive\n",
+                    ),
+                    format!(
+                        "transform {i} ({}) has no parameters, which ITK cannot write with \
+                         compression (H5Pset_chunk failed, ITK-15)",
+                        part.name
+                    ),
+                );
+                f.partial = Some(w.finish());
+                return Err(f);
+            }
+            notices.add(
+                &defects::ITK_15,
+                format!(
+                    "transform {i} ({}) has no parameters: stored uncompressed",
+                    part.name
+                ),
+            );
+            storage = Storage::Contiguous;
+        }
+        let values = match &part.parameters {
+            Parameters::F64(v) => Floats::F64(v),
+            Parameters::F32(v) => Floats::F32(v),
+        };
+        w.write_floats(g, "TransformParameters", values, storage)
+            .map_err(hdf5_write_error)?;
+    }
+    Ok(w.finish())
 }

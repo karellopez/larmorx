@@ -44,6 +44,12 @@ pub enum TransformFileError {
     /// ITK cannot read the file: why, and what ANTs prints.
     #[error("{0}")]
     Unreadable(crate::itk_hdf5::ReadFailure),
+    /// ITK cannot write the transforms: why, and what ANTs prints.
+    #[error("{}: {failure}", path.display())]
+    Unwritable {
+        path: std::path::PathBuf,
+        failure: crate::itk_hdf5::WriteFailure,
+    },
 }
 
 impl TransformFileError {
@@ -55,6 +61,13 @@ impl TransformFileError {
                 Some(format!("Transform file does not exist: {}\n", p.display()))
             }
             TransformFileError::Unreadable(f) => Some(f.ants_report.clone()),
+            TransformFileError::Unwritable { path, failure } if !failure.ants_report.is_empty() => {
+                Some(
+                    failure
+                        .ants_report
+                        .replace("<file>", &path.display().to_string()),
+                )
+            }
             _ => None,
         }
     }
@@ -389,6 +402,94 @@ pub fn write_itk_matlab(t: &LinearTransform) -> Vec<u8> {
         }
     }
     out
+}
+
+/// The extensions ITK's HDF5 transform writer takes (`HDF5TransformIOTemplate::CanWriteFile`:
+/// the file name's last extension, compared case for case).
+pub const HDF5_EXTENSIONS: &[&str] = &[
+    ".hdf", ".h4", ".hdf4", ".h5", ".hdf5", ".he4", ".he5", ".hd5",
+];
+
+/// The file name's last extension, dot included (`SystemTools::GetFilenameLastExtension`).
+fn last_extension(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    name.rfind('.')
+        .map(|i| name[i..].to_string())
+        .unwrap_or_default()
+}
+
+/// Whether ITK writes `path` as an HDF5 transform file ([`HDF5_EXTENSIONS`]).
+pub fn is_hdf5_name(path: &Path) -> bool {
+    HDF5_EXTENSIONS.contains(&last_extension(path).as_str())
+}
+
+/// Writes transforms in the ITK format of the file name's extension: HDF5
+/// ([`HDF5_EXTENSIONS`]; any transforms, written by [`crate::itk_hdf5::write`] with
+/// `options`), ITK text (`.txt`, `.tfm`; linear transforms) or MATLAB (`.mat`; one linear
+/// transform). A list of more than one transform is written as ITK writes a composite's: the
+/// `CompositeTransform` entry first (text files write it themselves).
+///
+/// When ITK's HDF5 writer fails with `notices` in `reproduce` mode and leaves a file behind
+/// (ITK-15), that file is written before the error is returned.
+pub fn write_itk_transform_parts(
+    path: &Path,
+    parts: &[ItkTransformParts],
+    options: &crate::itk_hdf5::WriteOptions,
+    notices: &mut Notices,
+) -> Result<(), TransformFileError> {
+    let io = |source| TransformFileError::Io {
+        path: path.to_path_buf(),
+        source,
+    };
+    let bytes = if is_hdf5_name(path) {
+        match crate::itk_hdf5::write(parts, options, notices) {
+            Ok(bytes) => bytes,
+            Err(mut failure) => {
+                if let Some(partial) = failure.partial.take() {
+                    std::fs::write(path, partial).map_err(io)?;
+                }
+                return Err(TransformFileError::Unwritable {
+                    path: path.to_path_buf(),
+                    failure,
+                });
+            }
+        }
+    } else {
+        let lower = last_extension(path).to_ascii_lowercase();
+        let components = match parts.first() {
+            Some(first) if first.name.starts_with("CompositeTransform") => &parts[1..],
+            _ => parts,
+        };
+        let linear = components
+            .iter()
+            .map(|p| {
+                LinearTransform::from_itk(&p.name, &p.parameters.to_f64(), &p.fixed_parameters)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        match lower.as_str() {
+            ".mat" => match linear.as_slice() {
+                [one] => write_itk_matlab(one),
+                _ => {
+                    return Err(format_err(
+                        path,
+                        "a .mat file holds exactly one linear transform",
+                    ));
+                }
+            },
+            ".txt" | ".tfm" => write_itk_text(&linear).into_bytes(),
+            _ => {
+                return Err(format_err(
+                    path,
+                    "unknown transform file type (expected .h5 or another HDF5 extension, .txt, \
+                     .tfm or .mat)",
+                ));
+            }
+        }
+    };
+    std::fs::write(path, bytes).map_err(io)
 }
 
 // ------------------------------------------------------------------------------------------------

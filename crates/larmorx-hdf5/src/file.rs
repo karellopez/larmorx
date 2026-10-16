@@ -193,6 +193,19 @@ impl File {
         dataset::info(self, &oh)
     }
 
+    /// The stored chunks of a chunked dataset, in the order its index lists them (none for
+    /// other layouts).
+    pub fn chunks(&self, info: &DatasetInfo) -> Result<Vec<dataset::Chunk>> {
+        dataset::chunks(self, info)
+    }
+
+    /// A chunk's bytes as stored, before its filters are undone (`H5Dread_chunk`).
+    pub fn read_chunk_raw(&self, chunk: &dataset::Chunk) -> Result<Vec<u8>> {
+        let size =
+            usize::try_from(chunk.size).map_err(|_| crate::error::corrupt("chunk too large"))?;
+        self.read_at(chunk.addr, size)
+    }
+
     /// Every element of a dataset as stored (row-major, the datatype's size each).
     pub fn read_raw(&self, info: &DatasetInfo, n_threads: usize) -> Result<Vec<u8>> {
         dataset::read_raw(self, info, n_threads)

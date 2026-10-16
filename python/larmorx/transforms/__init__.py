@@ -20,7 +20,7 @@ from larmorx.transforms.chain import (
     load_itk_linear,
     load_transforms,
 )
-from larmorx.transforms.itk import ItkTransform, _read_parts, read, write
+from larmorx.transforms.itk import Hdf5WriteOptions, ItkTransform, _read_parts, read, write
 from larmorx.transforms.resample import (
     PE_DIRECTIONS,
     ensure_positive_cosines,
@@ -32,6 +32,7 @@ __all__ = [
     "Affine",
     "AffineSeries",
     "DenseField",
+    "Hdf5WriteOptions",
     "ItkTransform",
     "Transform",
     "TransformChain",

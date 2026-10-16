@@ -55,6 +55,7 @@ MIXED = {
     "crates/larmorx-hdf5/src/superblock.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/alloc.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/btree.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-hdf5/src/write/dense.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/encode.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/gheap.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/mod.rs": "Apache-2.0 AND BSD-3-Clause",

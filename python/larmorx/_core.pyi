@@ -101,8 +101,36 @@ def itk_transform_read(
     in the file's order, read as ITK's reader for ``precision`` (``float64`` or ``float32``)
     reads them, and the upstream-defect notices."""
 
-def itk_transform_write(path: str, parts: Parts) -> None:
-    """Write linear transforms as ITK text (``.txt``, ``.tfm``) or MATLAB (``.mat``)."""
+def itk_transform_write(
+    path: str,
+    parts: Parts,
+    compression: bool = True,
+    time: int = 0,
+    itk_version: str | None = None,
+    hdf_version: str | None = None,
+    os_name: str | None = None,
+    os_version: str | None = None,
+    upstream_defects: str = "fix",
+) -> list[Notice]:
+    """Write transforms in ITK's format for the file name's extension: HDF5 (``.h5``,
+    ``.hdf5`` and ITK's other HDF5 extensions; any transforms, as ITK's HDF5 writer with these
+    options), ITK text (``.txt``, ``.tfm``; linear) or MATLAB (``.mat``; one linear). Returns
+    the upstream-defect notices."""
+
+# --- HDF5 (crate larmorx-hdf5) -----------------------------------------------------------------
+
+def hdf5_group_members(path: str, group: str) -> list[tuple[str, dict[str, Any]]]:
+    """The members of an HDF5 group in h5py's order (by name), each with the datasets it holds
+    as h5py reads them: strings as ``list[bytes | None]``, floats as float32 (4-byte) or
+    float64 arrays. ``KeyError`` if the group does not exist, ``OSError`` if the file is not
+    HDF5."""
+
+def itk_h5_replay(path: str) -> dict[str, Any]:
+    """Replay an ITK-written HDF5 transform file through larmorx's writer with the file's own
+    time, strings and compression, and compare the bytes (validation suite ``itk-hdf5``)."""
+
+def hdf5_set_times(data: bytes, time: int) -> bytes:
+    """An HDF5 file's bytes with every object header's times set to ``time``."""
 
 def ants_apply_transforms(
     data: np.ndarray,

@@ -20,6 +20,7 @@ larmorx-afni.workspace = true
 larmorx-ants.workspace = true
 larmorx-cli.workspace = true
 larmorx-core.workspace = true
+larmorx-hdf5.workspace = true
 larmorx-interp.workspace = true
 larmorx-io.workspace = true
 larmorx-mri.workspace = true

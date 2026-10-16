@@ -591,6 +591,332 @@ impl ObjHeader {
         idx
     }
 
+    /// The link messages, in the order of the header's message array (`H5O_msg_iterate`).
+    pub(crate) fn links(&self) -> Vec<(Vec<u8>, u64)> {
+        self.mesgs
+            .iter()
+            .filter_map(|m| match &m.native {
+                Native::Link { name, addr } => Some((name.clone(), *addr)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `H5O_msg_remove(H5O_LINK_ID, H5O_ALL)`: every link message becomes a null message,
+    /// then the header is condensed (`H5O__msg_iterate_real`).
+    pub(crate) fn remove_links(&mut self, space: &mut Space) {
+        for idx in 0..self.mesgs.len() {
+            if matches!(self.mesgs[idx].native, Native::Link { .. }) {
+                self.release(space, idx, false);
+            }
+        }
+        self.condense(space);
+    }
+
+    /// `H5O__release_mesg`: message `idx` becomes a null message with its bytes zeroed and
+    /// absorbs its chunk's gap. With `delete`, the chunk a continuation message points to is
+    /// freed first (`H5O__delete_mesg`, `H5O__cont_delete`, `H5O__chunk_delete`).
+    fn release(&mut self, space: &mut Space, idx: usize, delete: bool) {
+        if delete && let Native::Cont { chunkno, .. } = self.mesgs[idx].native {
+            let c = &self.chunks[chunkno];
+            space.xfree(Mem::OHdr, c.addr, c.size as u64);
+        }
+        let (raw, raw_size, chunkno) = {
+            let m = &self.mesgs[idx];
+            (m.raw, m.raw_size, m.chunkno)
+        };
+        self.chunks[chunkno].image[raw..raw + raw_size].fill(0);
+        self.mesgs[idx].native = Native::Null;
+        self.mesgs[idx].flags = 0;
+        let gap = self.chunks[chunkno].gap;
+        if gap > 0 {
+            let gap_loc = self.chunks[chunkno].size - (CHKSUM + gap);
+            self.eliminate_gap(idx, gap_loc, gap);
+        }
+    }
+
+    /// `H5O__condense_header`.
+    fn condense(&mut self, space: &mut Space) {
+        loop {
+            let mut rescan = self.move_msgs_forward(space);
+            rescan |= self.merge_null(space);
+            rescan |= self.remove_empty_chunks(space);
+            if !rescan {
+                break;
+            }
+        }
+    }
+
+    /// `H5O__merge_null`: merges adjacent null messages of a chunk.
+    fn merge_null(&mut self, space: &mut Space) -> bool {
+        let mut did = false;
+        loop {
+            let mut merged = false;
+            'scan: for u in 0..self.mesgs.len() {
+                if !self.mesgs[u].is_null() {
+                    continue;
+                }
+                for v in 0..self.mesgs.len() {
+                    let (a, b) = (&self.mesgs[u], &self.mesgs[v]);
+                    if u == v || !b.is_null() || a.chunkno != b.chunkno {
+                        continue;
+                    }
+                    let grow = MSGHDR + b.raw_size;
+                    let new_raw = if a.raw + a.raw_size == b.raw - MSGHDR {
+                        a.raw
+                    } else if a.raw - MSGHDR == b.raw + b.raw_size {
+                        a.raw - grow
+                    } else {
+                        continue;
+                    };
+                    self.mesgs[u].raw = new_raw;
+                    self.mesgs[u].raw_size += grow;
+                    self.mesgs.remove(v);
+                    merged = true;
+                    // The merged message may fill a whole chunk.
+                    self.remove_empty_chunks(space);
+                    break 'scan;
+                }
+            }
+            if !merged {
+                break;
+            }
+            did = true;
+        }
+        did
+    }
+
+    /// `H5O__remove_empty_chunks`: a continuation chunk holding only a null message is freed,
+    /// and the continuation message pointing to it becomes a null message.
+    fn remove_empty_chunks(&mut self, space: &mut Space) -> bool {
+        let mut did = false;
+        loop {
+            let mut deleted = false;
+            for u in 0..self.mesgs.len() {
+                let m = &self.mesgs[u];
+                if !(m.is_null()
+                    && m.chunkno > 0
+                    && MSGHDR + m.raw_size == self.chunks[m.chunkno].size - CHKHDR)
+                {
+                    continue;
+                }
+                let deleted_chunkno = m.chunkno;
+                let target = self.chunks[deleted_chunkno].addr;
+                let cont = self
+                    .mesgs
+                    .iter()
+                    .position(|c| matches!(c.native, Native::Cont { addr, .. } if addr == target))
+                    .expect("a continuation message points to every chunk after the first");
+                self.release(space, cont, true);
+                self.chunks.remove(deleted_chunkno);
+                self.mesgs.remove(u);
+                for m in &mut self.mesgs {
+                    if m.chunkno > deleted_chunkno {
+                        m.chunkno -= 1;
+                    }
+                    if let Native::Cont { chunkno, .. } = &mut m.native
+                        && *chunkno > deleted_chunkno
+                    {
+                        *chunkno -= 1;
+                    }
+                }
+                deleted = true;
+                break;
+            }
+            if !deleted {
+                break;
+            }
+            did = true;
+        }
+        did
+    }
+
+    /// `H5O__move_msgs_forward`: null messages go to the end of their chunks, and messages
+    /// move into large enough null messages of earlier chunks.
+    fn move_msgs_forward(&mut self, space: &mut Space) -> bool {
+        let mut did = false;
+        loop {
+            let mut packed = false;
+            let mut u = 0;
+            while u < self.mesgs.len() {
+                if self.mesgs[u].is_null() {
+                    let (craw, csize, cchunk) = {
+                        let m = &self.mesgs[u];
+                        (m.raw, m.raw_size, m.chunkno)
+                    };
+                    let chunk = &self.chunks[cchunk];
+                    if craw + csize != chunk.size - (CHKSUM + chunk.gap) {
+                        let next = self
+                            .mesgs
+                            .iter()
+                            .position(|n| n.chunkno == cchunk && craw + csize == n.raw - MSGHDR);
+                        if let Some(v) = next
+                            && !self.mesgs[v].is_null()
+                        {
+                            let (nraw, nsize) = (self.mesgs[v].raw, self.mesgs[v].raw_size);
+                            self.chunks[cchunk]
+                                .image
+                                .copy_within(nraw - MSGHDR..nraw + nsize, craw - MSGHDR);
+                            self.mesgs[v].raw = craw;
+                            self.mesgs[u].raw = craw + nsize + MSGHDR;
+                            packed = true;
+                        }
+                    }
+                } else {
+                    if matches!(self.mesgs[u].native, Native::Cont { .. })
+                        && self.move_cont(space, u)
+                    {
+                        packed = true;
+                        break;
+                    }
+                    if self.move_to_earlier_null(u) {
+                        packed = true;
+                        break;
+                    }
+                }
+                u += 1;
+            }
+            if !packed {
+                break;
+            }
+            did = true;
+        }
+        did
+    }
+
+    /// The second half of `H5O__move_msgs_forward`'s loop: message `u` moves into the first
+    /// null message of an earlier chunk that can hold it.
+    fn move_to_earlier_null(&mut self, u: usize) -> bool {
+        let (old_chunkno, old_raw, csize) = {
+            let m = &self.mesgs[u];
+            (m.chunkno, m.raw, m.raw_size)
+        };
+        let Some(v) = self
+            .mesgs
+            .iter()
+            .position(|n| n.is_null() && old_chunkno > n.chunkno && csize <= n.raw_size)
+        else {
+            return false;
+        };
+        let (nraw, nsize, nchunk) = {
+            let n = &self.mesgs[v];
+            (n.raw, n.raw_size, n.chunkno)
+        };
+        let bytes = self.chunks[old_chunkno].image[old_raw - MSGHDR..old_raw + csize].to_vec();
+        self.chunks[nchunk].image[nraw - MSGHDR..nraw + csize].copy_from_slice(&bytes);
+        self.mesgs[u].chunkno = nchunk;
+        self.mesgs[u].raw = nraw;
+        if csize == nsize {
+            self.mesgs[v].chunkno = old_chunkno;
+            self.mesgs[v].raw = old_raw;
+            let gap = self.chunks[old_chunkno].gap;
+            if gap > 0 {
+                let gap_loc = self.chunks[old_chunkno].size - (CHKSUM + gap);
+                self.eliminate_gap(v, gap_loc, gap);
+            }
+            return true;
+        }
+        let new_null = if nsize - csize < MSGHDR {
+            let gap_size = nsize - csize;
+            self.mesgs[v].raw_size = csize;
+            self.add_gap(nchunk, v, nraw + csize, gap_size);
+            v
+        } else {
+            self.mesgs[v].raw = nraw + csize + MSGHDR;
+            self.mesgs[v].raw_size = nsize - (csize + MSGHDR);
+            self.mesgs.push(Mesg {
+                native: Native::Null,
+                raw: 0,
+                raw_size: 0,
+                chunkno: 0,
+                flags: 0,
+            });
+            self.mesgs.len() - 1
+        };
+        let m = &mut self.mesgs[new_null];
+        m.native = Native::Null;
+        m.flags = 0;
+        m.raw = old_raw;
+        m.raw_size = csize;
+        m.chunkno = old_chunkno;
+        let gap = self.chunks[old_chunkno].gap;
+        if gap > 0 {
+            let gap_loc = self.chunks[old_chunkno].size - (CHKSUM + gap);
+            self.eliminate_gap(new_null, gap_loc, gap);
+        }
+        true
+    }
+
+    /// `H5O__move_cont`: when the messages of the last chunk fit in the place of the
+    /// continuation message pointing to it, they move there and the chunk is freed.
+    fn move_cont(&mut self, space: &mut Space, cont_u: usize) -> bool {
+        let Native::Cont {
+            chunkno: deleted_chunkno,
+            ..
+        } = self.mesgs[cont_u].native
+        else {
+            return false;
+        };
+        if deleted_chunkno != self.chunks.len() - 1 {
+            return false;
+        }
+        let nonnull_size: usize = self
+            .mesgs
+            .iter()
+            .filter(|m| m.chunkno == deleted_chunkno && !m.is_null())
+            .map(|m| m.raw_size + MSGHDR)
+            .sum();
+        let (craw, csize, cont_chunkno) = {
+            let m = &self.mesgs[cont_u];
+            (m.raw, m.raw_size, m.chunkno)
+        };
+        let mut gap_size = self.chunks[cont_chunkno].gap;
+        if nonnull_size == 0 || nonnull_size > gap_size + csize + MSGHDR {
+            return false;
+        }
+        let mut move_start = craw - MSGHDR;
+        let move_end = craw + csize;
+        self.release(space, cont_u, false);
+        for v in 0..self.mesgs.len() {
+            let m = &self.mesgs[v];
+            if m.chunkno != deleted_chunkno || m.is_null() {
+                continue;
+            }
+            let (raw, size) = (m.raw, m.raw_size);
+            let bytes = self.chunks[deleted_chunkno].image[raw - MSGHDR..raw + size].to_vec();
+            self.chunks[cont_chunkno].image[move_start..move_start + bytes.len()]
+                .copy_from_slice(&bytes);
+            self.mesgs[v].raw = move_start + MSGHDR;
+            self.mesgs[v].chunkno = cont_chunkno;
+            move_start += size + MSGHDR;
+        }
+        {
+            let c = &self.chunks[deleted_chunkno];
+            space.xfree(Mem::OHdr, c.addr, c.size as u64);
+        }
+        // C computes this with `move_end` taken before the release: a gap the release
+        // absorbed is counted through `gap_size`.
+        gap_size += move_end - move_start;
+        if gap_size >= MSGHDR {
+            self.mesgs[cont_u].raw_size = gap_size - MSGHDR;
+            self.mesgs[cont_u].raw = move_start + MSGHDR;
+        } else {
+            if gap_size > 0 {
+                self.add_gap(cont_chunkno, cont_u, move_start, gap_size);
+            }
+            self.mesgs.remove(cont_u);
+        }
+        let mut v = self.mesgs.len();
+        while v > 0 {
+            v -= 1;
+            if self.mesgs[v].chunkno == deleted_chunkno && self.mesgs[v].is_null() {
+                self.mesgs.remove(v);
+            }
+        }
+        self.chunks.pop();
+        true
+    }
+
     /// The bytes of every chunk at its address (`H5O__cache_serialize`,
     /// `H5O__cache_chk_serialize`).
     pub(crate) fn serialize(&self) -> Vec<(u64, Vec<u8>)> {

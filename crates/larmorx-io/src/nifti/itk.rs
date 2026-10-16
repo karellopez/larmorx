@@ -21,7 +21,10 @@ use super::header::{NiftiHeader, NiftiVersion, xform};
 use super::{Error, ReadOptions, Scaling};
 
 mod write;
-pub use write::{ItkMeta, ItkWriteError, is_itk_nifti_name, itk_header, write_itk_image};
+pub use write::{
+    ItkMeta, ItkWriteError, is_itk_nifti_name, itk_header, itk_vector_header, write_itk_image,
+    write_itk_vector_image,
+};
 
 /// The geometry ITK gives an image read from a NIfTI file.
 #[derive(Clone, Debug, PartialEq)]

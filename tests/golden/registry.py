@@ -1065,6 +1065,76 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.ants.antsApplyTransforms.outputs", covers=("cli:ants antsApplyTransforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The transform outputs: the chain collapsed to one affine (text) and inverted (MATLAB),
+    as a composite (HDF5, an inverted Euler as a ``MatrixOffsetTransformBase``; MATLAB in
+    float), and as a displacement field on the reference grid (NIfTI, the pointwise path through
+    the field; float, the scan-line path of a linear chain)."""
+    chain = ("-t", ctx.file("affine.mat"), "-t", f"[{ctx.file('rigid.txt')},1]")
+    files = {
+        "linear": ctx.out("linear.txt"),
+        "linear_inverse": ctx.out("inverse.mat"),
+        "composite": ctx.out("composite.h5"),
+        "composite_float": ctx.out("composite_float.mat"),
+        "field": ctx.out("field.nii.gz"),
+        "field_float": ctx.out("field_float.nii"),
+    }
+    cli("ants", "antsApplyTransforms", "-d", "3", "-o", f"Linear[{files['linear']}]", *chain)
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "-o", f"Linear[{files['linear_inverse']},1]",
+        *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3",
+        "-o", f"CompositeTransform[{files['composite']}]", "-t", ctx.file("warp.nii.gz"), *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1",
+        "-o", f"CompositeTransform[{files['composite_float']}]", *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "-r", ctx.file("reference.nii"),
+        "-o", f"DisplacementField[{files['field']}]", "-t", ctx.file("warp.nii.gz"), *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1", "-r", ctx.file("reference.nii"),
+        "-o", f"[{files['field_float']},1]", *chain,
+    )  # fmt: skip
+    out: dict[str, Any] = {}
+    for key, path in files.items():
+        if path.endswith(".h5"):
+            structure, values = _h5_structure(path)
+            out[f"{key}.structure"] = structure
+            out[f"{key}.values"] = values
+        elif ".nii" in path:
+            out[key] = Nifti(path)
+        else:
+            out[key] = File(path)
+    return out
+
+
+@case("py.ants.combine_transforms", covers=("lx.ants.combine_transforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.combine_transforms``: a composite, the collapsed affine and its inverse in
+    float, and a displacement field on the reference grid."""
+    chain = [ctx.file("warp.nii.gz"), ctx.file("affine.mat"), ctx.file("rigid.txt")]
+    flags = [False, False, True]
+    composite = lx.ants.combine_transforms(chain, invert=flags)
+    linear = lx.ants.combine_transforms(
+        chain[1:], invert=flags[1:], output="linear", invert_linear=True, precision="float32"
+    )
+    field = lx.ants.combine_transforms(
+        chain, invert=flags, output="displacement_field", reference=ctx.file("reference.nii")
+    )
+    out: dict[str, Any] = {}
+    for key, xfms in (("composite", composite), ("linear", linear), ("field", field)):
+        out[f"{key}.names"] = "\n".join(t.name for t in xfms)
+        out[f"{key}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+        out[f"{key}.fixed"] = np.concatenate([t.fixed_parameters for t in xfms])
+    return out
+
+
 # --- ANTs: the Python functions -----------------------------------------------------------------
 
 

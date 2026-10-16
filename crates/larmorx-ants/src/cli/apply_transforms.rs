@@ -2,11 +2,21 @@
 //! `antsApplyTransforms` with its original arguments (ANTs v2.6.5).
 //!
 //! Supported: 3D scalar images (`-e 0`) and time series (`-e 3`, also with `--time-index`),
-//! every interpolator, `-u`, `-f`, `--float` and `-v`, with NIfTI input and output. Not yet
-//! supported (an error says so): vector, tensor, multichannel and five-dimensional images, 2D
-//! and 4D transforms (`-d 2`, `-d 4`), transform outputs (`-o Linear[...]`,
-//! `-o CompositeTransform[...]`, `-o [field,1]`) and transform initializers
+//! every interpolator, `-u`, `-f`, `--float` and `-v`, with NIfTI input and output; and the
+//! transform outputs `-o Linear[file,<invert>]` (the chain collapsed to one affine transform),
+//! `-o CompositeTransform[file]` (the chain as ANTs holds it) and `-o DisplacementField[file]`
+//! (or `-o [file,1]`: the chain as a displacement field on the reference grid), in ITK's
+//! text, MATLAB and HDF5 transform formats and as NIfTI vector images. Not yet supported (an
+//! error says so): vector, tensor, multichannel and five-dimensional images, 2D and 4D
+//! transforms (`-d 2`, `-d 4`), MINC files (`.xfm`) and transform initializers
 //! (`-t [fixed,moving,feature]`).
+//!
+//! **Transform outputs** ([`crate::transform_output`]) follow `antsApplyTransforms.cxx`: the
+//! chain is built as `GetCompositeTransformFromParserOption` builds it (an identity
+//! `MatrixOffsetTransformBase` is added when it has no parameters), each transform keeping the
+//! class ITK reads it as, an inverted one the class ITK's `GetInverseTransform` makes
+//! ([`larmorx_transform::itk_object`]). An input image, when given, is read but not resampled:
+//! ANTs resamples it and discards the result.
 //!
 //! `--float 1` computes in single precision exactly as ANTs' float pipeline does
 //! ([`crate::apply_transforms`]): the input is read as float, text transforms are read in
@@ -27,12 +37,16 @@ use larmorx_core::array::DynArray;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use larmorx_core::{Grid3, Precision};
 use larmorx_interp::{Interpolation, Window};
+use larmorx_io::itk_transform::{Parameters, write_itk_transform_parts};
 use larmorx_io::nifti;
-use larmorx_io::nifti::itk::{ItkGeometry, ItkMeta, ItkVoxels, write_itk_image};
+use larmorx_io::nifti::itk::{
+    ItkGeometry, ItkMeta, ItkVoxels, write_itk_image, write_itk_vector_image,
+};
 use larmorx_transform::{LinearTransform, Transform, TransformChain};
 
 use super::parser::{self, OptionSpec, OptionValue, Parsed, atof};
 use super::{TransformLoader, itk_threads};
+use crate::transform_output::{TransformOutput, transform_output, with_identity_if_empty};
 use crate::{ApplyTransformsOptions, OutputType, apply_transforms};
 
 const fn opt(long: &'static str, short: Option<char>) -> OptionSpec {
@@ -303,10 +317,7 @@ fn transform_chain(
             }
         };
         let transform = if name == "identity" || name == "Identity" {
-            Transform::Linear(LinearTransform::from_matrix(
-                larmorx_core::linalg::IDENTITY3,
-                [0.0; 3],
-            ))
+            Transform::Linear(LinearTransform::identity_matrix_offset())
         } else {
             match loader.load_with(Path::new(name), precision, notices) {
                 Ok(t) => t,
@@ -331,28 +342,67 @@ fn grid3(g: &ItkGeometry) -> Result<Grid3, String> {
     g.grid3().ok_or_else(|| "singular image grid".to_owned())
 }
 
-/// The output file named by `-o`.
-fn output_path(p: &Parsed) -> Result<String, String> {
+/// What `-o` asks for (`antsApplyTransforms.cxx`, the output section).
+#[derive(Clone, Debug, PartialEq)]
+enum Output {
+    /// The warped image (`-o file`, `-o [file,0]`).
+    Image(String),
+    /// `-o Linear[file,<invert=0>]`: the chain collapsed to one `AffineTransform`.
+    Linear { path: String, invert: bool },
+    /// `-o CompositeTransform[file]`: the chain's transforms.
+    Composite(String),
+    /// `-o DisplacementField[file]` or `-o [file,1]`: the chain as a displacement field.
+    Field(String),
+}
+
+/// `Convert<unsigned int>` of a parameter, as a boolean (`!= 0`).
+fn nonzero(v: &str) -> bool {
+    atof(v) != 0.0
+}
+
+/// The output `-o` names.
+fn output(p: &Parsed) -> Result<Output, String> {
     let v = p
         .last("output")
         .ok_or("larmorx: an output (-o) is required")?;
-    let unsupported = |what: &str| format!("larmorx: {what} output (-o) is not supported yet");
-    match v.name.to_lowercase().as_str() {
-        "linear" => return Err(unsupported("linear transform")),
-        "compositetransform" => return Err(unsupported("composite transform")),
-        "displacementfield" => return Err(unsupported("displacement field")),
+    let name = v.name.to_lowercase();
+    let param = |i: usize| v.parameters.get(i).cloned();
+    match name.as_str() {
+        "linear" | "compositetransform" => {
+            let Some(path) = param(0) else {
+                return Err(
+                    "An output parameter is required with -o Linear or -o CompositeTransform, see \
+                     usage"
+                        .into(),
+                );
+            };
+            if name == "linear" {
+                let invert = param(1).is_some_and(|i| nonzero(&i));
+                return Ok(Output::Linear { path, invert });
+            }
+            return Ok(Output::Composite(path));
+        }
+        "displacementfield" => {
+            // ANTs writes to GetParameter(0), the empty string when there is none, and ITK's
+            // writer throws an uncaught exception.
+            let path = param(0).filter(|p| !p.is_empty()).ok_or(
+                "larmorx: -o DisplacementField needs a file name (DisplacementField[file]); ANTs \
+                 aborts",
+            )?;
+            return Ok(Output::Field(path));
+        }
+        "" if v.parameters.len() > 1 && nonzero(&v.parameters[1]) => {
+            return Ok(Output::Field(v.parameters[0].clone()));
+        }
         _ => {}
     }
-    if v.parameters.len() > 1 {
-        if atof(&v.parameters[1]) != 0.0 {
-            return Err(unsupported("displacement field"));
-        }
-        return Ok(v.parameters[0].clone());
+    if v.parameters.len() > 1 && !nonzero(&v.parameters[1]) {
+        return Ok(Output::Image(v.parameters[0].clone()));
     }
     if v.name.is_empty() {
         return Err("larmorx: empty output file name".into());
     }
-    Ok(v.name.clone())
+    Ok(Output::Image(v.name.clone()))
 }
 
 fn run(
@@ -430,12 +480,27 @@ fn run(
     });
     let n_threads = itk_threads();
 
+    let output = match self::output(p)? {
+        Output::Image(path) => path,
+        transform_output => {
+            return write_transform_output(
+                p,
+                loader,
+                notices,
+                &mut log,
+                transform_output,
+                precision,
+                image_type,
+                time_index,
+                n_threads,
+            );
+        }
+    };
     let input_path = &p.last("input").ok_or("An input image is required.")?.name;
     let reference_path = &p
         .last("reference-image")
         .ok_or("A reference image is required.")?
         .name;
-    let output = output_path(p)?;
     fn read_err(path: &str) -> impl FnOnce(nifti::Error) -> String + '_ {
         move |e| format!("Unable to read image {path}: {e}")
     }
@@ -578,6 +643,164 @@ fn run(
     .map_err(|e| e.to_string())?;
     log(format!("Output warped image: {output}"));
     Ok(())
+}
+
+/// The transform outputs (`-o Linear[...]`, `-o CompositeTransform[...]`,
+/// `-o DisplacementField[...]`), in the order ANTs checks its options: the input image, if
+/// any, is read; the reference is required unless the output is linear or composite; the
+/// chain is built (an identity `MatrixOffsetTransformBase` added when it has no parameters);
+/// the interpolator is checked; then the output is written. Where ANTs crashes (an input image
+/// to resample without a reference, a Gaussian or MultiLabel interpolator without an input
+/// image), larmorx refuses with a message in both D13 modes.
+#[allow(clippy::too_many_arguments)]
+fn write_transform_output(
+    p: &Parsed,
+    loader: &dyn TransformLoader,
+    notices: &mut Notices,
+    log: &mut dyn FnMut(String),
+    output: Output,
+    precision: Precision,
+    image_type: ImageType,
+    time_index: Option<usize>,
+    n_threads: usize,
+) -> Result<(), String> {
+    fn read_err(path: &str) -> impl FnOnce(nifti::Error) -> String + '_ {
+        move |e| format!("Unable to read image {path}: {e}")
+    }
+    let input_path = p.last("input").map(|v| v.name.clone());
+    let mut input_spacing = None;
+    if let Some(path) = &input_path {
+        let image = nifti::itk::read_itk_image(path, n_threads).map_err(read_err(path))?;
+        let g = &image.geometry;
+        match (g.ndim, image_type, time_index) {
+            (3, ImageType::Scalar, None) | (3 | 4, ImageType::TimeSeries, _) => {}
+            (3 | 4, ImageType::Scalar, Some(_)) => {}
+            (_, ImageType::Scalar, None) => {
+                return Err(format!(
+                    "Input image dimension does not match. Expected: 3, but got: {}\nSee -e option \
+                     for available input types.",
+                    g.ndim
+                ));
+            }
+            _ => {
+                return Err(format!(
+                    "larmorx: {}D time series are not supported",
+                    g.ndim
+                ));
+            }
+        }
+        if let Some(t) = time_index {
+            let n_t = if g.ndim >= 4 { g.size[3] } else { 1 };
+            if t >= n_t {
+                return Err(format!(
+                    "Error: time index to extract is out of range [0, {}]",
+                    n_t - 1
+                ));
+            }
+        }
+        input_spacing = Some(grid3(g)?.spacing);
+        log(format!("Input image: {path}"));
+    }
+    let reference = match p.last("reference-image") {
+        Some(v) => {
+            let path = &v.name;
+            let g = nifti::read_header(path)
+                .map_err(read_err(path))
+                .and_then(|h| nifti::itk::itk_geometry(&h).map_err(|e| format!("{path}: {e}")))?;
+            log(format!("Reference image: {path}"));
+            Some(grid3(&g)?)
+        }
+        None if matches!(output, Output::Field(_)) => {
+            return Err("A reference image is required.".into());
+        }
+        None => None,
+    };
+    let chain = transform_chain(p, loader, precision, notices, log)?;
+    let (chain, added) = with_identity_if_empty(chain).map_err(|e| e.to_string())?;
+    if added {
+        log("WARNING: No transforms found, using identify transform".into());
+    }
+    // The interpolator is set up whatever the output; Gaussian and MultiLabel sigmas default
+    // to the input's spacing, which ANTs reads from the first input image even when there is
+    // none.
+    let name = p.last("interpolation").map(|v| v.name.to_lowercase());
+    match (input_spacing, name.as_deref()) {
+        (Some(spacing), _) => {
+            interpolation(p, spacing, notices)?;
+        }
+        (None, Some("gaussian" | "multilabel")) => {
+            return Err(
+                "larmorx: a Gaussian or MultiLabel interpolator needs an input image (-i) for its \
+                 default sigmas; ANTs crashes"
+                    .into(),
+            );
+        }
+        (None, _) => {
+            interpolation(p, [1.0; 3], notices)?;
+        }
+    }
+    if input_path.is_some() && reference.is_none() {
+        return Err(
+            "larmorx: an input image (-i) is resampled onto the reference (-r), which is missing; \
+             ANTs crashes"
+                .into(),
+        );
+    }
+    let mode = notices.mode();
+    let (kind, path) = match output {
+        Output::Image(_) => unreachable!("handled by run"),
+        Output::Linear { path, invert } => {
+            log(format!("Output collapsed affine transform: {path}"));
+            (TransformOutput::Linear { invert }, path)
+        }
+        Output::Composite(path) => {
+            log(format!("Output composite transform: {path}"));
+            (TransformOutput::Composite, path)
+        }
+        Output::Field(path) => {
+            log(format!(
+                "Output collapsed transform displacement field: {path}"
+            ));
+            (TransformOutput::DisplacementField, path)
+        }
+    };
+    // A displacement field goes to a transform file only for these extensions (compared case
+    // for case); any other name is an image (`ImageFileWriter`).
+    let extension = Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .and_then(|n| n.rfind('.').map(|i| n[i..].to_string()))
+        .unwrap_or_default();
+    let field = kind == TransformOutput::DisplacementField;
+    if field && extension == ".xfm" {
+        return Err(format!(
+            "larmorx: {path}: MINC transform files (.xfm) are not supported"
+        ));
+    }
+    let (parts, output_notices) =
+        transform_output(&chain, kind, reference.as_ref(), precision, mode, n_threads)
+            .map_err(|e| e.to_string())?;
+    notices.extend(output_notices);
+    if field && extension != ".h5" && extension != ".hdf5" {
+        let grid = reference.expect("a displacement field needs the reference");
+        let geometry = ItkGeometry::from_grid3(&grid);
+        let options = nifti::WriteOptions {
+            n_threads,
+            ..Default::default()
+        };
+        let meta = ItkMeta::default();
+        return match &parts[0].parameters {
+            Parameters::F64(v) => write_itk_vector_image(&path, &geometry, 3, &meta, v, &options),
+            Parameters::F32(v) => write_itk_vector_image(&path, &geometry, 3, &meta, v, &options),
+        }
+        .map_err(|e| e.to_string());
+    }
+    let options = larmorx_io::itk_hdf5::WriteOptions::default();
+    write_itk_transform_parts(Path::new(&path), &parts, &options, notices).map_err(|e| {
+        e.ants_report()
+            .map(|r| r.trim_end().to_string())
+            .unwrap_or_else(|| e.to_string())
+    })
 }
 
 /// ANTs' output cast (`CastImageFilter`, a `static_cast`): floats round to nearest, integers

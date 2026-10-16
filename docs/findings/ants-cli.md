@@ -113,7 +113,65 @@ accepted although the help does not list it. *Read.* *larmorx:* reproduced.
 - `CompositeTransform[file]` writes the composite.
 - `[file]` with a single parameter gives an empty file name (`antsApplyTransforms.cxx:762-771`).
 
-*Read.* *larmorx:* only the image outputs so far. The others report "not supported yet".
+*Read.* *larmorx:* every form (the transform outputs since 2026-10-16, A4 part 2).
+
+**The transform outputs** (`antsApplyTransforms.cxx:409-456, 551-748`; added to larmorx
+2026-10-16; *read; verified* against the GCC 14.3 oracle, the `transform-output` cases of
+[validation/ants-apply-transforms.md](../validation/ants-apply-transforms.md), every file
+byte for byte or dataset for dataset):
+- **Order of checks.** An input image, if any, is read first; then `Linear` and
+  `CompositeTransform` need a parameter ("An output parameter is required with -o Linear or
+  -o CompositeTransform, see usage") and need no reference image; every other output needs
+  `-r` ("A reference image is required."); `-o [file,0]` without `-i` is "An input image is
+  required."; then the chain is built, an identity added when it has no parameters ("WARNING:
+  No transforms found, using identify transform", `antsApplyTransforms.cxx:559-568`), the
+  interpolator set up, and **every input image resampled onto the reference** before the
+  output section looks at `-o`: the warped image is computed and thrown away. Each message is
+  printed only with `-v` (ANTS-45's pattern); larmorx prints it always.
+- **Inverses keep or lose their class.** `-t [file,1]` calls `GetInverseTransform()`.
+  `AffineTransform`, `TranslationTransform` and the 2-D Euler, rigid and similarity classes
+  override it (`InvertTransform(*this)` with their own type), but the 3-D Euler, versor,
+  similarity and rigid classes inherit `MatrixOffsetTransformBase::GetInverseTransform`, whose
+  `InvertTransform(*this)` instantiates the base class (`itkTransform.h:597-603`,
+  `itkMatrixOffsetTransformBase.hxx:463-467`). So the inverse of an `Euler3DTransform` is a
+  `MatrixOffsetTransformBase` with `M⁻¹` (vnl's SVD inverse), offset `−(M⁻¹·offset)`, the
+  translation `ComputeTranslation` derives, and the original's fixed parameters: an
+  `Euler3DTransform` always has four (`GetFixedParameters` appends its ZYX flag), so the
+  inverse's are four values too (`0 1 -2 1`). *larmorx:* `larmorx_transform::itk_object`.
+- **`CollapseLinearTransforms`** (`itkantsRegistrationHelper.hxx:3746-3799`): a new
+  `AffineTransform` centred on the last transform of the queue that is a
+  `MatrixOffsetTransformBase` (a `TranslationTransform` is not), composed (`Compose(nth,
+  true)`: `offset = M·nth.offset + offset`, `M = M·nth.M`, then `ComputeTranslation`) with an
+  `AffineTransform` made of each transform in queue order: a translation by `SetOffset`, any
+  other by `SetCenter`, `SetMatrix`, `SetTranslation`. An `IdentityTransform` (read from a
+  file) fails the `dynamic_cast` and is dereferenced as a null pointer: ANTs crashes (ANTS-48).
+  `Linear[file,1]` writes a new `AffineTransform` with `SetMatrix(M⁻¹)` and
+  `SetOffset(−(M⁻¹·offset))`: centre 0, unlike `GetInverse`.
+- **Writers.** The text writer (`TxtTransformIO`) prints numbers with `itk::NumberToString`:
+  double-conversion's ECMAScript shortest form (`1`, `0.1`, `1.5e-7`, `1e+21`), a float
+  transform's parameters as floats (`ToShortestSingle`, `1.0510259`), fixed parameters as
+  doubles; an empty list is `FixedParameters: ` with its blank. The MATLAB writer
+  (`MatlabTransformIO`) does not expand composites: `CompositeTransform[x.mat]` is one
+  variable named `CompositeTransform_double_3_3` holding `GetParameters()` (the components'
+  parameters from the **last** to the first, `itkCompositeTransform.hxx`) and one `fixed`
+  likewise; and it converts the fixed parameters to the transform's parameter type
+  (`TempArray = GetFixedParameters()` into an `OptimizerParameters<float>`), so a float
+  transform's `fixed` is written as single precision (type 10). HDF5 as A4 part 1 found
+  ([itk-hdf5.md](itk-hdf5.md)).
+- **`TransformToDisplacementFieldFilter`** (`itkTransformToDisplacementFieldFilter.hxx:150-271`):
+  its `PointType` is the image's, `Point<double>`, whatever the transform's precision; each
+  point is converted to `Point<float>` for a float transform and the result widened back, so
+  `T(p) − p` is a double difference, stored as the field's component type. With every
+  transform linear, each scan line is mapped at index 0 and at index `nx` (one past the end)
+  and interpolated, `(1 − α)·start + α·end` with `α = x / nx` in double. The field is written
+  by the transform writer when the last extension is exactly `.h5` or `.hdf5` (`.xfm` is
+  MINC), else by `ImageFileWriter`: a NIfTI vector image (`dim[0] = 5`, `dim[4] = 1`,
+  `dim[5] = 3`, intent `NIFTI_INTENT_VECTOR`, components as the slowest axis,
+  `NiftiImageIO::WriteImageInformation`).
+- **Crashes** (ANTS-48): an unknown extension (`TransformFileWriter` throws, uncaught: abort,
+  exit 134), `-i` without `-r` (the resampler's reference is null), a Gaussian or MultiLabel
+  interpolator without `-i` (`inputImages[0]` of an empty vector), an `IdentityTransform`
+  collapsed. *larmorx:* refuses each, exit 1, in both D13 modes.
 
 **Threads.** ITK uses all cores unless `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` is set.
 *larmorx's CLI:* the same environment variable. The result does not depend on the thread

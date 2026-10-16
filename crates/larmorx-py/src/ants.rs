@@ -523,6 +523,50 @@ fn ants_transform_points<'py>(
     ))
 }
 
+/// `antsApplyTransforms`' transform outputs (`larmorx_ants::transform_output`): the chain of
+/// `transforms` (as for `ants_apply_transforms`) as a composite (`kind="composite"`), collapsed
+/// to one affine transform (`"linear"`, inverted with `invert_linear`), or as a displacement
+/// field on `reference_grid` (`"displacement_field"`), in `precision`. Returns
+/// `(parts, notices)` with `parts` as `itk_transform_read` gives them.
+#[pyfunction]
+#[pyo3(signature = (transforms, kind, invert_linear = false, reference_grid = None, precision = "float64", upstream_defects = "fix", n_threads = 1))]
+#[allow(clippy::too_many_arguments)]
+fn ants_transform_output<'py>(
+    py: Python<'py>,
+    transforms: &Bound<'_, PyAny>,
+    kind: &str,
+    invert_linear: bool,
+    reference_grid: Option<&Bound<'_, PyDict>>,
+    precision: &str,
+    upstream_defects: &str,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyTuple>> {
+    use larmorx_ants::transform_output::{
+        TransformOutput, transform_output, with_identity_if_empty,
+    };
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
+    let precision = precision_from(precision)?;
+    let kind = match kind {
+        "composite" => TransformOutput::Composite,
+        "linear" => TransformOutput::Linear {
+            invert: invert_linear,
+        },
+        "displacement_field" => TransformOutput::DisplacementField,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "output must be 'composite', 'linear' or 'displacement_field', not {other:?}"
+            )));
+        }
+    };
+    let reference = reference_grid.map(grid_from_dict).transpose()?;
+    let chain = chain_from_py(transforms)?;
+    let (chain, _) = with_identity_if_empty(chain).map_err(value_err)?;
+    let (parts, notices) = py
+        .detach(|| transform_output(&chain, kind, reference.as_ref(), precision, mode, n_threads))
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    crate::defects::with_notices(py, parts_to_py(py, &parts)?.into_any(), notices)
+}
+
 // ------------------------------------------------------------------------------------------------
 // Transform files on the command line
 
@@ -536,5 +580,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ants_apply_transforms, m)?)?;
     m.add_function(wrap_pyfunction!(ants_cast_output, m)?)?;
     m.add_function(wrap_pyfunction!(ants_transform_points, m)?)?;
+    m.add_function(wrap_pyfunction!(ants_transform_output, m)?)?;
     Ok(())
 }

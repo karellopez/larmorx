@@ -15,7 +15,7 @@ from larmorx.image import Image, as_image
 from larmorx.transforms import ItkTransform
 from larmorx.transforms.itk import _read_parts
 
-__all__ = ["apply_transforms", "apply_transforms_to_points"]
+__all__ = ["apply_transforms", "apply_transforms_to_points", "combine_transforms"]
 
 PathLike = str | os.PathLike[str]
 Precision = Literal["float64", "float32"]
@@ -259,3 +259,55 @@ def apply_transforms_to_points(
         mapped *= flip
     pts[:, :3] = mapped
     return pts
+
+
+def combine_transforms(
+    transforms: TransformLike | Sequence[TransformLike] = (),
+    *,
+    invert: Sequence[bool] | None = None,
+    output: Literal["composite", "linear", "displacement_field"] = "composite",
+    invert_linear: bool = False,
+    reference: Any = None,
+    precision: Precision = "float64",
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> list[ItkTransform]:
+    """``antsApplyTransforms``' transform outputs: the chain of ``transforms`` (``-t``, with
+    ``invert`` as for :func:`apply_transforms`) as ANTs holds it, collapsed or sampled.
+
+    - ``output="composite"`` (``-o CompositeTransform[file]``): a ``CompositeTransform``
+      followed by every transform of the chain, each with the class ITK reads it as; an
+      inverted one has the class ITK's inverse makes (a ``MatrixOffsetTransformBase`` for an
+      inverted Euler, versor or similarity transform). An empty chain is an identity
+      ``MatrixOffsetTransformBase``.
+    - ``output="linear"`` (``-o Linear[file,invert]``): the linear chain collapsed to one
+      ``AffineTransform`` (ANTs's ``CollapseLinearTransforms``), inverted with
+      ``invert_linear``. A chain with a displacement field is refused, as by ANTs.
+    - ``output="displacement_field"`` (``-o DisplacementField[file]``): the chain as a
+      ``DisplacementFieldTransform`` on the grid of ``reference`` (an image or a path).
+
+    ``precision="float32"`` computes as ``--float 1`` does (``_float_3_3`` classes). Write the
+    result with :func:`larmorx.transforms.write` (the ITK formats; ``larmorx ants
+    antsApplyTransforms -o DisplacementField[field.nii.gz]`` writes a field as a NIfTI image).
+    """
+    check(upstream_defects)
+    if output not in ("composite", "linear", "displacement_field"):
+        raise ValueError(
+            f"output must be 'composite', 'linear' or 'displacement_field', not {output!r}"
+        )
+    grid = None
+    if output == "displacement_field":
+        if reference is None:
+            raise ValueError("a displacement field needs a reference image")
+        grid = _grid_of(as_image(reference))
+    parts, notices = _core.ants_transform_output(
+        _transform_items(transforms, invert, precision, upstream_defects),
+        output,
+        invert_linear,
+        grid,
+        precision,
+        upstream_defects,
+        n_threads,
+    )
+    warn(notices)
+    return [ItkTransform(name, params, fixed) for name, params, fixed in parts]

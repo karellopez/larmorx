@@ -3,7 +3,9 @@
 //! they run on. See `PROVENANCE.md`.
 //!
 //! - `antsApplyTransforms` is [`apply_transforms`] (ITK's `ResampleImageFilter`).
-//! - `antsApplyTransformsToPoints` is [`transform_points`].
+//! - `antsApplyTransformsToPoints` is [`transform_points`]; `antsApplyTransforms`' transform
+//!   outputs (`-o Linear[...]`, `-o CompositeTransform[...]`, `-o DisplacementField[...]`) are
+//!   [`transform_output()`].
 //! - `DenoiseImage` is [`denoise_image()`] (ITK's adaptive non-local means filter).
 //! - `ThresholdImage` is [`threshold_image()`], `MultiplyImages` is [`multiply_images()`],
 //!   `SmoothImage` is [`smooth_image()`], `ResampleImageBySpacing` is
@@ -27,6 +29,7 @@ pub mod resample_image;
 pub mod resample_image_by_spacing;
 pub mod smooth_image;
 pub mod threshold_image;
+pub mod transform_output;
 
 pub use apply_transforms::{
     ApplyTransformsError, ApplyTransformsOptions, OutputType, apply_transforms, transform_points,
@@ -43,3 +46,4 @@ pub use resample_image_by_spacing::{
 };
 pub use smooth_image::{Smoothing, smooth_image};
 pub use threshold_image::{ThresholdMode, ThresholdOutput, threshold_image};
+pub use transform_output::{TransformOutput, TransformOutputError, transform_output};

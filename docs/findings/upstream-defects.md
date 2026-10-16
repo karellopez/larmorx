@@ -93,6 +93,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-45 | N4, DenoiseImage | errors explained only with `-v` | f | none | always explained | – |
 | ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | c? | every run | not ported (A4) | open |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-48 | antsApplyTransforms | transform outputs: crashes and aborts (an unknown extension, `-i` without `-r`, a Gaussian interpolator without `-i`, a collapsed `IdentityTransform`) | a | none | refuses (exit 1) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -221,7 +222,8 @@ clean-room original needs (`specs/3dTshift.md` §6.1 to §6.5); part 2a (2026-10
 replica AFNI's global options and environment variables (spec §7.1), corrected AFNI-11 and
 AFNI-12 for them, and added AFNI-18 to AFNI-24; AFNI-23, decided the same day, is corrected by
 default in the replica. A4 part 1 (ITK's HDF5 transform files, 2026-10-16) added ITK-12 to
-ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch.
+ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch; A4 part 2
+(antsApplyTransforms' transform outputs, 2026-10-16) added ANTS-48.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -933,6 +935,20 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** corrected by default (`upstream_defects`, 2026-10-12): an error (`larmorx_ants::cli::denoise_image`); `reproduce` denoises
   the whole image, with a warning.
 - **D13 / gap:** done. No gap.
+
+### ANTS-48 antsApplyTransforms' transform outputs crash or abort — (a)
+- **What:** with `-o Linear[...]`, `-o CompositeTransform[...]` or `-o DisplacementField[...]`:
+  an output name whose extension no transform writer takes makes ITK throw, uncaught, and the
+  program aborts (exit 134); an input image without a reference image is still resampled, onto
+  a null reference (segmentation fault); a Gaussian or MultiLabel interpolator without an
+  input image reads its default sigmas from `inputImages[0]` of an empty vector; and
+  `CollapseLinearTransforms` dereferences the null `dynamic_cast` of an `IdentityTransform`.
+- **Evidence:** read: `antsApplyTransforms.cxx:578-633, 693-698`,
+  `itkantsRegistrationHelper.hxx:3790-3794`; verified (the oracle exits 134, −11 and −11,
+  2026-10-16; the `transform-output/errors/*` cases).
+- **fMRIPrep:** none.
+- **larmorx:** refuses each with a message, exit 1, in both modes.
+- **D13 / gap:** class (a), not reproduced. No gap.
 
 ### ANTS-44 DenoiseImage's bias outside the mask — (c?)
 - **What:** where the smoothed bias is not positive, or outside the mask, the bias keeps its

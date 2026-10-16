@@ -165,6 +165,18 @@ def ants_cast_output(
 def ants_transform_points(points: np.ndarray, transforms: list[tuple[Parts, bool]]) -> np.ndarray:
     """Map ``(n, 3)`` LPS points through ``transforms``."""
 
+def ants_transform_output(
+    transforms: list[tuple[Parts, bool]],
+    kind: str,
+    invert_linear: bool = False,
+    reference_grid: Grid | None = None,
+    precision: str = "float64",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[Parts, list[Notice]]:
+    """``antsApplyTransforms``' transform outputs: the chain as a composite, collapsed to one
+    affine transform, or as a displacement field on ``reference_grid``; ``(parts, notices)``."""
+
 # --- AFNI 3dTshift (larmorx/afni) ------------------------------------------------------------
 
 def afni_tshift_file(

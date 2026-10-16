@@ -270,32 +270,147 @@ pub fn parse_itk_text_with(
     Ok(out)
 }
 
-/// ITK's text representation of a list of linear transforms (with a leading composite header
-/// when there is more than one).
-pub fn write_itk_text(transforms: &[LinearTransform]) -> String {
+/// How ITK writes a number in a text transform file (`itk::NumberToString`, ITK v5.4.5
+/// `Modules/Core/Common/src/itkNumberToString.cxx`): double-conversion's `ToShortest` with the
+/// ECMAScript converter, that is the shortest decimal that reads back to the same value, in
+/// fixed notation for decimal exponents from −6 to 20 and in exponential notation otherwise
+/// (`1e-7`, `1.5e+21`), `0` for both zeros, `NaN`, `Infinity` and `-Infinity`.
+pub fn itk_number(v: f64) -> String {
+    ecmascript(v.is_nan(), v.is_infinite(), v == 0.0, v < 0.0, || {
+        format!("{:e}", v.abs())
+    })
+}
+
+/// [`itk_number`] for a single-precision value (`ToShortestSingle`): the shortest decimal that
+/// reads back to the same `float`.
+pub fn itk_number_f32(v: f32) -> String {
+    ecmascript(v.is_nan(), v.is_infinite(), v == 0.0, v < 0.0, || {
+        format!("{:e}", v.abs())
+    })
+}
+
+/// double-conversion's `ToShortest` with `EcmaScriptConverter()`'s settings (flags
+/// `UNIQUE_ZERO | EMIT_POSITIVE_EXPONENT_SIGN`, `decimal_in_shortest_low` −6,
+/// `decimal_in_shortest_high` 21), from Rust's shortest round-trip digits (`{:e}`).
+fn ecmascript(
+    nan: bool,
+    infinite: bool,
+    zero: bool,
+    negative: bool,
+    scientific: impl Fn() -> String,
+) -> String {
+    if nan {
+        return "NaN".into();
+    }
+    if infinite {
+        return if negative { "-Infinity" } else { "Infinity" }.into();
+    }
+    if zero {
+        return "0".into();
+    }
+    let s = scientific();
+    let (mantissa, exponent) = s.split_once('e').expect("{:e} has an exponent");
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let exponent: i32 = exponent.parse().expect("{:e} exponent");
+    let n = digits.len() as i32;
+    let mut out = String::new();
+    if negative {
+        out.push('-');
+    }
+    // The decimal point sits after `point` digits.
+    let point = exponent + 1;
+    if (-6..21).contains(&exponent) {
+        if point <= 0 {
+            out.push_str("0.");
+            out.extend(std::iter::repeat_n('0', (-point) as usize));
+            out.push_str(&digits);
+        } else if point >= n {
+            out.push_str(&digits);
+            out.extend(std::iter::repeat_n('0', (point - n) as usize));
+        } else {
+            out.push_str(&digits[..point as usize]);
+            out.push('.');
+            out.push_str(&digits[point as usize..]);
+        }
+    } else {
+        out.push_str(&digits[..1]);
+        if n > 1 {
+            out.push('.');
+            out.push_str(&digits[1..]);
+        }
+        out.push('e');
+        if exponent >= 0 {
+            out.push('+');
+        }
+        let _ = write!(out, "{exponent}");
+    }
+    out
+}
+
+/// Whether a stored transform's name says it holds single-precision parameters
+/// (`<Class>_float_<D>_<D>`).
+pub fn is_float_name(name: &str) -> bool {
+    name.contains("_float_")
+}
+
+/// The values ITK prints for parameters: single-precision transforms print their parameters
+/// as `float`s (`vnl_vector<float>`), others as doubles.
+fn print_vector(out: &mut String, values: &[f64], single: bool) {
+    for (i, &v) in values.iter().enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        if single {
+            out.push_str(&itk_number_f32(v as f32));
+        } else {
+            out.push_str(&itk_number(v));
+        }
+    }
+}
+
+/// ITK's text transform file for a list of stored transforms (`TxtTransformIOTemplate::Write`):
+/// the header line, then for each transform `#Transform <n>`, `Transform: <class>`, and,
+/// except for a composite, `Parameters: ` and `FixedParameters: ` with the values separated by
+/// blanks ([`itk_number`]; a single-precision transform's parameters as floats, its fixed
+/// parameters as doubles). A composite may only come first.
+pub fn write_itk_text_parts(parts: &[ItkTransformParts]) -> Result<String, String> {
     let mut s = String::from("#Insight Transform File V1.0\n");
-    let mut index = 0;
+    for (count, p) in parts.iter().enumerate() {
+        let _ = write!(s, "#Transform {count}\nTransform: {}\n", p.name);
+        if p.name.contains("CompositeTransform") {
+            if count > 0 {
+                return Err("Composite Transform can only be 1st transform in a file".into());
+            }
+            continue;
+        }
+        s.push_str("Parameters: ");
+        print_vector(&mut s, &p.parameters.to_f64(), is_float_name(&p.name));
+        s.push_str("\nFixedParameters: ");
+        print_vector(&mut s, &p.fixed_parameters, false);
+        s.push('\n');
+    }
+    Ok(s)
+}
+
+/// ITK's text representation of a list of linear transforms (with a leading composite header
+/// when there is more than one), as [`write_itk_text_parts`] writes it.
+pub fn write_itk_text(transforms: &[LinearTransform]) -> String {
+    let mut parts = Vec::with_capacity(transforms.len() + 1);
     if transforms.len() > 1 {
-        s.push_str("#Transform 0\nTransform: CompositeTransform_double_3_3\n");
-        index = 1;
+        parts.push(ItkTransformParts {
+            name: "CompositeTransform_double_3_3".into(),
+            parameters: Parameters::F64(Vec::new()),
+            fixed_parameters: Vec::new(),
+        });
     }
     for t in transforms {
-        let join = |v: &[f64]| {
-            v.iter()
-                .map(|x| format!("{x:?}"))
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
-        let _ = write!(
-            s,
-            "#Transform {index}\nTransform: {}\nParameters: {}\nFixedParameters: {}\n",
-            t.itk_name,
-            join(&t.parameters),
-            join(&t.fixed_parameters)
-        );
-        index += 1;
+        parts.push(ItkTransformParts {
+            name: t.itk_name.clone(),
+            parameters: Parameters::F64(t.parameters.clone()),
+            fixed_parameters: t.fixed_parameters.clone(),
+        });
     }
-    s
+    write_itk_text_parts(&parts).expect("a composite only first")
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -385,23 +500,72 @@ pub fn parse_itk_matlab(bytes: &[u8]) -> Result<Vec<ItkTransformParts>, String> 
         .collect())
 }
 
-/// ITK's MATLAB representation of a linear transform (double precision, little-endian).
-pub fn write_itk_matlab(t: &LinearTransform) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (name, values) in [
-        (t.itk_name.as_str(), &t.parameters),
-        ("fixed", &t.fixed_parameters),
-    ] {
-        let name = format!("{name}\0");
-        for v in [0i32, values.len() as i32, 1, 0, name.len() as i32] {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        out.extend_from_slice(name.as_bytes());
-        for v in values.iter() {
+/// One `vnl_matlab_write` of a column vector: the header (type: little-endian, column-wise,
+/// double `0` or single precision `10`; rows; one column; no imaginary part; the name's length
+/// with its NUL), the name with its NUL, the values.
+fn matlab_var(out: &mut Vec<u8>, name: &str, values: &[f64], single: bool) {
+    let name = format!("{name}\0");
+    let ty = if single { 10i32 } else { 0 };
+    for v in [ty, values.len() as i32, 1, 0, name.len() as i32] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(name.as_bytes());
+    for &v in values {
+        if single {
+            out.extend_from_slice(&(v as f32).to_le_bytes());
+        } else {
             out.extend_from_slice(&v.to_le_bytes());
         }
     }
+}
+
+/// ITK's MATLAB transform file (`MatlabTransformIOTemplate::Write`): for each transform of the
+/// writer's list, its parameters named by its class (as `float`s for a single-precision
+/// transform) and its fixed parameters named `fixed` (converted to the parameters' type, so
+/// floats too for a float transform: `TempArray = GetFixedParameters()`). The MATLAB writer does not
+/// expand composites: a list starting with a `CompositeTransform` is the composite alone, whose
+/// parameters are those of its components from the last to the first (`CompositeTransform::
+/// GetParameters`; one component's own when there is only one), and likewise its fixed
+/// parameters.
+pub fn write_itk_matlab_parts(parts: &[ItkTransformParts]) -> Vec<u8> {
+    let mut out = Vec::new();
+    match parts.first() {
+        Some(first) if first.name.contains("CompositeTransform") => {
+            let (mut params, mut fixed) = (Vec::new(), Vec::new());
+            for c in parts[1..].iter().rev() {
+                params.extend_from_slice(&c.parameters.to_f64());
+                fixed.extend_from_slice(&c.fixed_parameters);
+            }
+            matlab_var(&mut out, &first.name, &params, is_float_name(&first.name));
+            matlab_var(&mut out, "fixed", &fixed, is_float_name(&first.name));
+        }
+        _ => {
+            for p in parts {
+                matlab_var(
+                    &mut out,
+                    &p.name,
+                    &p.parameters.to_f64(),
+                    is_float_name(&p.name),
+                );
+                matlab_var(
+                    &mut out,
+                    "fixed",
+                    &p.fixed_parameters,
+                    is_float_name(&p.name),
+                );
+            }
+        }
+    }
     out
+}
+
+/// ITK's MATLAB representation of a linear transform (double precision, little-endian).
+pub fn write_itk_matlab(t: &LinearTransform) -> Vec<u8> {
+    write_itk_matlab_parts(&[ItkTransformParts {
+        name: t.itk_name.clone(),
+        parameters: Parameters::F64(t.parameters.clone()),
+        fixed_parameters: t.fixed_parameters.clone(),
+    }])
 }
 
 /// The extensions ITK's HDF5 transform writer takes (`HDF5TransformIOTemplate::CanWriteFile`:
@@ -459,27 +623,11 @@ pub fn write_itk_transform_parts(
         }
     } else {
         let lower = last_extension(path).to_ascii_lowercase();
-        let components = match parts.first() {
-            Some(first) if first.name.starts_with("CompositeTransform") => &parts[1..],
-            _ => parts,
-        };
-        let linear = components
-            .iter()
-            .map(|p| {
-                LinearTransform::from_itk(&p.name, &p.parameters.to_f64(), &p.fixed_parameters)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
         match lower.as_str() {
-            ".mat" => match linear.as_slice() {
-                [one] => write_itk_matlab(one),
-                _ => {
-                    return Err(format_err(
-                        path,
-                        "a .mat file holds exactly one linear transform",
-                    ));
-                }
-            },
-            ".txt" | ".tfm" => write_itk_text(&linear).into_bytes(),
+            ".mat" => write_itk_matlab_parts(parts),
+            ".txt" | ".tfm" => write_itk_text_parts(parts)
+                .map_err(|e| format_err(path, e))?
+                .into_bytes(),
             _ => {
                 return Err(format_err(
                     path,
@@ -661,6 +809,71 @@ mod tests {
         assert!(parse_itk_text("Transform AffineTransform").is_err());
     }
 
+    /// ITK's `NumberToString` (double-conversion's ECMAScript `ToShortest`), as the oracle's
+    /// text transform files show it.
+    #[test]
+    fn itk_numbers() {
+        for (v, s) in [
+            (0.0, "0"),
+            (-0.0, "0"),
+            (1.0, "1"),
+            (-2.5, "-2.5"),
+            (1.0462342565124438, "1.0462342565124438"),
+            (1e-6, "0.000001"),
+            (1.5e-7, "1.5e-7"),
+            (-3e-7, "-3e-7"),
+            (1e20, "100000000000000000000"),
+            (1e21, "1e+21"),
+            (1.5e300, "1.5e+300"),
+            (123456.789, "123456.789"),
+            (f64::NAN, "NaN"),
+            (f64::NEG_INFINITY, "-Infinity"),
+        ] {
+            assert_eq!(itk_number(v), s, "{v:e}");
+        }
+        for (v, s) in [
+            (1.0510259f32, "1.0510259"),
+            (0.1f32, "0.1"),
+            (-0.4087162f32, "-0.4087162"),
+            (3.0e-8f32, "3e-8"),
+        ] {
+            assert_eq!(itk_number_f32(v), s, "{v:e}");
+        }
+    }
+
+    /// The text writer: a composite only first, empty fixed parameters as an empty list, float
+    /// transforms' parameters as floats.
+    #[test]
+    fn text_parts() {
+        let part = |name: &str, p: Vec<f64>, f: Vec<f64>| ItkTransformParts {
+            name: name.into(),
+            parameters: Parameters::F64(p),
+            fixed_parameters: f,
+        };
+        let text = write_itk_text_parts(&[
+            part("CompositeTransform_float_3_3", vec![], vec![]),
+            part(
+                "TranslationTransform_float_3_3",
+                vec![0.1f32 as f64, 2.0, -0.5],
+                vec![],
+            ),
+        ])
+        .unwrap();
+        assert_eq!(
+            text,
+            "#Insight Transform File V1.0\n#Transform 0\nTransform: CompositeTransform_float_3_3\n\
+             #Transform 1\nTransform: TranslationTransform_float_3_3\nParameters: 0.1 2 -0.5\n\
+             FixedParameters: \n"
+        );
+        assert!(
+            write_itk_text_parts(&[
+                part("AffineTransform_double_3_3", vec![1.0; 12], vec![0.0; 3]),
+                part("CompositeTransform_double_3_3", vec![], vec![]),
+            ])
+            .is_err()
+        );
+    }
+
     #[test]
     fn matlab_round_trip_and_single_precision() {
         let Transform::Linear(lin) =
@@ -671,6 +884,16 @@ mod tests {
         let bytes = write_itk_matlab(&lin);
         let parts = parse_itk_matlab(&bytes).unwrap();
         assert_eq!(parts[0].name, "AffineTransform_float_3_3");
+        // A float transform's parameters and fixed parameters are written as floats.
+        let single = |v: &[f64]| v.iter().map(|&x| f64::from(x as f32)).collect::<Vec<_>>();
+        assert_eq!(
+            parts[0].parameters,
+            Parameters::F64(single(&lin.parameters))
+        );
+        assert_eq!(parts[0].fixed_parameters, single(&lin.fixed_parameters));
+        let mut double = lin.clone();
+        double.itk_name = "AffineTransform_double_3_3".into();
+        let parts = parse_itk_matlab(&write_itk_matlab(&double)).unwrap();
         assert_eq!(parts[0].parameters, Parameters::F64(lin.parameters.clone()));
         // A float32, big-endian variable (as some writers produce).
         let mut be = Vec::new();

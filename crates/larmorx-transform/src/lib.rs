@@ -17,12 +17,14 @@ use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, ItkReal};
 
 pub mod field;
+pub mod itk_object;
 pub mod linear;
 pub mod nitransforms;
 pub mod openblas;
 pub mod resample_series;
 
 pub use field::{DisplacementField, FieldData};
+pub use itk_object::{ItkObject, MatrixOffsetState, ObjectParameters};
 pub use linear::{LinearKind, LinearTransform, MatrixOffset};
 
 /// A transform cannot be built or used.
@@ -191,6 +193,13 @@ impl TransformChain {
             },
             notices.into_vec(),
         ))
+    }
+
+    /// The chain with `t` added at the back of the queue (`CompositeTransform::AddTransform`:
+    /// it acts first on a point).
+    pub fn with_appended(mut self, t: Transform) -> Result<Self, TransformError> {
+        push_flattened(t, false, &mut self.transforms, &mut self.inverted_from)?;
+        Ok(self)
     }
 
     /// The transforms in ITK's composite-queue order (the last one acts first on a point).

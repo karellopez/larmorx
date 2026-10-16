@@ -61,6 +61,11 @@ impl Grid3 {
         self.size.iter().product()
     }
 
+    /// ITK's `m_IndexToPhysicalPoint`: `direction · diag(spacing)`.
+    pub fn index_to_point_matrix(&self) -> &Mat3 {
+        &self.index_to_point
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

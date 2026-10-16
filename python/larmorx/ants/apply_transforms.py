@@ -59,6 +59,7 @@ def _transform_items(
     transforms: TransformLike | Sequence[TransformLike],
     invert: Sequence[bool] | None,
     precision: Precision = "float64",
+    upstream_defects: str = "fix",
 ) -> list[tuple[list[tuple[str, np.ndarray, np.ndarray]], bool]]:
     if isinstance(transforms, (str, os.PathLike, ItkTransform)):
         transforms = [transforms]
@@ -71,7 +72,7 @@ def _transform_items(
     out = []
     for t, flag in zip(items, flags, strict=True):
         if isinstance(t, (str, os.PathLike)):
-            out.append((_read_parts(t, precision), flag))
+            out.append((_read_parts(t, precision, upstream_defects), flag))
             continue
         parts = [t] if isinstance(t, ItkTransform) else list(t)
         out.append(([p._as_tuple() for p in parts], flag))
@@ -211,7 +212,7 @@ def apply_transforms(
         data,
         grid,
         ref_grid,
-        _transform_items(transforms, invert, precision),
+        _transform_items(transforms, invert, precision, upstream_defects),
         _interpolator(interpolation),
         sigma,
         alpha,

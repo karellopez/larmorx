@@ -14,6 +14,7 @@ repository = "https://github.com/karellopez/larmorx"
 [workspace.dependencies]
 larmorx-core = { path = "crates/larmorx-core", version = "0.0.1" }
 larmorx-io = { path = "crates/larmorx-io", version = "0.0.1" }
+larmorx-hdf5 = { path = "crates/larmorx-hdf5", version = "0.0.1" }
 larmorx-cli = { path = "crates/larmorx-cli", version = "0.0.1" }
 larmorx-transform = { path = "crates/larmorx-transform", version = "0.0.1" }
 larmorx-interp = { path = "crates/larmorx-interp", version = "0.0.1" }

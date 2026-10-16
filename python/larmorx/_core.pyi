@@ -94,9 +94,12 @@ def itk_read_image(path: str, n_threads: int = 1) -> tuple[np.ndarray, dict[str,
 def itk_grid(path: str) -> Grid:
     """The 3D grid ITK reads from a NIfTI header."""
 
-def itk_transform_read(path: str, precision: str = "float64") -> Parts:
-    """The transforms stored in an ITK text, MATLAB or NIfTI displacement-field file, read as
-    ITK's reader for ``precision`` (``float64`` or ``float32``) reads them."""
+def itk_transform_read(
+    path: str, precision: str = "float64", upstream_defects: str = "fix"
+) -> tuple[Parts, list[Notice]]:
+    """The transforms stored in an ITK text, MATLAB, HDF5 or NIfTI displacement-field file,
+    in the file's order, read as ITK's reader for ``precision`` (``float64`` or ``float32``)
+    reads them, and the upstream-defect notices."""
 
 def itk_transform_write(path: str, parts: Parts) -> None:
     """Write linear transforms as ITK text (``.txt``, ``.tfm``) or MATLAB (``.mat``)."""

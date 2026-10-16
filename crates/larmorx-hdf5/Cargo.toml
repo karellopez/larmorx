@@ -1,0 +1,17 @@
+[package]
+name = "larmorx-hdf5"
+description = "HDF5 for larmorx, in pure Rust: a reader of the format, and a writer that lays files out as HDF5 1.12.1 does (ITK's transform files)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+flate2.workspace = true
+larmorx-core.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true

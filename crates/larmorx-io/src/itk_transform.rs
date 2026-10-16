@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-//! ITK transform files: text (`.txt`, `.tfm`), MATLAB v4 (`.mat`), and displacement fields
-//! stored as NIfTI vector images (`.nii`, `.nii.gz`).
+//! ITK transform files: text (`.txt`, `.tfm`), MATLAB v4 (`.mat`), HDF5 (`.h5`, through
+//! [`crate::itk_hdf5`]), and displacement fields stored as NIfTI vector images (`.nii`,
+//! `.nii.gz`).
 //!
-//! Follows ITK v5.4.5's `TxtTransformIO` and `MatlabTransformIO`: a file holds a list of
-//! transforms; when the first is a `CompositeTransform`, the following ones are its components.
-//! Like ANTs, [`read_itk_transform`] returns the first transform of the list. HDF5 (`.h5`)
-//! composites are read by the Python layer for now (PLAN.md §4.1).
+//! Follows ITK v5.4.5's `TxtTransformIO`, `MatlabTransformIO` and `HDF5TransformIO`: a file
+//! holds a list of transforms; when the first is a `CompositeTransform`, the following ones
+//! are its components. As ANTs's `itk::ants::ReadTransform` does, [`read_itk_transform`]
+//! returns that composite, the one transform of a list of one, or a composite of all the
+//! transforms of a longer list. As ITK's reader does, a file in HDF5 with a `/TransformGroup`
+//! is read as HDF5 whatever its name ends with (ITK asks its HDF5 transform reader first).
 
 use std::fmt::Write as _;
 use std::path::Path;
 
+use larmorx_core::defects::{Notices, UpstreamDefects};
 use larmorx_core::linalg::Mat3;
 use larmorx_core::{Grid3, Precision};
 use larmorx_transform::{DisplacementField, FieldData, LinearTransform, Transform, TransformError};
@@ -34,6 +38,26 @@ pub enum TransformFileError {
     Transform(#[from] TransformError),
     #[error(transparent)]
     Nifti(#[from] nifti::Error),
+    /// The file does not exist (ANTs: `Transform file does not exist: <path>`).
+    #[error("Transform file does not exist: {}", .0.display())]
+    Missing(std::path::PathBuf),
+    /// ITK cannot read the file: why, and what ANTs prints.
+    #[error("{0}")]
+    Unreadable(crate::itk_hdf5::ReadFailure),
+}
+
+impl TransformFileError {
+    /// What ANTs's `itk::ants::ReadTransform` prints on standard error for this error, where
+    /// larmorx reproduces it (missing files, HDF5 files).
+    pub fn ants_report(&self) -> Option<String> {
+        match self {
+            TransformFileError::Missing(p) => {
+                Some(format!("Transform file does not exist: {}\n", p.display()))
+            }
+            TransformFileError::Unreadable(f) => Some(f.ants_report.clone()),
+            _ => None,
+        }
+    }
 }
 
 fn format_err(path: &Path, message: impl Into<String>) -> TransformFileError {
@@ -89,8 +113,12 @@ impl From<Vec<f64>> for Parameters {
     }
 }
 
-/// Builds transforms from ITK's stored parts, nesting the components of a leading composite.
-/// Displacement fields need their vectors in `parameters` (e.g. from an `.h5` file).
+/// Builds the transform ANTs's `itk::ants::ReadTransform` makes of a file's stored parts: a
+/// leading composite takes the following parts as its components
+/// (`TransformFileReaderTemplate::Update`); otherwise one part is itself and several make a
+/// composite of all of them. A composite further down the list is an empty composite (ITK
+/// creates it without components): the identity. Displacement fields need their vectors in
+/// `parameters` (e.g. from an `.h5` file).
 pub fn transform_from_parts(parts: &[ItkTransformParts]) -> Result<Transform, TransformError> {
     let first = parts
         .first()
@@ -102,10 +130,21 @@ pub fn transform_from_parts(parts: &[ItkTransformParts]) -> Result<Transform, Tr
             .collect::<Result<_, _>>()?;
         return Ok(Transform::Composite(components));
     }
+    if parts.len() > 1 {
+        return Ok(Transform::Composite(
+            parts
+                .iter()
+                .map(single_from_parts)
+                .collect::<Result<_, _>>()?,
+        ));
+    }
     single_from_parts(first)
 }
 
 fn single_from_parts(p: &ItkTransformParts) -> Result<Transform, TransformError> {
+    if p.name.starts_with("CompositeTransform") {
+        return Ok(Transform::Composite(Vec::new()));
+    }
     if p.name.starts_with("DisplacementFieldTransform") {
         let data = match &p.parameters {
             Parameters::F32(v) => FieldData::F32(v.clone()),
@@ -402,50 +441,99 @@ pub fn read_displacement_field(path: &Path) -> Result<DisplacementField, Transfo
     )?)
 }
 
-/// Reads an ITK transform file by its extension, returning its first transform (as ANTs
-/// does): `.txt`/`.tfm` text, `.mat` MATLAB, `.nii`/`.nii.gz` displacement field.
+/// Reads an ITK transform file as ANTs does ([`transform_from_parts`] of what the file
+/// stores), in double precision and with upstream defects corrected (notices are dropped; see
+/// [`read_itk_transform_parts`]).
 pub fn read_itk_transform(path: &Path) -> Result<Transform, TransformFileError> {
     read_itk_transform_with(path, Precision::Double)
 }
 
 /// [`read_itk_transform`] as ITK's reader for the computation type `precision` reads the
-/// file. Only text files differ: their numbers are read in that precision
-/// ([`parse_itk_text_with`]). MATLAB, HDF5 and NIfTI files are read as stored; ITK casts their
-/// values to the transform's type afterwards, as
+/// file. Text files' numbers are read in that precision ([`parse_itk_text_with`]); MATLAB,
+/// HDF5 and NIfTI files are read as stored (ITK casts their values to the transform's type
+/// afterwards, as
 /// [`LinearTransform::with_precision`](larmorx_transform::LinearTransform::with_precision)
-/// and the displacement field lookup do.
+/// and the displacement field lookup do).
 pub fn read_itk_transform_with(
     path: &Path,
     precision: Precision,
 ) -> Result<Transform, TransformFileError> {
+    let mut notices = Notices::new(UpstreamDefects::Fix);
+    let parts = read_itk_transform_parts(path, precision, &mut notices)?;
+    Ok(transform_from_parts(&parts)?)
+}
+
+/// The parts a transform file stores, read as ANTs's `itk::ants::ReadTransform` reads them
+/// for the computation type `precision`, with D13's mode and notices in `notices` (HDF5 files:
+/// [`crate::itk_hdf5`]). Which reader applies:
+/// - a missing file: [`TransformFileError::Missing`];
+/// - `.nii`, `.nii.gz`: a displacement field (ANTs tries files without a transform extension
+///   as images first);
+/// - an HDF5 file with a `/TransformGroup`, whatever its name ends with;
+/// - `.mat`: MATLAB v4; `.txt`, `.tfm`: ITK text;
+/// - `.h5`, `.hdf5`, `.hdf4` files that are not HDF5 transform files: ITK's "Could not create
+///   Transform IO object" error.
+pub fn read_itk_transform_parts(
+    path: &Path,
+    precision: Precision,
+    notices: &mut Notices,
+) -> Result<Vec<ItkTransformParts>, TransformFileError> {
+    if !path.exists() {
+        return Err(TransformFileError::Missing(path.to_path_buf()));
+    }
     let name = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
     if name.ends_with(".nii") || name.ends_with(".nii.gz") {
-        return Ok(Transform::DisplacementField(read_displacement_field(path)?));
+        return Ok(transform_to_parts(&Transform::DisplacementField(
+            read_displacement_field(path)?,
+        )));
     }
     let io = |source| TransformFileError::Io {
         path: path.to_path_buf(),
         source,
     };
-    let parts = if name.ends_with(".mat") {
-        parse_itk_matlab(&std::fs::read(path).map_err(io)?).map_err(|m| format_err(path, m))?
+    // ITK's transform IO factory asks the HDF5 reader first: an HDF5 file with a transform
+    // group is read as HDF5 whatever its extension.
+    match crate::itk_hdf5::can_read(path) {
+        Ok(_) => {
+            return crate::itk_hdf5::read(path, precision, notices)
+                .map_err(TransformFileError::Unreadable);
+        }
+        Err((why, h5)) => {
+            if name.ends_with(".h5") || name.ends_with(".hdf5") || name.ends_with(".hdf4") {
+                return Err(TransformFileError::Unreadable(
+                    crate::itk_hdf5::no_transform_io(
+                        &path.display().to_string(),
+                        h5.as_ref(),
+                        &why,
+                    ),
+                ));
+            }
+        }
+    }
+    if name.ends_with(".mat") {
+        parse_itk_matlab(&std::fs::read(path).map_err(io)?).map_err(|m| format_err(path, m))
     } else if name.ends_with(".txt") || name.ends_with(".tfm") {
         parse_itk_text_with(&std::fs::read_to_string(path).map_err(io)?, precision)
-            .map_err(|m| format_err(path, m))?
-    } else if name.ends_with(".h5") || name.ends_with(".hdf5") {
-        return Err(format_err(
-            path,
-            "HDF5 transforms are read by the Python layer (larmorx.transforms.read)",
-        ));
+            .map_err(|m| format_err(path, m))
     } else {
-        return Err(format_err(
+        Err(format_err(
             path,
-            "unknown transform file type (expected .txt, .tfm, .mat, .nii or .nii.gz)",
-        ));
-    };
+            "unknown transform file type (expected .txt, .tfm, .mat, .h5, .nii or .nii.gz)",
+        ))
+    }
+}
+
+/// [`read_itk_transform_parts`] made into a transform ([`transform_from_parts`]).
+pub fn read_itk_transform_notices(
+    path: &Path,
+    precision: Precision,
+    notices: &mut Notices,
+) -> Result<Transform, TransformFileError> {
+    let parts = read_itk_transform_parts(path, precision, notices)?;
     Ok(transform_from_parts(&parts)?)
 }
 

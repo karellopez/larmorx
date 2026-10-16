@@ -202,6 +202,12 @@ defects! {
         "asked for x.nii.gz, the reader takes the header from x.nii.gz but the voxels from x.nii when that file exists";
     ITK_10 = "ITK-10", "ITK", true,
         "a versor whose axis has a norm of at least 1 can fail to load in single precision";
+    ITK_12 = "ITK-12", "ITK", true,
+        "an HDF5 transform file whose TransformType is a fixed-length string (as h5py writes numpy bytes) cannot be read: ITK reads only variable-length strings";
+    ITK_14 = "ITK-14", "ITK", true,
+        "HDF5 transform parameters stored in a floating-point type wider than 8 bytes (long double, quadruple precision) are read through float, losing their precision";
+    HDF_01 = "HDF-01", "HDF5", true,
+        "converting floating-point data of a non-native format (half, quadruple, VAX, custom), HDF5 1.12 keeps state from one element to the next: after a denormalized value every later value of the same conversion buffer rounds as a denormal, an unnormalized zero takes the previous value's mantissa width, and a denormal that rounds up to the smallest normal loses the carry";
     PIPE_03 = "PIPE-03", "fMRIPrep ResampleSeries", true,
         "the Jacobian of the field map is taken along the target grid's axis with the source's phase-encoding index, in target voxels";
     PIPE_04 = "PIPE-04", "nitransforms", true,

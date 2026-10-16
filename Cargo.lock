@@ -192,6 +192,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-hdf5"
+version = "0.0.1"
+dependencies = [
+ "flate2",
+ "larmorx-core",
+ "proptest",
+ "rayon",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-image"
 version = "0.0.1"
 dependencies = [
@@ -218,6 +230,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "larmorx-core",
+ "larmorx-hdf5",
  "larmorx-transform",
  "proptest",
  "rayon",

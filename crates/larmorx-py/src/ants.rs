@@ -6,9 +6,8 @@
 //! nests the ones after it). Grids are dicts with `size`, `spacing`, `origin` and `direction`
 //! (LPS, as ITK). The GIL is released while images are read or resampled.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use larmorx_ants::cli::{FileLoader, TransformLoader};
 use larmorx_ants::{ApplyTransformsOptions, apply_transforms, transform_points};
 use larmorx_core::{Grid3, Precision};
 use larmorx_interp::{Interpolation, Window};
@@ -209,22 +208,43 @@ fn precision_from(name: &str) -> PyResult<Precision> {
     })
 }
 
-/// The transforms stored in an ITK text (`.txt`, `.tfm`), MATLAB (`.mat`) or NIfTI
-/// displacement-field (`.nii`, `.nii.gz`) file, as `(name, parameters, fixed)` tuples, read
-/// as ITK's reader for `precision` (`float64` or `float32`) reads them: in float, the numbers
-/// of a text file are rounded once from their text to float (then widened to float64).
+/// The transforms stored in an ITK transform file (text `.txt`, `.tfm`; MATLAB `.mat`; HDF5
+/// `.h5`; NIfTI displacement fields `.nii`, `.nii.gz`), as `(name, parameters, fixed)` tuples
+/// in the file's order, read as ITK's reader for `precision` (`float64` or `float32`) reads
+/// them: in float, the numbers of a text file are rounded once from their text to float (then
+/// widened to float64). Returns `(parts, notices)`.
 #[pyfunction]
-#[pyo3(signature = (path, precision = "float64"))]
+#[pyo3(signature = (path, precision = "float64", upstream_defects = "fix"))]
 fn itk_transform_read<'py>(
     py: Python<'py>,
     path: PathBuf,
     precision: &str,
-) -> PyResult<Bound<'py, PyList>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
     let precision = precision_from(precision)?;
-    let t = py
-        .detach(|| itk_transform::read_itk_transform_with(&path, precision))
-        .map_err(value_err)?;
-    parts_to_py(py, &itk_transform::transform_to_parts(&t))
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
+    let (parts, notices) = py
+        .detach(|| {
+            let mut notices = larmorx_core::defects::Notices::new(mode);
+            itk_transform::read_itk_transform_parts(&path, precision, &mut notices)
+                .map(|p| (p, notices))
+        })
+        .map_err(transform_file_err)?;
+    crate::defects::with_notices(py, parts_to_py(py, &parts)?.into_any(), notices.into_vec())
+}
+
+/// A transform file error as Python's exception: a missing file is `FileNotFoundError`, an
+/// I/O failure `OSError`, anything else `ValueError`.
+fn transform_file_err(e: itk_transform::TransformFileError) -> PyErr {
+    use itk_transform::TransformFileError as E;
+    match &e {
+        E::Missing(p) => pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+            "[Errno 2] No such file or directory: '{}'",
+            p.display()
+        )),
+        E::Io { .. } => pyo3::exceptions::PyOSError::new_err(e.to_string()),
+        _ => PyValueError::new_err(e.to_string()),
+    }
 }
 
 /// Writes linear transforms as an ITK text (`.txt`, `.tfm`) or MATLAB (`.mat`, one transform)
@@ -500,30 +520,6 @@ fn ants_transform_points<'py>(
 
 // ------------------------------------------------------------------------------------------------
 // Transform files on the command line
-
-/// Reads `.h5` transforms through Python (`larmorx.transforms.read`), the rest in Rust.
-pub struct PyLoader;
-
-impl TransformLoader for PyLoader {
-    fn load(&self, path: &Path) -> Result<Transform, String> {
-        self.load_with(path, Precision::Double)
-    }
-
-    /// HDF5 files are read as stored (ITK casts their values afterwards), the others as
-    /// [`FileLoader`] reads them for `precision`.
-    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
-        let name = path.to_string_lossy().to_ascii_lowercase();
-        if !(name.ends_with(".h5") || name.ends_with(".hdf5")) {
-            return FileLoader.load_with(path, precision);
-        }
-        Python::attach(|py| -> PyResult<Transform> {
-            let read = py.import("larmorx.transforms")?.getattr("_read_parts")?;
-            let parts = read.call1((path,))?;
-            transform_from_py(&parts)
-        })
-        .map_err(|e| e.to_string())
-    }
-}
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(grid_from_ras_affine, m)?)?;

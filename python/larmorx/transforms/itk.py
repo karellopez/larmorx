@@ -5,12 +5,12 @@ Transforms are kept in ITK's stored form: a class name, parameters and fixed par
 (:class:`ItkTransform`). A file holds a list of them. When the first is a
 ``CompositeTransform`` entry, the following ones are its components.
 
-Formats:
+Formats, all read in Rust as ITK v5.4.5 reads them:
 
-- ITK text (``.txt``, ``.tfm``), MATLAB v4 (``.mat``) and displacement fields stored as NIfTI
-  vector images (``.nii``, ``.nii.gz``) are read in Rust.
-- HDF5 (``.h5``), the format of fMRIPrep's ``*_xfm.h5`` composites, is read and written with
-  h5py, in ITK's layout.
+- ITK text (``.txt``, ``.tfm``) and MATLAB v4 (``.mat``);
+- HDF5 (``.h5``), the format of fMRIPrep's ``*_xfm.h5`` composites (any HDF5 file with a
+  ``/TransformGroup`` is read as one, whatever its name, as ITK does);
+- displacement fields stored as NIfTI vector images (``.nii``, ``.nii.gz``).
 
 Points are mapped in ITK's physical space (LPS millimetres), as by ANTs.
 """
@@ -24,6 +24,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 
 __all__ = ["ItkTransform", "read", "write"]
 
@@ -75,9 +76,15 @@ def _is_h5(path: PathLike) -> bool:
     return os.fspath(path).lower().endswith(_H5_SUFFIXES)
 
 
-def read(path: PathLike) -> list[ItkTransform]:
-    """Read the transforms stored in an ITK transform file."""
-    return [ItkTransform(*parts) for parts in _read_parts(path)]
+def read(path: PathLike, *, upstream_defects: UpstreamDefectsName = "fix") -> list[ItkTransform]:
+    """Read the transforms stored in an ITK transform file, in the file's order (a composite
+    first, then its components).
+
+    ``upstream_defects="reproduce"`` reads as ITK does where it is defective
+    (``docs/api/transforms-hdf5.md``): it refuses an HDF5 ``TransformType`` stored as a
+    fixed-length string (ITK-12) and reads parameters wider than 8 bytes through float
+    (ITK-14). A :class:`~larmorx.UpstreamDefectWarning` says when that changes the result."""
+    return [ItkTransform(*parts) for parts in _read_parts(path, upstream_defects=upstream_defects)]
 
 
 def write(path: PathLike, transforms: ItkTransform | Sequence[ItkTransform]) -> None:
@@ -94,55 +101,23 @@ def write(path: PathLike, transforms: ItkTransform | Sequence[ItkTransform]) -> 
 
 
 def _read_parts(
-    path: PathLike, precision: str = "float64"
+    path: PathLike, precision: str = "float64", upstream_defects: UpstreamDefectsName = "fix"
 ) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    """The stored ``(name, parameters, fixed)`` tuples; also used by the command line for
-    ``.h5`` files. With ``precision="float32"``, text files are read as ITK's float reader
-    reads them (each number rounded once to float); the other formats are read as stored."""
-    if _is_h5(path):
-        return _read_h5(path)
-    return _core.itk_transform_read(os.fspath(path), precision)
+    """The stored ``(name, parameters, fixed)`` tuples. With ``precision="float32"``, text
+    files are read as ITK's float reader reads them (each number rounded once to float); the
+    other formats are read as stored."""
+    check(upstream_defects)
+    parts, notices = _core.itk_transform_read(os.fspath(path), precision, upstream_defects)
+    warn(notices, stacklevel=3)
+    return parts
 
 
 def _h5py():  # type: ignore[no-untyped-def]
     try:
         import h5py
     except ImportError as e:  # pragma: no cover - h5py is a dependency
-        raise ImportError("reading and writing .h5 transforms needs h5py") from e
+        raise ImportError("writing .h5 transforms needs h5py") from e
     return h5py
-
-
-def _text(value: object) -> str:
-    if isinstance(value, np.ndarray):
-        value = value.reshape(-1)[0]
-    return value.decode() if isinstance(value, bytes) else str(value)
-
-
-def _read_h5(path: PathLike) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    """ITK's HDF5 layout: ``/TransformGroup/<n>/{TransformType, TransformParameters,
-    TransformFixedParameters}`` for n = 0, 1, ..."""
-    h5py = _h5py()
-    out = []
-    with h5py.File(os.fspath(path), "r") as f:
-        group = f.get("TransformGroup")
-        if group is None:
-            raise ValueError(f"{os.fspath(path)}: not an ITK transform file (no /TransformGroup)")
-        for key in sorted(group, key=int):
-            g = group[key]
-            name = _text(g["TransformType"][()])
-            params = g["TransformParameters"][()] if "TransformParameters" in g else np.zeros(0)
-            fixed = (
-                g["TransformFixedParameters"][()]
-                if "TransformFixedParameters" in g
-                else np.zeros(0)
-            )
-            params = np.asarray(params).ravel()
-            if params.dtype not in (np.float32, np.float64):
-                params = params.astype(np.float64)
-            out.append((name, params, np.asarray(fixed, dtype=np.float64).ravel()))
-    if not out:
-        raise ValueError(f"{os.fspath(path)}: no transform in file")
-    return out
 
 
 def _write_h5(path: PathLike, transforms: Sequence[ItkTransform]) -> None:

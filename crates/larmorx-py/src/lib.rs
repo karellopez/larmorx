@@ -34,7 +34,7 @@ fn cli_main(
     implementation: Option<&str>,
 ) -> PyResult<(u8, String, String)> {
     let options = larmorx_cli::Options {
-        loader: &ants::PyLoader,
+        loader: &larmorx_cli::FileLoader,
         implementation: implementation.map(replica::implementation).transpose()?,
         replica_dirs,
         replica_output: larmorx_cli::replica::Output::Capture,

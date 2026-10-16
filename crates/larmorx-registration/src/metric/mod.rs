@@ -14,8 +14,11 @@
 //! the points ([`ImageMetricv4::for_each_sample`]): the dense domain in index order, the
 //! sampled points in their order.
 
+pub mod correlation;
+pub mod joint_histogram;
 pub mod mattes;
 pub mod mean_squares;
+pub mod neighborhood_correlation;
 
 use std::sync::Arc;
 
@@ -104,6 +107,28 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         floor: &IndexFloor,
     ) -> Option<Sample<R, D>> {
         let (virtual_index, virtual_point) = self.domain_point(i);
+        self.sample_at(
+            &virtual_index,
+            &virtual_point,
+            moving,
+            gradients,
+            compute_derivative,
+            floor,
+        )
+    }
+
+    /// [`ImageMetricv4::sample`] for the virtual point `virtual_point` (of index
+    /// `virtual_index`).
+    pub fn sample_at(
+        &self,
+        virtual_index: &[i64; D],
+        virtual_point: &[f64; D],
+        moving: &Composite<R, D>,
+        gradients: GradientSource,
+        compute_derivative: bool,
+        floor: &IndexFloor,
+    ) -> Option<Sample<R, D>> {
+        let (virtual_index, virtual_point) = (*virtual_index, *virtual_point);
         let as_r = |p: &[f64; D]| -> [R; D] { std::array::from_fn(|k| R::from_f64(p[k])) };
         let as_f64 = |p: &[R; D]| -> [f64; D] { std::array::from_fn(|k| p[k].to_f64()) };
         let local = as_r(&virtual_point);

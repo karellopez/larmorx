@@ -763,6 +763,7 @@ fn do_registration<R: Compute, const D: usize>(
         Conv::bool(&function0(p, "minc").expect("default").name).map_err(|e| throw(log, e))?;
     let mut helper = RegistrationHelper::<R, D> {
         n_threads: ctx.n_threads,
+        upstream_defects: ctx.notices.mode(),
         ..RegistrationHelper::default()
     };
     if let Some(s) = p.last("random-seed") {
@@ -1133,7 +1134,10 @@ fn do_registration<R: Compute, const D: usize>(
     }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());
-    if let Err(RegistrationFailed(_)) = helper.do_registration(log, &floor) {
+    let done = helper.do_registration(log, &floor);
+    ctx.notices.extend(std::mem::take(&mut helper.notices));
+    if let Err(RegistrationFailed(_)) = done {
+        floor.notice(ctx.notices, "interpolated values");
         return Err(1);
     }
     floor.notice(ctx.notices, "interpolated values");

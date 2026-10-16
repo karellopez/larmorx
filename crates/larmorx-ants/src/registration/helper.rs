@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use larmorx_core::IndexFloor;
-use larmorx_core::defects::Notices;
+use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects, push_once};
 use larmorx_registration::format::OStream;
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{
@@ -188,6 +188,10 @@ pub struct RegistrationHelper<R, const D: usize> {
     pub n_threads: usize,
     /// Warnings ITK printed to `std::cerr` (`itkWarningMacro`).
     pub warnings: Vec<String>,
+    /// The D13 mode (ANTS-49: a linear stage that throws).
+    pub upstream_defects: UpstreamDefects,
+    /// The defects that changed this run, or would have.
+    pub notices: Vec<Notice>,
 }
 
 impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
@@ -218,6 +222,8 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
             moving_masks: Vec::new(),
             n_threads: 1,
             warnings: Vec::new(),
+            upstream_defects: UpstreamDefects::Fix,
+            notices: Vec::new(),
         }
     }
 }
@@ -558,7 +564,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "  using the CC metric (radius = {}, weight = {weight}, use gradient filter = {gradient})\n",
                             m.radius
                         ));
-                        return self.unsupported(log, "the CC metric");
+                        MethodMetric::Cc {
+                            radius: m.radius as usize,
+                        }
                     }
                     Some(MetricKind::Mattes) => {
                         log.logger(&format!(
@@ -574,7 +582,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "  using the joint histogram MI metric (number of bins = {}, weight = {weight}, use gradient filter = {gradient})\n",
                             m.number_of_bins
                         ));
-                        return self.unsupported(log, "the joint histogram MI metric");
+                        MethodMetric::Mi {
+                            bins: m.number_of_bins.max(0) as usize,
+                        }
                     }
                     Some(MetricKind::MeanSquares) => {
                         log.logger(&format!(
@@ -586,13 +596,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                         log.logger(&format!(
                             "  using the Demons metric ( weight = {weight}, use gradient filter = {gradient})\n"
                         ));
-                        return self.unsupported(log, "the Demons metric");
+                        MethodMetric::Demons
                     }
                     Some(MetricKind::Gc) => {
                         log.logger(&format!(
                             "  using the global correlation metric ( weight = {weight}, use gradient filter = {gradient})\n"
                         ));
-                        return self.unsupported(log, "the global correlation metric");
+                        MethodMetric::Gc
                     }
                     Some(k) => {
                         log.logger(&format!(
@@ -638,10 +648,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     fixed_mask: fixed_mask.clone(),
                     moving_mask: moving_mask.clone(),
                     use_gradient_filter: m.use_gradient_filter,
+                    weight: m.weighting,
                 });
-            }
-            if prepared.len() > 1 {
-                return self.unsupported(log, "several metrics in one stage");
             }
             let factors = &self.shrink_factors[stage];
             if factors.len() != levels {
@@ -757,7 +765,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 self.default_seed
             };
             let stage_spec = Stage {
-                metric: prepared.remove(0),
+                metrics: prepared,
                 shrink_factors: per_level,
                 smoothing_sigmas: sigmas_r,
                 sigmas_in_physical_units: self.sigmas_in_physical_units[stage],
@@ -796,8 +804,36 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     self.composite.as_mut().expect("set above").push(t);
                 }
                 Err(e) => {
+                    // AddLinearTransformToCompositeTransform logs the exception and returns
+                    // EXIT_FAILURE, which DoRegistration ignores (ANTS-49).
                     log.logger(&format!("Exception caught: {}\n", e.print()));
-                    return Err(RegistrationFailed(e.description));
+                    if self.upstream_defects.fix() {
+                        push_once(
+                            &mut self.notices,
+                            Notice::new(
+                                &defects::ANTS_49,
+                                self.upstream_defects,
+                                format!(
+                                    "stage {stage} failed: an error; ANTs drops the stage and goes on"
+                                ),
+                            ),
+                        );
+                        let msg = format!(
+                            "larmorx: antsRegistration: stage {stage} failed (the exception above); \
+                             {}=reproduce drops the stage and goes on, as ANTs does (ANTS-49)\n",
+                            defects::ENV
+                        );
+                        log.cerr(&msg);
+                        return Err(RegistrationFailed(e.description));
+                    }
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ANTS_49,
+                            self.upstream_defects,
+                            format!("stage {stage} failed and was dropped, as in ANTs"),
+                        ),
+                    );
                 }
             }
             let elapsed = timer.elapsed().as_secs_f64();

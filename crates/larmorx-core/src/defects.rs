@@ -192,6 +192,8 @@ defects! {
         "the Rician correction factor overflows at high signal-to-noise ratios and the bias becomes 0";
     ANTS_47 = "ANTS-47", "DenoiseImage", true,
         "a mask that cannot be read is no mask: the whole image is denoised, exit 0";
+    ANTS_49 = "ANTS-49", "antsRegistration", true,
+        "a linear stage that throws (an ITK exception) is dropped: the next stages run without it, the outputs are written and the program exits 0";
     ITK_01 = "ITK-01", "ITK", true,
         "Math::Floor gives 0 instead of -1 for negative values closer to 0 than 2^-26 (float) or 2^-55 (double)";
     ITK_02 = "ITK-02", "ITK", true,

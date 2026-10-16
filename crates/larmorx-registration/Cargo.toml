@@ -9,5 +9,6 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-image.workspace = true
+larmorx-io.workspace = true
 rayon.workspace = true
 thiserror.workspace = true

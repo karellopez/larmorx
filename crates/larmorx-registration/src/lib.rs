@@ -173,6 +173,24 @@ impl ItkException {
         }
     }
 
+    /// The exception ITK throws on catching this one, `ExceptionObject(__FILE__, __LINE__,
+    /// prefix + what())`: no class prefix, the location `Unknown`, and `what()` is the file,
+    /// the line and the description.
+    pub fn wrapped(&self, file: &'static str, line: u32, prefix: &str) -> ItkException {
+        let description = if self.class.is_empty() {
+            self.description.clone()
+        } else {
+            format!("ITK ERROR: {}(0x0): {}", self.class, self.description)
+        };
+        ItkException {
+            file,
+            line,
+            class: "",
+            description: format!("{prefix}{}:{}:\n{description}", self.file, self.line),
+            location: "Unknown",
+        }
+    }
+
     /// An `ExceptionObject` built empty and given a description and a location (no file, line
     /// 0, no class prefix), as `itk::Versor` throws.
     pub fn located(location: &'static str, description: impl Into<String>) -> Self {

@@ -119,10 +119,19 @@ pub fn hex_float(v: f64) -> String {
     format!("{sign}0x{lead}{frac}p{esign}{}", e.abs())
 }
 
-/// An ITK array with the default stream format.
+/// `operator<<` of an `itk::Array<double>` or `<float>`: `[a, b, ...]`, each number by
+/// `ConvertNumberToString` (the shortest decimal that reads back to it).
 pub fn itk_array<R: larmorx_core::ItkReal>(values: &[R]) -> String {
-    let v: Vec<f64> = values.iter().map(|x| x.to_f64()).collect();
-    OStream::default().array(&v)
+    let parts: Vec<String> = values
+        .iter()
+        .map(|x| match R::PRECISION {
+            larmorx_core::Precision::Double => larmorx_io::itk_transform::itk_number(x.to_f64()),
+            larmorx_core::Precision::Float => {
+                larmorx_io::itk_transform::itk_number_f32(x.to_f64() as f32)
+            }
+        })
+        .collect();
+    format!("[{}]", parts.join(", "))
 }
 
 #[cfg(test)]

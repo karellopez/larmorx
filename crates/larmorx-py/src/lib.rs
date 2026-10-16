@@ -11,6 +11,7 @@ mod afni;
 mod ants;
 mod ants_filters;
 mod defects;
+mod hdf5;
 mod mri;
 mod ndimage;
 mod nifti;
@@ -34,7 +35,7 @@ fn cli_main(
     implementation: Option<&str>,
 ) -> PyResult<(u8, String, String)> {
     let options = larmorx_cli::Options {
-        loader: &ants::PyLoader,
+        loader: &larmorx_cli::FileLoader,
         implementation: implementation.map(replica::implementation).transpose()?,
         replica_dirs,
         replica_output: larmorx_cli::replica::Output::Capture,
@@ -68,6 +69,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ants_filters::register(m)?;
     afni::register(m)?;
     defects::register(m)?;
+    hdf5::register(m)?;
     mri::register(m)?;
     ndimage::register(m)?;
     replica::register(m)?;

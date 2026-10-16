@@ -332,6 +332,14 @@ def load_itk_linear(path: PathLike) -> Affine | AffineSeries:
     return series[0] if len(series) == 1 else series
 
 
+def _first_type(member: dict) -> bytes:
+    """A group's ``TransformType`` (its first string), or ``b""``."""
+    try:
+        return bytes(np.asarray(member["TransformType"], dtype=object).ravel()[0])
+    except (KeyError, IndexError, TypeError):
+        return b""
+
+
 def load_itk_composite(
     path: PathLike, *, upstream_defects: UpstreamDefectsName = "fix"
 ) -> TransformChain:
@@ -341,72 +349,115 @@ def load_itk_composite(
 
     nitransforms takes the file's transforms in the order h5py lists the groups, which is name
     order: ``"10"`` comes before ``"2"``, so a composite of 10 or more transforms is read out
-    of order (PIPE-04, ``docs/findings/upstream-defects.md``). larmorx reads them in numeric
-    order; ``upstream_defects="reproduce"`` gives nitransforms' order. A
+    of order (PIPE-04, ``docs/findings/upstream-defects.md``). It also skips the first group as
+    if it were the composite: a file of one transform (as ``antsApplyTransforms -o Linear[...]``
+    writes) fails, a file of several transforms without a composite loses its first, and an
+    empty composite fails (PIPE-17). larmorx reads the transforms in numeric order, from the
+    first group when it is not a composite, and an empty composite as the identity;
+    ``upstream_defects="reproduce"`` reads as nitransforms does. A
     :class:`~larmorx.UpstreamDefectWarning` says when the two differ."""
-    import h5py
-
     _defects.check(upstream_defects)
+    fix = upstream_defects == "fix"
     retval: list[Transform] = []
-    with h5py.File(os.fspath(path), "r") as f:
-        h5group = f["TransformGroup"]
-        typo = "Transform"
-        try:
-            h5group["1"][f"{typo}Parameters"]
-        except KeyError:
-            typo = "Tranform"
-        # list(h5group.values())[1:]: every group but the first, in h5py's (name) order.
-        by_name = list(h5group.keys())[1:]
-        numeric = sorted(
-            (k for k in h5group if k != "0"),
-            key=lambda k: (0, int(k)) if k.isdigit() else (1, k),
-        )
-        if by_name != numeric:
-            _defects.warn(
-                [
-                    (
-                        "PIPE-04",
-                        "nitransforms",
-                        upstream_defects,
-                        f"{os.fspath(path)}: its {len(numeric)} transforms are read in "
-                        + (
-                            "numeric order; nitransforms reads them in name order"
-                            if upstream_defects == "fix"
-                            else "name order, as nitransforms does; their numeric order differs"
-                        ),
-                    )
-                ]
+    # The members of /TransformGroup in h5py's order (by name), read in Rust as h5py reads
+    # them (KeyError when the group is missing, as h5py raises).
+    members = dict(_core.hdf5_group_members(os.fspath(path), "/TransformGroup"))
+    head = next(iter(members), None)
+    keep_head = head is not None and not _first_type(members[head]).startswith(
+        b"CompositeTransform"
+    )
+    notices = []
+    if keep_head:
+        notices.append(
+            (
+                "PIPE-17",
+                "nitransforms",
+                upstream_defects,
+                f"{os.fspath(path)}: its first transform is not a composite; "
+                + (
+                    "it is read (nitransforms skips it)"
+                    if fix
+                    else "it is skipped, as nitransforms does"
+                ),
             )
-        names = numeric if upstream_defects == "fix" else by_name
-        for xfm in (h5group[name] for name in names):
-            kind = xfm["TransformType"][0]
-            if kind.startswith(b"AffineTransform"):
-                params = np.asanyarray(xfm[f"{typo}Parameters"])
-                lin = _ItkLinear(
-                    _from_matvec(params[:-3].reshape(3, 3), params[-3:]).astype("f8"),
-                    np.asanyarray(xfm[f"{typo}FixedParameters"]).astype("f4"),
-                )
-                retval.insert(0, Affine(lin.to_ras()))
-                continue
-            if kind.startswith(b"DisplacementFieldTransform"):
-                fixed = xfm[f"{typo}FixedParameters"]
-                shape = fixed[:3]
-                offset = fixed[3:6]
-                zooms = fixed[6:9]
-                directions = np.reshape(fixed[9:], (3, 3))
-                affine = _from_matvec(directions * zooms, offset)
-                field = np.moveaxis(
-                    np.reshape(xfm[f"{typo}Parameters"], (3, *shape.astype(int)), order="F"),
-                    0,
-                    -1,
-                )
-                field[..., (0, 1)] *= -1.0
-                retval.insert(
-                    0,
-                    DenseField(np.squeeze(field.astype("float")), matmul(LPS, affine)),
-                )
-                continue
-            raise TransformFileError(f"Unsupported transform type {kind}")
+        )
+    typo = "Transform"
+    try:
+        members[head if fix and keep_head else "1"][f"{typo}Parameters"]
+    except KeyError:
+        typo = "Tranform"
+    # list(h5group.values())[1:]: every group but the first, in h5py's (name) order.
+    by_name = list(members)[1:]
+    numeric = sorted(
+        (k for k in members if k != head),
+        key=lambda k: (0, int(k)) if k.isdigit() else (1, k),
+    )
+    if by_name != numeric:
+        notices.append(
+            (
+                "PIPE-04",
+                "nitransforms",
+                upstream_defects,
+                f"{os.fspath(path)}: its {len(numeric)} transforms are read in "
+                + (
+                    "numeric order; nitransforms reads them in name order"
+                    if fix
+                    else "name order, as nitransforms does; their numeric order differs"
+                ),
+            )
+        )
+    names = numeric if fix else by_name
+    if fix and keep_head:
+        names = [head, *names]
+    if head is not None and not names and not keep_head:
+        notices.append(
+            (
+                "PIPE-17",
+                "nitransforms",
+                upstream_defects,
+                f"{os.fspath(path)}: an empty composite "
+                + (
+                    "is read as the identity (nitransforms fails)"
+                    if fix
+                    else "fails, as in nitransforms"
+                ),
+            )
+        )
+    _defects.warn(notices)
+    for xfm in (members[name] for name in names):
+        kind = xfm["TransformType"][0]
+        if kind.startswith(b"AffineTransform"):
+            params = np.asanyarray(xfm[f"{typo}Parameters"])
+            lin = _ItkLinear(
+                _from_matvec(params[:-3].reshape(3, 3), params[-3:]).astype("f8"),
+                np.asanyarray(xfm[f"{typo}FixedParameters"]).astype("f4"),
+            )
+            retval.insert(0, Affine(lin.to_ras()))
+            continue
+        if kind.startswith(b"DisplacementFieldTransform"):
+            fixed = xfm[f"{typo}FixedParameters"]
+            shape = fixed[:3]
+            offset = fixed[3:6]
+            zooms = fixed[6:9]
+            directions = np.reshape(fixed[9:], (3, 3))
+            affine = _from_matvec(directions * zooms, offset)
+            field = np.moveaxis(
+                np.reshape(xfm[f"{typo}Parameters"], (3, *shape.astype(int)), order="F"),
+                0,
+                -1,
+            )
+            field[..., (0, 1)] *= -1.0
+            retval.insert(
+                0,
+                DenseField(np.squeeze(field.astype("float")), matmul(LPS, affine)),
+            )
+            continue
+        raise TransformFileError(f"Unsupported transform type {kind}")
+    if not retval and not fix:
+        # nitransforms' TransformChain([]) looks at its first transform.
+        raise IndexError("list index out of range")
+    if head is None:
+        raise TransformFileError(f"no transform in {os.fspath(path)}")
     return TransformChain(tuple(retval))
 
 

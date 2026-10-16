@@ -338,6 +338,17 @@ impl LinearTransform {
         parameters: &[f64],
         fixed_parameters: &[f64],
     ) -> Result<Self, TransformError> {
+        // ITK's names end with the input and output dimensions (`_3_3`). A transform of another
+        // dimension inside a 3-D composite is cast blindly by ITK (ITK-17); larmorx refuses it.
+        let mut dims = itk_name.rsplit('_').take(2);
+        if let (Some(out), Some(input)) = (dims.next(), dims.next())
+            && out.parse::<u32>().is_ok()
+            && (out != "3" || input != "3")
+        {
+            return Err(TransformError::Invalid(format!(
+                "{itk_name}: a transform of dimension {input}→{out}; 3-D transforms are read"
+            )));
+        }
         let kind = LinearKind::from_itk_name(itk_name)
             .ok_or_else(|| TransformError::Unsupported(itk_name.to_owned()))?;
         if parameters.len() != kind.n_parameters() {

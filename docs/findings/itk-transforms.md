@@ -88,11 +88,14 @@ reversed, and it is consistent with the mapping `affine(warp(x))`. *Verified*
 gives different bytes and only the datasets are reproducible. The test-data generator
 therefore compares `.h5` files by their datasets. *Verified.* larmorx's writer
 (`lx.transforms.write`) gives the same bytes every time: two writes of one transform 1.5 s
-apart are identical (*verified* 2026-10-11).
+apart are identical (*verified* 2026-10-11; since 2026-10-16 every object records the time 0
+unless told otherwise).
 
-**ANTs reads `.h5` composites written by larmorx.** `lx.transforms.write` uses ITK's layout:
-- variable-length ASCII `TransformType` strings;
-- float64 fixed parameters;
-- parameters in their stored precision, chunked and gzip-compressed when large.
-
-*Validated* (parity case `transform/chain-larmorx-written-h5`, bit-identical).
+**ANTs reads `.h5` composites written by larmorx.** Since 2026-10-16 `lx.transforms.write`
+writes, in Rust, what ITK 5.4.5 writes on HDF5 1.12.1, byte for byte but for the object times
+and the compressed chunks' bytes: variable-length ASCII `TransformType` strings, float64
+contiguous fixed parameters, parameters in their stored precision in chunks of at most 1 Mi
+values compressed at level 5 (as ANTs asks). Everything about ITK's HDF5 files, reading and
+writing: [itk-hdf5.md](itk-hdf5.md). *Validated* (`itk-hdf5`; parity cases
+`transform/chain-larmorx-written-h5` and `transform/chain-h5-larmorx-dense` of
+`ants-apply-transforms`, bit-identical).

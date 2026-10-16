@@ -5,12 +5,12 @@ Transforms are kept in ITK's stored form: a class name, parameters and fixed par
 (:class:`ItkTransform`). A file holds a list of them. When the first is a
 ``CompositeTransform`` entry, the following ones are its components.
 
-Formats:
+Formats, all read in Rust as ITK v5.4.5 reads them:
 
-- ITK text (``.txt``, ``.tfm``), MATLAB v4 (``.mat``) and displacement fields stored as NIfTI
-  vector images (``.nii``, ``.nii.gz``) are read in Rust.
-- HDF5 (``.h5``), the format of fMRIPrep's ``*_xfm.h5`` composites, is read and written with
-  h5py, in ITK's layout.
+- ITK text (``.txt``, ``.tfm``) and MATLAB v4 (``.mat``);
+- HDF5 (``.h5``), the format of fMRIPrep's ``*_xfm.h5`` composites (any HDF5 file with a
+  ``/TransformGroup`` is read as one, whatever its name, as ITK does);
+- displacement fields stored as NIfTI vector images (``.nii``, ``.nii.gz``).
 
 Points are mapped in ITK's physical space (LPS millimetres), as by ANTs.
 """
@@ -24,12 +24,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from larmorx import _core
+from larmorx._defects import UpstreamDefectsName, check, warn
 
-__all__ = ["ItkTransform", "read", "write"]
+__all__ = ["Hdf5WriteOptions", "ItkTransform", "read", "write"]
 
 PathLike = str | os.PathLike[str]
-
-_H5_SUFFIXES = (".h5", ".hdf5")
 
 
 @dataclass(frozen=True, eq=False)
@@ -71,103 +70,82 @@ class ItkTransform:
         return (self.name, self.parameters, self.fixed_parameters)
 
 
-def _is_h5(path: PathLike) -> bool:
-    return os.fspath(path).lower().endswith(_H5_SUFFIXES)
+def read(path: PathLike, *, upstream_defects: UpstreamDefectsName = "fix") -> list[ItkTransform]:
+    """Read the transforms stored in an ITK transform file, in the file's order (a composite
+    first, then its components).
+
+    ``upstream_defects="reproduce"`` reads as ITK does where it is defective
+    (``docs/api/transforms-hdf5.md``): it refuses an HDF5 ``TransformType`` stored as a
+    fixed-length string (ITK-12) and reads parameters wider than 8 bytes through float
+    (ITK-14). A :class:`~larmorx.UpstreamDefectWarning` says when that changes the result."""
+    return [ItkTransform(*parts) for parts in _read_parts(path, upstream_defects=upstream_defects)]
 
 
-def read(path: PathLike) -> list[ItkTransform]:
-    """Read the transforms stored in an ITK transform file."""
-    return [ItkTransform(*parts) for parts in _read_parts(path)]
+@dataclass(frozen=True)
+class Hdf5WriteOptions:
+    """How :func:`write` stores transforms in an HDF5 file (``docs/api/transforms-hdf5.md``).
 
-
-def write(path: PathLike, transforms: ItkTransform | Sequence[ItkTransform]) -> None:
-    """Write transforms in ITK's format for the file's extension.
-
-    ``.h5`` takes any transforms, composites and displacement fields included; ``.txt`` and
-    ``.tfm`` take linear transforms; ``.mat`` exactly one linear transform.
+    ``compression``: store the parameters in chunks of at most 1 Mi values compressed by
+    deflate at level 5, as ANTs always asks ITK to; ``False`` stores them contiguous, ITK's
+    own default. ``time``: the time every HDF5 object header records, in seconds since
+    1970-01-01 UTC (ITK records the time of writing; 0 makes the same transforms give the same
+    bytes). The four strings are the file's ``/ITKVersion``, ``/HDFVersion``, ``/OSName`` and
+    ``/OSVersion`` (ITK writes its version, its HDF5's, and the system's name and release).
     """
+
+    compression: bool = True
+    time: int = 0
+    itk_version: str = "5.4.5"
+    hdf_version: str = "HDF5 library version: 1.12.1"
+    os_name: str = "larmorx"
+    os_version: str = _core.__version__
+
+
+def write(
+    path: PathLike,
+    transforms: ItkTransform | Sequence[ItkTransform],
+    *,
+    hdf5: Hdf5WriteOptions | None = None,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> None:
+    """Write transforms in ITK's format for the file's extension, as ITK v5.4.5 writes them.
+
+    HDF5 (``.h5``, ``.hdf5``, and ITK's other HDF5 extensions ``.hdf``, ``.h4``, ``.hdf4``,
+    ``.he4``, ``.he5``, ``.hd5``, compared case for case as ITK does) takes any transforms,
+    composites and displacement fields included, stored as :class:`Hdf5WriteOptions` says:
+    the layout is HDF5 1.12.1's for ITK's calls, byte for byte apart from the compressed
+    chunks. ``.txt`` and ``.tfm`` take linear transforms; ``.mat`` exactly one linear
+    transform. A composite may only come first: the transforms after it are its components.
+
+    ``upstream_defects="reproduce"`` fails where ITK fails: a transform without parameters
+    cannot be written with compression (ITK-15; larmorx stores its empty parameters
+    uncompressed, with a :class:`~larmorx.UpstreamDefectWarning`), and the file ITK leaves
+    behind is written before the error is raised.
+    """
+    check(upstream_defects)
     items = [transforms] if isinstance(transforms, ItkTransform) else list(transforms)
-    if _is_h5(path):
-        _write_h5(path, items)
-    else:
-        _core.itk_transform_write(os.fspath(path), [t._as_tuple() for t in items])
+    o = hdf5 if hdf5 is not None else Hdf5WriteOptions()
+    notices = _core.itk_transform_write(
+        os.fspath(path),
+        [t._as_tuple() for t in items],
+        compression=o.compression,
+        time=o.time,
+        itk_version=o.itk_version,
+        hdf_version=o.hdf_version,
+        os_name=o.os_name,
+        os_version=o.os_version,
+        upstream_defects=upstream_defects,
+    )
+    warn(notices, stacklevel=2)
 
 
 def _read_parts(
-    path: PathLike, precision: str = "float64"
+    path: PathLike, precision: str = "float64", upstream_defects: UpstreamDefectsName = "fix"
 ) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    """The stored ``(name, parameters, fixed)`` tuples; also used by the command line for
-    ``.h5`` files. With ``precision="float32"``, text files are read as ITK's float reader
-    reads them (each number rounded once to float); the other formats are read as stored."""
-    if _is_h5(path):
-        return _read_h5(path)
-    return _core.itk_transform_read(os.fspath(path), precision)
-
-
-def _h5py():  # type: ignore[no-untyped-def]
-    try:
-        import h5py
-    except ImportError as e:  # pragma: no cover - h5py is a dependency
-        raise ImportError("reading and writing .h5 transforms needs h5py") from e
-    return h5py
-
-
-def _text(value: object) -> str:
-    if isinstance(value, np.ndarray):
-        value = value.reshape(-1)[0]
-    return value.decode() if isinstance(value, bytes) else str(value)
-
-
-def _read_h5(path: PathLike) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    """ITK's HDF5 layout: ``/TransformGroup/<n>/{TransformType, TransformParameters,
-    TransformFixedParameters}`` for n = 0, 1, ..."""
-    h5py = _h5py()
-    out = []
-    with h5py.File(os.fspath(path), "r") as f:
-        group = f.get("TransformGroup")
-        if group is None:
-            raise ValueError(f"{os.fspath(path)}: not an ITK transform file (no /TransformGroup)")
-        for key in sorted(group, key=int):
-            g = group[key]
-            name = _text(g["TransformType"][()])
-            params = g["TransformParameters"][()] if "TransformParameters" in g else np.zeros(0)
-            fixed = (
-                g["TransformFixedParameters"][()]
-                if "TransformFixedParameters" in g
-                else np.zeros(0)
-            )
-            params = np.asarray(params).ravel()
-            if params.dtype not in (np.float32, np.float64):
-                params = params.astype(np.float64)
-            out.append((name, params, np.asarray(fixed, dtype=np.float64).ravel()))
-    if not out:
-        raise ValueError(f"{os.fspath(path)}: no transform in file")
-    return out
-
-
-def _write_h5(path: PathLike, transforms: Sequence[ItkTransform]) -> None:
-    h5py = _h5py()
-    string = h5py.string_dtype("ascii")
-    with h5py.File(os.fspath(path), "w") as f:
-        f.create_dataset("ITKVersion", data=np.array(["5.4.5"], dtype=object), dtype=string)
-        f.create_dataset(
-            "HDFVersion", data=np.array([h5py.version.hdf5_version], dtype=object), dtype=string
-        )
-        f.create_dataset("OSName", data=np.array(["larmorx"], dtype=object), dtype=string)
-        f.create_dataset(
-            "OSVersion", data=np.array([_core.__version__], dtype=object), dtype=string
-        )
-        group = f.create_group("TransformGroup")
-        for i, t in enumerate(transforms):
-            g = group.create_group(str(i))
-            g.create_dataset("TransformType", data=np.array([t.name], dtype=object), dtype=string)
-            if t.is_composite:
-                continue
-            g.create_dataset("TransformFixedParameters", data=t.fixed_parameters)
-            large = t.parameters.size > 1 << 16
-            g.create_dataset(
-                "TransformParameters",
-                data=t.parameters,
-                chunks=(min(t.parameters.size, 1 << 20),) if large else None,
-                compression="gzip" if large else None,
-            )
+    """The stored ``(name, parameters, fixed)`` tuples. With ``precision="float32"``, text
+    files are read as ITK's float reader reads them (each number rounded once to float); the
+    other formats are read as stored."""
+    check(upstream_defects)
+    parts, notices = _core.itk_transform_read(os.fspath(path), precision, upstream_defects)
+    warn(notices, stacklevel=3)
+    return parts

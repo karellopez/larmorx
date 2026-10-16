@@ -5,14 +5,15 @@ Both programs get the same arguments and files. ANTs is the oracle's ``antsApply
 binary (``LARMORX_ANTS_BIN``, else the workspace's ``oracles/ants-2.6.5/bin``, built by
 ``scripts/build_ants_oracle.sh``), with ``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=4`` unless set;
 without it, ANTs runs in-process through ANTsPy's ``ants.internal.get_lib_fn``, the same
-command line in ANTsPy's own build. larmorx runs through its Python console entry point, which
-also reads ``.h5`` transforms. The two output files are read with nibabel, a reader
-independent of both, and compared.
+command line in ANTsPy's own build. larmorx runs through its Python console entry point (its
+command line reads ``.h5`` transforms in Rust, crate ``larmorx-hdf5``). The two output files are
+read with nibabel, a reader independent of both, and compared.
 
 Cases cover:
 - every interpolator;
 - every transform type and file format ANTs reads, including inverses, chains, displacement
-  fields and HDF5 composites;
+  fields and HDF5 composites (fMRIPrep's, and files ITK writes: ``-o Linear[...]``, float
+  parameters, dense groups, larmorx's own rewrites);
 - awkward geometries: oblique, flipped, anisotropic, single-slice, qform-only, scaled
   integers, nearest-neighbour ties and voxels outside the input;
 - output types, time series and the errors both programs must raise;
@@ -198,6 +199,38 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         "larmorx-written-h5": (
             "the composite rewritten by lx.transforms.write: ANTs must read larmorx's .h5",
             ((f"larmorx:{T['composite-affine-warp.h5']}", False),),
+        ),
+        "h5-itk-linear": (
+            "-t linear.h5: an affine ITK wrote (-o Linear[...])",
+            (("ants-h5:linear", False),),
+        ),
+        "h5-itk-linear-inverse": (
+            "-t [linear.h5,1]: the inverse of an affine ITK wrote",
+            (("ants-h5:linear", True),),
+        ),
+        "h5-itk-linear-float": (
+            "-t linear-float.h5: float parameters (ITK's --float 1 -o Linear[...])",
+            (("ants-h5:linear-float", False),),
+        ),
+        "h5-itk-types": (
+            "-t composite.h5: six transform types in one composite ITK wrote",
+            (("ants-h5:composite-types", False),),
+        ),
+        "h5-itk-types-inverse": (
+            "-t [composite.h5,1]: the inverse of a composite of six linear transforms",
+            (("ants-h5:composite-types", True),),
+        ),
+        "h5-itk-dense": (
+            "-t composite.h5: nine affines ITK wrote (a dense group: fractal heap, v2 B-tree)",
+            (("ants-h5:composite-9-affines", False),),
+        ),
+        "h5-itk-warp-float": (
+            "-t composite.h5: a field and an affine in float (ITK's --float 1 output)",
+            (("ants-h5:composite-float", False),),
+        ),
+        "h5-larmorx-dense": (
+            "the nine-affine composite rewritten by lx.transforms.write (dense)",
+            (("larmorx:ants-h5:composite-9-affines", False),),
         ),
     }
     for name, (desc, chain) in chains.items():
@@ -547,10 +580,16 @@ def _resolve(path: str, tmp: Path) -> str:
             encoding="utf-8",
         )
         return str(out)
+    if path.startswith("ants-h5:"):
+        # A file ITK writes (the oracle's antsApplyTransforms or CompositeTransformUtil).
+        from larmorx_validation.parity import itk_hdf5
+
+        return str(itk_hdf5.itk_file(path.removeprefix("ants-h5:"), tmp))
     if path.startswith("larmorx:"):
         import larmorx as lx
 
-        source = td.get(path.removeprefix("larmorx:"))
+        inner = path.removeprefix("larmorx:")
+        source = Path(_resolve(inner, tmp)) if inner.startswith("ants-h5:") else td.get(inner)
         out = tmp / ("larmorx-" + source.name)
         lx.transforms.write(out, lx.transforms.read(source))
         return str(out)
@@ -857,12 +896,12 @@ def suite() -> Suite:
         ],
         cases=cases,
         run_case=run_case,
-        packages=("antspyx", "nibabel", "h5py"),
+        packages=("antspyx", "nibabel"),
         highlights=_highlights,
         notes=(
             "Both programs read the same files with the same arguments; the outputs are read with "
-            "nibabel. larmorx runs through its Python console entry point, so `.h5` transforms are "
-            "read with h5py. Where ITK calls the platform's transcendental functions, larmorx uses "
+            "nibabel. larmorx runs through its Python console entry point; its command line reads "
+            "`.h5` transforms in Rust (crate larmorx-hdf5). Where ITK calls the platform's transcendental functions, larmorx uses "
             "correctly rounded ones (`larmorx_core::math`; the `libm` crate where none is ported "
             "yet), the same bits on every platform, which can differ from glibc in the last bit "
             "(docs/findings/platform-math.md). With `--float 1` both compute in single precision "

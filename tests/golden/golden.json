@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "d18cdeff495e9e73ae969ee3dc73440c55b47020", "date": "2026-10-12", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "60c569e534612f12f0a2ce8af57e4a8e8b2efca8", "date": "2026-10-16", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
@@ -621,6 +621,18 @@
   },
   "py.transforms.resample_series.sdc": {
    "out": {"dtype": "<f8", "sample": "3d90b4c4be27184065f02c0518ca1740434da531e6ce37404c949c84d2aa2240284301c97a3d33402e0fc619ae5426404d6a8d372af72a405e59c7e87ab13040", "sha256": "d9a1f8a4700888789fc8b29d81be565d9cec1b3dcc11aa53ad422cc4ccf7370f", "shape": [12, 10, 9, 4], "sum": "82757.6283616281"}
+  },
+  "py.transforms.write_h5": {
+   "comp.file": {"bytes": 159411, "sha256": "96ee33930e22444299b742fcfab76567d9f4f69a26b35454778c597d47210bc5"},
+   "comp.structure": {"bytes": 698, "sha256": "be844a92156a3bd81be69740a46b0dc39ee3dbb539ae77fc46884b5ecfc131ac"},
+   "comp.values": {"dtype": "<f8", "sample": "333333333333d33f000000000000f33f000000000000c0bf000000000000d0bf000000000000f9bf000000000000d4bf000000000000ff3f000000000000f4bf", "sha256": "8ec7d4ab0a11ab5639711f0fadcd07f23eafa90a35d039674d0002916db0d47c", "shape": [98337], "sum": "-1521.405"},
+   "dense.file": {"bytes": 44073, "sha256": "f7d1bbdfa79ef70fece755ec0cba3127dde4e78863dd3fa6cdc18fe7caaffc81"},
+   "dense.structure": {"bytes": 2509, "sha256": "3ab9252418297880c50ffaa5da8a5d39641a6d660dc5decdf6ffb35e5407fb5b"},
+   "dense.values": {"dtype": "<f8", "sample": "0000000000000000000000000000000000000000000000000000000000000000000000000000f03f000000000000f83f00000000000000000000000000000000", "sha256": "525f44d3f1f25ad884cacb1c3a5a2819cbf553293b5b284075e00d978812aaa0", "shape": [165], "sum": "41.25"},
+   "plain.file": {"bytes": 795000, "sha256": "f696b087987750190c0a21fc0675912152ddc11c315e417113fdc77f6880daf6"},
+   "plain.structure": {"bytes": 698, "sha256": "be844a92156a3bd81be69740a46b0dc39ee3dbb539ae77fc46884b5ecfc131ac"},
+   "plain.values": {"dtype": "<f8", "sample": "333333333333d33f000000000000f33f000000000000c0bf000000000000d0bf000000000000f9bf000000000000d4bf000000000000ff3f000000000000f4bf", "sha256": "8ec7d4ab0a11ab5639711f0fadcd07f23eafa90a35d039674d0002916db0d47c", "shape": [98337], "sum": "-1521.405"},
+   "read": {"dtype": "<f8", "sample": "52b81e85eb51f03f000000000000c83f000000000000f0bf000000000000044000000000000004c0000000000000fd3f00000000008003c0000000000000f4bf", "sha256": "a18ca25303a5aff173c5221089f0d60b1be4f83a3d3b8c6749d4703ffb9a752a", "shape": [98316], "sum": "-1538.305"}
   }
  }
 }

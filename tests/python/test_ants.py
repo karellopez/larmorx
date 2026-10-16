@@ -58,8 +58,12 @@ def test_h5_composites_keep_float32_fields(tmp_path):
 
 
 def test_unknown_formats_are_rejected(tmp_path):
+    (tmp_path / "x.xfm").write_text("MNI Transform File\n", encoding="utf-8")
     with pytest.raises(ValueError, match="unknown transform file type"):
         lx.transforms.read(tmp_path / "x.xfm")
+    # As ANTs, a missing file is reported before its type is looked at.
+    with pytest.raises(FileNotFoundError):
+        lx.transforms.read(tmp_path / "missing.xfm")
     with pytest.raises(ValueError, match=r"\.mat file holds exactly one"):
         lx.transforms.write(tmp_path / "x.mat", [affine_transform(), affine_transform()])
 

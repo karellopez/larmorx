@@ -202,10 +202,20 @@ defects! {
         "asked for x.nii.gz, the reader takes the header from x.nii.gz but the voxels from x.nii when that file exists";
     ITK_10 = "ITK-10", "ITK", true,
         "a versor whose axis has a norm of at least 1 can fail to load in single precision";
+    ITK_12 = "ITK-12", "ITK", true,
+        "an HDF5 transform file whose TransformType is a fixed-length string (as h5py writes numpy bytes) cannot be read: ITK reads only variable-length strings";
+    ITK_14 = "ITK-14", "ITK", true,
+        "HDF5 transform parameters stored in a floating-point type wider than 8 bytes (long double, quadruple precision) are read through float, losing their precision";
+    ITK_15 = "ITK-15", "ITK", true,
+        "a transform without parameters (IdentityTransform) cannot be written to HDF5 with compression, which ANTs always asks for: the zero chunk size fails (H5Pset_chunk failed), leaving a file without that transform's parameters that ITK cannot read";
+    HDF_01 = "HDF-01", "HDF5", true,
+        "converting floating-point data of a non-native format (half, quadruple, VAX, custom), HDF5 1.12 keeps state from one element to the next: after a denormalized value every later value of the same conversion buffer rounds as a denormal, an unnormalized zero takes the previous value's mantissa width, and a denormal that rounds up to the smallest normal loses the carry";
     PIPE_03 = "PIPE-03", "fMRIPrep ResampleSeries", true,
         "the Jacobian of the field map is taken along the target grid's axis with the source's phase-encoding index, in target voxels";
     PIPE_04 = "PIPE-04", "nitransforms", true,
         "the transforms of an ITK composite .h5 file are read in name order, so a composite of 10 or more transforms is misordered";
+    PIPE_17 = "PIPE-17", "nitransforms", true,
+        "the first group of an ITK .h5 file is skipped as if it were a composite: a file of one transform cannot be loaded (IndexError), a file of several transforms without a composite loses its first, and an empty composite fails";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

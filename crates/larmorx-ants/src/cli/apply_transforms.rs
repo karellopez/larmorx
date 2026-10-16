@@ -277,11 +277,15 @@ fn interpolation(
 }
 
 /// The `-t` options as a chain (`GetCompositeTransformFromParserOption`), each file read by
-/// `TransformFileReaderTemplate<T>` for the computation type `precision`.
+/// `TransformFileReaderTemplate<T>` for the computation type `precision`. A file that cannot be
+/// read gives ANTs's report where larmorx reproduces it (`itk::ants::ReadTransform`: a missing
+/// file, an HDF5 file), after which ANTs says, when verbose, "Can't read initial transform".
 fn transform_chain(
     p: &Parsed,
     loader: &dyn TransformLoader,
     precision: Precision,
+    notices: &mut Notices,
+    log: &mut dyn FnMut(String),
 ) -> Result<TransformChain, String> {
     let mut items = Vec::new();
     for v in p.all("transform") {
@@ -304,9 +308,19 @@ fn transform_chain(
                 [0.0; 3],
             ))
         } else {
-            loader
-                .load_with(Path::new(name), precision)
-                .map_err(|e| format!("Can't read initial transform {name}: {e}"))?
+            match loader.load_with(Path::new(name), precision, notices) {
+                Ok(t) => t,
+                Err(e) => {
+                    return Err(match e.ants_report() {
+                        Some(report) => {
+                            log(format!("Can't read initial transform {name}"));
+                            // `main` ends the message with a newline.
+                            report.strip_suffix('\n').unwrap_or(&report).to_string()
+                        }
+                        None => format!("Can't read initial transform {name}: {e}"),
+                    });
+                }
+            }
         };
         items.push((transform, invert));
     }
@@ -459,7 +473,7 @@ fn run(
     let reference_grid = grid3(&reference)?;
     log(format!("Reference image: {reference_path}"));
 
-    let chain = transform_chain(p, loader, precision)?;
+    let chain = transform_chain(p, loader, precision, notices, &mut log)?;
     let interpolation = interpolation(p, input_grid.spacing, notices)?;
     log(format!("Interpolation: {interpolation:?}"));
     log(format!("Default pixel value: {default_value}"));

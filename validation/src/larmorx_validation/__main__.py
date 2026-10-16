@@ -23,6 +23,7 @@ PARITY_MODULES = {
     "nifti-io": "nifti_io",
     "itk-geometry": "itk_geometry",
     "ants-apply-transforms": "ants_apply_transforms",
+    "itk-hdf5": "itk_hdf5",
     "afni-tshift": "afni_tshift",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",

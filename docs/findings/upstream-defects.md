@@ -101,9 +101,16 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-06 | nifti_clib | NaN and ±inf read as 0 | c? | none seen | reproduces | decide |
 | ITK-07 | ITK NIfTI reader | integer data scaled in float32 | d | scaled inputs | reproduces | – |
 | ITK-08 | nifti_clib | asked for `x.nii.gz`, opens `x.nii` | e | none | opens the named file; `reproduce` reads nifti_clib's (2026-10-12) | – |
-| ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical | – |
+| ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical (object time 0) | – |
 | ITK-10 | ITK `Versor<float>` | a versor axis of norm ≥ 1 can fail to load in float (`--float 1`) | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-11 | ITK `GaussianOperator` | Bessel coefficients inaccurate for variances above about 50 voxels² | d | none | reproduces (finite kernels) | – (D11) |
+| ITK-12 | ITK HDF5 transform reader | `TransformType` read only as a variable-length string: a fixed-length one (h5py's `numpy.bytes_`) is refused | c | none (ITK writes variable-length strings) | corrected by default (`upstream_defects`, 2026-10-16) | – |
+| ITK-13 | ITK HDF5 transform reader | a parameter dataset of the wrong class or rank: the message names `TransformType` and runs the path into "in HDF5 File" | f | none | names the dataset; `reproduce` gives ITK's text (2026-10-16) | – |
+| ITK-14 | ITK HDF5 transform reader | parameters wider than 8 bytes (long double, quadruple) read through float | c | none | corrected by default (`upstream_defects`, 2026-10-16) | – |
+| ITK-15 | ITK HDF5 transform writer | a transform without parameters cannot be written with compression, which ANTs always asks for ("H5Pset_chunk failed"); a file ITK cannot read is left | c | none | corrected by default (`upstream_defects`, 2026-10-16) | – |
+| ITK-16 | ITK HDF5 transform reader | a null variable-length `TransformType` builds a `std::string` from a null pointer | a | none | refuses | – |
+| ITK-17 | ITK `CompositeTransformIOHelper` | a component of another dimension is `static_cast` to the composite's: ANTs runs on, exit 0 | a | none | refuses | – |
+| HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
 | PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -120,6 +127,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
 | PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect | decide |
+| PIPE-17 | nitransforms | the first group of an `.h5` file skipped as if it were the composite: one transform fails, a list without a composite loses its first, an empty composite fails | c | none (fMRIPrep's composites) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -182,16 +190,16 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (134 entries; an entry with two classes counts under its first):
+**Counts** (142 entries; an entry with two classes counts under its first):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 14 | |
+| (a) crash, undefined behaviour, out of bounds | 16 | |
 | (b) race, nondeterminism | 6 | |
-| (c) deterministic bug that changes results | 58 | 14 |
+| (c) deterministic bug that changes results | 63 | 14 |
 | (d) imprecision | 19 | |
 | (e) command-line or parsing quirk | 29 | |
-| (f) documentation or message only | 8 | |
+| (f) documentation or message only | 9 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
 FSL-08 (e). ANTS-46 (an unexplained early stop) is counted as (c?) until A4 explains it. Gap
@@ -212,7 +220,8 @@ AFNI-16 and its `reproduce` for AFNI-12's second check, and wrote the spec addit
 clean-room original needs (`specs/3dTshift.md` §6.1 to §6.5); part 2a (2026-10-12) gave the
 replica AFNI's global options and environment variables (spec §7.1), corrected AFNI-11 and
 AFNI-12 for them, and added AFNI-18 to AFNI-24; AFNI-23, decided the same day, is corrected by
-default in the replica.
+default in the replica. A4 part 1 (ITK's HDF5 transform files, 2026-10-16) added ITK-12 to
+ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -1073,8 +1082,92 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** verified.
 - **fMRIPrep:** none (values unaffected).
 - **larmorx:** `lx.transforms.write` gives the same bytes (verified 2026-10-11: two writes
-  1.5 s apart are identical).
+  1.5 s apart are identical). Since 2026-10-16 the writer is larmorx's own (crate
+  `larmorx-hdf5`): every object header records `Hdf5WriteOptions.time`, 0 by default; the
+  validation passes ITK's time to compare bytes ([itk-hdf5.md](itk-hdf5.md)).
 - **D13 / gap:** not reproduced. No gap.
+
+### ITK-12 A fixed-length `TransformType` string cannot be read — (c)
+- **What:** `HDF5TransformIOTemplate::Read` reads `TransformType` with a variable-length
+  `C_S1` memory type; HDF5 has no conversion from a fixed-length string, so a file whose type
+  is stored as one (as h5py writes a `numpy.bytes_` array) fails: "H5Dread failed for variable
+  length string".
+- **Evidence:** read: `itkHDF5TransformIO.cxx:307-316`; verified (h5py-written file, ANTs
+  2.6.5, 2026-10-16; validation `itk-hdf5`, `errors/h5py/fixed-string`).
+- **fMRIPrep:** none (ITK writes variable-length strings).
+- **larmorx:** reads the string by default, with a warning; `reproduce` fails with ITK's
+  messages (`larmorx_io::itk_hdf5`).
+- **D13 / gap:** done. No gap.
+
+### ITK-13 Wrong messages for a parameter dataset of the wrong class or rank — (f)
+- **What:** `ReadParameters` and `ReadFixedParameters` report a non-float dataset as "Wrong
+  data type for <path>in HDF5 File" (no blank) and a dataset of rank other than 1 as "Wrong #
+  of dims for TransformType in HDF5 File", whatever the dataset.
+- **Evidence:** read: `itkHDF5TransformIO.cxx:171, 176, 218, 223`; verified.
+- **fMRIPrep:** none.
+- **larmorx:** names the dataset, with a blank; `reproduce` prints ITK's text.
+- **D13 / gap:** messages only. No gap.
+
+### ITK-14 Parameters wider than 8 bytes are read through float — (c)
+- **What:** `ReadParameters` reads a dataset whose type is 8 bytes as `NATIVE_DOUBLE` and every
+  other floating-point type as `NATIVE_FLOAT`: `long double` (x87, 16 bytes) and IEEE
+  quadruple parameters lose their precision, even in the double reader.
+- **Evidence:** read: `itkHDF5TransformIO.cxx:186-204`; verified (h5py-written `long double`
+  parameters, ANTs 2.6.5).
+- **fMRIPrep:** none (ITK writes float or double).
+- **larmorx:** reads them in the reader's precision by default, warning where the values
+  differ; `reproduce` goes through float.
+- **D13 / gap:** done. No gap.
+
+### ITK-15 A transform without parameters cannot be written with compression — (c)
+- **What:** `WriteParameters` with compression sets a chunk of `min(n, 1 Mi)` values; for a
+  transform without parameters (`IdentityTransform`) that is 0, `H5Pset_chunk` fails ("all
+  chunk dimensions must be positive"), and `Write` throws "H5Pset_chunk failed". ANTs always
+  asks for compression, so ANTs' writer (`itk::ants::WriteTransform`, as in
+  `CompositeTransformUtil --assemble`) cannot store an `IdentityTransform` in `.h5`; the file
+  is left with what was written before, the transform's empty fixed parameters included, and
+  ITK cannot read it back (its `TransformParameters` is missing).
+- **Evidence:** read: `itkHDF5TransformIO.cxx:127-138, 462`; verified
+  (`CompositeTransformUtil --assemble out.h5 affine.mat identity.txt`, ANTs 2.6.5,
+  2026-10-16; validation `itk-hdf5`, `write/itk15-identity-compressed`).
+- **fMRIPrep:** none (its transforms have parameters; `antsApplyTransforms -t identity` is a
+  12-parameter `MatrixOffsetTransformBase`).
+- **larmorx:** stores the empty parameters uncompressed (as ITK does without compression),
+  with a warning; `reproduce` fails as ITK does and writes the file ITK leaves, byte for byte.
+- **D13 / gap:** done. No gap.
+
+### ITK-16 A null `TransformType` string — (a)
+- **What:** a variable-length `TransformType` that is HDF5's null string reads as a null
+  `char *`, from which ITK's C++ binding builds a `std::string`: undefined behaviour.
+- **Evidence:** read: ITK's HDF5 1.12.1 C++ binding, `c++/src/H5DataSet.cpp:747-763`
+  (`p_read_variable_len`: `strg = strg_C`).
+- **fMRIPrep:** none.
+- **larmorx:** refuses the file in both modes.
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### ITK-17 A composite component of another dimension — (a)
+- **What:** `CompositeTransformIOHelperTemplate::InternalSetTransformList` adds each
+  component with a `static_cast` to the composite's dimension, so a 2-D transform in a 3-D
+  composite becomes a 3-D transform pointer to a 2-D object; antsApplyTransforms runs on and
+  exits 0.
+- **Evidence:** read: `itkCompositeTransformIOHelper.cxx:197-206`; verified (an h5py-written 3-D
+  composite holding `AffineTransform_double_2_2`, ANTs 2.6.5 exits 0, 2026-10-16).
+- **fMRIPrep:** none.
+- **larmorx:** refuses the file in both modes.
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### HDF-01 HDF5 1.12 converts non-native floats with state carried over — (c)
+- **What:** `H5T__conv_f_f` (the soft conversion between floating-point formats that are not
+  the platform's, such as half precision, x87 extended or a custom format) keeps variables from
+  one element to the next: after a denormalized value every later value of the same conversion
+  buffer rounds as a denormal, an unnormalized zero takes the previous value's mantissa width,
+  and a denormal that rounds up to the smallest normal loses the carry. ITK reads such
+  parameters through it.
+- **Evidence:** read: HDF5 1.12.1 `src/H5Tconv.c` (`H5T__conv_f_f`).
+- **fMRIPrep:** none (its parameters are native floats).
+- **larmorx:** computes each element on its own by default and warns where HDF5's result
+  differs; `reproduce` carries the state as HDF5 does (`larmorx_hdf5::datatype::conv_f_f`).
+- **D13 / gap:** done. No gap.
 
 ## fMRIPrep and its libraries
 
@@ -1308,6 +1401,20 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   (`larmorx_validation.stages.nodes._NipypePost`).
 - **D13 / gap:** **decide** for larmorprepx: keep N4's float32 output (the default larmorprepx
   would take), or write the input's type as fMRIPrep does.
+
+### PIPE-17 nitransforms skips the first group of an `.h5` file — (c)
+- **What:** `ITKCompositeH5.from_h5obj` reads `list(h5group.values())[1:]`, assuming group `0` is
+  the composite. A file of one transform (what `antsApplyTransforms -o Linear[x.h5]` writes)
+  gives an empty list, and `TransformChain([])` fails with `IndexError`; a file of several
+  transforms without a composite loses its first; an empty composite fails the same way. The
+  misspelt-name check looks at group `1` only.
+- **Evidence:** read: nitransforms 25.1.0 `io/itk.py:381-430`, `manip.py:94`; verified
+  (validation `itk-hdf5`, `read/itk/linear`, 2026-10-16).
+- **fMRIPrep:** none (its composites start with the composite).
+- **larmorx:** `lx.transforms.load_itk_composite` reads the first group when it is not a
+  composite and an empty composite as the identity, with a warning; `reproduce` behaves as
+  nitransforms.
+- **D13 / gap:** done. No gap.
 
 ### SCI-01 `map_coordinates` reads outside its array — (a)
 - **What:** coordinates go through `(npy_intp)floor(cc)`, undefined for NaN and beyond ±2^63; on

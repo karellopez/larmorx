@@ -264,7 +264,7 @@ Every catalog entry ships the same seven things. CI checks that all of them exis
 ### 4.1 Shared conventions
 - **Coordinates:** world space is RAS mm. Images carry a float64 affine. Converting to and from ITK's LPS conventions happens at the API boundary of `lx.ants`, exactly as ANTs does.
 - **Transforms:** `lx.Transform` is a composable chain (affines, affine series, displacement fields, B-spline fields). I/O covers ITK `.txt`/`.mat`, FSL `.mat`, LTA, AFNI `.1D` and X5.
-  - ITK `.h5` composites are read and written by the Python layer with h5py, which has wheels on all six targets. A minimal pure-Rust HDF5 reader/writer for the ITK layout follows, so the standalone CLI can handle `.h5` too.
+  - ITK `.h5` transform files are read and written in pure Rust (crate `larmorx-hdf5`, done 2026-10-16: an HDF5 reader, and a writer that lays files out byte for byte as ITK 5.4.5's HDF5 1.12.1 does), by the Python layer and the standalone CLI alike; no h5py.
 - **Threads:** an explicit `n_threads` on every call (no environment-variable coupling). The GIL is released during Rust work.
 - **Errors:** typed exceptions; the CLI returns the original tool's exit codes where they are documented.
 - **Logs and progress:** structured logs (Python `logging`) and an optional progress callback, which is also used for cancellation (Ctrl-C works on every OS).

@@ -11,7 +11,6 @@ import io
 import os
 import warnings
 
-import h5py
 import nibabel as nib
 import numpy as np
 import pytest
@@ -131,15 +130,12 @@ def test_jacobian_axis():
 
 def _composite(path, n):
     """An ITK composite .h5 file of ``n`` translations (group "0" is the composite itself)."""
-    with h5py.File(path, "w") as f:
-        g = f.create_group("TransformGroup")
-        c = g.create_group("0")
-        c["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
-        for i in range(1, n + 1):
-            t = g.create_group(str(i))
-            t["TransformType"] = np.array([b"AffineTransform_double_3_3"])
-            t["TransformParameters"] = np.array([1, 0, 0, 0, 1, 0, 0, 0, 1, i, 0, 0], np.float64)
-            t["TransformFixedParameters"] = np.zeros(3)
+    xfm = lx.transforms.ItkTransform
+    rows = [xfm("CompositeTransform_double_3_3", np.zeros(0), np.zeros(0))]
+    for i in range(1, n + 1):
+        params = np.array([1, 0, 0, 0, 1, 0, 0, 0, 1, i, 0, 0], np.float64)
+        rows.append(xfm("AffineTransform_double_3_3", params, np.zeros(3)))
+    lx.transforms.write(path, rows)
 
 
 def test_composite_order(tmp_path):

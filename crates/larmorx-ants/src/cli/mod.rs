@@ -24,36 +24,42 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::Precision;
+use larmorx_core::defects::Notices;
+use larmorx_io::itk_transform::TransformFileError;
 use larmorx_transform::Transform;
 
 /// Reads the transform files named on a command line.
 ///
-/// The standalone binary reads ITK text, MATLAB and NIfTI files ([`FileLoader`]); the Python
-/// entry point also reads HDF5 (`.h5`) files, through h5py.
+/// [`FileLoader`] reads every format larmorx supports (ITK text, MATLAB, HDF5, NIfTI
+/// displacement fields); tests may substitute their own.
 pub trait TransformLoader: Sync {
-    fn load(&self, path: &Path) -> Result<Transform, String>;
+    /// Reads `path` as ITK's reader for the computation type `precision` reads it, with
+    /// D13's mode and notices in `notices`.
+    fn load_with(
+        &self,
+        path: &Path,
+        precision: Precision,
+        notices: &mut Notices,
+    ) -> Result<Transform, TransformFileError>;
 
-    /// [`TransformLoader::load`] as ITK's reader for the computation type `precision` reads
-    /// the file (in float, text files' numbers are read as float). The default reads as
-    /// [`TransformLoader::load`] does.
-    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
-        let _ = precision;
-        self.load(path)
+    /// [`TransformLoader::load_with`] in double precision, defects corrected, notices dropped.
+    fn load(&self, path: &Path) -> Result<Transform, TransformFileError> {
+        let mut notices = Notices::new(larmorx_core::defects::UpstreamDefects::Fix);
+        self.load_with(path, Precision::Double, &mut notices)
     }
 }
 
-/// [`TransformLoader`] for the formats the Rust reader supports (`.txt`, `.tfm`, `.mat`,
-/// `.nii`, `.nii.gz`).
+/// [`TransformLoader`] for the files larmorx reads (`larmorx_io::itk_transform`).
 pub struct FileLoader;
 
 impl TransformLoader for FileLoader {
-    fn load(&self, path: &Path) -> Result<Transform, String> {
-        self.load_with(path, Precision::Double)
-    }
-
-    fn load_with(&self, path: &Path, precision: Precision) -> Result<Transform, String> {
-        larmorx_io::itk_transform::read_itk_transform_with(path, precision)
-            .map_err(|e| e.to_string())
+    fn load_with(
+        &self,
+        path: &Path,
+        precision: Precision,
+        notices: &mut Notices,
+    ) -> Result<Transform, TransformFileError> {
+        larmorx_io::itk_transform::read_itk_transform_notices(path, precision, notices)
     }
 }
 

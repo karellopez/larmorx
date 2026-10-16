@@ -3,6 +3,10 @@
 The ordered work after 2026-10-12, when 3dTshift was completed and the stage comparisons on
 the field-map runs were merged. Keep it current: CLAUDE.md's queue points here.
 
+**Order (user, 2026-10-16): port every tool first, then compare with fMRIPrep at the end.** Each
+port is still validated against its original program (parity, golden); the stage-by-stage and
+end-to-end comparisons with fMRIPrep wait until the tools are all ported.
+
 Ground rules (decision log, 2026-10-12): **full completeness** for every tool (every option,
 message and failure case, D13 switches included); **one agent at a time**; each agent's work
 merged through CLAUDE.md's checklist. Brief each porting agent for full completeness from the
@@ -69,9 +73,7 @@ metrics' threaded sums make results depend on the thread count) before any thres
 ## 3. A4, part 3: `antsAI` and `antsAffineInitializer`
 
 Every option of both programs (`antsAffineInitializer` was added to the oracle on
-2026-10-12), with sMRIPrep's and niworkflows' calls as regression cases. Then re-run the
-stage comparisons: the brain-extraction initialisation and the registration nodes become
-comparable.
+2026-10-12), with sMRIPrep's and niworkflows' calls as regression cases.
 
 ## 4. A5: `antsRegistration`'s deformable stages; A6: Atropos
 

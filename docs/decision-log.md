@@ -913,6 +913,31 @@ verification.
   every user the GPL and non-commercial components and a mixed licence.
 - CI stays as it is (the question of Actions credits was a misunderstanding).
 
+## 2026-10-16: HDF5 transform files: identical content, not identical compressed bytes
+
+**Context:** A4 part 1 writes ITK's `.h5` transform files in Rust (`larmorx-hdf5`). ANTs compresses
+large datasets (deflate, level 5). The oracle's ITK 5.4.5 bundles HDF5 1.12.1 with zlib-ng
+2.1.6; larmorx's pure-Rust deflate gives the same decompressed data but a different compressed
+stream on large chunks (first seen at byte 22,228 of a 190 KB chunk).
+
+**Decided (orchestrator, confirmed by the user):** the requirement is identical content
+(every value bit for bit after decompression) and identical results through ANTs, h5py and
+nitransforms; the compressed bytes may differ from ITK's, and the validation record says
+exactly which bytes differ. Not ported: zlib-ng's deflate. Why:
+- no reader's result depends on the compressed bytes;
+- ITK's files are not reproducible themselves: each object header stores the time of
+  writing, so two ANTs runs give different files;
+- the bytes depend on the build: fMRIPrep's ITK 5.4.4 with HDF5 1.14.6 already writes files that
+  differ from the oracle's; matching one build is not matching "ANTs";
+- the same rule already holds for `.nii.gz` (data bit-identical, gzip streams not).
+
+**If revisited:** a pure-Rust port of zlib-ng 2.1.6's deflate (zlib licence, permissive) as
+the oracle's build uses it: level 5, its "medium" strategy, its hash and match finder, its block
+splitting and Huffman trees; a few thousand lines of C, estimated one to two days of agent
+work, validated by compressing many buffers and comparing bytes with the oracle's. It would
+give byte-identical compressed streams for that one build only, with the object-header times
+still different. Listed under "Deferred" in `docs/next-steps.md`.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

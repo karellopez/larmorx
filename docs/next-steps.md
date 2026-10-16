@@ -125,6 +125,12 @@ Still to do:
   publishing `larmorx-nc` (FSL) and `larmorx-freesurfer` on PyPI; the first release's scope
   (D10) and version numbering.
 
+## Deferred (decide later)
+
+- **Byte-identical deflate in HDF5 files** (decision log, 2026-10-16): larmorx's `.h5` files hold
+  the same values as ITK's, but their compressed chunks differ in bytes; porting zlib-ng's
+  deflate (one to two days) would make them match the oracle's build only. Skipped for now.
+
 ## Waiting for the user
 
 - **PIPE-16** (for larmorprepx): nipype's N4 interface writes the corrected field-map

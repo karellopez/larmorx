@@ -85,6 +85,40 @@ pub fn format_e(v: f64, precision: usize) -> String {
     format!("{mantissa}e{sign}{:02}", x.abs())
 }
 
+/// `printf("%a", v)` as glibc prints it (`0x1.8p+1`, `-0x0p+0`, subnormals as `0x0.8p-1022`).
+pub fn hex_float(v: f64) -> String {
+    if v.is_nan() {
+        return if v.is_sign_negative() { "-nan" } else { "nan" }.into();
+    }
+    if v.is_infinite() {
+        return if v < 0.0 { "-inf" } else { "inf" }.into();
+    }
+    let bits = v.to_bits();
+    let sign = if bits >> 63 == 1 { "-" } else { "" };
+    let exp = ((bits >> 52) & 0x7ff) as i64;
+    let mut mant = bits & ((1u64 << 52) - 1);
+    if exp == 0 && mant == 0 {
+        return format!("{sign}0x0p+0");
+    }
+    let (lead, e) = if exp == 0 {
+        (0, -1022)
+    } else {
+        (1, exp - 1023)
+    };
+    let mut digits = 13;
+    while digits > 0 && mant & 0xf == 0 {
+        mant >>= 4;
+        digits -= 1;
+    }
+    let frac = if digits == 0 {
+        String::new()
+    } else {
+        format!(".{mant:0digits$x}")
+    };
+    let esign = if e < 0 { '-' } else { '+' };
+    format!("{sign}0x{lead}{frac}p{esign}{}", e.abs())
+}
+
 /// An ITK array with the default stream format.
 pub fn itk_array<R: larmorx_core::ItkReal>(values: &[R]) -> String {
     let v: Vec<f64> = values.iter().map(|x| x.to_f64()).collect();

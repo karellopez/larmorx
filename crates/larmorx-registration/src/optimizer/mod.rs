@@ -50,6 +50,11 @@ pub struct IterationState<R> {
     pub value: R,
     /// `GetConvergenceValue()`.
     pub convergence: R,
+    /// `GetLearningRate()`: the step the line search chose.
+    pub learning_rate: R,
+    /// `GetGradient()`: the step just taken (the conjugate direction times the learning
+    /// rate).
+    pub step: Vec<R>,
 }
 
 /// The iteration observer (ANTs' `antsRegistrationOptimizerCommandIterationUpdate`): it may
@@ -349,6 +354,8 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             iteration: run.current_iteration,
             value: run.value,
             convergence: run.convergence,
+            learning_rate: self.learning_rate,
+            step: run.gradient.clone(),
         };
         observer.iteration(&state, &mut self.number_of_iterations, problem)
     }

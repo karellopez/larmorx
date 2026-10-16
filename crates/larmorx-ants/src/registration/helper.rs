@@ -676,10 +676,22 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
             }
             let sigmas_r: Vec<R> = sigmas.iter().map(|&s| R::r(f64::from(s))).collect();
-            let shown: Vec<f64> = sigmas_r.iter().map(|s| s.to_f64()).collect();
+            // `itk::Array<R>`'s `operator<<` prints with `ConvertNumberToString` (the
+            // shortest round trip), whatever the stream's format.
+            let shown: Vec<String> = sigmas_r
+                .iter()
+                .map(|s| match R::PRECISION {
+                    larmorx_core::Precision::Double => {
+                        larmorx_io::itk_transform::itk_number(s.to_f64())
+                    }
+                    larmorx_core::Precision::Float => {
+                        larmorx_io::itk_transform::itk_number_f32(s.to_f64() as f32)
+                    }
+                })
+                .collect();
             log.logger(&format!(
-                "  smoothing sigmas per level: {}\n",
-                log.cout.array(&shown)
+                "  smoothing sigmas per level: [{}]\n",
+                shown.join(", ")
             ));
             let m0 = &stage_metrics[0];
             let percentage = m0.sampling_percentage.to_f64() as f32;

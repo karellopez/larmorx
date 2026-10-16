@@ -27,6 +27,7 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
+use larmorx_registration::initializer::{Feature, initialize};
 use larmorx_registration::mask::Mask;
 use larmorx_registration::transform::{Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Space};
@@ -502,10 +503,49 @@ fn initial_composite<R: Compute, const D: usize>(
     let mut derived = vec![false; functions.len()];
     for (n, f) in functions.iter().enumerate() {
         if f.parameters.len() > 2 {
-            return Err(refuse(
-                log,
-                "initial transforms derived from images ([fixed,moving,feature]) are not supported yet",
-            ));
+            let fixed_name = param(f, 0).to_owned();
+            let moving_name = param(f, 1).to_owned();
+            let fixed = read_image::<R, D>(ctx, log, &fixed_name);
+            let moving = if fixed.is_some() {
+                read_image::<R, D>(ctx, log, &moving_name)
+            } else {
+                None
+            };
+            let feature = Conv::u16(param(f, 2)).map_err(|e| caught(log, &e))?;
+            let (kind, feature) = match feature {
+                0 => ("Image center alignment using ", Feature::Geometry),
+                1 => ("Center of mass alignment using ", Feature::Moments),
+                _ => ("Image origin alignment using ", Feature::Origins),
+            };
+            let (Some(fixed), Some(moving)) = (fixed, moving) else {
+                if feature == Feature::Origins {
+                    return Err(refuse(
+                        log,
+                        "an image of the initial transform could not be read (ANTs crashes here: it uses the missing image)",
+                    ));
+                }
+                let e = ItkException::new(
+                    "Modules/Registration/Common/include/itkCenteredTransformInitializer.hxx",
+                    if f.parameters.is_empty() { 38 } else { 32 },
+                    "CenteredTransformInitializer",
+                    "Fixed Image has not been set",
+                );
+                return Err(caught(log, &e));
+            };
+            let (center, translation) =
+                initialize(&fixed, &moving, feature).map_err(|e| caught(log, &e))?;
+            let mut t = rigid_transform::<R, D>();
+            if let Xfm::Linear(l) = &mut t {
+                l.set_center(center);
+                l.set_translation(translation);
+            }
+            derived[n] = true;
+            out.push(Initial {
+                transform: t,
+                name: format!("{kind}fixed image: {fixed_name} and moving image: {moving_name}"),
+                derived: true,
+            });
+            continue;
         }
         let (name, invert) = if f.parameters.is_empty() {
             (f.name.clone(), false)
@@ -581,6 +621,47 @@ fn initial_composite<R: Compute, const D: usize>(
         log.cout(&s);
     }
     Ok((out, derived))
+}
+
+/// The transforms derived from images among the initial ones, written as
+/// `<prefix><n>DerivedInitial<Moving|Fixed>Translation.mat` (ANTs indexes the option's
+/// functions with `n` and takes the composite's `n`-th transform).
+fn write_derived<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    log: &mut Log<'_>,
+    prefix: &str,
+    which: &str,
+    queue: &[Xfm<R, D>],
+    derived: &[bool],
+    minc: bool,
+) -> Result<(), Exit> {
+    if minc && derived.iter().any(|&d| d) {
+        return Err(refuse(
+            log,
+            "MINC transform files (--minc 1) are not supported yet",
+        ));
+    }
+    for (n, &d) in derived.iter().enumerate() {
+        if let Some(t) = queue.get(n)
+            && d
+            && t.is_linear()
+        {
+            let name = format!("{prefix}{n}DerivedInitial{which}Translation.mat");
+            write_transform_file(log, ctx.notices, &name, &[xfm_parts(t)]);
+        }
+    }
+    Ok(())
+}
+
+/// `RigidTransformTraits<R, D>::TransformType::New()`: `Euler2DTransform`, `Euler3DTransform`,
+/// or `AffineTransform` in 4D.
+fn rigid_transform<R: Compute, const D: usize>() -> Xfm<R, D> {
+    let kind = match D {
+        2 => Kind::Euler2D,
+        3 => Kind::Euler3D { zyx: false },
+        _ => Kind::Affine,
+    };
+    Xfm::Linear(LinearXfm::new(kind))
 }
 
 /// Whether a file holds a composite (`.h5` composites, the transforms ANTs lists with `[i]`).
@@ -780,12 +861,20 @@ fn do_registration<R: Compute, const D: usize>(
         let (initial, derived) =
             initial_composite::<R, D>(&mut ctx, log, "initial-moving-transform")?;
         moving_initial_count = p.all("initial-moving-transform").len();
-        let _ = (derived, minc);
-        helper.composite = Some(initial.into_iter().map(|i| i.transform).collect());
+        let queue: Vec<Xfm<R, D>> = initial.into_iter().map(|i| i.transform).collect();
+        if !collapse {
+            write_derived(&mut ctx, log, &prefix, "Moving", &queue, &derived, minc)?;
+        }
+        helper.composite = Some(queue);
     }
     if p.has("initial-fixed-transform") {
-        let (initial, _) = initial_composite::<R, D>(&mut ctx, log, "initial-fixed-transform")?;
-        helper.fixed_initial = Some(initial.into_iter().map(|i| i.transform).collect());
+        let (initial, derived) =
+            initial_composite::<R, D>(&mut ctx, log, "initial-fixed-transform")?;
+        let queue: Vec<Xfm<R, D>> = initial.into_iter().map(|i| i.transform).collect();
+        if !collapse {
+            write_derived(&mut ctx, log, &prefix, "Fixed", &queue, &derived, minc)?;
+        }
+        helper.fixed_initial = Some(queue);
     }
     if p.has("restore-state") {
         if p.has("initial-moving-transform") || p.has("initial-fixed-transform") {

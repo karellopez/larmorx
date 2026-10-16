@@ -45,6 +45,15 @@ from larmorx.ants.morphology import (
     pad_image,
 )
 from larmorx.ants.n4 import N4Iteration, N4Result, n4_bias_field_correction
+from larmorx.ants.registration import (
+    AlignCenters,
+    RegistrationError,
+    RegistrationIteration,
+    RegistrationMetric,
+    RegistrationResult,
+    RegistrationStage,
+    registration,
+)
 from larmorx.ants.resample import PIXEL_TYPES, resample_image, resample_image_by_spacing
 from larmorx.ants.smoothing import (
     discrete_gaussian,
@@ -57,11 +66,17 @@ from larmorx.ants.threshold import OtsuResult, multiply_images, otsu_threshold, 
 
 __all__ = [
     "PIXEL_TYPES",
+    "AlignCenters",
     "DenoiseResult",
     "ImageMathError",
     "N4Iteration",
     "N4Result",
     "OtsuResult",
+    "RegistrationError",
+    "RegistrationIteration",
+    "RegistrationMetric",
+    "RegistrationResult",
+    "RegistrationStage",
     "add_to_zero",
     "apply_transforms",
     "apply_transforms_to_points",
@@ -93,6 +108,7 @@ __all__ = [
     "normalize_image",
     "otsu_threshold",
     "pad_image",
+    "registration",
     "replace_voxel_value",
     "resample_image",
     "resample_image_by_spacing",

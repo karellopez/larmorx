@@ -251,6 +251,19 @@ pub fn run(
     code
 }
 
+/// [`run`] for in-memory images: transform files read by [`super::FileLoader`], no
+/// `ANTS_RANDOM_SEED` (callers pass `--random-seed`). The Python wrapper's entry point.
+pub fn run_store(
+    args: &[String],
+    store: &mut dyn ImageStore,
+    n_threads: usize,
+    mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    run(args, store, &super::FileLoader, n_threads, mode, None, out, err)
+}
+
 /// `antsRegistration`'s `main` (`antsRegistration.cxx`, from `Parse` on).
 fn antsregistration(
     args: &[String],

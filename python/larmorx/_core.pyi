@@ -321,8 +321,8 @@ def ants_program(
     upstream_defects: str = "fix",
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
     """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``, ``N4BiasFieldCorrection``,
-    ``ResampleImageBySpacing`` or ``ResampleImage`` with ``args`` on in-memory ``inputs`` (by
-    placeholder name);
+    ``DenoiseImage``, ``ResampleImageBySpacing``, ``ResampleImage`` or ``antsRegistration`` with
+    ``args`` on in-memory ``inputs`` (by placeholder name; other names are files);
     writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``. The program runs in
     the D13 mode ``upstream_defects``; its notices are lines of ``stderr``."""

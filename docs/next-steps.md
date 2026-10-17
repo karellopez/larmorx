@@ -104,10 +104,10 @@ stand-ins). Register: ANTS-52 to ANTS-60, ITK-19 to ITK-21. To decide: ANTS-54, 
 
 ## 3a. A4, part 3 (done 2026-10-17, merged `084b61d`) and its two corrections
 
-`antsAI` and `antsAffineInitializer` are ported (all but `antsAI -b`). Decided the same day, to
-implement first in the next agent run: ANTS-54 (honour `antsAffineInitializer`'s local-search
+`antsAI` and `antsAffineInitializer` are ported (all but `antsAI -b`). Decided the same day and
+done the same day (A4 part 4's first step): ANTS-54 (honour `antsAffineInitializer`'s local-search
 argument) and ITK-21 (each start point at the configured learning rate), both corrected by default
-with switches; then re-record `ants-affine-initializer`. `antsAI -b`: its own task after A5/A6.
+with switches; `ants-affine-initializer` re-recorded. `antsAI -b`: its own task after A5/A6.
 
 ## 3b. A4, part 4: `antsRegistration`'s point-set metrics
 
@@ -173,12 +173,6 @@ Still to do:
   deflate (one to two days) would make them match the oracle's build only. Skipped for now.
 
 ## Waiting for the user
-
-- **ANTS-54** (antsAffineInitializer ignores its local-search argument; niworkflows passes 10,
-  ANTs runs 20) and **ITK-21** (its learning rate carried from one start point to the next):
-  correct by default, or keep ANTs' behaviour?
-- **`antsAI -b`** (blob alignment): port it (Eigen's eigen-solver and LINPACK's QR included) or
-  leave it refused; fMRIPrep does not use it.
 
 - **PIPE-16** (for larmorprepx): nipype's N4 interface writes the corrected field-map
   reference in the input's int16 type (re-quantized, up to 0.3 % at the dimmest voxels). Keep

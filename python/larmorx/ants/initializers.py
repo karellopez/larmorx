@@ -242,9 +242,14 @@ def affine_initializer(
 
     - ``search_factor``: the rotation step in degrees; ``radian_fraction``: the rotations run
       over ``±π·radian_fraction`` (clamped to ``[0.01, 1]``).
-    - ``local_search_iterations``: the command line's eighth argument, which ANTs does not
-      read: each start point runs 20 conjugate-gradient iterations whatever it says (ANTS-54,
-      a questionable behaviour larmorx reproduces until it is decided).
+    - ``local_search_iterations``: the conjugate-gradient iterations of each start point (0:
+      each start point is only evaluated). ANTs never reads this argument and runs 20
+      (ANTS-54): larmorx honours it, with an :class:`~larmorx.UpstreamDefectWarning` when it
+      is not 20; ``upstream_defects="reproduce"`` runs 20 whatever it says.
+    - Each start point's local search begins at the learning rate 0.1. ITK begins each one at
+      the rate the previous start point's line search left (ITK-21), so its result depends on
+      the order of the start points; larmorx warns where that changes the result, and
+      ``upstream_defects="reproduce"`` gives ITK's.
     - ``fixed_mask``: the mask of the metric (Mattes mutual information, 32 bins, every 10th
       voxel of the fixed image).
 

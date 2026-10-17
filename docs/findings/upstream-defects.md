@@ -99,7 +99,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-51 | antsRegistration | transform files without collapsing: initial transforms skipped by counting `-r` options, each file named after the next stage; a composite `-r` file or a restored state gives a misnamed file, then a read past the end of the names (crash) | a | none (fMRIPrep collapses) | corrected by default; `reproduce` writes ANTs' files up to the crash and stops (A4 part 2) | – |
 | ANTS-52 | antsAI | the translation grid does not move `Rigid`/`Similarity` start points in 2D nor `Similarity` ones in 3D | c | none (fMRIPrep's grids are for `Affine`) | corrected by default (A4 part 3) | – |
 | ANTS-53 | antsAI | `AlignGeometricCenters`/`AlignCentersOfMass` with iterations write an empty `.mat`, exit 0 (`.txt`, `.h5`: a crash) | e | none | corrected by default: the alignment is written (A4 part 3) | – |
-| ANTS-54 | antsAffineInitializer | the local-search argument is never read: 20 iterations whatever it says | c? | niworkflows passes 10, ANTs runs 20 | reproduces | decide |
+| ANTS-54 | antsAffineInitializer | the local-search argument is never read: 20 iterations whatever it says | c (c? until 2026-10-17) | niworkflows passes 10, ANTs runs 20 | corrected by default: the argument is honoured (0: no local search), a notice where it is not 20 (2026-10-17) | – |
 | ANTS-55 | antsAI | a translation grid with fewer extents than dimensions is read past the end of its vector | a | none | refuses; `reproduce` reads the missing extents as 0 and warns (A4 part 3) | – |
 | ANTS-56 | antsAffineInitializer | a dimension other than 2, 3 or 4 runs as 2D | e | none | corrected by default: an error (A4 part 3) | – |
 | ANTS-57 | antsAffineInitializer | two or three arguments abort (`std::string` of a null pointer) instead of printing the usage | a | none | prints ANTs' message, exit 1 | – |
@@ -126,7 +126,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-18 | ITK joint-histogram mutual information (ANTs' `MI2`) | each image's marginal density is the other's | c | none (fMRIPrep uses Mattes and CC) | corrected by default (A4 part 2) | – |
 | ITK-19 | ITK `MultiStartOptimizerv4` | a start point that throws keeps the previous start point's value (0 for the first), which competes for the minimum | c | possible (two of fMRIPrep's BOLD `init_aff` start points throw) | corrected by default: start points that throw take no part (A4 part 3) | – |
 | ITK-20 | ITK Mattes metric | a zero or negative joint-histogram spacing (one intensity, or none, in the analysis region) is refused and leaves the histogram without a buffer: the next evaluation crashes | a | none | refuses at the crash (A4 part 3) | – |
-| ITK-21 | ITK `ConjugateGradientLineSearchOptimizerv4` in `antsAffineInitializer` | without a scales estimator the learning rate the line search leaves in one start point starts the next | c? | every niworkflows initialization | reproduces | decide |
+| ITK-21 | ITK `ConjugateGradientLineSearchOptimizerv4` in `antsAffineInitializer` | without a scales estimator the learning rate the line search leaves in one start point starts the next | c (c? until 2026-10-17) | every niworkflows initialization | corrected by default: each start point at the configured rate (0.1), a notice where the result changes (2026-10-17) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -245,7 +245,8 @@ ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switc
 linear stages ANTS-49 to ANTS-51 and ITK-18. A4 part 3 (antsAI and antsAffineInitializer,
 2026-10-17) added ANTS-52 to ANTS-60 and ITK-19 to ITK-21: ANTS-52, -53, -56 and ITK-19
 corrected by default with a switch, ANTS-55 refused by default with a switch, ANTS-54 and
-ITK-21 to decide.
+ITK-21 to decide; both decided the same day (defects, corrected by default) and corrected with
+a switch (2026-10-17).
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -406,7 +407,8 @@ The original proposals, for the record:
    they touch, so a fix would move many results. Added by A4 part 3 (2026-10-17): ANTS-54
    (antsAffineInitializer ignores its local-search argument: honouring it would change
    niworkflows' initialization, which passes 10 where ANTs runs 20) and ITK-21 (the learning
-   rate carried from one start point to the next in antsAffineInitializer).
+   rate carried from one start point to the next in antsAffineInitializer); both decided by
+   the user on 2026-10-17 (defects, corrected by default with a switch) and done the same day.
 3. **D13 for replicas.** `implementation="auto"` runs the replica whenever it is installed. If
    only the original fixed a defect, installing `larmorx[exact]` would bring it back. This
    register reads D13 as: both implementations have the same corrected default, and the
@@ -1091,7 +1093,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   and HDF5 cases (the crash).
 - **D13 / gap:** done. No gap.
 
-### ANTS-54 antsAffineInitializer ignores its local-search argument — (c?)
+### ANTS-54 antsAffineInitializer ignores its local-search argument — (c; c? until 2026-10-17)
 - **What:** the usage describes the eighth argument as the number of local-optimization
   iterations per start point ("Default = 20"); the code skips it unread
   (`// NOT USED: localoptimizeriterations = std::stoi(...)`) and always runs
@@ -1099,8 +1101,18 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `antsAffineInitializer.cxx:193, 235-239, 405`; validated
   (`search/local-search-text`: text there is not even parsed).
 - **fMRIPrep:** niworkflows' `AffineInitializer` passes `10` (nipype's default); ANTs runs 20.
-- **larmorx:** reproduces (the documented behaviour would change niworkflows' result).
-- **D13 / gap:** decided by the user (2026-10-17): the argument is honoured by default (warning where it differs from ANTs' 20), switch reproduces; larmorprepx passes 20. **Gap** until implemented (next agent, with ITK-21).
+- **larmorx:** corrected by default (2026-10-17, the user's decision of that day): the argument
+  is read as the commented-out line would read it (`std::stoi`) and gives each start point's
+  iterations; 0 runs no local search (`if (localSearchIterations > 0)
+  SetLocalOptimizer(...)`, the code's own path); text that is not such a number, a negative
+  value or one beyond `int` is an error (exit 1). A notice names ANTS-54 wherever the argument
+  is not 20. `reproduce` skips the argument and runs 20, with a notice when it says otherwise.
+  On niworkflows' arguments (`15 0.1 0 10`, the MNI template and fMRIPrep's T1w), 10 iterations
+  instead of 20 move the transform's parameters by up to about 1.5 (`real/mni-2mm`'s fix pass,
+  [ants-affine-initializer.md](../validation/ants-affine-initializer.md)). larmorprepx will
+  pass 20, what fMRIPrep effectively runs.
+- **D13 / gap:** done (2026-10-17): the argument is honoured by default, `reproduce` gives
+  ANTs' 20. No gap.
 
 ### ANTS-55 antsAI reads a short translation grid past its end — (a)
 - **What:** `-g [s,AxB]` in 3D (or `[s,A]`) gives a vector of fewer extents than dimensions;
@@ -1207,7 +1219,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   refuses (A4 part 3).
 - **D13 / gap:** class (a), not reproduced. No gap.
 
-### ITK-21 The learning rate carries over between start points — (c?)
+### ITK-21 The learning rate carries over between start points — (c; c? until 2026-10-17)
 - **What:** `antsAffineInitializer` gives its local optimizer scales with `SetScales` and no
   scales estimator, so `GradientDescentOptimizerv4` never re-estimates the learning rate: the
   rate the golden-section line search leaves at the end of one start point is where the next
@@ -1216,8 +1228,17 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `itkGradientDescentOptimizerv4.hxx` (`EstimateLearningRate` returns without an estimator);
   validated (every `search/*` case of `ants-affine-initializer` reproduces it bit for bit).
 - **fMRIPrep:** every niworkflows initialization without an initial transform.
-- **larmorx:** reproduces.
-- **D13 / gap:** decided by the user (2026-10-17): corrected by default (each start point at the configured rate, 0.1), switch reproduces. **Gap** until implemented (next agent, with ANTS-54).
+- **larmorx:** corrected by default (2026-10-17, the user's decision of that day: a multi-start
+  search compares its start points, so each must be evaluated alike and independently of their
+  order): every start point's local search begins at the configured learning rate, 0.1
+  (`multistart::Corrections::restart_learning_rate`). The search also runs the other way, to
+  name ITK-21 exactly where the correction changes the result, saying whether another start
+  point is chosen or the same one ends elsewhere; this doubles the search's time (only with a
+  local search and more than one start point). `reproduce` carries the rate over, as ITK
+  does, bit for bit. On niworkflows' arguments with the MNI template and fMRIPrep's T1w, the
+  same start point (14 of 16) is chosen either way and its parameters move by up to about 1.9.
+- **D13 / gap:** done (2026-10-17): corrected by default, `reproduce` gives ITK's carry-over.
+  No gap.
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

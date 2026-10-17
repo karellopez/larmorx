@@ -212,7 +212,9 @@ What a replica needs, read on 2026-10-17 (for the task that ports it):
   The search factor and the radian fraction are `atof` (text reads as 0), the fraction clamped
   to `[0.01, 1]`; the principal-axes flag is `std::stoi` (any non-zero value is true). **The
   local search's iterations are never read** ("NOT USED"): every start point runs 20 (ANTS-54),
-  though the usage says the argument sets them.
+  though the usage says the argument sets them. larmorx honours the argument by default (the
+  user's decision of 2026-10-17; `if (localSearchIterations > 0)` is the code's own path for
+  0), with a notice wherever it is not 20; `reproduce` runs 20.
 - `degtorad` is `0.0174532925`, not `π/180`.
 - The moments: `ImageMomentsCalculator` of both images, the centres **in double** (unlike
   antsAI). A missing image, or one whose values sum to 0, prints ` zero image1 error ` (or `2`,
@@ -235,7 +237,11 @@ What a replica needs, read on 2026-10-17 (for the task that ports it):
   asked, then `Scale(1)`.
 - The optimizers get the scales with `SetScales` and **no scales estimator**: neither the scales
   nor the learning rate is estimated, so the learning rate the line search leaves in one start
-  point is where the next one starts (ITK-21).
+  point is where the next one starts (ITK-21). larmorx starts each one at 0.1 by default (the
+  user's decision of 2026-10-17) and runs the search ITK's way too, to name ITK-21 where that
+  changes the result; `reproduce` carries the rate over. On niworkflows' arguments with the MNI
+  template and fMRIPrep's T1w (10 iterations), the same start point (14 of 16) is chosen either
+  way, and the carry-over alone moves its parameters by up to 1.6 (with 20 iterations, 1.9).
 - The best start point is written over the initial transform, centred at the fixed centre of
   mass. Nothing is printed on success but the determinant lines.
 

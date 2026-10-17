@@ -154,6 +154,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-51 | antsRegistration | `-z 0`: files misnamed, then a read past the end of the names (crash) | every computed transform under its stage's name (`reproduce`: ANTs' files up to the crash, then an error) |
 | ANTS-52 | antsAI | the translation grid does not move `Rigid`/`Similarity` start points in 2D, nor `Similarity` ones in 3D | translated as the 3D rigid ones |
 | ANTS-53 | antsAI | `AlignGeometricCenters`/`AlignCentersOfMass` with iterations write an empty `.mat` | the alignment, as with 0 iterations |
+| ANTS-54 | antsAffineInitializer | the eighth argument (the local search's iterations) is never read: 20 iterations whatever it says | the argument's iterations (0: no local search; text or a negative value: an error) |
 | ANTS-55 | antsAI | a translation grid with fewer extents than dimensions read past its end | an error (`reproduce`: the missing extents read as 0) |
 | ANTS-56 | antsAffineInitializer | a dimension other than 2, 3 or 4 runs as 2D | an error |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
@@ -167,6 +168,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-15 | ITK HDF5 writer | a transform without parameters cannot be written with compression; a file ITK cannot read is left | its empty parameters stored uncompressed (`reproduce`: ITK's error and file) |
 | ITK-18 | ITK joint-histogram MI (`MI2`) | the marginal densities swapped | each image's own marginal |
 | ITK-19 | ITK `MultiStartOptimizerv4` (antsAI, antsAffineInitializer) | a start point that throws keeps the previous one's value (0 for the first) and can be the best | it takes no part in the search for the best |
+| ITK-21 | ITK `MultiStartOptimizerv4` without a scales estimator (antsAffineInitializer) | each start point's local search begins at the learning rate the previous one's line search left | each at the configured rate (0.1); named where the result changes |
 
 **Not the default yet:**
 

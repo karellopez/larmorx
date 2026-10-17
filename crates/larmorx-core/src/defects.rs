@@ -202,6 +202,8 @@ defects! {
         "the translation search grid is ignored for Rigid and Similarity in 2D and for Similarity in 3D: every translation gives the same start point";
     ANTS_53 = "ANTS-53", "antsAI", true,
         "AlignGeometricCenters and AlignCentersOfMass with iterations above 0 run a search that lists no start point and write no transform: an empty .mat file, exit 0 (a .txt or .h5 output crashes)";
+    ANTS_54 = "ANTS-54", "antsAffineInitializer", true,
+        "the local-search argument is never read: every start point runs 20 iterations of the local optimizer, whatever it says";
     ANTS_55 = "ANTS-55", "antsAI", true,
         "a translation search grid with fewer extents than dimensions is read past the end of its vector";
     ANTS_56 = "ANTS-56", "antsAffineInitializer", true,
@@ -216,6 +218,8 @@ defects! {
         "MultiStartOptimizerv4 counts a start point that threw with the previous one's metric value (0 for the first), so a first start point that throws stays the best unless another one's value is below 0";
     ITK_20 = "ITK-20", "ITK", true,
         "the Mattes metric refuses its joint histogram's spacing when the analysis region has one intensity or none, and is then left without the histogram's buffer: the next evaluation of the metric crashes";
+    ITK_21 = "ITK-21", "ITK", true,
+        "MultiStartOptimizerv4 without a scales estimator (antsAffineInitializer) starts each start point's local optimization at the learning rate the previous start point's line search left, so each start point's result depends on the one before it";
     ITK_03 = "ITK-03", "ITK", true,
         "components relabelled in a float image stop getting new labels at 2^24";
     ITK_08 = "ITK-08", "nifti_clib", true,

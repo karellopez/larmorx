@@ -1287,19 +1287,47 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("cli.ants.antsAffineInitializer", covers=("cli:ants antsAffineInitializer",))
 def _(ctx: Context) -> dict[str, Any]:
     """``antsAffineInitializer``: a 3D search from the principal axes with a fixed mask; a 2D
-    search; the 4D path (the initial alignment only)."""
-    files = {"3d": ctx.out("init3d.mat"), "2d": ctx.out("init2d.mat"), "4d": ctx.out("init4d.mat")}
+    search of 5 local iterations (ANTS-54 corrected), one without a local search (0); the 4D
+    path (the initial alignment only). Each start point's local search begins at the learning
+    rate 0.1 (ITK-21 corrected)."""
+    files = {
+        "3d": ctx.out("init3d.mat"),
+        "2d": ctx.out("init2d.mat"),
+        "2d0": ctx.out("init2d0.mat"),
+        "4d": ctx.out("init4d.mat"),
+    }
     cli(
         "ants", "antsAffineInitializer", "3", ctx.file("anat.nii"), ctx.file("anat2.nii"),
         files["3d"], "45", "0.25", "1", "20", ctx.file("mask.nii"),
     )  # fmt: skip
     cli(
         "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
-        files["2d"], "30", "0.5", "0",
+        files["2d"], "30", "0.5", "0", "5",
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
+        files["2d0"], "30", "0.5", "0", "0",
     )  # fmt: skip
     cli(
         "ants", "antsAffineInitializer", "4", ctx.file("bold.nii"), ctx.file("bold.nii"),
         files["4d"], "10", "0.1", "1",
+    )  # fmt: skip
+    return {name: File(path) for name, path in files.items()}
+
+
+@case("cli.ants.antsAffineInitializer.reproduce", covers=("cli:ants antsAffineInitializer",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.ants.antsAffineInitializer``'s 3D and 2D searches with ANTs' defects reproduced:
+    the learning rate carried from one start point to the next (ITK-21) and the local-search
+    argument not read (ANTS-54: the 2D search's 5 runs 20)."""
+    files = {"3d": ctx.out("init3d.mat"), "2d": ctx.out("init2d.mat")}
+    cli(
+        "ants", "antsAffineInitializer", "3", ctx.file("anat.nii"), ctx.file("anat2.nii"),
+        files["3d"], "45", "0.25", "1", "20", ctx.file("mask.nii"), upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
+        files["2d"], "30", "0.5", "0", "5", upstream_defects=REPRODUCE,
     )  # fmt: skip
     return {name: File(path) for name, path in files.items()}
 

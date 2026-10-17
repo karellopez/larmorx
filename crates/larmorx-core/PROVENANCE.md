@@ -69,3 +69,28 @@ B-spline prefilter (`larmorx_interp::ndimage`). Verified against exact rational 
 with `n` = 0 to 2,599, through underflow and overflow: 0 mismatches. glibc 2.35's `pow`
 differs from the exact value in 6 of them, all below 1e-100
 (`docs/findings/scipy-ndimage.md`).
+
+## vnl's eigensystems (`src/vnl_eigen.rs`)
+
+**Ported** from VXL as bundled with ITK v5.4.5 (BSD; EISPACK from netlib), for ITK's
+`ImageMomentsCalculator` and ANTs' `antsAI` (A4 part 3):
+- `core/vnl/algo/vnl_symmetric_eigensystem.hxx` (`vnl_symmetric_eigensystem_compute`: the
+  row-major data handed to Fortran as it is, so EISPACK reads the transpose);
+- `core/vnl/algo/vnl_real_eigensystem.cxx` (the eigenvalues; a complex pair copied as
+  `(wr[c], ±wi[c])`);
+- `v3p/netlib/eispack/{rs,tred2,tql2,pythag}.c` and `{rg,balanc,elmhes,hqr2}.c` (the
+  eigenvalue part of `hqr2`, with every update of the Hessenberg matrix it makes; `eltran`,
+  the eigenvector accumulation and back-substitution and `balbak` do not change the
+  eigenvalues and are not ported).
+
+Bit-identical to the oracle's VNL (ITK 5.4.5 as built for `oracles/ants-2.6.5`, GCC 14.3) on
+21,000 cases (2×2 to 4×4): symmetric matrices exact and symmetric only up to rounding (as
+`ImageMomentsCalculator` forms them), diagonal ones with repeated eigenvalues, the orthogonal
+matrices of their eigenvectors, general matrices and signed permutations, with the product of
+the eigenvalues as `std::complex<double>` (a scratch harness linking the oracle's libraries).
+
+## vnl's closed-form determinants and inverses (`src/vnl_fixed.rs`)
+
+**Ported** from the same VXL: `core/vnl/vnl_det.hxx`, `core/vnl/algo/vnl_determinant.hxx`
+(1 to 4 rows), `core/vnl/vnl_inverse.h` (2×2 to 4×4). Bit-identical to the oracle's VNL in the
+same comparison (`vnl_svd` of a sum of outer products, `V·Uᵀ`, its inverse and determinant).

@@ -1080,9 +1080,7 @@ def _stand_ins(args: list[str], run_dir: Path, tmp: Path) -> list[str]:
                 out += [word, f"[{fixed},{moving},1]"]
                 i += 2
                 continue
-        if word.startswith("["):
-            word = "[" + ",".join(replace(v) for v in word[1:-1].split(",")) + "]"
-        out.append(replace(word))
+        out.append(re.sub(r"[^\[\],]+", lambda m: replace(m.group(0)), word))
         i += 1
     return out
 

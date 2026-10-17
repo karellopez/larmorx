@@ -16,6 +16,10 @@ reproduces the original copyright and MIT notice.
 | `math/log.rs`, `math/dint.rs` | `src/binary64/log/log.c` (`922af9ae4b4b…`), `src/binary64/log/dint.h` (`0da80a15d311…`) | 0 mismatches against mpmath on 1.36 M inputs (all of `log.wc`, plus every input forced through the accurate path); bit-identical to the C on every non-NaN result |
 | `math/expf.rs` | `src/binary32/exp/expf.c` (`598f2e509a12…`) | bit-identical to the C (gcc 11, `-ffp-contract=off`) on all 2^32 inputs; a unit test checks a checksum of every 4099th input, an ignored one of all inputs |
 | `math/logf.rs` | `src/binary32/log/logf.c` (`92c878fb172d…`) | as for `expf` |
+| `math/asin.rs` | `src/binary64/asin/asin.c` (`08c4d31ad429…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 249,150 cases of `asin.wc` and about 300,000 random inputs (uniform, near ±1, tiny, random bits, rotation-matrix entries), 2026-10-17 |
+| `math/acos.rs` | `src/binary64/acos/acos.c` (`ecd617383721…`) | as for `asin`, with `acos.wc` (264,123 cases) |
+| `math/atan2.rs` | `src/binary64/atan2/atan2.c` (`404b0db90e53…`), `src/binary64/atan2/tint.h` (`41264d54812a…`) | bit-identical to the C on all of `atan2.wc` (signalling NaNs aside, which C's `strtod` cannot read) and 300,000 random pairs (random bits, comparable magnitudes, exponent differences of 40 to 70, rotation angles) |
+| `math/cbrt.rs` | `src/binary64/cbrt/cbrt.c` (`0a86b7a8f433…`) | bit-identical to the C on all of `cbrt.wc` and 300,000 random inputs; round to nearest only (the directed-rounding branches dropped) |
 | `math/sinf.rs` (`sinf`, `cosf`) | `src/binary32/sin/sinf.c` (`f27c4baa849b…`), `src/binary32/cos/cosf.c` (`3ea4c6d03d32…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 2^32 inputs of each; unit tests check checksums of every 4099th input, an ignored one of all inputs |
 
 Differences from the C code, all without effect on the result in round-to-nearest:

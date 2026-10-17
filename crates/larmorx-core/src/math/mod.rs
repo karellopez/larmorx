@@ -6,8 +6,13 @@
 //! AFNI on Linux, except where glibc itself is not correctly rounded (about 0.1 % of
 //! calls). They are pure-Rust ports of CORE-MATH (MIT, commit `040ee482a8ca`, see
 //! `UPSTREAM.md`), verified against mpmath on CORE-MATH's worst-case inputs and millions of
-//! random inputs. Background: `docs/findings/platform-math.md`.
+//! random inputs (`asin`, `acos`, `atan2`, `cbrt`: against CORE-MATH's C on its worst cases
+//! and random inputs). Background: `docs/findings/platform-math.md`.
 
+mod acos;
+mod asin;
+mod atan2;
+mod cbrt;
 mod cos;
 pub(crate) mod dint;
 mod exp;
@@ -59,6 +64,34 @@ dispatch!(
     /// The sine of `x`, correctly rounded.
     sin
 );
+dispatch!(
+    /// The arcsine of `x`, correctly rounded (CORE-MATH's `cr_asin`). ITK's `std::asin`
+    /// (glibc's `asin`), as in `Euler3DTransform::ComputeMatrixParameters`.
+    asin
+);
+dispatch!(
+    /// The arccosine of `x`, correctly rounded (CORE-MATH's `cr_acos`). ITK's `std::acos`
+    /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`.
+    acos
+);
+dispatch!(
+    /// The cube root of `x`, correctly rounded (CORE-MATH's `cr_cbrt`). ITK's
+    /// `itk::Math::cbrt` (glibc's `cbrt`, which is not correctly rounded), as in
+    /// `Similarity3DTransform::SetMatrix`.
+    cbrt
+);
+
+/// `atan2(y, x)`, correctly rounded (CORE-MATH's `cr_atan2`). ITK's `std::atan2` (glibc's
+/// `atan2`), as in `Euler3DTransform::ComputeMatrixParameters`.
+#[inline]
+#[must_use]
+pub fn atan2(y: f64, x: f64) -> f64 {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("fma") {
+        return fma::atan2(y, x);
+    }
+    atan2::atan2(y, x)
+}
 
 /// `x^y` for `f32`, correctly rounded (CORE-MATH's `cr_powf`). It has no FMA-compiled copy:
 /// it is only used where speed does not matter (ImageMath's `^`).
@@ -101,6 +134,19 @@ mod fma {
     fma_copy!(exp);
     fma_copy!(log);
     fma_copy!(sin);
+    fma_copy!(asin);
+    fma_copy!(acos);
+    fma_copy!(cbrt);
+
+    #[inline]
+    pub(super) fn atan2(y: f64, x: f64) -> f64 {
+        #[target_feature(enable = "fma")]
+        fn kernel(y: f64, x: f64) -> f64 {
+            super::atan2::atan2(y, x)
+        }
+        // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
+        unsafe { kernel(y, x) }
+    }
 }
 
 #[cfg(test)]
@@ -119,6 +165,20 @@ mod tests {
                 (super::sin(x), super::sin::sin(x)),
                 (super::exp(x), super::exp::exp(x)),
                 (super::log(x.abs()), super::log::log(x.abs())),
+                (super::cbrt(x), super::cbrt::cbrt(x)),
+                (super::atan2(x, 1.5), super::atan2::atan2(x, 1.5)),
+                (super::atan2(-0.25, x), super::atan2::atan2(-0.25, x)),
+            ] {
+                assert!(
+                    a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),
+                    "{x:e}"
+                );
+            }
+            // Arguments in [-1, 1] for the inverse sine and cosine.
+            let u = (s >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0;
+            for (a, b) in [
+                (super::asin(u), super::asin::asin(u)),
+                (super::acos(u), super::acos::acos(u)),
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),

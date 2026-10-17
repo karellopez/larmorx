@@ -178,12 +178,27 @@ replica's own count agrees (GLIBC-03). *larmorx:* `larmorx_core::math::{sinf, co
 CORE-MATH's `src/binary32/sin/sinf.c` and `src/binary32/cos/cosf.c`, bit-identical to the C on
 all 2^32 inputs.
 
+**`asin`, `acos`, `atan2`, `cbrt`** (2026-10-17, A4 part 3). ITK's rigid and similarity
+transforms compute their parameters from a matrix with them (`Euler3DTransform::ComputeMatrixParameters`:
+`asin`, `atan2`; `Rigid2DTransform` and `Similarity2DTransform`: `acos`; `Similarity3DTransform::SetMatrix`:
+`itk::Math::cbrt`), which `antsAI` does for every start point of a rigid or similarity search.
+glibc 2.35's `cbrt` is not correctly rounded (about 1 ulp); its `asin`, `acos` and `atan2`
+(the IBM accurate library, with the slow paths removed since glibc 2.33/2.34) are not
+guaranteed to be. *larmorx:* `larmorx_core::math::{asin, acos, atan2, cbrt}`, ports of
+CORE-MATH's `src/binary64/{asin,acos,atan2,cbrt}` (atan2 with its 192-bit `tint.h`),
+bit-identical to the C (GCC 11.4, `-O2`, no FMA contraction) on 1.85 M inputs: all of
+CORE-MATH's worst cases (`asin.wc`, `acos.wc`, `atan2.wc`, `cbrt.wc`) and random arguments
+(uniform, near ±1, tiny, random bit patterns, the entries of rotation matrices, `atan2` with
+exponent differences around 53, where its accurate path runs). *Verified* (2026-10-17).
+
 ## Making ANTs correctly rounded: the preload library
 
 `scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin`,
-`cos`, `sinf` and `cosf` with a small wrapper (which also provides `sincos` and `sincosf`) into
-`oracles/core-math-preload/libcrmath.so` (`sinf`, `cosf` and `sincosf` since 2026-10-11; no
-other suite's result changed, since no other port computes with them). Run with `LD_PRELOAD` set to it, ANTs' dynamically
+`cos`, `sinf`, `cosf`, `asin`, `acos`, `atan2` and `cbrt` with a small wrapper (which also
+provides `sincos` and `sincosf`) into `oracles/core-math-preload/libcrmath.so` (`sinf`, `cosf`
+and `sincosf` since 2026-10-11; `asin`, `acos`, `atan2` and `cbrt` since 2026-10-17, the
+previous library archived in `<workspace>/archive/2026-10-17-crmath-preload/`; no other suite's
+result changed either time, since no other port computes with them). Run with `LD_PRELOAD` set to it, ANTs' dynamically
 linked calls to these functions go to the correctly rounded versions (checked with
 `LD_DEBUG=bindings`), so ANTs computes what larmorx computes. The N4 and DenoiseImage parity
 suites use it as their exact reference: larmorx is bit-identical to N4BiasFieldCorrection run

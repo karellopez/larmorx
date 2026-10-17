@@ -31,6 +31,10 @@ SPDX = re.compile(r"SPDX-License-Identifier:\s*(.+?)\s*$")
 # Apache-2.0 files that are translations of code under another permissive licence. The
 # original notice is reproduced in each file and in NOTICE.
 MIXED = {
+    "crates/larmorx-core/src/math/acos.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/asin.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/atan2.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/cbrt.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/exp.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/log.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/sin.rs": "Apache-2.0 AND MIT",

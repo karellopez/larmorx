@@ -89,8 +89,14 @@ impl<R: Real> Mattes<R> {
         bins: usize,
         m: &ImageMetricv4<R, D>,
     ) -> Result<Self, ItkException> {
-        let mut fmin = R::MAX;
-        let mut fmax = -R::MAX;
+        // NumericTraits<PixelType>::max() and NonpositiveMin(): the pixel type's range.
+        let pixel_max = if m.pixel_f32 {
+            R::from_f64(f64::from(f32::MAX))
+        } else {
+            R::MAX
+        };
+        let mut fmin = pixel_max;
+        let mut fmax = -pixel_max;
         let take = |v: R, lo: &mut R, hi: &mut R| {
             *lo = if *lo < v { *lo } else { v };
             *hi = if *hi > v { *hi } else { v };
@@ -128,8 +134,8 @@ impl<R: Real> Mattes<R> {
                 }
             },
         }
-        let mut mmin = R::MAX;
-        let mut mmax = -R::MAX;
+        let mut mmin = pixel_max;
+        let mut mmax = -pixel_max;
         let moving = &m.moving;
         match &m.moving_mask {
             Some(mask) => {
@@ -185,6 +191,42 @@ impl<R: Real> Mattes<R> {
         i as usize
     }
 
+    /// The threader's `BeforeThreadedExecution` allocates the joint histogram as an image
+    /// whose spacing is the two bin sizes; `ImageBase::SetSpacing` (ITK built with
+    /// `ITK_LEGACY_REMOVE`, as ANTs builds it) throws for a zero or negative spacing: an
+    /// analysis region of one intensity, or of none (an empty mask). The image is then left
+    /// without a buffer, so a later evaluation of the same metric crashes in ITK
+    /// (`FillBuffer`); this is the first evaluation's exception (from the default spacing
+    /// `[1, 1]`).
+    pub fn check_joint_pdf_spacing(&self) -> Result<(), ItkException> {
+        let spacing = [self.fixed_bin_size.to_f64(), self.moving_bin_size.to_f64()];
+        let o = crate::format::OStream::default();
+        let to = format!("[{}, {}]", o.float(spacing[0]), o.float(spacing[1]));
+        for &v in &spacing {
+            if v == 0.0 {
+                return Err(ItkException::new(
+                    "Modules/Core/Common/include/itkImageBase.hxx",
+                    77,
+                    "Image",
+                    format!(
+                        "Zero-valued spacing is not supported and may result in undefined behavior.\nRefusing to change spacing from [1, 1] to {to}"
+                    ),
+                ));
+            }
+            if v < 0.0 {
+                return Err(ItkException::new(
+                    "Modules/Core/Common/include/itkImageBase.hxx",
+                    90,
+                    "Image",
+                    format!(
+                        "Negative spacing is not supported and may result in undefined behavior.\nRefusing to change spacing from [1, 1] to {to}"
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`: the value and the
     /// derivative (empty without it).
     pub fn evaluate<const D: usize>(
@@ -194,6 +236,7 @@ impl<R: Real> Mattes<R> {
         compute_derivative: bool,
         floor: &IndexFloor,
     ) -> Result<(R, Vec<R>), ItkException> {
+        self.check_joint_pdf_spacing()?;
         let bins = self.bins;
         let np = transform.number_of_parameters();
         let gradients = GradientSource {

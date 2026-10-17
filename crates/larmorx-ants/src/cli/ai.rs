@@ -17,8 +17,10 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
-use larmorx_io::itk_transform::{ItkTransformParts, Parameters, write_itk_transform_parts};
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
+use larmorx_io::itk_transform::{
+    ItkTransformParts, Parameters, TransformFileError, write_itk_transform_parts,
+};
 use larmorx_registration::mask::Mask;
 use larmorx_registration::transform::LinearXfm;
 use larmorx_registration::{Image, ItkException};
@@ -27,7 +29,8 @@ use super::menu::{MenuOption, print_menu};
 use super::parser::{self, OptionValue, ParseFailure, Parsed};
 use super::registration::{Conv, param, to_image};
 use crate::ai::{
-    AiError, AiMetric, AiSampling, AiSettings, AiTransform, initial, search, without_search,
+    AiError, AiMetric, AiSampling, AiSettings, AiTransform, SearchOutcome, initial, search,
+    without_search,
 };
 use crate::image::{FileStore, ImageStore, read_with};
 use crate::registration::helper::Log;
@@ -396,7 +399,7 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
                 log,
                 &ItkException::new(
                     "Modules/Registration/Common/include/itkCenteredTransformInitializer.hxx",
-                    if fixed.is_none() { 47 } else { 52 },
+                    if fixed.is_none() { 31 } else { 35 },
                     "CenteredTransformInitializer",
                     if fixed.is_none() {
                         "Fixed Image has not been set"
@@ -409,7 +412,7 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
                 log,
                 &ItkException::new(
                     "Modules/Filtering/ImageStatistics/include/itkImageMomentsCalculator.hxx",
-                    218,
+                    225,
                     "ImageMomentsCalculator",
                     "GetCenterOfGravity() invoked, but the moments have not been computed. Call Compute() first.",
                 ),
@@ -452,10 +455,24 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
             param(o, 0).to_owned()
         }
     });
-    if s.iterations == 0 {
+    // ANTS-53: the two alignments with iterations run the search, which lists no start
+    // point, and write no transform. Corrected, the iterations are ignored (the metric is not
+    // used, as the help says).
+    let align_with_iterations = transform.from_images() && s.iterations > 0;
+    if align_with_iterations && ctx.notices.fix() {
+        ctx.notices.add(
+            &defects::ANTS_53,
+            "AlignGeometricCenters and AlignCentersOfMass ignore --convergence: the alignment is written as with 0 iterations (ANTs writes no transform)",
+        );
+    }
+    if s.iterations == 0 || (align_with_iterations && ctx.notices.fix()) {
         if let Some(name) = output {
-            let t = without_search(&s, &init, ctx.warnings).map_err(|e| ai_failure(log, e))?;
-            write_output(ctx, log, &name, &t, true)?;
+            let t = without_search(&s, &init, ctx.warnings).map_err(|e| {
+                flush(ctx, log);
+                ai_failure(log, e)
+            })?;
+            flush(ctx, log);
+            write_output(ctx, log, &name, Some(&t), true)?;
         }
         return Ok(0);
     }
@@ -492,54 +509,92 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
             },
         };
     }
-    if !transform.from_images() {
-        let best = search(
-            &s,
-            &init,
-            &fixed64,
-            &moving64,
-            &moving32,
-            fixed_mask,
-            moving_mask,
-            log,
-            ctx.notices,
-            ctx.warnings,
-            ctx.n_threads,
-        )
-        .map_err(|e| ai_failure(log, e))?;
-        if let Some(name) = output {
-            write_output(ctx, log, &name, &best, false)?;
-        }
+    let outcome = search(
+        &s,
+        &init,
+        &fixed64,
+        &moving64,
+        &moving32,
+        fixed_mask,
+        moving_mask,
+        log,
+        ctx.notices,
+        ctx.warnings,
+        ctx.n_threads,
+    );
+    flush(ctx, log);
+    let outcome = outcome.map_err(|e| ai_failure(log, e))?;
+    let Some(name) = output else {
         return Ok(0);
-    }
-    // AlignGeometricCenters / AlignCentersOfMass with iterations: ANTs runs its metric on
-    // an empty list of start points and writes no transform (TransformFileWriter throws
-    // "No transform to write").
-    match s.metric {
-        Some(_) => {}
-        None => {
-            log.cerr("ERROR: Unrecognized metric. \n");
-            return Err(1);
+    };
+    match outcome {
+        SearchOutcome::Best(best) => write_output(ctx, log, &name, Some(&best), false)?,
+        // The two alignments: the writer gets no transform.
+        SearchOutcome::NoStartPoint if transform.from_images() => {
+            write_output::<D>(ctx, log, &name, None, false)?
         }
-    }
-    if output.is_some() {
-        return Err(refuse(
-            log,
-            "AlignGeometricCenters and AlignCentersOfMass with iterations give ANTs no transform to write (its writer throws and ANTs aborts); use 0 iterations",
-        ));
+        SearchOutcome::NoStartPoint => {
+            return Err(refuse(
+                log,
+                "no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
+            ));
+        }
     }
     Ok(0)
 }
 
+/// Prints the warnings gathered so far (ITK prints them as they happen, before what follows
+/// on the same stream).
+fn flush(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) {
+    for w in ctx.warnings.drain(..) {
+        log.cerr(&w);
+    }
+}
+
 /// `TransformFileWriter::Update()` of `t` (`SetUseCompression(true)` when `compress`): the
-/// class with its parameters and fixed parameters in double.
+/// class with its parameters and fixed parameters in double. `None`: the writer has no
+/// transform (the two alignments with iterations, ANTS-53): ITK's MATLAB writer opens the
+/// file and writes nothing; its text and HDF5 writers read the first transform of the empty
+/// list and crash (refused).
+///
+/// ITK's exceptions are not caught (ANTs aborts): larmorx prints them as ANTs does.
 fn write_output<const D: usize>(
     ctx: &mut Context<'_, '_>,
     log: &mut Log<'_>,
     name: &str,
-    t: &LinearXfm<f64, D>,
+    t: Option<&LinearXfm<f64, D>>,
     compress: bool,
 ) -> Result<(), Exit> {
+    let path = Path::new(name);
+    let lower = name.to_ascii_lowercase();
+    let kind = if larmorx_io::itk_transform::is_hdf5_name(path) {
+        "HDF5"
+    } else if lower.ends_with(".mat") {
+        "Matlab"
+    } else if lower.ends_with(".txt") || lower.ends_with(".tfm") {
+        "Txt"
+    } else {
+        let e = ItkException::new(
+            "Modules/IO/TransformBase/src/itkTransformFileWriterSpecializations.cxx",
+            153,
+            "TransformFileWriterTemplate",
+            format!(
+                "Could not create Transform IO object for writing file {name}\n  Tried to create one of the following:\n    HDF5TransformIOTemplate\n    HDF5TransformIOTemplate\n    MatlabTransformIOTemplate\n    MatlabTransformIOTemplate\n    TxtTransformIOTemplate\n    TxtTransformIOTemplate\n  You probably failed to set a file suffix, or\n    set the suffix to an unsupported type.\n"
+            ),
+        );
+        return Err(uncaught(log, &e));
+    };
+    let Some(t) = t else {
+        if kind != "Matlab" {
+            return Err(refuse(
+                log,
+                "the transform writer has no transform: ITK's text and HDF5 writers read the first transform of an empty list and crash (ANTS-53)",
+            ));
+        }
+        return std::fs::File::create(path)
+            .map(|_| ())
+            .map_err(|_| uncaught(log, &open_failure(kind, name)));
+    };
     let parts = vec![ItkTransformParts {
         name: format!("{}_double_{D}_{D}", t.kind.class()),
         parameters: Parameters::F64(t.parameters()),
@@ -549,16 +604,33 @@ fn write_output<const D: usize>(
         compression: compress,
         ..Default::default()
     };
-    write_itk_transform_parts(Path::new(name), &parts, &options, ctx.notices).map_err(|e| {
-        match e.ants_report() {
-            Some(r) => log.cerr(&r),
-            None => log.cerr(&format!("{e}\n")),
+    write_itk_transform_parts(path, &parts, &options, ctx.notices).map_err(|e| match e {
+        TransformFileError::Io { .. } if kind != "HDF5" => uncaught(log, &open_failure(kind, name)),
+        e => {
+            match e.ants_report() {
+                Some(r) => log.cerr(&r),
+                None => log.cerr(&format!("{e}\n")),
+            }
+            refuse(
+                log,
+                "ITK's transform writer throws and antsAI does not catch it (ANTs aborts)",
+            )
         }
-        refuse(
-            log,
-            "ITK's transform writer throws and antsAI does not catch it (ANTs aborts)",
-        )
     })
+}
+
+/// `TransformIOBaseTemplate::OpenStream`'s exception for a file it cannot open.
+fn open_failure(kind: &str, name: &str) -> ItkException {
+    ItkException::new(
+        "Modules/IO/TransformBase/src/itkTransformIOBase.cxx",
+        88,
+        match kind {
+            "HDF5" => "HDF5TransformIOTemplate",
+            "Matlab" => "MatlabTransformIOTemplate",
+            _ => "TxtTransformIOTemplate",
+        },
+        format!("Failed opening file{name}"),
+    )
 }
 
 /// The command's description (`antsAI.cxx:1820-1821`, the two strings joined as ANTs joins

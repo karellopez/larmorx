@@ -56,6 +56,19 @@ pub struct MultiStartOutcome<R> {
     pub minimum: R,
     /// Whether each start point threw.
     pub failed: Vec<bool>,
+    /// The exception of each start point that threw, with its number.
+    pub errors: Vec<(usize, ItkException)>,
+    /// The start point at which ITK crashes: after a start point whose exception leaves the
+    /// metric unusable ([`leaves_metric_unusable`]), the next evaluation crashes. The loop
+    /// stops there, before the end event; `parameters` and `best_index` are then partial.
+    pub crashed_at: Option<usize>,
+}
+
+/// Whether an exception leaves ITK's metric unusable: `ImageBase::SetSpacing` refusing the
+/// Mattes joint histogram's spacing in `BeforeThreadedExecution` leaves that histogram
+/// without a buffer, and the next evaluation crashes in `FillBuffer`.
+pub fn leaves_metric_unusable(e: &ItkException) -> bool {
+    e.file == "Modules/Core/Common/include/itkImageBase.hxx"
 }
 
 impl<R: Real> MultiStartOutcome<R> {
@@ -89,6 +102,7 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
     let mut best = 0usize;
     let mut minimum = R::MAX;
     let mut failures = Vec::new();
+    let mut errors = Vec::new();
     if n == 0 {
         return Ok(MultiStartOutcome {
             parameters: list,
@@ -96,6 +110,8 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
             best_index: best,
             minimum,
             failed: failures,
+            errors,
+            crashed_at: None,
         });
     }
     // ObjectToObjectOptimizerBase::StartOptimization: the scales, if set, must match.
@@ -143,9 +159,10 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
                 values.push(v);
                 false
             }
-            Err(_) => {
+            Err(e) => {
+                errors.push((current, e));
                 warnings.push(format!(
-                    "WARNING: In {FILE}, line 183\nMultiStartOptimizerv4Template (0x0): An exception occurred in sub-optimization number {current}.  If too many of these occur, you may need to set a different set of initial parameters.\n\n"
+                    "WARNING: In {FILE}, line 187\nMultiStartOptimizerv4Template (0x0): An exception occurred in sub-optimization number {current}.  If too many of these occur, you may need to set a different set of initial parameters.\n\n"
                 ));
                 true
             }
@@ -156,6 +173,22 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
             best = current;
         }
         observer.iteration(current, current_value);
+        if failed
+            && current + 1 < n
+            && errors
+                .last()
+                .is_some_and(|(_, e)| leaves_metric_unusable(e))
+        {
+            return Ok(MultiStartOutcome {
+                parameters: list,
+                metric_values: values,
+                best_index: best,
+                minimum,
+                failed: failures,
+                errors,
+                crashed_at: Some(current + 1),
+            });
+        }
     }
     // StopOptimization: the best parameters into the metric.
     problem.set_parameters(&list[best])?;
@@ -166,5 +199,7 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
         best_index: best,
         minimum,
         failed: failures,
+        errors,
+        crashed_at: None,
     })
 }

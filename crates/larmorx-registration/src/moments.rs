@@ -87,7 +87,7 @@ pub fn compute<R: Real, const D: usize>(image: &Image<R, D>) -> Result<Moments<D
     if m0 == 0.0 {
         return Err(MomentsError::ZeroMass(ItkException::new(
             FILE,
-            172,
+            123,
             CLASS,
             "Compute(): Total Mass of the image was zero. Aborting here to prevent division by zero later on.",
         )));

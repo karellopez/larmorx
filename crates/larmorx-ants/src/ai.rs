@@ -68,6 +68,15 @@ impl AiMetric {
             _ => None,
         }
     }
+
+    /// The ITK class, as its exceptions name it.
+    pub fn class_name(self) -> &'static str {
+        match self {
+            AiMetric::Mattes => "MattesMutualInformationImageToImageMetricv4",
+            AiMetric::Mi => "JointHistogramMutualInformationImageToImageMetricv4",
+            AiMetric::Gc => "CorrelationImageToImageMetricv4",
+        }
+    }
 }
 
 /// The fourth parameter of `--metric`.
@@ -409,6 +418,9 @@ fn ulong_of(x: f64, notices: &mut Notices, what: &str) -> u64 {
 /// The normal variates come from a generator seeded with `seed`. ANTs draws the random
 /// voxels from the iterator's own generator, seeded from the clock (it is never reseeded):
 /// larmorx seeds it with `seed + 1` (`seed` 0: 121212 and 121213).
+///
+/// Returns the points kept and how many were generated before the mapping (ITK's two
+/// exceptions for an empty set tell them apart).
 pub fn sample_points<const D: usize>(
     space: &Space<D>,
     sampling: AiSampling,
@@ -416,7 +428,7 @@ pub fn sample_points<const D: usize>(
     fixed_mask: Option<&Mask<D>>,
     seed: i32,
     notices: &mut Notices,
-) -> Result<Vec<[f64; D]>, AiError> {
+) -> Result<(Vec<[f64; D]>, usize), AiError> {
     let third: [f64; D] = std::array::from_fn(|k| space.spacing[k] / 3.0);
     let base = if seed == 0 { 121_212 } else { seed };
     let mut randomizer = MersenneTwister::from_int(base);
@@ -487,8 +499,9 @@ pub fn sample_points<const D: usize>(
     }
     // MapFixedSampledPointSetToVirtual: points whose nearest index is outside the virtual
     // domain (the fixed image's) are skipped.
+    let generated = points.len();
     points.retain(|p| space.contains(&space.point_to_index(p)));
-    Ok(points)
+    Ok((points, generated))
 }
 
 /// The rigid start point's class in dimension `D`.
@@ -525,13 +538,15 @@ pub const MAX_START_POINTS: usize = 10_000_000;
 
 /// The multi-start optimizer's start points (`antsAI.cxx:1390-1509`), with what ANTs reads
 /// of the translation grid: missing entries are read past the end of ANTs' vector
-/// (undefined; refused by default, read as 0 with `reproduce`).
+/// (undefined; refused by default, read as 0 with `reproduce`). Returns the list and ANTs'
+/// `trialCounter` (the number of start points visited; for the two alignments the list
+/// stays empty).
 pub fn start_points<const D: usize>(
     s: &AiSettings,
     init: &Initial<D>,
     notices: &mut Notices,
     warnings: &mut Vec<String>,
-) -> Result<Vec<Vec<f64>>, AiError> {
+) -> Result<(Vec<Vec<f64>>, usize), AiError> {
     let pi = std::f64::consts::PI;
     let grid: Vec<f64> = (0..D)
         .map(|d| s.translation_grid.get(d).copied())
@@ -589,6 +604,10 @@ pub fn start_points<const D: usize>(
     }
     if total > MAX_START_POINTS {
         return Err(never("the search factor and the translation grid"));
+    }
+    if s.transform.from_images() {
+        // The loops only move the affine search transform: no start point is listed.
+        return Ok((Vec::new(), total));
     }
     let c = init.transform.center;
     let m0 = init.transform.matrix;
@@ -722,7 +741,7 @@ pub fn start_points<const D: usize>(
             },
         );
     }
-    Ok(list)
+    Ok((list, total))
 }
 
 /// ANTs' `antsCommandIterationUpdate<MultiStartOptimizerv4>` (verbose): the header, every
@@ -758,9 +777,32 @@ impl MultiStartObserver<f64> for Progress<'_, '_> {
     fn end(&mut self, _best_index: usize, _metric_values: &[f64]) {}
 }
 
+/// What [`search`] ends with.
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)]
+pub enum SearchOutcome<const D: usize> {
+    /// The best start point in the output class, centred at the initial centre.
+    Best(LinearXfm<f64, D>),
+    /// No start point was listed: ANTs' multi-start optimizer does nothing. For the two
+    /// alignments (`AlignGeometricCenters`, `AlignCentersOfMass` with iterations) its loops
+    /// list none; otherwise the angle or translation loops are empty (a negative arc
+    /// fraction or grid extent).
+    NoStartPoint,
+}
+
+const METRIC_FILE: &str = "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx";
+
+/// The warning `RegistrationParameterScalesFromPhysicalShift::EstimateScales` gives when no
+/// parameter moves a voxel (the two alignments: the metric keeps its default
+/// `IdentityTransform`, which has no parameters).
+const NO_SHIFT_WARNING: &str = "WARNING: In Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesFromShiftBase.hxx, line 91\nRegistrationParameterScalesFromPhysicalShift (0x0): Variation in any parameter won't change a voxel position. The default scales (1.0) are used to avoid division-by-zero.\n\n";
+
 /// The search (`antsAI.cxx:1125-1577`): the metric, the start points and the multi-start
-/// optimization. Returns the best transform in the output class (centred at the initial
-/// centre). `moving_f32` is the moving image as read (for its gradient image).
+/// optimization. `moving_f32` is the moving image as read (for its gradient image).
+///
+/// As in ANTs, the two alignments run this too when they are given iterations (ANTS-53): the
+/// metric is set up, the loops count their start points without listing any, and the
+/// optimizer does nothing ([`SearchOutcome::NoStartPoint`]).
 #[allow(clippy::too_many_arguments)]
 pub fn search<const D: usize>(
     s: &AiSettings,
@@ -774,8 +816,8 @@ pub fn search<const D: usize>(
     notices: &mut Notices,
     warnings: &mut Vec<String>,
     n_threads: usize,
-) -> Result<LinearXfm<f64, D>, AiError> {
-    let kind = match s.metric {
+) -> Result<SearchOutcome<D>, AiError> {
+    let (kind, metric_kind) = match s.metric {
         Some(AiMetric::Mattes) => {
             if log.verbose {
                 log.cout(&format!(
@@ -783,9 +825,12 @@ pub fn search<const D: usize>(
                     s.bins
                 ));
             }
-            MetricKind::Mattes {
-                bins: s.bins as usize,
-            }
+            (
+                AiMetric::Mattes,
+                MetricKind::Mattes {
+                    bins: s.bins as usize,
+                },
+            )
         }
         Some(AiMetric::Mi) => {
             if log.verbose {
@@ -795,24 +840,19 @@ pub fn search<const D: usize>(
                 ));
             }
             let correct_marginals = notices.fix();
-            notices.add(
-                &defects::ITK_18,
-                if correct_marginals {
-                    "each image's marginal density is its own; ANTs swaps them"
-                } else {
-                    "the marginal densities are swapped, as in ANTs"
+            (
+                AiMetric::Mi,
+                MetricKind::Mi {
+                    bins: s.bins as usize,
+                    correct_marginals,
                 },
-            );
-            MetricKind::Mi {
-                bins: s.bins as usize,
-                correct_marginals,
-            }
+            )
         }
         Some(AiMetric::Gc) => {
             if log.verbose {
                 log.cout("Using the global correlation metric \n");
             }
-            MetricKind::Gc
+            (AiMetric::Gc, MetricKind::Gc)
         }
         None => {
             // ANTS-45: larmorx explains it without -v too.
@@ -823,24 +863,44 @@ pub fn search<const D: usize>(
     let samples = if s.sampling == AiSampling::None {
         None
     } else {
-        Some(Arc::new(sample_points(
+        let (points, generated) = sample_points(
             &fixed.space,
             s.sampling,
             s.sampling_percentage,
             fixed_mask.as_ref(),
             s.random_seed,
             notices,
-        )?))
+        )?;
+        // The metric's Initialize (MapFixedSampledPointSetToVirtual).
+        if generated == 0 {
+            return Err(AiError::Uncaught(ItkException::new(
+                METRIC_FILE,
+                595,
+                kind.class_name(),
+                "Fixed Sample point set is empty.",
+            )));
+        }
+        if points.is_empty() {
+            return Err(AiError::Uncaught(ItkException::new(
+                METRIC_FILE,
+                628,
+                kind.class_name(),
+                "The virtual sampled point set has zero points because no fixed sampled points were within the virtual domain after mapping. There are no points to evaulate.",
+            )));
+        }
+        Some(Arc::new(points))
     };
-    if let Some(p) = &samples
-        && p.is_empty()
-    {
-        return Err(AiError::Uncaught(ItkException::new(
-            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-            627,
-            "MattesMutualInformationImageToImageMetricv4",
-            "The virtual sampled point set has zero points because no fixed sampled points were within the virtual domain after mapping. There are no points to evaulate.",
-        )));
+    if s.transform.from_images() {
+        // The metric keeps its IdentityTransform: the scales estimator finds no parameter,
+        // the loops list nothing, and the multi-start optimizer does nothing.
+        warnings.push(NO_SHIFT_WARNING.to_owned());
+        let (_, trials) = start_points(s, init, notices, warnings)?;
+        if log.verbose {
+            log.cout(&format!(
+                "Starting optimizer with {trials} starting points\n"
+            ));
+        }
+        return Ok(SearchOutcome::NoStartPoint);
     }
     let moving_gradient =
         Arc::new(gradient_image::<f32, D>(moving_f32, n_threads).map_err(AiError::Uncaught)?);
@@ -856,11 +916,25 @@ pub fn search<const D: usize>(
         moving_gradient_image: Some(moving_gradient),
         pixel_f32: true,
     };
-    let mut list = start_points(s, init, notices, warnings)?;
+    let (mut list, trials) = start_points(s, init, notices, warnings)?;
     if list.is_empty() {
-        return Err(AiError::Refused(
-            "no start point (the arc fraction or the translation grid is negative): ANTs reads the best parameters past the end of an empty list".into(),
-        ));
+        if log.verbose {
+            log.cout("Starting optimizer with 0 starting points\n");
+        }
+        return Ok(SearchOutcome::NoStartPoint);
+    }
+    if let MetricKind::Mi {
+        correct_marginals, ..
+    } = metric_kind
+    {
+        notices.add(
+            &defects::ITK_18,
+            if correct_marginals {
+                "each image's marginal density is its own; ANTs swaps them"
+            } else {
+                "the marginal densities are swapped, as in ANTs"
+            },
+        );
     }
     let output_kind = s.transform.output_kind(D);
     let mut search_transform = LinearXfm::<f64, D>::new(output_kind.clone());
@@ -871,7 +945,7 @@ pub fn search<const D: usize>(
     let floor = IndexFloor::new(notices.mode());
     let mut problem = LevelProblem::single(
         metric,
-        kind,
+        metric_kind,
         Composite::new(vec![Xfm::Linear(search_transform)]),
         &floor,
     )
@@ -891,7 +965,6 @@ pub fn search<const D: usize>(
         estimate_learning_rate_once: true,
         scales: None,
     };
-    let trials = list.len();
     let skip_failed = notices.fix();
     let outcome = if log.verbose {
         log.cout(&format!(
@@ -912,14 +985,20 @@ pub fn search<const D: usize>(
             skip_failed,
         )
         .map_err(AiError::Uncaught)?;
-        let best = best_value_printed(&outcome, notices).unwrap_or(outcome.minimum);
+        warnings.append(&mut problem.warnings);
+        crash_after_failure(&outcome)?;
+        if outcome.metric_values.is_empty() {
+            // `std::endl` is printed before the value that cannot be read.
+            progress.log.cout("\n");
+        }
+        let best = best_value_printed(&outcome, notices)?;
         progress.log.cout(&format!(
             "\nOptimization complete. Best metric value: {}\n",
             OStream::default().float(best)
         ));
         outcome
     } else {
-        multistart::optimize(
+        let outcome = multistart::optimize(
             std::mem::take(&mut list),
             Some(&mut local),
             &[],
@@ -928,9 +1007,11 @@ pub fn search<const D: usize>(
             warnings,
             skip_failed,
         )
-        .map_err(AiError::Uncaught)?
+        .map_err(AiError::Uncaught)?;
+        warnings.append(&mut problem.warnings);
+        crash_after_failure(&outcome)?;
+        outcome
     };
-    warnings.append(&mut problem.warnings);
     // ITK-19: a first start point that throws counts with the value 0 in ITK, so ITK keeps it
     // as the best unless another start point's value is below 0.
     if outcome.failed.first() == Some(&true) {
@@ -950,9 +1031,14 @@ pub fn search<const D: usize>(
         }
     }
     if skip_failed && outcome.failed.iter().all(|&f| f) {
-        return Err(AiError::Refused(
-            "every start point threw: there is no best one (ITK keeps the first, unoptimised, and prints a value read past the end of its list)".into(),
-        ));
+        let why = outcome
+            .errors
+            .first()
+            .map(|(_, e)| format!(" (the first: {})", e.description.trim_end()))
+            .unwrap_or_default();
+        return Err(AiError::Refused(format!(
+            "every start point threw{why}: there is no best one (ITK keeps the first, unoptimised)"
+        )));
     }
     let best = outcome
         .best_parameters()
@@ -960,25 +1046,47 @@ pub fn search<const D: usize>(
     let mut out = LinearXfm::<f64, D>::new(output_kind);
     out.set_center(init.transform.center);
     out.set_parameters(best).map_err(AiError::Uncaught)?;
-    Ok(out)
+    Ok(SearchOutcome::Best(out))
+}
+
+/// ITK's Mattes metric leaves its joint histogram without a buffer when the histogram's
+/// spacing is refused (an analysis region of one intensity or none): ANTs then crashes
+/// (`Image::FillBuffer`) in the start point after the one that threw. larmorx refuses there,
+/// in both modes (class (a), ITK-20).
+fn crash_after_failure(outcome: &multistart::MultiStartOutcome<f64>) -> Result<(), AiError> {
+    if let Some(k) = outcome.crashed_at
+        && let Some((current, e)) = outcome.errors.last()
+    {
+        return Err(AiError::Refused(format!(
+            "start point {current} threw ({}); ITK's Mattes metric is then left without its joint histogram, and ANTs crashes in start point {k} (ITK-20)",
+            e.description.replace('\n', " ")
+        )));
+    }
+    Ok(())
 }
 
 /// The value the observer prints at the end: `metricValues[bestIndex]` (ITK). When start
 /// points threw, that index points at another start point's value, or past the end of the
-/// list (undefined): larmorx prints the best start point's value, with `reproduce` the
-/// list's entry where it exists.
+/// list: larmorx prints the best start point's value, with `reproduce` the list's entry where
+/// it exists. When every start point threw the list is empty and ANTs crashes reading it:
+/// refused in both modes.
 fn best_value_printed(
     outcome: &multistart::MultiStartOutcome<f64>,
     notices: &mut Notices,
-) -> Option<f64> {
+) -> Result<f64, AiError> {
+    if outcome.metric_values.is_empty() {
+        return Err(AiError::Refused(
+            "every start point threw: ANTs' observer reads the best metric value from an empty list and crashes".into(),
+        ));
+    }
     let failed = outcome.failed.iter().filter(|&&f| f).count();
     if failed == 0 {
-        return outcome.metric_values.get(outcome.best_index).copied();
+        return Ok(outcome.metric_values[outcome.best_index]);
     }
     if notices.reproduce()
         && let Some(&v) = outcome.metric_values.get(outcome.best_index)
     {
-        return Some(v);
+        return Ok(v);
     }
-    Some(outcome.minimum)
+    Ok(outcome.minimum)
 }

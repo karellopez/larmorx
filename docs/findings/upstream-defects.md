@@ -90,7 +90,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
 | ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | sMRIPrep's T1w (7-8 % of voxels) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
-| ANTS-45 | N4, DenoiseImage | errors explained only with `-v` | f | none | always explained | – |
+| ANTS-45 | N4, DenoiseImage, antsRegistration | errors explained only with `-v` | f | none | always explained | – |
 | ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | – | every run | explained (A4 part 2): ITK's window convergence test passes when the metric stops improving; not a defect | – |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-48 | antsApplyTransforms | transform outputs: crashes and aborts (an unknown extension, `-i` without `-r`, a Gaussian interpolator without `-i`, a collapsed `IdentityTransform`) | a | none | refuses (exit 1) | – |
@@ -965,7 +965,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 
 ### ANTS-45 Errors explained only with `-v` — (f)
 - **What:** N4 exits 1 on a weight image on another grid, and on a mesh of the wrong length,
-  but says why only with `-v`; DenoiseImage's invalid noise model and radii likewise.
+  but says why only with `-v`; DenoiseImage's invalid noise model and radii likewise; so do
+  most of antsRegistration's checks (a missing dimension, option or metric; inconsistent
+  levels; an unreadable initial transform), which print to standard output or error only with
+  `-v` (parity cases `errors/version-0`, `errors/no-dimension-quiet`,
+  `errors/unbalanced-bracket`).
 - **Evidence:** read; verified.
 - **fMRIPrep:** none.
 - **larmorx:** always prints the reason; exit codes as ANTs'.

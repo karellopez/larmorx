@@ -818,6 +818,7 @@ def all_cases() -> list[RegCase]:
             reason="deformable registration is milestone A5; larmorx refuses with a message",
         ),
     ]
+    cases += _message_cases()
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -851,7 +852,118 @@ def all_cases() -> list[RegCase]:
                 band=band,
             )
         )
+    # The linear stages of sMRIPrep's brain extraction (OASIS30ANTs, MI, Rigid then Affine)
+    # and template registration (MNI152NLin2009cAsym, Mattes, Rigid then Affine) as fMRIPrep
+    # ran them, without their SyN stage (A5).
+    for run, subject in (
+        ("ds000005-sub-01-noreconall", "sub_01_wf"),
+        ("ds001600-sub-1-noreconall", "sub_1_wf"),
+        ("ds005040-sub-002-noreconall", "sub_002_wf"),
+        ("ds005454-sub-16-noreconall", "sub_16_wf"),
+        ("ds005752-sub-ON01016-noreconall", "sub_ON01016_ses_01_wf"),
+    ):
+        for short, node in (
+            ("brain-extraction", "anat_fit_wf/brain_extraction_wf/norm"),
+            (
+                "template",
+                "anat_fit_wf/register_template_wf/_template_MNI152NLin2009cAsym/registration",
+            ),
+        ):
+            first = run.startswith("ds000005") and short == "template"
+            cases.append(
+                RegCase(
+                    f"real-linear/{run.split('-noreconall')[0]}/{short}",
+                    "real-linear",
+                    f"the linear stages of fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} "
+                    "(its SyN stage left out)",
+                    (f"{{fmriprep-linear:{run}/{subject}/{node}}}",),
+                    tier="standard" if first else "full",
+                )
+            )
     return cases
+
+
+def _message_cases() -> list[RegCase]:
+    """The command line's other checks and messages: help, version, missing and inconsistent
+    options, conversions, unknown names, the point-set metrics and MINC larmorx refuses."""
+    E = "errors"
+    PFX = "{out}/o"
+    mat = f"Mattes[{F},{M},1,32]"
+    base = ("-d", "3", "-o", PFX, "-t", "Rigid[0.1]", "-m", mat, "-c", "10", "-f", "1", "-s", "0")
+    tail = ("-c", "10", "-f", "1", "-s", "0")
+
+    def err(name: str, description: str, *args: str, **kw) -> RegCase:
+        kw.setdefault("expect", "error")
+        return RegCase(f"{E}/{name}", E, description, args, **kw)
+
+    def ok(name: str, description: str, *args: str, **kw) -> RegCase:
+        return RegCase(f"{E}/{name}", E, description, args, **kw)
+
+    return [
+        ok("short-help", "-h: the short menu, exit 0", "-h"),
+        ok(
+            "version",
+            "--version",
+            "--version",
+            expect="divergence",
+            reason="larmorx prints its own version and the ANTs version it ports",
+        ),
+        err("version-0", "--version 0: no version, then no dimension", "--version", "0", expect="divergence", reason="ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)"),
+        err("no-dimension", "no -d, verbose: the dimension from the first fixed image is unknown", "-o", PFX, "-v"),
+        err("no-dimension-quiet", "no -d, quiet", "-o", PFX, expect="divergence", reason="ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)"),
+        err("bad-dimension", "-d 5", "-d", "5", "-v"),
+        err("invalid-flag", "an option ANTs does not know", "-d", "3", "--nope", "1", "-y"),
+        err(
+            "unbalanced-bracket",
+            "-t Rigid[0.1 (no closing bracket): the rest of the line joins the transform",
+            "-d", "3", "-t", "Rigid[0.1", "-v",
+            expect="divergence", reason="ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
+        ),
+        err("misplaced-bracket", "-t Rig]id[0.1]", "-d", "3", "-t", "Rig]id[0.1]", "-v"),
+        err("no-transform", "no -t", "-d", "3", "-v", "-o", PFX),
+        err("no-metric", "no -m", "-d", "3", "-v", "-o", PFX, "-t", "Rigid[0.1]"),
+        err("no-convergence", "no -c", "-d", "3", "-v", "-o", PFX, "-t", "Rigid[0.1]", "-m", mat),
+        err("no-shrink-factors", "no -f", "-d", "3", "-v", "-o", PFX, "-t", "Rigid[0.1]", "-m", mat, "-c", "10"),
+        err(
+            "no-smoothing-sigmas",
+            "no -s",
+            "-d", "3", "-v", "-o", PFX, "-t", "Rigid[0.1]", "-m", mat, "-c", "10", "-f", "1",
+        ),
+        err("no-output", "no -o", "-d", "3", "-v", "-t", "Rigid[0.1]", "-m", mat, *tail),
+        err("per-stage-without-composite", "-i 1 without -a 1", *base, "-v", "-i", "1"),
+        err("convergence-count", "two -c for one stage", *base, "-v", "-c", "10"),
+        ok("window-1", "-c [10,1e-6,1]: a convergence window of 1", *base[:-6], "-v", "-c", "[10,1e-6,1]", "-f", "1", "-s", "0"),
+        err("bad-iterations", "-c [1ox,1e-6,5]", *base[:-6], "-v", "-c", "[1ox,1e-6,5]", "-f", "1", "-s", "0"),
+        err("unknown-metric", "an unknown metric", *base[:6], "-v", "-m", f"Foo[{F},{M},1,32]", *base[8:]),
+        err("bad-sampling", "an unknown sampling strategy", *base[:6], "-v", "-m", f"Mattes[{F},{M},1,32,Sparse,0.2]", *base[8:]),
+        err("sigmas-mismatch", "three sigmas for two levels", *base[:-6], "-v", "-c", "10x5", "-f", "2x1", "-s", "1x0x0"),
+        err("stage-without-metric", "a second -t without its -m", *base, "-v", "-t", "Affine[0.1]", *tail),
+        ok("sampling-above-1", "a sampling percentage of 1.5", *base[:6], "-v", "-m", f"Mattes[{F},{M},1,32,Regular,1.5]", *base[8:]),
+        err("missing-initial", "-r a transform file that does not exist", *base, "-v", "-r", "{missing:none.mat}"),
+        err(
+            "point-set-metric",
+            "an ICP stage (a point-set metric)",
+            *base[:6],
+            "-v",
+            "-m",
+            f"ICP[{F},{M},1,1]",
+            *base[8:],
+            expect="divergence",
+            reason="larmorx does not port ANTs' point-set metrics (ICP, PSE, JHCT, IGDM) yet and "
+            "refuses them with a message",
+        ),
+        err(
+            "minc",
+            "--minc 1: MINC transform files",
+            *base,
+            "-v",
+            "--minc",
+            "1",
+            expect="divergence",
+            reason="the oracle has no MINC transform IO (it prints ITK's error and exits 0); "
+            "larmorx refuses MINC transform files with a message",
+        ),
+    ]  # fmt: skip
 
 
 def cases_for(tier: str) -> list[Case]:
@@ -875,9 +987,113 @@ def _oracle_root() -> Path | None:
     return None
 
 
-def _fmriprep_args(spec: str, out: Path) -> list[str]:
+#: nipype's per-stage options (``Registration._format_registration``).
+_STAGE_OPTIONS = {
+    "--transform",
+    "--metric",
+    "--convergence",
+    "--smoothing-sigmas",
+    "--shrink-factors",
+    "--use-histogram-matching",
+    "--restrict-deformation",
+    "--masks",
+}
+_LINEAR = ("Translation[", "Rigid[", "Similarity[", "Affine[", "CompositeAffine[")
+
+
+def _linear_stages(args: list[str]) -> list[str]:
+    """``args`` without its deformable stages: each ``--transform`` that is not linear and the
+    stage options after it, up to the next stage or the global options."""
+    kept: list[str] = []
+    skipping = False
+    i = 0
+    while i < len(args):
+        word = args[i]
+        if word == "--transform":
+            skipping = not args[i + 1].startswith(_LINEAR)
+        elif word.startswith("-") and word not in _STAGE_OPTIONS:
+            skipping = False
+        if not skipping:
+            kept.append(word)
+        i += 1
+    return kept
+
+
+def _masked(tmp: Path, name: str, image: Path, mask: Path) -> Path:
+    """``image`` times ``mask`` (float32), as niworkflows' ``RobustMNINormalization`` masks its
+    inputs with ``explicit_masking``."""
+    import nibabel as nib
+
+    path = tmp / name
+    if not path.exists():
+        img = nib.load(image)
+        data = np.asarray(img.dataobj, dtype=np.float32) * (np.asarray(nib.load(mask).dataobj) > 0)
+        nib.save(nib.Nifti1Image(data, img.affine, img.header), path)
+    return path
+
+
+def _stand_ins(args: list[str], run_dir: Path, tmp: Path) -> list[str]:
+    """``args`` with the intermediates nipype did not keep in the oracle's working directory
+    replaced: the brain extraction's N4-corrected T1w by the run's ``desc-preproc_T1w`` (the
+    same image after the final N4), the template registration's masked images by the template
+    and the T1w times their brain masks, and its initial transform (which nipype did not keep
+    either) by ``[fixed,moving,1]``."""
+    import larmorx_testdata as td
+
+    anat = sorted(
+        p
+        for p in (run_dir / "out").glob("sub-*/**/anat/*desc-preproc_T1w.nii.gz")
+        if "space-" not in p.name
+    )
+    if not anat:
+        raise Outcome(SKIPPED, f"{run_dir.name} has no desc-preproc_T1w")
+    t1w = anat[0]
+    brain = t1w.with_name(t1w.name.replace("desc-preproc_T1w", "desc-brain_mask"))
+    tpl = "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_"
+    fixed = _masked(
+        tmp,
+        "fixed_masked.nii.gz",
+        td.get(tpl + "T1w.nii.gz"),
+        td.get(tpl + "desc-brain_mask.nii.gz"),
+    )
+    moving = _masked(tmp, f"{run_dir.name}_moving_masked.nii.gz", t1w, brain)
+
+    def replace(path: str) -> str:
+        if Path(path).exists() or not path.startswith(str(run_dir)):
+            return path
+        name = Path(path).name
+        if name == "fixed_masked.nii.gz":
+            return str(fixed)
+        if name == "moving_masked.nii.gz":
+            return str(moving)
+        if name.endswith("_corrected.nii.gz"):
+            return str(t1w)
+        return path
+
+    out = []
+    i = 0
+    while i < len(args):
+        word = args[i]
+        if word == "--initial-moving-transform" and "transform.mat" in args[i + 1]:
+            path = args[i + 1][1:-1].split(",")[0]
+            if not Path(path).exists():
+                out += [word, f"[{fixed},{moving},1]"]
+                i += 2
+                continue
+        if word.startswith("["):
+            word = "[" + ",".join(replace(v) for v in word[1:-1].split(",")) + "]"
+        out.append(replace(word))
+        i += 1
+    return out
+
+
+def _fmriprep_args(
+    spec: str, out: Path, linear_only: bool = False, tmp: Path | None = None
+) -> list[str]:
     """The ``antsRegistration`` arguments of an fMRIPrep node (``run/node``), its paths mapped to
-    the oracle run and ``larmorx-testdata``, the output prefix moved to ``out``."""
+    the oracle run and ``larmorx-testdata``, the output prefix moved to ``out``; with
+    ``linear_only``, without its deformable stages, and stand-ins (made in ``tmp``) for the
+    inputs nipype did not keep."""
     import larmorx_testdata as td
 
     root = _oracle_root()
@@ -896,6 +1112,8 @@ def _fmriprep_args(spec: str, out: Path) -> list[str]:
 
     text = re.sub(r"/templateflow/[^\s,\]]+", template, text)
     args = text.split()
+    if linear_only:
+        args = _stand_ins(_linear_stages(args), root / run, tmp or out)
     i = args.index("--output")
     value = args[i + 1]
     if value.startswith("["):
@@ -1129,6 +1347,8 @@ def _dimension_cases() -> list[RegCase]:
 def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep:"):
         return _fmriprep_args(c.args[0][10:-1], out)
+    if len(c.args) == 1 and c.args[0].startswith("{fmriprep-linear:"):
+        return _fmriprep_args(c.args[0][17:-1], out, linear_only=True, tmp=tmp)
 
     def sub(m: re.Match[str]) -> str:
         key = m.group(1)

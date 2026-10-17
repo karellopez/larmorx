@@ -84,7 +84,7 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 | `-z 0/1` | `collapse_output_transforms=` | default 1 |
 | `-a 1` | `write_composite_transform=True` | `Composite.h5`, `InverseComposite.h5` |
 | `-i 1` | `initialize_transforms_per_stage=True` | needs `-a 1` and `-z 0` |
-| `-n Linear` | `interpolation="Linear"` | the warped images' interpolator, as `antsApplyTransforms -n`; in 2D and 4D `Linear` and `NearestNeighbor` only |
+| `-n Linear` | `interpolation="Linear"` | the warped images' interpolator, as `antsApplyTransforms -n`, in every dimension |
 | `--float 1` | `precision="float32"` | ANTs' single-precision pipeline |
 | `--random-seed N` / `ANTS_RANDOM_SEED` | `random_seed=N` | without one: ANTs from the clock, larmorx 121212 |
 | `--print-similarity-measure-interval N` | `print_similarity_measure_interval=N` | `RegistrationIteration.full_scale_value` |
@@ -98,8 +98,6 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 
 - Deformable stages (A5), point-set metrics (`ICP`, `PSE`, `JHCT`, `IGDM`), MINC transform
   files: refused with a message.
-- In 2D and 4D, the warped images' `BSpline`, `Gaussian`, windowed-sinc, `GenericLabel` and
-  `MultiLabel` interpolators (3D has them all): refused before the registration runs.
 - Displacement fields among the initial transforms (`-r field.nii.gz`, or a composite holding
   one), in any dimension.
 - Transform files of classes larmorx does not build in 2D and 4D (ITK's `CenteredRigid2D`,

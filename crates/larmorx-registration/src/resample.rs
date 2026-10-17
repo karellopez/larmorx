@@ -8,23 +8,31 @@
 //! double, mapped by the transform in `R`, and turned into a continuous index of the input in
 //! `R`. Each voxel of the line is then `start + α·(end − start)` with `α = (i − first) / size`
 //! in double, stored in `R`. Inside the input's buffer the interpolated value is cast with
-//! bounds checking (clamped to `R`'s range); outside, the default value.
+//! bounds checking (clamped to the float range for float pixels); outside, the default value.
 
 use larmorx_core::IndexFloor;
+use larmorx_interp::nd::{InterpolationNd, InterpolatorNd};
 use rayon::prelude::*;
 
 use crate::interp::at_cindex_with;
 use crate::transform::Composite;
 use crate::{Image, Real, Space};
 
-/// The interpolators this resampler has.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Interpolator {
+/// The interpolators of the warped images (`make_interpolator_snip.tmpl`), with the
+/// coordinate type `R`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Interpolator<const D: usize> {
     /// `LinearInterpolateImageFunction<Image<R>, R>`.
     Linear,
     /// `NearestNeighborInterpolateImageFunction<Image<R>, R>`: the voxel at the continuous
     /// index rounded half up on each axis.
     NearestNeighbor,
+    /// `LabelImageGenericInterpolateImageFunction<Image<R>, LinearInterpolateImageFunction, R>`:
+    /// for each label of the image (ascending), the linear interpolation of its indicator; the
+    /// label with the strictly highest value wins, from label 0 at 0.
+    GenericLabel,
+    /// B-spline, Gaussian, label-Gaussian or windowed sinc ([`larmorx_interp::nd`]).
+    Other(InterpolationNd<D>),
 }
 
 /// `CastPixelWithBoundsChecking`: the interpolator's double value as is for double pixels,
@@ -43,20 +51,71 @@ fn cast<R: Real>(v: f64) -> R {
     }
 }
 
+/// The generic-label interpolation at `c`. Only the labels among the voxels the linear
+/// interpolator reads (the corners of the cell, clamped to the image) can have a non-zero
+/// value and win, so only those are evaluated, in ascending order.
+fn generic_label<R: Real, const D: usize>(
+    image: &Image<R, D>,
+    c: &[R; D],
+    floor: &IndexFloor,
+) -> f64 {
+    let space = &image.space;
+    let base: [i64; D] = std::array::from_fn(|d| c[d].itk_floor().max(space.start[d]));
+    let mut labels: Vec<f64> = Vec::with_capacity(1 << D);
+    for corner in 0..(1usize << D) {
+        let idx: [i64; D] = std::array::from_fn(|d| {
+            let last = space.start[d] + space.size[d] as i64 - 1;
+            (base[d] + ((corner >> d) & 1) as i64).min(last)
+        });
+        labels.push(image.data[space.offset(&idx)].to_f64());
+    }
+    labels.sort_by(|a, b| a.total_cmp(b));
+    labels.dedup_by(|a, b| a.to_bits() == b.to_bits());
+    let (mut best_value, mut best_label) = (0.0f64, 0.0f64);
+    for label in labels {
+        let value = at_cindex_with(space, c, floor, |o| {
+            if image.data[o].to_f64() == label {
+                1.0
+            } else {
+                0.0
+            }
+        });
+        if value > best_value {
+            best_value = value;
+            best_label = label;
+        }
+    }
+    best_label
+}
+
 /// `input` resampled onto `output` through `transform` (a linear composite), with
-/// `interpolator` and the value `default` outside the input.
+/// `interpolator` and the value `default` outside the input. Fails where the interpolator
+/// cannot be built (a B-spline order above 5, a non-positive Gaussian sigma or alpha).
 pub fn resample_linear<R: Real, const D: usize>(
     input: &Image<R, D>,
     output: &Space<D>,
     transform: &Composite<R, D>,
-    interpolator: Interpolator,
+    interpolator: &Interpolator<D>,
     default: R,
     floor: &IndexFloor,
-) -> Vec<R> {
+) -> Result<Vec<R>, String> {
     let n0 = output.size[0];
     if n0 == 0 || output.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
+    let other = match interpolator {
+        Interpolator::Other(method) => Some(
+            InterpolatorNd::with_precision(
+                &input.data,
+                input.space.size,
+                method,
+                input.space.spacing,
+                R::PRECISION,
+            )
+            .map_err(|e| e.to_string())?,
+        ),
+        _ => None,
+    };
     let first = output.start[0];
     let size0 = n0 as f64;
     let transform_index = |idx: &[i64; D]| -> [R; D] {
@@ -72,12 +131,21 @@ pub fn resample_linear<R: Real, const D: usize>(
         if !space.is_inside_buffer(c) {
             return default;
         }
-        match interpolator {
-            Interpolator::Linear => cast(at_cindex_with(space, c, floor, |o| data[o].to_f64())),
-            Interpolator::NearestNeighbor => {
+        match (interpolator, &other) {
+            (Interpolator::Linear, _) => {
+                cast(at_cindex_with(space, c, floor, |o| data[o].to_f64()))
+            }
+            (Interpolator::NearestNeighbor, _) => {
                 let idx: [i64; D] = std::array::from_fn(|k| c[k].itk_round_half_up());
                 cast(data[space.offset(&idx)].to_f64())
             }
+            (Interpolator::GenericLabel, _) => cast(generic_label(input, c, floor)),
+            (Interpolator::Other(_), Some(interp)) => {
+                // The interpolators index the buffer from 0.
+                let ci: [f64; D] = std::array::from_fn(|k| c[k].to_f64() - space.start[k] as f64);
+                cast(interp.evaluate(ci, floor))
+            }
+            (Interpolator::Other(_), None) => unreachable!("prepared above"),
         }
     };
     let lines = output.len() / n0;
@@ -101,5 +169,5 @@ pub fn resample_linear<R: Real, const D: usize>(
                 .collect()
         })
         .collect();
-    rows.into_iter().flatten().collect()
+    Ok(rows.into_iter().flatten().collect())
 }

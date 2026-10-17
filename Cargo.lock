@@ -274,6 +274,7 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-image",
+ "larmorx-interp",
  "larmorx-io",
  "rayon",
  "thiserror",

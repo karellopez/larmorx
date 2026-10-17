@@ -1141,7 +1141,9 @@ def _(ctx: Context) -> dict[str, Any]:
     """2D: a similarity then an ``ANTSCenteredAffine2DTransform`` (mean squares, dense), then a
     rigid stage from the inverted similarity file with the warped images (the 2D rotations'
     own inverses, the scan-line resampler); 4D: a translation then an affine (4D
-    interpolation's general path), collapsed, with the nearest-neighbour warped image."""
+    interpolation's general path), collapsed, with the nearest-neighbour warped image; and
+    warped images with the B-spline, label-Gaussian, windowed-sinc and generic-label
+    interpolators in 2D and 4D."""
     p2 = ctx.out("plane_")
     plane = ctx.file("plane.nii")
     cli(
@@ -1170,7 +1172,24 @@ def _(ctx: Context) -> dict[str, Any]:
         "-t", "Affine[0.1]", "-m", f"Mattes[{bold},{bold},1,8,Regular,0.5]",
         "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "9",
     )  # fmt: skip
+    # The other warped-image interpolators outside 3D (larmorx_interp::nd, the generic label).
+    extra = {}
+    for d, image, interp in (
+        ("2", plane, "BSpline[3]"),
+        ("2", plane, "MultiLabel"),
+        ("4", bold, "LanczosWindowedSinc"),
+        ("4", bold, "GenericLabel"),
+    ):
+        name = f"{d}d.warped.{interp.split('[')[0]}"
+        warped = ctx.out(f"{name}.nii")
+        cli(
+            "ants", "antsRegistration", "-d", d, "-o", f"[{ctx.out(name + '_')},{warped}]",
+            "-n", interp, "-t", "Translation[0.1]", "-m", f"MeanSquares[{image},{image},1,0]",
+            "-c", "[1,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "2",
+        )  # fmt: skip
+        extra[name] = Nifti(warped)
     return {
+        **extra,
         "2d.similarity": File(p2 + "1Similarity.mat"),
         "2d.composite_affine": File(p2 + "2Affine.mat"),
         "2d.rigid": File(p2r + "0GenericAffine.mat"),

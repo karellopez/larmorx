@@ -16,6 +16,9 @@
 //! | `WindowedSinc(window)` | `WindowedSincInterpolateImageFunction` (radius 3, zero outside) |
 //! | `WindowedSincEdge(window)` | the same with ITK's default boundary (the nearest edge voxel outside) |
 //!
+//! [`nd`] has the B-spline, Gaussian, label-Gaussian and windowed-sinc interpolators in any
+//! dimension.
+//!
 //! Callers check [`is_inside`] first, as ITK's resampler does: interpolators assume the index
 //! lies within half a voxel of the grid.
 //!
@@ -32,6 +35,7 @@
 //! every boundary mode), as fMRIPrep and nitransforms use them.
 #![forbid(unsafe_code)]
 
+pub mod nd;
 pub mod ndimage;
 mod vnl;
 
@@ -759,7 +763,7 @@ mod bspline {
 
     const TOLERANCE: f64 = 1e-10;
 
-    fn poles(order: u32) -> Vec<f64> {
+    pub(super) fn poles(order: u32) -> Vec<f64> {
         match order {
             2 => vec![8f64.sqrt() - 3.0],
             3 => vec![3f64.sqrt() - 2.0],
@@ -779,7 +783,7 @@ mod bspline {
     }
 
     /// ITK's `DataToCoefficients1D` on one line (in place).
-    fn line_to_coefficients(c: &mut [f64], poles: &[f64]) {
+    pub(super) fn line_to_coefficients(c: &mut [f64], poles: &[f64]) {
         let n = c.len();
         if n == 1 {
             return;
@@ -868,7 +872,7 @@ mod bspline {
         c
     }
 
-    fn weights(order: u32, x: f64, first: i64) -> [f64; 6] {
+    pub(super) fn weights(order: u32, x: f64, first: i64) -> [f64; 6] {
         let mut w = [0.0f64; 6];
         match order {
             0 => w[0] = 1.0,

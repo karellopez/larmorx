@@ -134,7 +134,11 @@ line, the continuous input indices of its first voxel and of the voxel one past 
 output point in double, the transform in `R`, the index in `R`), and each voxel at
 `start + α·(end − start)`, `α = (i − first)/size` in double, stored in `R`
 (`larmorx_registration::resample`, used in 2D and 4D; 3D goes through `antsApplyTransforms`'
-resampler, which computes the same).
+resampler, which computes the same). Its interpolators are ITK's, templated on the dimension:
+the B-spline, Gaussian, label-Gaussian and windowed-sinc ones in `larmorx_interp::nd` (the 3D
+code with every per-axis step done for `D` axes, the neighbourhood visited with x fastest; in
+3D bit-identical to the 3D versions), the linear and generic-label ones with ITK's linear
+interpolator for the dimension (its optimised path in 2D, the general one in 4D).
 
 **The 2D rotations invert to their own class.** `Rigid2DTransform`, `Euler2DTransform` and
 `Similarity2DTransform` override `GetInverse` (`itkRigid2DTransform.hxx:137-150`,

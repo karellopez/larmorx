@@ -1289,33 +1289,6 @@ fn do_registration<R: Compute, const D: usize>(
     }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());
-    if D != 3 && (!warped_name.is_empty() || !inverse_warped_name.is_empty()) {
-        // Only the linear and nearest-neighbour interpolators are ported outside 3D: refuse
-        // the others before the registration rather than after it.
-        if let Some(v) = function0(p, "interpolation") {
-            let name = v.name.to_lowercase();
-            let known_3d_only = [
-                "bspline",
-                "gaussian",
-                "cosinewindowedsinc",
-                "hammingwindowedsinc",
-                "lanczoswindowedsinc",
-                "blackmanwindowedsinc",
-                "welchwindowedsinc",
-                "genericlabel",
-                "multilabel",
-            ];
-            if known_3d_only.contains(&name.as_str()) {
-                return Err(refuse(
-                    log,
-                    &format!(
-                        "{} interpolation of the warped images is supported in 3D only, not yet in {D} dimensions (Linear and NearestNeighbor are)",
-                        v.name
-                    ),
-                ));
-            }
-        }
-    }
     let done = match (&helper.metrics[0].fixed, &helper.metrics[0].moving) {
         (Some(f), Some(m)) if helper.write_interval_volumes != 0 => {
             let mut sink = IntervalVolumes {
@@ -1455,21 +1428,40 @@ fn read_mask<const D: usize>(
     }
 }
 
+/// The warped images' interpolator, and the Gaussian ones' sigma in every dimension (the
+/// 3D interpolators carry it in [`larmorx_interp::Interpolation`]).
+struct OutputInterpolation<const D: usize> {
+    method: larmorx_interp::Interpolation,
+    sigma: [f64; D],
+}
+
+impl<const D: usize> OutputInterpolation<D> {
+    fn linear() -> Self {
+        OutputInterpolation {
+            method: larmorx_interp::Interpolation::Linear,
+            sigma: [1.0; D],
+        }
+    }
+}
+
 /// The interpolator of the warped outputs (`make_interpolator_snip.tmpl`), read with the
-/// parser's strict conversions. `fixed_spacing` is `cache_spacing_for_smoothing_sigmas`.
+/// parser's strict conversions. `fixed_spacing` is `cache_spacing_for_smoothing_sigmas`, the
+/// Gaussian interpolators' default sigma (for both warped images).
 fn output_interpolation<const D: usize>(
     p: &Parsed,
     log: &mut Log<'_>,
-    fixed_spacing: [f64; 3],
-) -> Result<larmorx_interp::Interpolation, Exit> {
+    fixed_spacing: [f64; D],
+) -> Result<OutputInterpolation<D>, Exit> {
     use larmorx_interp::{Interpolation, Window};
     let Some(v) = function0(p, "interpolation") else {
-        return Ok(Interpolation::Linear);
+        return Ok(OutputInterpolation::linear());
     };
     let name = v.name.to_lowercase();
-    let sigma = |log: &mut Log<'_>| -> Result<[f64; 3], Exit> {
+    let mut sigma_nd = fixed_spacing;
+    let mut sigma = |log: &mut Log<'_>| -> Result<[f64; 3], Exit> {
+        let as3 = |s: &[f64; D]| -> [f64; 3] { std::array::from_fn(|d| s[d.min(D - 1)]) };
         if v.parameters.is_empty() {
-            return Ok(fixed_spacing);
+            return Ok(as3(&sigma_nd));
         }
         let s = match parser_convert_vector_f64(param(&v, 0)) {
             Some(s) => s,
@@ -1482,13 +1474,14 @@ fn output_interpolation<const D: usize>(
                 return Err(caught(log, &e));
             }
         };
-        Ok(if s.len() == D {
-            std::array::from_fn(|d| s[d.min(s.len() - 1)])
+        sigma_nd = if s.len() == D {
+            std::array::from_fn(|d| s[d])
         } else {
-            [s[0]; 3]
-        })
+            [s[0]; D]
+        };
+        Ok(as3(&sigma_nd))
     };
-    Ok(match name.as_str() {
+    let method = match name.as_str() {
         "linear" => Interpolation::Linear,
         "nearestneighbor" => Interpolation::NearestNeighbor,
         "bspline" => {
@@ -1524,6 +1517,10 @@ fn output_interpolation<const D: usize>(
             ));
             return Err(1);
         }
+    };
+    Ok(OutputInterpolation {
+        method,
+        sigma: sigma_nd,
     })
 }
 
@@ -1587,19 +1584,29 @@ fn resample<R: Compute, const D: usize>(
     input: &Image<R, D>,
     reference: &Image<R, D>,
     queue: &[Xfm<R, D>],
-    interpolation: &larmorx_interp::Interpolation,
+    interpolation: &OutputInterpolation<D>,
     ctx: &mut Context<'_, '_>,
 ) -> Result<Vec<R>, String> {
     if D != 3 {
+        use larmorx_interp::Interpolation as I;
+        use larmorx_interp::nd::InterpolationNd as N;
         use larmorx_registration::resample::{Interpolator, resample_linear};
-        let interpolator = match interpolation {
-            larmorx_interp::Interpolation::Linear => Interpolator::Linear,
-            larmorx_interp::Interpolation::NearestNeighbor => Interpolator::NearestNeighbor,
-            _ => {
-                return Err(format!(
-                    "this interpolation of the warped images is supported in 3D only, not yet in {D} dimensions"
-                ));
-            }
+        let sigma = interpolation.sigma;
+        let interpolator = match &interpolation.method {
+            I::Linear => Interpolator::Linear,
+            I::NearestNeighbor => Interpolator::NearestNeighbor,
+            I::GenericLabel => Interpolator::GenericLabel,
+            I::BSpline { order } => Interpolator::Other(N::BSpline { order: *order }),
+            I::Gaussian { alpha, .. } => Interpolator::Other(N::Gaussian {
+                sigma,
+                alpha: *alpha,
+            }),
+            I::MultiLabel { alpha, .. } => Interpolator::Other(N::MultiLabel {
+                sigma,
+                alpha: *alpha,
+            }),
+            I::WindowedSinc(w) => Interpolator::Other(N::WindowedSinc(*w)),
+            I::WindowedSincEdge(w) => Interpolator::Other(N::WindowedSincEdge(*w)),
         };
         let floor = IndexFloor::new(ctx.notices.mode());
         let composite = Composite::new(queue.to_vec());
@@ -1608,12 +1615,12 @@ fn resample<R: Compute, const D: usize>(
                 input,
                 &reference.space,
                 &composite,
-                interpolator,
+                &interpolator,
                 R::ZERO,
                 &floor,
             )
         })
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())??;
         floor.notice(ctx.notices, "interpolated values");
         return Ok(data);
     }
@@ -1628,7 +1635,7 @@ fn resample<R: Compute, const D: usize>(
     };
     let chain = chain_of(queue)?;
     let options = crate::ApplyTransformsOptions {
-        interpolation: interpolation.clone(),
+        interpolation: interpolation.method.clone(),
         default_value: 0.0,
         n_threads: ctx.n_threads,
         precision: R::PRECISION,
@@ -1661,7 +1668,7 @@ struct IntervalVolumes<'c, 'x, 'n, R, const D: usize> {
 
 impl<R: Compute, const D: usize> IntervalSink<R, D> for IntervalVolumes<'_, '_, '_, R, D> {
     fn write_interval_volume(&mut self, log: &mut Log<'_>, name: &str, moving: &[Xfm<R, D>]) {
-        let linear = larmorx_interp::Interpolation::Linear;
+        let linear = OutputInterpolation::linear();
         let written =
             resample(&self.moving, &self.fixed, moving, &linear, self.ctx).and_then(|data| {
                 let image = output_image(&self.fixed, data);
@@ -1747,9 +1754,7 @@ fn write_outputs<R: Compute, const D: usize>(
     let (Some(fixed), Some(moving)) = (&first.fixed, &first.moving) else {
         return Err(refuse(log, "the first metric has no images"));
     };
-    let spacing3: [f64; 3] =
-        std::array::from_fn(|i| if i < D { fixed.space.spacing[i] } else { 1.0 });
-    let interpolation = output_interpolation::<D>(p, log, spacing3)?;
+    let interpolation = output_interpolation::<D>(p, log, fixed.space.spacing)?;
     let queue = helper.composite.clone().unwrap_or_default();
     if !warped_name.is_empty() {
         let data =

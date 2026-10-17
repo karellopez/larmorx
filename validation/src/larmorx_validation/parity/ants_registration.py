@@ -1297,16 +1297,20 @@ def _dimension_cases() -> list[RegCase]:
             st=one,
             out=PRE,
         ),
-        case2(
-            "warped-bspline",
-            "-n BSpline[3] in 2D",
-            "-n",
-            "BSpline[3]",
-            st=one,
-            expect="divergence",
-            reason="larmorx ports the warped images' B-spline, Gaussian, windowed-sinc and label "
-            "interpolators in 3D only; in 2D and 4D it refuses them before the registration",
-        ),
+        *[
+            case2(f"interpolation-{label}", f"-n {interp} in 2D", "-n", interp, *extra, st=one)
+            for label, interp, extra in (
+                ("BSpline", "BSpline[3]", ()),
+                ("BSpline5-float", "BSpline[5]", ("--float", "1")),
+                ("Gaussian", "Gaussian", ()),
+                ("Gaussian-sigmas", "Gaussian[1.5x0.8,1.2]", ()),
+                ("LanczosWindowedSinc", "LanczosWindowedSinc", ()),
+                ("BlackmanWindowedSinc-float", "BlackmanWindowedSinc", ("--float", "1")),
+                ("WelchWindowedSinc", "WelchWindowedSinc", ()),
+                ("GenericLabel", "GenericLabel", ()),
+                ("MultiLabel", "MultiLabel[1.2]", ()),
+            )
+        ],
         case4("warped", "the warped and inverse-warped images (linear)"),
         case4(
             "warped-nearest-float",
@@ -1320,6 +1324,16 @@ def _dimension_cases() -> list[RegCase]:
         case4(
             "file-affine-inverted", "-r [AffineTransform file,1]", "-r", tf("affine-4d.mat", True)
         ),
+        *[
+            case4(f"interpolation-{label}", f"-n {interp} in 4D", "-n", interp, *extra, st=one)
+            for label, interp, extra in (
+                ("BSpline", "BSpline[2]", ()),
+                ("Gaussian-float", "Gaussian[1x1x1x1,1.5]", ("--float", "1")),
+                ("HammingWindowedSinc", "HammingWindowedSinc", ()),
+                ("GenericLabel", "GenericLabel", ()),
+                ("MultiLabel-float", "MultiLabel", ("--float", "1")),
+            )
+        ],
         case4(
             "composite-z0",
             "-a 1 -z 0 -r [fixed,moving,0]",

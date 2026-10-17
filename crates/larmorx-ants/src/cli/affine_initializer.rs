@@ -36,9 +36,7 @@ use larmorx_registration::{Image, ItkException};
 use super::ai::terminate_text;
 use super::cstd::{atof, stoi};
 use super::registration::to_image;
-use crate::affine_initializer::{
-    AffineInitializerSettings, LOCAL_SEARCH_ITERATIONS, image_moments, initial, search,
-};
+use crate::affine_initializer::{AffineInitializerSettings, image_moments, initial, search};
 use crate::ai::AiError;
 use crate::image::{FileStore, ImageStore, read_with};
 use crate::registration::helper::Log;
@@ -289,17 +287,9 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
         }
         k += 1;
     }
-    if let Some(a) = ctx.args.get(k) {
-        // ANTS-54: read by nothing; ANTs always runs 20 iterations.
-        let given = stoi(a);
-        if given != Some(LOCAL_SEARCH_ITERATIONS as i32) {
-            ctx.notices.add(
-                &defects::ANTS_54,
-                format!(
-                    "the local search iterations ({a}) are ignored, as in ANTs: each start point runs {LOCAL_SEARCH_ITERATIONS}"
-                ),
-            );
-        }
+    if ctx.args.get(k).is_some() {
+        // ANTS-54 (questionable, reproduced): the local search's iterations are not read;
+        // every start point runs LOCAL_SEARCH_ITERATIONS.
         k += 1;
     }
     let fixed = read_float::<D>(ctx, log, fixed_name);

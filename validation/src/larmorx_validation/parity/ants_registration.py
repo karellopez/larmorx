@@ -425,6 +425,21 @@ def all_cases() -> list[RegCase]:
                 band=True,
             )
         )
+    # The gradient filter on a grid whose spacings are not powers of two: ITK stores each
+    # derivative through a float (findings/ants-ai.md, "The moving image's gradient").
+    for name, metric in (
+        ("mattes-gradient-filter-oblique", f"Mattes[{FO},{MO},1,32,Regular,0.25,1]"),
+        ("cc-gradient-filter-oblique", f"CC[{FO},{MO},1,2,None,1,1]"),
+    ):
+        cases.append(
+            reg(
+                f"{ME}/{name}",
+                ME,
+                f"Rigid with {metric.split('[')[0]} and the gradient filter, oblique grids",
+                *stage("Rigid[0.1]", metric),
+                out=PRE,
+            )
+        )
     for name, metric, d in (
         ("mi2-2d", f"MI2[{F2},{M2},1,24,Regular,0.5]", "2"),
         ("cc-2d", f"CC[{F2},{M2},1,4,None]", "2"),

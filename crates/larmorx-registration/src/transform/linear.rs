@@ -17,6 +17,9 @@ pub enum Kind {
     Euler3D { zyx: bool },
     /// `Euler2DTransform` (`Rigid2DTransform`): the angle, then the translation.
     Euler2D,
+    /// `Rigid2DTransform` read from a file: `Euler2DTransform`'s parent, the same parameters
+    /// and computations under its own name.
+    Rigid2D,
     /// `Similarity2DTransform`: the scale, the angle, then the translation.
     Similarity2D,
     /// `Similarity3DTransform`: the versor's vector part, the translation, the scale.
@@ -44,6 +47,7 @@ impl Kind {
             Kind::MatrixOffset => "MatrixOffsetTransformBase",
             Kind::Euler3D { .. } => "Euler3DTransform",
             Kind::Euler2D => "Euler2DTransform",
+            Kind::Rigid2D => "Rigid2DTransform",
             Kind::Similarity2D => "Similarity2DTransform",
             Kind::Similarity3D => "Similarity3DTransform",
             Kind::AntsAffine3D => "ANTSAffine3DTransform",
@@ -75,7 +79,7 @@ impl Kind {
         match self {
             Kind::Affine | Kind::MatrixOffset => d * d + d,
             Kind::Euler3D { .. } => 6,
-            Kind::Euler2D => 3,
+            Kind::Euler2D | Kind::Rigid2D => 3,
             Kind::Similarity2D => 4,
             Kind::Similarity3D => 7,
             Kind::AntsAffine3D => 13,
@@ -338,12 +342,19 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
         self.compute_translation();
     }
 
-    /// `GetInverse` into a transform of the same parameterisation where ITK keeps the class
-    /// (`AffineTransform`, `MatrixOffsetTransformBase`): `M⁻¹` by vnl's SVD in `R`,
-    /// `offset = −(M⁻¹·offset)`, `ComputeTranslation`; the centre is kept. Other classes
+    /// `GetInverseTransform()`. `AffineTransform` and `MatrixOffsetTransformBase`: `M⁻¹` by
+    /// vnl's SVD in `R`, `offset = −(M⁻¹·offset)`, `ComputeTranslation`, the centre kept. The
+    /// 2D rotations (`Rigid2DTransform`, `Euler2DTransform`, `Similarity2DTransform`) invert
+    /// to their own class through their parameters ([`LinearXfm::inverse_2d`]). Other classes
     /// invert to a `MatrixOffsetTransformBase` (ITK's `InvertTransform` with the base type).
     /// `None` for a singular matrix.
     pub fn inverse(&self) -> Option<Self> {
+        if matches!(
+            self.kind,
+            Kind::Euler2D | Kind::Rigid2D | Kind::Similarity2D
+        ) {
+            return self.inverse_2d();
+        }
         let inv = inverse_r(&self.matrix)?;
         let mv: [R; D] = std::array::from_fn(|r| {
             let mut s = R::ZERO;
@@ -366,6 +377,32 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
         out.matrix = inv;
         out.offset = std::array::from_fn(|i| -mv[i]);
         out.compute_translation();
+        Some(out)
+    }
+
+    /// `Rigid2DTransform::GetInverse` (and `Euler2DTransform`'s, the same) and
+    /// `Similarity2DTransform::GetInverse`: the same fixed parameters and centre, the scale
+    /// `1.0 / scale` (in double, stored in `R`), the angle negated, the translation
+    /// `−(M⁻¹·translation)` with this transform's inverse matrix (vnl's, in `R`; each row
+    /// summed from 0); the matrix and offset recomputed. `None` for a singular matrix.
+    fn inverse_2d(&self) -> Option<Self> {
+        let inv = inverse_r(&self.matrix)?;
+        let mut out = LinearXfm::new(self.kind.clone());
+        out.extra_fixed = self.extra_fixed.clone();
+        out.center = self.center;
+        if self.kind == Kind::Similarity2D {
+            out.scale = R::from_f64(1.0 / self.scale.to_f64());
+        }
+        out.angles[0] = -self.angles[0];
+        out.translation = std::array::from_fn(|r| {
+            let mut s = R::ZERO;
+            for c in 0..D {
+                s = s + inv[r][c] * self.translation[c];
+            }
+            -s
+        });
+        out.compute_matrix();
+        out.compute_offset();
         Some(out)
     }
 
@@ -404,7 +441,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                     }
                 }
             }
-            Kind::Euler2D => {
+            Kind::Euler2D | Kind::Rigid2D => {
                 let ca = self.angles[0].cos();
                 let sa = self.angles[0].sin();
                 self.matrix[0][0] = ca;
@@ -481,7 +518,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 p.extend_from_slice(&self.translation);
                 p
             }
-            Kind::Euler2D => {
+            Kind::Euler2D | Kind::Rigid2D => {
                 let mut p = vec![self.angles[0]];
                 p.extend_from_slice(&self.translation);
                 p
@@ -545,7 +582,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                 }
                 self.compute_offset();
             }
-            Kind::Euler2D => {
+            Kind::Euler2D | Kind::Rigid2D => {
                 self.angles[0] = p[0];
                 for i in 0..D {
                     self.translation[i] = p[1 + i];
@@ -855,7 +892,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
                     out[j(dim, 3 + dim)] = R::ONE;
                 }
             }
-            Kind::Euler2D => {
+            Kind::Euler2D | Kind::Rigid2D => {
                 let ca = self.angles[0].cos().to_f64();
                 let sa = self.angles[0].sin().to_f64();
                 let cx = self.center[0].to_f64();

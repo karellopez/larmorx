@@ -433,7 +433,8 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 
 ### ANTS-02 Crashes on missing files and arguments — (a)
 - **What:** ImageMath, N4 and DenoiseImage dereference a null image when the input is missing
-  (SIGSEGV); MultiplyImages without its first file or output name aborts (`throw;`); PadImage
+  (SIGSEGV), and so does antsRegistration when a metric's image is missing (after
+  "All_Command_lines_OK"); MultiplyImages without its first file or output name aborts (`throw;`); PadImage
   without its pad and ReplaceVoxelValue without its value pass a null pointer to `atof`;
   SmoothImage without an output name, `std::stoi`/`std::stof` of text, ITK exceptions outside
   a `try` (`ThresholdAtMean` above the maximum, `RescaleImage` reversed), a morphology radius

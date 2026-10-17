@@ -46,6 +46,7 @@ pub mod method;
 pub mod metric;
 pub mod optimizer;
 pub mod preprocess;
+pub mod resample;
 pub mod rng;
 pub mod space;
 pub mod transform;

@@ -2,7 +2,8 @@
 //! `JointHistogramMutualInformationImageToImageMetricv4` (ITK v5.4.5,
 //! `itkJointHistogramMutualInformationImageToImageMetricv4.hxx`,
 //! `itkJointHistogramMutualInformationComputeJointPDFThreaderBase.hxx`,
-//! `itkJointHistogramMutualInformationGetValueAndDerivativeThreader.hxx`): ANTs' `MI`.
+//! `itkJointHistogramMutualInformationGetValueAndDerivativeThreader.hxx`): ANTs' `MI2`
+//! (ANTs' `MI` is Mattes').
 //!
 //! Each evaluation first builds the joint histogram: every valid point's fixed and moving
 //! values, scaled to `[0, 1]` by the images' extremes, fall in one bin of a `bins × bins`

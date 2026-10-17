@@ -15,11 +15,11 @@
 //! - the option values are read newest first (`GetFunction(0)` is the last one given), the
 //!   stages are numbered from the last on the command line (`AssignStages`).
 //!
-//! **Scope (A4 part 2).** The linear stages (`Translation`, `Rigid`, `Affine`; `Similarity`
-//! and `CompositeAffine` as far as [`crate::registration`] ports them) with the Mattes and
-//! mean-squares metrics. The deformable transforms are parsed as ANTs parses them and refused
-//! before the registration runs (A5). What is not ported yet is refused with a message naming
-//! it.
+//! **Scope (A4 part 2).** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
+//! `CompositeAffine`) with the image metrics (`MI`/`Mattes`, `MI2`, `MeanSquares`, `GC`, `CC`;
+//! `Demons` fails in a linear stage as in ANTs), in 2, 3 and 4 dimensions, float and double.
+//! The deformable transforms are parsed as ANTs parses them and refused before the
+//! registration runs (A5). What is not ported yet is refused with a message naming it.
 
 use std::io::Write;
 use std::path::Path;
@@ -29,7 +29,7 @@ use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
 use larmorx_registration::initializer::{Feature, initialize};
 use larmorx_registration::mask::Mask;
-use larmorx_registration::transform::{Kind, LinearXfm, Xfm};
+use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Space};
 
 use super::TransformLoader;
@@ -221,11 +221,13 @@ pub fn main(
 
 /// Runs `antsRegistration` with images from `store`, ANTs' thread count `n_threads` (larmorx's
 /// result does not depend on it), the D13 mode `mode` and the value of `ANTS_RANDOM_SEED`.
+/// Transform files are read from disk in the registration's dimension (`_loader`, the other
+/// tools' 3D reader, is not used).
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     args: &[String],
     store: &mut dyn ImageStore,
-    loader: &dyn TransformLoader,
+    _loader: &dyn TransformLoader,
     n_threads: usize,
     mode: UpstreamDefects,
     env_seed: Option<String>,
@@ -235,15 +237,7 @@ pub fn run(
     let mut notices = Notices::new(mode);
     let code = {
         let mut log = Log::new(out, err, false);
-        match antsregistration(
-            args,
-            store,
-            loader,
-            n_threads,
-            &env_seed,
-            &mut log,
-            &mut notices,
-        ) {
+        match antsregistration(args, store, n_threads, &env_seed, &mut log, &mut notices) {
             Ok(code) | Err(code) => code,
         }
     };
@@ -277,7 +271,6 @@ pub fn run_store(
 fn antsregistration(
     args: &[String],
     store: &mut dyn ImageStore,
-    loader: &dyn TransformLoader,
     n_threads: usize,
     env_seed: &Option<String>,
     log: &mut Log<'_>,
@@ -414,7 +407,6 @@ fn antsregistration(
     let ctx = Context {
         p: &p,
         store,
-        loader,
         n_threads,
         env_seed,
         notices,
@@ -452,7 +444,6 @@ fn explain_out(log: &mut Log<'_>, message: &str) {
 struct Context<'a, 'n> {
     p: &'a Parsed,
     store: &'a mut dyn ImageStore,
-    loader: &'a dyn TransformLoader,
     n_threads: usize,
     env_seed: &'a Option<String>,
     notices: &'n mut Notices,
@@ -701,25 +692,133 @@ enum LoadError {
 }
 
 /// `itk::ants::ReadTransform` of `name`, flattened (a composite's transforms in order).
+///
+/// ITK's reader creates each stored transform in the dimension its class name gives; ANTs
+/// then `dynamic_cast`s it to a transform of the registration's dimension, which gives a null
+/// pointer for another dimension: "Can't read initial transform", with no other message.
 fn load_transform<R: Compute, const D: usize>(
     ctx: &mut Context<'_, '_>,
     name: &str,
 ) -> Result<Vec<Xfm<R, D>>, LoadError> {
-    if D != 3 {
-        return Err(LoadError::Unsupported(format!(
-            "initial transform files in {D} dimensions are not supported yet"
-        )));
+    let parts = larmorx_io::itk_transform::read_itk_transform_parts(
+        Path::new(name),
+        R::PRECISION,
+        ctx.notices,
+    )
+    .map_err(|e| match e.ants_report() {
+        Some(r) => LoadError::Report(r),
+        None => LoadError::Report(format!("{e}\n")),
+    })?;
+    // ITK's reader creates each transform by its class name, corrected to the reader's
+    // precision, through the factory: antsRegistration registers its own
+    // MatrixOffsetTransformBase on top of ITK's classes.
+    let lower = name.to_ascii_lowercase();
+    let io = if larmorx_io::itk_hdf5::can_read(Path::new(name)).is_ok() {
+        None
+    } else if lower.ends_with(".mat") {
+        Some("MatlabTransformIOTemplate")
+    } else if lower.ends_with(".txt") || lower.ends_with(".tfm") {
+        Some("TxtTransformIOTemplate")
+    } else {
+        None
+    };
+    if let Some(io) = io {
+        let (own, other) = match R::PRECISION {
+            Precision::Double => ("double", "float"),
+            Precision::Float => ("float", "double"),
+        };
+        let matrix_offset = format!("MatrixOffsetTransformBase_{own}_{D}_{D}");
+        for part in &parts {
+            let corrected = if part.name.contains(own) {
+                part.name.clone()
+            } else {
+                part.name.replacen(other, own, 1)
+            };
+            if let Some(f) =
+                larmorx_io::itk_hdf5::unregistered_class(name, io, &corrected, &matrix_offset)
+            {
+                return Err(LoadError::Report(f.ants_report));
+            }
+        }
     }
-    let t = ctx
-        .loader
-        .load_with(Path::new(name), R::PRECISION, ctx.notices)
-        .map_err(|e| match e.ants_report() {
-            Some(r) => LoadError::Report(r),
-            None => LoadError::Report(format!("{e}\n")),
-        })?;
+    let dimension = format!("_{D}_{D}");
+    if parts
+        .iter()
+        .any(|p| !p.name.ends_with(&dimension) && !p.name.is_empty())
+    {
+        return Err(LoadError::Report(String::new()));
+    }
+    if D != 3 {
+        return parts
+            .iter()
+            .filter(|p| !p.name.starts_with("CompositeTransform"))
+            .map(|p| xfm_from_part::<R, D>(name, p))
+            .collect();
+    }
+    let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
     let mut flat = Vec::new();
     flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
     Ok(flat)
+}
+
+/// One stored transform in 2 or 4 dimensions, as ITK's reader builds it (`SetParameters`,
+/// `SetFixedParameters`): the classes ITK's transform factory knows there and larmorx has
+/// (identity, translation, affine, matrix-offset; in 2D Euler, rigid and similarity).
+fn xfm_from_part<R: Compute, const D: usize>(
+    file: &str,
+    part: &ItkTransformParts,
+) -> Result<Xfm<R, D>, LoadError> {
+    let class = part.name.split('_').next().unwrap_or("");
+    let p: Vec<R> = match &part.parameters {
+        Parameters::F64(v) => v.iter().map(|&x| R::r(x)).collect(),
+        Parameters::F32(v) => v.iter().map(|&x| R::r(f64::from(x))).collect(),
+    };
+    let mismatch = |n: usize| {
+        LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {n} parameters expected, {} stored\n",
+            part.name,
+            p.len()
+        ))
+    };
+    let kind = match (class, D) {
+        ("IdentityTransform", _) => return Ok(Xfm::Identity),
+        ("TranslationTransform", _) => {
+            if p.len() < D {
+                return Err(mismatch(D));
+            }
+            return Ok(Xfm::Translation {
+                offset: std::array::from_fn(|i| p[i]),
+            });
+        }
+        ("AffineTransform", _) => Kind::Affine,
+        ("MatrixOffsetTransformBase", _) => Kind::MatrixOffset,
+        ("Euler2DTransform", 2) => Kind::Euler2D,
+        ("Rigid2DTransform", 2) => Kind::Rigid2D,
+        ("Similarity2DTransform", 2) => Kind::Similarity2D,
+        _ => {
+            return Err(LoadError::Unsupported(format!(
+                "{} transforms among the initial transforms are not supported yet in {D} dimensions",
+                part.name
+            )));
+        }
+    };
+    let n = kind.number_of_parameters(D);
+    if p.len() < n {
+        return Err(mismatch(n));
+    }
+    if part.fixed_parameters.len() < D {
+        return Err(LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {} fixed parameters, at least {D} expected\n",
+            part.name,
+            part.fixed_parameters.len()
+        )));
+    }
+    let mut x = LinearXfm::<R, D>::new(kind);
+    x.set_parameters(&p[..n])
+        .map_err(|e| LoadError::Report(e.print()))?;
+    x.set_center(std::array::from_fn(|i| R::r(part.fixed_parameters[i])));
+    x.extra_fixed = part.fixed_parameters[D..].to_vec();
+    Ok(Xfm::Linear(x))
 }
 
 fn flatten<R: Compute, const D: usize>(
@@ -767,7 +866,6 @@ fn flatten<R: Compute, const D: usize>(
     }
 }
 
-/// `GetInverseTransform()` of an initial transform.
 /// `CompositeTransform::Clone()` of the initial transforms (ANTs' `SetMovingInitialTransform`,
 /// `SetFixedInitialTransform`, `SetRestoreStateTransform`): each transform cloned through its
 /// parameters ([`Xfm::itk_clone`]).
@@ -781,6 +879,7 @@ fn itk_clones<R: Compute, const D: usize>(
         .collect()
 }
 
+/// `GetInverseTransform()` of an initial transform.
 fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
     match t {
         Xfm::Identity => Some(Xfm::Identity),
@@ -1190,11 +1289,32 @@ fn do_registration<R: Compute, const D: usize>(
     }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());
-    if helper.write_interval_volumes != 0 && D != 3 {
-        return Err(refuse(
-            log,
-            &format!("--write-interval-volumes in {D} dimensions is not supported yet"),
-        ));
+    if D != 3 && (!warped_name.is_empty() || !inverse_warped_name.is_empty()) {
+        // Only the linear and nearest-neighbour interpolators are ported outside 3D: refuse
+        // the others before the registration rather than after it.
+        if let Some(v) = function0(p, "interpolation") {
+            let name = v.name.to_lowercase();
+            let known_3d_only = [
+                "bspline",
+                "gaussian",
+                "cosinewindowedsinc",
+                "hammingwindowedsinc",
+                "lanczoswindowedsinc",
+                "blackmanwindowedsinc",
+                "welchwindowedsinc",
+                "genericlabel",
+                "multilabel",
+            ];
+            if known_3d_only.contains(&name.as_str()) {
+                return Err(refuse(
+                    log,
+                    &format!(
+                        "{} interpolation of the warped images is supported in 3D only, not yet in {D} dimensions (Linear and NearestNeighbor are)",
+                        v.name
+                    ),
+                ));
+            }
+        }
     }
     let done = match (&helper.metrics[0].fixed, &helper.metrics[0].moving) {
         (Some(f), Some(m)) if helper.write_interval_volumes != 0 => {
@@ -1471,9 +1591,31 @@ fn resample<R: Compute, const D: usize>(
     ctx: &mut Context<'_, '_>,
 ) -> Result<Vec<R>, String> {
     if D != 3 {
-        return Err(format!(
-            "warped images in {D} dimensions are not supported yet"
-        ));
+        use larmorx_registration::resample::{Interpolator, resample_linear};
+        let interpolator = match interpolation {
+            larmorx_interp::Interpolation::Linear => Interpolator::Linear,
+            larmorx_interp::Interpolation::NearestNeighbor => Interpolator::NearestNeighbor,
+            _ => {
+                return Err(format!(
+                    "this interpolation of the warped images is supported in 3D only, not yet in {D} dimensions"
+                ));
+            }
+        };
+        let floor = IndexFloor::new(ctx.notices.mode());
+        let composite = Composite::new(queue.to_vec());
+        let data = larmorx_core::parallel::with_threads(ctx.n_threads, || {
+            resample_linear(
+                input,
+                &reference.space,
+                &composite,
+                interpolator,
+                R::ZERO,
+                &floor,
+            )
+        })
+        .map_err(|e| e.to_string())?;
+        floor.notice(ctx.notices, "interpolated values");
+        return Ok(data);
     }
     let grid = |s: &Space<D>| {
         larmorx_core::Grid3::new(

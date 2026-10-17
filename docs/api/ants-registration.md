@@ -84,11 +84,11 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 | `-z 0/1` | `collapse_output_transforms=` | default 1 |
 | `-a 1` | `write_composite_transform=True` | `Composite.h5`, `InverseComposite.h5` |
 | `-i 1` | `initialize_transforms_per_stage=True` | needs `-a 1` and `-z 0` |
-| `-n Linear` | `interpolation="Linear"` | the warped images' interpolator, as `antsApplyTransforms -n` |
+| `-n Linear` | `interpolation="Linear"` | the warped images' interpolator, as `antsApplyTransforms -n`; in 2D and 4D `Linear` and `NearestNeighbor` only |
 | `--float 1` | `precision="float32"` | ANTs' single-precision pipeline |
 | `--random-seed N` / `ANTS_RANDOM_SEED` | `random_seed=N` | without one: ANTs from the clock, larmorx 121212 |
 | `--print-similarity-measure-interval N` | `print_similarity_measure_interval=N` | `RegistrationIteration.full_scale_value` |
-| `--write-interval-volumes N` | – | command line only; 3D only for now |
+| `--write-interval-volumes N` | – | command line only |
 | `-v 1` | `RegistrationResult.log`, `.iterations` | Python always runs verbose and parses the `DIAGNOSTIC` lines |
 | `--minc 1` | – | MINC transforms: not supported yet |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | the result does not depend on it |
@@ -98,5 +98,12 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 
 - Deformable stages (A5), point-set metrics (`ICP`, `PSE`, `JHCT`, `IGDM`), MINC transform
   files: refused with a message.
-- In 2D and 4D: initial transforms from files, warped images and interval volumes (refused);
-  displacement fields among the initial transforms.
+- In 2D and 4D, the warped images' `BSpline`, `Gaussian`, windowed-sinc, `GenericLabel` and
+  `MultiLabel` interpolators (3D has them all): refused before the registration runs.
+- Displacement fields among the initial transforms (`-r field.nii.gz`, or a composite holding
+  one), in any dimension.
+- Transform files of classes larmorx does not build in 2D and 4D (ITK's `CenteredRigid2D`,
+  `CenteredSimilarity2D`, `CenteredAffine`, `Scale`, B-spline transforms): refused. Files of the
+  classes antsRegistration writes (`AffineTransform`, `MatrixOffsetTransformBase`,
+  `Euler2DTransform`, `Rigid2DTransform`, `Similarity2DTransform`, `TranslationTransform`,
+  `IdentityTransform`) are read in every dimension.

@@ -101,7 +101,12 @@ crate `larmorx-hdf5`:
 - `Modules/Core/Common/src/itkExceptionObject.cxx` (`Print`, the report's layout);
 - ANTs v2.6.5 `Utilities/itkantsReadWriteTransform.h` (`ReadTransform`, `WriteTransform`: the
   messages and the composite flattening) and `Examples/antsApplyTransforms.cxx:536-539` (the
-  `MatrixOffsetTransformBase` it registers).
+  `MatrixOffsetTransformBase` it registers);
+- for `unregistered_class` (the factory's message for the MATLAB and text readers as well):
+  `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` and
+  `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (`CreateTransform` of the
+  precision-corrected name), and ANTs v2.6.5 `Examples/itkantsRegistrationHelper.h:1388-1396`
+  (the `MatrixOffsetTransformBase` antsRegistration registers for its dimension).
 
 `itk_transform_names.rs` lists the transform classes registered with ITK's factory in the ANTs
 2.6.5 build, copied from the oracle's own message for an unknown class.

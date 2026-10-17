@@ -1138,8 +1138,10 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("cli.ants.antsRegistration.dimensions", covers=("cli:ants antsRegistration",))
 def _(ctx: Context) -> dict[str, Any]:
-    """2D: a similarity then an ``ANTSCenteredAffine2DTransform`` (mean squares, dense); 4D: a
-    translation then an affine (4D interpolation's general path), collapsed."""
+    """2D: a similarity then an ``ANTSCenteredAffine2DTransform`` (mean squares, dense), then a
+    rigid stage from the inverted similarity file with the warped images (the 2D rotations'
+    own inverses, the scan-line resampler); 4D: a translation then an affine (4D
+    interpolation's general path), collapsed, with the nearest-neighbour warped image."""
     p2 = ctx.out("plane_")
     plane = ctx.file("plane.nii")
     cli(
@@ -1150,10 +1152,19 @@ def _(ctx: Context) -> dict[str, Any]:
         "-t", "CompositeAffine[0.1]", "-m", f"Mattes[{plane},{plane},1,10,Regular,0.5]",
         "-c", "[3,1e-6,3]", "-f", "2", "-s", "1vox", "--random-seed", "3",
     )  # fmt: skip
+    p2r = ctx.out("plane_rigid_")
+    w2, iw2 = ctx.out("plane_warped.nii"), ctx.out("plane_inverse_warped.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", f"[{p2r},{w2},{iw2}]",
+        "-r", f"[{p2}1Similarity.mat,1]",
+        "-t", "Rigid[0.1]", "-m", f"Mattes[{plane},{plane},1,10,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "4",
+    )  # fmt: skip
     p4 = ctx.out("bold_")
     bold = ctx.file("bold.nii")
+    w4 = ctx.out("bold_warped.nii")
     cli(
-        "ants", "antsRegistration", "-d", "4", "-o", p4,
+        "ants", "antsRegistration", "-d", "4", "-o", f"[{p4},{w4}]", "-n", "NearestNeighbor",
         "-t", "Translation[0.1]", "-m", f"MeanSquares[{bold},{bold},1,0,Random,0.5]",
         "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
         "-t", "Affine[0.1]", "-m", f"Mattes[{bold},{bold},1,8,Regular,0.5]",
@@ -1162,7 +1173,11 @@ def _(ctx: Context) -> dict[str, Any]:
     return {
         "2d.similarity": File(p2 + "1Similarity.mat"),
         "2d.composite_affine": File(p2 + "2Affine.mat"),
+        "2d.rigid": File(p2r + "0GenericAffine.mat"),
+        "2d.warped": Nifti(w2),
+        "2d.inverse_warped": Nifti(iw2),
         "4d.affine": File(p4 + "0GenericAffine.mat"),
+        "4d.warped": Nifti(w4),
     }
 
 

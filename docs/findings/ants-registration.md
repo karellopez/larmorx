@@ -128,7 +128,31 @@ last bits when the matrix rotates and the centre is not 0. larmorx clones the sa
 
 The warped images (`GetWarpedImage`, `GetInverseWarpedImage`, `itkantsRegistrationHelper.hxx:720-763`)
 use the moving composite alone (and its inverse), not the fixed initial transform; each linear
-transform maps with its matrix and offset as they are.
+transform maps with its matrix and offset as they are. `ResampleImageFilter` takes its
+scan-line path (`LinearThreadedGenerateData`, `itkResampleImageFilter.hxx:432-510`): per output
+line, the continuous input indices of its first voxel and of the voxel one past its end (the
+output point in double, the transform in `R`, the index in `R`), and each voxel at
+`start + α·(end − start)`, `α = (i − first)/size` in double, stored in `R`
+(`larmorx_registration::resample`, used in 2D and 4D; 3D goes through `antsApplyTransforms`'
+resampler, which computes the same).
+
+**The 2D rotations invert to their own class.** `Rigid2DTransform`, `Euler2DTransform` and
+`Similarity2DTransform` override `GetInverse` (`itkRigid2DTransform.hxx:137-150`,
+`itkEuler2DTransform.hxx:48-61`, `itkSimilarity2DTransform.hxx:237-256`): the same centre, the
+angle negated (the scale `1.0/scale`), the translation `−(M⁻¹·t)`, and the matrix recomputed
+from the angle with `cos`/`sin`. So a 2D `-r [rigid.mat,1]`, or the inverse-warped image of a 2D
+rigid registration, uses that transform, not the inverted matrix that every 3D class and
+`AffineTransform` give (which differs in the last bits).
+
+**Transform files are read in the registration's dimension.** ITK's reader creates each stored
+transform through its factory, by the class name with its precision corrected to the reader's
+(`CorrectTransformPrecisionType`); a class the factory does not know (ANTs' own
+`ANTSCenteredAffine2DTransform`, which `CompositeAffine` writes with `-z 0` in 2D, and
+`ANTSAffine3DTransform` in 3D) is ITK's "Could not create an instance" exception, whose list of
+known classes includes the `MatrixOffsetTransformBase` antsRegistration registers for its own
+dimension (`itkantsRegistrationHelper.h:1388-1396`). A transform of another dimension is read,
+then `dynamic_cast` to the registration's transform type gives a null pointer
+(`itkantsReadWriteTransform.h`): only "Can't read initial transform" (with `-v`), exit 1.
 
 ## Outputs
 

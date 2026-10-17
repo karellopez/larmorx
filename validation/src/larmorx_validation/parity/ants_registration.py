@@ -707,6 +707,7 @@ def all_cases() -> list[RegCase]:
             "larmorx writes the same files up to there and stops with an error",
         ),
     ]
+    cases.extend(_dimension_cases())
     # Outputs.
     for interp in (
         "NearestNeighbor",
@@ -766,7 +767,7 @@ def all_cases() -> list[RegCase]:
         reg(
             f"{E}/missing-image",
             E,
-            "a metric image that does not exist",
+            "a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02)",
             *stage("Rigid[0.1]", mattes(m="{missing:none.nii.gz}")),
             expect="error",
         ),
@@ -909,13 +910,61 @@ def _fmriprep_args(spec: str, out: Path) -> list[str]:
     return [*args, "-v", "1"]
 
 
+#: The 2D and 4D transform files the cases start from: class, parameters, fixed parameters.
+_TRANSFORMS_ND: dict[str, tuple[str, list[float], list[float]]] = {
+    "affine-2d.mat": ("AffineTransform_double_2_2", [1.01, 0.02, -0.03, 0.99, 1.5, -0.5], [2, -1]),
+    "euler-2d.txt": ("Euler2DTransform_double_2_2", [0.05, 1.0, -2.0], [1.0, 0.5]),
+    "rigid-2d.mat": ("Rigid2DTransform_double_2_2", [-0.04, 0.5, 1.0], [0.0, 1.0]),
+    "similarity-2d.mat": ("Similarity2DTransform_double_2_2", [1.03, 0.06, -1.0, 0.5], [1.5, -0.5]),
+    "translation-2d.txt": ("TranslationTransform_double_2_2", [0.75, -1.25], []),
+    "centered-affine-2d.mat": (
+        "ANTSCenteredAffine2DTransform_double_2_2",
+        [0.05, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0],
+        [],
+    ),
+    "affine-4d.mat": (
+        "AffineTransform_double_4_4",
+        # The matrix row by row, then the translation.
+        [
+            1.01,
+            0.01,
+            0.0,
+            0.0,
+            -0.02,
+            0.99,
+            0.01,
+            0.0,
+            0.0,
+            0.01,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            -1.0,
+            0.5,
+            0.0,
+        ],
+        [1.0, 2.0, 0.0, 0.0],
+    ),
+}
+
+
 def _transform_file(tmp: Path, name: str) -> Path:
-    """A transform file the cases start from: a rigid motion with a centre, as an
-    ``AffineTransform`` in MATLAB format."""
+    """A transform file the cases start from: ``initial.mat``, a rigid motion with a centre as
+    an ``AffineTransform`` in MATLAB format; or one of :data:`_TRANSFORMS_ND`."""
     import larmorx as lx
 
     path = tmp / name
     if not path.exists():
+        if name in _TRANSFORMS_ND:
+            cls, params, fixed = _TRANSFORMS_ND[name]
+            lx.transforms.write(
+                path, lx.transforms.ItkTransform(cls, np.array(params), np.array(fixed, float))
+            )
+            return path
         th = np.deg2rad(4.0)
         matrix = np.array([[np.cos(th), -np.sin(th), 0], [np.sin(th), np.cos(th), 0], [0, 0, 1]])
         params = np.concatenate([matrix.ravel(), [2.0, -1.5, 1.0]])
@@ -923,6 +972,158 @@ def _transform_file(tmp: Path, name: str) -> Path:
             path, lx.transforms.ItkTransform("AffineTransform_double_3_3", params, [1.0, -2.0, 0.5])
         )
     return path
+
+
+def _dimension_cases() -> list[RegCase]:
+    """2D and 4D: the warped images, interval volumes, composites and transform files."""
+    D2, D4 = "dimensions-2d", "dimensions-4d"
+    short = {"c": "[6x4,1e-6,5]"}
+    one = {"c": "[4,1e-6,5]", "f": "1", "s": "0"}
+
+    def case2(name: str, description: str, *args: str, t: str = "Rigid[0.1]", st=short, **kw):
+        return reg(
+            f"{D2}/{name}", D2, description, *args, *stage(t, mattes(F2, M2), **st), d="2", **kw
+        )
+
+    def case4(name: str, description: str, *args: str, t: str = "Affine[0.1]", st=short, **kw):
+        return reg(
+            f"{D4}/{name}", D4, description, *args, *stage(t, mattes(F4, M4), **st), d="4", **kw
+        )
+
+    def tf(name: str, inverse: bool = False) -> str:
+        return f"[{{gen-transform:{name}}},1]" if inverse else f"{{gen-transform:{name}}}"
+
+    return [
+        case2("warped", "the warped and inverse-warped images (linear)"),
+        case2("warped-nearest", "-n NearestNeighbor", "-n", "NearestNeighbor", t="Affine[0.1]"),
+        case2("warped-float", "Similarity, --float 1", "--float", "1", t="Similarity[0.1]"),
+        case2("fixed-initial", "-q [fixed,moving,1]", "-q", f"[{F2},{M2},1]", t="Affine[0.1]"),
+        case2(
+            "file-affine", "-r an AffineTransform file", "-r", tf("affine-2d.mat"), t="Affine[0.1]"
+        ),
+        case2(
+            "file-affine-inverted", "-r [AffineTransform file,1]", "-r", tf("affine-2d.mat", True)
+        ),
+        case2(
+            "file-euler",
+            "-r a text Euler2DTransform file, -z 0",
+            "-z",
+            "0",
+            "-r",
+            tf("euler-2d.txt"),
+            t="Affine[0.1]",
+        ),
+        case2(
+            "file-euler-inverted",
+            "-r [Euler2DTransform,1]: its own inverse class",
+            "-r",
+            tf("euler-2d.txt", True),
+            t="Affine[0.1]",
+        ),
+        case2(
+            "file-rigid2d",
+            "-r a Rigid2DTransform file, -z 0 -a 1",
+            "-z",
+            "0",
+            "-a",
+            "1",
+            "-r",
+            tf("rigid-2d.mat"),
+            t="Affine[0.1]",
+            out=PRE,
+        ),
+        case2(
+            "file-similarity-inverted",
+            "-r [Similarity2DTransform,1], --float 1",
+            "--float",
+            "1",
+            "-r",
+            tf("similarity-2d.mat", True),
+            t="Affine[0.1]",
+        ),
+        case2(
+            "file-translation",
+            "-r a TranslationTransform file",
+            "-r",
+            tf("translation-2d.txt"),
+            t="Rigid[0.1]",
+        ),
+        case2(
+            "file-unregistered",
+            "-r an ANTSCenteredAffine2DTransform file: ITK's factory does not know the class",
+            "-r",
+            tf("centered-affine-2d.mat"),
+            t="Affine[0.1]",
+            expect="error",
+        ),
+        case2(
+            "file-3d",
+            "-r a 3D transform in a 2D registration",
+            "-r",
+            tf("initial.mat"),
+            t="Affine[0.1]",
+            expect="error",
+        ),
+        case2(
+            "composite",
+            "-a 1 with -r [fixed,moving,1]",
+            "-a",
+            "1",
+            "-r",
+            f"[{F2},{M2},1]",
+            t="Affine[0.1]",
+        ),
+        case2(
+            "interval-volumes",
+            "--write-interval-volumes 2",
+            "--write-interval-volumes",
+            "2",
+            st=one,
+            out=PRE,
+        ),
+        case2(
+            "warped-bspline",
+            "-n BSpline[3] in 2D",
+            "-n",
+            "BSpline[3]",
+            st=one,
+            expect="divergence",
+            reason="larmorx ports the warped images' B-spline, Gaussian, windowed-sinc and label "
+            "interpolators in 3D only; in 2D and 4D it refuses them before the registration",
+        ),
+        case4("warped", "the warped and inverse-warped images (linear)"),
+        case4(
+            "warped-nearest-float",
+            "-n NearestNeighbor, --float 1",
+            "-n",
+            "NearestNeighbor",
+            "--float",
+            "1",
+            t="Translation[0.1]",
+        ),
+        case4(
+            "file-affine-inverted", "-r [AffineTransform file,1]", "-r", tf("affine-4d.mat", True)
+        ),
+        case4(
+            "composite-z0",
+            "-a 1 -z 0 -r [fixed,moving,0]",
+            "-a",
+            "1",
+            "-z",
+            "0",
+            "-r",
+            f"[{F4},{M4},0]",
+            t="Rigid[0.1]",
+        ),
+        case4(
+            "interval-volumes",
+            "--write-interval-volumes 1",
+            "--write-interval-volumes",
+            "1",
+            st={"c": "[3,1e-6,5]", "f": "1", "s": "0"},
+            out=PRE,
+        ),
+    ]
 
 
 def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
@@ -1015,7 +1216,9 @@ def _normalise(text: str, out: Path) -> list[str]:
             r"(Modified Time|UpdateMTime|PipelineMTime|Reference Count): \d+", r"\1: N", line
         )
         line = re.sub(
-            r"File: \S*?/(Modules|Utilities|Examples|ImageRegistration)/", r"File: \1/", line
+            r"File: (?:<ITK source>|\S*?)/(Modules|Utilities|Examples|ImageRegistration)/",
+            r"File: \1/",
+            line,
         )
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
         if "DIAGNOSTIC," in line and not line.startswith("DIAGNOSTIC"):

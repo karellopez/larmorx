@@ -64,7 +64,14 @@ files written by larmorx read back by ANTs 2.6.5 (`antsApplyTransforms` gives th
 as with ANTs' own file), h5py and nitransforms; the bytes compared with ITK's own output where
 HDF5 allows (object times may differ; say what differs). Golden cases on all six platforms.
 
-## 2. A4, part 2: `antsRegistration`, the linear stages
+## 2. A4, part 2: `antsRegistration`, the linear stages (done 2026-10-17, merged `c6fdd61`)
+
+Done, with `antsApplyTransforms`' transform outputs and the HDF5 golden fixtures: crate
+`larmorx-registration` (ITK's v4 framework), `lx.ants.registration`, `larmorx ants antsRegistration`;
+`docs/validation/ants-registration.md` (166 standard / 175 full cases, 0 failures, 102 bit-identical to
+the unmodified ANTs, the rest only through glibc's maths). Refused, with messages: the point-set
+metrics (part 4 below), displacement fields among the initial transforms (A5), MINC transform
+files (the oracle cannot read them either). The original scope, kept for reference:
 
 **Scope (full completeness):** the whole command line parsed and checked as ANTs does (every
 option; the deformable transforms accepted by the parser and implemented in A5); the
@@ -88,6 +95,14 @@ metrics' threaded sums make results depend on the thread count) before any thres
 
 Every option of both programs (`antsAffineInitializer` was added to the oracle on
 2026-10-12), with sMRIPrep's and niworkflows' calls as regression cases.
+
+## 3b. A4, part 4: `antsRegistration`'s point-set metrics
+
+ICP, PSE, JHCT, IGDM (about 3,800 lines of ITK/ANTs C++: ITK's exact kd-tree, the point-set
+readers for label images, VTK and text, ANTs' intensity point-set filter), so `antsRegistration` is
+complete. Below 100 % sampling ANTs seeds point sampling from the clock: compare what can be
+compared. **The next agent's brief covers parts 3 and 4 together** (part 3 first); a copy is in
+the session scratchpad (`brief-a43.md`), and this file and CLAUDE.md hold its substance.
 
 ## 4. A5: `antsRegistration`'s deformable stages; A6: Atropos
 

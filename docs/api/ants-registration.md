@@ -23,8 +23,12 @@ line, standard error, every file), most against the unmodified binary, the rest 
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
-| standard | 166 | 102 | 24 | 31 | 9 | 0 |
+| standard | 168 | 104 | 24 | 31 | 9 | 0 |
 | full | 175 | 102 | 33 | 31 | 9 | 0 |
+
+The standard record was re-run by A4 part 3 (2026-10-17), with two cases of the gradient filter
+on oblique grids (its float components, [findings](../findings/ants-ai.md)); the full record
+predates them.
 
 The cases cover every transform in 2D, 3D and 4D, double and float, every metric and sampling,
 masks, the initial transforms and their files, every output and interpolator, every

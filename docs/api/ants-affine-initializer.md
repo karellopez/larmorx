@@ -13,8 +13,16 @@ given no initial transform (fMRIPrep's template registration).
 [validation record](../validation/ants-affine-initializer.md), standard tier): every compared
 case identical to ANTs 2.6.5 at one thread (exit status, both streams, the transform file byte
 for byte), including the usage, every abort and its messages, 2D, 3D and 4D, masks, oblique
-grids and real images (the MNI template and fMRIPrep's preprocessed T1w). The counts are in
-the record.
+grids and real images (the MNI template and fMRIPrep's preprocessed T1w).
+
+| Tier | Cases | Identical to the unmodified ANTs | Rejected by both | Expected divergences | Failures |
+|---|---|---|---|---|---|
+| standard | 38 | 23 | 13 | 2 | 0 |
+
+"Rejected by both" includes the aborts (everything ANTs printed before it stopped is
+identical); the expected divergences are the two search factors whose loop never ends in ANTs.
+**ANTs' own thread band** (4 cases): up to 1e-6 in a parameter on the MNI template,
+1e-15 on the phantoms; larmorx gives the one-thread result at any thread count.
 
 **Results do not depend on threads.** larmorx gives ANTs' one-thread result at any thread
 count.

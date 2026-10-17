@@ -104,7 +104,11 @@ float image computes each derivative image in float (`NumericTraits<double>::Flo
 then the direction cosines are applied in double. With power-of-two spacings this is invisible;
 on a 1.5 × 1.2 × 2 mm grid every component differs from the unrounded quotient
 (`GradientRecursiveGaussianImageFilter.hxx:263-273`, `.h:98`; verified against ITK on the
-oblique phantom, 2026-10-17).
+oblique phantom, 2026-10-17). `antsRegistration`'s metrics run the same filter when their
+gradient-filter flag is set; A4 part 2's port divided in double without the rounding, which its
+2 mm phantoms could not show: corrected on 2026-10-17, with two oblique cases
+(`metrics/*-gradient-filter-oblique` in the ants-registration record) and a changed golden
+checksum (`cli.ants.antsRegistration.metrics`, its composite-affine stage).
 
 ### The start points
 

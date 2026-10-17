@@ -69,7 +69,8 @@ HDF5 allows (object times may differ; say what differs). Golden cases on all six
 Done, with `antsApplyTransforms`' transform outputs and the HDF5 golden fixtures: crate
 `larmorx-registration` (ITK's v4 framework), `lx.ants.registration`, `larmorx ants antsRegistration`;
 `docs/validation/ants-registration.md` (166 standard / 175 full cases, 0 failures, 102 bit-identical to
-the unmodified ANTs, the rest only through glibc's maths). Refused, with messages: the point-set
+the unmodified ANTs, the rest only through glibc's maths; 168 standard, 104 bit-identical, since A4
+part 3's gradient-filter correction). Refused, with messages: the point-set
 metrics (part 4 below), displacement fields among the initial transforms (A5), MINC transform
 files (the oracle cannot read them either). The original scope, kept for reference:
 

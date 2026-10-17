@@ -27,6 +27,13 @@ linear stage, found while porting them (milestone A4, part 2). File names are at
   collapsing, then a crash); and ANTS-46 (an "early stop") explained as ITK's design. All in the
   [register](upstream-defects.md).
 
+- **The gradient filter's components are floats** (found by A4 part 3, 2026-10-17):
+  `GradientRecursiveGaussianImageFilter` stores each derivative through
+  `NthElementImageAdaptor<_, float>`, so the quotient by the spacing is rounded to float before
+  the direction cosines are applied in double ([ants-ai.md](ants-ai.md), "The moving image's
+  gradient"). It shows only where a spacing is not a power of two; the oblique cases
+  `metrics/*-gradient-filter-oblique` check it.
+
 ## The pipeline of one stage
 
 `DoRegistration` (`itkantsRegistrationHelper.hxx`) builds an `ImageRegistrationMethodv4` per

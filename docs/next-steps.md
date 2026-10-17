@@ -69,7 +69,8 @@ HDF5 allows (object times may differ; say what differs). Golden cases on all six
 Done, with `antsApplyTransforms`' transform outputs and the HDF5 golden fixtures: crate
 `larmorx-registration` (ITK's v4 framework), `lx.ants.registration`, `larmorx ants antsRegistration`;
 `docs/validation/ants-registration.md` (166 standard / 175 full cases, 0 failures, 102 bit-identical to
-the unmodified ANTs, the rest only through glibc's maths). Refused, with messages: the point-set
+the unmodified ANTs, the rest only through glibc's maths; 168 standard, 104 bit-identical, since A4
+part 3's gradient-filter correction). Refused, with messages: the point-set
 metrics (part 4 below), displacement fields among the initial transforms (A5), MINC transform
 files (the oracle cannot read them either). The original scope, kept for reference:
 
@@ -91,10 +92,15 @@ thread as the target; the registration settings fMRIPrep, sMRIPrep and sdcflows 
 on real data from the oracle runs; ANTs' own variability with threads measured (whether its
 metrics' threaded sums make results depend on the thread count) before any threshold is set.
 
-## 3. A4, part 3: `antsAI` and `antsAffineInitializer`
+## 3. A4, part 3: `antsAI` and `antsAffineInitializer` (done 2026-10-17, branch `worktree-agent-a00b4c84605ebf2d7`, not merged yet)
 
-Every option of both programs (`antsAffineInitializer` was added to the oracle on
-2026-10-12), with sMRIPrep's and niworkflows' calls as regression cases.
+Both programs ported (`larmorx_ants::ai`, `larmorx_ants::affine_initializer`, `lx.ants.ai`,
+`lx.ants.affine_initializer`), with every option but `antsAI -b` (blob alignment, refused with a
+message; what its port needs is in `docs/findings/ants-ai.md`, "Blobs": ANTs' blob detector,
+patch correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`).
+Parity records `docs/validation/ants-ai.md` and `ants-affine-initializer.md` (fMRIPrep's own
+`init_aff` command lines with fMRIPrep's seed; niworkflows' `antsAffineInitializer` call on
+stand-ins). Register: ANTS-52 to ANTS-60, ITK-19 to ITK-21. To decide: ANTS-54, ITK-21.
 
 ## 3b. A4, part 4: `antsRegistration`'s point-set metrics
 
@@ -160,6 +166,12 @@ Still to do:
   deflate (one to two days) would make them match the oracle's build only. Skipped for now.
 
 ## Waiting for the user
+
+- **ANTS-54** (antsAffineInitializer ignores its local-search argument; niworkflows passes 10,
+  ANTs runs 20) and **ITK-21** (its learning rate carried from one start point to the next):
+  correct by default, or keep ANTs' behaviour?
+- **`antsAI -b`** (blob alignment): port it (Eigen's eigen-solver and LINPACK's QR included) or
+  leave it refused; fMRIPrep does not use it.
 
 - **PIPE-16** (for larmorprepx): nipype's N4 interface writes the corrected field-map
   reference in the input's int16 type (re-quantized, up to 0.3 % at the dimmest voxels). Keep

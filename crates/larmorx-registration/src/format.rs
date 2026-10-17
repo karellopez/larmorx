@@ -134,6 +134,19 @@ pub fn itk_array<R: larmorx_core::ItkReal>(values: &[R]) -> String {
     format!("[{}]", parts.join(", "))
 }
 
+/// `operator<<` of an `itk::Matrix<double>` (`vnl_matrix_fixed::print`): each row's entries
+/// separated by a blank (the default stream format), each row ended by a new line.
+pub fn itk_matrix<const R: usize, const C: usize>(m: &[[f64; C]; R]) -> String {
+    let os = OStream::default();
+    let mut s = String::new();
+    for row in m {
+        let parts: Vec<String> = row.iter().map(|&v| os.float(v)).collect();
+        s.push_str(&parts.join(" "));
+        s.push('\n');
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -215,6 +215,13 @@ def plane() -> lx.Image:
 
 
 @functools.cache
+def plane2() -> lx.Image:
+    """A second 2D image on the plane's grid (another seed, shifted one pixel)."""
+    v = (phantom(SHAPE2, 12, shift=1) * 3 + ints(13, SHAPE2, 0, 7)) / 4 + 0.25
+    return _frozen(plane().with_data(v.astype(np.float32)))
+
+
+@functools.cache
 def bold() -> lx.Image:
     """4D float32 (16 × 14 × 12 × 4, TR 2 s) on an oblique 3 mm grid: one volume moved by
     fractions of a voxel (weighted averages of shifted copies) and noise."""
@@ -401,6 +408,7 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "mask.nii": lambda p: lx.save(mask(), p),
     "labels.nii": lambda p: lx.save(labels(), p),
     "plane.nii": lambda p: lx.save(plane(), p),
+    "plane2.nii": lambda p: lx.save(plane2(), p),
     "plane_mask.nii": lambda p: lx.save(
         plane().with_data(ellipsoid(SHAPE2, 3, 5).astype(np.uint8)), p
     ),
@@ -1215,6 +1223,111 @@ def _(ctx: Context) -> dict[str, Any]:
         upstream_defects="reproduce",
     )  # fmt: skip
     return {"rigid": File(prefix + "0GenericAffine.mat")}
+
+
+@case("cli.ants.antsAI", covers=("cli:ants antsAI",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``antsAI``'s paths: a rigid search from the principal axes with Mattes on regularly
+    sampled points and a fixed mask; the centres of mass (a text file); an affine search with
+    the joint-histogram MI and a translation grid; a similarity search with global
+    correlation; a 2D rigid search over every pixel. Few start points (90-degree steps over a quarter turn)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    files = {
+        "rigid": ctx.out("rigid.mat"),
+        "mass": ctx.out("mass.txt"),
+        "affine": ctx.out("affine.mat"),
+        "similarity": ctx.out("similarity.mat"),
+        "rigid_2d": ctx.out("rigid2d.mat"),
+    }
+    search = ("-s", "[90,0.25]", "-c", "[2,1e-6,3]")
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"Mattes[{a},{b},16,Regular,0.5]", "-x", m,
+        "-t", "Rigid[0.1]", "-p", "1", *search, "-o", files["rigid"],
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"Mattes[{a},{b}]", "-t", "AlignCentersOfMass",
+        "-o", files["mass"],
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"MI[{a},{b},12,Regular,0.5]", "-t", "Affine[0.1]",
+        *search, "-g", "[2,2x0x0]", "-o", files["affine"],
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"GC[{a},{b},0,Regular,0.5]",
+        "-t", "Similarity[0.1]", "-s", "[180,0.5]", "-c", "[2,1e-6,3]",
+        "-o", files["similarity"],
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "2", "-m",
+        f"Mattes[{ctx.file('plane.nii')},{ctx.file('plane2.nii')},12]", "-t", "Rigid[0.1]",
+        "-s", "[45,0.5]", "-c", "[2,1e-6,3]", "-o", files["rigid_2d"],
+    )  # fmt: skip
+    return {name: File(path) for name, path in files.items()}
+
+
+@case("cli.ants.antsAI.reproduce", covers=("cli:ants antsAI",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defects reproduced: a 3D similarity search whose translation grid is ignored
+    (ANTS-52), and an alignment given iterations, which writes an empty transform file
+    (ANTS-53)."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    similarity, empty = ctx.out("similarity.mat"), ctx.out("empty.mat")
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"Mattes[{a},{b},16,Regular,0.5]",
+        "-t", "Similarity[0.1]", "-s", "[180,0.5]", "-c", "[2,1e-6,3]", "-g", "[2,2x0x0]",
+        "-o", similarity, upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "3", "-m", f"Mattes[{a},{b}]", "-t", "AlignGeometricCenters",
+        "-c", "2", "-o", empty, upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    return {"similarity": File(similarity), "empty": File(empty)}
+
+
+@case("cli.ants.antsAffineInitializer", covers=("cli:ants antsAffineInitializer",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``antsAffineInitializer``: a 3D search from the principal axes with a fixed mask; a 2D
+    search; the 4D path (the initial alignment only)."""
+    files = {"3d": ctx.out("init3d.mat"), "2d": ctx.out("init2d.mat"), "4d": ctx.out("init4d.mat")}
+    cli(
+        "ants", "antsAffineInitializer", "3", ctx.file("anat.nii"), ctx.file("anat2.nii"),
+        files["3d"], "45", "0.25", "1", "20", ctx.file("mask.nii"),
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
+        files["2d"], "30", "0.5", "0",
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "4", ctx.file("bold.nii"), ctx.file("bold.nii"),
+        files["4d"], "10", "0.1", "1",
+    )  # fmt: skip
+    return {name: File(path) for name, path in files.items()}
+
+
+@case("py.ants.ai", covers=("lx.ants.ai",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.ai``: an in-memory moving image, a rigid search with a translation grid and
+    the parsed metric values."""
+    res = lx.ants.ai(
+        ctx.file("anat.nii"), anat2(), transform="Rigid", bins=12, sampling="Regular",
+        sampling_percentage=0.5, search_factor=90, arc_fraction=0.25,
+        translation_search_grid=(2, (2, 0, 0)), iterations=2, convergence_window=3,
+    )  # fmt: skip
+    return {
+        "parameters": res.transform.parameters,
+        "fixed": res.transform.fixed_parameters,
+        "values": np.array(res.values, dtype=np.float64),
+        "best": res.best_value,
+    }
+
+
+@case("py.ants.affine_initializer", covers=("lx.ants.affine_initializer",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.affine_initializer``: in-memory images, from the principal axes."""
+    t = lx.ants.affine_initializer(
+        anat(), anat2(), search_factor=45, radian_fraction=0.25, principal_axes=True
+    )
+    return {"parameters": t.parameters, "fixed": t.fixed_parameters}
 
 
 @case("cli.ants.antsApplyTransforms.outputs", covers=("cli:ants antsApplyTransforms",))

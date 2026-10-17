@@ -16,6 +16,10 @@ reproduces the original copyright and MIT notice.
 | `math/log.rs`, `math/dint.rs` | `src/binary64/log/log.c` (`922af9ae4b4b…`), `src/binary64/log/dint.h` (`0da80a15d311…`) | 0 mismatches against mpmath on 1.36 M inputs (all of `log.wc`, plus every input forced through the accurate path); bit-identical to the C on every non-NaN result |
 | `math/expf.rs` | `src/binary32/exp/expf.c` (`598f2e509a12…`) | bit-identical to the C (gcc 11, `-ffp-contract=off`) on all 2^32 inputs; a unit test checks a checksum of every 4099th input, an ignored one of all inputs |
 | `math/logf.rs` | `src/binary32/log/logf.c` (`92c878fb172d…`) | as for `expf` |
+| `math/asin.rs` | `src/binary64/asin/asin.c` (`08c4d31ad429…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 249,150 cases of `asin.wc` and about 300,000 random inputs (uniform, near ±1, tiny, random bits, rotation-matrix entries), 2026-10-17 |
+| `math/acos.rs` | `src/binary64/acos/acos.c` (`ecd617383721…`) | as for `asin`, with `acos.wc` (264,123 cases) |
+| `math/atan2.rs` | `src/binary64/atan2/atan2.c` (`404b0db90e53…`), `src/binary64/atan2/tint.h` (`41264d54812a…`) | bit-identical to the C on all of `atan2.wc` (signalling NaNs aside, which C's `strtod` cannot read) and 300,000 random pairs (random bits, comparable magnitudes, exponent differences of 40 to 70, rotation angles) |
+| `math/cbrt.rs` | `src/binary64/cbrt/cbrt.c` (`0a86b7a8f433…`) | bit-identical to the C on all of `cbrt.wc` and 300,000 random inputs; round to nearest only (the directed-rounding branches dropped) |
 | `math/sinf.rs` (`sinf`, `cosf`) | `src/binary32/sin/sinf.c` (`f27c4baa849b…`), `src/binary32/cos/cosf.c` (`3ea4c6d03d32…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 2^32 inputs of each; unit tests check checksums of every 4099th input, an ignored one of all inputs |
 
 Differences from the C code, all without effect on the result in round-to-nearest:
@@ -69,3 +73,28 @@ B-spline prefilter (`larmorx_interp::ndimage`). Verified against exact rational 
 with `n` = 0 to 2,599, through underflow and overflow: 0 mismatches. glibc 2.35's `pow`
 differs from the exact value in 6 of them, all below 1e-100
 (`docs/findings/scipy-ndimage.md`).
+
+## vnl's eigensystems (`src/vnl_eigen.rs`)
+
+**Ported** from VXL as bundled with ITK v5.4.5 (BSD; EISPACK from netlib), for ITK's
+`ImageMomentsCalculator` and ANTs' `antsAI` (A4 part 3):
+- `core/vnl/algo/vnl_symmetric_eigensystem.hxx` (`vnl_symmetric_eigensystem_compute`: the
+  row-major data handed to Fortran as it is, so EISPACK reads the transpose);
+- `core/vnl/algo/vnl_real_eigensystem.cxx` (the eigenvalues; a complex pair copied as
+  `(wr[c], ±wi[c])`);
+- `v3p/netlib/eispack/{rs,tred2,tql2,pythag}.c` and `{rg,balanc,elmhes,hqr2}.c` (the
+  eigenvalue part of `hqr2`, with every update of the Hessenberg matrix it makes; `eltran`,
+  the eigenvector accumulation and back-substitution and `balbak` do not change the
+  eigenvalues and are not ported).
+
+Bit-identical to the oracle's VNL (ITK 5.4.5 as built for `oracles/ants-2.6.5`, GCC 14.3) on
+21,000 cases (2×2 to 4×4): symmetric matrices exact and symmetric only up to rounding (as
+`ImageMomentsCalculator` forms them), diagonal ones with repeated eigenvalues, the orthogonal
+matrices of their eigenvectors, general matrices and signed permutations, with the product of
+the eigenvalues as `std::complex<double>` (a scratch harness linking the oracle's libraries).
+
+## vnl's closed-form determinants and inverses (`src/vnl_fixed.rs`)
+
+**Ported** from the same VXL: `core/vnl/vnl_det.hxx`, `core/vnl/algo/vnl_determinant.hxx`
+(1 to 4 rows), `core/vnl/vnl_inverse.h` (2×2 to 4×4). Bit-identical to the oracle's VNL in the
+same comparison (`vnl_svd` of a sum of outer products, `V·Uᵀ`, its inverse and determinant).

@@ -27,6 +27,21 @@ linear stage, found while porting them (milestone A4, part 2). File names are at
   collapsing, then a crash); and ANTS-46 (an "early stop") explained as ITK's design. All in the
   [register](upstream-defects.md).
 
+- **The gradient filter's components are floats** (found by A4 part 3, 2026-10-17):
+  `GradientRecursiveGaussianImageFilter` stores each derivative through
+  `NthElementImageAdaptor<_, float>`, so the quotient by the spacing is rounded to float before
+  the direction cosines are applied in double ([ants-ai.md](ants-ai.md), "The moving image's
+  gradient"). It shows only where a spacing is not a power of two; the oblique cases
+  `metrics/*-gradient-filter-oblique` check it.
+
+- **Known message gap** (found by A4 part 3, 2026-10-17): with a constant fixed image
+  (`reg-constant`, 100 everywhere) the Mattes joint histogram's spacing comes out NaN (the 2 × 2
+  matrix vnl prints has NaN entries; the cause was not traced); ITK accepts it
+  (only zero and negative spacings throw, ITK-20) and `ComputeIndexToPhysicalPointMatrices`
+  inverts a NaN matrix: vnl's SVD prints "suspicious return value (2) from SVDC", "M is 2x2" and
+  the matrix (`vnl_matlab_print`) on standard error. larmorx gives the same transform but does
+  not print these lines (verified, 2026-10-17).
+
 ## The pipeline of one stage
 
 `DoRegistration` (`itkantsRegistrationHelper.hxx`) builds an `ImageRegistrationMethodv4` per

@@ -269,6 +269,8 @@ fn ants_program<'py>(
         "ResampleImage" => larmorx_ants::cli::resample_image::run,
         "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
         "antsRegistration" => larmorx_ants::cli::registration::run_store,
+        "antsAI" => larmorx_ants::cli::ai::run_store,
+        "antsAffineInitializer" => larmorx_ants::cli::affine_initializer::run,
         other => {
             return Err(PyValueError::new_err(format!(
                 "unknown ANTs image program {other:?}"

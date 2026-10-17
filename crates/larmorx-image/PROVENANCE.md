@@ -55,3 +55,5 @@ Behaviour found while porting: [ants-image-programs.md](../../docs/findings/ants
 [ants-morphology.md](../../docs/findings/ants-morphology.md),
 [ants-n4.md](../../docs/findings/ants-n4.md),
 [ants-denoise.md](../../docs/findings/ants-denoise.md).
+
+`gaussian::gradient_recursive_gaussian` stores each component as ITK's `GradientRecursiveGaussianImageFilter` does through `NthElementImageAdaptor<TOutputImage, float>` (ITK v5.4.5, `Modules/Filtering/ImageGradient/include/itkGradientRecursiveGaussianImageFilter.h/.hxx`): the quotient by the spacing rounded to float.

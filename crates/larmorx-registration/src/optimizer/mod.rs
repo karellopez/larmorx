@@ -10,6 +10,7 @@
 //! The optimizer is one object across a stage's levels, as in ANTs: its learning rate and
 //! number of iterations carry over from one level to the next.
 
+pub mod multistart;
 pub mod scales;
 
 use crate::convergence::WindowConvergence;
@@ -86,6 +87,11 @@ pub struct ConjugateGradientLineSearch<R> {
     /// estimated by the line-search optimizers anyway).
     pub estimate_learning_rate_at_each_iteration: bool,
     pub estimate_learning_rate_once: bool,
+    /// Scales set with `SetScales` and no scales estimator (`antsAffineInitializer`): `None`
+    /// estimates them (`RegistrationParameterScalesFromPhysicalShift`, as ANTs' registrations
+    /// and `antsAI` set it). Without an estimator neither the scales nor the learning rate are
+    /// estimated, so the learning rate a run ends with is the next run's first.
+    pub scales: Option<Vec<R>>,
 }
 
 /// The state of one level's optimisation.
@@ -122,7 +128,10 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         observer: &mut O,
     ) -> Result<Outcome<R>, ItkException> {
         let np = problem.parameters().len();
-        if self.estimate_learning_rate_once && self.estimate_learning_rate_at_each_iteration {
+        if self.scales.is_none()
+            && self.estimate_learning_rate_once
+            && self.estimate_learning_rate_at_each_iteration
+        {
             return Err(ItkException::new(
                 "Modules/Numerics/Optimizersv4/include/itkGradientDescentOptimizerBasev4.hxx",
                 99,
@@ -133,11 +142,16 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         // GradientDescentOptimizerBasev4::StartOptimization: the scales and, without a
         // maximum step, its estimate; then ObjectToObjectOptimizerBase estimates the scales
         // again and checks them.
-        let _ = problem.estimate_scales()?;
-        if self.maximum_step_size <= R::EPSILON {
-            self.maximum_step_size = problem.estimate_maximum_step();
-        }
-        let scales = problem.estimate_scales()?;
+        let scales = match &self.scales {
+            Some(s) => s.clone(),
+            None => {
+                let _ = problem.estimate_scales()?;
+                if self.maximum_step_size <= R::EPSILON {
+                    self.maximum_step_size = problem.estimate_maximum_step();
+                }
+                problem.estimate_scales()?
+            }
+        };
         if scales.len() != np {
             return Err(ItkException::new(
                 "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
@@ -285,8 +299,9 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         problem: &mut P,
         run: &Run<R>,
     ) -> Result<(), ItkException> {
-        if self.estimate_learning_rate_at_each_iteration
-            || (self.estimate_learning_rate_once && run.current_iteration == 0)
+        if self.scales.is_none()
+            && (self.estimate_learning_rate_at_each_iteration
+                || (self.estimate_learning_rate_once && run.current_iteration == 0))
         {
             let step_scale = problem.estimate_step_scale(&run.gradient)?;
             self.learning_rate = if step_scale <= R::EPSILON {

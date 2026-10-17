@@ -26,7 +26,7 @@ pub fn center_of_gravity<R: Real, const D: usize>(
     if m0 == 0.0 {
         return Err(ItkException::new(
             "Modules/Filtering/ImageStatistics/include/itkImageMomentsCalculator.hxx",
-            172,
+            123,
             "ImageMomentsCalculator",
             "Compute(): Total Mass of the image was zero. Aborting here to prevent division by zero later on.",
         ));

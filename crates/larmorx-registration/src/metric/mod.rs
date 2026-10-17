@@ -50,6 +50,11 @@ pub struct ImageMetricv4<R, const D: usize> {
     /// `CovariantVector<double, D>` pixels.
     pub fixed_gradient_image: Option<Arc<Image<[f64; D], D>>>,
     pub moving_gradient_image: Option<Arc<Image<[f64; D], D>>>,
+    /// The images' pixel type is `float` while the metric computes in `R` = double
+    /// (`antsAI`, `antsAffineInitializer`): the interpolated values are stored in a
+    /// `FixedImagePixelType` / `MovingImagePixelType` (`TransformAndEvaluateFixedPoint`), so
+    /// they are rounded to float. In `antsRegistration` the pixel type is `R`.
+    pub pixel_f32: bool,
 }
 
 /// One virtual point as the metric sees it (`ProcessVirtualPoint`'s locals).
@@ -149,7 +154,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         if !self.fixed.space.is_inside_buffer(&fixed_c) {
             return None;
         }
-        let fixed_value = R::from_f64(fixed_interp.at_cindex(&fixed_c, floor));
+        let fixed_value = R::from_f64(self.pixel(fixed_interp.at_cindex(&fixed_c, floor)));
         let mut fixed_gradient = [R::ZERO; D];
         if compute_derivative && gradients.fixed {
             fixed_gradient =
@@ -168,7 +173,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         if !self.moving.space.is_inside_buffer(&moving_c) {
             return None;
         }
-        let moving_value = R::from_f64(moving_interp.at_cindex(&moving_c, floor));
+        let moving_value = R::from_f64(self.pixel(moving_interp.at_cindex(&moving_c, floor)));
         let mut moving_gradient = [R::ZERO; D];
         if compute_derivative && gradients.moving {
             moving_gradient = self.gradient(
@@ -188,6 +193,16 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
             moving_value,
             moving_gradient,
         })
+    }
+
+    /// An interpolated value stored in the pixel type.
+    #[inline]
+    fn pixel(&self, v: f64) -> f64 {
+        if self.pixel_f32 {
+            f64::from(v as f32)
+        } else {
+            v
+        }
     }
 
     /// `ComputeFixed/MovingImageGradientAtPoint`: the gradient image interpolated linearly

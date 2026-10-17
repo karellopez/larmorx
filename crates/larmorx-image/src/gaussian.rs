@@ -586,7 +586,10 @@ pub fn laplacian_recursive_gaussian(
 /// before its direction correction: for each axis `dim`, the first derivative along `dim`
 /// (the line read as double, the result stored as `float`, ITK's `InternalRealType`), then
 /// smoothing along the other axes in increasing order (`float → float`), each value then
-/// divided by the spacing along `dim` in double. One component image per axis.
+/// divided by the spacing along `dim` in double and stored through the filter's
+/// `NthElementImageAdaptor<TOutputImage, InternalScalarRealType>`, whose accessor takes a
+/// `float` (`NumericTraits<double>::FloatType` is `float`): the quotient is rounded to `float`
+/// before it lands in the `double` component. One component image per axis.
 fn gradient_components<T: crate::lines::LinePixel>(
     input: VolumeRef<'_, T>,
     sigma: f64,
@@ -623,7 +626,11 @@ fn gradient_components<T: crate::lines::LinePixel>(
             )?;
         }
         let spacing = input.spacing[dim];
-        out.push(work.iter().map(|&v| f64::from(v) / spacing).collect());
+        out.push(
+            work.iter()
+                .map(|&v| f64::from((f64::from(v) / spacing) as f32))
+                .collect(),
+        );
     }
     Ok(out)
 }

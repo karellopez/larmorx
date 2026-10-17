@@ -303,6 +303,13 @@ hand (the stage comparison re-renders from its JSON with `--render`). The model 
   commit when the merge changed anything.
 - **Thresholds** come from PLAN.md §11.3. They are widened only by a measured band, per case
   or per run, and the record says where (mri-hmc: "25 runs use the band").
+- **Cases where the original stops badly are still compared** as far as it gets (the ants-ai
+  suite's expectations, `validation/.../parity/ants_ai.py`): where it aborts or crashes,
+  everything it printed before the signal must be identical, and larmorx then adds one line and
+  exits 1; where it never finishes, it runs for a few seconds and larmorx must refuse; where it
+  draws from the clock, it runs twice and the record reports how far apart its own runs are,
+  next to larmorx's distance from them; where it fails silently (ANTS-45), the statuses must
+  agree and larmorx must explain.
 
 **Status** (PLAN.md §4): `experimental` while any case fails its threshold, `validated` when
 every case of the oracle set passes, `stable` once the API is also frozen. One failing case

@@ -198,7 +198,39 @@ pub struct LevelProblem<'a, R, const D: usize> {
     pub warnings: Vec<String>,
 }
 
-impl<R: Real, const D: usize> LevelProblem<'_, R, D> {
+impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
+    /// The problem of one image metric outside a registration method (`antsAI`,
+    /// `antsAffineInitializer`): `metric` with its sample points and gradient images already
+    /// set, initialised here (`Initialize()`), and the moving transform `moving`, whose scales
+    /// are estimated at the corners of the metric's virtual domain.
+    pub fn single(
+        metric: ImageMetricv4<R, D>,
+        kind: MetricKind,
+        moving: Composite<R, D>,
+        floor: &'a IndexFloor,
+    ) -> Result<Self, ItkException> {
+        if let Some(s) = &metric.samples
+            && s.is_empty()
+        {
+            return Err(ItkException::new(
+                "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
+                268,
+                "ImageToImageMetricv4",
+                "VirtualSampledPointSet must have 1 or more points.",
+            ));
+        }
+        let state = LevelMetric::initialize(kind, &metric)?;
+        let corners = scales::corners(&metric.virtual_space);
+        Ok(LevelProblem {
+            metrics: vec![(metric, state)],
+            weights: vec![R::ONE],
+            moving,
+            corners,
+            floor,
+            warnings: Vec::new(),
+        })
+    }
+
     /// The first metric's inputs (the virtual domain is common to all).
     pub fn metric(&self) -> &ImageMetricv4<R, D> {
         &self.metrics[0].0
@@ -366,7 +398,7 @@ pub fn sample_points<R: Real, const D: usize>(
 /// `ComputeMovingImageGradientFilterImage`: `GradientRecursiveGaussianImageFilter` with the
 /// largest spacing as sigma, normalised across scale, each vector then turned by the image's
 /// direction (`TransformLocalVectorToPhysicalVector`, each row summed from 0 in double).
-fn gradient_image<R: Real, const D: usize>(
+pub fn gradient_image<R: Real, const D: usize>(
     image: &Image<R, D>,
     n_threads: usize,
 ) -> Result<Image<[f64; D], D>, ItkException> {
@@ -418,6 +450,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         samples: None,
         fixed_gradient_image: None,
         moving_gradient_image: None,
+        pixel_f32: false,
     };
     let r =
         NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
@@ -507,6 +540,7 @@ where
                 samples: None,
                 fixed_gradient_image: None,
                 moving_gradient_image: None,
+                pixel_f32: false,
             });
         }
         // SetMetricSamplePoints: one set per metric, each from the first metric's virtual

@@ -31,6 +31,10 @@ SPDX = re.compile(r"SPDX-License-Identifier:\s*(.+?)\s*$")
 # Apache-2.0 files that are translations of code under another permissive licence. The
 # original notice is reproduced in each file and in NOTICE.
 MIXED = {
+    "crates/larmorx-core/src/math/acos.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/asin.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/atan2.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/cbrt.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/exp.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/log.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/sin.rs": "Apache-2.0 AND MIT",
@@ -39,6 +43,8 @@ MIXED = {
     "crates/larmorx-core/src/math/expf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/logf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/sinf.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/vnl_eigen.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-core/src/vnl_fixed.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd_f32.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/btree.rs": "Apache-2.0 AND BSD-3-Clause",

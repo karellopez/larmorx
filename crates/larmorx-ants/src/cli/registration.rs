@@ -62,7 +62,7 @@ fn caught(log: &mut Log<'_>, e: &ItkException) -> Exit {
 }
 
 /// The exception `CommandLineParser::Convert<T>` throws for `text` (`antsCommandLineParser.h:133`).
-fn convert_exception(text: &str, code: &str, human: &str) -> ItkException {
+pub(crate) fn convert_exception(text: &str, code: &str, human: &str) -> ItkException {
     ItkException::new(
         "Utilities/antsCommandLineParser.h",
         133,
@@ -75,36 +75,36 @@ fn convert_exception(text: &str, code: &str, human: &str) -> ItkException {
 }
 
 /// The parser's conversions, which throw where ANTs' do.
-struct Conv;
+pub(crate) struct Conv;
 
 impl Conv {
-    fn bool(s: &str) -> Result<bool, ItkException> {
+    pub(crate) fn bool(s: &str) -> Result<bool, ItkException> {
         parser_convert_bool(s).ok_or_else(|| convert_exception(s, "b", "Unmapped Type"))
     }
-    fn u32(s: &str) -> Result<u32, ItkException> {
+    pub(crate) fn u32(s: &str) -> Result<u32, ItkException> {
         parser_convert_u32(s).ok_or_else(|| convert_exception(s, "j", "unsigned int"))
     }
-    fn u16(s: &str) -> Result<u16, ItkException> {
+    pub(crate) fn u16(s: &str) -> Result<u16, ItkException> {
         parser_convert_u16(s).ok_or_else(|| convert_exception(s, "t", "unsigned int"))
     }
-    fn i32(s: &str) -> Result<i32, ItkException> {
+    pub(crate) fn i32(s: &str) -> Result<i32, ItkException> {
         parser_convert_i32(s).ok_or_else(|| convert_exception(s, "i", "signed int"))
     }
-    fn f32(s: &str) -> Result<f32, ItkException> {
+    pub(crate) fn f32(s: &str) -> Result<f32, ItkException> {
         parser_convert_f32(s).ok_or_else(|| convert_exception(s, "f", "float"))
     }
-    fn f64(s: &str) -> Result<f64, ItkException> {
+    pub(crate) fn f64(s: &str) -> Result<f64, ItkException> {
         parser_convert_f64(s).ok_or_else(|| convert_exception(s, "d", "double"))
     }
     /// `Convert<RealType>`.
-    fn real<R: Compute>(s: &str) -> Result<R, ItkException> {
+    pub(crate) fn real<R: Compute>(s: &str) -> Result<R, ItkException> {
         match R::PRECISION {
             Precision::Double => Ok(R::r(Self::f64(s)?)),
             Precision::Float => Ok(R::r(f64::from(Self::f32(s)?))),
         }
     }
     /// `ConvertVector<unsigned int>`: the first piece that throws names itself.
-    fn vec_u32(s: &str) -> Result<Vec<u32>, ItkException> {
+    pub(crate) fn vec_u32(s: &str) -> Result<Vec<u32>, ItkException> {
         match parser_convert_vector_u32(s) {
             Some(v) => Ok(v),
             None => Err(convert_exception(
@@ -114,7 +114,7 @@ impl Conv {
             )),
         }
     }
-    fn vec_f32(s: &str) -> Result<Vec<f32>, ItkException> {
+    pub(crate) fn vec_f32(s: &str) -> Result<Vec<f32>, ItkException> {
         match parser_convert_vector_f32(s) {
             Some(v) => Ok(v),
             None => Err(convert_exception(
@@ -124,7 +124,7 @@ impl Conv {
             )),
         }
     }
-    fn vec_real<R: Compute>(s: &str) -> Result<Vec<R>, ItkException> {
+    pub(crate) fn vec_real<R: Compute>(s: &str) -> Result<Vec<R>, ItkException> {
         match R::PRECISION {
             Precision::Double => match parser_convert_vector_f64(s) {
                 Some(v) => Ok(v.into_iter().map(R::r).collect()),
@@ -143,7 +143,7 @@ impl Conv {
 }
 
 /// The first piece of `ConvertVector`'s split (`getline(·, 'x')`) that does not convert.
-fn first_bad(s: &str, ok: impl Fn(&str) -> bool) -> String {
+pub(crate) fn first_bad(s: &str, ok: impl Fn(&str) -> bool) -> String {
     let t = s.trim_end_matches([' ', '\n', '\r', '\t']);
     let mut pieces: Vec<&str> = t.split('x').collect();
     if t.ends_with('x') {
@@ -153,7 +153,7 @@ fn first_bad(s: &str, ok: impl Fn(&str) -> bool) -> String {
 }
 
 /// `GetParameter(i)`: the parameter, or "" past the end.
-fn param(v: &OptionValue, i: usize) -> &str {
+pub(crate) fn param(v: &OptionValue, i: usize) -> &str {
     v.parameters.get(i).map_or("", String::as_str)
 }
 

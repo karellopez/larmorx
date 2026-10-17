@@ -31,6 +31,13 @@ from larmorx.ants.image_math import (
     rescale_image,
     truncate_image_intensity,
 )
+from larmorx.ants.initializers import (
+    AffineInitializerError,
+    AIError,
+    AIResult,
+    affine_initializer,
+    ai,
+)
 from larmorx.ants.morphology import (
     fill_holes,
     grayscale_close,
@@ -66,6 +73,9 @@ from larmorx.ants.threshold import OtsuResult, multiply_images, otsu_threshold, 
 
 __all__ = [
     "PIXEL_TYPES",
+    "AIError",
+    "AIResult",
+    "AffineInitializerError",
     "AlignCenters",
     "DenoiseResult",
     "ImageMathError",
@@ -78,6 +88,8 @@ __all__ = [
     "RegistrationResult",
     "RegistrationStage",
     "add_to_zero",
+    "affine_initializer",
+    "ai",
     "apply_transforms",
     "apply_transforms_to_points",
     "combine_transforms",

@@ -923,6 +923,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 weights,
                 estimate_learning_rate_at_each_iteration: true,
                 estimate_learning_rate_once: false,
+                scales: None,
             };
             // PrepareRegistrationMethod: with --initialize-transforms-per-stage, the stage starts
             // from the last transform of the composite when it can, and that transform leaves

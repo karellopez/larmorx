@@ -12,7 +12,9 @@
 //! - [`itk_real`]: ITK's two computation types (`double`, and `float` as ANTs' `--float 1`) as
 //!   a type parameter, [`ItkReal`], and as a run-time choice, [`Precision`].
 //! - [`linalg`], [`rotation`]: small fixed-size linear algebra and quaternions; [`vnl_svd`],
-//!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK.
+//!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK;
+//!   [`vnl_eigen`]: vnl's symmetric and real eigensystems (EISPACK); [`vnl_fixed`]: vnl's
+//!   closed-form determinants and inverses of small matrices.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
 
@@ -27,6 +29,8 @@ pub mod linalg;
 pub mod math;
 pub mod parallel;
 pub mod rotation;
+pub mod vnl_eigen;
+pub mod vnl_fixed;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
 

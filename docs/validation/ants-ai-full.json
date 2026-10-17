@@ -1,0 +1,1138 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "a34fc312db95",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "antsAI from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread",
+ "results": [
+  {
+   "case": "initial/rigid",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.372,
+   "status": "pass"
+  },
+  {
+   "case": "initial/rigid-principal-axes",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "initial/affine-principal-axes",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "initial/similarity-principal-axes",
+   "category": "initial",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "initial/geometric-centers",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "initial/centers-of-mass",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "initial/2d-rigid-principal-axes",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "initial/2d-centers-of-mass-txt",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "initial/h5",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "search/rigid-grid",
+   "category": "search",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 38.144,
+   "status": "pass"
+  },
+  {
+   "case": "search/similarity",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.67,
+   "status": "pass"
+  },
+  {
+   "case": "search/affine-mi",
+   "category": "search",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.748,
+   "status": "pass"
+  },
+  {
+   "case": "search/rigid-gc",
+   "category": "search",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.376,
+   "status": "pass"
+  },
+  {
+   "case": "search/affine-oblique",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.609,
+   "status": "pass"
+  },
+  {
+   "case": "search/masks",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.845,
+   "status": "pass"
+  },
+  {
+   "case": "search/fixed-mask",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.59,
+   "status": "pass"
+  },
+  {
+   "case": "search/missing-mask",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.855,
+   "status": "pass"
+  },
+  {
+   "case": "search/dense",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.991,
+   "status": "pass"
+  },
+  {
+   "case": "search/gc-dense",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.808,
+   "status": "pass"
+  },
+  {
+   "case": "search/2d-affine-grid",
+   "category": "search",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.926,
+   "status": "pass"
+  },
+  {
+   "case": "search/2d-rigid-grid",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.292,
+   "status": "pass"
+  },
+  {
+   "case": "search/2d-rigid",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.221,
+   "status": "pass"
+  },
+  {
+   "case": "search/2d-similarity-gc",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.189,
+   "status": "pass"
+  },
+  {
+   "case": "search/2d-mi-dense",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.15,
+   "status": "pass"
+  },
+  {
+   "case": "search/similarity-grid",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.498,
+   "status": "pass"
+  },
+  {
+   "case": "search/grid-two-extents",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.677,
+   "status": "pass"
+  },
+  {
+   "case": "search/grid-one-extent",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.033,
+   "status": "pass"
+  },
+  {
+   "case": "search/arc-zero",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.145,
+   "status": "pass"
+  },
+  {
+   "case": "search/arc-wide",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.141,
+   "status": "pass"
+  },
+  {
+   "case": "search/seed",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.874,
+   "status": "pass"
+  },
+  {
+   "case": "search/env-seed",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.875,
+   "status": "pass"
+  },
+  {
+   "case": "search/env-seed-prefix",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.911,
+   "status": "pass"
+  },
+  {
+   "case": "search/percentage-above-one",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.08,
+   "status": "pass"
+  },
+  {
+   "case": "search/quiet",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.873,
+   "status": "pass"
+  },
+  {
+   "case": "search/txt",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.89,
+   "status": "pass"
+  },
+  {
+   "case": "search/h5",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.831,
+   "status": "pass"
+  },
+  {
+   "case": "search/plain-values",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.721,
+   "status": "pass"
+  },
+  {
+   "case": "search/two-outputs",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "search/verbose-last",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "search/unknown-metric-initial",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "search/empty-start-list-no-output",
+   "category": "search",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "search/align-with-iterations",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "search/align-with-iterations-quiet",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "search/align-with-iterations-2d-gc",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "search/align-with-iterations-no-start",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "search/gc-empty-mask-dense",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.887,
+   "status": "pass"
+  },
+  {
+   "case": "search/mi-empty-mask-dense",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.898,
+   "status": "pass"
+  },
+  {
+   "case": "messages/no-arguments",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "          Print the help menu.",
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/h",
+   "category": "messages",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "messages/help",
+   "category": "messages",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "messages/help-0",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Image dimensionality not specified.  See command line option --dimensionality",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/h-0",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Image dimensionality not specified.  See command line option --dimensionality",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/no-dimension",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Image dimensionality not specified.  See command line option --dimensionality",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/dimension-4",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized dimensionality.  Please see help menu.",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/dimension-1",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized dimensionality.  Please see help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/no-metric",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Input metric not specified.",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/no-metric-quiet",
+   "category": "messages",
+   "checks_passed": 1,
+   "checks_total": 2,
+   "failed_checks": [
+    {
+     "detail": "ANTs 1 lines; larmorx: Input metric not specified.",
+     "metric": "exact",
+     "name": "ANTs is silent, larmorx explains (ANTS-45)",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "Input metric not specified.",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/one-image",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Fixed and/or moving images not specified.",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-sampling",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized sampling strategy.",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-transform",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized transform option.",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-transform-quiet",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized transform option.",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/no-transform",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unrecognized transform option.",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-metric",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unrecognized metric.",
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-metric-align",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unrecognized metric.",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/two-blobs",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Please specify a greater number of blobs (>=3).",
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/two-blobs-bracket",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Please specify a greater number of blobs (>=3).",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-flag",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR:  Invalid flag provided bogus",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/missing-fixed",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/missing-moving-geometry",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/missing-fixed-mass",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/bad-iterations",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/bad-bins",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unbalanced-bracket",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.013,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/bad-seed",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/bad-env-seed",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/env-seed-range",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/zero-moving-mass",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/zero-moving-geometry",
+   "category": "messages",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "messages/zero-principal-axes",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.03,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/zero-fixed-search",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.028,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/unknown-extension",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 1.366,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/no-directory",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/align-iterations-unknown-extension",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+   "seconds": 0.056,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/align-iterations-txt",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+   "seconds": 0.051,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/align-iterations-h5",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+   "seconds": 0.063,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-start-list",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
+   "seconds": 0.061,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-grid",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-sample-mattes",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-sample-mi",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-sample-gc",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/empty-sample-align",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/random-zero",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/mattes-empty-mask-dense",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [-2.43059e+37, 33.1286]); ITK's Mattes metric is",
+   "seconds": 0.057,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/mattes-empty-moving-mask",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [16.229, -2.43059e+37]); ITK's Mattes metric is ",
+   "seconds": 0.072,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/mattes-one-start-point",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: every start point threw: ANTs' observer reads the best metric value from an empty list and crashes",
+   "seconds": 0.058,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/percentage-zero",
+   "category": "messages",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-06 (ANTs) reproduced: the Regular sampling step: unsigned long of inf is undefined; 9223372036854775808, as x86-64 converts it [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+   "seconds": 0.053,
+   "status": "both-error"
+  },
+  {
+   "case": "messages/search-factor-negative",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ANTs never finishes (class (a)); larmorx refuses",
+   "seconds": 20.277,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "messages/translation-step-zero",
+   "category": "messages",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ANTs never finishes (class (a)); larmorx refuses",
+   "seconds": 20.613,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "random/random-sampling",
+   "category": "random",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
+   "seconds": 2.572,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "random/seed-zero",
+   "category": "random",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
+   "seconds": 2.211,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "real/ds000005-sub-01/brain-extraction",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 212.185,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/bold-mixedgamblestask-run-01",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 394.146,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/bold-mixedgamblestask-run-02",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 243.477,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/bold-mixedgamblestask-run-03",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 242.285,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds001600-sub-1/brain-extraction",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 131.556,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040-sub-002/brain-extraction",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 123.365,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040-sub-002/bold-clip-run-1",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 230.769,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005454-sub-16/brain-extraction",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 121.491,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005454-sub-16/bold-rest",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 272.833,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005752-sub-ON01016/brain-extraction",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 136.14,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-ai",
+ "summary": {
+  "both-error": 46,
+  "expected-divergence": 4,
+  "fail": 0,
+  "pass": 60,
+  "skipped": 0
+ },
+ "tier": "full"
+}

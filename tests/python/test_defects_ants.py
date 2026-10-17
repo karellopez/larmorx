@@ -78,11 +78,17 @@ def test_the_registry_lists_the_ants_entries():
         "ANTS-49",
         "ANTS-50",
         "ANTS-51",
+        "ANTS-52",
+        "ANTS-53",
+        "ANTS-55",
+        "ANTS-56",
         "ITK-01",
         "ITK-02",
         "ITK-08",
         "ITK-10",
         "ITK-18",
+        "ITK-19",
+        "ITK-20",
         "SCI-02",
     ):
         assert entry in ids, entry
@@ -464,6 +470,102 @@ def test_itk_reader_defects(tmp_path):
     assert code == 0 and "ITK-02" in err
     # ITK's identity direction is LPS: in RAS, x and y flip.
     np.testing.assert_allclose(nib.load(out).affine[:3, :3], np.diag([-1, -1, 1]), atol=1e-6)
+
+
+# --- antsAI and antsAffineInitializer ----------------------------------------------------------
+
+
+def _pair(tmp_path, dims=3):
+    """A phantom and a copy shifted one voxel, as files."""
+    if dims == 3:
+        data = phantom((14, 12, 10))
+        moved = np.roll(data, 1, axis=0)
+        affine = AFFINE
+    else:
+        data = phantom((14, 12, 10))[:, :, 5]
+        moved = np.roll(data, 1, axis=1)
+        affine = np.diag([2.0, 2.0, 1.0, 1.0])
+    a, b = tmp_path / f"a{dims}.nii.gz", tmp_path / f"b{dims}.nii.gz"
+    nib.Nifti1Image(data, affine).to_filename(a)
+    nib.Nifti1Image(moved.astype(np.float32), affine).to_filename(b)
+    return a, b
+
+
+def test_ai_alignment_with_iterations(tmp_path):
+    a, b = _pair(tmp_path)
+    # ANTS-53: ANTs runs a search with no start point and writes an empty file; corrected,
+    # the alignment is written as with 0 iterations.
+    plain = lx.ants.ai(a, b, transform="AlignGeometricCenters")
+    fixed, fw = entries(lx.ants.ai, a, b, transform="AlignGeometricCenters", iterations=2)
+    assert fw == ["ANTS-53"]
+    np.testing.assert_array_equal(fixed.transform.parameters, plain.transform.parameters)
+    with pytest.raises(lx.ants.AIError, match="ANTS-53"), pytest.warns(lx.UpstreamDefectWarning):
+        lx.ants.ai(
+            a, b, transform="AlignGeometricCenters", iterations=2, upstream_defects=REPRODUCE
+        )
+    out = tmp_path / "empty.mat"
+    code, _, _ = ants(
+        "antsAI", "-d", 3, "-m", f"Mattes[{a},{b}]", "-t", "AlignGeometricCenters", "-c", 2,
+        "-o", out, env=REPRODUCE,
+    )  # fmt: skip
+    assert code == 0 and out.stat().st_size == 0
+
+
+def test_ai_translation_grid(tmp_path):
+    a, b = _pair(tmp_path, dims=2)
+    kw = {"transform": "Rigid", "search_factor": 90, "arc_fraction": 0.5, "iterations": 1}
+    grid = {"translation_search_grid": (2.0, (2.0, 0.0))}
+    # ANTS-52: in 2D the rigid start points ignore the grid (corrected, it is named when the
+    # best start point is a translated one).
+    fixed, fw = entries(lx.ants.ai, a, b, **kw, **grid)
+    ants_, aw = entries(lx.ants.ai, a, b, **kw, **grid, upstream_defects=REPRODUCE)
+    without = lx.ants.ai(a, b, **kw)
+    assert aw == ["ANTS-52"] and fw in ([], ["ANTS-52"])
+    assert (fw == []) == np.array_equal(fixed.transform.parameters, ants_.transform.parameters)
+    assert fixed.start_points == ants_.start_points == 3 * without.start_points
+    np.testing.assert_array_equal(ants_.transform.parameters, without.transform.parameters)
+    # ANTS-55: a 3D grid of one extent is read past the end of its vector.
+    a3, b3 = _pair(tmp_path)
+    short = {"translation_search_grid": (2.0, (2.0,))}
+    with pytest.raises(lx.ants.AIError, match="ANTS-55"), pytest.warns(lx.UpstreamDefectWarning):
+        lx.ants.ai(a3, b3, **kw, **short)
+    _, w = entries(lx.ants.ai, a3, b3, **kw, **short, upstream_defects=REPRODUCE)
+    assert w == ["ANTS-55"]
+
+
+def test_ai_wrapper(tmp_path):
+    a, b = _pair(tmp_path)
+    res = lx.ants.ai(a, b, transform="Affine", search_factor=90, arc_fraction=0.5, iterations=2)
+    assert res.transform.name == "AffineTransform_double_3_3"
+    assert res.start_points == 27 and res.best_value is not None and res.values
+    # In memory, the same result.
+    img = lx.load(b)
+    again = lx.ants.ai(a, img, transform="Affine", search_factor=90, arc_fraction=0.5, iterations=2)
+    np.testing.assert_array_equal(again.transform.parameters, res.transform.parameters)
+    with pytest.raises(lx.ants.AIError, match="does not exist"):
+        lx.ants.ai(a, tmp_path / "missing.nii.gz")
+    with pytest.raises(ValueError, match="fixed mask"):
+        lx.ants.ai(a, b, moving_mask=a)
+
+
+def test_affine_initializer(tmp_path):
+    a, b = _pair(tmp_path)
+    t = lx.ants.affine_initializer(a, b, search_factor=45, principal_axes=True)
+    assert t.name == "AffineTransform_double_3_3" and t.parameters.size == 12
+    # ANTS-54 (questionable, reproduced): the local search's iterations are not read.
+    other = lx.ants.affine_initializer(
+        a, b, search_factor=45, principal_axes=True, local_search_iterations=3
+    )
+    np.testing.assert_array_equal(other.parameters, t.parameters)
+    # ANTS-56: a dimension other than 2, 3 or 4 runs as 2D; corrected, an error.
+    a2, b2 = _pair(tmp_path, dims=2)
+    out = tmp_path / "t.mat"
+    code, _, err = ants("antsAffineInitializer", 7, a2, b2, out, env=FIX)
+    assert code == 1 and "ANTS-56" in err
+    code, _, err = ants("antsAffineInitializer", 7, a2, b2, out, env=REPRODUCE)
+    assert code == 0 and "ANTS-56" in err and out.exists()
+    with pytest.raises(lx.ants.AffineInitializerError, match="zero image2 error"):
+        lx.ants.affine_initializer(a, lx.load(a).with_data(np.zeros((14, 12, 10), np.float32)))
 
 
 # --- SciPy --------------------------------------------------------------------------------------

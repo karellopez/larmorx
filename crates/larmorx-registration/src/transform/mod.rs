@@ -14,6 +14,7 @@
 //! array of `R`).
 
 mod linear;
+mod set_matrix;
 
 pub use linear::{Kind, LinearXfm, collapse_linear, inverse_r};
 

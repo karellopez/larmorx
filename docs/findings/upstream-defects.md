@@ -105,6 +105,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-57 | antsAffineInitializer | two or three arguments abort (`std::string` of a null pointer) instead of printing the usage | a | none | prints ANTs' message, exit 1 | – |
 | ANTS-58 | antsAI | `Random` sampling (always) and `--random-seed 0` draw from the clock: no two runs agree | b | none (fMRIPrep uses `Regular` with a seed) | seeded from the seed: repeatable | – |
 | ANTS-59 | antsAI | `--convergence`'s window defaults to 5; the help says 10 | f | none | follows the code; documented | – |
+| ANTS-60 | antsAI `-b` (ANTs' blob detector) | with more than one thread, per-thread heaps sized by the thread count are indexed by work units, four times as many | a | none | `-b` not implemented (refused) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -206,12 +207,12 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (159 entries, recounted from the table on 2026-10-17; an entry with two classes
+**Counts** (160 entries, recounted from the table on 2026-10-17; an entry with two classes
 counts under its first):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 21 | |
+| (a) crash, undefined behaviour, out of bounds | 22 | |
 | (b) race, nondeterminism | 7 | |
 | (c) deterministic bug that changes results | 68 | 16 |
 | (d) imprecision | 19 | |
@@ -242,7 +243,7 @@ default in the replica. A4 part 1 (ITK's HDF5 transform files, 2026-10-16) added
 ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch; A4 part 2
 (antsApplyTransforms' transform outputs, 2026-10-16) added ANTS-48, and antsRegistration's
 linear stages ANTS-49 to ANTS-51 and ITK-18. A4 part 3 (antsAI and antsAffineInitializer,
-2026-10-17) added ANTS-52 to ANTS-59 and ITK-19 to ITK-21: ANTS-52, -53, -56 and ITK-19
+2026-10-17) added ANTS-52 to ANTS-60 and ITK-19 to ITK-21: ANTS-52, -53, -56 and ITK-19
 corrected by default with a switch, ANTS-55 refused by default with a switch, ANTS-54 and
 ITK-21 to decide.
 
@@ -1148,6 +1149,19 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** none (nipype passes the window).
 - **larmorx:** follows the code; the menus print ANTs' text; documented in `docs/api/ants-ai.md`.
 - **D13 / gap:** not D13. No gap.
+
+### ANTS-60 antsAI's blob detector writes past its per-thread heaps — (a)
+- **What:** `MultiScaleLaplacianBlobDetectorImageFilter::GenerateData` sizes `m_BlobHeapPerThread`
+  by `GetGlobalDefaultNumberOfThreads()` ("FIXME - setting to 2 threads"), but runs
+  `ThreadedGenerateData` through `SingleMethodExecute` on the multi-threader's work units,
+  which ITK 5's pool threader makes four times the thread count when there is more than one
+  thread: work units past the thread count index the vector past its end.
+- **Evidence:** read: `Utilities/itkMultiScaleLaplacianBlobDetectorImageFilter.hxx:79-81, 199`,
+  ITK v5.4.5 `Modules/Core/Common/src/itkPoolMultiThreader.cxx:88-95`.
+- **fMRIPrep:** none (it does not align blobs).
+- **larmorx:** `-b` is not implemented (refused with a message); a port would compute the
+  one-work-unit result.
+- **D13 / gap:** class (a), not reproduced. No gap.
 
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums

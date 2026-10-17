@@ -27,10 +27,10 @@ The v4 framework both programs run on (metrics, scales, the conjugate-gradient o
   alignments with iterations write no transform), ANTS-54 (antsAffineInitializer ignores its
   local-search argument), ANTS-55 (a short grid read past its end), ANTS-56 (an unknown
   dimension runs as 2D), ANTS-57 (two or three arguments abort), ANTS-58 (the clock), ANTS-59
-  (the convergence window's documented default), ITK-19 (a start point that throws keeps the
-  previous value), ITK-20 (the Mattes metric unusable after a refused histogram spacing), ITK-21
-  (the learning rate carried from one start point to the next). All in the
-  [register](upstream-defects.md).
+  (the convergence window's documented default), ANTS-60 (the blob detector's per-thread heaps),
+  ITK-19 (a start point that throws keeps the previous value), ITK-20 (the Mattes metric
+  unusable after a refused histogram spacing), ITK-21 (the learning rate carried from one start
+  point to the next). All in the [register](upstream-defects.md).
 
 ## antsAI
 
@@ -172,8 +172,28 @@ start point after the first.
 per octave), keeps the pairs whose patch correlation is highest, filters them by preserved
 distances, and fits an affine (or a rigid, `LandmarkBasedTransformInitializer`) transform to the
 pairs. The detector keeps one heap per thread of `GetGlobalDefaultNumberOfThreads()` entries but
-is run on more work units than that with more than one thread (an index past the end). larmorx
-does not implement `-b` yet: it refuses it with a message.
+is run on more work units than that with more than one thread (an index past the end,
+ANTS-60). larmorx does not implement `-b` yet: it refuses it with a message.
+
+What a replica needs, read on 2026-10-17 (for the task that ports it):
+
+- the detector: `LaplacianRecursiveGaussianImageFilter<float, float>` (normalised across scale)
+  at `ceil(log(32 k)/log k) + 1` scales, `k = 2^(1/10)`, from the largest σ down; the local
+  maxima of each scale against its 26 neighbours in it and the two adjacent scales
+  (`ImageBoundaryFacesCalculator` faces, zero-flux Neumann outside), kept in a min-heap of
+  `n` blobs with libstdc++'s `push_heap`/`pop_heap`/`sort_heap` and merged with `std::merge`
+  (the order of equal values depends on them);
+- the patch correlations: `GradientRecursiveGaussianImageFilter<float, CovariantVector<float>>`
+  (σ 1 mm, not normalised), spherical patches of radius 20 voxels weighted by
+  `expf(−d/400)`, sums in float over about 33,500 points, `vnl_symmetric_eigensystem<float>`
+  (computed in double), `vnl_svd<float>` (single-precision LINPACK), the linear interpolator
+  with float coordinates;
+- the landmark fit (`LandmarkBasedTransformInitializer`): for `Affine` a least-squares system
+  solved with `vnl_qr` (LINPACK `dqrdc`/`dqrsl`); for `Rigid`/`Similarity` in 3D
+  `VersorRigid3DTransform` from Horn's quaternion, the eigenvectors of a 4 × 4 matrix from
+  **Eigen's `SelfAdjointEigenSolver`** (`SymmetricEigenAnalysisFixedDimension`, vectorised by
+  Eigen); in 2D `Rigid2DTransform`. The initial transform then has its centre at 0 and the
+  search rotates about the image axes.
 
 ## antsAffineInitializer
 

@@ -74,6 +74,13 @@ fn ai_failure(log: &mut Log<'_>, e: AiError) -> Exit {
         AiError::Uncaught(e) => uncaught(log, &e),
         AiError::Refused(m) => refuse(log, &m),
         AiError::Exit(c) => c,
+        AiError::Terminated(text) => {
+            log.cerr(&text);
+            log.cerr(
+                "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1\n",
+            );
+            1
+        }
     }
 }
 
@@ -489,25 +496,36 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
             _ => {}
         }
     }
-    // The sampling seed.
+    // The sampling seed, read by the search after the metric's message.
+    let mut seed_failure = None;
     if s.sampling != AiSampling::None {
-        s.random_seed = match last(p, "random-seed") {
-            Some(r) => Conv::i32(&r.name).map_err(|e| conv_err(log, e))?,
-            None => match ctx.env_seed {
-                Some(v) => match super::cstd::stoi(v) {
-                    Some(seed) => seed,
-                    None => {
-                        return Err(refuse(
-                            log,
-                            &format!(
-                                "ANTS_RANDOM_SEED={v} is not a number: std::stoi throws and ANTs aborts"
-                            ),
-                        ));
-                    }
-                },
-                None => 1234,
+        match last(p, "random-seed") {
+            Some(r) => match Conv::i32(&r.name) {
+                Ok(v) => s.random_seed = v,
+                Err(e) => seed_failure = Some(AiError::Uncaught(e)),
             },
-        };
+            None => {
+                if let Some(v) = ctx.env_seed {
+                    match super::cstd::stoi(v) {
+                        Some(seed) => s.random_seed = seed,
+                        None => {
+                            // std::stoi throws invalid_argument without digits, else
+                            // out_of_range.
+                            let t = v.trim_start_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']);
+                            let t = t.strip_prefix(['+', '-']).unwrap_or(t);
+                            let kind = if t.starts_with(|c: char| c.is_ascii_digit()) {
+                                "std::out_of_range"
+                            } else {
+                                "std::invalid_argument"
+                            };
+                            seed_failure = Some(AiError::Terminated(format!(
+                                "terminate called after throwing an instance of '{kind}'\n  what():  stoi\n"
+                            )));
+                        }
+                    }
+                }
+            }
+        }
     }
     let outcome = search(
         &s,
@@ -521,6 +539,7 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
         ctx.notices,
         ctx.warnings,
         ctx.n_threads,
+        seed_failure,
     );
     flush(ctx, log);
     let outcome = outcome.map_err(|e| ai_failure(log, e))?;

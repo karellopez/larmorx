@@ -198,6 +198,10 @@ pub enum AiError {
     /// `antsAI` returns this status after its message (already printed).
     #[error("exit {0}")]
     Exit(u8),
+    /// A C++ exception other than ITK's reaches `std::terminate` (ANTs aborts): what
+    /// libstdc++ prints.
+    #[error("{0}")]
+    Terminated(String),
 }
 
 /// The initial transform and the rotation axes of the search.
@@ -799,6 +803,8 @@ const NO_SHIFT_WARNING: &str = "WARNING: In Modules/Numerics/Optimizersv4/includ
 
 /// The search (`antsAI.cxx:1125-1577`): the metric, the start points and the multi-start
 /// optimization. `moving_f32` is the moving image as read (for its gradient image).
+/// `seed_failure`: why the sampling seed could not be read (returned where ANTs reads it,
+/// only when the metric is sampled).
 ///
 /// As in ANTs, the two alignments run this too when they are given iterations (ANTS-53): the
 /// metric is set up, the loops count their start points without listing any, and the
@@ -816,6 +822,7 @@ pub fn search<const D: usize>(
     notices: &mut Notices,
     warnings: &mut Vec<String>,
     n_threads: usize,
+    seed_failure: Option<AiError>,
 ) -> Result<SearchOutcome<D>, AiError> {
     let (kind, metric_kind) = match s.metric {
         Some(AiMetric::Mattes) => {
@@ -863,6 +870,10 @@ pub fn search<const D: usize>(
     let samples = if s.sampling == AiSampling::None {
         None
     } else {
+        // The seed is read here (--random-seed, else ANTS_RANDOM_SEED).
+        if let Some(e) = seed_failure {
+            return Err(e);
+        }
         let (points, generated) = sample_points(
             &fixed.space,
             s.sampling,

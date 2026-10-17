@@ -593,15 +593,7 @@ fn write_output<const D: usize>(
     } else if lower.ends_with(".txt") || lower.ends_with(".tfm") {
         "Txt"
     } else {
-        let e = ItkException::new(
-            "Modules/IO/TransformBase/src/itkTransformFileWriterSpecializations.cxx",
-            153,
-            "TransformFileWriterTemplate",
-            format!(
-                "Could not create Transform IO object for writing file {name}\n  Tried to create one of the following:\n    HDF5TransformIOTemplate\n    HDF5TransformIOTemplate\n    MatlabTransformIOTemplate\n    MatlabTransformIOTemplate\n    TxtTransformIOTemplate\n    TxtTransformIOTemplate\n  You probably failed to set a file suffix, or\n    set the suffix to an unsupported type.\n"
-            ),
-        );
-        return Err(uncaught(log, &e));
+        return Err(uncaught(log, &unknown_transform_type(name)));
     };
     let Some(t) = t else {
         if kind != "Matlab" {
@@ -638,8 +630,20 @@ fn write_output<const D: usize>(
     })
 }
 
+/// `TransformFileWriterTemplate::Update`'s exception for a name no transform writer takes.
+pub(crate) fn unknown_transform_type(name: &str) -> ItkException {
+    ItkException::new(
+        "Modules/IO/TransformBase/src/itkTransformFileWriterSpecializations.cxx",
+        153,
+        "TransformFileWriterTemplate",
+        format!(
+            "Could not create Transform IO object for writing file {name}\n  Tried to create one of the following:\n    HDF5TransformIOTemplate\n    HDF5TransformIOTemplate\n    MatlabTransformIOTemplate\n    MatlabTransformIOTemplate\n    TxtTransformIOTemplate\n    TxtTransformIOTemplate\n  You probably failed to set a file suffix, or\n    set the suffix to an unsupported type.\n"
+        ),
+    )
+}
+
 /// `TransformIOBaseTemplate::OpenStream`'s exception for a file it cannot open.
-fn open_failure(kind: &str, name: &str) -> ItkException {
+pub(crate) fn open_failure(kind: &str, name: &str) -> ItkException {
     ItkException::new(
         "Modules/IO/TransformBase/src/itkTransformIOBase.cxx",
         88,

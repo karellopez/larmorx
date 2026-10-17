@@ -436,15 +436,7 @@ pub fn sample_points<const D: usize>(
     let third: [f64; D] = std::array::from_fn(|k| space.spacing[k] / 3.0);
     let base = if seed == 0 { 121_212 } else { seed };
     let mut randomizer = MersenneTwister::from_int(base);
-    let point_f32 = |idx: &[i64; D]| -> [f32; D] {
-        std::array::from_fn(|i| {
-            let mut v = space.origin[i] as f32;
-            for j in 0..D {
-                v = (f64::from(v) + space.index_to_point[i][j] * idx[j] as f64) as f32;
-            }
-            v
-        })
-    };
+    let point_f32 = |idx: &[i64; D]| point_f32(space, idx);
     let mut points = Vec::new();
     let keep = |p: [f32; D], points: &mut Vec<[f64; D]>| {
         let q: [f64; D] = std::array::from_fn(|k| f64::from(p[k]));
@@ -506,6 +498,18 @@ pub fn sample_points<const D: usize>(
     let generated = points.len();
     points.retain(|p| space.contains(&space.point_to_index(p)));
     Ok((points, generated))
+}
+
+/// `TransformIndexToPhysicalPoint` into a `Point<float, D>` (the metrics' sampled point
+/// sets): the origin as float, then each index term added in double and stored in float.
+pub(crate) fn point_f32<const D: usize>(space: &Space<D>, idx: &[i64; D]) -> [f32; D] {
+    std::array::from_fn(|i| {
+        let mut v = space.origin[i] as f32;
+        for j in 0..D {
+            v = (f64::from(v) + space.index_to_point[i][j] * idx[j] as f64) as f32;
+        }
+        v
+    })
 }
 
 /// The rigid start point's class in dimension `D`.
@@ -1023,8 +1027,22 @@ pub fn search<const D: usize>(
         crash_after_failure(&outcome)?;
         outcome
     };
-    // ITK-19: a first start point that throws counts with the value 0 in ITK, so ITK keeps it
-    // as the best unless another start point's value is below 0.
+    let best = best_start_point(&outcome, notices, skip_failed)?;
+    let mut out = LinearXfm::<f64, D>::new(output_kind);
+    out.set_center(init.transform.center);
+    out.set_parameters(&best).map_err(AiError::Uncaught)?;
+    Ok(SearchOutcome::Best(out))
+}
+
+/// The best start point's parameters after `MultiStartOptimizerv4` (`GetBestParameters`),
+/// with ITK-19: a first start point that throws counts with the value 0 in ITK, so ITK keeps
+/// it as the best unless another start point's value is below 0. Corrected (`skip_failed`),
+/// start points that threw take no part, and when every one threw there is no best one.
+pub(crate) fn best_start_point(
+    outcome: &multistart::MultiStartOutcome<f64>,
+    notices: &mut Notices,
+    skip_failed: bool,
+) -> Result<Vec<f64>, AiError> {
     if outcome.failed.first() == Some(&true) {
         let itk_keeps_first = outcome
             .metric_values
@@ -1051,20 +1069,19 @@ pub fn search<const D: usize>(
             "every start point threw{why}: there is no best one (ITK keeps the first, unoptimised)"
         )));
     }
-    let best = outcome
+    outcome
         .best_parameters()
-        .ok_or_else(|| AiError::Refused("no start point".into()))?;
-    let mut out = LinearXfm::<f64, D>::new(output_kind);
-    out.set_center(init.transform.center);
-    out.set_parameters(best).map_err(AiError::Uncaught)?;
-    Ok(SearchOutcome::Best(out))
+        .map(<[f64]>::to_vec)
+        .ok_or_else(|| AiError::Refused("no start point".into()))
 }
 
 /// ITK's Mattes metric leaves its joint histogram without a buffer when the histogram's
 /// spacing is refused (an analysis region of one intensity or none): ANTs then crashes
 /// (`Image::FillBuffer`) in the start point after the one that threw. larmorx refuses there,
 /// in both modes (class (a), ITK-20).
-fn crash_after_failure(outcome: &multistart::MultiStartOutcome<f64>) -> Result<(), AiError> {
+pub(crate) fn crash_after_failure(
+    outcome: &multistart::MultiStartOutcome<f64>,
+) -> Result<(), AiError> {
     if let Some(k) = outcome.crashed_at
         && let Some((current, e)) = outcome.errors.last()
     {

@@ -3,6 +3,8 @@
 //! they run on. See `PROVENANCE.md`.
 //!
 //! - `antsApplyTransforms` is [`apply_transforms`] (ITK's `ResampleImageFilter`).
+//! - `antsAI` is [`ai`] and `antsAffineInitializer` is [`affine_initializer`] (multi-start
+//!   searches for an initial linear transform).
 //! - `antsApplyTransformsToPoints` is [`transform_points`]; `antsApplyTransforms`' transform
 //!   outputs (`-o Linear[...]`, `-o CompositeTransform[...]`, `-o DisplacementField[...]`) are
 //!   [`transform_output()`].
@@ -17,6 +19,7 @@
 //! - The original command lines are in [`cli`].
 #![forbid(unsafe_code)]
 
+pub mod affine_initializer;
 pub mod ai;
 pub mod apply_transforms;
 pub mod cli;

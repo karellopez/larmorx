@@ -202,6 +202,8 @@ defects! {
         "the translation search grid is ignored for Rigid and Similarity in 2D and for Similarity in 3D: every translation gives the same start point";
     ANTS_53 = "ANTS-53", "antsAI", true,
         "AlignGeometricCenters and AlignCentersOfMass with iterations above 0 run a search that lists no start point and write no transform: an empty .mat file, exit 0 (a .txt or .h5 output crashes)";
+    ANTS_54 = "ANTS-54", "antsAffineInitializer", true,
+        "the local search's iterations (the eighth argument) are not read: every start point runs 20 iterations, whatever the command line says";
     ANTS_55 = "ANTS-55", "antsAI", true,
         "a translation search grid with fewer extents than dimensions is read past the end of its vector";
     ANTS_56 = "ANTS-56", "antsAffineInitializer", true,

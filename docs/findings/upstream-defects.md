@@ -90,9 +90,13 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
 | ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | sMRIPrep's T1w (7-8 % of voxels) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
-| ANTS-45 | N4, DenoiseImage | errors explained only with `-v` | f | none | always explained | – |
-| ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | c? | every run | not ported (A4) | open |
+| ANTS-45 | N4, DenoiseImage, antsRegistration | errors explained only with `-v` | f | none | always explained | – |
+| ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | – | every run | explained (A4 part 2): ITK's window convergence test passes when the metric stops improving; not a defect | – |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-48 | antsApplyTransforms | transform outputs: crashes and aborts (an unknown extension, `-i` without `-r`, a Gaussian interpolator without `-i`, a collapsed `IdentityTransform`) | a | none | refuses (exit 1) | – |
+| ANTS-49 | antsRegistration | a linear stage that throws is dropped and the run goes on, exit 0 | e | none seen | corrected by default: an error (A4 part 2) | – |
+| ANTS-50 | antsRegistration | `--save-state` after linear stages only: exit 1 without a message, no transform written | e | none | corrected by default: the state is written (A4 part 2) | – |
+| ANTS-51 | antsRegistration | transform files without collapsing: initial transforms skipped by counting `-r` options, each file named after the next stage; a composite `-r` file or a restored state gives a misnamed file, then a read past the end of the names (crash) | a | none (fMRIPrep collapses) | corrected by default; `reproduce` writes ANTs' files up to the crash and stops (A4 part 2) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -110,6 +114,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-15 | ITK HDF5 transform writer | a transform without parameters cannot be written with compression, which ANTs always asks for ("H5Pset_chunk failed"); a file ITK cannot read is left | c | none | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | ITK-16 | ITK HDF5 transform reader | a null variable-length `TransformType` builds a `std::string` from a null pointer | a | none | refuses | – |
 | ITK-17 | ITK `CompositeTransformIOHelper` | a component of another dimension is `static_cast` to the composite's: ANTs runs on, exit 0 | a | none | refuses | – |
+| ITK-18 | ITK joint-histogram mutual information (ANTs' `MI2`) | each image's marginal density is the other's | c | none (fMRIPrep uses Mattes and CC) | corrected by default (A4 part 2) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -221,7 +226,8 @@ clean-room original needs (`specs/3dTshift.md` §6.1 to §6.5); part 2a (2026-10
 replica AFNI's global options and environment variables (spec §7.1), corrected AFNI-11 and
 AFNI-12 for them, and added AFNI-18 to AFNI-24; AFNI-23, decided the same day, is corrected by
 default in the replica. A4 part 1 (ITK's HDF5 transform files, 2026-10-16) added ITK-12 to
-ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch.
+ITK-17, HDF-01 and PIPE-17, the class (c) ones corrected by default with a switch; A4 part 2
+(antsApplyTransforms' transform outputs, 2026-10-16) added ANTS-48.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -427,7 +433,8 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 
 ### ANTS-02 Crashes on missing files and arguments — (a)
 - **What:** ImageMath, N4 and DenoiseImage dereference a null image when the input is missing
-  (SIGSEGV); MultiplyImages without its first file or output name aborts (`throw;`); PadImage
+  (SIGSEGV), and so does antsRegistration when a metric's image is missing (after
+  "All_Command_lines_OK"); MultiplyImages without its first file or output name aborts (`throw;`); PadImage
   without its pad and ReplaceVoxelValue without its value pass a null pointer to `atof`;
   SmoothImage without an output name, `std::stoi`/`std::stof` of text, ITK exceptions outside
   a `try` (`ThresholdAtMean` above the maximum, `RescaleImage` reversed), a morphology radius
@@ -934,6 +941,20 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   the whole image, with a warning.
 - **D13 / gap:** done. No gap.
 
+### ANTS-48 antsApplyTransforms' transform outputs crash or abort — (a)
+- **What:** with `-o Linear[...]`, `-o CompositeTransform[...]` or `-o DisplacementField[...]`:
+  an output name whose extension no transform writer takes makes ITK throw, uncaught, and the
+  program aborts (exit 134); an input image without a reference image is still resampled, onto
+  a null reference (segmentation fault); a Gaussian or MultiLabel interpolator without an
+  input image reads its default sigmas from `inputImages[0]` of an empty vector; and
+  `CollapseLinearTransforms` dereferences the null `dynamic_cast` of an `IdentityTransform`.
+- **Evidence:** read: `antsApplyTransforms.cxx:578-633, 693-698`,
+  `itkantsRegistrationHelper.hxx:3790-3794`; verified (the oracle exits 134, −11 and −11,
+  2026-10-16; the `transform-output/errors/*` cases).
+- **fMRIPrep:** none.
+- **larmorx:** refuses each with a message, exit 1, in both modes.
+- **D13 / gap:** class (a), not reproduced. No gap.
+
 ### ANTS-44 DenoiseImage's bias outside the mask — (c?)
 - **What:** where the smoothed bias is not positive, or outside the mask, the bias keeps its
   unsmoothed value, so a voxel just outside a mask keeps the raw estimate of a centre inside it.
@@ -944,21 +965,95 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 
 ### ANTS-45 Errors explained only with `-v` — (f)
 - **What:** N4 exits 1 on a weight image on another grid, and on a mesh of the wrong length,
-  but says why only with `-v`; DenoiseImage's invalid noise model and radii likewise.
+  but says why only with `-v`; DenoiseImage's invalid noise model and radii likewise; so do
+  most of antsRegistration's checks (a missing dimension, option or metric; inconsistent
+  levels; an unreadable initial transform), which print to standard output or error only with
+  `-v` (parity cases `errors/version-0`, `errors/no-dimension-quiet`,
+  `errors/unbalanced-bracket`).
 - **Evidence:** read; verified.
 - **fMRIPrep:** none.
 - **larmorx:** always prints the reason; exit codes as ANTs'.
 - **D13 / gap:** not D13. No gap.
 
-### ANTS-46 The BOLD reference's affine registration stops early — (c?), open
+### ANTS-46 The BOLD reference's affine registration stops early — explained, not a defect
 - **What:** fMRIPrep's affine registration of the BOLD reference to MNI (`Affine[0.1]`, Mattes
   64 bins, `Random 0.2`, convergence `[200, 1e-09, 10]`) ends after iteration 25 of 200 with a
-  convergence value of 1.9e-6, above its threshold. Not understood yet.
-- **Evidence:** verified (its `command.txt` re-run in fMRIPrep's image with `--verbose 1`);
-  ANTs 2.6.2, `itkantsRegistrationHelper.hxx:1363-1375`.
-- **fMRIPrep:** every run.
-- **larmorx:** not ported (A4).
-- **D13 / gap:** open; A4 explains it.
+  convergence value of 1.9e-6, above its threshold.
+- **Explained (A4 part 2, 2026-10-17):** the last `DIAGNOSTIC` line shows the convergence value
+  computed at that iteration; the optimizer stops at the *next* evaluation, before it prints
+  anything, because `WindowConvergenceMonitoringFunction` gives the negative slope of a line
+  fitted to the last 10 metric values, normalised by their sum: it is **negative** when the
+  metric rose over the window, and `GradientDescentOptimizerv4::ResumeOptimization` stops when
+  it is `≤ 1e-9`. With `Random 0.2` sampling the metric fluctuates near the optimum, so the
+  registration stops as soon as it stops improving, which is what the test is for. Re-running
+  fMRIPrep's command line (ds000005, run 1) with `ANTS_RANDOM_SEED=42`: ANTs and larmorx both
+  print 36 identical lines and stop at the 37th evaluation, convergence value −1.56e-6.
+- **Evidence:** read: `itkGradientDescentOptimizerv4.hxx:72-140` (`ResumeOptimization`, the test at 126),
+  `itkWindowConvergenceMonitoringFunction.hxx`; validated (`real/ds000005-sub-01/boldref-affine`
+  in `docs/validation/ants-registration.md`).
+- **fMRIPrep:** every run; by design.
+- **larmorx:** the same stop.
+- **D13 / gap:** not a defect. No gap.
+
+### ANTS-49 A linear stage that throws is dropped — (e)
+- **What:** `AddLinearTransformToCompositeTransform` catches an ITK exception from the
+  registration (a Demons metric in a linear stage, "All samples map outside moving image
+  buffer", a joint PDF that sums to zero, ...), logs "Exception caught:" and returns
+  `EXIT_FAILURE`, which `DoRegistration` ignores: the stage's transform is not added, the next
+  stages run without it, the outputs are written and the program exits 0. Only `--verbose`
+  shows the exception.
+- **Evidence:** read: `itkantsRegistrationHelper.h:1072-1089`, `itkantsRegistrationHelper.hxx:1464`
+  (return value unused); verified (`metrics/demons`, `metrics/no-overlap`).
+- **fMRIPrep:** none seen.
+- **larmorx:** corrected by default (A4 part 2): the exception is printed as ANTs prints it and the
+  run stops with an error naming the stage; `reproduce` drops the stage and goes on, with a
+  warning.
+- **D13 / gap:** done. No gap.
+
+### ANTS-50 `--save-state` after linear stages only — (e)
+- **What:** the registration state is set by SyN stages only; after linear stages
+  `antsRegistration` finds it null and returns `EXIT_FAILURE` with no message, after writing the
+  warped images and before writing any transform. The option's own description says the state
+  is the composite transform "unless the last transform is a SyN transform".
+- **Evidence:** read: `antsRegistrationTemplateHeader.h:1301-1307`; verified
+  (`initial/save-state`).
+- **fMRIPrep:** none (fMRIPrep does not save states).
+- **larmorx:** corrected by default (A4 part 2): the state file holds every transform of the
+  registration (initial and computed, not collapsed), which `--restore-state` reads back, and
+  the outputs follow; `reproduce` exits 1 as ANTs does, with a warning.
+- **D13 / gap:** done. No gap.
+
+### ANTS-51 Transform files without collapsing: names and the end of the list — (a)
+- **What:** with `-z 0` the transforms are written one file each, named after the stages in
+  order (`TransformTypeNames`, popped once per file). The initial transforms are skipped by
+  counting the `-r` options, not the transforms they hold: a composite `-r` file, or a
+  `--restore-state` file (not counted at all), makes ANTs write an initial transform under a
+  stage's name, and then pop from the empty list (undefined behaviour: a garbage name, the
+  writer's "Could not create IO object", a segmentation fault). With
+  `--initialize-transforms-per-stage` (which needs `-a 1`, so it never reaches this code) the
+  same miscount would follow.
+- **Evidence:** read: `antsRegistrationTemplateHeader.h:1429-1440`; verified (the oracle exits
+  −11 after writing `r1BOGUS.XXXX`, `initial/names-restored`).
+- **fMRIPrep:** none (it collapses).
+- **larmorx:** corrected by default (A4 part 2): every transform a stage computed is written, at
+  its position, named after that stage; `reproduce` writes ANTs' files up to the point where
+  ANTs reads past the end of its list, then stops with an error.
+- **D13 / gap:** class (a): the crash is not reproduced. No gap.
+
+### ITK-18 The joint-histogram MI swaps its marginals — (c)
+- **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
+  the joint density along its first index (the fixed image's bin) into what it calls the
+  fixed image's marginal, and along the second into the moving image's: each image gets the
+  other's marginal. `ComputeValue` (`p(f,m) log p(f,m) / (p_f · p_m)`) and the derivative
+  (`p_m` at the moving value) use them under their names, so the value is not the mutual
+  information and the derivative not its gradient (unless the two marginals agree).
+- **Evidence:** read: `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:263-295`;
+  validated (`metrics/mi2*`: reproduced bit for bit; corrected, a 5-iteration affine changes
+  its parameters by up to 0.06).
+- **fMRIPrep:** none (fMRIPrep and its libraries use `Mattes` and `CC`).
+- **larmorx:** corrected by default (A4 part 2): each image gets its own marginal, with a
+  notice; `reproduce` swaps them as ITK does.
+- **D13 / gap:** done. No gap.
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

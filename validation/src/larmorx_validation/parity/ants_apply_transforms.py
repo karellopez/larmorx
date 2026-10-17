@@ -19,7 +19,11 @@ Cases cover:
 - output types, time series and the errors both programs must raise;
 - real fMRIPrep derivatives;
 - all of the above again with ``--float 1``, ANTs' single-precision pipeline (category
-  ``float``), plus the parsing of float numbers in text transforms and ``-f``.
+  ``float``), plus the parsing of float numbers in text transforms and ``-f``;
+- the transform outputs ``-o Linear[...]``, ``-o CompositeTransform[...]`` and
+  ``-o DisplacementField[...]`` (category ``transform-output``, ``ants_transform_output``), whose files
+  are compared byte for byte (text, MATLAB), dataset by dataset (HDF5) or header and vectors
+  (NIfTI).
 
 ANTs runs twice: as built (glibc's maths), the headline, and with CORE-MATH's correctly
 rounded functions preloaded (``scripts/build_crmath_preload.sh``), which larmorx computes with
@@ -39,6 +43,7 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
+from larmorx_validation.parity import ants_transform_output as outputs
 from larmorx_validation.parity import defects
 from larmorx_validation.parity.ants_programs import (
     affine_difference,
@@ -544,7 +549,7 @@ def cases(tier: str) -> list[Case]:
     rank = _TIERS.index(tier)
     return [
         Case(cid, category, desc, scenario)
-        for cid, category, desc, scenario in _scenarios()
+        for cid, category, desc, scenario in [*_scenarios(), *outputs.scenarios()]
         if _TIERS.index(scenario.tier) <= rank
     ]
 
@@ -694,6 +699,10 @@ def _ulps(a: np.ndarray, b: np.ndarray) -> int:
 def run_case(case: Case, checks: CheckList) -> None:
     import nibabel as nib
 
+    if isinstance(case.payload, outputs.OutputScenario):
+        with tempfile.TemporaryDirectory(prefix="lx-aat-") as tmp_name:
+            outputs.run_output_case(case.id, case.payload, checks, Path(tmp_name))
+        return
     s: Scenario = case.payload
     with tempfile.TemporaryDirectory(prefix="lx-aat-") as tmp_name:
         tmp = Path(tmp_name)
@@ -815,7 +824,10 @@ def _identical(r: CaseResult, name: str) -> bool | None:
 
 
 def _highlights(results: list[CaseResult]) -> list[str]:
-    compared = [r for r in results if r.status == PASS]
+    produced = [r for r in results if r.case.startswith("transform-output/") and r.status == PASS]
+    compared = [
+        r for r in results if r.status == PASS and not r.case.startswith("transform-output/")
+    ]
     single = [
         r for r in compared if r.case.startswith("float/") or r.case.startswith("output/float-")
     ]
@@ -854,6 +866,30 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             lines.append(
                 "**Not explained by the maths library**: " + ", ".join(f"`{c}`" for c in rest) + "."
             )
+    if produced:
+        exact = [r for r in produced if all(c.passed for c in r.checks)]
+        h5 = [
+            c
+            for r in produced
+            for c in r.checks
+            if c.name.endswith("bytes, ITK's strings and object times")
+        ]
+        h5_same = [c for c in h5 if c.value == 0]
+        h5_chunks = [c for c in h5 if c.passed]
+        lines.append(
+            f"**Transform outputs** (`-o Linear[...]`, `-o CompositeTransform[...]`, "
+            f"`-o DisplacementField[...]`): {len(exact)} of {len(produced)} cases write ANTs's "
+            "files: text and MATLAB files byte for byte, NIfTI fields header and vectors bit for "
+            "bit, HDF5 files dataset for dataset"
+            + (
+                f"; written with ITK's strings and object times, {len(h5_chunks)} of {len(h5)} "
+                f"HDF5 files are ITK's byte for byte given ITK's compressed chunks, {len(h5_same)} "
+                "with larmorx's own deflate"
+                if h5
+                else ""
+            )
+            + "."
+        )
     lines += defects.summary(results)
     return lines
 
@@ -888,6 +924,12 @@ def suite() -> Suite:
                 f"max |diff| ≤ {RTOL:g} × max |ANTs output| (PLAN.md §11.3, interpolation vs ITK); bit-identity reported for every case",
             ),
             ("Other interpolators, integer output (-u)", "max |diff| ≤ 1"),
+            (
+                "Transform outputs",
+                "text and MATLAB files byte for byte; HDF5 files: every dataset bit for bit "
+                "(bytes reported, object times set alike); NIfTI fields: header bytes and every "
+                "vector bit for bit (differing vectors reported)",
+            ),
             (
                 "Reported",
                 "bit-identity with ANTs as built, and with ANTs with CORE-MATH's correctly "

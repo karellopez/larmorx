@@ -1,6 +1,6 @@
 # Parity: antsApplyTransforms
 
-**All cases agree.** 182 cases on the `standard` tier: 174 pass, 8 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 220 cases on the `standard` tier: 202 pass, 14 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
 - **Reference:** antsApplyTransforms from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with 4 threads
@@ -10,6 +10,7 @@
 **Bit-identical to the unmodified antsApplyTransforms, all cases: 160 of 174** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 174 of 174.
 **Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 89 of 89** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 89 of 89.
 Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `sincos`, `sinf`, `cosf` or `sincosf` (bit-identical with CORE-MATH preloaded; Gaussian and windowed-sinc weights, Euler and versor matrices; docs/findings/platform-math.md): `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `time-series/LanczosWindowedSinc`.
+**Transform outputs** (`-o Linear[...]`, `-o CompositeTransform[...]`, `-o DisplacementField[...]`): 28 of 28 cases write ANTs's files: text and MATLAB files byte for byte, NIfTI fields header and vectors bit for bit, HDF5 files dataset for dataset; written with ITK's strings and object times, 8 of 8 HDF5 files are ITK's byte for byte given ITK's compressed chunks, 5 with larmorx's own deflate.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-06: 4 case(s) named it, 4 with changed values (largest difference 255): `output/-u-char`, `output/-u-uchar`, `float/output/-u-char`, `float/output/-u-uchar`
 
@@ -23,6 +24,7 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 | Label interpolators (NearestNeighbor, MultiLabel, GenericLabel) | identical voxels |
 | Other interpolators, float output | max \|diff\| ≤ 0.0001 × max \|ANTs output\| (PLAN.md §11.3, interpolation vs ITK); bit-identity reported for every case |
 | Other interpolators, integer output (-u) | max \|diff\| ≤ 1 |
+| Transform outputs | text and MATLAB files byte for byte; HDF5 files: every dataset bit for bit (bytes reported, object times set alike); NIfTI fields: header bytes and every vector bit for bit (differing vectors reported) |
 | Reported | bit-identity with ANTs as built, and with ANTs with CORE-MATH's correctly rounded functions preloaded (`LD_PRELOAD`, the oracle binary only) |
 
 ## Results by category
@@ -37,6 +39,16 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 | output | 9 | 9 | 0 | 0 | 0 |
 | time-series | 5 | 5 | 0 | 0 | 0 |
 | transform | 33 | 33 | 0 | 0 | 0 |
+| transform-output | 38 | 28 | 6 | 4 | 0 |
+
+## Expected divergences
+
+| Case | Reason |
+|---|---|
+| `transform-output/errors/unknown-extension` | ITK's transform writer finds no IO for the extension and throws; antsApplyTransforms does not catch it and aborts. larmorx refuses with a message |
+| `transform-output/errors/linear-input-no-reference` | an input image is resampled onto the reference even for a transform output; without one ANTs dereferences a null image and crashes. larmorx refuses |
+| `transform-output/errors/gaussian-no-input` | ANTs reads the Gaussian interpolator's default sigmas from the first input image even when there is none (an empty vector) and crashes. larmorx refuses |
+| `transform-output/errors/identity-transform-file` | ANTs's CollapseLinearTransforms takes an IdentityTransform for a matrix-offset transform and dereferences a null pointer. larmorx refuses |
 
 ## Rejected by both
 
@@ -44,18 +56,24 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4so_9vi5/missing.mat |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4s7ni5y7/missing.mat |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `float/errors/4d-as-scalar` | --float 1: a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `float/errors/invert-field` | --float 1: inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-k2tcia93/missing.mat |
+| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-m3f7cs3s/missing.mat |
 | `float/errors/unknown-interpolator` | --float 1: -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
+| `transform-output/errors/linear-no-parameter` | -o Linear without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
+| `transform-output/errors/composite-no-parameter` | -o CompositeTransform without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
+| `transform-output/errors/linear-with-field` | -o Linear[...] of a chain with a displacement field: not linear | ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear. |
+| `transform-output/errors/field-no-reference` | -o DisplacementField[...] without -r | ANTs: A reference image is required.; larmorx: A reference image is required. |
+| `transform-output/errors/image-no-input` | -o [x.nii.gz,0] without -i: an image output needs an input | ANTs: An input image is required.; larmorx: An input image is required. |
+| `transform-output/errors/inverted-field` | -o CompositeTransform[...] -t [field,1]: a displacement field has no inverse | ANTs: Inverse does not exist for <larmorx-testdata>/data/synthetic/resampling/transforms/warp-lps-vector.nii.gz; larmorx: Inverse does not exist: a displacemen… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (be0c0eb89fde) |
+| larmorx | 0.0.1 (32c535626228) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -254,3 +272,41 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `float/fmriprep/bold-series-to-T1w` | pass | 8/8 | --float 1: the 4D preprocessed BOLD series → T1w, -e 3 Lanczos (fMRIPrep's classic BOLD resampling) |
 | `float/parse/text-transform` | pass | 8/8 | --float 1: a text affine whose numbers round differently read as float (strtof) and as double then cast |
 | `float/parse/default-value` | pass | 8/8 | --float 1 -f 0.1000000052154064178466796874999999999999: the default value read as float (strtof), not as double then c… |
+| `transform-output/linear/text` | pass | 3/3 | -o Linear[x.txt]: an Euler transform after a centred affine, collapsed |
+| `transform-output/linear/matlab-inverse` | pass | 3/3 | -o Linear[x.mat,1]: collapsed, then inverted (centre 0) |
+| `transform-output/linear/hdf5` | pass | 4/4 | -o Linear[x.h5]: Euler, an inverted versor, a translation |
+| `transform-output/linear/every-class` | pass | 3/3 | -o Linear[x.txt]: an inverted similarity, a versor, an inverted translation, an Euler with a centre and the identity ke… |
+| `transform-output/linear/no-transforms` | pass | 3/3 | -o Linear[x.txt] without -t: the identity ANTs adds |
+| `transform-output/linear/with-image` | pass | 3/3 | -o Linear[x.txt] with -i and -r: the image is read (ANTs resamples it and discards the result) |
+| `transform-output/linear/float-text` | pass | 3/3 | --float 1 -o Linear[x.txt]: an inverted Euler and a float affine, in single precision |
+| `transform-output/linear/float-matlab-inverse` | pass | 3/3 | --float 1 -o Linear[x.mat,1]: float parameters and fixed parameters in the MATLAB file |
+| `transform-output/linear/float-hdf5` | pass | 4/4 | --float 1 -o Linear[x.h5]: float parameters in HDF5 |
+| `transform-output/linear/fmriprep` | pass | 3/3 | -o Linear[x.txt]: fMRIPrep's BOLD-to-T1w affine (ds000005) after its inverse: the identity, up to rounding |
+| `transform-output/composite/text-inverses` | pass | 3/3 | -o CompositeTransform[x.txt]: inverted Euler, translation and similarity (as MatrixOffsetTransformBase, TranslationTran… |
+| `transform-output/composite/matlab` | pass | 3/3 | -o CompositeTransform[x.mat]: one CompositeTransform variable, its components' parameters from the last to the first |
+| `transform-output/composite/matlab-one` | pass | 3/3 | -o CompositeTransform[x.mat] of one transform: its own parameters |
+| `transform-output/composite/hdf5-nested` | pass | 4/4 | -o CompositeTransform[x.h5]: an .h5 composite (affine and field) and an inverted Euler |
+| `transform-output/composite/hdf5-field` | pass | 4/4 | -o CompositeTransform[x.h5]: an inverted affine, a NIfTI displacement field, an inverted versor |
+| `transform-output/composite/float-text` | pass | 3/3 | --float 1 -o CompositeTransform[x.txt]: float classes, an inverted versor |
+| `transform-output/composite/float-hdf5` | pass | 4/4 | --float 1 -o CompositeTransform[x.h5]: the field read in float |
+| `transform-output/composite/float-matlab` | pass | 3/3 | --float 1 -o CompositeTransform[x.mat] |
+| `transform-output/composite/no-transforms` | pass | 3/3 | -o CompositeTransform[x.txt] without -t |
+| `transform-output/composite/fmriprep` | pass | 4/4 | -o CompositeTransform[x.h5]: fMRIPrep's T1w-to-MNI composite (ds000005) after its BOLD-to-T1w affine |
+| `transform-output/field/nifti` | pass | 4/4 | -o DisplacementField[x.nii.gz]: a NIfTI field after a centred affine (pointwise) |
+| `transform-output/field/legacy-form` | pass | 4/4 | -o [x.nii.gz,1]: a linear chain (scan lines interpolated) |
+| `transform-output/field/hdf5-linear` | pass | 4/4 | -o DisplacementField[x.h5]: a DisplacementFieldTransform file |
+| `transform-output/field/hdf5-field` | pass | 4/4 | -o DisplacementField[x.h5]: a RAS displacement field (NIFTI_INTENT_DISPVECT) on a grid of exact ties |
+| `transform-output/field/float-linear` | pass | 4/4 | --float 1 -o DisplacementField[x.nii.gz]: float transforms on double points |
+| `transform-output/field/float-composite` | pass | 4/4 | --float 1 -o DisplacementField[x.nii]: an .h5 composite with a field, uncompressed NIfTI |
+| `transform-output/field/no-transforms` | pass | 4/4 | -o DisplacementField[x.nii.gz] without -t: zero vectors |
+| `transform-output/field/fmriprep` | pass | 4/4 | -o DisplacementField[x.nii.gz]: fMRIPrep's T1w-to-MNI composite (ds000005) on its 2 mm MNI grid |
+| `transform-output/errors/linear-no-parameter` | both-error | 1/1 | -o Linear without a file name |
+| `transform-output/errors/composite-no-parameter` | both-error | 1/1 | -o CompositeTransform without a file name |
+| `transform-output/errors/linear-with-field` | both-error | 1/1 | -o Linear[...] of a chain with a displacement field: not linear |
+| `transform-output/errors/field-no-reference` | both-error | 1/1 | -o DisplacementField[...] without -r |
+| `transform-output/errors/image-no-input` | both-error | 1/1 | -o [x.nii.gz,0] without -i: an image output needs an input |
+| `transform-output/errors/inverted-field` | both-error | 1/1 | -o CompositeTransform[...] -t [field,1]: a displacement field has no inverse |
+| `transform-output/errors/unknown-extension` | expected-divergence | 1/1 | -o CompositeTransform[x.foo]: no transform writer for the extension |
+| `transform-output/errors/linear-input-no-reference` | expected-divergence | 1/1 | -o Linear[...] with -i and without -r |
+| `transform-output/errors/gaussian-no-input` | expected-divergence | 1/1 | -o Linear[...] -n Gaussian without -i |
+| `transform-output/errors/identity-transform-file` | expected-divergence | 1/1 | -o Linear[...] of an IdentityTransform read from a file |

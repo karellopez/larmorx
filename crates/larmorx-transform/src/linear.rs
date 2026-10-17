@@ -123,7 +123,7 @@ type VersorParts<R> = (R, R, R, R);
 /// ITK-10). With [`UpstreamDefects::Reproduce`] that is the error here too; with
 /// [`UpstreamDefects::Fix`] the versor is computed as ITK computes it in double, then stored as
 /// `R` (the second value says whether that happened).
-fn versor<R: ItkReal>(
+pub(crate) fn versor<R: ItkReal>(
     p: [R; 3],
     norm: f64,
     mode: UpstreamDefects,
@@ -389,6 +389,22 @@ impl LinearTransform {
             fixed_parameters: vec![0.0; 3],
             matrix,
             offset,
+        }
+    }
+
+    /// The identity ANTs puts in a chain for `-t identity` (and for no `-t` at all): a
+    /// `MatrixOffsetTransformBase` after `SetIdentity()` (`GetCompositeTransformFromParserOption`).
+    pub fn identity_matrix_offset() -> Self {
+        let matrix = larmorx_core::linalg::IDENTITY3;
+        let mut parameters: Vec<f64> = matrix.iter().flatten().copied().collect();
+        parameters.extend_from_slice(&[0.0; 3]);
+        LinearTransform {
+            itk_name: "MatrixOffsetTransformBase_double_3_3".into(),
+            kind: LinearKind::Affine,
+            parameters,
+            fixed_parameters: vec![0.0; 3],
+            matrix,
+            offset: [0.0; 3],
         }
     }
 

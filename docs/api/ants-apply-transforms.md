@@ -1,25 +1,29 @@
 # antsApplyTransforms
 
-`lx.ants.apply_transforms`, `lx.ants.apply_transforms_to_points` and `lx.transforms`
-(command line `larmorx ants antsApplyTransforms`; Rust crates `larmorx-ants`,
+`lx.ants.apply_transforms`, `lx.ants.apply_transforms_to_points`, `lx.ants.combine_transforms`
+and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crates `larmorx-ants`,
 `larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
 
 **Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 182 cases:
+[validation record](../validation/ants-apply-transforms.md)). The record covers 220 cases:
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
   included;
 - awkward geometries, output types and time series;
 - real fMRIPrep derivatives;
-- all of them again with `--float 1`, ANTs' single-precision pipeline.
+- all of them again with `--float 1`, ANTs' single-precision pipeline;
+- the transform outputs, every form and format, and the errors around them.
 
-All 182 agree (8 of them errors both programs report). Of the 174 compared, 160 are
+All 220 agree (14 of them errors both programs report; 4 expected divergences, where ANTs
+crashes and larmorx refuses, ANTS-48). Of the 174 resampling cases compared, 160 are
 byte-identical to the unmodified ANTs program, among them all 89 `--float 1` cases; the other
 14 (two of them through fMRIPrep's `.h5` composite) differ only where ITK calls the platform's
 `exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc in double), by at most about 1e-15
 relative ([why](../findings/platform-math.md)). With correctly rounded maths preloaded into
-ANTs, all 174 are byte-identical. All 14 of fMRIPrep's
+ANTs, all 174 are byte-identical. The 28 transform-output cases (`-o Linear[...]`,
+`-o CompositeTransform[...]`, `-o DisplacementField[...]`) write ANTs's files: text and MATLAB
+byte for byte, NIfTI fields bit for bit, HDF5 dataset for dataset. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
 ([stage record](../validation/fmriprep-stages.md)). Compared with ANTs' defects reproduced
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
@@ -84,6 +88,9 @@ are placed by their affine.
 | `-i file` | `image` | path, `lx.Image`, nibabel image or `(array, affine)` |
 | `-r file` | `reference` | only its grid is used |
 | `-o file` | the returned `Image` (`.save(path)`) | |
+| `-o Linear[file,<invert=0>]` | `combine_transforms(..., output="linear", invert_linear=)` | [below](#transform-outputs) |
+| `-o CompositeTransform[file]` | `combine_transforms(..., output="composite")` | [below](#transform-outputs) |
+| `-o DisplacementField[file]`, `-o [file,1]` | `combine_transforms(..., output="displacement_field", reference=)` | [below](#transform-outputs) |
 | `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists; linear transforms only can be inverted. **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
 | `-t identity` | `transforms=()` | |
 | `-n Linear` | `interpolation="linear"` | default |
@@ -102,8 +109,45 @@ are placed by their affine.
 | (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
 
 Not supported yet (the CLI says so): vector, tensor, multichannel and 5D images (`-e 1, 2, 4,
-5, 6`); `-d 2` and `-d 4`; transform outputs (`-o Linear[...]`, `-o CompositeTransform[...]`,
-`-o [field,1]`); initializers (`-t [fixed,moving,feature]`).
+5, 6`); `-d 2` and `-d 4`; initializers (`-t [fixed,moving,feature]`); MINC transform files
+(`.xfm`).
+
+## Transform outputs
+
+`-o Linear[file,<invert>]`, `-o CompositeTransform[file]` and `-o DisplacementField[file]`
+(or the older `-o [file,1]`) write the chain of `-t` transforms instead of a warped image, as
+ANTs builds it (added 2026-10-16, A4 part 2). In Python, `lx.ants.combine_transforms` returns
+the same transforms as `ItkTransform` objects, which `lx.transforms.write` writes.
+
+- **The chain** holds each transform with the class ITK reads it as, in the computation type
+  (`_double_3_3`, or `_float_3_3` with `--float 1`). An inverted transform (`-t [file,1]`) has
+  the class ITK's inverse makes: an `AffineTransform` stays one, a `TranslationTransform` is the
+  opposite translation, and every other matrix-offset class (Euler, versor, similarity, rigid)
+  becomes a `MatrixOffsetTransformBase` with the original's fixed parameters (four for an
+  Euler transform: its centre and its ZYX flag). A chain without parameters (no `-t`) gets the
+  identity `MatrixOffsetTransformBase` ANTs adds.
+- **`CompositeTransform[file]`** writes a `CompositeTransform` and the chain's transforms in
+  queue order: in HDF5 (`.h5`), ITK text (`.txt`) or MATLAB (`.mat`, where ITK writes the
+  composite as one variable: the components' parameters from the last to the first, then their
+  fixed parameters).
+- **`Linear[file,<invert>]`** collapses a chain of linear transforms into one `AffineTransform`
+  (ANTs's `CollapseLinearTransforms`: centred on the last matrix-offset transform of the
+  queue); with `invert` 1, its inverse, centred at 0. A chain with a displacement field is
+  refused ("The transform or set of transforms is not linear.").
+- **`DisplacementField[file]`** samples the chain on the reference grid (`-r`, required):
+  `T(p) − p` for every voxel (ITK's `TransformToDisplacementFieldFilter`, with points in
+  double; a linear chain maps each scan line's two ends and interpolates). `.h5` and `.hdf5`
+  give a `DisplacementFieldTransform` file, any other name a NIfTI vector image
+  (`x × y × z × 1 × 3`, intent `NIFTI_INTENT_VECTOR`, LPS vectors), as ITK writes them.
+- Numbers in text files are written as ITK writes them (the shortest decimal that reads back
+  to the same value: `1`, `0.1`, `1.5e-7`), a float transform's as floats; a float
+  transform's MATLAB file holds its fixed parameters as floats too.
+- An input image (`-i`) is read and checked as ANTs reads it, but not resampled: ANTs resamples
+  it onto the reference and discards the result, so the outputs are the same.
+
+Validated against antsApplyTransforms: the record's `transform-output` cases, every file
+byte for byte (text, MATLAB), header and vectors bit for bit (NIfTI) or dataset for dataset
+(HDF5, whose bytes differ only as [transforms-hdf5.md](transforms-hdf5.md) describes).
 
 ## `lx.ants.apply_transforms_to_points(points, transforms=(), *, invert=None, coordinates="lps")`
 
@@ -111,6 +155,14 @@ Maps an `(n, 3+)` array of points (extra columns kept) through the transforms, l
 `antsApplyTransformsToPoints`. ANTs works in LPS millimetres; `coordinates="ras"` takes and
 returns RAS+. To move points from the moving image to the fixed one, give the inverse
 transforms, as with ANTs.
+
+## `lx.ants.combine_transforms(transforms=(), *, invert=None, output="composite", ...)`
+
+`output="composite"`, `"linear"` (with `invert_linear=`) or `"displacement_field"` (with
+`reference=`, an image or a path); `precision="float32"` is `--float 1`. Returns a list of
+`ItkTransform`: the `CompositeTransform` entry and the chain, the collapsed affine, or the
+`DisplacementFieldTransform` (its parameters the interleaved vectors, its fixed parameters the
+reference grid). `n_threads` and `upstream_defects` as for `apply_transforms`.
 
 ## `lx.transforms`
 
@@ -120,8 +172,8 @@ nests the ones after it. `lx.transforms.write(path, transforms)` writes them.
 
 | Format | Read | Write |
 |---|---|---|
-| ITK text `.txt`, `.tfm` | ✓ | linear transforms |
-| MATLAB `.mat` (ANTs' `*GenericAffine.mat`) | ✓ | one linear transform |
+| ITK text `.txt`, `.tfm` | ✓ | ✓, numbers as ITK writes them |
+| MATLAB `.mat` (ANTs' `*GenericAffine.mat`) | ✓ | ✓ (a composite as ITK writes it: one variable) |
 | HDF5 `.h5` (fMRIPrep's `*_xfm.h5`) | ✓, in Rust (Python and command line) | ✓, composites and fields included, laid out as ITK 5.4.5 lays them out ([transforms-hdf5.md](transforms-hdf5.md)) |
 | Displacement field `.nii`, `.nii.gz` | ✓ (LPS vectors; RAS→LPS for intent DISPVECT, as ITK) | – |
 
@@ -188,6 +240,13 @@ a line on standard error) names the entry wherever it changed the result
 - **GenericLabel** evaluates only the labels among the 8 neighbours (ANTS-34): ITK evaluates
   every distinct value in the image and practically never finishes on an intensity image. The
   result is the same.
+- **Transform outputs where ANTs crashes or aborts** (ANTS-48): larmorx refuses with a
+  message, exit 1, in both D13 modes: an unknown transform file extension (ANTs aborts on an
+  uncaught ITK exception), an input image without a reference, a Gaussian or MultiLabel
+  interpolator without an input image, an `IdentityTransform` file collapsed by `Linear[...]`
+  (ANTs crashes on each), a singular collapsed affine inverted.
+- **HDF5 transform outputs** name larmorx as the system (`/OSName`, `/OSVersion`) and record
+  object time 0; ITK names the machine and stamps the time ([transforms-hdf5.md](transforms-hdf5.md)).
 
 ## Performance
 

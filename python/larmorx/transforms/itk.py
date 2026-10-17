@@ -114,8 +114,10 @@ def write(
     ``.he4``, ``.he5``, ``.hd5``, compared case for case as ITK does) takes any transforms,
     composites and displacement fields included, stored as :class:`Hdf5WriteOptions` says:
     the layout is HDF5 1.12.1's for ITK's calls, byte for byte apart from the compressed
-    chunks. ``.txt`` and ``.tfm`` take linear transforms; ``.mat`` exactly one linear
-    transform. A composite may only come first: the transforms after it are its components.
+    chunks. ``.txt`` and ``.tfm`` (ITK's text format, numbers as ITK writes them) and ``.mat``
+    (MATLAB, where ITK writes a composite as one variable) take any transforms too, as ITK's
+    writers write them. A composite may only come first: the transforms after it are its
+    components.
 
     ``upstream_defects="reproduce"`` fails where ITK fails: a transform without parameters
     cannot be written with compression (ITK-15; larmorx stores its empty parameters

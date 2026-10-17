@@ -1,0 +1,15 @@
+[package]
+name = "larmorx-registration"
+description = "ITK's v4 registration framework ported to Rust for larmorx (metrics, optimizers, transforms with their Jacobians, the multi-resolution registration method)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-image.workspace = true
+larmorx-interp.workspace = true
+larmorx-io.workspace = true
+rayon.workspace = true
+thiserror.workspace = true

@@ -465,6 +465,49 @@ fn check_registered(name: &str, ttype: &str, precision: Precision) -> Result<(),
     ))
 }
 
+/// `TransformIOBase::CreateTransform` (`itkTransformIOBase.cxx:62`) for a class name `ttype`
+/// (its precision already corrected to the reader's) that ITK's factory does not know, in a
+/// program that registered `matrix_offset` (its own `MatrixOffsetTransformBase_<type>_<D>_<D>`)
+/// and read by the transform IO class `io` (`MatlabTransformIOTemplate`,
+/// `TxtTransformIOTemplate`, `HDF5TransformIOTemplate`). `None` when the class is registered.
+pub fn unregistered_class(
+    path: &str,
+    io: &'static str,
+    ttype: &str,
+    matrix_offset: &str,
+) -> Option<ReadFailure> {
+    let list: Vec<&str> = REGISTERED
+        .iter()
+        .map(|&r| {
+            if r.starts_with("MatrixOffsetTransformBase_") {
+                matrix_offset
+            } else {
+                r
+            }
+        })
+        .collect();
+    if list.contains(&ttype) {
+        return None;
+    }
+    let mut description = format!(
+        "Could not create an instance of \"{ttype}\"\nThe usual cause of this error is not \
+         registering the transform with TransformFactory\nCurrently registered Transforms: \n"
+    );
+    for r in &list {
+        description.push_str(&format!("\t\"{r}\"\n"));
+    }
+    Some(failure(
+        path,
+        ItkSite {
+            class: io,
+            ..SITE_CREATE
+        },
+        &description,
+        None,
+        format!("{path}: unknown transform type {ttype:?}"),
+    ))
+}
+
 /// The transform classes ITK's factory knows in antsApplyTransforms for the computation type
 /// `precision`: ITK's own, and the `MatrixOffsetTransformBase` of that type, which
 /// antsApplyTransforms registers (`antsApplyTransforms.cxx:536-539`), in the factory's

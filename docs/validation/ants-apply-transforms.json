@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "be0c0eb89fde",
+  "larmorx_commit": "32c535626228",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -23,7 +23,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.154,
+   "seconds": 0.173,
    "status": "pass"
   },
   {
@@ -33,7 +33,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -43,7 +43,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.078,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -53,7 +53,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -63,7 +63,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -73,7 +73,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.118,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -83,7 +83,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -93,7 +93,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.083,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -103,7 +103,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.085,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -113,7 +113,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.091,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -123,7 +123,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.083,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -143,7 +143,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.092,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -163,7 +163,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.109,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -173,7 +173,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.124,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -183,7 +183,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -193,7 +193,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.097,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -203,7 +203,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.084,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -223,7 +223,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -243,7 +243,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -253,7 +253,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -263,7 +263,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -273,7 +273,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -283,7 +283,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -293,7 +293,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -303,7 +303,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.081,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -313,7 +313,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.089,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -323,7 +323,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -333,7 +333,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.085,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -343,7 +343,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -353,7 +353,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -363,7 +363,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -373,7 +373,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -383,7 +383,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -393,7 +393,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -403,7 +403,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -423,7 +423,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -433,7 +433,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.081,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -443,7 +443,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -453,7 +453,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -463,7 +463,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.101,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -473,7 +473,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.175,
+   "seconds": 0.196,
    "status": "pass"
   },
   {
@@ -483,7 +483,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.164,
+   "seconds": 0.174,
    "status": "pass"
   },
   {
@@ -493,7 +493,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.166,
+   "seconds": 0.178,
    "status": "pass"
   },
   {
@@ -503,7 +503,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.207,
+   "seconds": 0.205,
    "status": "pass"
   },
   {
@@ -513,7 +513,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.207,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -523,7 +523,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.226,
+   "seconds": 0.231,
    "status": "pass"
   },
   {
@@ -533,7 +533,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.21,
+   "seconds": 0.208,
    "status": "pass"
   },
   {
@@ -543,7 +543,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.243,
+   "seconds": 0.25,
    "status": "pass"
   },
   {
@@ -553,7 +553,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.094,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -563,7 +563,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.176,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -573,7 +573,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.063,
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -583,7 +583,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.066,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -593,7 +593,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.059,
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -603,7 +603,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -613,7 +613,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -623,7 +623,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.064,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -633,7 +633,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.064,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -643,7 +643,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -653,7 +653,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -663,7 +663,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -673,7 +673,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -683,7 +683,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -693,7 +693,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -703,7 +703,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.064,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -723,7 +723,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -733,7 +733,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -743,7 +743,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -753,7 +753,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -763,7 +763,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -773,7 +773,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.136,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -783,7 +783,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.304,
+   "seconds": 0.343,
    "status": "pass"
   },
   {
@@ -793,7 +793,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.157,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -803,7 +803,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.078,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -842,8 +842,8 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4so_9vi5/missing.mat",
-   "seconds": 0.026,
+   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4s7ni5y7/missing.mat",
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -853,7 +853,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1; larmorx: Error:  Unrecognized interpolation option. cubic",
-   "seconds": 0.026,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -863,7 +863,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 8.543,
+   "seconds": 9.956,
    "status": "pass"
   },
   {
@@ -873,7 +873,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.547,
+   "seconds": 3.611,
    "status": "pass"
   },
   {
@@ -883,7 +883,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.387,
+   "seconds": 5.383,
    "status": "pass"
   },
   {
@@ -893,7 +893,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.071,
+   "seconds": 4.203,
    "status": "pass"
   },
   {
@@ -903,7 +903,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.548,
+   "seconds": 0.55,
    "status": "pass"
   },
   {
@@ -913,7 +913,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 8.811,
+   "seconds": 8.915,
    "status": "pass"
   },
   {
@@ -923,7 +923,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 57.56,
+   "seconds": 60.378,
    "status": "pass"
   },
   {
@@ -933,7 +933,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -943,7 +943,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -953,7 +953,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.077,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -963,7 +963,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -973,7 +973,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.068,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -983,7 +983,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -993,7 +993,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1003,7 +1003,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1013,7 +1013,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -1033,7 +1033,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1043,7 +1043,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -1053,7 +1053,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.086,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1063,7 +1063,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.083,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -1073,7 +1073,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.082,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1093,7 +1093,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -1103,7 +1103,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.094,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -1113,7 +1113,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1123,7 +1123,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.054,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -1133,7 +1133,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -1183,7 +1183,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -1193,7 +1193,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.066,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1203,7 +1203,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1213,7 +1213,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1223,7 +1223,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -1233,7 +1233,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -1243,7 +1243,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -1253,7 +1253,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -1263,7 +1263,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.068,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -1273,7 +1273,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.106,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1293,7 +1293,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1313,7 +1313,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1323,7 +1323,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -1333,7 +1333,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.066,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1343,7 +1343,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1353,7 +1353,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1363,7 +1363,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.077,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1373,7 +1373,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.099,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1383,7 +1383,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.166,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -1393,7 +1393,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.178,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -1403,7 +1403,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.16,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -1413,7 +1413,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.191,
+   "seconds": 0.209,
    "status": "pass"
   },
   {
@@ -1423,7 +1423,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.226,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -1433,7 +1433,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.219,
+   "seconds": 0.22,
    "status": "pass"
   },
   {
@@ -1443,7 +1443,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.235,
+   "seconds": 0.194,
    "status": "pass"
   },
   {
@@ -1453,7 +1453,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.233,
+   "seconds": 0.231,
    "status": "pass"
   },
   {
@@ -1463,7 +1463,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -1473,7 +1473,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.15,
+   "seconds": 0.149,
    "status": "pass"
   },
   {
@@ -1483,7 +1483,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.063,
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1553,7 +1553,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1563,7 +1563,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1573,7 +1573,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1593,7 +1593,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -1603,7 +1603,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1613,7 +1613,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.063,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -1623,7 +1623,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1633,7 +1633,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.065,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1643,7 +1643,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1653,7 +1653,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -1663,7 +1663,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.1,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -1673,7 +1673,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.296,
+   "seconds": 0.267,
    "status": "pass"
   },
   {
@@ -1683,7 +1683,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.113,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1713,7 +1713,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4\nSee -e option for available input types.",
-   "seconds": 0.018,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -1723,7 +1723,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead",
-   "seconds": 0.03,
+   "seconds": 0.032,
    "status": "both-error"
   },
   {
@@ -1732,8 +1732,8 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-k2tcia93/missing.mat",
-   "seconds": 0.025,
+   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-m3f7cs3s/missing.mat",
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1743,7 +1743,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1; larmorx: Error:  Unrecognized interpolation option. cubic",
-   "seconds": 0.025,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1753,7 +1753,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.612,
+   "seconds": 7.316,
    "status": "pass"
   },
   {
@@ -1763,7 +1763,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.978,
+   "seconds": 2.98,
    "status": "pass"
   },
   {
@@ -1773,7 +1773,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.983,
+   "seconds": 4.884,
    "status": "pass"
   },
   {
@@ -1783,7 +1783,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.811,
+   "seconds": 3.701,
    "status": "pass"
   },
   {
@@ -1793,7 +1793,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.522,
+   "seconds": 0.535,
    "status": "pass"
   },
   {
@@ -1803,7 +1803,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 8.852,
+   "seconds": 8.664,
    "status": "pass"
   },
   {
@@ -1813,7 +1813,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 51.607,
+   "seconds": 52.859,
    "status": "pass"
   },
   {
@@ -1823,7 +1823,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -1833,16 +1833,396 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.071,
    "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/text",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/matlab-inverse",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/hdf5",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.032,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/every-class",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.023,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/no-transforms",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/with-image",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/float-text",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/float-matlab-inverse",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.022,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/float-hdf5",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/linear/fmriprep",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/text-inverses",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/matlab",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/matlab-one",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/hdf5-nested",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.065,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/hdf5-field",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/float-text",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/float-hdf5",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/float-matlab",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.019,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/no-transforms",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/fmriprep",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 28.399,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/nifti",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.072,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/legacy-form",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/hdf5-linear",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.069,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/hdf5-field",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/float-linear",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/float-composite",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/no-transforms",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.031,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/fmriprep",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.985,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/errors/linear-no-parameter",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o CompositeTransform, see usage",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/composite-no-parameter",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o CompositeTransform, see usage",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/linear-with-field",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear.",
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/field-no-reference",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: A reference image is required.; larmorx: A reference image is required.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/image-no-input",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: An input image is required.; larmorx: An input image is required.",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/inverted-field",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: Inverse does not exist for <larmorx-testdata>/data/synthetic/resampling/transforms/warp-lps-vector.nii.gz; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/unknown-extension",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ITK's transform writer finds no IO for the extension and throws; antsApplyTransforms does not catch it and aborts. larmorx refuses with a message",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "transform-output/errors/linear-input-no-reference",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "an input image is resampled onto the reference even for a transform output; without one ANTs dereferences a null image and crashes. larmorx refuses",
+   "seconds": 0.022,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "transform-output/errors/gaussian-no-input",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs reads the Gaussian interpolator's default sigmas from the first input image even when there is none (an empty vector) and crashes. larmorx refuses",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "transform-output/errors/identity-transform-file",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs's CollapseLinearTransforms takes an IdentityTransform for a matrix-offset transform and dereferences a null pointer. larmorx refuses",
+   "seconds": 0.016,
+   "status": "expected-divergence"
   }
  ],
  "suite": "ants-apply-transforms",
  "summary": {
-  "both-error": 8,
-  "expected-divergence": 0,
+  "both-error": 14,
+  "expected-divergence": 4,
   "fail": 0,
-  "pass": 174,
+  "pass": 202,
   "skipped": 0
  },
  "tier": "standard"

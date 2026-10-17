@@ -192,10 +192,18 @@ defects! {
         "the Rician correction factor overflows at high signal-to-noise ratios and the bias becomes 0";
     ANTS_47 = "ANTS-47", "DenoiseImage", true,
         "a mask that cannot be read is no mask: the whole image is denoised, exit 0";
+    ANTS_50 = "ANTS-50", "antsRegistration", true,
+        "--save-state after linear stages only: no state, exit 1 without a message, no transform written";
+    ANTS_51 = "ANTS-51", "antsRegistration", true,
+        "transform files without collapsing: the initial transforms skipped by counting the -r options (not the transforms they hold, nor --restore-state's), each file named after the next stage in order: a transform written under another's name, or the names run out (a read past the end of a list, then a crash)";
+    ANTS_49 = "ANTS-49", "antsRegistration", true,
+        "a linear stage that throws (an ITK exception) is dropped: the next stages run without it, the outputs are written and the program exits 0";
     ITK_01 = "ITK-01", "ITK", true,
         "Math::Floor gives 0 instead of -1 for negative values closer to 0 than 2^-26 (float) or 2^-55 (double)";
     ITK_02 = "ITK-02", "ITK", true,
         "a file with more dimensions than the program reads is read with an identity direction";
+    ITK_18 = "ITK-18", "ITK", true,
+        "the joint-histogram mutual information (ANTs' MI) swaps its marginal densities: each image's marginal is the other's";
     ITK_03 = "ITK-03", "ITK", true,
         "components relabelled in a float image stop getting new labels at 2^24";
     ITK_08 = "ITK-08", "nifti_clib", true,

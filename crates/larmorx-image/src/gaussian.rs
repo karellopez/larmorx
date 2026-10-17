@@ -350,9 +350,9 @@ fn check(input: &VolumeRef<'_, f32>) -> Result<usize, FilterError> {
 
 /// One recursive pass along `axis`, in place on `data` (`float → float`), an image with the
 /// size and spacing of `shape`.
-fn pass(
-    data: &mut [f32],
-    shape: VolumeRef<'_, f32>,
+fn pass<T: crate::lines::LinePixel, S>(
+    data: &mut [T],
+    shape: VolumeRef<'_, S>,
     axis: usize,
     sigma: f64,
     order: GaussianOrder,
@@ -449,6 +449,70 @@ pub fn smoothing_recursive_gaussian(
     Ok(out)
 }
 
+/// [`smoothing_recursive_gaussian`] for a `double` image
+/// (`SmoothingRecursiveGaussianImageFilter<Image<double>, Image<double>>`). Its intermediate
+/// images are `NumericTraits<double>::FloatType`, which is `float`: the first pass (along the
+/// last axis) reads the double voxels and stores float, the other passes are float to float,
+/// and the result is cast back to double.
+pub fn smoothing_recursive_gaussian_f64(
+    input: VolumeRef<'_, f64>,
+    sigma: &[f64],
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<f64>, FilterError> {
+    let d = input.dim();
+    if d == 0 {
+        return Err(FilterError::invalid("the image has no dimensions"));
+    }
+    if sigma.len() != d {
+        return Err(FilterError::invalid(format!(
+            "{} sigmas for a {d}-dimensional image",
+            sigma.len()
+        )));
+    }
+    let order = std::iter::once(d - 1).chain(0..d - 1);
+    for axis in order.clone() {
+        RecursiveCoefficients::new(
+            sigma[axis],
+            input.spacing[axis],
+            GaussianOrder::Zero,
+            normalize_across_scale,
+        )?;
+    }
+    for (axis, &n) in input.size.iter().enumerate() {
+        if n < 4 {
+            return Err(FilterError::invalid(format!(
+                "The number of pixels along dimension {axis} is less than 4. This filter \
+                 requires a minimum of four pixels along the dimension to be processed."
+            )));
+        }
+    }
+    let mut first = input.data.to_vec();
+    pass(
+        &mut first,
+        input,
+        d - 1,
+        sigma[d - 1],
+        GaussianOrder::Zero,
+        normalize_across_scale,
+        n_threads,
+    )?;
+    let mut out: Vec<f32> = first.iter().map(|&v| v as f32).collect();
+    drop(first);
+    for (axis, &s) in sigma.iter().enumerate().take(d - 1) {
+        pass(
+            &mut out,
+            input,
+            axis,
+            s,
+            GaussianOrder::Zero,
+            normalize_across_scale,
+            n_threads,
+        )?;
+    }
+    Ok(out.into_iter().map(f64::from).collect())
+}
+
 /// For each axis `dim`: the derivative of order `order` along `dim`, then smoothing along the
 /// other axes in increasing order, each pass `float → float`; `combine(dim, cumulative,
 /// filtered)` folds the result into the cumulative `float` image (which starts at 0).
@@ -516,6 +580,73 @@ pub fn laplacian_recursive_gaussian(
         n_threads,
         |dim, a, b| (f64::from(a) + f64::from(b) * inverse[dim]) as f32,
     )
+}
+
+/// `GradientRecursiveGaussianImageFilter` of a `T` image into `CovariantVector<double>` pixels,
+/// before its direction correction: for each axis `dim`, the first derivative along `dim`
+/// (the line read as double, the result stored as `float`, ITK's `InternalRealType`), then
+/// smoothing along the other axes in increasing order (`float → float`), each value then
+/// divided by the spacing along `dim` in double. One component image per axis.
+fn gradient_components<T: crate::lines::LinePixel>(
+    input: VolumeRef<'_, T>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    let d = input.dim();
+    if d == 0 {
+        return Err(FilterError::invalid("the image has no dimensions"));
+    }
+    let mut out = Vec::with_capacity(d);
+    for dim in 0..d {
+        let mut first: Vec<T> = input.data.to_vec();
+        pass(
+            &mut first,
+            input,
+            dim,
+            sigma,
+            GaussianOrder::First,
+            normalize_across_scale,
+            n_threads,
+        )?;
+        let mut work: Vec<f32> = first.iter().map(|v| v.to_f64() as f32).collect();
+        drop(first);
+        for axis in (0..d).filter(|&a| a != dim) {
+            pass(
+                &mut work,
+                input,
+                axis,
+                sigma,
+                GaussianOrder::Zero,
+                normalize_across_scale,
+                n_threads,
+            )?;
+        }
+        let spacing = input.spacing[dim];
+        out.push(work.iter().map(|&v| f64::from(v) / spacing).collect());
+    }
+    Ok(out)
+}
+
+/// [`gradient_components`] of a `float` image (`GradientRecursiveGaussianImageFilter<float>`).
+pub fn gradient_recursive_gaussian(
+    input: VolumeRef<'_, f32>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    gradient_components(input, sigma, normalize_across_scale, n_threads)
+}
+
+/// [`gradient_components`] of a `double` image (`GradientRecursiveGaussianImageFilter<double>`,
+/// whose intermediate images are `float` too).
+pub fn gradient_recursive_gaussian_f64(
+    input: VolumeRef<'_, f64>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<Vec<f64>>, FilterError> {
+    gradient_components(input, sigma, normalize_across_scale, n_threads)
 }
 
 /// `GradientMagnitudeRecursiveGaussianImageFilter<float, float>`: the square root of the sum

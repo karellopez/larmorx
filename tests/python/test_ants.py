@@ -64,8 +64,9 @@ def test_unknown_formats_are_rejected(tmp_path):
     # As ANTs, a missing file is reported before its type is looked at.
     with pytest.raises(FileNotFoundError):
         lx.transforms.read(tmp_path / "missing.xfm")
-    with pytest.raises(ValueError, match=r"\.mat file holds exactly one"):
-        lx.transforms.write(tmp_path / "x.mat", [affine_transform(), affine_transform()])
+    # As ITK's MATLAB writer, a list of two transforms is two (parameters, fixed) pairs.
+    lx.transforms.write(tmp_path / "x.mat", [affine_transform(), affine_transform()])
+    assert len(lx.transforms.read(tmp_path / "x.mat")) == 2
 
 
 # --- apply_transforms ---------------------------------------------------------------------------
@@ -177,7 +178,8 @@ def test_cli_matches_the_python_api(tmp_path, capsys):
     [
         (["-e", "1", "-i", "a", "-r", "b", "-o", "c"], "not supported yet"),
         (["-d", "2", "-i", "a", "-r", "b", "-o", "c"], "only 3D"),
-        (["-i", "a", "-r", "b", "-o", "Linear[x.mat]"], "not supported yet"),
+        (["-o", "Linear", "-t", "identity"], "An output parameter is required"),
+        (["-o", "DisplacementField[x.nii.gz]"], "A reference image is required"),
         (["--nope"], "Invalid flag"),
         (["-r", "b", "-o", "c"], "An input image is required"),
     ],
@@ -185,3 +187,40 @@ def test_cli_matches_the_python_api(tmp_path, capsys):
 def test_cli_errors(args, message, capsys):
     assert cli_run(["lx", "ants", "antsApplyTransforms", *args]) == 1
     assert message in capsys.readouterr().err
+
+
+# --- combine_transforms (antsApplyTransforms' transform outputs) --------------------------------
+
+
+def test_combine_transforms(tmp_path):
+    shift = affine_transform(translation=(1.0, -2.0, 0.5))
+    scale = affine_transform(np.diag([2.0, 1.0, 0.5]).ravel(), center=(1.0, 0.0, 0.0))
+    composite = lx.ants.combine_transforms([[shift], [scale]], invert=[False, True])
+    # The composite entry, then the queue: the last -t first.
+    assert [t.name for t in composite] == [
+        "CompositeTransform_double_3_3",
+        "AffineTransform_double_3_3",
+        "AffineTransform_double_3_3",
+    ]
+    # The collapsed affine maps points as the chain does.
+    (linear,) = lx.ants.combine_transforms(
+        [[shift], [scale]], invert=[False, True], output="linear"
+    )
+    m = linear.parameters[:9].reshape(3, 3)
+    c = linear.fixed_parameters
+    offset = linear.parameters[9:] + c - m @ c
+    p = np.array([[0.5, 1.0, -1.0]])
+    chain = lx.ants.apply_transforms_to_points(p, [[shift], [scale]], invert=[False, True])
+    np.testing.assert_allclose(m @ p[0] + offset, chain[0], atol=1e-12)
+    # No transforms: the identity ANTs adds, and a zero displacement field.
+    assert lx.ants.combine_transforms()[1].name == "MatrixOffsetTransformBase_double_3_3"
+    img = ramp_image()
+    (field,) = lx.ants.combine_transforms(output="displacement_field", reference=img)
+    assert field.name == "DisplacementFieldTransform_double_3_3"
+    assert field.parameters.size == 3 * img.data.size and not field.parameters.any()
+    with pytest.raises(ValueError, match="reference"):
+        lx.ants.combine_transforms(output="displacement_field")
+    # Written by lx.transforms.write, read back alike.
+    lx.transforms.write(tmp_path / "c.txt", composite)
+    back = lx.transforms.read(tmp_path / "c.txt")
+    np.testing.assert_array_equal(back[1].parameters, composite[1].parameters)

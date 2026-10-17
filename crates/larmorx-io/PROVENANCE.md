@@ -76,7 +76,15 @@ ITK's byte for byte.
 - `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (text format; with
   `parse_itk_text_with(_, Precision::Float)`, the numbers of both parameter lines read as
   float, as `TxtTransformIOTemplate<float>` reads them into `OptimizerParameters<float>`);
-- `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` (MATLAB v4 format);
+- `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` (MATLAB v4 format; a composite as
+  one variable, a float transform's fixed parameters as floats) and VXL's
+  `core/vnl/vnl_matlab_write.cxx`, `vnl_matlab_header.h` (the variable header);
+- `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (`Write`, `print_vector`) and
+  `Modules/Core/Common/src/itkNumberToString.cxx` (`itk_number`, `itk_number_f32`: the
+  double-conversion library's `DoubleToStringConverter::EcmaScriptConverter().ToShortest`,
+  BSD-3-Clause, re-expressed from its documented settings on Rust's shortest digits);
+- `nifti::itk::write_itk_vector_image`, `itk_vector_header`: `Modules/IO/NIFTI/src/itkNiftiImageIO.cxx`
+  (`WriteImageInformation` for vector pixels, `Write`'s component-major data);
 - the displacement-field reading path of ANTs v2.6.5's `itk::ants::ReadTransform`
   (`Utilities/itkantsReadWriteTransform.h`).
 
@@ -93,7 +101,12 @@ crate `larmorx-hdf5`:
 - `Modules/Core/Common/src/itkExceptionObject.cxx` (`Print`, the report's layout);
 - ANTs v2.6.5 `Utilities/itkantsReadWriteTransform.h` (`ReadTransform`, `WriteTransform`: the
   messages and the composite flattening) and `Examples/antsApplyTransforms.cxx:536-539` (the
-  `MatrixOffsetTransformBase` it registers).
+  `MatrixOffsetTransformBase` it registers);
+- for `unregistered_class` (the factory's message for the MATLAB and text readers as well):
+  `Modules/IO/TransformMatlab/src/itkMatlabTransformIO.cxx` and
+  `Modules/IO/TransformInsightLegacy/src/itkTxtTransformIO.cxx` (`CreateTransform` of the
+  precision-corrected name), and ANTs v2.6.5 `Examples/itkantsRegistrationHelper.h:1388-1396`
+  (the `MatrixOffsetTransformBase` antsRegistration registers for its dimension).
 
 `itk_transform_names.rs` lists the transform classes registered with ITK's factory in the ANTs
 2.6.5 build, copied from the oracle's own message for an unknown class.

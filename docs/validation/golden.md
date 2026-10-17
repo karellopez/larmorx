@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) |
 |---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 102 cases, 416 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 25 cases, 50 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 111 cases, 503 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 25 cases, 50 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) |
@@ -30,13 +30,14 @@ A coverage test fails when anything below has no case; its message says what to 
 
 | Family | Cases | What |
 |---|---|---|
-| Command line, ANTs | 53 | every ImageMath operation once (38, in 3D; `vtotal`, which larmorx refuses by default, with `LARMORX_UPSTREAM_DEFECTS=reproduce`), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `/`, `total` and `mean` with `reproduce`; `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `DenoiseImage` with the Rician model, a mask and the noise image, and with the Gaussian model, shrink 2 and per-axis radii; N4 and the Rician DenoiseImage again with `reproduce`; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite |
+| Command line, ANTs | 58 | every ImageMath operation once (38, in 3D; `vtotal`, which larmorx refuses by default, with `LARMORX_UPSTREAM_DEFECTS=reproduce`), ImageMath in 2D (`MaurerDistance`) and 4D (`G`); `/`, `total` and `mean` with `reproduce`; `ThresholdImage` (thresholds and Otsu), `MultiplyImages`, `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`; `N4BiasFieldCorrection` with a mask, a spline distance, two levels and the bias field; `DenoiseImage` with the Rician model, a mask and the noise image, and with the Gaussian model, shrink 2 and per-axis radii; N4 and the Rician DenoiseImage again with `reproduce`; `antsApplyTransforms` on a chain (NIfTI displacement field, MATLAB affine, inverted text rigid) and on a time series through an `.h5` composite; `antsRegistration`: a two-level rigid stage with the warped image and a float affine stage with `-a 1` (`Composite.h5`, `InverseComposite.h5`), the other metrics (CC sampled, MI2, GC weighed, a composite-affine stage with the gradient filter, `-z 0` from a centre-of-mass initialisation), 2D and 4D (similarity, composite affine, a rigid stage from an inverted 2D file with both warped images, every other interpolator family in 2D or 4D), and ITK-18 and ANTS-49 reproduced |
 | Command line, AFNI and MRI | 8 | `3dTshift` (int16 with a scale factor, Fourier); `hmc` with `-mats -plots -stats` (gzip output, `.par`, `MAT_*`); both with `LARMORX_UPSTREAM_DEFECTS=reproduce` (`3dTshift` with a negative scale factor and `-no_detrend`); the clean-room `3dTshift`'s AFNI paths (2026-10-12), each in both modes where they differ: a grid in metres 0.006° from plumb (AFNI-07, AFNI-16: the cardinal matrix and its quaternion), a copy keeping slice times within 3 ms of 0 (the slice fields of a copy, AFNI-08), `-DAFNI_NIFTI_SCALE=NO` on int16 with a slope and an intercept (AFNI-23, with the default's `-rlt -ignore` path), and AFNI's global options (`-overwrite` after the dataset onto an existing output, `-D` renaming the output, NIfTI-2 output and the tlrc view's code) |
-| `lx.ants` | 18 | all 39 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2; the division, the masked N4 and the Rician denoising again with `upstream_defects="reproduce"` |
+| `lx.ants` | 20 | all 41 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2; the division, the masked N4 and the Rician denoising again with `upstream_defects="reproduce"`; `registration` on an in-memory moving image, from an initial centre alignment: a rigid stage (Mattes, a fixed mask) then an affine stage (mean squares, random sampling), not collapsed, with both warped images and the parsed iterations |
 | `lx.afni` | 5 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects="reproduce"`; `afni_settings` in the clean-room original (`AFNI_NIFTI_SCALE=NO`, NIfTI-2); `fmriprep_slice_timing` |
 | `lx.mri` | 4 | `hmc` with the default, each other cost function, the mean volume with sinc interpolation, a separate reference with splines and 12 degrees of freedom, the in-plane mode with nearest neighbour and an initial matrix; the reference and in-plane cases with `upstream_defects="reproduce"`, and `normcorr_count="weights"`; `HmcResult.save_mats`/`save_par`/`save_itk`, `read_mats` |
 | `lx.transforms` | 8 | ITK files written and read (text, MATLAB, HDF5); ITK's HDF5 layout written in Rust (`py.transforms.write_h5`, 2026-10-16): a composite of an affine and a displacement field of 32³ vectors (deflate-compressed chunks), the same uncompressed, and a dense group of 11 affines (fractal heap, v2 B-tree), each by its bytes and by what is read back; `load_itk_linear`, `load_itk_composite`, `load_transforms`, and a composite of 11 transforms in both orders (PIPE-04); `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction (also with `upstream_defects="reproduce"`) |
 | `lx.ndimage` | 3 | `map_coordinates` with each spline order (0-5) and each boundary mode, an integer input; `spline_filter`, `spline_filter1d`; the reflect modes with `upstream_defects="reproduce"` |
+| HDF5 reader | 1 | `hdf5.fixtures` (2026-10-16): larmorx's HDF5 reader on the five committed [HDF5 fixtures](#hdf5-fixtures), every path its own writer never produces; each file fingerprinted by what larmorx reads back (groups, datasets, types, shapes, strings, values, integers' stored bytes), the members of three groups through soft links, and the shared-message file's transforms as `lx.transforms.read` reads them |
 | I/O (`lx`, `lx.io`) | 4 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel` |
 | `larmorx-gpl afni 3dTshift` | 25 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms; AFNI's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced: a negative scale factor (AFNI-01), float32 with a slope and an intercept in an oblique sform in metres with header slice code 2 (AFNI-02, -03, -07), a copy keeping slice times within 3 ms of 0 (AFNI-08), `-no_detrend` (AFNI-05), an sform 0.006° from plumb (AFNI-16; the reproduced header is the plumb input's, byte for byte), `-TR` in ms with `AFNI_ALLOW_MILLISECONDS` (AFNI-19, in both modes), int16 with a slope and an intercept under `-DAFNI_NIFTI_SCALE=NO` (AFNI-23, in both modes, and the default's `-rlt -ignore` path, read as without the variable); AFNI's global options and variables: `-overwrite` onto an existing output (written through a temporary file and a rename on every platform), NIfTI-2 output by `-DAFNI_NIFTI_WRITE_TYPE=2` and by the environment; each case also checks the defects named on standard error |
 
@@ -85,6 +86,44 @@ writes AFNI's header bytes (`regular = 'r'`, the plumb matrix's signed zeros).
 - **Sizes:** 24 × 20 × 16 (3D), 16 × 14 × 12 × 4 (4D), 32 × 24 (2D), all under the 32³ voxel
   and 4-volume bounds. **One exception:** 3dTshift refuses fewer than 5 time points, so its
   series is 8 × 6 × 5 voxels by 10 time points (2,400 values in all).
+
+## HDF5 fixtures
+
+The one exception to generated inputs (CLAUDE.md rule 10, user decision 2026-10-16): larmorx's
+HDF5 reader (crate `larmorx-hdf5`, A4 part 1) reads storage that only the HDF5 C library
+writes, and larmorx's own writer replays ITK's calls only, so golden cases cannot generate
+those files on every platform. Five tiny synthetic files are committed instead, in
+[`tests/golden/hdf5/`](../../tests/golden/hdf5/), gzip-compressed (14 KB in all; 140 KB
+decompressed, most of it the empty space HDF5 allocates for a paged extensible array, a huge
+object and global heap collections):
+
+| File | Format | What it holds |
+|---|---|---|
+| `sb0.h5.gz` | superblock 0, version-1 object headers | symbol-table groups (a group of 12 entries over two B-tree leaves, soft links in the local heap), a dataset whose 40 attributes spill into a continuation, a big-endian double, half, x87 extended and IEEE quadruple floats (both byte orders), fixed-length strings with each padding, variable-length strings, a chunked dataset with shuffle, Fletcher-32 and deflate under a version-1 B-tree with a chunk never written, a compact dataset, a scalar, a committed datatype, a soft link to a group |
+| `sb1.h5.gz` | superblock 1 | a chunk B-tree K of 64 (`H5Pset_istore_k`) |
+| `sb3-datasets.h5.gz` | superblock 3, version-2 object headers (file format 1.10) | every chunk index: a single chunk (filtered or not), implicit, fixed array (unpaged; paged and filtered), extensible array (index block, data blocks, a super block with filters, a page of a paged data block, the unlimited dimension second), version-2 B-trees (an internal node; filtered); the n-bit filter (a 20-bit float, little- and big-endian integers), the scale-offset filter (float D-scale, big-endian double, integers with a fill value), UTF-8 strings, a chunk never written, a committed datatype, soft links to a group and a dataset |
+| `sb3-groups.h5.gz` | superblock 3 | dense groups: 60 links and a 4,200-character name (a huge object) in a fractal heap with an indirect root block; the same with deflate on the heap; a heap filtered by deflate and Fletcher-32; links indexed by creation order |
+| `sohm.h5.gz` | superblock 3, a superblock extension | a transform file of 8 affines whose filter pipelines are shared in a list index and whose datatypes, dataspaces and fill values in a B-tree index of the shared-message heap |
+
+- **Made by** [`scripts/make_hdf5_fixtures.py`](../../scripts/make_hdf5_fixtures.py), with
+  h5py's low-level API (h5py 3.16.0 on HDF5 2.0.0, the workspace venv): seeded integers and
+  their quarters (SplitMix64, as the registry draws its inputs), no image data. Object times
+  are off (`track_times`); HDF5 still records them in objects it creates with a default
+  property list (the superblock extension, committed datatypes), so the script sets every
+  version-2 object header's times to 0 and recomputes its checksum (Jenkins' lookup3; a
+  header is changed only if its checksum checks). The script builds every file twice, more
+  than a second apart, and refuses if the bytes differ; gzip with `mtime=0` and no name.
+  `python scripts/make_hdf5_fixtures.py --check` rebuilds them and compares the
+  decompressed bytes with the committed files (another h5py or HDF5 version may write other
+  bytes; then re-run the parity cases below before committing new files).
+- **Checked against h5py** by the parity suite `itk-hdf5` (cases `hdf5/fixture/*`, smoke
+  tier): every dataset as h5py reads it, bit for bit (floats through HDF5's conversion to
+  double, so that quadruple precision is compared too), every group's links by name, and
+  the shared-message file's transforms as ITK reads them (`antsApplyTransforms`, double and
+  float).
+- **On every platform** the golden case `hdf5.fixtures` decompresses them into its directory
+  and fingerprints what larmorx reads back. Nothing hashes the fixtures' own bytes: they are
+  inputs, fixed by the repository.
 
 ## What is compared
 

@@ -13,8 +13,10 @@
 //!   digits).
 //! - [`convert_vector_f32`], [`convert_vector_f64`]: ANTs' `ConvertVector` (`1.5x1x2`).
 //! - [`stof`]: `std::stof`, which throws when there is no number.
-//! - [`parser_convert_f32`], [`parser_convert_i32`], [`parser_convert_u32`],
-//!   [`parser_convert_bool`], [`parser_convert_vector_u32`], [`parser_convert_vector_f32`]:
+//! - [`parser_convert_f32`], [`parser_convert_f64`], [`parser_convert_i32`],
+//!   [`parser_convert_u32`], [`parser_convert_u16`], [`parser_convert_bool`],
+//!   [`parser_convert_vector_u32`], [`parser_convert_vector_f32`],
+//!   [`parser_convert_vector_f64`]:
 //!   the strict `Convert<T>` and `ConvertVector<T>` of ANTs' command-line parser, which throw
 //!   (and so abort the program) unless the whole text is read.
 
@@ -467,6 +469,30 @@ pub fn parser_convert_f32(s: &str) -> Option<f32> {
     v.is_finite().then_some(v)
 }
 
+/// `Convert<unsigned short>`: as [`parser_convert_u32`] with `unsigned short`'s range; a
+/// minus sign negates modulo 2¹⁶ (libstdc++).
+pub fn parser_convert_u16(s: &str) -> Option<u16> {
+    let s = strip_end(s);
+    let (negative, magnitude, read) = extract_int(s, u64::from(u16::MAX))?;
+    if read != s.len() {
+        return None;
+    }
+    let v = magnitude as u16;
+    Some(if negative { v.wrapping_neg() } else { v })
+}
+
+/// `Convert<double>`: `istringstream >> double` must read every character and give a finite
+/// number (an overflow sets `failbit`, so ANTs throws).
+pub fn parser_convert_f64(s: &str) -> Option<f64> {
+    let s = strip_end(s);
+    let (at_end, text) = stream_text(s)?;
+    if !at_end {
+        return None;
+    }
+    let v: f64 = normalized_number(&text)?.parse().ok()?;
+    v.is_finite().then_some(v)
+}
+
 /// The pieces `ConvertVector` reads: `std::getline(stream, piece, 'x')` on the text with its
 /// trailing whitespace removed (no piece after a final `x`; none at all for an empty text).
 fn getline_pieces(s: &str) -> Vec<&str> {
@@ -494,6 +520,14 @@ pub fn parser_convert_vector_f32(s: &str) -> Option<Vec<f32>> {
     getline_pieces(s)
         .into_iter()
         .map(parser_convert_f32)
+        .collect()
+}
+
+/// `ConvertVector<double>`: `Convert<double>` of each piece; `None` if any throws.
+pub fn parser_convert_vector_f64(s: &str) -> Option<Vec<f64>> {
+    getline_pieces(s)
+        .into_iter()
+        .map(parser_convert_f64)
         .collect()
 }
 

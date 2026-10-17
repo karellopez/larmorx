@@ -222,8 +222,8 @@ pub(crate) fn output_to_py<'py>(
 }
 
 /// Runs ANTs program `program` (`ImageMath`, `ThresholdImage`, `MultiplyImages`,
-/// `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`) with `args` (after the program
-/// name). `inputs`
+/// `SmoothImage`, `ResampleImageBySpacing`, `ResampleImage`, `N4BiasFieldCorrection`,
+/// `DenoiseImage`, `antsRegistration`) with `args` (after the program name). `inputs`
 /// maps placeholder names to `(data, ras_affine, descrip)` or
 /// `(data, ras_affine, descrip, extra_spacing)` (the spacing of the axes after the third,
 /// such as the repetition time); writes to the names in `outputs` are returned instead of
@@ -268,6 +268,7 @@ fn ants_program<'py>(
         "DenoiseImage" => larmorx_ants::cli::denoise_image::run,
         "ResampleImage" => larmorx_ants::cli::resample_image::run,
         "ResampleImageBySpacing" => larmorx_ants::cli::resample_image_by_spacing::run,
+        "antsRegistration" => larmorx_ants::cli::registration::run_store,
         other => {
             return Err(PyValueError::new_err(format!(
                 "unknown ANTs image program {other:?}"

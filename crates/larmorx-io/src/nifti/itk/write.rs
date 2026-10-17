@@ -444,6 +444,70 @@ pub fn write_itk_image<T: Element>(
     super::super::write(path, &header, view, options)
 }
 
+/// The NIfTI-1 header ITK 5.4.5 writes for an image of vectors with `components` values per
+/// voxel (`itk::Image<itk::Vector<T, N>, D>`, a displacement field): the scalar header of
+/// [`itk_header`], with five dimensions, `dim[4] = 1`, the components as `dim[5]` and the intent
+/// `NIFTI_INTENT_VECTOR` (`NiftiImageIO::WriteImageInformation`: vector components are the
+/// slowest axis in NIfTI). Images of more than four dimensions are refused, as ITK refuses them.
+pub fn itk_vector_header(
+    geometry: &ItkGeometry,
+    components: usize,
+    data_type: DataType,
+    meta: &ItkMeta,
+) -> Result<NiftiHeader, ItkWriteError> {
+    let n = geometry.ndim;
+    if n > 4 {
+        return Err(ItkWriteError::BadNdim(n));
+    }
+    let mut h = itk_header(geometry, data_type, meta)?;
+    h.dim[0] = 5;
+    for d in n + 1..=4 {
+        h.dim[d] = 1;
+    }
+    h.dim[5] = components as i64;
+    h.intent_code = INTENT_VECTOR;
+    Ok(h)
+}
+
+const INTENT_VECTOR: i32 = 1007;
+
+/// Writes an image of vectors as ITK 5.4.5 writes it ([`itk_vector_header`]). `data` holds the
+/// vectors interleaved, as ITK's buffer does (the components of the first voxel, then of the
+/// next, voxels in Fortran order); the file stores them component by component.
+pub fn write_itk_vector_image<T: Element>(
+    path: impl AsRef<Path>,
+    geometry: &ItkGeometry,
+    components: usize,
+    meta: &ItkMeta,
+    data: &[T],
+    options: &WriteOptions,
+) -> Result<(), Error> {
+    let path = path.as_ref();
+    if !is_itk_nifti_name(path) {
+        return Err(Error::InvalidArgument(
+            ItkWriteError::BadFileName(path.display().to_string()).to_string(),
+        ));
+    }
+    let header = itk_vector_header(geometry, components, T::DATA_TYPE, meta)
+        .map_err(|e| super::super::format_err(path, e.to_string()))?;
+    let voxels: usize = geometry.size.iter().product();
+    if data.len() != voxels * components {
+        return Err(Error::InvalidArgument(format!(
+            "{}: {} values for {voxels} voxels of {components} components",
+            path.display(),
+            data.len()
+        )));
+    }
+    let mut planar = Vec::with_capacity(data.len());
+    for c in 0..components {
+        planar.extend((0..voxels).map(|v| data[v * components + c]));
+    }
+    let shape: Vec<usize> = (1..=5).map(|d| header.dim[d] as usize).collect();
+    let view = ArrayViewD::from_shape(IxDyn(&shape).f(), &planar)
+        .map_err(|e| Error::InvalidArgument(format!("{}: {e}", path.display())))?;
+    super::super::write(path, &header, view, options)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

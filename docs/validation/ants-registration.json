@@ -1,0 +1,1706 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "36aa668df831",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42",
+ "results": [
+  {
+   "case": "smoke/rigid",
+   "category": "smoke",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.947,
+   "status": "pass"
+  },
+  {
+   "case": "smoke/affine-float",
+   "category": "smoke",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.636,
+   "status": "pass"
+  },
+  {
+   "case": "smoke/composite",
+   "category": "smoke",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.237,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-3d",
+   "category": "transforms",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.645,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-3d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.492,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-3d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.289,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-2d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-2d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.059,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-2d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Translation-4d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.226,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-3d",
+   "category": "transforms",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.341,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-3d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.35,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-3d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.286,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-2d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-2d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-2d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Rigid-4d",
+   "category": "transforms",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.344,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-3d",
+   "category": "transforms",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.325,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-3d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.379,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-3d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.274,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-2d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-2d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-2d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Similarity-4d",
+   "category": "transforms",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.365,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-3d",
+   "category": "transforms",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.38,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-3d-z0",
+   "category": "transforms",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.606,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-3d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.301,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-2d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-2d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-2d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/Affine-4d",
+   "category": "transforms",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.364,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-3d",
+   "category": "transforms",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.565,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-3d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.357,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-3d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.302,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-2d",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-2d-z0",
+   "category": "transforms",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-2d-float",
+   "category": "transforms",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/CompositeAffine-4d",
+   "category": "transforms",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.369,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/two-stages",
+   "category": "transforms",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.598,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/two-stages-z0",
+   "category": "transforms",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.613,
+   "status": "pass"
+  },
+  {
+   "case": "transforms/oblique",
+   "category": "transforms",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.411,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mattes-mi-alias",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.523,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mi2",
+   "category": "metrics",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.864,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mi2-dense",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.473,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/meansquares",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.467,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/gc",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.579,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/gc-dense",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.497,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/cc-sampled",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 12.459,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/cc-dense",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 17.426,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mattes-gradient-filter",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.781,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/cc-gradient-filter",
+   "category": "metrics",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 20.84,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mi2-2d",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/cc-2d",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/gc-2d",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mi2-4d-gradient-filter",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.453,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/mi2-float",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.358,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/cc-float",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 13.065,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/gc-float",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.404,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/multi",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.473,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/demons",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.07,
+   "status": "pass"
+  },
+  {
+   "case": "metrics/no-overlap",
+   "category": "metrics",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/random",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.4,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/regular-1",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.788,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/sigmas-mm",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.273,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/shrink-4",
+   "category": "sampling",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.41,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/winsorize-histogram",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.279,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/masks",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.15,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/fixed-mask-only",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.325,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/moving-mask-null",
+   "category": "sampling",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.331,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/restrict-deformation",
+   "category": "sampling",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.505,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/zero-iterations",
+   "category": "sampling",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.081,
+   "status": "pass"
+  },
+  {
+   "case": "sampling/no-seed",
+   "category": "sampling",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "without a seed ANTs seeds its sampling from the clock and its result changes from run to run; larmorx uses a fixed seed",
+   "seconds": 0.215,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "initial/geometry",
+   "category": "initial",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.369,
+   "status": "pass"
+  },
+  {
+   "case": "initial/moments",
+   "category": "initial",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.368,
+   "status": "pass"
+  },
+  {
+   "case": "initial/origins",
+   "category": "initial",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.373,
+   "status": "pass"
+  },
+  {
+   "case": "initial/fixed-initial",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.218,
+   "status": "pass"
+  },
+  {
+   "case": "initial/file",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.196,
+   "status": "pass"
+  },
+  {
+   "case": "initial/file-inverted",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.203,
+   "status": "pass"
+  },
+  {
+   "case": "initial/per-stage",
+   "category": "initial",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.634,
+   "status": "pass"
+  },
+  {
+   "case": "initial/per-stage-from-r",
+   "category": "initial",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.279,
+   "status": "pass"
+  },
+  {
+   "case": "initial/restore-state",
+   "category": "initial",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.197,
+   "status": "pass"
+  },
+  {
+   "case": "initial/save-state",
+   "category": "initial",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.182,
+   "status": "both-error"
+  },
+  {
+   "case": "initial/names-restored",
+   "category": "initial",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs reads past the end of its list of file names and crashes (ANTS-51); larmorx writes the same files up to there and stops with an error",
+   "seconds": 0.155,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "dimensions-2d/warped",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/warped-nearest",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/warped-float",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/fixed-initial",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-affine",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-affine-inverted",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-euler",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-euler-inverted",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-rigid2d",
+   "category": "dimensions-2d",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-similarity-inverted",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-translation",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/file-unregistered",
+   "category": "dimensions-2d",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "\t\"VersorTransform_float_3_3\"",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "dimensions-2d/file-3d",
+   "category": "dimensions-2d",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.018,
+   "status": "both-error"
+  },
+  {
+   "case": "dimensions-2d/composite",
+   "category": "dimensions-2d",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interval-volumes",
+   "category": "dimensions-2d",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.035,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-BSpline",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-BSpline5-float",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.033,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-Gaussian",
+   "category": "dimensions-2d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.082,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-Gaussian-sigmas",
+   "category": "dimensions-2d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.089,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-LanczosWindowedSinc",
+   "category": "dimensions-2d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-BlackmanWindowedSinc-float",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-WelchWindowedSinc",
+   "category": "dimensions-2d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-GenericLabel",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.167,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-2d/interpolation-MultiLabel",
+   "category": "dimensions-2d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/warped",
+   "category": "dimensions-4d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.442,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/warped-nearest-float",
+   "category": "dimensions-4d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.272,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/file-affine-inverted",
+   "category": "dimensions-4d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.28,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interpolation-BSpline",
+   "category": "dimensions-4d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.208,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interpolation-Gaussian-float",
+   "category": "dimensions-4d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.502,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interpolation-HammingWindowedSinc",
+   "category": "dimensions-4d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.979,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interpolation-GenericLabel",
+   "category": "dimensions-4d",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 206.214,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interpolation-MultiLabel-float",
+   "category": "dimensions-4d",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 83.629,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/composite-z0",
+   "category": "dimensions-4d",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.334,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions-4d/interval-volumes",
+   "category": "dimensions-4d",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.186,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/interpolation-NearestNeighbor",
+   "category": "outputs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.293,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/interpolation-BSpline",
+   "category": "outputs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.299,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/interpolation-LanczosWindowedSinc",
+   "category": "outputs",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.395,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/interpolation-MultiLabel",
+   "category": "outputs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 24.24,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/interpolation-Gaussian",
+   "category": "outputs",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.799,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/print-similarity",
+   "category": "outputs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.022,
+   "status": "pass"
+  },
+  {
+   "case": "outputs/write-interval-volumes",
+   "category": "outputs",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.456,
+   "status": "pass"
+  },
+  {
+   "case": "errors/help",
+   "category": "errors",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "errors/no-arguments",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.018,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/bad-number",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/levels-mismatch",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/missing-image",
+   "category": "errors",
+   "checks_passed": 0,
+   "checks_total": 2,
+   "failed_checks": [
+    {
+     "detail": "ANTs -11, larmorx 1",
+     "metric": "exact",
+     "name": "both fail with the same status",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    },
+    {
+     "detail": "line 2: ANTs 'All_Command_lines_OK', larmorx 'larmorx: antsRegistration: a metric image could not be read (ANTs crashes here: it uses the missing image)'",
+     "metric": "exact",
+     "name": "their messages",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "file /tmp/lx-reg-fhbztdh6/none.nii.gz does not exist .",
+   "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/unknown-transform",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Unknown registration method \"foo\"",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/save-state-without-composite",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the the output transform will contain the this processes initializer",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/per-stage-with-collapse",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/restore-with-r",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "restore-state option is mutually exclusive with initial-moving-transform & initial-fixed-transform options.",
+   "seconds": 0.023,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/syn",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "deformable registration is milestone A5; larmorx refuses with a message",
+   "seconds": 3.612,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/short-help",
+   "category": "errors",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "errors/version",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "larmorx prints its own version and the ANTs version it ports",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/version-0",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/no-dimension",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Image dimensionality not specified.  See command line option --dimensionality",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-dimension-quiet",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/bad-dimension",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "bad image dimension 5",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/invalid-flag",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR:  Invalid command line flags found! Aborting execution.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/unbalanced-bracket",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
+   "seconds": 0.015,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/misplaced-bracket",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-transform",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the transform option ('-t') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-metric",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-convergence",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the convergence option ('-c') must be specified.  See help menu.",
+   "seconds": 0.016,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-shrink-factors",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the shrink factors option ('-f') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-smoothing-sigmas",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the smoothing sigmas option ('-s') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-output",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: the output option ('-o') must be specified.  See help menu.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/per-stage-without-composite",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the initializizing transform is collapsed into each stage for optimization",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/convergence-count",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: smoothing sigmas, shrink factors, and convergence options must be set once for each transform.",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/window-1",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Convergence Window Size must be greater than or equal to 2",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/bad-iterations",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unable to convert '1o' to type 'j' as unsigned int",
+   "seconds": 0.015,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/unknown-metric",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/bad-sampling",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: invalid sampling strategy specified: sparse",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/sigmas-mismatch",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.052,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/stage-without-metric",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "The number of transforms is 2 and the last stage ID  as determined by the metrics is 0.",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/sampling-above-1",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x57da48845bc0): sampling percentage outside expected (0,1] range",
+   "seconds": 0.054,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/missing-initial",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Transform file does not exist: /tmp/lx-reg-6yozfiei/none.mat",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/point-set-metric",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "larmorx does not port ANTs' point-set metrics (ICP, PSE, JHCT, IGDM) yet and refuses them with a message",
+   "seconds": 0.045,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "errors/minc",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "the oracle has no MINC transform IO (it prints ITK's error and exits 0); larmorx refuses MINC transform files with a message",
+   "seconds": 0.773,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "real/ds000005-sub-01/boldref-affine",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.705,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040-sub-002/boldref-affine",
+   "category": "real",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.36,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005040-sub-002/coregister",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.757,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds005454-sub-16/coregister",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 12.939,
+   "status": "pass"
+  },
+  {
+   "case": "real-linear/ds000005-sub-01/template",
+   "category": "real-linear",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 541.479,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-registration",
+ "summary": {
+  "both-error": 31,
+  "expected-divergence": 9,
+  "fail": 0,
+  "pass": 126,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

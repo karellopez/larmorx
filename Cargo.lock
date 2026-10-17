@@ -162,6 +162,7 @@ dependencies = [
  "larmorx-image",
  "larmorx-interp",
  "larmorx-io",
+ "larmorx-registration",
  "larmorx-transform",
  "rayon",
  "tempfile",
@@ -265,6 +266,18 @@ dependencies = [
  "larmorx-transform",
  "numpy",
  "pyo3",
+]
+
+[[package]]
+name = "larmorx-registration"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-image",
+ "larmorx-interp",
+ "larmorx-io",
+ "rayon",
+ "thiserror",
 ]
 
 [[package]]

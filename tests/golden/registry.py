@@ -1065,6 +1065,260 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.ants.antsRegistration", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Two linear registrations of ``anat2`` onto ``anat``: a rigid stage with Mattes mutual
+    information on regularly sampled points over two levels (shrunk and smoothed), collapsed
+    to ``0GenericAffine.mat``, with the warped image; and an affine stage in float with mean
+    squares on random points, written as a composite. The sampling seeds are fixed."""
+    prefix = ctx.out("rigid_")
+    warped = ctx.out("warped.nii")
+    cli(
+        "ants",
+        "antsRegistration",
+        "-d", "3",
+        "-o", f"[{prefix},{warped}]",
+        "-t", "Rigid[0.1]",
+        "-m", f"Mattes[{ctx.file('anat.nii')},{ctx.file('anat2.nii')},1,16,Regular,0.5]",
+        "-c", "[6x4,1e-6,3]",
+        "-f", "2x1",
+        "-s", "1x0vox",
+        "--random-seed", "7",
+    )  # fmt: skip
+    affine = ctx.out("affine_")
+    cli(
+        "ants",
+        "antsRegistration",
+        "-d", "3",
+        "--float", "1",
+        "-a", "1",
+        "-o", affine,
+        "-t", "Affine[0.2]",
+        "-m", f"MeanSquares[{ctx.file('anat.nii')},{ctx.file('anat2.nii')},1,0,Random,0.4]",
+        "-c", "[5,1e-6,3]",
+        "-f", "1",
+        "-s", "0.5mm",
+        "--random-seed", "11",
+    )  # fmt: skip
+    out: dict[str, Any] = {"rigid": File(prefix + "0GenericAffine.mat"), "warped": Nifti(warped)}
+    for key, name in (("composite", "Composite.h5"), ("inverse", "InverseComposite.h5")):
+        structure, values = _h5_structure(affine + name)
+        out[f"{key}.structure"] = structure
+        out[f"{key}.values"] = values
+    return out
+
+
+@case("cli.ants.antsRegistration.metrics", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The other metrics, in one affine stage of three (neighbourhood correlation on sampled
+    points, joint-histogram MI with its marginals corrected, global correlation, weighed and
+    normalised), then a composite-affine stage (``ANTSAffine3DTransform``) with the gradient
+    filter, not collapsed, from an initial centre-of-mass alignment."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    prefix = ctx.out("metrics_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-z", "0", "-o", prefix,
+        "-r", f"[{a},{b},1]",
+        "-t", "Affine[0.2]",
+        "-m", f"CC[{a},{b},0.5,2,Regular,0.5]",
+        "-m", f"MI2[{a},{b},1,12,Regular,0.5]",
+        "-m", f"GC[{a},{b},0.25,0,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "CompositeAffine[0.1]",
+        "-m", f"Mattes[{a},{b},1,12,Random,0.6,1]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "1vox",
+        "--random-seed", "5",
+    )  # fmt: skip
+    return {
+        "derived": File(prefix + "0DerivedInitialMovingTranslation.mat"),
+        "affine": File(prefix + "1Affine.mat"),
+        "composite_affine": File(prefix + "2Affine.mat"),
+    }
+
+
+@case("cli.ants.antsRegistration.dimensions", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """2D: a similarity then an ``ANTSCenteredAffine2DTransform`` (mean squares, dense), then a
+    rigid stage from the inverted similarity file with the warped images (the 2D rotations'
+    own inverses, the scan-line resampler); 4D: a translation then an affine (4D
+    interpolation's general path), collapsed, with the nearest-neighbour warped image; and
+    warped images with the B-spline, label-Gaussian, windowed-sinc and generic-label
+    interpolators in 2D and 4D."""
+    p2 = ctx.out("plane_")
+    plane = ctx.file("plane.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", p2, "-z", "0",
+        "-r", f"[{plane},{plane},2]",
+        "-t", "Similarity[0.1]", "-m", f"MeanSquares[{plane},{plane},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "CompositeAffine[0.1]", "-m", f"Mattes[{plane},{plane},1,10,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "2", "-s", "1vox", "--random-seed", "3",
+    )  # fmt: skip
+    p2r = ctx.out("plane_rigid_")
+    w2, iw2 = ctx.out("plane_warped.nii"), ctx.out("plane_inverse_warped.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", f"[{p2r},{w2},{iw2}]",
+        "-r", f"[{p2}1Similarity.mat,1]",
+        "-t", "Rigid[0.1]", "-m", f"Mattes[{plane},{plane},1,10,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "4",
+    )  # fmt: skip
+    p4 = ctx.out("bold_")
+    bold = ctx.file("bold.nii")
+    w4 = ctx.out("bold_warped.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "4", "-o", f"[{p4},{w4}]", "-n", "NearestNeighbor",
+        "-t", "Translation[0.1]", "-m", f"MeanSquares[{bold},{bold},1,0,Random,0.5]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "Affine[0.1]", "-m", f"Mattes[{bold},{bold},1,8,Regular,0.5]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "9",
+    )  # fmt: skip
+    # The other warped-image interpolators outside 3D (larmorx_interp::nd, the generic label).
+    extra = {}
+    for d, image, interp in (
+        ("2", plane, "BSpline[3]"),
+        ("2", plane, "MultiLabel"),
+        ("4", bold, "LanczosWindowedSinc"),
+        ("4", bold, "GenericLabel"),
+    ):
+        name = f"{d}d.warped.{interp.split('[')[0]}"
+        warped = ctx.out(f"{name}.nii")
+        cli(
+            "ants", "antsRegistration", "-d", d, "-o", f"[{ctx.out(name + '_')},{warped}]",
+            "-n", interp, "-t", "Translation[0.1]", "-m", f"MeanSquares[{image},{image},1,0]",
+            "-c", "[1,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "2",
+        )  # fmt: skip
+        extra[name] = Nifti(warped)
+    return {
+        **extra,
+        "2d.similarity": File(p2 + "1Similarity.mat"),
+        "2d.composite_affine": File(p2 + "2Affine.mat"),
+        "2d.rigid": File(p2r + "0GenericAffine.mat"),
+        "2d.warped": Nifti(w2),
+        "2d.inverse_warped": Nifti(iw2),
+        "4d.affine": File(p4 + "0GenericAffine.mat"),
+        "4d.warped": Nifti(w4),
+    }
+
+
+@case("cli.ants.antsRegistration.reproduce", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defects reproduced: the joint-histogram MI's swapped marginals (ITK-18), and a
+    Demons stage that throws and is dropped (ANTS-49), the run going on."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    prefix = ctx.out("rep_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", prefix,
+        "-t", "Rigid[0.1]", "-m", f"MI2[{a},{b},1,12,Regular,0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "Rigid[0.1]", "-m", f"Demons[{a},{b},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "--random-seed", "2",
+        upstream_defects="reproduce",
+    )  # fmt: skip
+    return {"rigid": File(prefix + "0GenericAffine.mat")}
+
+
+@case("cli.ants.antsApplyTransforms.outputs", covers=("cli:ants antsApplyTransforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The transform outputs: the chain collapsed to one affine (text) and inverted (MATLAB),
+    as a composite (HDF5, an inverted Euler as a ``MatrixOffsetTransformBase``; MATLAB in
+    float), and as a displacement field on the reference grid (NIfTI, the pointwise path through
+    the field; float, the scan-line path of a linear chain)."""
+    chain = ("-t", ctx.file("affine.mat"), "-t", f"[{ctx.file('rigid.txt')},1]")
+    files = {
+        "linear": ctx.out("linear.txt"),
+        "linear_inverse": ctx.out("inverse.mat"),
+        "composite": ctx.out("composite.h5"),
+        "composite_float": ctx.out("composite_float.mat"),
+        "field": ctx.out("field.nii.gz"),
+        "field_float": ctx.out("field_float.nii"),
+    }
+    cli("ants", "antsApplyTransforms", "-d", "3", "-o", f"Linear[{files['linear']}]", *chain)
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "-o", f"Linear[{files['linear_inverse']},1]",
+        *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3",
+        "-o", f"CompositeTransform[{files['composite']}]", "-t", ctx.file("warp.nii.gz"), *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1",
+        "-o", f"CompositeTransform[{files['composite_float']}]", *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "-r", ctx.file("reference.nii"),
+        "-o", f"DisplacementField[{files['field']}]", "-t", ctx.file("warp.nii.gz"), *chain,
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1", "-r", ctx.file("reference.nii"),
+        "-o", f"[{files['field_float']},1]", *chain,
+    )  # fmt: skip
+    out: dict[str, Any] = {}
+    for key, path in files.items():
+        if path.endswith(".h5"):
+            structure, values = _h5_structure(path)
+            out[f"{key}.structure"] = structure
+            out[f"{key}.values"] = values
+        elif ".nii" in path:
+            out[key] = Nifti(path)
+        else:
+            out[key] = File(path)
+    return out
+
+
+@case("py.ants.combine_transforms", covers=("lx.ants.combine_transforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.combine_transforms``: a composite, the collapsed affine and its inverse in
+    float, and a displacement field on the reference grid."""
+    chain = [ctx.file("warp.nii.gz"), ctx.file("affine.mat"), ctx.file("rigid.txt")]
+    flags = [False, False, True]
+    composite = lx.ants.combine_transforms(chain, invert=flags)
+    linear = lx.ants.combine_transforms(
+        chain[1:], invert=flags[1:], output="linear", invert_linear=True, precision="float32"
+    )
+    field = lx.ants.combine_transforms(
+        chain, invert=flags, output="displacement_field", reference=ctx.file("reference.nii")
+    )
+    out: dict[str, Any] = {}
+    for key, xfms in (("composite", composite), ("linear", linear), ("field", field)):
+        out[f"{key}.names"] = "\n".join(t.name for t in xfms)
+        out[f"{key}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+        out[f"{key}.fixed"] = np.concatenate([t.fixed_parameters for t in xfms])
+    return out
+
+
+@case("py.ants.registration", covers=("lx.ants.registration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.registration``: an in-memory moving image, an initial centre alignment, a
+    rigid stage with a fixed mask then an affine stage, not collapsed, with the warped images
+    and the parsed iterations."""
+    stage = lx.ants.RegistrationStage
+    metric = lx.ants.RegistrationMetric
+    a = ctx.file("anat.nii")
+    res = lx.ants.registration(
+        [
+            stage("Rigid", 0.1, metric("Mattes", a, anat2(), bins=12, sampling="Regular",
+                                       sampling_percentage=0.5),
+                  iterations=[3, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+                  convergence_window=3, masks=ctx.file("mask.nii")),
+            stage("Affine", 0.1, metric("MeanSquares", a, anat2(), sampling="Random",
+                                        sampling_percentage=0.5),
+                  iterations=[3], shrink_factors=[1], smoothing_sigmas=[0], convergence_window=3),
+        ],
+        initial_moving_transforms=[lx.ants.AlignCenters(a, anat2(), "geometry")],
+        collapse_output_transforms=False, warped=True, inverse_warped=True, random_seed=4,
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "files": "\n".join(sorted(res.files)),
+        "warped": res.warped.data,
+        "inverse_warped": res.inverse_warped.data,
+        "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
+    }
+    for name, xfms in res.files.items():
+        out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+    return out
+
+
 # --- ANTs: the Python functions -----------------------------------------------------------------
 
 
@@ -1899,6 +2153,69 @@ def _(ctx: Context) -> dict[str, Any]:
         out[f"{key}.structure"] = structure
         out[f"{key}.values"] = values
     out["read"] = np.concatenate([t.parameters for t in lx.transforms.read(comp)[1:]])
+    return out
+
+
+#: The HDF5 fixtures (``scripts/make_hdf5_fixtures.py``; ``docs/validation/golden.md``).
+HDF5_FIXTURES = Path(__file__).with_name("hdf5")
+
+
+def _h5_read_back(path: str) -> tuple[str, np.ndarray, bytes]:
+    """Every group and dataset larmorx reads in an HDF5 file: names, datatypes, shapes and
+    strings; the floating-point values (in float64) in file order; the integers' stored bytes
+    (filters undone)."""
+    lines, values, raw = [], [], []
+    for name, kind, shape, value in _core.hdf5_datasets(path):
+        text = f"{name} {kind} {list(shape)}"
+        if kind == "string":
+            text += " " + repr(value)
+        elif kind.startswith("float"):
+            values.append(np.asarray(value, np.float64).ravel())
+        elif kind.startswith("integer"):
+            raw.append(bytes(value))
+        lines.append(text)
+    floats = np.concatenate(values) if values else np.zeros(0)
+    return "\n".join(lines), floats, b"".join(raw)
+
+
+@case("hdf5.fixtures", covers=("lx.transforms.read",))
+def _(ctx: Context) -> dict[str, Any]:
+    """larmorx's HDF5 reader on the committed fixtures, which only the HDF5 C library writes:
+    superblocks 0, 1 and 3, version-1 object headers with a continuation, symbol-table groups,
+    every chunk index of file format 1.10 (single, implicit, fixed and extensible arrays,
+    paged or not, version-2 B-trees), the shuffle, Fletcher-32, n-bit and scale-offset
+    filters, half, x87 extended and quadruple floats, big-endian data, fixed-length strings,
+    dense groups with indirect blocks, huge objects and filtered heaps, creation-order
+    indexes, shared-message heaps (a list and a B-tree index), soft links and committed
+    datatypes. Each file is fingerprinted by what larmorx reads back; the soft links are
+    followed through ``hdf5_group_members``; the shared-message file is read as ITK reads
+    transforms."""
+    out: dict[str, Any] = {}
+    paths = {}
+    for fixture in sorted(HDF5_FIXTURES.glob("*.h5.gz")):
+        name = fixture.name.removesuffix(".h5.gz")
+        paths[name] = ctx.out(f"{name}.h5")
+        Path(paths[name]).write_bytes(gzip.decompress(fixture.read_bytes()))
+        structure, floats, integers = _h5_read_back(paths[name])
+        out[f"{name}.structure"] = structure
+        out[f"{name}.floats"] = floats
+        out[f"{name}.integers"] = integers
+    for name, group in (("sb0", "/"), ("sb3-datasets", "/"), ("sb3-groups", "/plain")):
+        lines, values = [], []
+        for member, datasets in _core.hdf5_group_members(paths[name], group):
+            lines.append(f"{member} {sorted(datasets)}")
+            for key in sorted(datasets):
+                value = datasets[key]
+                if not isinstance(value, list):
+                    values.append(np.asarray(value, np.float64).ravel())
+        out[f"{name}.members"] = "\n".join(lines)
+        out[f"{name}.member_values"] = np.concatenate(values) if values else np.zeros(0)
+    xfms = lx.transforms.read(paths["sohm"])
+    out["sohm.transforms"] = "\n".join(t.name for t in xfms)
+    out["sohm.parameters"] = np.concatenate(
+        [np.asarray(t.parameters, np.float64) for t in xfms]
+        + [np.asarray(t.fixed_parameters, np.float64) for t in xfms]
+    )
     return out
 
 

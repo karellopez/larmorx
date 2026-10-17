@@ -16,11 +16,12 @@ ANTs 2.6.5 at one thread (exit status, standard output with every printed metric
 standard error, the transform file byte for byte), most against the unmodified binary, the
 rest once glibc's not-correctly-rounded `cbrt` is replaced by CORE-MATH's (CLAUDE.md rule 5).
 fMRIPrep 25.2.6's own `init_aff` command lines, with fMRIPrep's seed, give fMRIPrep's
-transforms within ANTs' 8-thread band (about 1e-13).
+transforms within ANTs' 8-thread band: all ten `init_aff` nodes of the five oracle runs (full tier) within 1.5e-9 of fMRIPrep's files, nine of them within 1.3e-12.
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
 | standard | 102 | 51 | 1 | 46 | 4 | 0 |
+| full ([record](../validation/ants-ai-full.md)) | 110 | 59 | 1 | 46 | 4 | 0 |
 
 "Rejected by both" includes the cases where ANTs aborts or crashes: everything ANTs printed
 before it stopped is identical, and larmorx then exits 1 with one more line. The expected

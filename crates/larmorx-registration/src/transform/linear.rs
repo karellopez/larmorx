@@ -412,6 +412,115 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
         self.compute_offset();
     }
 
+    /// `SetIdentity()`: the identity matrix, a zero offset and translation; the centre is
+    /// kept (ITK 5.4: it is a fixed parameter); the classes' own parameters reset (angles 0,
+    /// scale 1, the identity versor).
+    pub fn set_identity(&mut self) {
+        self.matrix = identity();
+        self.offset = [R::ZERO; D];
+        self.translation = [R::ZERO; D];
+        self.angles = [R::ZERO; 3];
+        self.scale = R::ONE;
+        self.versor = [R::ZERO, R::ZERO, R::ZERO, R::ONE];
+        self.scales = [R::ONE; 3];
+        self.shears = [R::ZERO; 3];
+    }
+
+    /// `itk::Matrix · itk::Vector` in `R`: each row summed from 0.
+    fn matrix_vector(m: &Matrix<R, D>, v: &[R; D]) -> [R; D] {
+        std::array::from_fn(|r| {
+            let mut s = R::ZERO;
+            for c in 0..D {
+                s = s + m[r][c] * v[c];
+            }
+            s
+        })
+    }
+
+    /// `AffineTransform::Translate(trans, pre)`: the translation moved by `M·trans` (`pre`)
+    /// or by `trans`, then `ComputeOffset`.
+    pub fn translate(&mut self, trans: &[R; D], pre: bool) {
+        let add = if pre {
+            Self::matrix_vector(&self.matrix, trans)
+        } else {
+            *trans
+        };
+        for i in 0..D {
+            self.translation[i] = self.translation[i] + add[i];
+        }
+        self.compute_offset();
+    }
+
+    /// `AffineTransform::Scale(factor, pre)`: every matrix entry times `factor` (and, unless
+    /// `pre`, the translation), then `ComputeOffset`.
+    pub fn scale_uniform(&mut self, factor: R, pre: bool) {
+        for row in self.matrix.iter_mut() {
+            for v in row.iter_mut() {
+                *v = *v * factor;
+            }
+        }
+        if !pre {
+            for t in self.translation.iter_mut() {
+                *t = *t * factor;
+            }
+        }
+        self.compute_offset();
+    }
+
+    /// Composes the matrix with `trans`: `M·trans` (`pre`), or `trans·M` with the translation
+    /// `trans·t`; then `ComputeOffset`.
+    fn compose_matrix(&mut self, trans: &Matrix<R, D>, pre: bool) {
+        if pre {
+            self.matrix = mat_mat_r(&self.matrix, trans);
+        } else {
+            self.matrix = mat_mat_r(trans, &self.matrix);
+            self.translation = Self::matrix_vector(trans, &self.translation);
+        }
+        self.compute_offset();
+    }
+
+    /// `AffineTransform::Rotate2D(angle, pre)` (2D): the rotation
+    /// `[[cos, −sin], [sin, cos]]` of `std::cos`/`std::sin` in `R`.
+    pub fn rotate_2d(&mut self, angle: R, pre: bool) {
+        assert_eq!(D, 2, "Rotate2D needs a 2D transform");
+        let mut trans: Matrix<R, D> = [[R::ZERO; D]; D];
+        trans[0][0] = angle.cos();
+        trans[0][1] = -angle.sin();
+        trans[1][0] = angle.sin();
+        trans[1][1] = angle.cos();
+        self.compose_matrix(&trans, pre);
+    }
+
+    /// `AffineTransform::Rotate3D(axis, angle, pre)` (3D): the rotation of the unit quaternion
+    /// `(cos(θ/2), axis/|axis|·sin(θ/2))`; `θ/2` and its cosine and sine in double, the rest
+    /// in `R` (each `2.0 · (…)` in double).
+    pub fn rotate_3d(&mut self, axis: &[R; D], angle: R, pre: bool) {
+        assert_eq!(D, 3, "Rotate3D needs a 3D transform");
+        let r = (axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]).sqrt();
+        let x1 = axis[0] / r;
+        let x2 = axis[1] / r;
+        let x3 = axis[2] / r;
+        let half = angle.to_f64() / 2.0;
+        let c = larmorx_core::math::cos(half);
+        let s = larmorx_core::math::sin(half);
+        let q0 = R::from_f64(c);
+        let q1 = R::from_f64(x1.to_f64() * s);
+        let q2 = R::from_f64(x2.to_f64() * s);
+        let q3 = R::from_f64(x3.to_f64() * s);
+        let two = |v: R| R::from_f64(2.0 * v.to_f64());
+        let mut trans: Matrix<R, D> = [[R::ZERO; D]; D];
+        trans[0][0] = q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3;
+        trans[0][1] = two(q1 * q2 - q0 * q3);
+        trans[0][2] = two(q1 * q3 + q0 * q2);
+        trans[1][0] = two(q1 * q2 + q0 * q3);
+        trans[1][1] = q0 * q0 + q2 * q2 - q1 * q1 - q3 * q3;
+        trans[1][2] = two(q2 * q3 - q0 * q1);
+        trans[2][0] = two(q1 * q3 - q0 * q2);
+        trans[2][1] = two(q2 * q3 + q0 * q1);
+        trans[2][2] = q0 * q0 + q3 * q3 - q1 * q1 - q2 * q2;
+        self.compose_matrix(&trans, pre);
+    }
+
     /// `SetTranslation`.
     pub fn set_translation(&mut self, t: [R; D]) {
         self.translation = t;
@@ -419,7 +528,7 @@ impl<R: Real, const D: usize> LinearXfm<R, D> {
     }
 
     /// `ComputeMatrix` of the parameterised classes.
-    fn compute_matrix(&mut self) {
+    pub(crate) fn compute_matrix(&mut self) {
         match self.kind {
             Kind::Euler3D { zyx } => {
                 let [ax, ay, az] = self.angles;

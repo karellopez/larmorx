@@ -44,6 +44,7 @@ pub mod interp;
 pub mod mask;
 pub mod method;
 pub mod metric;
+pub mod moments;
 pub mod optimizer;
 pub mod preprocess;
 pub mod resample;

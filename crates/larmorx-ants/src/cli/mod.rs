@@ -8,6 +8,7 @@
 //! the C conversions in [`cstd`]. To add a program: write its module, add it to [`TOOLS`]
 //! and to [`run`].
 
+pub mod ai;
 pub mod apply_transforms;
 pub mod cstd;
 pub mod denoise_image;
@@ -67,6 +68,7 @@ impl TransformLoader for FileLoader {
 
 /// The ANTs tools on the command line.
 pub const TOOLS: &[&str] = &[
+    "antsAI",
     "antsApplyTransforms",
     "antsRegistration",
     "DenoiseImage",
@@ -89,6 +91,7 @@ pub fn run(
     err: &mut dyn Write,
 ) -> Option<u8> {
     match tool {
+        "antsAI" => Some(ai::main(args, out, err)),
         "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
         "antsRegistration" => Some(registration::main(args, loader, out, err)),
         "DenoiseImage" => Some(denoise_image::main(args, out, err)),

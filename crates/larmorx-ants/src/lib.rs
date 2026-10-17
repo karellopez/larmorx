@@ -17,6 +17,7 @@
 //! - The original command lines are in [`cli`].
 #![forbid(unsafe_code)]
 
+pub mod ai;
 pub mod apply_transforms;
 pub mod cli;
 pub mod denoise_image;

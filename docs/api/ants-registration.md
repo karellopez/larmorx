@@ -13,12 +13,28 @@ the gradient filter, winsorizing and histogram matching, initial transforms (fil
 Deformable stages (`SyN`, `BSpline`, displacement and velocity fields) come in milestone A5;
 larmorx refuses them with a message.
 
-**Status: `validated`** against antsRegistration itself (see the
-[validation record](../validation/ants-registration.md)): every compared case identical to
-ANTs 2.6.5 at one thread with the same seed (exit status, standard output with every
-`DIAGNOSTIC` line, standard error, every file) — most against the unmodified binary, the rest
-once glibc's `exp`/`log`/`sin`/`cos` are replaced by CORE-MATH's correctly rounded ones, which
-larmorx uses (CLAUDE.md rule 5).
+**Status: `validated`** against antsRegistration itself (the
+[validation record](../validation/ants-registration.md), standard tier, and the
+[full tier](../validation/ants-registration-full.md)): every compared case identical to ANTs
+2.6.5 at one thread with the same seed (exit status, standard output with every `DIAGNOSTIC`
+line, standard error, every file), most against the unmodified binary, the rest once glibc's
+`exp`/`log`/`sin`/`cos` are replaced by CORE-MATH's correctly rounded ones, which larmorx uses
+(CLAUDE.md rule 5).
+
+| Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
+|---|---|---|---|---|---|---|
+| standard | 166 | 102 | 24 | 31 | 9 | 0 |
+| full | 175 | 102 | 33 | 31 | 9 | 0 |
+
+The cases cover every transform in 2D, 3D and 4D, double and float, every metric and sampling,
+masks, the initial transforms and their files, every output and interpolator, every
+command-line check and message, fMRIPrep 25.2.6's own command lines of four oracle nodes, and
+(full tier) the linear stages of sMRIPrep's brain extraction and template registration in all
+five oracle runs. The expected divergences: no seed (ANTs from the clock), ANTS-51's crash,
+SyN (A5), `--version`, three of ANTS-45's silent failures, the point-set metrics and MINC
+transforms (refused). **ANTs' own thread band** (14 cases, 2, 4 and 8 threads against one):
+about 1e-13 to 1e-12 in a transform parameter in double, 3.5e-9 on fMRIPrep's BOLD-reference
+affine and 5e-3 on a float affine; larmorx gives the one-thread result at any thread count.
 
 **Results do not depend on threads.** ANTs' do (its metrics sum per work unit); larmorx always
 gives ANTs' one-thread result. **Without a seed ANTs is not repeatable** (its sampling is seeded

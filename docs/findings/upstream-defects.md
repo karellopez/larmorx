@@ -1100,7 +1100,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   (`search/local-search-text`: text there is not even parsed).
 - **fMRIPrep:** niworkflows' `AffineInitializer` passes `10` (nipype's default); ANTs runs 20.
 - **larmorx:** reproduces (the documented behaviour would change niworkflows' result).
-- **D13 / gap:** **decide** whether to honour the argument by default.
+- **D13 / gap:** decided by the user (2026-10-17): the argument is honoured by default (warning where it differs from ANTs' 20), switch reproduces; larmorprepx passes 20. **Gap** until implemented (next agent, with ITK-21).
 
 ### ANTS-55 antsAI reads a short translation grid past its end — (a)
 - **What:** `-g [s,AxB]` in 3D (or `[s,A]`) gives a vector of fewer extents than dimensions;
@@ -1217,7 +1217,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   validated (every `search/*` case of `ants-affine-initializer` reproduces it bit for bit).
 - **fMRIPrep:** every niworkflows initialization without an initial transform.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide** (an independent start would reset the rate to 0.1 each time).
+- **D13 / gap:** decided by the user (2026-10-17): corrected by default (each start point at the configured rate, 0.1), switch reproduces. **Gap** until implemented (next agent, with ANTS-54).
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

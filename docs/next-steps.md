@@ -102,6 +102,13 @@ Parity records `docs/validation/ants-ai.md` and `ants-affine-initializer.md` (fM
 `init_aff` command lines with fMRIPrep's seed; niworkflows' `antsAffineInitializer` call on
 stand-ins). Register: ANTS-52 to ANTS-60, ITK-19 to ITK-21. To decide: ANTS-54, ITK-21.
 
+## 3a. A4, part 3 (done 2026-10-17, merged `084b61d`) and its two corrections
+
+`antsAI` and `antsAffineInitializer` are ported (all but `antsAI -b`). Decided the same day, to
+implement first in the next agent run: ANTS-54 (honour `antsAffineInitializer`'s local-search
+argument) and ITK-21 (each start point at the configured learning rate), both corrected by default
+with switches; then re-record `ants-affine-initializer`. `antsAI -b`: its own task after A5/A6.
+
 ## 3b. A4, part 4: `antsRegistration`'s point-set metrics
 
 ICP, PSE, JHCT, IGDM (about 3,800 lines of ITK/ANTs C++: ITK's exact kd-tree, the point-set

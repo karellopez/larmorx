@@ -958,6 +958,22 @@ suite. **Decided by the user:** commit tiny synthetic fixtures (a few KB, no ima
 by a committed deterministic script, read by golden cases on all six platforms; CLAUDE.md
 rule 10 has the exception.
 
+## 2026-10-17: ANTS-54 and ITK-21 corrected by default; `antsAI -b` later
+
+**Decided by the user** (A4 part 3's questions):
+- **ANTS-54** (`antsAffineInitializer` ignores its local-search argument and always runs 20
+  iterations): **honour the argument** by default, warning where it differs from ANTs' 20; the
+  compatibility switch gives ANTs' behaviour. larmorprepx passes 20, what fMRIPrep effectively
+  runs (niworkflows passes 10, which never took effect).
+- **ITK-21** (the learning rate carries over between `antsAffineInitializer`'s start points):
+  asked what is methodically correct. A multi-start search compares start points, so each must
+  be evaluated alike and independently of their order; the carry-over makes each start's
+  result depend on the previous start's line search. **Corrected by default:** every start
+  point begins at the configured learning rate (0.1), with a warning where the chosen start
+  changes; the switch reproduces ITK's carry-over.
+- **`antsAI -b`** (blob alignment): ported later, as its own task after A5/A6; refused with a
+  message until then.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

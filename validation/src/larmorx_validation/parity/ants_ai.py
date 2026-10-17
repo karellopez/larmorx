@@ -1691,6 +1691,8 @@ def _resolve(c: AiCase, out: Path, tmp: Path) -> tuple[list[str], str | None]:
             import larmorx_testdata as td
 
             return str(td.get("templateflow/" + key[3:]))
+        if key == "nw-fixed" or key.startswith("nw-moving:"):
+            return str(_niworkflows_input(key, tmp))
         if key.startswith("oracle:"):
             root = reg._oracle_root()
             target = None if root is None else root / key[7:]
@@ -1700,6 +1702,35 @@ def _resolve(c: AiCase, out: Path, tmp: Path) -> tuple[list[str], str | None]:
         raise KeyError(f"unknown placeholder {{{key}}}")
 
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args], c.seed
+
+
+def _niworkflows_input(key: str, tmp: Path) -> Path:
+    """The images niworkflows' ``RobustMNINormalization`` gives ``antsAffineInitializer``
+    (nipype did not keep them): ``nw-fixed`` the 1 mm MNI template times its brain mask,
+    ``nw-moving:<run>`` the run's ``desc-preproc_T1w`` times its brain mask (as the
+    antsRegistration suite's stand-ins)."""
+    import larmorx_testdata as td
+
+    tpl = "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_"
+    if key == "nw-fixed":
+        return reg._masked(
+            tmp, "fixed_masked.nii.gz", td.get(tpl + "T1w.nii.gz"),
+            td.get(tpl + "desc-brain_mask.nii.gz"),
+        )  # fmt: skip
+    root = reg._oracle_root()
+    run = key.split(":", 1)[1]
+    run_dir = None if root is None else root / run
+    if run_dir is None or not run_dir.is_dir():
+        raise Outcome(SKIPPED, f"the fMRIPrep oracle run {run} is not here")
+    anat = sorted(
+        p
+        for p in (run_dir / "out").glob("sub-*/**/anat/*desc-preproc_T1w.nii.gz")
+        if "space-" not in p.name
+    )
+    if not anat:
+        raise Outcome(SKIPPED, f"{run} has no desc-preproc_T1w")
+    brain = anat[0].with_name(anat[0].name.replace("desc-preproc_T1w", "desc-brain_mask"))
+    return reg._masked(tmp, "moving_masked.nii.gz", anat[0], brain)
 
 
 def _run_ants(
@@ -1768,11 +1799,57 @@ def _run_larmorx(program: str, args: list[str], seed: str | None, mode: str = de
 
 
 def _normalise(text: str, out: Path) -> list[str]:
+    """``antsRegistration``'s masking, and the build's source paths in ITK's warnings and in
+    the exceptions libstdc++ prints."""
     lines = reg._normalise(text, out)
     return [
-        re.sub(r"what\(\):  \S*?/(Modules|Utilities|Examples)/", r"what():  \1/", line)
+        re.sub(r"(what\(\):  |WARNING: In )\S*?/(Modules|Utilities|Examples)/", r"\1\2/", line)
         for line in lines
     ]
+
+
+def _compare(
+    checks: CheckList, label: str, ants: tuple, lx: tuple, a_dir: Path, l_dir: Path
+) -> bool:
+    """``antsRegistration``'s comparison (exit status, both streams, every file) with this
+    suite's masking; whether everything is identical."""
+    (a_code, a_out, a_err), (l_code, l_out, l_err) = ants, lx
+    ok = True
+    same = a_code == l_code
+    checks(f"{label}: exit status", same, detail=f"ANTs {a_code}, larmorx {l_code}")
+    ok &= same
+    na, nl = _normalise(a_out, a_dir), _normalise(l_out, l_dir)
+    same = na == nl
+    checks(
+        f"{label}: standard output",
+        same,
+        metric="lines",
+        value=len(na),
+        threshold="identical, masked",
+        detail="identical" if same else reg._first_difference(na, nl),
+    )
+    ok &= same
+    ea, el = _normalise(a_err, a_dir), _normalise(l_err, l_dir)
+    same = ea == el
+    checks(
+        f"{label}: standard error",
+        same,
+        detail="identical" if same else reg._first_difference(ea, el),
+    )
+    ok &= same
+    fa, fl = reg._outputs(a_dir), reg._outputs(l_dir)
+    same = sorted(fa) == sorted(fl)
+    checks(
+        f"{label}: files written",
+        same,
+        detail=", ".join(sorted(fa)) if same else f"ANTs {sorted(fa)}, larmorx {sorted(fl)}",
+    )
+    ok &= same
+    for name in sorted(set(fa) & set(fl)):
+        s, why = reg._same_file(fa[name], fl[name])
+        checks(f"{label}: {name}", s, detail="identical" if s else why)
+        ok &= s
+    return ok
 
 
 _LARMORX = re.compile(r"^larmorx: ")
@@ -1783,7 +1860,15 @@ def _without_larmorx(lines: list[str]) -> list[str]:
 
 
 def _parameters(d: Path) -> np.ndarray | None:
-    return reg._parameters(d)
+    """Every transform parameter written, in file order; empty files (ANTS-53) hold none."""
+    import larmorx as lx
+
+    vals = []
+    for p in reg._outputs(d).values():
+        if p.suffix in (".mat", ".txt", ".h5") and p.stat().st_size > 0:
+            for t in lx.transforms.read(p):
+                vals.append(np.asarray(t.parameters, dtype=np.float64))
+    return np.concatenate(vals) if vals else None
 
 
 def _distance(a: np.ndarray | None, b: np.ndarray | None) -> float:
@@ -1928,7 +2013,7 @@ def run_case(case: Case, checks: CheckList) -> None:
                 "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
             )
         plain = CheckList()
-        identical = reg._compare(plain, "unmodified ANTs", ants, lx, a_dir, l_dir)
+        identical = _compare(plain, "unmodified ANTs", ants, lx, a_dir, l_dir)
         if identical:
             checks.checks.extend(plain.checks)
         else:
@@ -1939,7 +2024,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             c_dir = tmp / "ants-cr"
             c_dir.mkdir()
             cr = _run_ants(program, _resolve(c, c_dir, tmp)[0], seed, correctly_rounded=True)
-            reg._compare(checks, "ANTs with CORE-MATH", cr, lx, c_dir, l_dir)
+            _compare(checks, "ANTs with CORE-MATH", cr, lx, c_dir, l_dir)
         if c.fmriprep:
             theirs = _fmriprep_parameters(c.fmriprep)
             d = _distance(_parameters(l_dir), theirs)
@@ -1987,8 +2072,14 @@ def run_case(case: Case, checks: CheckList) -> None:
             change = defects.Change.of(pb, pa)
         elif (pa is None) != (pb is None):
             other.append("a transform written by one only")
+        # ITK-18 is named whenever the joint-histogram MI runs: where no point is valid (an
+        # empty mask) its correction cannot change the result.
         defects.add_fix_check(
-            checks, defects.notices_in(fx[2]), change, other_changes="; ".join(other)
+            checks,
+            defects.notices_in(fx[2]),
+            change,
+            other_changes="; ".join(other),
+            silent_ok=("ITK-18",),
         )
 
 

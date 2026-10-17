@@ -11,7 +11,10 @@ The program takes positional arguments only and prints nothing but its usage, th
 principal-axes determinant (` bad det`), the moments' ` zero image` errors and what ITK
 throws. The real case is niworkflows' call (``RobustMNINormalization`` without an initial
 transform: ``antsAffineInitializer 3 fixed moving transform.mat 15 0.1 0 10``) on the MNI
-template and fMRIPrep's preprocessed T1w of the ds000005 oracle run.
+template and fMRIPrep's preprocessed T1w of the ds000005 oracle run, and (full tier) fMRIPrep's
+own call in each oracle run's template registration, on stand-ins for the masked images nipype
+did not keep (the transform it wrote was not kept either, so there is nothing of fMRIPrep's to
+compare it with).
 """
 
 from __future__ import annotations
@@ -31,6 +34,14 @@ F4, M4 = reg.F4, reg.M4
 FO, MO = reg.FO, reg.MO
 Z = "{gen:reg-zero}"
 T1W = "{oracle:ds000005-sub-01-noreconall/out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz}"
+#: The fMRIPrep oracle runs whose template registration ran ``antsAffineInitializer``.
+RUNS = (
+    "ds000005-sub-01-noreconall",
+    "ds001600-sub-1-noreconall",
+    "ds005040-sub-002-noreconall",
+    "ds005454-sub-16-noreconall",
+    "ds005752-sub-ON01016-noreconall",
+)
 
 
 def case(cid: str, category: str, description: str, *args: str, **kw) -> AiCase:
@@ -396,9 +407,9 @@ def all_cases() -> list[AiCase]:
             "extra2",
         ),
         case(
-            "real/niworkflows-mni",
+            "real/mni-2mm",
             "real",
-            "niworkflows' call on the MNI template (2 mm) and fMRIPrep's preprocessed T1w "
+            "niworkflows' arguments on the 2 mm MNI template and fMRIPrep's preprocessed T1w "
             "(ds000005)",
             "3",
             "{tf:tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz}",
@@ -410,20 +421,24 @@ def all_cases() -> list[AiCase]:
             "10",
             band=True,
         ),
-        case(
-            "real/niworkflows-mni-1mm",
-            "real",
-            "The same on the 1 mm template",
-            "3",
-            "{tf:tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz}",
-            T1W,
-            out,
-            "15.000000",
-            "0.100000",
-            "0",
-            "10",
-            tier="full",
-        ),
+        *[
+            case(
+                f"real/niworkflows/{run.split('-noreconall')[0]}",
+                "real",
+                "fMRIPrep's call in RobustMNINormalization (no initial transform): the masked "
+                "1 mm template and the run's masked T1w",
+                "3",
+                "{nw-fixed}",
+                f"{{nw-moving:{run}}}",
+                "{out}/transform.mat",
+                "15.000000",
+                "0.100000",
+                "0",
+                "10",
+                tier="full",
+            )
+            for run in RUNS
+        ],
     ]
 
 

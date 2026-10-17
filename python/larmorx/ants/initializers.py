@@ -197,12 +197,12 @@ def ai(
         messages = _messages(err)
         if code != 0 or not os.path.exists(out_name):
             raise AIError("\n".join(messages).strip() or f"antsAI exited {code}")
+        if os.path.getsize(out_name) == 0:
+            raise AIError(
+                "antsAI wrote an empty transform file (the alignments with iterations, ANTS-53; "
+                "upstream_defects='fix' writes the alignment)"
+            )
         transforms = read(out_name, upstream_defects=upstream_defects)
-    if not transforms:
-        raise AIError(
-            "antsAI wrote no transform (the alignments with iterations, ANTS-53; "
-            "upstream_defects='fix' writes the alignment)"
-        )
     start_points = None
     values: list[tuple[int, float]] = []
     best = None

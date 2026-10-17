@@ -466,10 +466,14 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
     // point, and write no transform. Corrected, the iterations are ignored (the metric is not
     // used, as the help says).
     let align_with_iterations = transform.from_images() && s.iterations > 0;
-    if align_with_iterations && ctx.notices.fix() {
+    if align_with_iterations {
         ctx.notices.add(
             &defects::ANTS_53,
-            "AlignGeometricCenters and AlignCentersOfMass ignore --convergence: the alignment is written as with 0 iterations (ANTs writes no transform)",
+            if ctx.notices.fix() {
+                "AlignGeometricCenters and AlignCentersOfMass ignore --convergence: the alignment is written as with 0 iterations (ANTs writes no transform)"
+            } else {
+                "AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs"
+            },
         );
     }
     if s.iterations == 0 || (align_with_iterations && ctx.notices.fix()) {

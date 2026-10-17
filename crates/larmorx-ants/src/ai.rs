@@ -544,6 +544,20 @@ fn loop_values(from: f64, to: f64, step: f64, limit: usize) -> Option<Vec<f64>> 
 /// The most start points larmorx lists before it refuses (ANTs would run for years).
 pub const MAX_START_POINTS: usize = 10_000_000;
 
+/// What [`start_points`] lists.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StartPoints {
+    /// The parameters of each start point.
+    pub list: Vec<Vec<f64>>,
+    /// ANTs' `trialCounter`.
+    pub trials: usize,
+    /// Whether each start point has a non-zero search translation.
+    pub translated: Vec<bool>,
+    /// Whether the transform ignores the translation grid in ANTs (ANTS-52) and the grid has
+    /// non-zero translations.
+    pub grid_ignored: bool,
+}
+
 /// The multi-start optimizer's start points (`antsAI.cxx:1390-1509`), with what ANTs reads
 /// of the translation grid: missing entries are read past the end of ANTs' vector
 /// (undefined; refused by default, read as 0 with `reproduce`). Returns the list and ANTs'
@@ -554,7 +568,7 @@ pub fn start_points<const D: usize>(
     init: &Initial<D>,
     notices: &mut Notices,
     warnings: &mut Vec<String>,
-) -> Result<(Vec<Vec<f64>>, usize), AiError> {
+) -> Result<StartPoints, AiError> {
     let pi = std::f64::consts::PI;
     let grid: Vec<f64> = (0..D)
         .map(|d| s.translation_grid.get(d).copied())
@@ -562,6 +576,13 @@ pub fn start_points<const D: usize>(
         .map_or_else(
             || {
                 if notices.fix() {
+                    notices.add(
+                        &defects::ANTS_55,
+                        format!(
+                            "--translation-search-grid has {} extents for {D} dimensions: an error (ANTs reads the missing ones past the end of its vector)",
+                            s.translation_grid.len()
+                        ),
+                    );
                     Err(AiError::Refused(format!(
                         "--translation-search-grid has {} extents for {D} dimensions: ANTs reads the missing ones past the end of its vector (ANTS-55)",
                         s.translation_grid.len()
@@ -615,7 +636,12 @@ pub fn start_points<const D: usize>(
     }
     if s.transform.from_images() {
         // The loops only move the affine search transform: no start point is listed.
-        return Ok((Vec::new(), total));
+        return Ok(StartPoints {
+            list: Vec::new(),
+            trials: total,
+            translated: Vec::new(),
+            grid_ignored: false,
+        });
     }
     let c = init.transform.center;
     let m0 = init.transform.matrix;
@@ -633,7 +659,11 @@ pub fn start_points<const D: usize>(
             Kind::Similarity3D
         });
     }
-    let push = |list: &mut Vec<Vec<f64>>, p: Vec<f64>| list.push(p);
+    let mut translated = Vec::with_capacity(total);
+    let mut push = |list: &mut Vec<Vec<f64>>, p: Vec<f64>, st: &[f64; D]| {
+        list.push(p);
+        translated.push(st.iter().any(|&v| v != 0.0));
+    };
     for &angle1 in &angles {
         if D == 2 {
             for &t1 in &translations[0] {
@@ -650,7 +680,7 @@ pub fn start_points<const D: usize>(
                     match s.transform {
                         AiTransform::Affine => {
                             affine.scale_uniform(1.0, false);
-                            push(&mut list, affine.parameters());
+                            push(&mut list, affine.parameters(), &st);
                         }
                         AiTransform::Rigid | AiTransform::Similarity => {
                             let t = if s.transform == AiTransform::Rigid {
@@ -659,21 +689,25 @@ pub fn start_points<const D: usize>(
                                 &mut similarity
                             };
                             // ANTS-52: ANTs takes the initial offset, which drops the search
-                            // translation; corrected, the affine start point's offset.
-                            let offset = if fix_grid { affine.offset } else { o0 };
-                            if st.iter().any(|&v| v != 0.0) {
+                            // translation; corrected, the offset is translated as the 3D rigid
+                            // start point's is.
+                            let moved = st.iter().any(|&v| v != 0.0);
+                            if moved {
                                 grid_ignored = true;
                             }
                             t.set_identity();
                             t.set_center(c);
                             t.set_matrix_checked(affine.matrix, warnings)
                                 .map_err(AiError::Uncaught)?;
-                            t.set_offset(offset);
+                            t.set_offset(o0);
+                            if fix_grid && moved {
+                                t.translate_offset(&st);
+                            }
                             if s.transform == AiTransform::Similarity {
                                 t.set_scale(1.0);
                                 t.set_scale(1.0);
                             }
-                            push(&mut list, t.parameters());
+                            push(&mut list, t.parameters(), &st);
                         }
                         _ => {}
                     }
@@ -700,7 +734,7 @@ pub fn start_points<const D: usize>(
                                 match s.transform {
                                     AiTransform::Affine => {
                                         affine.scale_uniform(1.0, false);
-                                        push(&mut list, affine.parameters());
+                                        push(&mut list, affine.parameters(), &st);
                                     }
                                     AiTransform::Rigid => {
                                         rigid.set_identity();
@@ -710,7 +744,7 @@ pub fn start_points<const D: usize>(
                                         rigid
                                             .set_matrix_checked(affine.matrix, warnings)
                                             .map_err(AiError::Uncaught)?;
-                                        push(&mut list, rigid.parameters());
+                                        push(&mut list, rigid.parameters(), &st);
                                     }
                                     AiTransform::Similarity => {
                                         similarity.set_identity();
@@ -718,17 +752,18 @@ pub fn start_points<const D: usize>(
                                         similarity.set_offset(o0);
                                         // ANTS-52: ANTs does not translate the similarity
                                         // start point; corrected, as its rigid one.
-                                        if fix_grid {
+                                        let moved = st.iter().any(|&v| v != 0.0);
+                                        if fix_grid && moved {
                                             similarity.translate_offset(&st);
                                         }
-                                        if st.iter().any(|&v| v != 0.0) {
+                                        if moved {
                                             grid_ignored = true;
                                         }
                                         similarity
                                             .set_matrix_checked(affine.matrix, warnings)
                                             .map_err(AiError::Uncaught)?;
                                         similarity.set_scale(1.0);
-                                        push(&mut list, similarity.parameters());
+                                        push(&mut list, similarity.parameters(), &st);
                                     }
                                     _ => {}
                                 }
@@ -739,17 +774,12 @@ pub fn start_points<const D: usize>(
             }
         }
     }
-    if grid_ignored && (D == 2 || s.transform == AiTransform::Similarity) {
-        notices.add(
-            &defects::ANTS_52,
-            if fix_grid {
-                "the translation search grid moves each start point, as for Affine; ANTs ignores it for this transform"
-            } else {
-                "the translation search grid is ignored for this transform, as in ANTs"
-            },
-        );
-    }
-    Ok((list, total))
+    Ok(StartPoints {
+        list,
+        trials: total,
+        translated,
+        grid_ignored: grid_ignored && (D == 2 || s.transform == AiTransform::Similarity),
+    })
 }
 
 /// ANTs' `antsCommandIterationUpdate<MultiStartOptimizerv4>` (verbose): the header, every
@@ -909,7 +939,7 @@ pub fn search<const D: usize>(
         // The metric keeps its IdentityTransform: the scales estimator finds no parameter,
         // the loops list nothing, and the multi-start optimizer does nothing.
         warnings.push(NO_SHIFT_WARNING.to_owned());
-        let (_, trials) = start_points(s, init, notices, warnings)?;
+        let trials = start_points(s, init, notices, warnings)?.trials;
         if log.verbose {
             log.cout(&format!(
                 "Starting optimizer with {trials} starting points\n"
@@ -931,7 +961,18 @@ pub fn search<const D: usize>(
         moving_gradient_image: Some(moving_gradient),
         pixel_f32: true,
     };
-    let (mut list, trials) = start_points(s, init, notices, warnings)?;
+    let StartPoints {
+        mut list,
+        trials,
+        translated,
+        grid_ignored,
+    } = start_points(s, init, notices, warnings)?;
+    if grid_ignored && notices.reproduce() {
+        notices.add(
+            &defects::ANTS_52,
+            "the translation search grid is ignored for this transform, as in ANTs",
+        );
+    }
     if list.is_empty() {
         if log.verbose {
             log.cout("Starting optimizer with 0 starting points\n");
@@ -1028,6 +1069,13 @@ pub fn search<const D: usize>(
         outcome
     };
     let best = best_start_point(&outcome, notices, skip_failed)?;
+    // ANTS-52, corrected: the result differs from ANTs' when the best start point was moved.
+    if grid_ignored && notices.fix() && translated.get(outcome.best_index) == Some(&true) {
+        notices.add(
+            &defects::ANTS_52,
+            "the translation search grid moves each start point, as for Affine (ANTs ignores it for this transform); the best start point is a translated one",
+        );
+    }
     let mut out = LinearXfm::<f64, D>::new(output_kind);
     out.set_center(init.transform.center);
     out.set_parameters(&best).map_err(AiError::Uncaught)?;

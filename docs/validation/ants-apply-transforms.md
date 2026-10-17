@@ -5,7 +5,7 @@
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
 - **Reference:** antsApplyTransforms from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with 4 threads
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-16 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
+- **Generated:** 2026-10-17 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
 
 **Bit-identical to the unmodified antsApplyTransforms, all cases: 160 of 174** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 174 of 174.
 **Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 89 of 89** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 89 of 89.
@@ -56,11 +56,11 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-4s7ni5y7/missing.mat |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-cefn_syf/missing.mat |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `float/errors/4d-as-scalar` | --float 1: a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `float/errors/invert-field` | --float 1: inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-m3f7cs3s/missing.mat |
+| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-wnvfoq31/missing.mat |
 | `float/errors/unknown-interpolator` | --float 1: -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `transform-output/errors/linear-no-parameter` | -o Linear without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
 | `transform-output/errors/composite-no-parameter` | -o CompositeTransform without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
@@ -73,7 +73,7 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (32c535626228) |
+| larmorx | 0.0.1 (084b61d240f5) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

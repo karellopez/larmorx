@@ -9,7 +9,7 @@
 
 52 cases compared: 51 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.99e-13 in a transform parameter (`search/rigid-grid` 4.44e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.99e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.35e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.85e-13 in a transform parameter (`search/rigid-grid` 2.78e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.85e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.49e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
 
 fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is within 1.56e-13 (`real/ds000005-sub-01/brain-extraction`), 1.28e-13 (`real/ds000005-sub-01/bold-mixedgamblestask-run-01`) of them.
 
@@ -99,7 +99,7 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (7ba078394bc6-dirty) |
+| larmorx | 0.0.1 (084b61d240f5) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

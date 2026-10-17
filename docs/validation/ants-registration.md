@@ -9,7 +9,7 @@
 
 128 cases compared: 104 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 24 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
 
-Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.00488 in a transform parameter (`smoke/rigid` 6.69e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 7.07e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 3.85e-16, `metrics/cc-gradient-filter` 9.42e-14, `real/ds000005-sub-01/boldref-affine` 1.04e-09, `real/ds005040-sub-002/coregister` 1.26e-12); larmorx gives the one-thread result at any thread count, within 3.47e-18 of ANTs at one thread.
+Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.00488 in a transform parameter (`smoke/rigid` 8.13e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 8.11e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 8.88e-16, `metrics/cc-gradient-filter` 9.42e-14, `real/ds000005-sub-01/boldref-affine` 8.73e-10, `real/ds005040-sub-002/coregister` 1.32e-12); larmorx gives the one-thread result at any thread count, within 3.47e-18 of ANTs at one thread.
 
 ## Thresholds
 
@@ -62,7 +62,7 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/no-arguments` | no arguments: the short menu | 1 |
 | `errors/bad-number` | -c [1x,1e-6,5]: a number that does not convert | 1 |
 | `errors/levels-mismatch` | two shrink factors for one level | 1 |
-| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-k_8fllj8/none.nii.gz does not exist . |
+| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-gm8rfg1c/none.nii.gz does not exist . |
 | `errors/unknown-transform` | an unknown transform name | Unknown registration method "foo" |
 | `errors/save-state-without-composite` | --save-state without -a 1 | because the the output transform will contain the this processes initializer |
 | `errors/per-stage-with-collapse` | -i 1 -a 1 with collapsing | ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive. |
@@ -85,14 +85,14 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/bad-sampling` | an unknown sampling strategy | ERROR: invalid sampling strategy specified: sparse |
 | `errors/sigmas-mismatch` | three sigmas for two levels | 1 |
 | `errors/stage-without-metric` | a second -t without its -m | The number of transforms is 2 and the last stage ID as determined by the metrics is 0. |
-| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x61f47eaf3bc0): sampling percentage outside expected (0,1] range |
-| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-ndzjxbk1/none.mat |
+| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5a2d40bfbbc0): sampling percentage outside expected (0,1] range |
+| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-2ujzmtu5/none.mat |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (7ba078394bc6-dirty) |
+| larmorx | 0.0.1 (084b61d240f5) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -275,6 +275,7 @@ def all_cases() -> list[RegCase]:
             "Rigid, Mattes, regular sampling, 2 levels, warped images",
             *stage("Rigid[0.1]", mattes()),
             tier="smoke",
+            band=True,
         ),
         reg(
             "smoke/affine-float",
@@ -284,6 +285,7 @@ def all_cases() -> list[RegCase]:
             "1",
             *stage("Affine[0.1]", f"MeanSquares[{F},{M},1,0,Random,0.3]"),
             tier="smoke",
+            band=True,
         ),
         reg(
             "smoke/composite",
@@ -420,6 +422,7 @@ def all_cases() -> list[RegCase]:
                 f"Rigid with {metric.split('[')[0]} ({name})",
                 *stage("Rigid[0.1]", metric),
                 out=PRE,
+                band=True,
             )
         )
     for name, metric, d in (
@@ -1654,12 +1657,30 @@ def run_case(case: Case, checks: CheckList) -> None:
 def highlights(results: list[CaseResult]) -> list[str]:
     compared = [r for r in results if r.status == "pass"]
     plain = [r for r in compared if all(ch.threshold != GLIBC for ch in r.checks)]
-    return [
+    lines = [
         f"{len(compared)} cases compared: {len(plain)} identical to the unmodified ANTs (exit status, "
         f"standard output with every DIAGNOSTIC line, standard error, every file), "
         f"{len(compared) - len(plain)} identical once ANTs uses CORE-MATH's correctly rounded "
         "`exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded)."
     ]
+    band = []
+    for r in compared:
+        for ch in r.checks:
+            m = re.search(r"larmorx vs ANTs \(1 thread\) (\S+); ANTs' own band (\S+)", ch.detail)
+            if ch.name == "thread band" and m:
+                band.append((r.case, float(m.group(1)), float(m.group(2))))
+    if band:
+        threads = ", ".join(map(str, BAND_THREADS))
+        lines.append("")
+        lines.append(
+            f"Thread band, {len(band)} cases: ANTs at {threads} threads differs from its own "
+            f"one-thread result by up to {max(b for _, _, b in band):.3g} in a transform "
+            "parameter ("
+            + ", ".join(f"`{case}` {b:.3g}" for case, _, b in band)
+            + "); larmorx gives the one-thread result at any thread count, within "
+            f"{max(d for _, d, _ in band):.3g} of ANTs at one thread."
+        )
+    return lines
 
 
 def suite() -> Suite:

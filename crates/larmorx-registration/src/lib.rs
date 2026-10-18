@@ -46,6 +46,7 @@ pub mod method;
 pub mod metric;
 pub mod moments;
 pub mod optimizer;
+pub mod pointset;
 pub mod preprocess;
 pub mod resample;
 pub mod rng;
@@ -69,6 +70,12 @@ pub trait Real: ItkReal + Default + Send + Sync + 'static {
     fn from_i64(i: i64) -> Self;
     /// `std::log` (glibc's; correctly rounded here).
     fn ln(self) -> Self;
+    /// `std::exp` (glibc's `exp` or `expf`; correctly rounded here).
+    fn exp(self) -> Self;
+    /// `std::pow(x, y)`: glibc's `pow` or `powf`. `powf` is correctly rounded here
+    /// (CORE-MATH); `pow` is the `libm` crate's, as larmorx has no correctly rounded `pow` for
+    /// double yet.
+    fn powr(self, y: Self) -> Self;
     /// `SmoothingRecursiveGaussianImageFilter<Image<R>, Image<R>>` (sigmas in physical
     /// units).
     fn smooth(
@@ -104,6 +111,14 @@ impl Real for f64 {
     #[inline]
     fn ln(self) -> f64 {
         larmorx_core::math::log(self)
+    }
+    #[inline]
+    fn exp(self) -> f64 {
+        larmorx_core::math::exp(self)
+    }
+    #[inline]
+    fn powr(self, y: f64) -> f64 {
+        libm::pow(self, y)
     }
     fn smooth(
         data: &[f64],
@@ -149,6 +164,14 @@ impl Real for f32 {
     #[inline]
     fn ln(self) -> f32 {
         larmorx_core::math::logf(self)
+    }
+    #[inline]
+    fn exp(self) -> f32 {
+        larmorx_core::math::expf(self)
+    }
+    #[inline]
+    fn powr(self, y: f32) -> f32 {
+        larmorx_core::math::powf(self, y)
     }
     fn smooth(
         data: &[f32],
@@ -282,6 +305,12 @@ impl CompensatedSum {
     #[inline]
     pub fn sum(&self) -> f64 {
         self.sum
+    }
+
+    /// The compensation (`m_Compensation`), which `operator+=(const Self &)` adds first.
+    #[inline]
+    pub fn compensation(&self) -> f64 {
+        self.compensation
     }
 }
 

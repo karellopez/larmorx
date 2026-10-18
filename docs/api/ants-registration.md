@@ -25,12 +25,13 @@ line, standard error, every file), most against the unmodified binary, the rest 
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
-| standard | 168 | 104 | 24 | 31 | 9 | 0 |
-| full | 175 | 102 | 33 | 31 | 9 | 0 |
+| standard | 224 | 145 | 24 | 44 | 11 | 0 |
+| full | 235 | 146 | 33 | 44 | 12 | 0 |
 
-The standard record was re-run by A4 part 3 (2026-10-17), with two cases of the gradient filter
-on oblique grids (its float components, [findings](../findings/ants-ai.md)); the full record
-predates them.
+Both records were re-run by A4 part 4 (2026-10-18, from `8bac0bf`), with the point-set
+metrics' cases (57 standard, 59 full; all 42 compared ones identical to
+the unmodified ANTs) and A4 part 3's two cases of the gradient filter on oblique grids (its
+float components, [findings](../findings/ants-ai.md)).
 
 The cases cover every transform in 2D, 3D and 4D, double and float, every metric and sampling,
 masks, the initial transforms and their files, every output and interpolator, every
@@ -43,9 +44,12 @@ transforms, several levels and stages, and every message, failure and crash. The
 divergences: no seed (ANTs from the clock), ANTS-51's crash, SyN (A5), `--version`, three of
 ANTS-45's silent failures, MINC transforms (refused), a point set's random fraction (ANTs seeds
 it from the clock, ANTS-64), IGDM's value for neighbourhoods of more than one voxel (ANTs reads
-before its arrays, ANTS-66) and a text point set ANTs reads forever (ANTS-69). **ANTs' own thread band** (14 cases, 2, 4 and 8 threads against one):
-about 1e-13 to 1e-12 in a transform parameter in double, 3.5e-9 on fMRIPrep's BOLD-reference
-affine and 5e-3 on a float affine; larmorx gives the one-thread result at any thread count.
+before its arrays, ANTS-66) and a text point set ANTs reads forever (ANTS-69).
+
+**ANTs' own thread band** (the standard record's 18 cases, 2, 4 and 8 threads against one):
+about 1e-13 to 1e-12 in a transform parameter in double, 3.9e-10 on fMRIPrep's BOLD-reference
+affine (3.5e-9 in A4 part 2's run: the band itself changes from run to run), 4.9e-3 on a float
+affine and up to 1.1e-16 with the point-set metrics; larmorx gives the one-thread result at any thread count.
 
 **Results do not depend on threads.** ANTs' do (its metrics sum per work unit); larmorx always
 gives ANTs' one-thread result. **Without a seed ANTs is not repeatable** (its sampling is seeded

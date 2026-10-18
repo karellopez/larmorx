@@ -1,15 +1,15 @@
 # Parity: antsRegistration (linear stages)
 
-**All cases agree.** 168 cases on the `standard` tier: 128 pass, 31 rejected by both, 9 expected divergences, 0 failures.
+**All cases agree.** 224 cases on the `standard` tier: 169 pass, 44 rejected by both, 11 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, larmorx-ants)
 - **Reference:** antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-17 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
+- **Generated:** 2026-10-18 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
 
-128 cases compared: 104 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 24 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
+169 cases compared: 145 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 24 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
 
-Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.00488 in a transform parameter (`smoke/rigid` 8.13e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 8.11e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 8.88e-16, `metrics/cc-gradient-filter` 9.42e-14, `real/ds000005-sub-01/boldref-affine` 8.73e-10, `real/ds005040-sub-002/coregister` 1.32e-12); larmorx gives the one-thread result at any thread count, within 3.47e-18 of ANTs at one thread.
+Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.00488 in a transform parameter (`smoke/rigid` 7.04e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 6.79e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 1.06e-15, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `real/ds000005-sub-01/boldref-affine` 3.9e-10, `real/ds005040-sub-002/coregister` 4.68e-13); larmorx gives the one-thread result at any thread count, within 3.47e-18 of ANTs at one thread.
 
 ## Thresholds
 
@@ -28,10 +28,11 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 |---|---|---|---|---|---|
 | dimensions-2d | 24 | 22 | 2 | 0 | 0 |
 | dimensions-4d | 10 | 10 | 0 | 0 | 0 |
-| errors | 37 | 2 | 28 | 7 | 0 |
+| errors | 36 | 2 | 28 | 6 | 0 |
 | initial | 11 | 9 | 1 | 1 | 0 |
 | metrics | 22 | 22 | 0 | 0 | 0 |
 | outputs | 7 | 7 | 0 | 0 | 0 |
+| point-sets | 57 | 41 | 13 | 3 | 0 |
 | real | 4 | 4 | 0 | 0 | 0 |
 | real-linear | 1 | 1 | 0 | 0 | 0 |
 | sampling | 11 | 10 | 0 | 1 | 0 |
@@ -49,8 +50,10 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/version-0` | ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45) |
 | `errors/no-dimension-quiet` | ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45) |
 | `errors/unbalanced-bracket` | ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45) |
-| `errors/point-set-metric` | larmorx does not port ANTs' point-set metrics (ICP, PSE, JHCT, IGDM) yet and refuses them with a message |
 | `errors/minc` | the oracle has no MINC transform IO (it prints ITK's error and exits 0); larmorx refuses MINC transform files with a message |
+| `point-sets/icp-sampled` | ANTs draws the points of a sampling percentage below 1 with a generator seeded from the clock (ANTS-64): two runs differ; larmorx seeds it from the registration's seed |
+| `point-sets/igdm-neighbourhood` | ANTs' line search computes IGDM's centre index from a negative number and reads memory before the intensity arrays (ANTS-66, undefined); larmorx takes the two intensities as equal |
+| `point-sets/igdm-2d` | ANTs reads memory before IGDM's intensity arrays for neighbourhoods of more than one voxel (ANTS-66) |
 
 ## Rejected by both
 
@@ -62,7 +65,7 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/no-arguments` | no arguments: the short menu | 1 |
 | `errors/bad-number` | -c [1x,1e-6,5]: a number that does not convert | 1 |
 | `errors/levels-mismatch` | two shrink factors for one level | 1 |
-| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-gm8rfg1c/none.nii.gz does not exist . |
+| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-8tiyuzyh/none.nii.gz does not exist . |
 | `errors/unknown-transform` | an unknown transform name | Unknown registration method "foo" |
 | `errors/save-state-without-composite` | --save-state without -a 1 | because the the output transform will contain the this processes initializer |
 | `errors/per-stage-with-collapse` | -i 1 -a 1 with collapsing | ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive. |
@@ -85,14 +88,27 @@ Thread band, 14 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/bad-sampling` | an unknown sampling strategy | ERROR: invalid sampling strategy specified: sparse |
 | `errors/sigmas-mismatch` | three sigmas for two levels | 1 |
 | `errors/stage-without-metric` | a second -t without its -m | The number of transforms is 2 and the last stage ID as determined by the metrics is 0. |
-| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5a2d40bfbbc0): sampling percentage outside expected (0,1] range |
-| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-2ujzmtu5/none.mat |
+| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5a16a0812bc0): sampling percentage outside expected (0,1] range |
+| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-ubp11596/none.mat |
+| `point-sets/igdm-few-parameters` | IGDM with three parameters | The expected number of parameters aren't specified. Please see help menu. |
+| `point-sets/igdm-radius-dimension` | IGDM with a 2D radius in 3D | The neighborhood size must equal the dimension. |
+| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x62c7eb93de60): sampling percentage outside expected (0,1] range |
+| `point-sets/icp-no-mask` | Point-set metrics without a fixed mask: no virtual domain | larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs cras… |
+| `point-sets/icp-missing` | A point set that does not exist | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
+| `point-sets/icp-short-name` | A point set named with fewer than 3 characters | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
+| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-d16qg81c/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
+| `point-sets/icp-vtk-no-points` | A VTK file without POINTS: libstdc++'s out_of_range | larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `point-sets/igdm-missing-mask` | An IGDM mask that does not exist | larmorx: antsRegistration: an intensity point set could not be read: ANTs goes on with a null point set and crashes |
+| `point-sets/icp-warped` | Warped images with a point-set metric first | larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops |
+| `point-sets/icp-print-similarity` | --print-similarity-measure-interval with a point-set metric first | larmorx: antsRegistration: --print-similarity-measure-interval with a point-set metric first: ANTs' observer computes the full-scale similarity of null images;… |
+| `point-sets/icp-interval-volumes` | --write-interval-volumes with a point-set metric first | larmorx: antsRegistration: --write-interval-volumes with a point-set metric first: ANTs' observer resamples a null image; ANTs crashes here, larmorx stops |
+| `point-sets/mattes-regular-then-icp` | Regular sampling with a point-set metric in the stage | larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric an… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (084b61d240f5) |
+| larmorx | 0.0.1 (8bac0bf019bc) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -270,8 +286,64 @@ Inputs named `gen:<name>` are built by this suite (seeded phantoms); the real ca
 | `errors/stage-without-metric` | both-error | 2/2 | a second -t without its -m |
 | `errors/sampling-above-1` | both-error | 2/2 | a sampling percentage of 1.5 |
 | `errors/missing-initial` | both-error | 2/2 | -r a transform file that does not exist |
-| `errors/point-set-metric` | expected-divergence | 1/1 | an ICP stage (a point-set metric) |
 | `errors/minc` | expected-divergence | 1/1 | --minc 1: MINC transform files |
+| `point-sets/icp` | pass | 7/7 | ICP between two label images, the fixed mask as the virtual domain |
+| `point-sets/icp-affine-two-levels` | pass | 6/6 | ICP, Affine, two levels (shrink 2x1, smoothing ignored) |
+| `point-sets/icp-float` | pass | 6/6 | ICP with --float 1 |
+| `point-sets/icp-text` | pass | 6/6 | ICP between text point sets (a final newline: ANTs reads one more record, ANTS-62) |
+| `point-sets/icp-text-no-final-newline` | pass | 6/6 | A text point set without a final newline |
+| `point-sets/icp-vtk` | pass | 6/6 | ICP between ASCII VTK point sets |
+| `point-sets/icp-vtk-binary` | pass | 6/6 | A binary VTK point set: its labels read past one value (ANTS-63) |
+| `point-sets/icp-vtk-no-scalars` | pass | 6/6 | A VTK point set without labels: label 0 for every point |
+| `point-sets/icp-boundary` | pass | 6/6 | ICP on the labels' contours (boundaryPointsOnly) |
+| `point-sets/icp-not-bijective` | pass | 6/6 | A label only the fixed set has: ITK throws, the stage is dropped (ITK-22) |
+| `point-sets/icp-empty` | pass | 6/6 | An empty fixed point set: the scales estimator throws |
+| `point-sets/icp-sampled` | expected-divergence | 1/1 | ICP on half of each point set (a sampling percentage of 0.5) |
+| `point-sets/icp-2d` | pass | 6/6 | ICP in 2D |
+| `point-sets/icp-4d` | pass | 6/6 | ICP in 4D, Affine |
+| `point-sets/icp-fixed-initial` | pass | 6/6 | ICP with an initial fixed transform (-q) |
+| `point-sets/icp-moving-initial` | pass | 6/6 | ICP with an initial moving transform (-r) |
+| `point-sets/icp-images-initial` | pass | 6/6 | ICP with -r [fixed,moving,1] from intensity images |
+| `point-sets/icp-same-sets` | pass | 6/6 | ICP of a point set with itself |
+| `point-sets/pse` | pass | 7/7 | PSE (sigma 1, 50 neighbours) |
+| `point-sets/pse-boundary` | pass | 6/6 | PSE on the contours, 20 neighbours |
+| `point-sets/pse-sigma-zero` | pass | 6/6 | PSE with a point-set sigma of 0: ITK throws |
+| `point-sets/pse-text-2d` | pass | 6/6 | PSE between 2D text point sets |
+| `point-sets/jhct` | pass | 7/7 | JHCT with anisotropic covariances (sigma 1, alpha 1.1) |
+| `point-sets/jhct-isotropic` | pass | 6/6 | JHCT with isotropic covariances (sigma 1: ITK's univariate prefactor, ITK-23) |
+| `point-sets/jhct-alpha-1` | pass | 6/6 | JHCT with alpha 1 (the logarithm) |
+| `point-sets/jhct-alpha-2` | pass | 6/6 | JHCT with alpha 2 |
+| `point-sets/jhct-sigma-2` | pass | 6/6 | JHCT with a point-set sigma of 2 |
+| `point-sets/jhct-anisotropic-sigma-2` | pass | 6/6 | JHCT, anisotropic, sigma 2, alpha 1.5 |
+| `point-sets/jhct-text` | pass | 6/6 | JHCT between text point sets (fewer points than neighbours: ITK's warnings) |
+| `point-sets/jhct-2d` | pass | 6/6 | JHCT in 2D |
+| `point-sets/igdm` | pass | 7/7 | IGDM between masked intensity images (sigmas estimated) |
+| `point-sets/igdm-sigmas` | pass | 6/6 | IGDM with given sigmas |
+| `point-sets/igdm-fixed-initial` | pass | 6/6 | IGDM with an initial fixed transform |
+| `point-sets/igdm-neighbourhood` | expected-divergence | 1/1 | IGDM with a neighbourhood of radius 1 |
+| `point-sets/igdm-2d` | expected-divergence | 1/1 | IGDM in 2D, radius 1 |
+| `point-sets/igdm-2d-radius-0` | pass | 6/6 | IGDM in 2D |
+| `point-sets/mattes-then-icp` | pass | 6/6 | Mattes and ICP in one stage (the image metric's virtual domain) |
+| `point-sets/icp-then-mattes` | pass | 6/6 | ICP and Mattes in one stage, weights 0.5 and 2 |
+| `point-sets/icp-then-mattes-regular` | pass | 6/6 | ICP first: the stage takes ICP's sampling (none) |
+| `point-sets/igdm-then-mattes` | pass | 6/6 | IGDM and Mattes in one stage |
+| `point-sets/icp-then-igdm` | pass | 6/6 | ICP and IGDM in one stage: IGDM gets no input, ITK throws (ANTS-61) |
+| `point-sets/mattes-then-igdm` | pass | 6/6 | Mattes and IGDM in one stage: IGDM gets no input (ANTS-61) |
+| `point-sets/icp-then-pse-stages` | pass | 6/6 | Two stages: ICP (Rigid), then PSE (Affine) |
+| `point-sets/mattes-and-icp-warped` | pass | 8/8 | Mattes first, then ICP: the warped images of the image metric |
+| `point-sets/igdm-few-parameters` | both-error | 2/2 | IGDM with three parameters |
+| `point-sets/igdm-radius-dimension` | both-error | 2/2 | IGDM with a 2D radius in 3D |
+| `point-sets/icp-percentage-above-1` | both-error | 2/2 | A sampling percentage of 1.5 |
+| `point-sets/icp-no-mask` | both-error | 4/4 | Point-set metrics without a fixed mask: no virtual domain |
+| `point-sets/icp-missing` | both-error | 4/4 | A point set that does not exist |
+| `point-sets/icp-short-name` | both-error | 4/4 | A point set named with fewer than 3 characters |
+| `point-sets/icp-unreadable` | both-error | 4/4 | A point set no reader takes (ITK's image reader throws) |
+| `point-sets/icp-vtk-no-points` | both-error | 4/4 | A VTK file without POINTS: libstdc++'s out_of_range |
+| `point-sets/igdm-missing-mask` | both-error | 4/4 | An IGDM mask that does not exist |
+| `point-sets/icp-warped` | both-error | 4/4 | Warped images with a point-set metric first |
+| `point-sets/icp-print-similarity` | both-error | 4/4 | --print-similarity-measure-interval with a point-set metric first |
+| `point-sets/icp-interval-volumes` | both-error | 4/4 | --write-interval-volumes with a point-set metric first |
+| `point-sets/mattes-regular-then-icp` | both-error | 4/4 | Regular sampling with a point-set metric in the stage |
 | `real/ds000005-sub-01/boldref-affine` | pass | 7/7 | fMRIPrep 25.2.6's enhance_and_skullstrip_bold_wf/norm of ds000005-sub-01-noreconall |
 | `real/ds005040-sub-002/boldref-affine` | pass | 11/11 | fMRIPrep 25.2.6's enhance_and_skullstrip_bold_wf/norm of ds005040-sub-002-noreconall |
 | `real/ds005040-sub-002/coregister` | pass | 7/7 | fMRIPrep 25.2.6's fmapreg_wf/coregister of ds005040-sub-002-noreconall |

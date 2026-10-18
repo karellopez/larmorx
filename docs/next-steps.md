@@ -109,13 +109,23 @@ done the same day (A4 part 4's first step): ANTS-54 (honour `antsAffineInitializ
 argument) and ITK-21 (each start point at the configured learning rate), both corrected by default
 with switches; `ants-affine-initializer` re-recorded. `antsAI -b`: its own task after A5/A6.
 
-## 3b. A4, part 4: `antsRegistration`'s point-set metrics
+## 3b. A4, part 4: `antsRegistration`'s point-set metrics (done 2026-10-18, branch `worktree-agent-a1b1eb9dc5f346cdd`, not merged yet)
 
-ICP, PSE, JHCT, IGDM (about 3,800 lines of ITK/ANTs C++: ITK's exact kd-tree, the point-set
-readers for label images, VTK and text, ANTs' intensity point-set filter), so `antsRegistration` is
-complete. Below 100 % sampling ANTs seeds point sampling from the clock: compare what can be
-compared. **The next agent's brief covers parts 3 and 4 together** (part 3 first); a copy is in
-the session scratchpad (`brief-a43.md`), and this file and CLAUDE.md hold its substance.
+ICP, PSE, JHCT and IGDM, to full completeness: ITK's exact k-d tree, the readers for label
+images (boundary points too), text and VTK (ASCII and binary) point sets, ANTs' intensity
+point-set filter, the labelled wrapper, the manifold Parzen density, every combination with
+each other and with image metrics, 2D/3D/4D, double and float (`larmorx_registration::pointset`,
+`larmorx_ants::registration::pointsets`; `lx.ants.PointSetMetric`,
+`lx.ants.IntensityPointSetMetric`). `ants-registration` re-recorded from `8bac0bf`: standard
+224 cases (145 identical to the unmodified ANTs, 24 with CORE-MATH, 0 failures), full
+235 (146 and 33, 0 failures); every compared point-set case identical to the
+unmodified ANTs; expected divergences only where ANTs is not repeatable (a point set's random
+fraction, ANTS-64), reads undefined memory (ANTS-66) or never ends (ANTS-69). Correctly rounded
+`pow` (a port of CORE-MATH's `cr_pow`, for JHCT) and `pow`/`powf` in the CORE-MATH preload.
+Register: ANTS-61 to ANTS-70, ITK-22 to ITK-29; **to decide:** ANTS-67, ANTS-68, ANTS-70, ITK-24,
+ITK-29 (all in the point-set metrics, which fMRIPrep does not use). Left: `larmorx-interp`'s
+B-spline prefilter still calls the `libm` crate's `pow` (switching it needs `antsApplyTransforms`'
+B-spline cases re-run).
 
 ## 4. A5: `antsRegistration`'s deformable stages; A6: Atropos
 

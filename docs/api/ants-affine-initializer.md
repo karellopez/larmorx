@@ -18,13 +18,16 @@ grids and real images (the MNI template and fMRIPrep's preprocessed T1w; full ti
 
 | Tier | Cases | Identical to the unmodified ANTs | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|
-| standard | 38 | 23 | 13 | 2 | 0 |
-| full ([record](../validation/ants-affine-initializer-full.md)) | 43 | 28 | 13 | 2 | 0 |
+| standard | 41 | 26 | 13 | 2 | 0 |
+| full ([record](../validation/ants-affine-initializer-full.md)) | 46 | 31 | 13 | 2 | 0 |
 
 "Rejected by both" includes the aborts (everything ANTs printed before it stopped is
 identical); the expected divergences are the two search factors whose loop never ends in ANTs.
-**ANTs' own thread band** (4 cases): up to 1e-6 in a parameter on the MNI template,
-1e-15 on the phantoms; larmorx gives the one-thread result at any thread count.
+**ANTs' own thread band** (4 cases): up to 1.3e-6 in a parameter on the MNI template,
+1e-15 on the phantoms; larmorx gives the one-thread result at any thread count. The
+comparison runs larmorx with ANTs' defects reproduced (`reproduce`); every case also runs in
+larmorx's default mode, where ANTS-54 and ITK-21 (below) are named exactly where they change
+the transform (the fix pass of each case).
 
 **Results do not depend on threads.** larmorx gives ANTs' one-thread result at any thread
 count.

@@ -1107,10 +1107,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   SetLocalOptimizer(...)`, the code's own path); text that is not such a number, a negative
   value or one beyond `int` is an error (exit 1). A notice names ANTS-54 wherever the argument
   is not 20. `reproduce` skips the argument and runs 20, with a notice when it says otherwise.
-  On niworkflows' arguments (`15 0.1 0 10`, the MNI template and fMRIPrep's T1w), 10 iterations
-  instead of 20 move the transform's parameters by up to about 1.5 (`real/mni-2mm`'s fix pass,
-  [ants-affine-initializer.md](../validation/ants-affine-initializer.md)). larmorprepx will
-  pass 20, what fMRIPrep effectively runs.
+  On niworkflows' arguments (`15 0.1 0 10`, the 2 mm MNI template and fMRIPrep's T1w of
+  ds000005, `real/mni-2mm` of [ants-affine-initializer.md](../validation/ants-affine-initializer.md)),
+  larmorx's default (10 iterations, each start point at 0.1, with ITK-21) moves the transform
+  by up to 1.41 mm in its translation and 0.15 in its matrix from ANTs' result.
+  larmorprepx will pass 20, what fMRIPrep effectively runs.
 - **D13 / gap:** done (2026-10-17): the argument is honoured by default, `reproduce` gives
   ANTs' 20. No gap.
 

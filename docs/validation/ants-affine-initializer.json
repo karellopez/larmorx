@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "81ac401e129b",
+  "larmorx_commit": "61309dd10e0e",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -23,7 +23,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -33,7 +33,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -43,7 +43,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.081,
+   "seconds": 0.077,
    "status": "both-error"
   },
   {
@@ -53,7 +53,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.166,
+   "seconds": 0.302,
    "status": "both-error"
   },
   {
@@ -63,7 +63,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.021,
+   "seconds": 0.013,
    "status": "both-error"
   },
   {
@@ -83,7 +83,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.211,
+   "seconds": 0.32,
    "status": "pass"
   },
   {
@@ -93,7 +93,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.183,
+   "seconds": 0.34,
    "status": "pass"
   },
   {
@@ -113,7 +113,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.022,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -133,7 +133,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.028,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -143,7 +143,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.029,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -153,7 +153,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.038,
+   "seconds": 0.073,
    "status": "both-error"
   },
   {
@@ -163,7 +163,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.058,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -173,7 +173,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.62,
+   "seconds": 20.681,
    "status": "expected-divergence"
   },
   {
@@ -183,7 +183,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.781,
+   "seconds": 20.698,
    "status": "expected-divergence"
   },
   {
@@ -193,7 +193,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: no start point (a search factor or radian fraction that is not a number): ANTs reads the best parameters from an empty list and crashes",
-   "seconds": 0.059,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -203,7 +203,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsAffineInitializer: no start point (a search factor or radian fraction that is not a number): ANTs reads the best parameters from an empty list and crashes",
-   "seconds": 0.054,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -213,7 +213,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 53.81,
+   "seconds": 64.864,
    "status": "pass"
   },
   {
@@ -223,7 +223,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.392,
+   "seconds": 4.962,
    "status": "pass"
   },
   {
@@ -233,7 +233,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.977,
+   "seconds": 7.364,
    "status": "pass"
   },
   {
@@ -243,7 +243,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.434,
+   "seconds": 2.953,
    "status": "pass"
   },
   {
@@ -253,7 +253,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.264,
+   "seconds": 5.0,
    "status": "pass"
   },
   {
@@ -263,7 +263,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 35.81,
+   "seconds": 49.834,
    "status": "pass"
   },
   {
@@ -273,7 +273,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.028,
+   "seconds": 1.747,
    "status": "pass"
   },
   {
@@ -283,7 +283,37 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.364,
+   "seconds": 2.416,
+   "status": "pass"
+  },
+  {
+   "case": "search/local-search-zero",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.139,
+   "status": "pass"
+  },
+  {
+   "case": "search/local-search-negative",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.245,
+   "status": "pass"
+  },
+  {
+   "case": "search/local-search-20",
+   "category": "search",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.294,
    "status": "pass"
   },
   {
@@ -293,7 +323,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.111,
+   "seconds": 3.269,
    "status": "pass"
   },
   {
@@ -303,7 +333,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.73,
+   "seconds": 5.893,
    "status": "pass"
   },
   {
@@ -313,7 +343,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.076,
+   "seconds": 1.071,
    "status": "pass"
   },
   {
@@ -323,7 +353,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.444,
+   "seconds": 0.602,
    "status": "pass"
   },
   {
@@ -333,7 +363,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.082,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -343,7 +373,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -353,7 +383,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.728,
+   "seconds": 6.555,
    "status": "pass"
   },
   {
@@ -363,7 +393,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.047,
+   "seconds": 6.022,
    "status": "pass"
   },
   {
@@ -373,7 +403,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.18,
+   "seconds": 5.957,
    "status": "pass"
   },
   {
@@ -383,7 +413,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.295,
+   "seconds": 2.623,
    "status": "pass"
   },
   {
@@ -393,7 +423,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 135.195,
+   "seconds": 136.548,
    "status": "pass"
   }
  ],
@@ -402,7 +432,7 @@
   "both-error": 13,
   "expected-divergence": 2,
   "fail": 0,
-  "pass": 23,
+  "pass": 26,
   "skipped": 0
  },
  "tier": "standard"

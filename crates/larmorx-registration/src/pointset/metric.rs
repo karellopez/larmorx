@@ -58,7 +58,10 @@ pub struct IntensityPointSet<R, const D: usize> {
 pub enum PointSetMetricKind<R> {
     Icp,
     /// `SetPointSetSigma` (a `float`), `SetEvaluationKNeighborhood`.
-    Pse { sigma: f32, k: usize },
+    Pse {
+        sigma: f32,
+        k: usize,
+    },
     /// `SetPointSetSigma`, `SetKernelSigma(10)`, `SetUseAnisotropicCovariances`,
     /// `SetCovarianceKNeighborhood(5)`, `SetEvaluationKNeighborhood`, `SetAlpha`.
     Jhct {
@@ -180,7 +183,12 @@ impl PointSetEvents {
 
 /// `PointsLocator::Initialize()`'s exception for an empty point set.
 fn no_points() -> ItkException {
-    ItkException::new(LOCATOR_FILE, 41, "PointsLocator", "The number of points is 0.")
+    ItkException::new(
+        LOCATOR_FILE,
+        41,
+        "PointsLocator",
+        "The number of points is 0.",
+    )
 }
 
 fn tree<const D: usize>(points: &[[f32; D]]) -> Result<KdTree<D>, ItkException> {
@@ -665,6 +673,17 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                         "WARNING: In {LABELED_FILE}, line 235\nLabeledPointSetToPointSetMetricv4 (0x0): The label sets are not bijective.\n\n"
                     ));
                 }
+                if common.is_empty() && !fl.is_empty() && self.corrections.skip_uncommon_labels {
+                    // ITK-22 corrected: with no label in common nothing can be matched (ITK
+                    // throws at the first fixed point).
+                    self.events.uncommon_labels = true;
+                    return Err(ItkException::new(
+                        LABELED_FILE,
+                        116,
+                        "LabeledPointSetToPointSetMetricv4",
+                        "The fixed and moving point sets have no label in common",
+                    ));
+                }
                 let mut clones = Vec::with_capacity(common.len());
                 let mut events = self.events;
                 for &label in &common {
@@ -744,6 +763,14 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         if fixed_t.is_empty() || self.moving_points().is_empty() {
             return Err(no_points());
         }
+        if fixed_t.iter().any(|p| p.iter().any(|c| c.is_nan())) {
+            return Err(ItkException::new(
+                crate::method::CRASH_FILE,
+                0,
+                "",
+                "a fixed point maps to a coordinate that is not a number (the transform's parameters are not numbers): ITK's nearest-neighbour search finds no point and reads past the end of the moving point set",
+            ));
+        }
         let mut valid = 0;
         for (i, p) in virt.iter().enumerate() {
             if !self.inside(p) {
@@ -822,9 +849,9 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 continue;
             }
             let v = match &self.inputs {
-                PointSetInputs::Labeled { .. } => {
-                    self.label_metric(index, 95)?.value(&fixed_t[index], warnings)
-                }
+                PointSetInputs::Labeled { .. } => self
+                    .label_metric(index, 95)?
+                    .value(&fixed_t[index], warnings),
                 PointSetInputs::Intensity { fixed, moving: m } => {
                     let pixel = &fixed.data[index];
                     if pixel.len() / (1 + D) > 1 {

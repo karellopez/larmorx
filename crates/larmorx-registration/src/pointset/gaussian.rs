@@ -111,8 +111,7 @@ impl<const D: usize> Gaussian<D> {
                 }
             }
             self.inverse_covariance = inv;
-            self.prefactor =
-                1.0 / (det.sqrt() * larmorx_core::math::powi(sqrt_two_pi(), D as u32));
+            self.prefactor = 1.0 / (det.sqrt() * larmorx_core::math::powi(sqrt_two_pi(), D as u32));
         } else {
             // std::pow(DBL_MAX, 1.0 / 3.0) / D.
             let large = libm::pow(f64::MAX, 1.0 / 3.0) / D as f64;

@@ -328,7 +328,9 @@ fn read_vtk<const D: usize>(
                 itk_print(
                     READER_FILE,
                     244,
-                    &format!("ERROR: Failed to read numberOfPoints\n       pointLine = {point_line}")
+                    &format!(
+                        "ERROR: Failed to read numberOfPoints\n       pointLine = {point_line}"
+                    )
                 )
             )));
         }
@@ -550,9 +552,7 @@ fn intensity_points<R: Real, const D: usize>(
         let mut local = [0.0f64; D];
         let mut local_r = [R::ZERO; D];
         for d in 0..D {
-            if idx[d] < space.start[d] + 1
-                || idx[d] > space.start[d] + space.size[d] as i64 - 2
-            {
+            if idx[d] < space.start[d] + 1 || idx[d] > space.start[d] + space.size[d] as i64 - 2 {
                 continue;
             }
             let plus = image.data[o + strides[d]];

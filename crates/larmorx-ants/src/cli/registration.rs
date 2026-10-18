@@ -1339,9 +1339,7 @@ fn point_set_metric<R: Compute, const D: usize>(
     seed: i32,
     metric: &mut Metric<R, D>,
 ) -> Result<(), Exit> {
-    use crate::registration::pointsets::{
-        PointSetError, ReadNotes, read_intensity, read_labeled,
-    };
+    use crate::registration::pointsets::{PointSetError, ReadNotes, read_intensity, read_labeled};
     let n = m.parameters.len();
     let dim = D;
     let fail = |log: &mut Log<'_>, e: PointSetError| -> Exit {
@@ -1379,10 +1377,12 @@ fn point_set_metric<R: Compute, const D: usize>(
         let fixed_mask = param(m, 3).to_owned();
         let moving_mask = param(m, 4).to_owned();
         if n > 6 {
-            metric.intensity_distance_sigma = Conv::real::<R>(param(m, 6)).map_err(|e| caught(log, &e))?;
+            metric.intensity_distance_sigma =
+                Conv::real::<R>(param(m, 6)).map_err(|e| caught(log, &e))?;
         }
         if n > 7 {
-            metric.euclidean_distance_sigma = Conv::real::<R>(param(m, 7)).map_err(|e| caught(log, &e))?;
+            metric.euclidean_distance_sigma =
+                Conv::real::<R>(param(m, 7)).map_err(|e| caught(log, &e))?;
         }
         let mut k = 1u32;
         if n > 8 {
@@ -1461,7 +1461,8 @@ fn point_set_metric<R: Compute, const D: usize>(
         metric.alpha = Conv::real::<R>(param(m, 7)).map_err(|e| caught(log, &e))?;
     }
     if n > 8 {
-        metric.use_anisotropic_covariances = Conv::bool(param(m, 8)).map_err(|e| caught(log, &e))?;
+        metric.use_anisotropic_covariances =
+            Conv::bool(param(m, 8)).map_err(|e| caught(log, &e))?;
     }
     let fixed_name = param(m, 0).to_owned();
     let moving_name = param(m, 1).to_owned();

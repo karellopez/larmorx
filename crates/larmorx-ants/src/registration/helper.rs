@@ -20,11 +20,11 @@ use larmorx_registration::method::{
     self, ImageStageMetric, LevelProblem, MetricKind as MethodMetric, PointSetStageMetric,
     SamplingStrategy, Stage, StageMetric,
 };
+use larmorx_registration::optimizer::{ConjugateGradientLineSearch, IterationState, Observer};
 use larmorx_registration::pointset::{
     IntensityPointSet, PointSetCorrections, PointSetEvents, PointSetInputs, PointSetMetric,
     PointSetMetricKind,
 };
-use larmorx_registration::optimizer::{ConjugateGradientLineSearch, IterationState, Observer};
 use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Real};
 
@@ -470,9 +470,9 @@ pub fn point_set_print<const D: usize>(
         Some(n) => out.push_str(&format!(
             "  Point Data Container pointer: 0x0\n  Size of Point Data Container: {n}\n\n"
         )),
-        None => out.push_str(
-            "  Point Data Container pointer: 0\n  Size of Point Data Container: 0\n\n",
-        ),
+        None => {
+            out.push_str("  Point Data Container pointer: 0\n  Size of Point Data Container: 0\n\n")
+        }
     }
     out
 }
@@ -1385,8 +1385,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
 
     /// A case where ANTs crashes (class (a)): larmorx stops with a message.
     pub fn crash(&self, log: &mut Log<'_>, what: &str) -> RegistrationFailed {
-        let msg =
-            format!("larmorx: antsRegistration: {what}; ANTs crashes here, larmorx stops\n");
+        let msg = format!("larmorx: antsRegistration: {what}; ANTs crashes here, larmorx stops\n");
         log.cerr(&msg);
         RegistrationFailed(msg)
     }

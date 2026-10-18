@@ -637,7 +637,15 @@ where
             StageMetric::Image(_) => None,
         })
         .collect();
-    let result = levels(stage, output, optimizer, observer, floor, warnings, &mut point_sets);
+    let result = levels(
+        stage,
+        output,
+        optimizer,
+        observer,
+        floor,
+        warnings,
+        &mut point_sets,
+    );
     (result, point_sets.into_iter().flatten().collect())
 }
 

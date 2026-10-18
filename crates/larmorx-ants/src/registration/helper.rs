@@ -17,12 +17,17 @@ use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects, push_once};
 use larmorx_registration::format::OStream;
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{
-    self, LevelProblem, MetricKind as MethodMetric, SamplingStrategy, Stage, StageMetric,
+    self, ImageStageMetric, LevelProblem, MetricKind as MethodMetric, PointSetStageMetric,
+    SamplingStrategy, Stage, StageMetric,
+};
+use larmorx_registration::pointset::{
+    IntensityPointSet, PointSetCorrections, PointSetInputs, PointSetMetric, PointSetMetricKind,
 };
 use larmorx_registration::optimizer::{ConjugateGradientLineSearch, IterationState, Observer};
 use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Real};
 
+use super::pointsets::{LabeledRead, OutputState};
 use super::{MetricKind, XfrmMethod};
 use crate::image::Pixel;
 
@@ -127,6 +132,10 @@ pub struct Metric<R, const D: usize> {
     pub sampling_percentage: R,
     pub intensity_distance_sigma: R,
     pub euclidean_distance_sigma: R,
+    /// The labelled point sets (`ICP`, `PSE`, `JHCT`), fixed and moving.
+    pub labeled: Option<(Arc<LabeledRead<D>>, Arc<LabeledRead<D>>)>,
+    /// The intensity point sets (`IGDM`), fixed and moving.
+    pub intensity: Option<(Arc<IntensityPointSet<R, D>>, Arc<IntensityPointSet<R, D>>)>,
 }
 
 /// `RegistrationHelper::TransformMethod` (the fields `PrintState` shows).
@@ -424,6 +433,43 @@ pub fn itk_image_print<R: Compute, const D: usize>(image: &Image<R, D>) -> Strin
     out
 }
 
+/// ITK's `Print` of a point set (`PrintState`'s "Fixed labeled point set = ..."): `pixel` is
+/// the point data's C++ type; addresses and modification times are printed as 0. `data`: the
+/// size of the point data container (`None`: a null container).
+pub fn point_set_print<const D: usize>(
+    pixel: &str,
+    points: usize,
+    state: OutputState,
+    data: Option<usize>,
+) -> String {
+    let (regions, region) = match state {
+        OutputState::Updated => (1, 0),
+        OutputState::Grafted => (0, -1),
+    };
+    let mut out = String::new();
+    out.push_str("PointSet (0x0)\n");
+    out.push_str(&format!(
+        "  RTTI typeinfo:   itk::PointSet<{pixel}, {D}u, itk::DefaultStaticMeshTraits<{pixel}, {D}u, {D}u, float, float, {pixel}> >\n"
+    ));
+    out.push_str("  Reference Count: 2\n  Modified Time: 0\n  Debug: Off\n  Object Name: \n");
+    out.push_str("  Observers: \n    none\n  Source: (none)\n  Source output name: (none)\n");
+    out.push_str("  Release Data: Off\n  Data Released: False\n  Global Release Data: Off\n");
+    out.push_str("  PipelineMTime: 0\n  UpdateMTime: 0\n  RealTimeStamp: 0 seconds \n");
+    out.push_str(&format!("  Number Of Points: {points}\n"));
+    out.push_str(&format!(
+        "  Requested Number Of Regions: {regions}\n  Requested Region: {region}\n  Buffered Region: -1\n  Maximum Number Of Regions: 1\n"
+    ));
+    match data {
+        Some(n) => out.push_str(&format!(
+            "  Point Data Container pointer: 0x0\n  Size of Point Data Container: {n}\n\n"
+        )),
+        None => out.push_str(
+            "  Point Data Container pointer: 0\n  Size of Point Data Container: 0\n\n",
+        ),
+    }
+    out
+}
+
 /// Where `--write-interval-volumes` writes (the command line's image store): the original moving
 /// image resampled onto the original fixed image's grid by the moving transforms, linearly,
 /// written as `name`; ANTs' messages if it cannot be written.
@@ -446,6 +492,11 @@ struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     clock: Instant,
     last: f64,
     full_scale: Option<FullScale<R, D>>,
+    /// `--print-similarity-measure-interval` (0: off).
+    full_scale_interval: u32,
+    /// The first metric has no images (a point-set metric): ANTs' observer computes the
+    /// full-scale similarity and writes the interval volumes from null images, and crashes.
+    no_images: bool,
     /// `--write-interval-volumes` (0: off), the stage, the output prefix and the writer.
     write_interval: u32,
     stage: usize,
@@ -469,14 +520,15 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
         if current == 1 {
             *number_of_iterations = self.iterations[self.current_level] as usize;
             self.current_level += 1;
-            match &self.full_scale {
-                Some(f) => self.log.logger(&format!(
+            if self.full_scale_interval != 0 {
+                self.log.logger(&format!(
                     "DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST,FullScaleCCInterval={}\n",
-                    f.interval
-                )),
-                None => self.log.logger(
+                    self.full_scale_interval
+                ));
+            } else {
+                self.log.logger(
                     "DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST\n",
-                ),
+                );
             }
         }
         // ITK's output window prints the metric's warnings as they happen.
@@ -494,6 +546,18 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
                     || current32 == last_iteration)
         };
         let mut full_scale_value = R::ZERO;
+        if self.no_images && (due(self.full_scale_interval) || due(self.write_interval)) {
+            return Err(ItkException::new(
+                method::CRASH_FILE,
+                0,
+                "",
+                if due(self.full_scale_interval) {
+                    "--print-similarity-measure-interval with a point-set metric first: ANTs' observer computes the full-scale similarity of null images"
+                } else {
+                    "--write-interval-volumes with a point-set metric first: ANTs' observer resamples a null image"
+                },
+            ));
+        }
         if let Some(f) = &self.full_scale
             && due(f.interval)
         {
@@ -588,6 +652,55 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     },
                     m.number_of_bins,
                     m.radius,
+                    log.f(m.sampling_percentage.to_f64()),
+                ));
+            } else if m.kind == Some(MetricKind::Igdm) {
+                let print = |set: Option<&Arc<IntensityPointSet<R, D>>>| match set {
+                    Some(set) => point_set_print::<D>(
+                        &format!("itk::Array<{}>", R::ITK_NAME),
+                        set.points.len(),
+                        OutputState::Grafted,
+                        Some(set.data.len()),
+                    ),
+                    None => "0\n".into(),
+                };
+                let (f, mv) = match &m.intensity {
+                    Some((f, mv)) => (Some(f), Some(mv)),
+                    None => (None, None),
+                };
+                s.push_str(&format!(
+                    "   Point Set Metric = {name}\n     Fixed intensity point set = {}     Moving intensity point set = {}     Weighting = {}\n     Intensity distance sigma = {}\n     Euclidean distance sigma = {}\n     Evaluation K neighborhood = {}\n",
+                    print(f),
+                    print(mv),
+                    log.f(m.weighting.to_f64()),
+                    log.f(m.intensity_distance_sigma.to_f64()),
+                    log.f(m.euclidean_distance_sigma.to_f64()),
+                    log.f(m.evaluation_k_neighborhood.to_f64()),
+                ));
+            } else {
+                let print = |set: Option<&Arc<LabeledRead<D>>>| match set {
+                    Some(r) => point_set_print::<D>(
+                        "unsigned int",
+                        r.set.points.len(),
+                        r.state,
+                        r.set.labels.as_ref().map(Vec::len),
+                    ),
+                    None => "0\n".into(),
+                };
+                let (f, mv) = match &m.labeled {
+                    Some((f, mv)) => (Some(f), Some(mv)),
+                    None => (None, None),
+                };
+                s.push_str(&format!(
+                    "   Point Set Metric = {name}\n     Fixed labeled point set = {}     Moving labeled point set = {}     Weighting = {}\n     Use only boundary points = {}\n     Point set sigma = {}\n     Evaluation K neighborhood = {}\n     Alpha = {}\n     Use anisotropic covariances = {}\n     Sampling percentage = {}\n",
+                    print(f),
+                    print(mv),
+                    log.f(m.weighting.to_f64()),
+                    m.use_boundary_points_only,
+                    log.f(m.point_set_sigma.to_f64()),
+                    log.f(m.evaluation_k_neighborhood.to_f64()),
+                    log.f(m.alpha.to_f64()),
+                    m.use_anisotropic_covariances,
                     log.f(m.sampling_percentage.to_f64()),
                 ));
             }
@@ -782,7 +895,44 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "  using the {} metric (weight = {weight})\n",
                             k.as_str()
                         ));
-                        return self.unsupported(log, "the point-set metrics");
+                        let kind = match k {
+                            MetricKind::Icp => PointSetMetricKind::Icp,
+                            MetricKind::Pse => PointSetMetricKind::Pse {
+                                sigma: m.point_set_sigma.to_f64() as f32,
+                                k: m.evaluation_k_neighborhood.to_f64() as u32 as usize,
+                            },
+                            MetricKind::Jhct => PointSetMetricKind::Jhct {
+                                sigma: m.point_set_sigma,
+                                k: m.evaluation_k_neighborhood.to_f64() as u32 as usize,
+                                alpha: m.alpha,
+                                anisotropic: m.use_anisotropic_covariances,
+                            },
+                            _ => PointSetMetricKind::Igdm {
+                                intensity_sigma: m.intensity_distance_sigma,
+                                euclidean_sigma: m.euclidean_distance_sigma,
+                            },
+                        };
+                        let inputs = match (&m.labeled, &m.intensity) {
+                            (Some((f, mv)), _) => PointSetInputs::Labeled {
+                                fixed: Arc::new(f.set.clone()),
+                                moving: Arc::new(mv.set.clone()),
+                            },
+                            (None, Some((f, mv))) => PointSetInputs::Intensity {
+                                fixed: Arc::clone(f),
+                                moving: Arc::clone(mv),
+                            },
+                            (None, None) => unreachable!("read by the command line"),
+                        };
+                        prepared.push(StageMetric::PointSet(Box::new(PointSetStageMetric {
+                            metric: PointSetMetric::new(
+                                kind,
+                                inputs,
+                                PointSetCorrections::default(),
+                            ),
+                            fixed_mask: fixed_mask.clone(),
+                            weight: m.weighting,
+                        })));
+                        continue;
                     }
                     None => {
                         log.logger("ERROR: Unrecognized metric. \n");
@@ -811,7 +961,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     );
                 }
                 log.logger(&preprocessing);
-                prepared.push(StageMetric {
+                prepared.push(StageMetric::Image(ImageStageMetric {
                     kind,
                     fixed: Arc::new(fixed.with_data(pf)),
                     moving: Arc::new(moving.with_data(pm)),
@@ -819,7 +969,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     moving_mask: moving_mask.clone(),
                     use_gradient_filter: m.use_gradient_filter,
                     weight: m.weighting,
-                });
+                }));
             }
             let factors = &self.shrink_factors[stage];
             if factors.len() != levels {
@@ -832,7 +982,18 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     "The number of shrink factors does not match the number of levels.".into(),
                 ));
             }
-            let virtual_spacing = prepared[0].fixed.space.spacing;
+            // The helper's virtual domain image: the first metric's (an image metric's fixed
+            // image, a point-set metric's fixed mask). Without one ANTs reads the spacing of a
+            // null image and crashes.
+            let Some(virtual_spacing) = prepared
+                .iter()
+                .find_map(|m| m.virtual_domain().map(|s| s.spacing))
+            else {
+                return Err(self.crash(
+                    log,
+                    "a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image",
+                ));
+            };
             let mut per_level = Vec::new();
             for (n, &f) in factors.iter().enumerate() {
                 let s = shrink_factors_per_dimension(f, &virtual_spacing);
@@ -987,6 +1148,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 clock: Instant::now(),
                 last: 0.0,
                 full_scale,
+                full_scale_interval: self.print_similarity_measure_interval,
+                no_images: originals.is_none(),
                 write_interval: self.write_interval_volumes,
                 stage,
                 prefix: self.output_prefix.clone(),
@@ -1014,6 +1177,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 Ok((t, _)) => {
                     self.composite.as_mut().expect("set above").push(t);
                     self.origins.push(Some(stage));
+                }
+                Err(e) if e.file == method::CRASH_FILE => {
+                    return Err(self.crash(log, &e.description));
                 }
                 Err(e) => {
                     // AddLinearTransformToCompositeTransform logs the exception and returns
@@ -1078,6 +1244,14 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             }
             _ => None,
         }
+    }
+
+    /// A case where ANTs crashes (class (a)): larmorx stops with a message.
+    pub fn crash(&self, log: &mut Log<'_>, what: &str) -> RegistrationFailed {
+        let msg =
+            format!("larmorx: antsRegistration: {what}; ANTs crashes here, larmorx stops\n");
+        log.cerr(&msg);
+        RegistrationFailed(msg)
     }
 
     /// A part of `antsRegistration` larmorx does not port yet.

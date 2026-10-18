@@ -114,7 +114,7 @@ impl<const D: usize> Gaussian<D> {
             self.prefactor = 1.0 / (det.sqrt() * larmorx_core::math::powi(sqrt_two_pi(), D as u32));
         } else {
             // std::pow(DBL_MAX, 1.0 / 3.0) / D.
-            let large = libm::pow(f64::MAX, 1.0 / 3.0) / D as f64;
+            let large = larmorx_core::math::pow(f64::MAX, 1.0 / 3.0) / D as f64;
             let mut inv = identity::<D>();
             for (r, row) in inv.iter_mut().enumerate() {
                 row[r] *= large;

@@ -11,6 +11,5 @@ larmorx-core.workspace = true
 larmorx-image.workspace = true
 larmorx-interp.workspace = true
 larmorx-io.workspace = true
-libm.workspace = true
 rayon.workspace = true
 thiserror.workspace = true

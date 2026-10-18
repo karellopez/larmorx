@@ -613,6 +613,13 @@ where
     result.0
 }
 
+/// A stage's result (its transform and per-level outcomes), and its point-set metrics as they
+/// end.
+type StageRun<R, const D: usize> = (
+    Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>,
+    Vec<Box<PointSetMetric<R, D>>>,
+);
+
 /// The levels of [`run_stage`]; also the stage's point-set metrics as they end.
 fn run_levels<R: Real, const D: usize, O>(
     stage: &Stage<R, D>,
@@ -621,10 +628,7 @@ fn run_levels<R: Real, const D: usize, O>(
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
-) -> (
-    Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>,
-    Vec<Box<PointSetMetric<R, D>>>,
-)
+) -> StageRun<R, D>
 where
     O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
 {

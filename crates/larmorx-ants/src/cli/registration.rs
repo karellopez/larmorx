@@ -2103,7 +2103,7 @@ fn write_transforms<R: Compute, const D: usize>(
         ));
     }
     let (to_write, names): (Vec<Xfm<R, D>>, Vec<String>) = if collapse {
-        match collapse_linear(&queue) {
+        match collapse_linear(queue) {
             Some(t) => (vec![Xfm::Linear(t)], vec!["genericaffine".into()]),
             None => {
                 return Err(refuse(

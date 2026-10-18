@@ -134,10 +134,13 @@ pub struct Metric<R, const D: usize> {
     pub intensity_distance_sigma: R,
     pub euclidean_distance_sigma: R,
     /// The labelled point sets (`ICP`, `PSE`, `JHCT`), fixed and moving.
-    pub labeled: Option<(Arc<LabeledRead<D>>, Arc<LabeledRead<D>>)>,
+    pub labeled: Option<FixedMoving<LabeledRead<D>>>,
     /// The intensity point sets (`IGDM`), fixed and moving.
-    pub intensity: Option<(Arc<IntensityPointSet<R, D>>, Arc<IntensityPointSet<R, D>>)>,
+    pub intensity: Option<FixedMoving<IntensityPointSet<R, D>>>,
 }
+
+/// A metric's fixed and moving point sets.
+pub type FixedMoving<T> = (Arc<T>, Arc<T>);
 
 /// `RegistrationHelper::TransformMethod` (the fields `PrintState` shows).
 #[derive(Clone, Debug)]

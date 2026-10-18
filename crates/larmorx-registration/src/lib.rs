@@ -72,9 +72,7 @@ pub trait Real: ItkReal + Default + Send + Sync + 'static {
     fn ln(self) -> Self;
     /// `std::exp` (glibc's `exp` or `expf`; correctly rounded here).
     fn exp(self) -> Self;
-    /// `std::pow(x, y)`: glibc's `pow` or `powf`. `powf` is correctly rounded here
-    /// (CORE-MATH); `pow` is the `libm` crate's, as larmorx has no correctly rounded `pow` for
-    /// double yet.
+    /// `std::pow(x, y)`: glibc's `pow` or `powf` (correctly rounded here, CORE-MATH's).
     fn powr(self, y: Self) -> Self;
     /// `SmoothingRecursiveGaussianImageFilter<Image<R>, Image<R>>` (sigmas in physical
     /// units).
@@ -118,10 +116,7 @@ impl Real for f64 {
     }
     #[inline]
     fn powr(self, y: f64) -> f64 {
-        if std::env::var_os("LXPOW").is_some() {
-            return self.powf(y);
-        }
-        libm::pow(self, y)
+        larmorx_core::math::pow(self, y)
     }
     fn smooth(
         data: &[f64],

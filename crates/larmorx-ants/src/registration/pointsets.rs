@@ -350,8 +350,8 @@ fn read_vtk<const D: usize>(
     if binary {
         let raw = s.read(3 * n * 4);
         let mut data = vec![0f32; 3 * n];
-        for (k, chunk) in raw.chunks_exact(4).enumerate() {
-            data[k] = f32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        for (k, chunk) in raw.as_chunks::<4>().0.iter().enumerate() {
+            data[k] = f32::from_be_bytes(*chunk);
         }
         for (i, p) in points.iter_mut().enumerate() {
             for (j, c) in p.iter_mut().enumerate() {
@@ -388,9 +388,9 @@ fn read_vtk<const D: usize>(
             let wanted = if fix { values * 4 } else { components * 4 };
             let raw = s.read(wanted);
             let mut data = vec![0i32; values];
-            for (k, chunk) in raw.chunks_exact(4).enumerate() {
+            for (k, chunk) in raw.as_chunks::<4>().0.iter().enumerate() {
                 if k < values {
-                    data[k] = i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                    data[k] = i32::from_be_bytes(*chunk);
                 }
             }
             if values > components {
@@ -466,9 +466,8 @@ fn read_image<const D: usize>(
     };
     let mut points = Vec::new();
     let mut labels = Vec::new();
-    for o in 0..space.len() {
-        let label = image.data[o];
-        if keep[o] && label > 0 {
+    for (o, (&label, &kept)) in image.data.iter().zip(&keep).enumerate().take(space.len()) {
+        if kept && label > 0 {
             let p = space.index_to_point(&space.index_of(o));
             points.push(std::array::from_fn(|k| p[k] as f32));
             labels.push(label);
@@ -594,8 +593,7 @@ fn intensity_points<R: Real, const D: usize>(
         }
         let masked = mask.data[mask.space.offset(&idx)] != 0;
         let in_bounds = (0..D).all(|d| {
-            idx[d] - r[d] >= space.start[d]
-                && idx[d] + r[d] <= space.start[d] + space.size[d] as i64 - 1
+            idx[d] - r[d] >= space.start[d] && idx[d] + r[d] < space.start[d] + space.size[d] as i64
         });
         if !(masked && in_bounds) {
             continue;
@@ -607,9 +605,7 @@ fn intensity_points<R: Real, const D: usize>(
             let q: [i64; D] = std::array::from_fn(|d| idx[d] + off[d]);
             let oo = space.offset(&q);
             array.push(image.data[oo]);
-            for d in 0..D {
-                array.push(gradient[oo][d]);
-            }
+            array.extend_from_slice(&gradient[oo]);
         }
         data.push(array);
     }

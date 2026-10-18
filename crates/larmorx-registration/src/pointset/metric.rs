@@ -557,6 +557,10 @@ pub struct PointSetValue<R> {
     pub derivative: Vec<R>,
 }
 
+/// The fixed points in the virtual domain, the same points mapped into the moving space, and
+/// the number of valid points.
+type TransformedPoints<const D: usize> = (Vec<[f32; D]>, Vec<[f32; D]>, usize);
+
 impl<R: Real, const D: usize> PointSetMetric<R, D> {
     pub fn new(
         kind: PointSetMetricKind<R>,
@@ -751,13 +755,13 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         Ok(())
     }
 
-    /// The wrapper's `InitializeForIteration()`: the transformed points, the locators' checks,
-    /// the number of valid points and its warning.
+    /// The wrapper's `InitializeForIteration()`: the transformed points (virtual, then moving),
+    /// the locators' checks, the number of valid points and its warning.
     fn initialize_for_iteration(
         &mut self,
         moving: &Composite<R, D>,
         warnings: &mut Vec<String>,
-    ) -> Result<(Vec<[f32; D]>, Vec<[f32; D]>, usize), ItkException> {
+    ) -> Result<TransformedPoints<D>, ItkException> {
         let (virt, fixed_t) = self.transform_fixed(moving);
         // InitializePointsLocators: the fixed locator, then the moving one.
         if fixed_t.is_empty() || self.moving_points().is_empty() {

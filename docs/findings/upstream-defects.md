@@ -106,6 +106,16 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-58 | antsAI | `Random` sampling (always) and `--random-seed 0` draw from the clock: no two runs agree | b | none (fMRIPrep uses `Regular` with a seed) | seeded from the seed: repeatable | – |
 | ANTS-59 | antsAI | `--convergence`'s window defaults to 5; the help says 10 | f | none | follows the code; documented | – |
 | ANTS-60 | antsAI `-b` (ANTs' blob detector) | with more than one thread, per-thread heaps sized by the thread count are indexed by work units, four times as many | a | none | `-b` not implemented (refused) | – |
+| ANTS-61 | antsRegistration IGDM | a stage that combines IGDM with ICP, PSE or JHCT, or lists it after an image metric, hands only one kind of point set to ITK: "Mismatch between number of image pairs and the number of metrics" (the stage dropped, ANTS-49) or a crash | c | none (fMRIPrep uses no point-set metric) | corrected by default: every metric gets its inputs, a notice; `reproduce` throws ITK's exception, or stops where ANTs crashes (A4 part 4) | – |
+| ANTS-62 | antsRegistration point-set text reader | a file that ends with a newline gets one more record, from variables the failed read leaves (in the oracle's build a copy of the last point) | a | none | corrected by default: no extra record, a notice; `reproduce` adds the copy of the last record, as the oracle's build, with a notice (A4 part 4) | – |
+| ANTS-63 | antsRegistration VTK reader | a binary file's labels are read only as far as one point's components: the other labels are uninitialised memory | a | none | corrected by default: every label read; `reproduce` reads ANTs' bytes and takes the unread labels as 0, with a notice (A4 part 4) | – |
+| ANTS-64 | antsRegistration point sets | a sampling percentage below 1 keeps a random fraction drawn with a generator seeded from the clock: no two runs agree | b | none | seeded from the registration's seed (121212 without one): repeatable | – |
+| ANTS-65 | antsRegistration IGDM | the estimated intensity sigma ignores both point sets' minima (never updated: `else if`) and subtracts the moving maximum (`std::min(minMoving, maxMoving)`): the difference of the maxima, or the larger maximum | c | none | corrected by default: the range of both sets' intensities, a notice with both values; `reproduce` as ANTs (A4 part 4) | – |
+| ANTS-66 | antsRegistration IGDM | the value (the line search's) computes the neighbourhood's centre from `-0.5` times its voxel count: for a radius of 1 or more, a negative index and a read before the intensity arrays | a | none | corrected by default: the centre as the derivative reads it; `reproduce` takes the two intensities as equal, with a notice (A4 part 4) | – |
+| ANTS-67 | antsRegistration IGDM | the `kNeighborhood` and `gradientSigma` arguments are parsed and never used (central differences, one neighbour) | c? | none | reproduces (both ignored) | decide |
+| ANTS-68 | antsRegistration IGDM | the derivative lacks the Gaussians' `1/σ²` factors, so it is not the value's gradient and its two terms are weighed by `σ²` | c? | none | reproduces | decide |
+| ANTS-69 | antsRegistration point sets | crashes and a hang: no fixed mask, warped outputs, `--print-similarity-measure-interval` or `--write-interval-volumes` with a point-set metric first, an unreadable point set, image sampling in a stage with a point-set metric, NaN parameters; a text file with a word among its numbers loops forever | a | none | refuses with a message where ANTs crashes (its output up to there); refuses a hanging read | – |
+| ANTS-70 | antsRegistration IGDM | the estimated distance sigma is the standard deviation of the nearest distances: 0 when they are all equal (identical point sets), and the registration's parameters become NaN | c? | none | reproduces the estimate; stops where the parameters become NaN (ANTS-69) | decide |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -127,6 +137,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-19 | ITK `MultiStartOptimizerv4` | a start point that throws keeps the previous start point's value (0 for the first), which competes for the minimum | c | possible (two of fMRIPrep's BOLD `init_aff` start points throw) | corrected by default: start points that throw take no part (A4 part 3) | – |
 | ITK-20 | ITK Mattes metric | a zero or negative joint-histogram spacing (one intensity, or none, in the analysis region) is refused and leaves the histogram without a buffer: the next evaluation crashes | a | none | refuses at the crash (A4 part 3) | – |
 | ITK-21 | ITK `ConjugateGradientLineSearchOptimizerv4` in `antsAffineInitializer` | without a scales estimator the learning rate the line search leaves in one start point starts the next | c (c? until 2026-10-17) | every niworkflows initialization | corrected by default: each start point at the configured rate (0.1), a notice where the result changes (2026-10-17) | – |
+| ITK-22 | ITK `LabeledPointSetToPointSetMetricv4` | label sets that differ: a warning, then "Label not found in common label set" for the first fixed point whose label the moving set lacks (the stage dropped, ANTS-49) | c | none | corrected by default: those points take no part (an error when no label is common), a notice; `reproduce` throws ITK's exception (A4 part 4) | – |
+| ITK-23 | ITK `GaussianMembershipFunction` | a covariance equal to the identity (JHCT with a point-set sigma of 1, isotropic) keeps the univariate prefactor `1/√(2π)` in any dimension | c | none | corrected by default: the `D`-dimensional prefactor, a notice; `reproduce` as ITK (A4 part 4) | – |
+| ITK-24 | ITK JHCT metric | the total number of points leaves out the fixed ones (`m_NumberOfValidPoints` is still 0 in `Initialize`) | c? | none | reproduces | decide |
+| ITK-25 | ITK `ManifoldParzenWindowsPointSetFunction` | fewer points than the covariance neighbourhood (5): the loop reads past the end of the list of neighbours | a | none | uses the neighbours there are, in both modes, with a notice (A4 part 4) | – |
+| ITK-26 | ITK `ManifoldParzenWindowsPointSetFunction` | anisotropic covariances add each diagonal product twice (`Cout(m, n)` and `Cout(n, m)` with `n = m`) | c | none | corrected by default: once, a notice; `reproduce` as ITK (A4 part 4) | – |
+| ITK-27 | ITK `CompensatedSummation` | adding one compensated sum to another adds its compensation first, then its sum | d | none | reproduces (one work unit) | – (D11) |
+| ITK-28 | ITK JHCT metric | `alpha` is tested with `!= 1` for the prefactor and with `AlmostEquals` for the value: an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | c | none | corrected by default: both test `AlmostEquals`, a notice; `reproduce` as ITK (A4 part 4) | – |
+| ITK-29 | ITK `ManifoldParzenWindowsPointSetFunction` | the kernel sigma multiplies the covariance unsquared (a variance of 10), where the regularisation sigma is squared | c? | none | reproduces | decide |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -207,15 +225,15 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (160 entries, recounted from the table on 2026-10-17; an entry with two classes
-counts under its first):
+**Counts** (178 entries, recounted from the table on 2026-10-18; an entry with two classes
+counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 22 | |
-| (b) race, nondeterminism | 7 | |
-| (c) deterministic bug that changes results | 68 | 16 |
-| (d) imprecision | 19 | |
+| (a) crash, undefined behaviour, out of bounds | 27 | |
+| (b) race, nondeterminism | 8 | |
+| (c) deterministic bug that changes results | 79 | 19 |
+| (d) imprecision | 20 | |
 | (e) command-line or parsing quirk | 33 | |
 | (f) documentation or message only | 10 | |
 | explained, not a defect | 1 | |
@@ -246,7 +264,12 @@ linear stages ANTS-49 to ANTS-51 and ITK-18. A4 part 3 (antsAI and antsAffineIni
 2026-10-17) added ANTS-52 to ANTS-60 and ITK-19 to ITK-21: ANTS-52, -53, -56 and ITK-19
 corrected by default with a switch, ANTS-55 refused by default with a switch, ANTS-54 and
 ITK-21 to decide; both decided the same day (defects, corrected by default) and corrected with
-a switch (2026-10-17).
+a switch (2026-10-17). A4 part 4 (antsRegistration's point-set metrics, 2026-10-18) added
+ANTS-61 to ANTS-70 and ITK-22 to ITK-29: ANTS-61, -65, ITK-22, -23, -26 and -28 corrected by
+default with a switch; ANTS-62, -63 and -66 (class (a)) corrected by default, their defined
+parts reproduced on request; ANTS-64, -69 and ITK-25 not reproduced; ITK-27 an imprecision;
+ANTS-67, -68, -70, ITK-24 and ITK-29 to decide. The gap column now has 24 **decide** (recounted
+2026-10-18), 1 rule 8 and 1 open.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -409,6 +432,12 @@ The original proposals, for the record:
    niworkflows' initialization, which passes 10 where ANTs runs 20) and ITK-21 (the learning
    rate carried from one start point to the next in antsAffineInitializer); both decided by
    the user on 2026-10-17 (defects, corrected by default with a switch) and done the same day.
+   Added by A4 part 4 (2026-10-18), all in antsRegistration's point-set metrics, which
+   fMRIPrep does not use: ANTS-67 (IGDM's `kNeighborhood` and `gradientSigma` ignored), ANTS-68
+   (IGDM's derivative without the `1/σ²` factors), ANTS-70 (IGDM's distance sigma, the standard
+   deviation of the nearest distances, 0 for identical point sets), ITK-24 (JHCT's total
+   number of points without the fixed ones) and ITK-29 (the Parzen kernel sigma used as a
+   variance). Each changes results wherever the metric is used; none is reached by fMRIPrep.
 3. **D13 for replicas.** `implementation="auto"` runs the replica whenever it is installed. If
    only the original fixed a defect, installing `larmorx[exact]` would bring it back. This
    register reads D13 as: both implementations have the same corrected default, and the
@@ -1176,6 +1205,150 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   one-work-unit result.
 - **D13 / gap:** class (a), not reproduced. No gap.
 
+### ANTS-61 IGDM with another kind of metric gets no input — (c)
+- **What:** `DoRegistration` instantiates the registration method for one kind of point set,
+  chosen by the stage's **first** metric (`if (stageMetricList[0].m_MetricType != IGDM)`, the
+  labelled point sets; otherwise the intensity ones), and gives it only that kind. A stage
+  that combines IGDM with ICP, PSE or JHCT, or lists IGDM after an image metric, leaves the
+  other metrics without their point sets: `ImageRegistrationMethodv4` throws "Mismatch between
+  number of image pairs and the number of metrics" (the stage is dropped, ANTS-49), or, where
+  the counts happen to agree, a metric is cast to the other kind's type and ANTs crashes.
+- **Evidence:** read: `itkantsRegistrationHelper.hxx:1188-1240, 1462-1735`,
+  `itkImageRegistrationMethodv4.hxx:306`; validated (`point-sets/icp-then-igdm`,
+  `point-sets/mattes-then-igdm`, [ants-registration](../validation/ants-registration.md)).
+- **fMRIPrep:** none (no point-set metric).
+- **larmorx:** corrected by default (A4 part 4): every metric of the stage gets its own inputs,
+  with a notice (on the synthetic cases the corrected stage moves the transform by 2e-6 to 0.56
+  from ANTs' dropped stage). `reproduce` throws ITK's exception as ANTs, or stops with a message
+  where ANTs crashes.
+- **D13 / gap:** done. No gap.
+
+### ANTS-62 A text point set's final newline adds a record — (a)
+- **What:** `ReadPointsFromAvantsFile` loops `while (!inputFile.eof())`; after the last line's
+  newline the stream is not yet at its end, so one more iteration reads nothing, and the point
+  and label it adds are the loop's uninitialised variables (in the oracle's build, the previous
+  record's values: a copy of the last point).
+- **Evidence:** read: `Utilities/itkLabeledPointSetFileReader.hxx:167-197`; verified (the
+  oracle reads one more point); validated (`point-sets/icp-text`,
+  `point-sets/icp-text-no-final-newline`, `point-sets/jhct-text`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): no extra record, with a notice naming the file
+  (on `icp-text` the transform moves by up to 0.012). `reproduce` adds a copy of the last
+  record, as the oracle's build does, with a notice that the value is undefined in ANTs.
+- **D13 / gap:** class (a), its defined part reproduced on request. No gap.
+
+### ANTS-63 A binary VTK point set's labels are read short — (a)
+- **What:** `ReadScalarsFromVTKFile` allocates `numberOfPoints × numberOfComponents` integers but
+  reads `numberOfComponents * sizeof(float)` bytes: one point's labels. The others are
+  uninitialised memory.
+- **Evidence:** read: `Utilities/itkLabeledPointSetFileReader.hxx:348-360`; validated
+  (`point-sets/icp-vtk-binary`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): every label is read, with a notice (the
+  synthetic case's transform moves by up to 1.7). `reproduce` reads ANTs' bytes and takes the
+  unread labels as 0, with a notice.
+- **D13 / gap:** class (a), the defined part reproduced on request. No gap.
+
+### ANTS-64 A point set's random fraction is seeded from the clock — (b)
+- **What:** a sampling percentage below 1 keeps each point with probability `p`, drawn from a
+  Mersenne twister seeded with `SetSeed()`, the clock; `ANTS_RANDOM_SEED` does not reach it.
+  Two runs of ANTs keep different points.
+- **Evidence:** read: `Utilities/itkLabeledPointSetFileReader.hxx:99-125`; verified (two runs
+  differ); validated (`point-sets/icp-sampled`, an expected divergence).
+- **fMRIPrep:** none.
+- **larmorx:** the generator is seeded from the registration's seed (`--random-seed`,
+  `ANTS_RANDOM_SEED`, else 121212): repeatable.
+- **D13 / gap:** class (b), not reproduced. No gap.
+
+### ANTS-65 IGDM's estimated intensity sigma — (c)
+- **What:** `EstimateIntensityDistanceSigma` tracks each point set's extremes with
+  `if (v > max) max = v; else if (v > min) min = v;`: the minima start at the largest value and
+  are never updated. It then takes `std::max(maxMoving, maxFixed) - std::min(minMoving,
+  maxMoving)`, with the moving maximum where the fixed minimum belongs: the result is the
+  difference of the two maxima (0 when they agree, and then the larger maximum, the code's
+  fallback), not the intensities' range.
+- **Evidence:** read: `Temporary/itkMeanSquaresPointSetToPointSetIntensityMetricv4.hxx:224-307`;
+  validated (every `point-sets/igdm*` case without given sigmas).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): the range of both point sets' centre
+  intensities (the larger maximum when it is 0, as ANTs falls back), with a notice giving both
+  values (on the synthetic `igdm` case 131.9 against ANTs' 320.0). `reproduce` as ANTs.
+- **D13 / gap:** done. No gap.
+
+### ANTS-66 IGDM's value reads before its intensity arrays — (a)
+- **What:** `GetLocalNeighborhoodValue` (the line search's value) computes the neighbourhood's
+  centre as `static_cast<SizeValueType>(-0.5 * numberOfVoxelsInNeighborhood) * (D + 1)`: for a
+  neighbourhood of more than one voxel (a radius of 1 or more) a negative number converted to
+  an unsigned index, and the intensities are read far before both arrays (undefined).
+  `GetLocalNeighborhoodValueAndDerivative` uses `+0.5`, the centre.
+- **Evidence:** read: `Temporary/itkMeanSquaresPointSetToPointSetIntensityMetricv4.hxx:348-355,
+  398-403`; validated (`point-sets/igdm-neighbourhood`, `point-sets/igdm-2d`: expected
+  divergences; `point-sets/igdm-2d-radius-0`, a radius of 0, passes).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): the value reads the centre as the derivative
+  does, with a notice. `reproduce` takes the two intensities as equal (the intensity term 1),
+  with a notice; on one 3D case that equals the oracle's output by chance.
+- **D13 / gap:** class (a), the defined part reproduced on request. No gap.
+
+### ANTS-67 IGDM's `kNeighborhood` and `gradientSigma` do nothing — (c?)
+- **What:** `IGDM[...,kNeighborhood,gradientSigma]` are parsed; `kNeighborhood` goes to
+  `AddMetric` but IGDM's setup never passes it on (one nearest point), and `gradientSigma`
+  reaches `ImageIntensityAndGradientToPointSetFilter::SetSigma`, which only the Gaussian
+  gradient filter would use; the filter uses central differences
+  (`m_UseCentralDifferenceFunction = true`).
+- **Evidence:** read: `antsRegistrationTemplateHeader.h:1114-1160`,
+  `itkantsRegistrationHelper.hxx:1067-1095`, `Utilities/itkImageIntensityAndGradientToPointSetFilter.hxx:29-95`.
+- **fMRIPrep:** none.
+- **larmorx:** reproduces (both arguments accepted and ignored; documented in
+  `docs/api/ants-registration.md`).
+- **D13 / gap:** decide: whether to honour them (the k nearest points; the Gaussian gradient
+  with that sigma) or keep ANTs' behaviour.
+
+### ANTS-68 IGDM's derivative lacks the Gaussians' 1/σ² — (c?)
+- **What:** the value is `−exp(−½ d²/σ_d²) · exp(−½ Δ²/σ_i²)`; the local derivative is
+  `(closest − point) · I · D + I · D · Δ · ∇I` without the `1/σ_d²` and `1/σ_i²` of the
+  gradient: its direction is not the value's gradient where the two terms disagree, and its
+  size scales with `σ²`.
+- **Evidence:** read: `Temporary/itkMeanSquaresPointSetToPointSetIntensityMetricv4.hxx:396-417`.
+- **fMRIPrep:** none.
+- **larmorx:** reproduces.
+- **D13 / gap:** decide (possibly intended: a step direction rather than a gradient).
+
+### ANTS-69 Crashes and a hang with point-set metrics — (a)
+- **What:** ANTs crashes (a) in a stage of point-set metrics without a fixed mask (the spacing
+  of a null virtual image); (b) with warped outputs, `--print-similarity-measure-interval` or
+  `--write-interval-volumes` when the first metric is a point-set metric (the observer and the
+  resampler use null images); (c) with a point set it cannot read (a message, then a null
+  point set); (d) with a Regular or Random sampling strategy in a stage that also holds a
+  point-set metric (`SetMetricSamplePoints` casts every metric to an image metric); (e) when the
+  transform's parameters become NaN (the k-d tree finds no point and an index past the moving
+  set is used; IGDM with ANTS-70). A text point set with a word among its numbers sets the
+  stream's fail bit without reaching its end, and the reader loops forever.
+- **Evidence:** read: `itkantsRegistrationHelper.hxx` (the virtual domain, the observer),
+  `itkImageRegistrationMethodv4.hxx` (`SetMetricSamplePoints`),
+  `Utilities/itkLabeledPointSetFileReader.hxx:174`; verified (segmentation faults, the hang);
+  validated (`point-sets/icp-no-mask`, `-warped`, `-print-similarity`, `-interval-volumes`,
+  `-missing`, `-short-name`, `mattes-regular-then-icp`: rejected by both, ANTs' output up to the
+  crash compared; `icp-text-garbage`: an expected divergence).
+- **fMRIPrep:** none.
+- **larmorx:** prints what ANTs printed up to the crash and stops with a message naming it
+  (exit 1); refuses the garbage text file.
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### ANTS-70 IGDM's estimated distance sigma can be 0 — (c?)
+- **What:** `EstimateEuclideanDistanceSigma` takes the **standard deviation** of the distances
+  from each fixed point to its nearest moving point (Welford's running variance). When every
+  distance is the same, identical point sets above all (an image registered to itself), the
+  sigma is 0, the distance term `exp(−½ (d/0)²)` is NaN, and so are the parameters after the
+  first step.
+- **Evidence:** read: `Temporary/itkMeanSquaresPointSetToPointSetIntensityMetricv4.hxx:176-219`;
+  verified by larmorx (identical masks: NaN parameters).
+- **fMRIPrep:** none.
+- **larmorx:** reproduces the estimate; where the parameters become NaN it stops as ANTs would
+  crash (ANTS-69).
+- **D13 / gap:** decide: a defect (a typical distance, e.g. the mean, or a floor) or the
+  heuristic as intended.
+
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
   the joint density along its first index (the fixed image's bin) into what it calls the
@@ -1240,6 +1413,99 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   same start point (14 of 16) is chosen either way and its parameters move by up to about 1.9.
 - **D13 / gap:** done (2026-10-17): corrected by default, `reproduce` gives ITK's carry-over.
   No gap.
+
+### ITK-22 A label the moving set lacks stops the stage — (c)
+- **What:** `LabeledPointSetToPointSetMetricv4` runs one metric per label common to both point
+  sets. Label sets that differ give the warning "The label sets are not bijective" at every
+  level's `Initialize`; then the first fixed point whose label the moving set lacks throws
+  "Label not found in common label set" in `GetLocalNeighborhoodValue` or its derivative, and
+  the stage is dropped (ANTS-49): one stray label ends the registration.
+- **Evidence:** read: `itkLabeledPointSetToPointSetMetricv4.hxx:84-117, 225-236`; validated
+  (`point-sets/icp-not-bijective`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): fixed points of labels the moving set lacks take
+  no part, with a notice (an error when no label is common, where nothing can be matched).
+  `reproduce` throws ITK's exception, as ANTs.
+- **D13 / gap:** done. No gap.
+
+### ITK-23 An identity covariance keeps the univariate prefactor — (c)
+- **What:** a new `GaussianMembershipFunction` has the identity covariance and the univariate
+  prefactor `1/√(2π)`; `SetCovariance` returns early when the covariance it is given equals the
+  one it has, so a Gaussian of identity covariance keeps `1/√(2π)` instead of `(2π)^(−D/2)`.
+  JHCT sets the identity times `pointSetSigma²` for isotropic covariances: with a sigma of 1,
+  every Gaussian of the density has the wrong normalisation.
+- **Evidence:** read: `Modules/Numerics/Statistics/include/itkGaussianMembershipFunction.hxx:32,
+  103-107, 133`; validated (`point-sets/jhct-isotropic`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): the covariance is set like any other, with a
+  notice (the synthetic case's transform moves by 1e-14). `reproduce` as ITK.
+- **D13 / gap:** done. No gap.
+
+### ITK-24 JHCT's number of points leaves out the fixed ones — (c?)
+- **What:** `Initialize` computes `m_TotalNumberOfPoints = m_NumberOfValidPoints + moving points`
+  for its prefactors, but `m_NumberOfValidPoints` is only counted later, in
+  `InitializeForIteration`: at `Initialize` it is 0, so the total is the moving points alone.
+- **Evidence:** read: `itkJensenHavrdaCharvatTsallisPointSetToPointSetMetricv4.hxx:41-63`,
+  `itkPointSetToPointSetMetricWithIndexv4.hxx` (`InitializeForIteration`); validated (every JHCT
+  case reproduces it).
+- **fMRIPrep:** none.
+- **larmorx:** reproduces.
+- **D13 / gap:** decide (the total is a normalisation constant: it scales the value and the
+  derivative alike).
+
+### ITK-25 The Parzen covariances read past their neighbours — (a)
+- **What:** `ManifoldParzenWindowsPointSetFunction::SetInputPointSet` asks the points locator
+  for `m_CovarianceKNeighborhood` (5) neighbours and loops over 5 entries of the returned list,
+  which is shorter when the point set (one label's points) has fewer: a read past its end.
+- **Evidence:** read: `itkManifoldParzenWindowsPointSetFunction.hxx:86-117`.
+- **fMRIPrep:** none.
+- **larmorx:** uses the neighbours there are, in both modes, with a notice (the read's values
+  are undefined in ITK).
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### ITK-26 The Parzen covariances count the diagonal twice — (c)
+- **What:** the anisotropic covariance loop `for (m) for (n = m; …) { Cout(m, n) += c;
+  Cout(n, m) += c; }` adds each diagonal product twice: the diagonal is doubled against the
+  off-diagonal terms, a covariance that is not the weighted covariance of the neighbours.
+- **Evidence:** read: `itkManifoldParzenWindowsPointSetFunction.hxx:106-114`; validated (every
+  anisotropic JHCT case).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): once, with a notice (on the synthetic cases the
+  transform moves by 0.027 to 0.047). `reproduce` as ITK.
+- **D13 / gap:** done. No gap.
+
+### ITK-27 Adding compensated sums adds the compensation first — (d)
+- **What:** `CompensatedSummation::operator+=(const Self &)` adds the other sum's compensation,
+  then its sum, as two elements; the per-thread sums of the point-set metrics are combined so.
+  The result differs from the exact sum by rounding, and with the thread count.
+- **Evidence:** read: `Modules/Core/Common/include/itkCompensatedSummation.hxx:104-109`,
+  `itkPointSetToPointSetMetricWithIndexv4.hxx:179-215`.
+- **fMRIPrep:** none.
+- **larmorx:** reproduces it for its one work unit (ANTs' one-thread result).
+- **D13 / gap:** not D13 (D11).
+
+### ITK-28 JHCT tests alpha = 1 two ways — (c)
+- **What:** `Initialize` divides the prefactor by `alpha − 1` when `m_Alpha != 1.0`;
+  `ComputeValueAndDerivative` takes the logarithm (the Shannon case) when
+  `Math::AlmostEquals(m_Alpha, 1)`, within 4 ulps. An alpha within 4 ulps of 1, not 1, gets the
+  logarithm and a prefactor divided by almost 0.
+- **Evidence:** read: `itkJensenHavrdaCharvatTsallisPointSetToPointSetMetricv4.hxx:59-62, 121`;
+  validated (`point-sets/jhct-alpha-1`: exactly 1, both tests agree).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A4 part 4): both test `AlmostEquals`, with a notice.
+  `reproduce` as ITK.
+- **D13 / gap:** done. No gap.
+
+### ITK-29 The Parzen kernel sigma is used as a variance — (c?)
+- **What:** each point's initial Gaussian has the covariance `identity × m_KernelSigma` (ANTs
+  sets 10): the sigma unsquared, where the regularisation sigma is squared
+  (`Math::sqr(m_RegularizationSigma)`).
+- **Evidence:** read: `itkManifoldParzenWindowsPointSetFunction.hxx:56-60, 129, 138`,
+  `itkantsRegistrationHelper.hxx:1058`.
+- **fMRIPrep:** none.
+- **larmorx:** reproduces.
+- **D13 / gap:** decide (a width of √10 instead of 10; it weighs the neighbours of the local
+  covariances).
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

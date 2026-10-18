@@ -22,6 +22,7 @@ use crate::metric::mattes::Mattes;
 use crate::metric::neighborhood_correlation::NeighborhoodCorrelation;
 use crate::metric::{ImageMetricv4, correlation, mean_squares, no_valid_points_warning};
 use crate::optimizer::{ConjugateGradientLineSearch, Observer, Outcome, Problem, scales};
+use crate::pointset::{PointSetEvents, PointSetMetric};
 use crate::rng::{MersenneTwister, RandomIterator};
 use crate::transform::{Composite, Xfm};
 use crate::{Image, ItkException, Real, Space};
@@ -65,7 +66,7 @@ pub enum MetricKind {
 
 /// One image metric of a stage: its images (preprocessed), masks and settings.
 #[derive(Clone, Debug)]
-pub struct StageMetric<R, const D: usize> {
+pub struct ImageStageMetric<R, const D: usize> {
     pub kind: MetricKind,
     pub fixed: Arc<Image<R, D>>,
     pub moving: Arc<Image<R, D>>,
@@ -75,6 +76,48 @@ pub struct StageMetric<R, const D: usize> {
     /// The metric's weight in a stage of several metrics.
     pub weight: R,
 }
+
+/// One point-set metric of a stage: the metric (which keeps state from level to level) and
+/// the stage's fixed mask, whose grid is the metric's virtual domain (`SetVirtualDomainFromImage`
+/// of the mask cast to the virtual image type; the mask's values are not used).
+#[derive(Clone, Debug)]
+pub struct PointSetStageMetric<R, const D: usize> {
+    pub metric: PointSetMetric<R, D>,
+    pub fixed_mask: Option<Mask<D>>,
+    pub weight: R,
+}
+
+/// A metric of a stage.
+#[derive(Clone, Debug)]
+pub enum StageMetric<R, const D: usize> {
+    Image(ImageStageMetric<R, D>),
+    PointSet(Box<PointSetStageMetric<R, D>>),
+}
+
+impl<R: Real, const D: usize> StageMetric<R, D> {
+    /// The metric's weight.
+    pub fn weight(&self) -> R {
+        match self {
+            StageMetric::Image(m) => m.weight,
+            StageMetric::PointSet(m) => m.weight,
+        }
+    }
+
+    /// The metric's own virtual domain, as `antsRegistration` sets it: an image metric's fixed
+    /// image; a point-set metric's fixed mask, if the stage has one.
+    pub fn virtual_domain(&self) -> Option<&Space<D>> {
+        match self {
+            StageMetric::Image(m) => Some(&m.fixed.space),
+            StageMetric::PointSet(m) => m.fixed_mask.as_ref().map(|k| &k.image.space),
+        }
+    }
+}
+
+/// The description of the error larmorx raises where ANTs crashes (the caller refuses with
+/// its message): a point-set metric in a stage that samples its metrics
+/// (`SetMetricSamplePoints` casts every metric to an image metric), a stage of point-set
+/// metrics without a virtual domain.
+pub const CRASH_FILE: &str = "larmorx: ANTs crashes here";
 
 /// A stage as `ImageRegistrationMethodv4` runs it.
 #[derive(Clone, Debug)]
@@ -101,7 +144,7 @@ pub struct Stage<R, const D: usize> {
 }
 
 /// A metric, initialised for a level.
-enum LevelMetric<R> {
+pub enum LevelMetric<R> {
     Mattes(Mattes<R>),
     MeanSquares,
     Mi(Box<JointHistogramMi<R>>),
@@ -185,14 +228,26 @@ fn magnitude<R: Real>(v: &[R]) -> R {
     R::from_f64(sum.to_f64().sqrt())
 }
 
+/// A metric of a level: an image metric with its level state, or a point-set metric.
+pub enum LevelEntry<R, const D: usize> {
+    Image(ImageMetricv4<R, D>, LevelMetric<R>),
+    PointSet(Box<PointSetMetric<R, D>>),
+}
+
 /// The optimizer's view of a level: the metrics and the moving composite.
 pub struct LevelProblem<'a, R, const D: usize> {
     /// Each metric with its level state; the first is the one the scales estimator uses.
-    metrics: Vec<(ImageMetricv4<R, D>, LevelMetric<R>)>,
+    metrics: Vec<LevelEntry<R, D>>,
     /// The weights of a stage of several metrics.
     weights: Vec<R>,
     pub moving: Composite<R, D>,
-    corners: Vec<[f64; D]>,
+    /// The scales estimator's samples: the corners of the virtual domain, or the first
+    /// metric's fixed points when it is a point-set metric (`SetVirtualDomainPointSet`).
+    samples: Vec<[f64; D]>,
+    /// Whether `samples` are the first metric's fixed points (`VirtualDomainPointSetSampling`).
+    point_set_samples: bool,
+    /// The level's virtual domain.
+    virtual_space: Space<D>,
     floor: &'a IndexFloor,
     /// Warnings ITK's output window would print (`itkWarningMacro`).
     pub warnings: Vec<String>,
@@ -220,20 +275,47 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             ));
         }
         let state = LevelMetric::initialize(kind, &metric)?;
-        let corners = scales::corners(&metric.virtual_space);
+        let samples = scales::corners(&metric.virtual_space);
+        let virtual_space = metric.virtual_space.clone();
         Ok(LevelProblem {
-            metrics: vec![(metric, state)],
+            metrics: vec![LevelEntry::Image(metric, state)],
             weights: vec![R::ONE],
             moving,
-            corners,
+            samples,
+            point_set_samples: false,
+            virtual_space,
             floor,
             warnings: Vec::new(),
         })
     }
 
-    /// The first metric's inputs (the virtual domain is common to all).
-    pub fn metric(&self) -> &ImageMetricv4<R, D> {
-        &self.metrics[0].0
+    /// The first metric's inputs, if it is an image metric.
+    pub fn metric(&self) -> Option<&ImageMetricv4<R, D>> {
+        match &self.metrics[0] {
+            LevelEntry::Image(m, _) => Some(m),
+            LevelEntry::PointSet(_) => None,
+        }
+    }
+
+    /// One metric's value (and derivative).
+    fn evaluate_one(
+        entry: &mut LevelEntry<R, D>,
+        moving: &Composite<R, D>,
+        derivative: bool,
+        floor: &IndexFloor,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        match entry {
+            LevelEntry::Image(m, state) => state.evaluate(m, moving, derivative, floor, warnings),
+            LevelEntry::PointSet(p) => {
+                if derivative {
+                    let v = p.value_and_derivative(moving, warnings)?;
+                    Ok((v.value, v.derivative))
+                } else {
+                    Ok((p.value(moving, warnings)?, Vec::new()))
+                }
+            }
+        }
     }
 
     /// `GetValue`/`GetValueAndDerivative`; with several metrics
@@ -241,16 +323,26 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
     /// `Σ w_j·d_j/|d_j|` times the mean of the magnitudes `|d_j|`.
     fn evaluate(&mut self, derivative: bool) -> Result<(R, Vec<R>), ItkException> {
         if self.metrics.len() == 1 {
-            let (m, state) = &self.metrics[0];
-            return state.evaluate(m, &self.moving, derivative, self.floor, &mut self.warnings);
+            return Self::evaluate_one(
+                &mut self.metrics[0],
+                &self.moving,
+                derivative,
+                self.floor,
+                &mut self.warnings,
+            );
         }
         let np = self.moving.number_of_parameters();
         let mut first = R::ZERO;
         let mut result = vec![R::ZERO; if derivative { np } else { 0 }];
         let mut total = R::ZERO;
-        for (j, (m, state)) in self.metrics.iter().enumerate() {
-            let (v, d) =
-                state.evaluate(m, &self.moving, derivative, self.floor, &mut self.warnings)?;
+        for (j, entry) in self.metrics.iter_mut().enumerate() {
+            let (v, d) = Self::evaluate_one(
+                entry,
+                &self.moving,
+                derivative,
+                self.floor,
+                &mut self.warnings,
+            )?;
             if j == 0 {
                 first = v;
             }
@@ -277,6 +369,21 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
     }
 }
 
+impl<R: Real, const D: usize> LevelProblem<'_, R, D> {
+    /// `SampleVirtualDomainWithPointSet`'s check: an empty point set throws.
+    fn check_samples(&self) -> Result<(), ItkException> {
+        if self.point_set_samples && self.samples.is_empty() {
+            return Err(ItkException::new(
+                "Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesEstimator.hxx",
+                609,
+                "RegistrationParameterScalesFromPhysicalShift",
+                "The virtual domain point set has no points.",
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     fn value_and_derivative(&mut self) -> Result<(R, Vec<R>), ItkException> {
         self.evaluate(true)
@@ -299,15 +406,17 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
-        scales::estimate_scales(&mut self.moving, &self.corners)
+        self.check_samples()?;
+        scales::estimate_scales(&mut self.moving, &self.samples)
     }
 
     fn estimate_step_scale(&mut self, step: &[R]) -> Result<R, ItkException> {
-        scales::estimate_step_scale(&mut self.moving, &self.corners, step)
+        self.check_samples()?;
+        scales::estimate_step_scale(&mut self.moving, &self.samples, step)
     }
 
     fn estimate_maximum_step(&self) -> R {
-        scales::maximum_step(&self.metrics[0].0.virtual_space)
+        scales::maximum_step(&self.virtual_space)
     }
 }
 
@@ -464,6 +573,26 @@ pub fn full_scale_cc<R: Real, const D: usize>(
     Ok(r.value)
 }
 
+impl<R: Real, const D: usize> Stage<R, D> {
+    /// The virtual domain the stage's levels shrink: the first metric's own (an image metric's
+    /// fixed image, a point-set metric's fixed mask), else the first image metric's fixed
+    /// image (`GetCurrentLevelVirtualDomainImage`, then `GetFixedImage(firstImageMetric)`);
+    /// `None` for point-set metrics without a fixed mask (ANTs crashes).
+    pub fn virtual_base(&self) -> Option<Space<D>> {
+        if let Some(s) = self.metrics.first()?.virtual_domain() {
+            return Some(s.clone());
+        }
+        self.metrics.iter().find_map(|m| match m {
+            StageMetric::Image(i) => Some(i.fixed.space.clone()),
+            StageMetric::PointSet(_) => None,
+        })
+    }
+}
+
+fn crash(description: impl Into<String>) -> ItkException {
+    ItkException::new(CRASH_FILE, 0, "", description)
+}
+
 /// Runs a stage: returns the optimised transform and each level's outcome.
 pub fn run_stage<R: Real, const D: usize, O>(
     stage: &Stage<R, D>,
@@ -472,6 +601,67 @@ pub fn run_stage<R: Real, const D: usize, O>(
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
+    events: &mut PointSetEvents,
+) -> Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>
+where
+    O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
+{
+    let result = run_levels(stage, output, optimizer, observer, floor, warnings);
+    for p in &result.1 {
+        events.merge(&p.events);
+    }
+    result.0
+}
+
+/// A stage's result (its transform and per-level outcomes), and its point-set metrics as they
+/// end.
+type StageRun<R, const D: usize> = (
+    Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>,
+    Vec<Box<PointSetMetric<R, D>>>,
+);
+
+/// The levels of [`run_stage`]; also the stage's point-set metrics as they end.
+fn run_levels<R: Real, const D: usize, O>(
+    stage: &Stage<R, D>,
+    output: Xfm<R, D>,
+    optimizer: &mut ConjugateGradientLineSearch<R>,
+    observer: &mut O,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+) -> StageRun<R, D>
+where
+    O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
+{
+    // The point-set metrics live through the stage (ITK keeps one metric object).
+    let mut point_sets: Vec<Option<Box<PointSetMetric<R, D>>>> = stage
+        .metrics
+        .iter()
+        .map(|m| match m {
+            StageMetric::PointSet(p) => Some(Box::new(p.metric.clone())),
+            StageMetric::Image(_) => None,
+        })
+        .collect();
+    let result = levels(
+        stage,
+        output,
+        optimizer,
+        observer,
+        floor,
+        warnings,
+        &mut point_sets,
+    );
+    (result, point_sets.into_iter().flatten().collect())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn levels<R: Real, const D: usize, O>(
+    stage: &Stage<R, D>,
+    output: Xfm<R, D>,
+    optimizer: &mut ConjugateGradientLineSearch<R>,
+    observer: &mut O,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+    point_sets: &mut [Option<Box<PointSetMetric<R, D>>>],
 ) -> Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>
 where
     O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
@@ -488,10 +678,14 @@ where
     {
         out.set_center(c);
     }
-    let virtual_base = stage.metrics[0].fixed.space.clone();
+    let Some(virtual_base) = stage.virtual_base() else {
+        return Err(crash(
+            "a stage of point-set metrics without a fixed mask has no virtual domain (ANTs reads its spacing from a null image)",
+        ));
+    };
     let multi = stage.metrics.len() > 1;
     // ObjectToObjectMultiMetricv4's weights, normalised to sum 1 at each Initialize.
-    let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight).collect();
+    let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
     let mut outcomes = Vec::new();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
@@ -528,33 +722,52 @@ where
             })?;
             Ok(Arc::new(image.with_data(data)))
         };
-        let mut metrics = Vec::with_capacity(stage.metrics.len());
+        let mut images: Vec<Option<ImageMetricv4<R, D>>> = Vec::with_capacity(stage.metrics.len());
         for sm in &stage.metrics {
-            metrics.push(ImageMetricv4 {
-                fixed: smooth(&sm.fixed)?,
-                moving: smooth(&sm.moving)?,
-                fixed_mask: sm.fixed_mask.clone(),
-                moving_mask: sm.moving_mask.clone(),
-                fixed_transform: stage.fixed_initial.clone(),
-                virtual_space: virtual_space.clone(),
-                samples: None,
-                fixed_gradient_image: None,
-                moving_gradient_image: None,
-                pixel_f32: false,
+            images.push(match sm {
+                StageMetric::Image(sm) => Some(ImageMetricv4 {
+                    fixed: smooth(&sm.fixed)?,
+                    moving: smooth(&sm.moving)?,
+                    fixed_mask: sm.fixed_mask.clone(),
+                    moving_mask: sm.moving_mask.clone(),
+                    fixed_transform: stage.fixed_initial.clone(),
+                    virtual_space: virtual_space.clone(),
+                    samples: None,
+                    fixed_gradient_image: None,
+                    moving_gradient_image: None,
+                    pixel_f32: false,
+                }),
+                StageMetric::PointSet(_) => None,
             });
         }
         // SetMetricSamplePoints: one set per metric, each from the first metric's virtual
-        // domain and fixed mask, with the next seeds.
+        // domain and fixed mask, with the next seeds; every metric is cast to an image metric.
         if stage.sampling != SamplingStrategy::None {
-            let first_mask = stage.metrics[0].fixed_mask.clone();
-            for m in &mut metrics {
-                m.samples = Some(Arc::new(sample_points(
+            let StageMetric::Image(first) = &stage.metrics[0] else {
+                return Err(ItkException::new(
+                    FILE,
+                    if multi { 924 } else { 938 },
+                    CLASS,
+                    "Invalid metric conversion.",
+                ));
+            };
+            let first_mask = first.fixed_mask.clone();
+            for m in &mut images {
+                let points = sample_points(
                     &virtual_space,
                     stage.sampling,
                     stage.sampling_percentage,
                     first_mask.as_ref(),
                     &mut current_seed,
-                )));
+                );
+                match m {
+                    Some(m) => m.samples = Some(Arc::new(points)),
+                    None => {
+                        return Err(crash(
+                            "a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes",
+                        ));
+                    }
+                }
             }
         }
         // m_Metric->Initialize().
@@ -578,56 +791,105 @@ where
                 *w = *w / sum;
             }
         }
-        let mut states = Vec::with_capacity(metrics.len());
-        for (m, sm) in metrics.iter_mut().zip(&stage.metrics) {
-            let initialized = (|| {
-                if let Some(s) = &m.samples
-                    && s.is_empty()
-                {
-                    return Err(ItkException::new(
-                        "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-                        268,
-                        "ImageToImageMetricv4",
-                        "VirtualSampledPointSet must have 1 or more points.",
-                    ));
-                }
-                // Demons checks its transform before ImageToImageMetricv4::Initialize.
-                if sm.kind == MetricKind::Demons {
-                    return LevelMetric::initialize(sm.kind, m);
-                }
-                if sm.use_gradient_filter {
-                    m.moving_gradient_image =
-                        Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
-                }
-                LevelMetric::initialize(sm.kind, m)
-            })();
-            match initialized {
-                Ok(state) => states.push(state),
-                Err(e) if multi => {
-                    return Err(e.wrapped(
-                        "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
-                        226,
-                        "Caught exception initializing metric: \n",
-                    ));
-                }
-                Err(e) => return Err(e),
-            }
-        }
         let mut transforms = stage.moving_initial.clone();
         transforms.push(output.clone());
-        let corners = scales::corners(&virtual_space);
+        let moving = Composite::new(transforms);
+        let mut entries = Vec::with_capacity(images.len());
+        let mut level_warnings = Vec::new();
+        for (j, (m, sm)) in images.into_iter().zip(&stage.metrics).enumerate() {
+            let initialized = match (m, sm) {
+                (Some(mut m), StageMetric::Image(sm)) => (|| {
+                    if let Some(s) = &m.samples
+                        && s.is_empty()
+                    {
+                        return Err(ItkException::new(
+                            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
+                            268,
+                            "ImageToImageMetricv4",
+                            "VirtualSampledPointSet must have 1 or more points.",
+                        ));
+                    }
+                    // Demons checks its transform before ImageToImageMetricv4::Initialize.
+                    if sm.kind == MetricKind::Demons {
+                        return LevelMetric::initialize(sm.kind, &m)
+                            .map(|s| LevelEntry::Image(m, s));
+                    }
+                    if sm.use_gradient_filter {
+                        m.moving_gradient_image =
+                            Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
+                    }
+                    let state = LevelMetric::initialize(sm.kind, &m)?;
+                    Ok(LevelEntry::Image(m, state))
+                })(),
+                (_, StageMetric::PointSet(_)) => {
+                    let mut p = point_sets[j].take().expect("kept between levels");
+                    let r = p.initialize(
+                        Some(virtual_space.clone()),
+                        stage.fixed_initial.as_ref(),
+                        &moving,
+                        &mut level_warnings,
+                    );
+                    match r {
+                        Ok(()) => Ok(LevelEntry::PointSet(p)),
+                        Err(e) => {
+                            point_sets[j] = Some(p);
+                            Err(e)
+                        }
+                    }
+                }
+                (None, StageMetric::Image(_)) => unreachable!("built above"),
+            };
+            match initialized {
+                Ok(entry) => entries.push(entry),
+                Err(e) => {
+                    warnings.append(&mut level_warnings);
+                    for (k, entry) in entries.into_iter().enumerate() {
+                        if let LevelEntry::PointSet(p) = entry {
+                            point_sets[k] = Some(p);
+                        }
+                    }
+                    if multi {
+                        return Err(e.wrapped(
+                            "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
+                            226,
+                            "Caught exception initializing metric: \n",
+                        ));
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        // The scales estimator's samples: the first metric's fixed points when it is a
+        // point-set metric (SetVirtualDomainPointSet), else the domain's corners.
+        let samples = match &entries[0] {
+            LevelEntry::PointSet(p) => p
+                .inputs
+                .fixed_points()
+                .iter()
+                .map(|q| std::array::from_fn(|k| f64::from(q[k])))
+                .collect(),
+            LevelEntry::Image(..) => scales::corners(&virtual_space),
+        };
+        let point_set_samples = matches!(entries[0], LevelEntry::PointSet(_));
         let mut problem = LevelProblem {
-            metrics: metrics.into_iter().zip(states).collect(),
+            metrics: entries,
             weights: weights.clone(),
-            moving: Composite::new(transforms),
-            corners,
+            moving,
+            samples,
+            point_set_samples,
+            virtual_space: virtual_space.clone(),
             floor,
-            warnings: Vec::new(),
+            warnings: level_warnings,
         };
         let outcome = optimizer.start(&mut problem, observer);
         warnings.append(&mut problem.warnings);
-        outcomes.push(outcome?);
         output = problem.moving.active().clone();
+        for (j, entry) in problem.metrics.into_iter().enumerate() {
+            if let LevelEntry::PointSet(p) = entry {
+                point_sets[j] = Some(p);
+            }
+        }
+        outcomes.push(outcome?);
     }
     Ok((output, outcomes))
 }

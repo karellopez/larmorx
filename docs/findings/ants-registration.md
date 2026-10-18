@@ -1,7 +1,7 @@
 # antsRegistration's linear stages (ANTs v2.6.5, ITK v5.4.5)
 
 What `antsRegistration` and the ITK v4 registration framework behind it really compute in a
-linear stage, found while porting them (milestone A4, part 2). File names are at the tags
+linear stage, found while porting them (milestone A4, part 2; the point-set metrics, part 4). File names are at the tags
 `ANTs-v2.6.5` (`Examples/`) and `ITK-v5.4.5` (`Modules/`). The parity record is
 [ants-registration](../validation/ants-registration.md), the API page
 [ants-registration](../api/ants-registration.md). How ANTs parses its command line is in
@@ -26,6 +26,10 @@ linear stage, found while porting them (milestone A4, part 2). File names are at
   exit 0), ANTS-50 (`--save-state` after linear stages), ANTS-51 (file names without
   collapsing, then a crash); and ANTS-46 (an "early stop") explained as ITK's design. All in the
   [register](upstream-defects.md).
+
+- **The point-set metrics** (`ICP`, `PSE`, `JHCT`, `IGDM`; A4 part 4, 2026-10-18): every
+  compared case identical to the unmodified ANTs; 18 defects found (ANTS-61 to ANTS-70, ITK-22
+  to ITK-29), see "Point-set metrics" below.
 
 - **The gradient filter's components are floats** (found by A4 part 3, 2026-10-17):
   `GradientRecursiveGaussianImageFilter` stores each derivative through
@@ -115,6 +119,88 @@ normalised again (they may move by an ulp).
 `GradientRecursiveGaussianImageFilter` (sigma the largest spacing, normalised across scale,
 float intermediate images, the vectors turned by the image's direction) interpolated linearly,
 instead of central differences.
+
+## Point-set metrics (A4 part 4, 2026-10-18)
+
+| ANTs name | ITK or ANTs class | The value at one fixed point |
+|---|---|---|
+| `ICP` | `EuclideanDistancePointSetToPointSetMetricv4` | the distance to the nearest moving point of its label |
+| `PSE` | `ExpectationBasedPointSetToPointSetMetricv4` | minus the Gaussian expectation (width `pointSetSigma`, a `float`) over the `k` nearest moving points |
+| `JHCT` | `JensenHavrdaCharvatTsallisPointSetToPointSetMetricv4` | the Jensen-Havrda-Charvát-Tsallis divergence of a manifold Parzen density of the moving points (`ManifoldParzenWindowsPointSetFunction`: regularisation `pointSetSigma`, kernel sigma 10, covariances from 5 neighbours when anisotropic, `k` evaluation neighbours, order `alpha`) |
+| `IGDM` | ANTs' `MeanSquaresPointSetToPointSetIntensityMetricv4` (`Temporary/`) | minus the product of two Gaussians: the intensity difference with the nearest moving point and the distance to it |
+
+`ICP`, `PSE` and `JHCT` are wrapped in `LabeledPointSetToPointSetMetricv4`, which runs one clone
+of the metric per label common to both point sets. All four share
+`PointSetToPointSetMetricWithIndexv4`:
+
+- **The virtual domain is the stage's fixed mask** (`-x`), cast to the virtual image type
+  (`itkantsRegistrationHelper.hxx:1188-1240`); its grid also gives the shrink factors. A stage of
+  point-set metrics without a fixed mask reads the spacing of a null image and crashes
+  (ANTS-69).
+- **The points.** The fixed points are mapped into the virtual domain by the inverse of the
+  fixed transform and on into the moving domain by the moving transform, both stored as
+  `Point<float>`; points whose virtual position is outside the virtual domain take no part. The
+  value is the mean over the valid points, the derivative the mean of the local derivatives
+  turned by the transform's Jacobian at the virtual point; sums are `CompensatedSummation`s per
+  work unit (`ITK-27`: adding one compensated sum to another adds its compensation, then its
+  sum), so ANTs' result moves with its thread count by about 1e-16 in a transform parameter
+  (4 cases at 2, 4 and 8 threads). larmorx sums as one work unit.
+- **Nearest neighbours** come from ITK's `PointsLocator`, a k-d tree (`KdTreeGenerator`, bucket
+  size 16, `NthElement` quickselect for the partitions, `NearestNeighbors` keeping the k best by
+  replacing the farthest): `larmorx_registration::pointset::kdtree`, the same neighbours in the
+  same order, ties included. Asking for more neighbours than a label has prints ITK's warning
+  (`itkPointsLocator.hxx:82`) at every call, thousands of lines; larmorx prints them too.
+- **Scales** (`RegistrationParameterScalesFromPhysicalShift`) are estimated from the fixed
+  points mapped into the virtual domain; with no point the estimator throws ("The virtual domain
+  point set has no points", `itkRegistrationParameterScalesEstimator.hxx:609`) and the stage is
+  dropped (ANTS-49).
+- **Labels.** Label sets that differ print "The label sets are not bijective" at every level
+  (`itkLabeledPointSetToPointSetMetricv4.hxx:235`); a fixed point whose label the moving set
+  lacks then throws "Label not found in common label set" (lines 95, 116): ITK-22.
+
+**Reading the point sets** (`ReadLabeledPointSet`, `Utilities/itkLabeledPointSetFileReader.hxx`):
+`.txt` files are read with `operator>>` (`x y z label` per line, `x y 0 label` in 2D; a point
+at the origin with label 0 is skipped), `.vtk` polydata as ASCII or binary (big-endian), the
+labels from its scalars; anything else is read as an image (a label image: every voxel whose
+label is not 0, or with `boundaryPointsOnly` the voxels `LabelContourImageFilter` marks, at
+its physical point). larmorx reads text with an emulation of libstdc++'s stream extraction
+(`larmorx_ants::cli::cstd`), so what ANTs reads from a malformed number larmorx reads too. A
+final newline makes the text reader add one more record (ANTS-62); a word among the numbers
+makes it loop forever (ANTS-69). Binary VTK labels are read only as far as one point's
+components (ANTS-63). A sampling percentage below 1 keeps a random fraction drawn with a
+generator seeded from the clock (ANTS-64): two runs of ANTs differ.
+
+**IGDM's point sets** come from `ImageIntensityAndGradientToPointSetFilter`: every voxel of the
+mask whose neighbourhood (`neighborhoodRadius`) lies inside the image is a point, with the
+intensities and central-difference gradients (`CentralDifferenceImageFunction`, the image's
+direction applied) of its neighbourhood voxels as its data. Its `kNeighborhood` and
+`gradientSigma` arguments are read and never used (ANTS-67). The intensity sigma, when not
+given, is estimated from the two point sets' extremes with two slips (ANTS-65); the distance
+sigma is the standard deviation of the nearest distances, 0 when they are all equal (ANTS-70).
+The value at a point and its derivative differ: the value computes the neighbourhood's centre
+from `-0.5` times the number of voxels (ANTS-66), and the derivative lacks the Gaussians'
+`1/σ²` factors (ANTS-68). Combined with `ICP`, `PSE` or `JHCT` in one stage, or listed after an
+image metric, IGDM gets no input (ANTS-61).
+
+**JHCT** has six findings of its own: the total number of points leaves out the fixed ones
+(ITK-24), the kernel sigma is used as a variance (ITK-29), a Gaussian whose covariance is the
+identity keeps the univariate prefactor (ITK-23), the local covariances count each diagonal
+product twice (ITK-26), the neighbour search for the covariances reads past the end of its list
+for small labels (ITK-25), and `alpha` near 1 is tested two ways (ITK-28). It calls `std::pow`
+(glibc's `pow`, not correctly rounded; larmorx's `pow` is CORE-MATH's,
+[platform-math.md](platform-math.md), "pow").
+
+**Crashes** (ANTS-69, class (a)): besides a stage without a fixed mask, ANTs crashes with
+warped outputs, `--print-similarity-measure-interval` or `--write-interval-volumes` when the
+first metric is a point-set metric (null images), with a point set it cannot read (a message,
+then a null point set), with a Regular or Random sampling strategy in a stage that also holds a
+point-set metric (`SetMetricSamplePoints` casts every metric to an image metric), and when the
+transform's parameters become NaN (the k-d tree finds no point; IGDM with ANTS-70). larmorx
+prints what ANTs printed up to there and stops with a message; the parity harness compares up
+to the crash.
+
+`PrintState` (`-v` before each stage) prints each point set object (`PointSet (0x…)`, its
+modification times and containers); the parity harness masks the addresses (lowercase `0x`).
 
 ## Initial transforms
 

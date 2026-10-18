@@ -1038,7 +1038,11 @@ pub fn search<const D: usize>(
             &mut problem,
             &mut progress,
             warnings,
-            skip_failed,
+            multistart::Corrections {
+                skip_failed,
+                // antsAI estimates the learning rate at each start point (ITK-21 cannot occur).
+                restart_learning_rate: false,
+            },
         )
         .map_err(AiError::Uncaught)?;
         warnings.append(&mut problem.warnings);
@@ -1061,7 +1065,11 @@ pub fn search<const D: usize>(
             &mut problem,
             &mut multistart::Silent,
             warnings,
-            skip_failed,
+            multistart::Corrections {
+                skip_failed,
+                // antsAI estimates the learning rate at each start point (ITK-21 cannot occur).
+                restart_learning_rate: false,
+            },
         )
         .map_err(AiError::Uncaught)?;
         warnings.append(&mut problem.warnings);

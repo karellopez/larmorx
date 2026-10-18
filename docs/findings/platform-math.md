@@ -142,6 +142,34 @@ It is bit-identical to the C on 1.5 M random inputs and on all 460,475 cases of 
 `powf.wc`. In the ImageMath suite the `^` cases differ from ANTs in at most 35 of 35,840
 voxels, by one ulp. *Validated.*
 
+## pow
+
+**ITK's `std::pow(double, double)` is glibc's `pow`, which is not correctly rounded** (its
+documented bound is about 0.52 ulp). Against CORE-MATH's `cr_pow` on 5.66 M inputs (glibc
+2.35, x86-64, NaN payloads aside) it differs by one ulp in 0.07 to 0.1 % of random calls
+(403 of 500,000 moderate inputs; 221 of 300,000 calls with the probabilities and exponents of
+`antsRegistration`'s JHCT metric; 0.03 % for x near 1), and in 8 % of CORE-MATH's worst cases
+(`pow.wc`). The `libm` crate's `pow` (musl's algorithm) is another rounding again: it differs
+from glibc in other calls, so neither matches ITK bit for bit. *Verified* (2026-10-18).
+
+ITK calls it in the JHCT point-set metric (`std::pow(probability, alpha - 1)` and
+`std::pow(probability, 2 - alpha)` per point and neighbour,
+`itkJensenHavrdaCharvatTsallisPointSetToPointSetMetricv4.hxx`) and in the Gaussian
+membership function (`std::pow(DBL_MAX, 1/3)` for a singular covariance,
+`itkGaussianMembershipFunction.hxx`); `std::pow(sqrt(2π), d)` with an integer exponent is
+`powi` (both correctly rounded, so equal).
+
+*larmorx:* `larmorx_core::math::pow`, a port of CORE-MATH's `cr_pow` (three phases: double-double,
+128-bit and 256-bit arithmetic), bit-identical to the C on all 5.66 M inputs, 950,312 of them
+through the second phase and 78,436 through the third (`crates/larmorx-core/PROVENANCE.md`).
+The CORE-MATH preload (`scripts/build_crmath_preload.sh`) replaces `pow` and `powf` too since
+2026-10-18 (the previous build is archived in `<workspace>/archive/2026-10-18-crmath-preload/`),
+so an oracle run with it preloaded computes ITK's powers correctly rounded, as larmorx does.
+Left: the ITK B-spline prefilter (`larmorx-interp`, `libm::pow` for short axes) still uses the
+`libm` crate; switching it changes `antsApplyTransforms`' B-spline cases and needs their parity
+re-run (not done in A4 part 4). *Validated* (the port); JHCT parity in
+`docs/validation/ants-registration*.md`.
+
 ## expf and logf
 
 **ITK's `std::exp(float)` and `std::log(float)` are glibc's `expf` and `logf`**, and neither is

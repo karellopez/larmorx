@@ -208,6 +208,28 @@ def labels() -> lx.Image:
 
 
 @functools.cache
+def labels2() -> lx.Image:
+    """``labels`` moved one voxel along the first axis (a moving label image)."""
+    return _frozen(labels().with_data(np.roll(labels().data, 1, axis=0)))
+
+
+def point_set(shift: int) -> tuple[np.ndarray, np.ndarray]:
+    """Every 5th labelled voxel of ``labels`` as a point of exact coordinates
+    ``(2i - 20 + shift, 2j - 18, 3k - 20)`` mm, with its label."""
+    lab = labels().data
+    idx = np.argwhere(lab > 0)[::5]
+    pts = np.stack([2.0 * idx[:, 0] - 20 + shift, 2.0 * idx[:, 1] - 18, 3.0 * idx[:, 2] - 20], 1)
+    return pts, lab[tuple(idx.T)].astype(np.int64)
+
+
+def _points_text(shift: int) -> str:
+    """``point_set(shift)`` as ANTs' text point set, with a final newline."""
+    pts, lab = point_set(shift)
+    rows = [f"{x:.1f} {y:.1f} {z:.1f} {int(v)}" for (x, y, z), v in zip(pts, lab, strict=True)]
+    return "\n".join(rows) + "\n"
+
+
+@functools.cache
 def plane() -> lx.Image:
     """2D float32 (32 × 24); the affine places it in the z = 0 plane."""
     v = (phantom(SHAPE2, 7) * 2 + ints(8, SHAPE2, 0, 5)) / 3
@@ -407,6 +429,10 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "probability.nii": lambda p: lx.save(probability(), p),
     "mask.nii": lambda p: lx.save(mask(), p),
     "labels.nii": lambda p: lx.save(labels(), p),
+    "labels2.nii": lambda p: lx.save(labels2(), p),
+    "mask2.nii": lambda p: lx.save(mask().with_data(np.roll(mask().data, 1, axis=0)), p),
+    "points.txt": lambda p: p.write_text(_points_text(0)),
+    "points2.txt": lambda p: p.write_text(_points_text(1)),
     "plane.nii": lambda p: lx.save(plane(), p),
     "plane2.nii": lambda p: lx.save(plane2(), p),
     "plane_mask.nii": lambda p: lx.save(
@@ -1225,6 +1251,56 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"rigid": File(prefix + "0GenericAffine.mat")}
 
 
+@case("cli.ants.antsRegistration.pointsets", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The point-set metrics with ANTs' defects corrected: ICP between label images, PSE between
+    text point sets (their final newlines, ANTS-62), JHCT with anisotropic covariances (ITK-26),
+    IGDM between masked images (ANTS-65), each one rigid stage of 3 iterations whose virtual
+    domain is the fixed mask."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    m2 = ctx.file("mask2.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    pa, pb = ctx.file("points.txt"), ctx.file("points2.txt")
+    files = {}
+    for name, metric in [
+        ("icp", f"ICP[{la},{lb},1]"),
+        ("pse", f"PSE[{pa},{pb},1,1,0,2,10]"),
+        ("jhct", f"JHCT[{la},{lb},1,1,0,1,10,1.1,1]"),
+        ("igdm", f"IGDM[{a},{b},1,{m},{m2}]"),
+    ]:
+        prefix = ctx.out(f"{name}_")
+        cli(
+            "ants", "antsRegistration", "-d", "3", "-o", prefix, "-t", "Rigid[0.1]", "-m", metric,
+            "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "-x", m,
+        )  # fmt: skip
+        files[name] = File(prefix + "0GenericAffine.mat")
+    return files
+
+
+@case("cli.ants.antsRegistration.pointsets.reproduce", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.ants.antsRegistration.pointsets``' PSE, JHCT and IGDM with ANTs' defects
+    reproduced, and JHCT with isotropic covariances of sigma 1 (ITK-23)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    m2 = ctx.file("mask2.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    pa, pb = ctx.file("points.txt"), ctx.file("points2.txt")
+    files = {}
+    for name, metric in [
+        ("pse", f"PSE[{pa},{pb},1,1,0,2,10]"),
+        ("jhct", f"JHCT[{la},{lb},1,1,0,1,10,1.1,1]"),
+        ("jhct_isotropic", f"JHCT[{la},{lb},1,1,0,1,10,1.1,0]"),
+        ("igdm", f"IGDM[{a},{b},1,{m},{m2}]"),
+    ]:
+        prefix = ctx.out(f"{name}_")
+        cli(
+            "ants", "antsRegistration", "-d", "3", "-o", prefix, "-t", "Rigid[0.1]", "-m", metric,
+            "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "-x", m, upstream_defects=REPRODUCE,
+        )  # fmt: skip
+        files[name] = File(prefix + "0GenericAffine.mat")
+    return files
+
+
 @case("cli.ants.antsAI", covers=("cli:ants antsAI",))
 def _(ctx: Context) -> dict[str, Any]:
     """``antsAI``'s paths: a rigid search from the principal axes with Mattes on regularly
@@ -1287,19 +1363,47 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("cli.ants.antsAffineInitializer", covers=("cli:ants antsAffineInitializer",))
 def _(ctx: Context) -> dict[str, Any]:
     """``antsAffineInitializer``: a 3D search from the principal axes with a fixed mask; a 2D
-    search; the 4D path (the initial alignment only)."""
-    files = {"3d": ctx.out("init3d.mat"), "2d": ctx.out("init2d.mat"), "4d": ctx.out("init4d.mat")}
+    search of 5 local iterations (ANTS-54 corrected), one without a local search (0); the 4D
+    path (the initial alignment only). Each start point's local search begins at the learning
+    rate 0.1 (ITK-21 corrected)."""
+    files = {
+        "3d": ctx.out("init3d.mat"),
+        "2d": ctx.out("init2d.mat"),
+        "2d0": ctx.out("init2d0.mat"),
+        "4d": ctx.out("init4d.mat"),
+    }
     cli(
         "ants", "antsAffineInitializer", "3", ctx.file("anat.nii"), ctx.file("anat2.nii"),
         files["3d"], "45", "0.25", "1", "20", ctx.file("mask.nii"),
     )  # fmt: skip
     cli(
         "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
-        files["2d"], "30", "0.5", "0",
+        files["2d"], "30", "0.5", "0", "5",
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
+        files["2d0"], "30", "0.5", "0", "0",
     )  # fmt: skip
     cli(
         "ants", "antsAffineInitializer", "4", ctx.file("bold.nii"), ctx.file("bold.nii"),
         files["4d"], "10", "0.1", "1",
+    )  # fmt: skip
+    return {name: File(path) for name, path in files.items()}
+
+
+@case("cli.ants.antsAffineInitializer.reproduce", covers=("cli:ants antsAffineInitializer",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``cli.ants.antsAffineInitializer``'s 3D and 2D searches with ANTs' defects reproduced:
+    the learning rate carried from one start point to the next (ITK-21) and the local-search
+    argument not read (ANTS-54: the 2D search's 5 runs 20)."""
+    files = {"3d": ctx.out("init3d.mat"), "2d": ctx.out("init2d.mat")}
+    cli(
+        "ants", "antsAffineInitializer", "3", ctx.file("anat.nii"), ctx.file("anat2.nii"),
+        files["3d"], "45", "0.25", "1", "20", ctx.file("mask.nii"), upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    cli(
+        "ants", "antsAffineInitializer", "2", ctx.file("plane.nii"), ctx.file("plane2.nii"),
+        files["2d"], "30", "0.5", "0", "5", upstream_defects=REPRODUCE,
     )  # fmt: skip
     return {name: File(path) for name, path in files.items()}
 
@@ -1426,6 +1530,33 @@ def _(ctx: Context) -> dict[str, Any]:
         "warped": res.warped.data,
         "inverse_warped": res.inverse_warped.data,
         "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
+    }
+    for name, xfms in res.files.items():
+        out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+    return out
+
+
+@case("py.ants.registration.pointsets", covers=("lx.ants.registration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.registration`` with point-set metrics: ICP between in-memory point arrays
+    and a label image, then IGDM and Mattes in one stage."""
+    stage = lx.ants.RegistrationStage
+    a, m = ctx.file("anat.nii"), ctx.file("mask.nii")
+    res = lx.ants.registration(
+        [
+            stage("Rigid", 0.1, lx.ants.PointSetMetric("ICP", point_set(0), point_set(1)),
+                  iterations=[3], shrink_factors=[1], smoothing_sigmas=[0], convergence_window=3,
+                  masks=m),
+            stage("Affine", 0.1, [lx.ants.IntensityPointSetMetric(a, anat2(), m,
+                                                                   ctx.file("mask2.nii")),
+                                  lx.ants.RegistrationMetric("Mattes", a, anat2(), bins=12)],
+                  iterations=[2], shrink_factors=[1], smoothing_sigmas=[0], convergence_window=3,
+                  masks=m),
+        ],
+        dimension=3,
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations])
     }
     for name, xfms in res.files.items():
         out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])

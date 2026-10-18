@@ -2073,13 +2073,15 @@ def run_case(case: Case, checks: CheckList) -> None:
         elif (pa is None) != (pb is None):
             other.append("a transform written by one only")
         # ITK-18 is named whenever the joint-histogram MI runs: where no point is valid (an
-        # empty mask) its correction cannot change the result.
+        # empty mask) its correction cannot change the result. ANTS-54 is named wherever
+        # antsAffineInitializer's local-search argument is not 20, whether or not the search
+        # converges before the iterations differ.
         defects.add_fix_check(
             checks,
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ITK-18",),
+            silent_ok=("ITK-18", "ANTS-54"),
         )
 
 

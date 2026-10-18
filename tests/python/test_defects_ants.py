@@ -80,6 +80,7 @@ def test_the_registry_lists_the_ants_entries():
         "ANTS-51",
         "ANTS-52",
         "ANTS-53",
+        "ANTS-54",
         "ANTS-55",
         "ANTS-56",
         "ITK-01",
@@ -89,6 +90,7 @@ def test_the_registry_lists_the_ants_entries():
         "ITK-18",
         "ITK-19",
         "ITK-20",
+        "ITK-21",
         "SCI-02",
     ):
         assert entry in ids, entry
@@ -550,13 +552,38 @@ def test_ai_wrapper(tmp_path):
 
 def test_affine_initializer(tmp_path):
     a, b = _pair(tmp_path)
-    t = lx.ants.affine_initializer(a, b, search_factor=45, principal_axes=True)
+    kw = {"search_factor": 45, "principal_axes": True}
+    t, w = entries(lx.ants.affine_initializer, a, b, **kw)
     assert t.name == "AffineTransform_double_3_3" and t.parameters.size == 12
-    # ANTS-54 (questionable, reproduced): the local search's iterations are not read.
-    other = lx.ants.affine_initializer(
-        a, b, search_factor=45, principal_axes=True, local_search_iterations=3
+    # ITK-21: each start point at the learning rate 0.1 (ITK carries the rate over); named
+    # exactly where the result differs from ITK's.
+    itk, iw = entries(lx.ants.affine_initializer, a, b, upstream_defects=REPRODUCE, **kw)
+    changed = not np.array_equal(itk.parameters, t.parameters)
+    assert w == iw == (["ITK-21"] if changed else [])
+    # ANTS-54: the local search's iterations are honoured (ANTs runs 20 whatever they say).
+    three, w3 = entries(lx.ants.affine_initializer, a, b, local_search_iterations=3, **kw)
+    assert "ANTS-54" in w3
+    ants3, aw3 = entries(
+        lx.ants.affine_initializer,
+        a,
+        b,
+        local_search_iterations=3,
+        upstream_defects=REPRODUCE,
+        **kw,
     )
-    np.testing.assert_array_equal(other.parameters, t.parameters)
+    assert "ANTS-54" in aw3
+    np.testing.assert_array_equal(ants3.parameters, itk.parameters)
+    # 0: each start point only evaluated, no learning rate to carry over.
+    zero, w0 = entries(lx.ants.affine_initializer, a, b, local_search_iterations=0, **kw)
+    assert w0 == ["ANTS-54"]
+    assert not np.array_equal(zero.parameters, three.parameters)
+    with pytest.raises(lx.ants.AffineInitializerError, match="not an integer of 0 or more"):
+        entries(lx.ants.affine_initializer, a, b, local_search_iterations=-1, **kw)
+    out = tmp_path / "t.mat"
+    code, _, err = ants("antsAffineInitializer", 3, a, b, out, 45, 0.25, 1, "abc")
+    assert code == 1 and "ANTS-54" in err and "not an integer" in err
+    code, _, err = ants("antsAffineInitializer", 3, a, b, out, 45, 0.25, 1, "abc", env=REPRODUCE)
+    assert code == 0 and "ANTS-54" in err
     # ANTS-56: a dimension other than 2, 3 or 4 runs as 2D; corrected, an error.
     a2, b2 = _pair(tmp_path, dims=2)
     out = tmp_path / "t.mat"

@@ -568,6 +568,205 @@ pub fn format_g_precision(v: f64, precision: usize) -> String {
     }
 }
 
+/// A `std::istream` over a file's bytes, with libstdc++'s formatted extraction of `float` and
+/// `unsigned int`, `std::getline` and `read`, and the stream's `failbit` and `eofbit`, as ANTs'
+/// point-set file reader uses them (`Utilities/itkLabeledPointSetFileReader.hxx`).
+#[derive(Clone, Debug)]
+pub struct CppIstream<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+    /// `failbit`.
+    pub fail: bool,
+    /// `eofbit`.
+    pub eof: bool,
+}
+
+fn is_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
+}
+
+impl<'a> CppIstream<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        CppIstream {
+            bytes,
+            pos: 0,
+            fail: false,
+            eof: false,
+        }
+    }
+
+    /// `good()`.
+    pub fn good(&self) -> bool {
+        !self.fail && !self.eof
+    }
+
+    /// The `sentry` of a formatted extraction: a stream that is not good fails (failbit);
+    /// whitespace is skipped, and reaching the end sets eofbit and failbit.
+    fn sentry(&mut self) -> bool {
+        if !self.good() {
+            self.fail = true;
+            return false;
+        }
+        while self.pos < self.bytes.len() && is_space(self.bytes[self.pos]) {
+            self.pos += 1;
+        }
+        if self.pos == self.bytes.len() {
+            self.eof = true;
+            self.fail = true;
+            return false;
+        }
+        true
+    }
+
+    /// `operator>>(float&)`: `false` where the sentry failed and `v` is untouched; otherwise
+    /// `v` is the value (0 for text that is not a number, `±FLT_MAX` on overflow, both with
+    /// failbit).
+    pub fn read_f32(&mut self, v: &mut f32) -> bool {
+        if !self.sentry() {
+            return false;
+        }
+        let rest = &self.bytes[self.pos..];
+        let (text, used) = collect_float(rest);
+        self.pos += used;
+        if self.pos == self.bytes.len() {
+            self.eof = true;
+        }
+        // __convert_to_v: strtof must take the whole text (else 0); overflow gives ±FLT_MAX;
+        // both set failbit.
+        let value = match normalized_number(&text).and_then(|n| n.parse::<f32>().ok()) {
+            None => {
+                self.fail = true;
+                0.0
+            }
+            Some(x) if x.is_infinite() => {
+                self.fail = true;
+                if x > 0.0 { f32::MAX } else { -f32::MAX }
+            }
+            Some(x) => x,
+        };
+        *v = value;
+        true
+    }
+
+    /// `operator>>(unsigned int&)`: as [`CppIstream::read_f32`]; a minus sign negates modulo
+    /// 2³², a magnitude beyond `UINT_MAX` gives `UINT_MAX` with failbit, no digits 0 with
+    /// failbit.
+    pub fn read_u32(&mut self, v: &mut u32) -> bool {
+        if !self.sentry() {
+            return false;
+        }
+        let b = self.bytes;
+        let mut i = self.pos;
+        let negative = b[i] == b'-';
+        if matches!(b[i], b'+' | b'-') {
+            i += 1;
+        }
+        let from = i;
+        let mut value: u64 = 0;
+        let mut overflow = false;
+        while i < b.len() && b[i].is_ascii_digit() {
+            if !overflow {
+                value = value * 10 + u64::from(b[i] - b'0');
+                if value > u64::from(u32::MAX) {
+                    overflow = true;
+                }
+            }
+            i += 1;
+        }
+        self.pos = i;
+        if i == b.len() {
+            self.eof = true;
+        }
+        if i == from {
+            self.fail = true;
+            *v = 0;
+        } else if overflow {
+            self.fail = true;
+            *v = u32::MAX;
+        } else {
+            let m = value as u32;
+            *v = if negative { m.wrapping_neg() } else { m };
+        }
+        true
+    }
+
+    /// `std::getline(stream, line)`: the characters up to the next newline (consumed); at the
+    /// end eofbit, and failbit if nothing was read; a stream that is not good gives nothing
+    /// (failbit).
+    pub fn getline(&mut self) -> String {
+        if !self.good() {
+            self.fail = true;
+            return String::new();
+        }
+        let start = self.pos;
+        while self.pos < self.bytes.len() && self.bytes[self.pos] != b'\n' {
+            self.pos += 1;
+        }
+        let line = String::from_utf8_lossy(&self.bytes[start..self.pos]).into_owned();
+        if self.pos < self.bytes.len() {
+            self.pos += 1;
+        } else {
+            self.eof = true;
+            if start == self.pos {
+                self.fail = true;
+            }
+        }
+        line
+    }
+
+    /// `read(buffer, n)`: up to `n` bytes; fewer at the end (eofbit and failbit).
+    pub fn read(&mut self, n: usize) -> Vec<u8> {
+        if !self.good() {
+            self.fail = true;
+            return Vec::new();
+        }
+        let end = (self.pos + n).min(self.bytes.len());
+        let out = self.bytes[self.pos..end].to_vec();
+        self.pos = end;
+        if out.len() < n {
+            self.eof = true;
+            self.fail = true;
+        }
+        out
+    }
+}
+
+/// The characters `num_get::_M_extract_float` takes from the start of `b` (no whitespace
+/// first): an optional sign, digits with one decimal point, one exponent after some digits
+/// with its own sign. Returns the text and the number of bytes taken.
+fn collect_float(b: &[u8]) -> (String, usize) {
+    let mut i = 0;
+    let mut text = String::new();
+    if matches!(b.first(), Some(b'+' | b'-')) {
+        text.push(b[0] as char);
+        i += 1;
+    }
+    let mut mantissa = false;
+    let mut dec = false;
+    let mut sci = false;
+    while i < b.len() {
+        let c = b[i];
+        if c == b'.' && !dec && !sci {
+            text.push('.');
+            dec = true;
+        } else if (c == b'e' || c == b'E') && !sci && mantissa {
+            text.push('e');
+            sci = true;
+            if i + 1 < b.len() && matches!(b[i + 1], b'+' | b'-') {
+                i += 1;
+                text.push(b[i] as char);
+            }
+        } else if c.is_ascii_digit() {
+            text.push(c as char);
+            mantissa = true;
+        } else {
+            break;
+        }
+        i += 1;
+    }
+    (text, i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -154,8 +154,14 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-51 | antsRegistration | `-z 0`: files misnamed, then a read past the end of the names (crash) | every computed transform under its stage's name (`reproduce`: ANTs' files up to the crash, then an error) |
 | ANTS-52 | antsAI | the translation grid does not move `Rigid`/`Similarity` start points in 2D, nor `Similarity` ones in 3D | translated as the 3D rigid ones |
 | ANTS-53 | antsAI | `AlignGeometricCenters`/`AlignCentersOfMass` with iterations write an empty `.mat` | the alignment, as with 0 iterations |
+| ANTS-54 | antsAffineInitializer | the eighth argument (the local search's iterations) is never read: 20 iterations whatever it says | the argument's iterations (0: no local search; text or a negative value: an error) |
 | ANTS-55 | antsAI | a translation grid with fewer extents than dimensions read past its end | an error (`reproduce`: the missing extents read as 0) |
 | ANTS-56 | antsAffineInitializer | a dimension other than 2, 3 or 4 runs as 2D | an error |
+| ANTS-61 | antsRegistration | IGDM with ICP, PSE or JHCT in a stage, or after an image metric: only one kind of point set reaches ITK (an exception, the stage dropped; or a crash) | every metric gets its inputs (`reproduce`: ITK's exception, or a stop where ANTs crashes) |
+| ANTS-62 | antsRegistration | a text point set ending with a newline gets one more record (uninitialised; a copy of the last one in the oracle's build) | no extra record (`reproduce`: the copy of the last record) |
+| ANTS-63 | antsRegistration | a binary VTK point set's labels read only as far as one point's components | every label read (`reproduce`: ANTs' bytes, the unread labels 0) |
+| ANTS-65 | antsRegistration | IGDM's estimated intensity sigma: the minima never updated, the moving maximum subtracted | the range of both point sets' intensities |
+| ANTS-66 | antsRegistration | IGDM's value reads before its intensity arrays for neighbourhoods of more than one voxel | the centre intensity, as the derivative reads it (`reproduce`: the two intensities taken as equal) |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -167,6 +173,12 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-15 | ITK HDF5 writer | a transform without parameters cannot be written with compression; a file ITK cannot read is left | its empty parameters stored uncompressed (`reproduce`: ITK's error and file) |
 | ITK-18 | ITK joint-histogram MI (`MI2`) | the marginal densities swapped | each image's own marginal |
 | ITK-19 | ITK `MultiStartOptimizerv4` (antsAI, antsAffineInitializer) | a start point that throws keeps the previous one's value (0 for the first) and can be the best | it takes no part in the search for the best |
+| ITK-21 | ITK `MultiStartOptimizerv4` without a scales estimator (antsAffineInitializer) | each start point's local search begins at the learning rate the previous one's line search left | each at the configured rate (0.1); named where the result changes |
+| ITK-22 | ITK labelled point-set metrics (`ICP`, `PSE`, `JHCT`) | a fixed point whose label the moving set lacks throws: the stage is dropped | those points take no part (no label in common: an error) |
+| ITK-23 | ITK `GaussianMembershipFunction` (`JHCT`) | an identity covariance keeps the univariate prefactor `1/√(2π)` | the `D`-dimensional prefactor |
+| ITK-25 | ITK manifold Parzen windows (`JHCT`) | fewer points than the covariance neighbourhood: a read past the list of neighbours | the neighbours there are (in both modes) |
+| ITK-26 | ITK manifold Parzen windows (`JHCT`) | anisotropic covariances count each diagonal product twice | once |
+| ITK-28 | ITK `JHCT` | an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | both tests treat it as 1 |
 
 **Not the default yet:**
 

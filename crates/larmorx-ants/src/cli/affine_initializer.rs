@@ -11,8 +11,9 @@
 //! - the dimension is `std::stoi` of the first argument; 2, 3 and 4 run as such, any other
 //!   number as 2 (ANTS-56; corrected by default: an error);
 //! - the search factor (degrees) and the radian fraction are read with `atof` (the fraction
-//!   clamped to `[0.01, 1]`), the principal-axes flag with `std::stoi`; the local search's
-//!   iterations are skipped unread (ANTs always runs 20, ANTS-54);
+//!   clamped to `[0.01, 1]`), the principal-axes flag with `std::stoi`; ANTs skips the local
+//!   search's iterations unread and always runs 20 (ANTS-54; corrected by default: read with
+//!   `std::stoi`, 0 or more, and run; a value that is not such a number is an error);
 //! - a missing image is reported and then aborts ANTs (` zero image1 error `, then the moments
 //!   calculator's exception), as does an image whose values sum to 0;
 //! - the initial alignment is written first, then (2D and 3D) replaced by the search's best
@@ -36,7 +37,9 @@ use larmorx_registration::{Image, ItkException};
 use super::ai::terminate_text;
 use super::cstd::{atof, stoi};
 use super::registration::to_image;
-use crate::affine_initializer::{AffineInitializerSettings, image_moments, initial, search};
+use crate::affine_initializer::{
+    AffineInitializerSettings, LOCAL_SEARCH_ITERATIONS, image_moments, initial, search,
+};
 use crate::ai::AiError;
 use crate::image::{FileStore, ImageStore, read_with};
 use crate::registration::helper::Log;
@@ -287,9 +290,8 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
         }
         k += 1;
     }
-    if ctx.args.get(k).is_some() {
-        // ANTS-54 (questionable, reproduced): the local search's iterations are not read;
-        // every start point runs LOCAL_SEARCH_ITERATIONS.
+    if let Some(a) = ctx.args.get(k) {
+        s.local_search_iterations = local_search_iterations(ctx.notices, log, a)?;
         k += 1;
     }
     let fixed = read_float::<D>(ctx, log, fixed_name);
@@ -325,6 +327,55 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
     let best = best.map_err(|e| failure(log, e))?;
     write_output(ctx, log, output, &best)?;
     Ok(0)
+}
+
+/// The eighth argument, the local optimizer's iterations per start point (ANTS-54). ANTs
+/// skips it unread (`// NOT USED: localoptimizeriterations = std::stoi(argv[argct])`) and
+/// always runs 20; corrected, it is read as that line would read it (`std::stoi`) and must be
+/// 0 or more. A notice wherever it differs from ANTs' 20.
+fn local_search_iterations(
+    notices: &mut Notices,
+    log: &mut Log<'_>,
+    a: &str,
+) -> Result<usize, Exit> {
+    let value = stoi(a).filter(|&v| v >= 0);
+    if value == Some(LOCAL_SEARCH_ITERATIONS as i32) {
+        return Ok(LOCAL_SEARCH_ITERATIONS);
+    }
+    if notices.reproduce() {
+        notices.add(
+            &defects::ANTS_54,
+            format!(
+                "the local-search argument '{a}' is not read: each start point runs {LOCAL_SEARCH_ITERATIONS} iterations, as in ANTs"
+            ),
+        );
+        return Ok(LOCAL_SEARCH_ITERATIONS);
+    }
+    match value {
+        Some(v) => {
+            notices.add(
+                &defects::ANTS_54,
+                format!(
+                    "each start point runs {v} iterations of the local search, as the argument says (ANTs ignores it and runs {LOCAL_SEARCH_ITERATIONS})"
+                ),
+            );
+            Ok(usize::try_from(v).unwrap_or(usize::MAX))
+        }
+        None => {
+            notices.add(
+                &defects::ANTS_54,
+                format!(
+                    "the local-search argument '{a}' is not a number of iterations: an error (ANTs ignores the argument and runs {LOCAL_SEARCH_ITERATIONS})"
+                ),
+            );
+            Err(refuse(
+                log,
+                &format!(
+                    "the local search's iterations '{a}' are not an integer of 0 or more (Optional-uint-UseLocalSearch)"
+                ),
+            ))
+        }
+    }
 }
 
 /// The float image's values as doubles (exact).
@@ -375,4 +426,48 @@ fn write_output<const D: usize>(
             )
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(mode: UpstreamDefects, a: &str) -> (Result<usize, Exit>, Vec<String>, String) {
+        let mut notices = Notices::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = {
+            let mut log = Log::new(&mut out, &mut err, false);
+            local_search_iterations(&mut notices, &mut log, a)
+        };
+        let ids = notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id.to_string())
+            .collect();
+        (r, ids, String::from_utf8(err).unwrap())
+    }
+
+    #[test]
+    fn the_local_search_argument() {
+        use UpstreamDefects::{Fix, Reproduce};
+        // ANTs' own 20: nothing to say in either mode.
+        assert_eq!(read(Fix, "20"), (Ok(20), vec![], String::new()));
+        assert_eq!(read(Reproduce, " 20"), (Ok(20), vec![], String::new()));
+        // ANTS-54 corrected: read with std::stoi; reproduced: 20.
+        assert_eq!(read(Fix, "10").0, Ok(10));
+        assert_eq!(read(Fix, "0").0, Ok(0));
+        assert_eq!(read(Fix, "7x").0, Ok(7));
+        assert_eq!(read(Fix, "10").1, vec!["ANTS-54"]);
+        assert_eq!(
+            read(Reproduce, "10"),
+            (Ok(20), vec!["ANTS-54".into()], String::new())
+        );
+        assert_eq!(read(Reproduce, "abc").0, Ok(20));
+        for bad in ["abc", "-3", "99999999999"] {
+            let (r, ids, err) = read(Fix, bad);
+            assert_eq!(r, Err(1), "{bad}");
+            assert_eq!(ids, vec!["ANTS-54"], "{bad}");
+            assert!(err.contains("not an integer of 0 or more"), "{err}");
+        }
+    }
 }

@@ -28,6 +28,8 @@ from larmorx.transforms.itk import ItkTransform, read, write
 
 __all__ = [
     "AlignCenters",
+    "IntensityPointSetMetric",
+    "PointSetMetric",
     "RegistrationError",
     "RegistrationIteration",
     "RegistrationMetric",
@@ -37,6 +39,7 @@ __all__ = [
 ]
 
 MetricType = Literal["Mattes", "MI", "MI2", "MeanSquares", "CC", "GC", "Demons"]
+PointSetMetricType = Literal["ICP", "PSE", "JHCT"]
 TransformType = Literal["Translation", "Rigid", "Similarity", "Affine", "CompositeAffine"]
 Sampling = Literal["None", "Regular", "Random"]
 Precision = Literal["float64", "float32"]
@@ -77,6 +80,74 @@ class RegistrationMetric:
 
 
 @dataclass(frozen=True)
+class PointSetMetric:
+    """One labelled point-set metric of a stage (``-m ICP|PSE|JHCT[fixed,moving,weight,
+    samplingPercentage,boundaryPointsOnly,pointSetSigma,kNeighborhood,alpha,
+    useAnisotropicCovariances]``): points of the same label are matched.
+
+    - ``type``: ``"ICP"`` (the distance to the nearest moving point), ``"PSE"`` (a Gaussian
+      expectation over the ``k_neighborhood`` nearest moving points, of width ``sigma``) or
+      ``"JHCT"`` (the Jensen-Havrda-Charvát-Tsallis divergence of a manifold Parzen density of
+      the moving points, of regularisation ``sigma``, order ``alpha``, over the
+      ``k_neighborhood`` nearest points, with ``anisotropic_covariances`` estimated from each
+      point's 5 nearest).
+    - ``fixed``, ``moving``: a label image (path or in-memory; every voxel whose label is not 0
+      is a point, or with ``boundary_points_only`` the voxels on a label's contour), a point
+      set file (``.txt``: ``x y z label`` per line, ``x y 0 label`` in 2D; ``.vtk`` polydata
+      whose scalars are the labels), or a pair ``(points, labels)`` of arrays (``N × D``
+      physical coordinates in ITK's LPS convention, ``N`` labels).
+    - ``sampling_percentage``: keep a random fraction of each point set (ANTs seeds this from
+      the clock; larmorx from ``random_seed``).
+    - ``weight``: the metric's weight in a stage of several metrics.
+
+    A stage of point-set metrics only needs a fixed mask (``RegistrationStage.masks``): its
+    grid is the virtual domain (ANTs crashes without one). Warped images and
+    ``print_similarity_measure_interval`` need an image metric first.
+    """
+
+    type: PointSetMetricType
+    fixed: Any
+    moving: Any
+    weight: float = 1.0
+    sampling_percentage: float = 1.0
+    boundary_points_only: bool = False
+    sigma: float = 1.0
+    k_neighborhood: int = 50
+    alpha: float = 1.1
+    anisotropic_covariances: bool = False
+
+
+@dataclass(frozen=True)
+class IntensityPointSetMetric:
+    """ANTs' intensity point-set metric of a stage (``-m IGDM[fixed,moving,weight,fixedMask,
+    movingMask,neighborhoodRadius,intensitySigma,distanceSigma,kNeighborhood,gradientSigma]``):
+    each masked voxel of ``fixed`` (whose neighbourhood of ``neighborhood_radius`` lies in the
+    image) is compared with the nearest masked voxel of ``moving`` by its intensity and its
+    distance.
+
+    - ``fixed``, ``moving``: images; ``fixed_mask``, ``moving_mask``: their masks (on their
+      grids).
+    - ``intensity_sigma``, ``distance_sigma``: the widths of the two terms; 0 estimates them.
+    - ``k_neighborhood`` and ``gradient_sigma`` are passed on as ANTs takes them; ANTs does not
+      use them (ANTS-67).
+    """
+
+    fixed: Any
+    moving: Any
+    fixed_mask: Any
+    moving_mask: Any
+    weight: float = 1.0
+    neighborhood_radius: int | Sequence[int] = 0
+    intensity_sigma: float = 0.0
+    distance_sigma: float = 0.0
+    k_neighborhood: int = 1
+    gradient_sigma: float = 1.0
+
+
+AnyMetric = RegistrationMetric | PointSetMetric | IntensityPointSetMetric
+
+
+@dataclass(frozen=True)
 class RegistrationStage:
     """One stage (``-t``, ``-m``, ``-c``, ``-f``, ``-s``, and per stage ``-x`` and ``-g``).
 
@@ -89,7 +160,7 @@ class RegistrationStage:
 
     transform: TransformType
     gradient_step: float
-    metrics: RegistrationMetric | Sequence[RegistrationMetric]
+    metrics: AnyMetric | Sequence[AnyMetric]
     iterations: Sequence[int]
     shrink_factors: Sequence[int]
     smoothing_sigmas: Sequence[float]
@@ -181,6 +252,30 @@ class _Args:
             self._images[key] = name
         return self._images[key]
 
+    def point_set(self, value: Any, dimension: int) -> str:
+        """A point-set argument: a path or an image as :meth:`image` takes it, or
+        ``(points, labels)`` written to a temporary text file."""
+        # (points, labels): labels are one-dimensional; an image's (array, affine) is not.
+        if isinstance(value, tuple) and len(value) == 2 and np.ndim(value[1]) == 1:
+            points = np.asarray(value[0], dtype=np.float64)
+            labels = np.asarray(value[1])
+            if points.ndim != 2 or points.shape[1] != dimension or len(labels) != len(points):
+                raise ValueError(
+                    f"a point set is (points, labels) with points of shape (N, {dimension}) and N labels"
+                )
+            self._files += 1
+            path = self.tmp / f"lx-points-{self._files}.txt"
+            rows = []
+            for p, label in zip(points, labels, strict=True):
+                coords = [repr(float(c)) for c in p]
+                if dimension == 2:
+                    coords.append("0")
+                rows.append(" ".join([*coords, str(int(label))]))
+            # No final newline: ANTs' reader would read one more record (ANTS-62).
+            path.write_text("\n".join(rows), encoding="utf-8")
+            return os.fspath(path)
+        return self.image(value)
+
     def transform(self, value: Any) -> str:
         """A transform file: a path as given, transform objects written to a temporary file."""
         if isinstance(value, (str, os.PathLike)):
@@ -200,7 +295,36 @@ def _initial(args: _Args, value: Any) -> str:
     return args.transform(value)
 
 
-def _metric(args: _Args, m: RegistrationMetric) -> str:
+def _metric(args: _Args, m: AnyMetric, dimension: int) -> str:
+    if isinstance(m, PointSetMetric):
+        fields = [
+            args.point_set(m.fixed, dimension),
+            args.point_set(m.moving, dimension),
+            _num(m.weight),
+            _num(m.sampling_percentage),
+            str(int(m.boundary_points_only)),
+            _num(m.sigma),
+            str(int(m.k_neighborhood)),
+            _num(m.alpha),
+            str(int(m.anisotropic_covariances)),
+        ]
+        return f"{m.type}[{','.join(fields)}]"
+    if isinstance(m, IntensityPointSetMetric):
+        radius = m.neighborhood_radius
+        r = [int(radius)] * dimension if isinstance(radius, int) else [int(v) for v in radius]
+        fields = [
+            args.image(m.fixed),
+            args.image(m.moving),
+            _num(m.weight),
+            args.image(m.fixed_mask),
+            args.image(m.moving_mask),
+            "x".join(str(v) for v in r),
+            _num(m.intensity_sigma),
+            _num(m.distance_sigma),
+            str(int(m.k_neighborhood)),
+            _num(m.gradient_sigma),
+        ]
+        return f"IGDM[{','.join(fields)}]"
     parameter = m.radius if m.type == "CC" else m.bins
     fields = [
         args.image(m.fixed),
@@ -276,8 +400,10 @@ def registration(
     (ANTs v2.6.5) does.
 
     Each :class:`RegistrationStage` optimises one transform (``Translation``, ``Rigid``, ``Similarity``,
-    ``Affine`` or ``CompositeAffine``) against its :class:`RegistrationMetric` objects, level by level
-    (shrunk and smoothed images); the stages chain, each starting where the previous left.
+    ``Affine`` or ``CompositeAffine``) against its metrics (image metrics,
+    :class:`RegistrationMetric`; point-set metrics, :class:`PointSetMetric` and
+    :class:`IntensityPointSetMetric`), level by level (shrunk and smoothed images); the stages
+    chain, each starting where the previous left.
     The deformable stages (``SyN``, ``BSpline``, ...) come in milestone A5.
 
     - ``initial_moving_transforms`` (``-r``): transform files, transform lists,
@@ -312,10 +438,16 @@ def registration(
         tmp = Path(tmpdir)
         a = _Args(tmp)
         first = stage_list[0].metrics
-        first_metric = first if isinstance(first, RegistrationMetric) else first[0]
+        first_metric = first if isinstance(first, AnyMetric) else first[0]
         if dimension is None:
             fixed = first_metric.fixed
-            if isinstance(fixed, (str, os.PathLike)):
+            if isinstance(fixed, tuple) and len(fixed) == 2 and np.ndim(fixed[0]) == 2:
+                ndim = np.shape(fixed[0])[1]
+            elif isinstance(fixed, (str, os.PathLike)):
+                if os.fspath(fixed).lower().endswith((".txt", ".vtk")):
+                    raise ValueError(
+                        "give the dimension for point sets read from text or VTK files"
+                    )
                 import nibabel as nib
 
                 ndim = len(nib.load(os.fspath(fixed)).shape)
@@ -352,9 +484,9 @@ def registration(
             argv += ["-k", _initial(a, restore_state)]
         for s in stage_list:
             argv += ["-t", f"{s.transform}[{_num(s.gradient_step)}]"]
-            metrics = [s.metrics] if isinstance(s.metrics, RegistrationMetric) else list(s.metrics)
+            metrics = [s.metrics] if isinstance(s.metrics, AnyMetric) else list(s.metrics)
             for m in metrics:
-                argv += ["-m", _metric(a, m)]
+                argv += ["-m", _metric(a, m, int(dimension))]
             its = "x".join(str(int(i)) for i in s.iterations)
             argv += ["-c", f"[{its},{_num(s.convergence_threshold)},{int(s.convergence_window)}]"]
             argv += ["-f", "x".join(str(int(f)) for f in s.shrink_factors)]
@@ -384,7 +516,7 @@ def registration(
         files: dict[str, list[ItkTransform]] = {}
         for path in sorted(tmp.iterdir()):
             ours = path.name.startswith("lx") and not path.name.startswith(
-                ("lx-initial-", "lx-input-")
+                ("lx-initial-", "lx-input-", "lx-points-")
             )
             if ours and path.suffix in (".mat", ".txt", ".h5"):
                 files[path.name[2:]] = read(path, upstream_defects=upstream_defects)

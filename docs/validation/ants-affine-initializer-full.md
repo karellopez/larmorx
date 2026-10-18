@@ -1,15 +1,15 @@
 # Parity: antsAffineInitializer
 
-**All cases agree.** 43 cases on the `full` tier: 28 pass, 13 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 46 cases on the `full` tier: 31 pass, 13 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsAffineInitializer` / `lx.ants.affine_initializer` (crates larmorx-ants, larmorx-registration)
 - **Reference:** antsAffineInitializer from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `full`
 - **Generated:** 2026-10-17 on Linux x86_64, with `python -m larmorx_validation parity ants-affine-initializer --tier full`
 
-28 cases compared: 28 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 0 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
+31 cases compared: 31 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 0 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 9.05e-07 in a transform parameter (`search/defaults` 0, `search/principal-axes` 1.11e-15, `search/2d` 5.55e-17, `real/mni-2mm` 9.05e-07); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.33e-06 in a transform parameter (`search/defaults` 0, `search/principal-axes` 5.55e-16, `search/2d` 5.55e-17, `real/mni-2mm` 1.33e-06); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
 
 ## Thresholds
 
@@ -28,7 +28,7 @@ Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread re
 |---|---|---|---|---|---|
 | messages | 19 | 4 | 13 | 2 | 0 |
 | real | 6 | 6 | 0 | 0 | 0 |
-| search | 18 | 18 | 0 | 0 | 0 |
+| search | 21 | 21 | 0 | 0 | 0 |
 
 ## Expected divergences
 
@@ -59,7 +59,7 @@ Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread re
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (a34fc312db95) |
+| larmorx | 0.0.1 (61309dd10e0e) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -102,7 +102,10 @@ Inputs named `gen:<name>` are built by the suites (seeded phantoms).
 | `search/missing-mask` | pass | 6/6 | A mask that cannot be read is no mask |
 | `search/fraction-above-one` | pass | 6/6 | A radian fraction of 5 (clamped to 1) |
 | `search/fraction-below-minimum` | pass | 6/6 | A radian fraction of 0.001 (clamped to 0.01) |
-| `search/local-search-text` | pass | 6/6 | A local-search argument that is not read (ANTS-54) |
+| `search/local-search-text` | pass | 6/6 | A local-search argument that is not read (ANTS-54; corrected: an error) |
+| `search/local-search-zero` | pass | 6/6 | A local search of 0 iterations (ANTS-54; corrected: start points only evaluated) |
+| `search/local-search-negative` | pass | 6/6 | A negative local search (ANTS-54; corrected: an error) |
+| `search/local-search-20` | pass | 6/6 | A local search of 20 iterations, ANTs' own (only ITK-21 can differ) |
 | `search/principal-axes-2` | pass | 6/6 | A principal-axes flag of 2 (true) |
 | `search/dimension-text-prefix` | pass | 6/6 | A dimension of 3x (std::stoi reads 3) |
 | `search/2d` | pass | 7/7 | 2D from the principal axes |

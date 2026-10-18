@@ -9,6 +9,12 @@
 //! a warning; the metric value then stays the previous start point's (or 0 before the first),
 //! which still takes part in the search for the minimum, as in ITK. At the end the metric's
 //! parameters are set to the best start point's.
+//!
+//! ITK runs one local optimizer object for every start point, so whatever state it keeps from
+//! one run to the next carries over: without a scales estimator
+//! (`antsAffineInitializer`), the learning rate the golden-section line search leaves at the
+//! end of one start point is where the next one begins (ITK-21). [`Corrections`] holds
+//! larmorx's corrections of ITK's behaviour (D13).
 
 use super::{ConjugateGradientLineSearch, Observer, Problem};
 use crate::{ItkException, Real};
@@ -78,15 +84,26 @@ impl<R: Real> MultiStartOutcome<R> {
     }
 }
 
+/// larmorx's corrections of `MultiStartOptimizerv4` (D13); `Default` is ITK's behaviour.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Corrections {
+    /// ITK-19: a start point that threw takes no part in the search for the minimum. ITK
+    /// compares the previous start point's value (0 before the first) instead, so a first
+    /// start point that throws becomes the best one unless another one's value is below 0.
+    pub skip_failed: bool,
+    /// ITK-21: every start point's local optimization begins at the learning rate the local
+    /// optimizer has when [`optimize`] is called (its configured rate). ITK starts each one
+    /// from the rate the previous start point's line search left, so each start point's
+    /// result depends on the one before it; with a scales estimator the rate is estimated
+    /// again at each start, and this changes nothing.
+    pub restart_learning_rate: bool,
+}
+
 /// `StartOptimization()` over `parameters`. `local` is the local optimizer (`None`: each
 /// start point is only evaluated). `scales` are the multi-start optimizer's own scales
 /// (`SetScales`; empty when not set), which ITK only checks. `warnings` receives ITK's
-/// warning text for each start point that threw.
-///
-/// `skip_failed` (larmorx's correction of ITK-19): a start point that threw takes no part
-/// in the search for the minimum. ITK compares the previous start point's value (0 before
-/// the first) instead, so a first start point that throws becomes the best one unless
-/// another one's value is below 0.
+/// warning text for each start point that threw. `corrections`: larmorx's corrections of
+/// ITK's behaviour ([`Corrections::default`] is ITK's).
 pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Sized>(
     parameters: Vec<Vec<R>>,
     mut local: Option<&mut ConjugateGradientLineSearch<R>>,
@@ -94,8 +111,10 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
     problem: &mut P,
     observer: &mut O,
     warnings: &mut Vec<String>,
-    skip_failed: bool,
+    corrections: Corrections,
 ) -> Result<MultiStartOutcome<R>, ItkException> {
+    let skip_failed = corrections.skip_failed;
+    let configured_rate = local.as_deref().map(|o| o.learning_rate);
     let mut list = parameters;
     let n = list.len();
     let mut values = Vec::new();
@@ -148,6 +167,11 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
         let attempt = (|| -> Result<R, ItkException> {
             problem.set_parameters(&list[current])?;
             if let Some(optimizer) = local.as_deref_mut() {
+                if corrections.restart_learning_rate
+                    && let Some(rate) = configured_rate
+                {
+                    optimizer.learning_rate = rate;
+                }
                 optimizer.start(problem, &mut NoLocalObserver)?;
                 list[current] = problem.parameters();
             }

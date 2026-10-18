@@ -6,8 +6,8 @@
 //! AFNI on Linux, except where glibc itself is not correctly rounded (about 0.1 % of
 //! calls). They are pure-Rust ports of CORE-MATH (MIT, commit `040ee482a8ca`, see
 //! `UPSTREAM.md`), verified against mpmath on CORE-MATH's worst-case inputs and millions of
-//! random inputs (`asin`, `acos`, `atan2`, `cbrt`: against CORE-MATH's C on its worst cases
-//! and random inputs). Background: `docs/findings/platform-math.md`.
+//! random inputs (`asin`, `acos`, `atan2`, `cbrt`, `pow`: against CORE-MATH's C on its worst
+//! cases and random inputs). Background: `docs/findings/platform-math.md`.
 
 mod acos;
 mod asin;
@@ -19,6 +19,7 @@ mod exp;
 mod expf;
 mod log;
 mod logf;
+mod pow;
 mod powf;
 mod powi;
 mod sin;
@@ -93,6 +94,18 @@ pub fn atan2(y: f64, x: f64) -> f64 {
     atan2::atan2(y, x)
 }
 
+/// `x^y`, correctly rounded (CORE-MATH's `cr_pow`). ITK's `std::pow` (glibc's `pow`, which is
+/// not correctly rounded), as in `JensenHavrdaCharvatTsallisPointSetToPointSetMetricv4`.
+#[inline]
+#[must_use]
+pub fn pow(x: f64, y: f64) -> f64 {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("fma") {
+        return fma::pow(x, y);
+    }
+    pow::pow(x, y)
+}
+
 /// `x^y` for `f32`, correctly rounded (CORE-MATH's `cr_powf`). It has no FMA-compiled copy:
 /// it is only used where speed does not matter (ImageMath's `^`).
 pub use powf::powf;
@@ -147,6 +160,16 @@ mod fma {
         // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
         unsafe { kernel(y, x) }
     }
+
+    #[inline]
+    pub(super) fn pow(x: f64, y: f64) -> f64 {
+        #[target_feature(enable = "fma")]
+        fn kernel(x: f64, y: f64) -> f64 {
+            super::pow::pow(x, y)
+        }
+        // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
+        unsafe { kernel(x, y) }
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +191,8 @@ mod tests {
                 (super::cbrt(x), super::cbrt::cbrt(x)),
                 (super::atan2(x, 1.5), super::atan2::atan2(x, 1.5)),
                 (super::atan2(-0.25, x), super::atan2::atan2(-0.25, x)),
+                (super::pow(x.abs(), 0.75), super::pow::pow(x.abs(), 0.75)),
+                (super::pow(1.0625, x), super::pow::pow(1.0625, x)),
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),

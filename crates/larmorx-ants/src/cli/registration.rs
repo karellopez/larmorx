@@ -1224,12 +1224,18 @@ fn do_registration<R: Compute, const D: usize>(
             sampling_percentage: R::ONE,
             intensity_distance_sigma: R::ZERO,
             euclidean_distance_sigma: R::ZERO,
+            labeled: None,
+            intensity: None,
         };
         if kind.is_some_and(|k| k.is_point_set()) {
-            return Err(refuse(
-                log,
-                "the point-set metrics (ICP, PSE, JHCT, IGDM) are not supported yet",
-            ));
+            let seed = if helper.random_seed != 0 {
+                helper.random_seed
+            } else {
+                helper.default_seed
+            };
+            point_set_metric::<R, D>(&mut ctx, log, m, &name, seed, &mut metric)?;
+            helper.metrics.push(metric);
+            continue;
         }
         if m.parameters.len() > 5 {
             let v = Conv::f32(param(m, 5)).map_err(|e| throw(log, e))?;
@@ -1319,6 +1325,209 @@ fn do_registration<R: Compute, const D: usize>(
         moving_initial_count,
         minc,
     )
+}
+
+/// A point-set metric's parameters and point sets (`antsRegistrationTemplateHeader.h:1054-1210`):
+/// IGDM's intensity point sets from two images and two masks, the other metrics' labelled
+/// point sets from two files. A point set that cannot be read is null in ANTs, which then
+/// crashes: larmorx prints what ANTs printed and stops.
+fn point_set_metric<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    log: &mut Log<'_>,
+    m: &OptionValue,
+    name: &str,
+    seed: i32,
+    metric: &mut Metric<R, D>,
+) -> Result<(), Exit> {
+    use crate::registration::pointsets::{PointSetError, ReadNotes, read_intensity, read_labeled};
+    let n = m.parameters.len();
+    let dim = D;
+    let fail = |log: &mut Log<'_>, e: PointSetError| -> Exit {
+        match e {
+            PointSetError::Null(msg) => {
+                log.cerr(&msg);
+                refuse(
+                    log,
+                    "a point set could not be read: ANTs goes on with a null point set and crashes",
+                )
+            }
+            PointSetError::Abort(text) => {
+                log.cerr(&text);
+                refuse(
+                    log,
+                    "ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+                )
+            }
+            PointSetError::Refused(msg) => refuse(log, &msg),
+        }
+    };
+    if name == "igdm" {
+        if n < 5 {
+            explain_err(
+                log,
+                "The expected number of parameters aren't specified.  Please see help menu.\n",
+            );
+            return Err(1);
+        }
+        let fixed_name = param(m, 0).to_owned();
+        let moving_name = param(m, 1).to_owned();
+        log.logger(&format!(
+            "  fixed intensity point set: {fixed_name}\n  moving intensity point set: {moving_name}\n"
+        ));
+        let fixed_mask = param(m, 3).to_owned();
+        let moving_mask = param(m, 4).to_owned();
+        if n > 6 {
+            metric.intensity_distance_sigma =
+                Conv::real::<R>(param(m, 6)).map_err(|e| caught(log, &e))?;
+        }
+        if n > 7 {
+            metric.euclidean_distance_sigma =
+                Conv::real::<R>(param(m, 7)).map_err(|e| caught(log, &e))?;
+        }
+        let mut k = 1u32;
+        if n > 8 {
+            k = Conv::u32(param(m, 8)).map_err(|e| caught(log, &e))?;
+        }
+        metric.evaluation_k_neighborhood = R::r(f64::from(k));
+        // The gradient sigma (parameter 9) is read and then not used: the filter computes
+        // central differences.
+        if n > 9 {
+            let _ = Conv::real::<R>(param(m, 9)).map_err(|e| caught(log, &e))?;
+        }
+        let radius = if n > 5 {
+            Conv::vec_u32(param(m, 5)).map_err(|e| caught(log, &e))?
+        } else {
+            vec![0; dim]
+        };
+        if radius.len() != dim {
+            explain_err(log, "The neighborhood size must equal the dimension.\n");
+            return Err(1);
+        }
+        let fixed = read_intensity::<R, D>(
+            ctx.store,
+            &fixed_name,
+            &fixed_mask,
+            &radius,
+            ctx.n_threads,
+            ctx.notices,
+        );
+        let fixed = match fixed {
+            Err(PointSetError::Null(msg)) => {
+                log.cerr(&msg);
+                None
+            }
+            Err(e) => return Err(fail(log, e)),
+            Ok(f) => Some(f),
+        };
+        let moving = read_intensity::<R, D>(
+            ctx.store,
+            &moving_name,
+            &moving_mask,
+            &radius,
+            ctx.n_threads,
+            ctx.notices,
+        );
+        let moving = match moving {
+            Err(PointSetError::Null(msg)) => {
+                log.cerr(&msg);
+                None
+            }
+            Err(e) => return Err(fail(log, e)),
+            Ok(f) => Some(f),
+        };
+        let (Some(fixed), Some(moving)) = (fixed, moving) else {
+            return Err(refuse(
+                log,
+                "an intensity point set could not be read: ANTs goes on with a null point set and crashes",
+            ));
+        };
+        metric.intensity = Some((Arc::new(fixed), Arc::new(moving)));
+        return Ok(());
+    }
+    if n > 3 {
+        metric.sampling_percentage = Conv::real::<R>(param(m, 3)).map_err(|e| caught(log, &e))?;
+    }
+    if n > 4 {
+        metric.use_boundary_points_only = Conv::bool(param(m, 4)).map_err(|e| caught(log, &e))?;
+    }
+    if n > 5 {
+        metric.point_set_sigma = Conv::real::<R>(param(m, 5)).map_err(|e| caught(log, &e))?;
+    }
+    if n > 6 {
+        let k = Conv::u32(param(m, 6)).map_err(|e| caught(log, &e))?;
+        metric.evaluation_k_neighborhood = R::r(f64::from(k));
+    }
+    if n > 7 {
+        metric.alpha = Conv::real::<R>(param(m, 7)).map_err(|e| caught(log, &e))?;
+    }
+    if n > 8 {
+        metric.use_anisotropic_covariances =
+            Conv::bool(param(m, 8)).map_err(|e| caught(log, &e))?;
+    }
+    let fixed_name = param(m, 0).to_owned();
+    let moving_name = param(m, 1).to_owned();
+    log.logger(&format!(
+        "  fixed labeled point set: {fixed_name}\n  moving labeled point set: {moving_name}\n"
+    ));
+    let percentage = metric.sampling_percentage.to_f64() as f32;
+    let fix = ctx.notices.fix();
+    let mut sets = Vec::with_capacity(2);
+    for file in [&fixed_name, &moving_name] {
+        let mut warnings = Vec::new();
+        let mut notes = ReadNotes::default();
+        let read = read_labeled::<D>(
+            ctx.store,
+            file,
+            metric.use_boundary_points_only,
+            percentage,
+            seed as u32,
+            fix,
+            ctx.n_threads,
+            ctx.notices,
+            &mut warnings,
+            &mut notes,
+        );
+        for w in &warnings {
+            log.cerr(w);
+        }
+        if notes.text_extra_record {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_62,
+                if fix {
+                    format!("'{file}' ends with a newline: no extra point; ANTs adds one from uninitialised variables")
+                } else {
+                    format!("'{file}' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninitialised variables")
+                },
+            );
+        }
+        if let Some(n) = notes.vtk_binary_scalars {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_63,
+                if fix {
+                    format!("every label of '{file}' read; ANTs reads only the first {n} and leaves the others uninitialised")
+                } else {
+                    format!("only the first {n} labels of '{file}' read, as in ANTs; the others, uninitialised there, read as 0")
+                },
+            );
+        }
+        match read {
+            Ok(r) => sets.push(Some(r)),
+            Err(PointSetError::Null(msg)) => {
+                log.cerr(&msg);
+                sets.push(None);
+            }
+            Err(e) => return Err(fail(log, e)),
+        }
+    }
+    let (Some(Some(fixed)), Some(Some(moving))) = (sets.first().cloned(), sets.get(1).cloned())
+    else {
+        return Err(refuse(
+            log,
+            "a labelled point set could not be read: ANTs goes on with a null point set and crashes",
+        ));
+    };
+    metric.labeled = Some((Arc::new(fixed), Arc::new(moving)));
+    Ok(())
 }
 
 /// The deformable transforms' parameters, read as ANTs reads them (so their conversion errors
@@ -1751,11 +1960,62 @@ fn write_outputs<R: Compute, const D: usize>(
 ) -> Result<Exit, Exit> {
     let p = ctx.p;
     let first = &helper.metrics[0];
-    let (Some(fixed), Some(moving)) = (&first.fixed, &first.moving) else {
-        return Err(refuse(log, "the first metric has no images"));
+    let images = match (&first.fixed, &first.moving) {
+        (Some(f), Some(m)) => Some((f, m)),
+        _ => None,
     };
-    let interpolation = output_interpolation::<D>(p, log, fixed.space.spacing)?;
+    // The Gaussian and MultiLabel interpolators take their sigma from the fixed image's
+    // spacing, which ANTs reads again from the first metric's first file.
+    let spacing = match images {
+        Some((f, _)) => f.space.spacing,
+        None => {
+            let gaussian = function0(p, "interpolation").is_some_and(|v| {
+                matches!(v.name.to_lowercase().as_str(), "gaussian" | "multilabel")
+            });
+            if gaussian {
+                let n = helper.transforms.len();
+                let metrics = functions(p, "metric", None);
+                let file = metrics
+                    .get(n.saturating_sub(1))
+                    .map(|v| param(v, 0).to_owned())
+                    .unwrap_or_default();
+                match read_with::<R, _>(ctx.store, &file, D, ctx.n_threads, ctx.notices) {
+                    Ok(img) => std::array::from_fn(|k| img.geometry.spacing[k]),
+                    Err(_) => {
+                        return Err(refuse(
+                            log,
+                            &format!(
+                                "the Gaussian and MultiLabel interpolators take the fixed image's spacing from '{file}', which ITK cannot read as an image (ANTs' reader throws)"
+                            ),
+                        ));
+                    }
+                }
+            } else {
+                [1.0; D]
+            }
+        }
+    };
+    let interpolation = output_interpolation::<D>(p, log, spacing)?;
     let queue = helper.composite.clone().unwrap_or_default();
+    let Some((fixed, moving)) = images else {
+        if !warped_name.is_empty() || !inverse_warped_name.is_empty() {
+            log.cerr(
+                "larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops\n",
+            );
+            return Err(1);
+        }
+        return write_transforms(
+            ctx,
+            log,
+            helper,
+            prefix,
+            write_composite,
+            collapse,
+            moving_initial_count,
+            minc,
+            &queue,
+        );
+    };
     if !warped_name.is_empty() {
         let data =
             resample(moving, fixed, &queue, &interpolation, ctx).map_err(|e| refuse(log, &e))?;
@@ -1785,6 +2045,34 @@ fn write_outputs<R: Compute, const D: usize>(
             .map_err(|e| refuse(log, &e))?;
         }
     }
+    write_transforms(
+        ctx,
+        log,
+        helper,
+        prefix,
+        write_composite,
+        collapse,
+        moving_initial_count,
+        minc,
+        &queue,
+    )
+}
+
+/// The transform files of `write_outputs` (`--save-state`, the composites, the individual
+/// files), after the warped images.
+#[allow(clippy::too_many_arguments)]
+fn write_transforms<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    log: &mut Log<'_>,
+    helper: &RegistrationHelper<R, D>,
+    prefix: &str,
+    write_composite: bool,
+    collapse: bool,
+    moving_initial_count: usize,
+    minc: bool,
+    queue: &[Xfm<R, D>],
+) -> Result<Exit, Exit> {
+    let p = ctx.p;
     if let Some(state) = p.last("save-state") {
         // ANTs sets the registration state in SyN stages only: after linear stages it finds
         // none and returns EXIT_FAILURE, writing no transform (ANTS-50). Corrected, the state
@@ -1815,7 +2103,7 @@ fn write_outputs<R: Compute, const D: usize>(
         ));
     }
     let (to_write, names): (Vec<Xfm<R, D>>, Vec<String>) = if collapse {
-        match collapse_linear(&queue) {
+        match collapse_linear(queue) {
             Some(t) => (vec![Xfm::Linear(t)], vec!["genericaffine".into()]),
             None => {
                 return Err(refuse(
@@ -1830,7 +2118,7 @@ fn write_outputs<R: Compute, const D: usize>(
             .iter()
             .map(|t| t.method.as_str().to_lowercase())
             .collect();
-        (queue.clone(), names)
+        (queue.to_vec(), names)
     };
     if write_composite {
         let head = ItkTransformParts {

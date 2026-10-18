@@ -17,9 +17,18 @@
 //!    once, for the search transform centred at 0; one start point per rotation (2D: about
 //!    the image plane; 3D: about the tertiary axis, then the secondary one) on
 //!    `[−π·f, π·f + step]`; `MultiStartOptimizerv4` with the scales and
-//!    `ConjugateGradientLineSearchOptimizerv4` (20 iterations, learning rate 0.1, line search
-//!    over `[0, 2]`, ε 0.1, at most 10 steps; no scales estimator, so the learning rate the
-//!    line search leaves carries over to the next start point, ITK-21).
+//!    `ConjugateGradientLineSearchOptimizerv4` (learning rate 0.1, line search over `[0, 2]`,
+//!    ε 0.1, at most 10 steps; no scales estimator).
+//!
+//! Two corrections of ANTs' behaviour by default (D13; the user's decision of 2026-10-17),
+//! each reproduced with [`UpstreamDefects::Reproduce`](larmorx_core::defects::UpstreamDefects):
+//! - ANTS-54: the local optimizer runs the number of iterations the command line asks for
+//!   ([`AffineInitializerSettings::local_search_iterations`]; 0: each start point is only
+//!   evaluated). ANTs never reads that argument and always runs 20.
+//! - ITK-21: every start point's local optimization begins at the configured learning rate
+//!   (0.1). Without a scales estimator ITK never estimates the rate again, so each start point
+//!   begins where the previous one's line search left it. The search runs both ways to say
+//!   whether the correction changed the result (and whether it chose another start point).
 //!
 //! The images are `itk::Image<float, D>` (their values are kept as doubles, which represent
 //! them exactly); the transforms and every computation are in double.
@@ -30,7 +39,7 @@
 use std::sync::Arc;
 
 use larmorx_core::IndexFloor;
-use larmorx_core::defects::Notices;
+use larmorx_core::defects::{self, Notices};
 use larmorx_core::vnl_fixed;
 use larmorx_registration::format::OStream;
 use larmorx_registration::mask::Mask;
@@ -56,6 +65,11 @@ pub struct AffineInitializerSettings {
     pub radian_fraction: f64,
     /// `Optional-bool-UsePrincipalAxes` (default false).
     pub use_principal_axes: bool,
+    /// `Optional-uint-UseLocalSearch`: the local optimizer's iterations per start point
+    /// (default 20; 0: no local optimization). ANTs never reads it and runs 20 (ANTS-54):
+    /// with [`UpstreamDefects::Reproduce`](larmorx_core::defects::UpstreamDefects) the search
+    /// runs [`LOCAL_SEARCH_ITERATIONS`] whatever it says.
+    pub local_search_iterations: usize,
 }
 
 impl Default for AffineInitializerSettings {
@@ -64,6 +78,7 @@ impl Default for AffineInitializerSettings {
             search_factor: 10.0,
             radian_fraction: 0.25,
             use_principal_axes: false,
+            local_search_iterations: LOCAL_SEARCH_ITERATIONS,
         }
     }
 }
@@ -71,9 +86,12 @@ impl Default for AffineInitializerSettings {
 /// `degtorad`, as ANTs writes it.
 pub const DEGREES_TO_RADIANS: f64 = 0.0174532925;
 
-/// The local optimizer's iterations: always 20 (the command line's value is ignored,
-/// ANTS-54).
+/// The local optimizer's iterations ANTs runs, whatever the command line says (ANTS-54), and
+/// larmorx's default.
 pub const LOCAL_SEARCH_ITERATIONS: usize = 20;
+
+/// The local optimizer's learning rate (`localoptimizerlearningrate`).
+pub const LOCAL_LEARNING_RATE: f64 = 0.1;
 
 /// The initial alignment and what the search needs of it.
 #[derive(Clone, Debug, PartialEq)]
@@ -364,45 +382,160 @@ pub fn search<const D: usize>(
             "no start point (a search factor or radian fraction that is not a number): ANTs reads the best parameters from an empty list and crashes".into(),
         ));
     }
-    let floor = IndexFloor::new(notices.mode());
-    let mut problem = LevelProblem::single(
-        metric,
-        MetricKind::Mattes { bins: 32 },
-        Composite::new(vec![Xfm::Linear(affine)]),
-        &floor,
-    )
-    .map_err(AiError::Uncaught)?;
-    let mut local = ConjugateGradientLineSearch {
-        learning_rate: 0.1,
-        maximum_step_size: 0.1,
-        number_of_iterations: LOCAL_SEARCH_ITERATIONS,
-        minimum_convergence_value: 1e-6,
-        convergence_window_size: 5,
-        lower_limit: 0.0,
-        upper_limit: 2.0,
-        epsilon: 0.1,
-        maximum_line_search_iterations: 10,
-        weights: Vec::new(),
-        estimate_learning_rate_at_each_iteration: false,
-        estimate_learning_rate_once: true,
-        scales: Some(moving_scales.clone()),
+    // ANTS-54: ANTs runs 20 iterations whatever the argument says.
+    let iterations = if notices.fix() {
+        s.local_search_iterations
+    } else {
+        LOCAL_SEARCH_ITERATIONS
     };
     let skip_failed = notices.fix();
-    let outcome = multistart::optimize(
-        list,
-        Some(&mut local),
-        &moving_scales,
-        &mut problem,
-        &mut multistart::Silent,
-        warnings,
+    let mode = notices.mode();
+    let n = list.len();
+    let search = Search {
+        metric: &metric,
+        transform: &affine,
+        list: &list,
+        scales: &moving_scales,
+        iterations,
         skip_failed,
-    )
-    .map_err(AiError::Uncaught)?;
-    warnings.append(&mut problem.warnings);
-    crash_after_failure(&outcome)?;
-    let best = best_start_point(&outcome, notices, skip_failed)?;
+    };
+    let (best_index, best) = search.run(notices.fix(), mode, notices, warnings)?;
+    // ITK-21 (corrected by default): the search again the other way, to say whether the
+    // correction changed the result. Only a local optimization has a learning rate, and only
+    // a second start point can inherit one.
+    if iterations > 0 && n > 1 {
+        let mut scratch = Notices::new(mode);
+        let other = search.run(!notices.fix(), mode, &mut scratch, &mut Vec::new());
+        if let Some(detail) = itk_21_detail(notices.fix(), n, best_index, &best, &other) {
+            notices.add(&defects::ITK_21, detail);
+        }
+    }
     let mut out = LinearXfm::<f64, D>::new(Kind::Affine);
     out.set_center(init.center);
     out.set_parameters(&best).map_err(AiError::Uncaught)?;
     Ok(out)
+}
+
+/// The search's multi-start optimization, run on a fresh problem each time.
+struct Search<'s, const D: usize> {
+    metric: &'s ImageMetricv4<f64, D>,
+    /// The search transform (centred at the fixed image's centre of mass).
+    transform: &'s LinearXfm<f64, D>,
+    list: &'s [Vec<f64>],
+    scales: &'s [f64],
+    iterations: usize,
+    skip_failed: bool,
+}
+
+impl<const D: usize> Search<'_, D> {
+    /// The best start point (its index, its parameters), each start point's local
+    /// optimization beginning at the configured learning rate (`restart`, ITK-21 corrected)
+    /// or at the rate the previous one left (ITK).
+    fn run(
+        &self,
+        restart: bool,
+        mode: larmorx_core::defects::UpstreamDefects,
+        notices: &mut Notices,
+        warnings: &mut Vec<String>,
+    ) -> Result<(usize, Vec<f64>), AiError> {
+        let floor = IndexFloor::new(mode);
+        let mut problem = LevelProblem::single(
+            self.metric.clone(),
+            MetricKind::Mattes { bins: 32 },
+            Composite::new(vec![Xfm::Linear(self.transform.clone())]),
+            &floor,
+        )
+        .map_err(AiError::Uncaught)?;
+        let mut local = ConjugateGradientLineSearch {
+            learning_rate: LOCAL_LEARNING_RATE,
+            maximum_step_size: LOCAL_LEARNING_RATE,
+            number_of_iterations: self.iterations,
+            minimum_convergence_value: 1e-6,
+            convergence_window_size: 5,
+            lower_limit: 0.0,
+            upper_limit: 2.0,
+            epsilon: 0.1,
+            maximum_line_search_iterations: 10,
+            weights: Vec::new(),
+            estimate_learning_rate_at_each_iteration: false,
+            estimate_learning_rate_once: true,
+            scales: Some(self.scales.to_vec()),
+        };
+        // `if (localSearchIterations > 0) SetLocalOptimizer(localoptimizer)`.
+        let local = (self.iterations > 0).then_some(&mut local);
+        let outcome = multistart::optimize(
+            self.list.to_vec(),
+            local,
+            self.scales,
+            &mut problem,
+            &mut multistart::Silent,
+            warnings,
+            multistart::Corrections {
+                skip_failed: self.skip_failed,
+                restart_learning_rate: restart,
+            },
+        )
+        .map_err(AiError::Uncaught)?;
+        warnings.append(&mut problem.warnings);
+        crash_after_failure(&outcome)?;
+        let best = best_start_point(&outcome, notices, self.skip_failed)?;
+        Ok((outcome.best_index, best))
+    }
+}
+
+/// ITK-21's notice, when the learning rate's carry-over changes the result: `fix` (the search
+/// ran with each start point at the configured rate and `other` with ITK's carry-over) or not
+/// (the other way round). `n` start points; `best_index` and `best` are the result given.
+fn itk_21_detail(
+    fix: bool,
+    n: usize,
+    best_index: usize,
+    best: &[f64],
+    other: &Result<(usize, Vec<f64>), AiError>,
+) -> Option<String> {
+    let (this_way, other_way) = if fix {
+        (
+            "each start point began its local search at the learning rate 0.1",
+            "with ITK's rate carried over from the previous start point",
+        )
+    } else {
+        (
+            "each start point began its local search at the learning rate the previous one left, as in ITK",
+            "each at the learning rate 0.1",
+        )
+    };
+    let chosen = format!("start point {} of {n} chosen", best_index + 1);
+    match other {
+        Ok((j, p)) => {
+            if p.len() == best.len() && p.iter().zip(best).all(|(a, b)| a.to_bits() == b.to_bits())
+            {
+                return None;
+            }
+            if *j != best_index {
+                Some(format!(
+                    "{this_way}: {chosen}; {other_way}, start point {}",
+                    j + 1
+                ))
+            } else {
+                let d = p
+                    .iter()
+                    .zip(best)
+                    .map(|(a, b)| (a - b).abs())
+                    .fold(0.0f64, f64::max);
+                Some(format!(
+                    "{this_way}: {chosen}, as {other_way}, but its local search ends elsewhere (parameters up to {} apart)",
+                    OStream::default().float(d)
+                ))
+            }
+        }
+        Err(e) => Some(format!(
+            "{this_way}: {chosen}; {other_way}, the search fails ({})",
+            match e {
+                AiError::Refused(m) => m.clone(),
+                AiError::Uncaught(e) => e.description.trim_end().to_string(),
+                AiError::Terminated(t) => t.trim_end().to_string(),
+                AiError::Exit(c) => format!("exit {c}"),
+            }
+        )),
+    }
 }

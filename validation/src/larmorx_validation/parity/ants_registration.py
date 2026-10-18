@@ -44,7 +44,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.parity import ants_inputs, defects
+from larmorx_validation.parity import ants_inputs, ants_point_sets, defects
 from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
@@ -59,6 +59,8 @@ from larmorx_validation.parity.harness import (
 
 PROGRAM = "antsRegistration"
 SEED = "42"
+#: How long a case whose ANTs never finishes runs before it is stopped.
+HANG_SECONDS = 30
 LX_THREADS = 4
 BAND_THREADS = (2, 4, 8)
 _TIERS = ("smoke", "standard", "full")
@@ -73,10 +75,12 @@ class RegCase:
 
     ``args`` use placeholders: ``{out}`` the program's output directory, ``{gen:name}`` a
     generated input, ``{in:path}`` a ``larmorx-testdata`` file, ``{oracle:run/path}`` a file of
-    an fMRIPrep oracle run, ``{missing:name}`` a file that does not exist. ``expect`` is
-    ``"pass"``, ``"error"`` (both fail) or ``"divergence"`` (a documented difference,
-    ``reason``). ``seed`` is ``ANTS_RANDOM_SEED`` (``None``: unset). ``band`` runs ANTs' thread
-    band.
+    an fMRIPrep oracle run, ``{missing:name}`` a file that does not exist, ``{gen-points:name}``
+    a point-set file (:mod:`ants_point_sets`). ``expect`` is ``"pass"``, ``"error"`` (both
+    fail), ``"crash"`` (ANTs crashes or aborts: everything it printed before must match, and
+    larmorx exits 1 with a message), ``"hang"`` (ANTs never finishes: larmorx refuses) or
+    ``"divergence"`` (a documented difference, ``reason``). ``seed`` is ``ANTS_RANDOM_SEED``
+    (``None``: unset). ``band`` runs ANTs' thread band.
     """
 
     id: str
@@ -837,6 +841,7 @@ def all_cases() -> list[RegCase]:
         ),
     ]
     cases += _message_cases()
+    cases += _point_set_cases()
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -959,18 +964,6 @@ def _message_cases() -> list[RegCase]:
         ok("sampling-above-1", "a sampling percentage of 1.5", *base[:6], "-v", "-m", f"Mattes[{F},{M},1,32,Regular,1.5]", *base[8:]),
         err("missing-initial", "-r a transform file that does not exist", *base, "-v", "-r", "{missing:none.mat}"),
         err(
-            "point-set-metric",
-            "an ICP stage (a point-set metric)",
-            *base[:6],
-            "-v",
-            "-m",
-            f"ICP[{F},{M},1,1]",
-            *base[8:],
-            expect="divergence",
-            reason="larmorx does not port ANTs' point-set metrics (ICP, PSE, JHCT, IGDM) yet and "
-            "refuses them with a message",
-        ),
-        err(
             "minc",
             "--minc 1: MINC transform files",
             *base,
@@ -981,6 +974,139 @@ def _message_cases() -> list[RegCase]:
             reason="the oracle has no MINC transform IO (it prints ITK's error and exits 0); "
             "larmorx refuses MINC transform files with a message",
         ),
+    ]  # fmt: skip
+
+
+# ------------------------------------------------------------------------------------------------
+# Point-set metrics (A4 part 4)
+
+PSF, PSM = "{gen:ps-labels-fixed}", "{gen:ps-labels-moving}"
+PSK, PSKM = "{gen:ps-mask}", "{gen:ps-mask-moving}"
+PSI, PSIM = "{gen:ps-intensity-fixed}", "{gen:ps-intensity-moving}"
+
+
+def _ps(
+    case_id: str,
+    description: str,
+    *metrics: str,
+    t: str = "Rigid[0.1]",
+    c: str = "5",
+    f: str = "1",
+    s: str = "0",
+    mask: str | None = PSK,
+    d: str = "3",
+    extra: tuple[str, ...] = (),
+    out: str = PRE,
+    **kw,
+) -> RegCase:
+    args: list[str] = ["-t", t]
+    for m in metrics:
+        args += ["-m", m]
+    args += ["-c", c, "-f", f, "-s", s]
+    if mask is not None:
+        args += ["-x", mask]
+    return reg(
+        f"point-sets/{case_id}", "point-sets", description, *args, *extra, d=d, out=out, **kw
+    )
+
+
+def _point_set_cases() -> list[RegCase]:
+    icp = f"ICP[{PSF},{PSM},1]"
+    txt = "{gen-points:fixed.txt}"
+    mtxt = "{gen-points:moving.txt}"
+    igdm = f"IGDM[{PSI},{PSIM},1,{PSK},{PSKM}]"
+    head_mattes = f"Mattes[{PSI},{PSIM},1,32]"
+    crash = "crash"
+    F2D, M2D, K2D = "{gen:ps-labels-fixed-2d}", "{gen:ps-labels-moving-2d}", "{gen:ps-mask-2d}"
+    return [
+        _ps("icp", "ICP between two label images, the fixed mask as the virtual domain", icp, tier="smoke", band=True),
+        _ps("icp-affine-two-levels", "ICP, Affine, two levels (shrink 2x1, smoothing ignored)", icp, t="Affine[0.1]", c="5x5", f="2x1", s="1x0"),
+        _ps("icp-float", "ICP with --float 1", icp, extra=("--float", "1")),
+        _ps("icp-text", "ICP between text point sets (a final newline: ANTs reads one more record, ANTS-62)", f"ICP[{txt},{mtxt},1]"),
+        _ps("icp-text-no-final-newline", "A text point set without a final newline", f"ICP[{{gen-points:fixed-no-final-newline.txt}},{mtxt},1]"),
+        _ps("icp-vtk", "ICP between ASCII VTK point sets", "ICP[{gen-points:fixed.vtk},{gen-points:moving.vtk},1]"),
+        _ps("icp-vtk-binary", "A binary VTK point set: its labels read past one value (ANTS-63)", "ICP[{gen-points:fixed-binary.vtk},{gen-points:moving.vtk},1]"),
+        _ps("icp-vtk-no-scalars", "A VTK point set without labels: label 0 for every point", "ICP[{gen-points:fixed-no-scalars.vtk},{gen-points:moving.vtk},1]"),
+        _ps("icp-boundary", "ICP on the labels' contours (boundaryPointsOnly)", f"ICP[{PSF},{PSM},1,1,1]"),
+        _ps("icp-not-bijective", "A label only the fixed set has: ITK throws, the stage is dropped (ITK-22)", f"ICP[{PSF},{{gen:ps-labels-moving-partial}},1]"),
+        _ps("icp-empty", "An empty fixed point set: the scales estimator throws", f"ICP[{{gen:ps-labels-zero}},{PSM},1]"),
+        _ps(
+            "icp-sampled",
+            "ICP on half of each point set (a sampling percentage of 0.5)",
+            f"ICP[{PSF},{PSM},1,0.5]",
+            expect="divergence",
+            reason="ANTs draws the points of a sampling percentage below 1 with a generator seeded from the clock (ANTS-64): two runs differ; larmorx seeds it from the registration's seed",
+        ),
+        _ps("icp-2d", "ICP in 2D", f"ICP[{F2D},{M2D},1]", mask=K2D, d="2"),
+        _ps("icp-4d", "ICP in 4D, Affine", "ICP[{gen:ps-labels-fixed-4d},{gen:ps-labels-moving-4d},1]", t="Affine[0.1]", c="3", mask="{gen:ps-mask-4d}", d="4"),
+        _ps("icp-fixed-initial", "ICP with an initial fixed transform (-q)", icp, extra=("-q", "{gen-transform:initial.mat}")),
+        _ps("icp-moving-initial", "ICP with an initial moving transform (-r)", icp, extra=("-r", "{gen-transform:initial.mat}")),
+        _ps("icp-images-initial", "ICP with -r [fixed,moving,1] from intensity images", icp, extra=("-r", f"[{PSI},{PSIM},1]")),
+        _ps("icp-same-sets", "ICP of a point set with itself", f"ICP[{PSF},{PSF},1]"),
+        _ps("pse", "PSE (sigma 1, 50 neighbours)", f"PSE[{PSF},{PSM},1,1,0,1,50]", band=True),
+        _ps("pse-boundary", "PSE on the contours, 20 neighbours", f"PSE[{PSF},{PSM},1,1,1,1,20]"),
+        _ps("pse-many-neighbours", "PSE asking for more neighbours than a label has (ITK's warning at every call)", f"PSE[{PSF},{PSM},1,1,0,1,500]", tier="full"),
+        _ps("pse-sigma-zero", "PSE with a point-set sigma of 0: ITK throws", f"PSE[{PSF},{PSM},1,1,0,0,50]"),
+        _ps("pse-text-2d", "PSE between 2D text point sets", "PSE[{gen-points:fixed-2d.txt},{gen-points:moving-2d.txt},1,1,0,1,10]", mask=K2D, d="2"),
+        _ps("jhct", "JHCT with anisotropic covariances (sigma 1, alpha 1.1)", f"JHCT[{PSF},{PSM},1,1,0,1,50,1.1,1]", band=True),
+        _ps("jhct-isotropic", "JHCT with isotropic covariances (sigma 1: ITK's univariate prefactor, ITK-23)", f"JHCT[{PSF},{PSM},1,1,0,1,50,1.1,0]"),
+        _ps("jhct-alpha-1", "JHCT with alpha 1 (the logarithm)", f"JHCT[{PSF},{PSM},1,1,0,1,50,1,0]"),
+        _ps("jhct-alpha-2", "JHCT with alpha 2", f"JHCT[{PSF},{PSM},1,1,0,1,50,2,0]"),
+        _ps("jhct-sigma-2", "JHCT with a point-set sigma of 2", f"JHCT[{PSF},{PSM},1,1,0,2,50,1.1,0]"),
+        _ps("jhct-anisotropic-sigma-2", "JHCT, anisotropic, sigma 2, alpha 1.5", f"JHCT[{PSF},{PSM},1,1,0,2,50,1.5,1]"),
+        _ps("jhct-text", "JHCT between text point sets (fewer points than neighbours: ITK's warnings)", f"JHCT[{txt},{mtxt},1,1,0,1,50,1.1,1]"),
+        _ps("jhct-2d", "JHCT in 2D", f"JHCT[{F2D},{M2D},1,1,0,1,20,1.1,1]", mask=K2D, d="2"),
+        _ps("igdm", "IGDM between masked intensity images (sigmas estimated)", igdm, band=True),
+        _ps("igdm-sigmas", "IGDM with given sigmas", f"IGDM[{PSI},{PSIM},1,{PSK},{PSKM},0x0x0,50,5,1,2]"),
+        _ps("igdm-fixed-initial", "IGDM with an initial fixed transform", igdm, extra=("-q", "{gen-transform:initial.mat}")),
+        _ps(
+            "igdm-neighbourhood",
+            "IGDM with a neighbourhood of radius 1",
+            f"IGDM[{PSI},{PSIM},1,{PSK},{PSKM},1x1x1]",
+            expect="divergence",
+            reason="ANTs' line search computes IGDM's centre index from a negative number and reads memory before the intensity arrays (ANTS-66, undefined); larmorx takes the two intensities as equal",
+        ),
+        _ps(
+            "igdm-2d",
+            "IGDM in 2D, radius 1",
+            "IGDM[{gen:ps-intensity-fixed-2d},{gen:ps-intensity-moving-2d},1,{gen:ps-mask-2d},{gen:ps-mask-moving-2d},1x1]",
+            mask=K2D,
+            d="2",
+            expect="divergence",
+            reason="ANTs reads memory before IGDM's intensity arrays for neighbourhoods of more than one voxel (ANTS-66)",
+        ),
+        _ps("igdm-2d-radius-0", "IGDM in 2D", "IGDM[{gen:ps-intensity-fixed-2d},{gen:ps-intensity-moving-2d},1,{gen:ps-mask-2d},{gen:ps-mask-moving-2d}]", mask=K2D, d="2"),
+        _ps("mattes-then-icp", "Mattes and ICP in one stage (the image metric's virtual domain)", head_mattes, icp),
+        _ps("icp-then-mattes", "ICP and Mattes in one stage, weights 0.5 and 2", f"ICP[{PSF},{PSM},0.5]", f"Mattes[{PSI},{PSIM},2,32]"),
+        _ps("icp-then-mattes-regular", "ICP first: the stage takes ICP's sampling (none)", icp, f"Mattes[{PSI},{PSIM},1,32,Regular,0.5]"),
+        _ps("igdm-then-mattes", "IGDM and Mattes in one stage", igdm, head_mattes),
+        _ps("icp-then-igdm", "ICP and IGDM in one stage: IGDM gets no input, ITK throws (ANTS-61)", icp, igdm),
+        _ps("mattes-then-igdm", "Mattes and IGDM in one stage: IGDM gets no input (ANTS-61)", head_mattes, igdm),
+        reg(
+            "point-sets/icp-then-pse-stages",
+            "point-sets",
+            "Two stages: ICP (Rigid), then PSE (Affine)",
+            "-t", "Rigid[0.1]", "-m", icp, "-c", "3", "-f", "1", "-s", "0",
+            "-t", "Affine[0.1]", "-m", f"PSE[{PSF},{PSM},1,1,0,1,20]", "-c", "3", "-f", "1", "-s", "0",
+            "-x", PSK,
+            out=PRE,
+        ),
+        _ps("mattes-and-icp-warped", "Mattes first, then ICP: the warped images of the image metric", head_mattes, icp, out=f"[{PRE},{{out}}/w.nii.gz,{{out}}/iw.nii.gz]"),
+        # Failures.
+        _ps("igdm-few-parameters", "IGDM with three parameters", f"IGDM[{PSI},{PSIM},1]", expect="error"),
+        _ps("igdm-radius-dimension", "IGDM with a 2D radius in 3D", f"IGDM[{PSI},{PSIM},1,{PSK},{PSKM},1x1]", expect="error"),
+        _ps("icp-percentage-above-1", "A sampling percentage of 1.5", f"ICP[{PSF},{PSM},1,1.5]", expect="error"),
+        _ps("icp-no-mask", "Point-set metrics without a fixed mask: no virtual domain", icp, mask=None, expect=crash),
+        _ps("icp-missing", "A point set that does not exist", "ICP[{missing:none.nii.gz},{gen:ps-labels-moving},1]", expect=crash),
+        _ps("icp-short-name", "A point set named with fewer than 3 characters", f"ICP[ab,{PSM},1]", expect=crash),
+        _ps("icp-unreadable", "A point set no reader takes (ITK's image reader throws)", "ICP[{gen-points:points.csv},{gen-points:moving.txt},1]", expect=crash),
+        _ps("icp-vtk-no-points", "A VTK file without POINTS: libstdc++'s out_of_range", "ICP[{gen-points:no-points.vtk},{gen-points:moving.vtk},1]", expect=crash),
+        _ps("igdm-missing-mask", "An IGDM mask that does not exist", f"IGDM[{PSI},{PSIM},1,{{missing:none.nii.gz}},{PSKM}]", expect=crash),
+        _ps("icp-warped", "Warped images with a point-set metric first", icp, out=f"[{PRE},{{out}}/w.nii.gz]", expect=crash),
+        _ps("icp-print-similarity", "--print-similarity-measure-interval with a point-set metric first", icp, extra=("--print-similarity-measure-interval", "1"), expect=crash),
+        _ps("icp-interval-volumes", "--write-interval-volumes with a point-set metric first", icp, extra=("--write-interval-volumes", "1"), expect=crash),
+        _ps("mattes-regular-then-icp", "Regular sampling with a point-set metric in the stage", f"Mattes[{PSI},{PSIM},1,32,Regular,0.5]", icp, expect=crash),
+        _ps("icp-text-garbage", "A text point set with a word among its numbers: ANTs' reader loops forever", "ICP[{gen-points:garbage.txt},{gen-points:moving.txt},1]", expect="hang", tier="full"),
     ]  # fmt: skip
 
 
@@ -1396,13 +1522,20 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
             return str(td.get(key[3:]))
         if key.startswith("missing:"):
             return str(tmp / key[8:])
+        if key.startswith("gen-points:"):
+            return str(ants_point_sets.write_points(key[11:], tmp))
         raise KeyError(f"unknown placeholder {{{key}}}")
 
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args]
 
 
 def _run_ants(
-    args: list[str], seed: str | None, threads: int = 1, *, correctly_rounded: bool = False
+    args: list[str],
+    seed: str | None,
+    threads: int = 1,
+    *,
+    correctly_rounded: bool = False,
+    timeout: float = 7200,
 ):
     b = ants_bin()
     if b is None or not (b / PROGRAM).is_file():
@@ -1416,15 +1549,18 @@ def _run_ants(
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    p = subprocess.run(
-        [str(b / PROGRAM), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        timeout=7200,
-    )
+    try:
+        p = subprocess.run(
+            [str(b / PROGRAM), *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "", ""
     return p.returncode, p.stdout, p.stderr
 
 
@@ -1461,13 +1597,18 @@ def _normalise(text: str, out: Path) -> list[str]:
     for line in text.replace(str(out), "{out}").splitlines():
         line = re.sub(r"\(0x[0-9a-f]+\)", "(0x)", line)
         line = re.sub(r"(Pointer|ImportImageContainer) (0x)?[0-9a-f]+", r"\1 0x", line)
-        line = re.sub(r"Pointer: 0x[0-9a-f]+", "Pointer: 0x", line)
+        line = re.sub(r"(Pointer|pointer): 0x[0-9a-f]+", r"\1: 0x", line)
         line = re.sub(
             r"(Modified Time|UpdateMTime|PipelineMTime|Reference Count): \d+", r"\1: N", line
         )
         line = re.sub(
-            r"File: (?:<ITK source>|\S*?)/(Modules|Utilities|Examples|ImageRegistration)/",
+            r"File: (?:<ITK source>|\S*?)/(Modules|Utilities|Examples|ImageRegistration|Temporary)/",
             r"File: \1/",
+            line,
+        )
+        line = re.sub(
+            r"WARNING: In \S*?/(Modules|Utilities|Examples|ImageRegistration|Temporary)/",
+            r"WARNING: In \1/",
             line,
         )
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
@@ -1591,8 +1732,52 @@ def run_case(case: Case, checks: CheckList) -> None:
         a_dir.mkdir()
         l_dir.mkdir()
         a_args, l_args = _resolve(c, a_dir, tmp), _resolve(c, l_dir, tmp)
-        ants = _run_ants(a_args, c.seed)
+        ants = _run_ants(a_args, c.seed, timeout=HANG_SECONDS if c.expect == "hang" else 7200)
         lx = _run_larmorx(l_args, c.seed)
+        if c.expect == "hang":
+            checks(
+                "ANTs does not finish",
+                ants[0] is None,
+                detail=f"ANTs {'still running' if ants[0] is None else f'exit {ants[0]}'} after {HANG_SECONDS} s",
+            )
+            last = (lx[2].strip().splitlines() or [""])[-1]
+            checks(
+                "larmorx refuses (exit 1)",
+                lx[0] == 1 and last.startswith("larmorx: "),
+                detail=f"exit {lx[0]}: {last[:160]}",
+            )
+            raise Outcome(EXPECTED, "ANTs never finishes (class (a)); larmorx refuses")
+        if c.expect == "crash":
+            crashed = ants[0] is not None and ants[0] < 0
+            checks(
+                "ANTs crashes or aborts, larmorx exits 1",
+                crashed and lx[0] == 1,
+                detail=f"ANTs {ants[0]} (a signal), larmorx {lx[0]}",
+            )
+            oa, ol = _normalise(ants[1], a_dir), _normalise(lx[1], l_dir)
+            checks(
+                "standard output up to the crash",
+                oa == ol,
+                detail="identical" if oa == ol else _first_difference(oa, ol),
+            )
+            ea = _normalise(ants[2], a_dir)
+            el = [x for x in _normalise(lx[2], l_dir) if not x.startswith("larmorx: ")]
+            checks(
+                "standard error up to the crash",
+                ea == el,
+                detail="identical" if ea == el else _first_difference(ea, el),
+            )
+            fa, fl = _outputs(a_dir), _outputs(l_dir)
+            checks(
+                "files written before the crash",
+                sorted(fa) == sorted(fl),
+                detail=f"ANTs {sorted(fa)}, larmorx {sorted(fl)}",
+            )
+            for name in sorted(set(fa) & set(fl)):
+                same, why = _same_file(fa[name], fl[name])
+                checks(f"{name} (before the crash)", same, detail="identical" if same else why)
+            last = (lx[2].strip().splitlines() or [""])[-1]
+            raise Outcome(BOTH_ERROR, last[:200])
         if c.expect == "divergence":
             checks(
                 "larmorx: exit status and message",
@@ -1664,8 +1849,14 @@ def run_case(case: Case, checks: CheckList) -> None:
         pa, pb = _parameters(l_dir), _parameters(f_dir)
         if pa is not None and pb is not None and pa.shape == pb.shape:
             change = defects.Change.of(pb, pa)
+        # ANTS-62's extra record repeats the last point: in a moving point set it may change
+        # no nearest neighbour.
         defects.add_fix_check(
-            checks, defects.notices_in(fx[2]), change, other_changes="; ".join(other)
+            checks,
+            defects.notices_in(fx[2]),
+            change,
+            other_changes="; ".join(other),
+            silent_ok=("ANTS-62",),
         )
 
 

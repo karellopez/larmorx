@@ -54,6 +54,8 @@ from larmorx.ants.morphology import (
 from larmorx.ants.n4 import N4Iteration, N4Result, n4_bias_field_correction
 from larmorx.ants.registration import (
     AlignCenters,
+    IntensityPointSetMetric,
+    PointSetMetric,
     RegistrationError,
     RegistrationIteration,
     RegistrationMetric,
@@ -79,9 +81,11 @@ __all__ = [
     "AlignCenters",
     "DenoiseResult",
     "ImageMathError",
+    "IntensityPointSetMetric",
     "N4Iteration",
     "N4Result",
     "OtsuResult",
+    "PointSetMetric",
     "RegistrationError",
     "RegistrationIteration",
     "RegistrationMetric",

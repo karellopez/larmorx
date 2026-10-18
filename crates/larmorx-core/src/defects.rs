@@ -208,6 +208,16 @@ defects! {
         "a translation search grid with fewer extents than dimensions is read past the end of its vector";
     ANTS_56 = "ANTS-56", "antsAffineInitializer", true,
         "a dimension other than 2, 3 or 4 runs as 2D";
+    ANTS_61 = "ANTS-61", "antsRegistration", true,
+        "a stage that combines IGDM with ICP, PSE or JHCT, or lists it after an image metric, registers only one kind of point set: ITK finds fewer inputs than metrics and throws (the stage is dropped), or crashes";
+    ANTS_62 = "ANTS-62", "antsRegistration", true,
+        "a text point set that ends with a newline gets one more point from uninitialised variables (in the oracle's build, a copy of the last point)";
+    ANTS_63 = "ANTS-63", "antsRegistration", true,
+        "a binary VTK point set's labels are read only as far as one point's components: the other labels are uninitialised memory";
+    ANTS_65 = "ANTS-65", "antsRegistration", true,
+        "IGDM's estimated intensity sigma ignores both point sets' minima (they are never updated) and subtracts the moving maximum: it is the difference of the two maxima, or the larger maximum";
+    ANTS_66 = "ANTS-66", "antsRegistration", true,
+        "IGDM's value (the line search's) computes the neighbourhood's centre from a negative number for neighbourhoods of more than one voxel and reads memory before the intensity arrays";
     ITK_01 = "ITK-01", "ITK", true,
         "Math::Floor gives 0 instead of -1 for negative values closer to 0 than 2^-26 (float) or 2^-55 (double)";
     ITK_02 = "ITK-02", "ITK", true,
@@ -220,6 +230,16 @@ defects! {
         "the Mattes metric refuses its joint histogram's spacing when the analysis region has one intensity or none, and is then left without the histogram's buffer: the next evaluation of the metric crashes";
     ITK_21 = "ITK-21", "ITK", true,
         "MultiStartOptimizerv4 without a scales estimator (antsAffineInitializer) starts each start point's local optimization at the learning rate the previous start point's line search left, so each start point's result depends on the one before it";
+    ITK_22 = "ITK-22", "ITK", true,
+        "LabeledPointSetToPointSetMetricv4 throws 'Label not found in common label set' for a fixed point whose label the moving set lacks (after warning that the label sets are not bijective)";
+    ITK_23 = "ITK-23", "ITK", true,
+        "GaussianMembershipFunction keeps the univariate prefactor 1/sqrt(2 pi) when its covariance is set to the identity, in any dimension (JHCT with a point-set sigma of 1)";
+    ITK_25 = "ITK-25", "ITK", true,
+        "ManifoldParzenWindowsPointSetFunction reads past the end of its list of neighbours when a point set has fewer points than the covariance neighbourhood";
+    ITK_26 = "ITK-26", "ITK", true,
+        "ManifoldParzenWindowsPointSetFunction adds each product to a local covariance's diagonal twice";
+    ITK_28 = "ITK-28", "ITK", true,
+        "JHCT tests alpha = 1 with != for its prefactor and with AlmostEquals for its value: an alpha within 4 ulps of 1 takes the logarithm and divides by alpha - 1";
     ITK_03 = "ITK-03", "ITK", true,
         "components relabelled in a float image stop getting new labels at 2^24";
     ITK_08 = "ITK-08", "nifti_clib", true,

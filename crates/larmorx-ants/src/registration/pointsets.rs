@@ -344,7 +344,7 @@ fn read_vtk<const D: usize>(
                     data[k] = i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
                 }
             }
-            if !fix && values > components {
+            if values > components {
                 notes.vtk_binary_scalars = Some(components);
             }
             if components == 1 {

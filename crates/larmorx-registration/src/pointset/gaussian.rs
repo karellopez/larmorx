@@ -46,16 +46,18 @@ impl<const D: usize> Gaussian<D> {
         }
     }
 
-    /// `SetCovariance(cov)`. `ITK-23` corrected (`normalise_identity`): an identity covariance
-    /// gets the `D`-dimensional prefactor like any other; ITK returns early and keeps the
+    /// `SetCovariance(cov)`; `true` when `cov` is the covariance the Gaussian has (a new
+    /// Gaussian's identity). `ITK-23` corrected (`normalise_identity`): it is set like any
+    /// other, and gets the `D`-dimensional prefactor; ITK returns early and keeps the
     /// univariate one.
     pub fn set_covariance(
         &mut self,
         cov: [[f64; D]; D],
         normalise_identity: bool,
-    ) -> Result<(), ItkException> {
-        if self.covariance == cov && !normalise_identity {
-            return Ok(());
+    ) -> Result<bool, ItkException> {
+        let same = self.covariance == cov;
+        if same && !normalise_identity {
+            return Ok(true);
         }
         self.covariance = cov;
         let flat: Vec<f64> = cov.iter().flatten().copied().collect();
@@ -121,7 +123,7 @@ impl<const D: usize> Gaussian<D> {
             self.inverse_covariance = inv;
             self.prefactor = 1.0;
         }
-        Ok(())
+        Ok(same)
     }
 
     /// `Evaluate(measurement)`: `prefactor · exp(−½ (y − μ)ᵀ Σ⁻¹ (y − μ))`, the differences of
@@ -162,6 +164,20 @@ pub struct ParzenSettings<R> {
     pub normalize: bool,
     /// ITK-23 corrected: an identity covariance gets the `D`-dimensional prefactor.
     pub normalise_identity: bool,
+    /// ITK-26 corrected: each product enters the covariance's diagonal once.
+    pub single_diagonal: bool,
+}
+
+/// What building the density met (for larmorx's notices).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ParzenEvents {
+    /// A Gaussian's covariance was the identity (ITK-23).
+    pub identity: bool,
+    /// A local covariance was accumulated (ITK-26).
+    pub covariances: bool,
+    /// The covariance neighbourhood is larger than the point set: ITK reads past the end of
+    /// the list of neighbours (ITK-25); the missing neighbours are left out.
+    pub short_neighbourhood: bool,
 }
 
 /// `PointsLocator::FindClosestNPoints`' warning (one per call that asks for more neighbours
@@ -190,13 +206,13 @@ pub fn closest_n<const D: usize>(
 
 impl<const D: usize> ParzenWindows<D> {
     /// `SetInputPointSet(points)`. Where the covariance neighbourhood is larger than the
-    /// point set, ITK reads past the end of the list of neighbours (class (a)): the missing
-    /// neighbours are left out here, with `out_of_range` set.
+    /// point set, ITK reads past the end of the list of neighbours (class (a), ITK-25): the
+    /// missing neighbours are left out here.
     pub fn new<R: Real>(
         points: &[[f32; D]],
         s: &ParzenSettings<R>,
         warnings: &mut Vec<String>,
-        out_of_range: &mut bool,
+        events: &mut ParzenEvents,
     ) -> Result<Self, ItkException> {
         let n = points.len();
         let mut kernel_cov = identity::<D>();
@@ -206,7 +222,7 @@ impl<const D: usize> ParzenWindows<D> {
         let mut inputs = Vec::with_capacity(n);
         for p in points {
             let mut g = Gaussian::new(std::array::from_fn(|k| f64::from(p[k])));
-            g.set_covariance(kernel_cov, s.normalise_identity)?;
+            events.identity |= g.set_covariance(kernel_cov, s.normalise_identity)?;
             inputs.push(g);
         }
         if n == 0 {
@@ -233,7 +249,7 @@ impl<const D: usize> ParzenWindows<D> {
                 let mut cout = [[0.0f64; D]; D];
                 let neighbours = closest_n(&tree, point, s.covariance_k, warnings);
                 if neighbours.len() < s.covariance_k {
-                    *out_of_range = true;
+                    events.short_neighbourhood = true;
                 }
                 let mut denominator = CompensatedSum::default();
                 for &j in &neighbours {
@@ -242,13 +258,16 @@ impl<const D: usize> ParzenWindows<D> {
                         let kernel = R::from_f64(inputs[index].evaluate(neighbour));
                         denominator.add(kernel.to_f64());
                         if kernel > R::ZERO {
+                            events.covariances = true;
                             for m in 0..D {
                                 for q in m..D {
                                     let dm = R::from_f64(f64::from(neighbour[m] - point[m]));
                                     let dq = R::from_f64(f64::from(neighbour[q] - point[q]));
                                     let c = kernel * dm * dq;
                                     cout[m][q] += c.to_f64();
-                                    cout[q][m] += c.to_f64();
+                                    if q != m || !s.single_diagonal {
+                                        cout[q][m] += c.to_f64();
+                                    }
                                 }
                             }
                         }
@@ -273,13 +292,13 @@ impl<const D: usize> ParzenWindows<D> {
                 for m in 0..D {
                     cout[m][m] += sigma2.to_f64();
                 }
-                g.set_covariance(cout, s.normalise_identity)?;
+                events.identity |= g.set_covariance(cout, s.normalise_identity)?;
             } else {
                 let mut cov = identity::<D>();
                 for (r, row) in cov.iter_mut().enumerate() {
                     row[r] *= sigma2.to_f64();
                 }
-                g.set_covariance(cov, s.normalise_identity)?;
+                events.identity |= g.set_covariance(cov, s.normalise_identity)?;
             }
             gaussians.push(g);
         }

@@ -21,7 +21,8 @@ use larmorx_registration::method::{
     SamplingStrategy, Stage, StageMetric,
 };
 use larmorx_registration::pointset::{
-    IntensityPointSet, PointSetCorrections, PointSetInputs, PointSetMetric, PointSetMetricKind,
+    IntensityPointSet, PointSetCorrections, PointSetEvents, PointSetInputs, PointSetMetric,
+    PointSetMetricKind,
 };
 use larmorx_registration::optimizer::{ConjugateGradientLineSearch, IterationState, Observer};
 use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
@@ -448,8 +449,14 @@ pub fn point_set_print<const D: usize>(
     };
     let mut out = String::new();
     out.push_str("PointSet (0x0)\n");
+    // The demangled name keeps a blank between closing brackets.
+    let last = if pixel.ends_with('>') {
+        format!("{pixel} ")
+    } else {
+        pixel.to_owned()
+    };
     out.push_str(&format!(
-        "  RTTI typeinfo:   itk::PointSet<{pixel}, {D}u, itk::DefaultStaticMeshTraits<{pixel}, {D}u, {D}u, float, float, {pixel}> >\n"
+        "  RTTI typeinfo:   itk::PointSet<{pixel}, {D}u, itk::DefaultStaticMeshTraits<{pixel}, {D}u, {D}u, float, float, {last}> >\n"
     ));
     out.push_str("  Reference Count: 2\n  Modified Time: 0\n  Debug: Off\n  Object Name: \n");
     out.push_str("  Observers: \n    none\n  Source: (none)\n  Source output name: (none)\n");
@@ -927,7 +934,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             metric: PointSetMetric::new(
                                 kind,
                                 inputs,
-                                PointSetCorrections::default(),
+                                PointSetCorrections::all(self.upstream_defects.fix()),
                             ),
                             fixed_mask: fixed_mask.clone(),
                             weight: m.weighting,
@@ -1159,14 +1166,76 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 warnings: Vec::new(),
             };
             let mut warnings = Vec::new();
-            let result = method::run_stage(
-                &stage_spec,
-                output,
-                &mut optimizer,
-                &mut observer,
-                floor,
-                &mut warnings,
-            );
+            let mut events = PointSetEvents::default();
+            // ANTS-61: ANTs' registration method holds one kind of point set, the intensity
+            // sets when the stage's first metric is IGDM and the labelled ones otherwise; a
+            // point-set metric of the other kind gets no input.
+            let intensity_kind = stage_metrics[0].kind == Some(MetricKind::Igdm);
+            let wrong: Vec<bool> = stage_metrics
+                .iter()
+                .map(|m| {
+                    m.kind.is_some_and(|k| k.is_point_set())
+                        && ((m.kind == Some(MetricKind::Igdm)) != intensity_kind)
+                })
+                .collect();
+            let mut failed_early = None;
+            if wrong.iter().any(|&w| w) {
+                // A null input sets nothing: the inputs end at the last metric that has one.
+                let pairs = wrong.iter().rposition(|&w| !w).map_or(0, |i| i + 1);
+                let mismatch = pairs != stage_metrics.len();
+                if self.upstream_defects.fix() {
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ANTS_61,
+                            self.upstream_defects,
+                            format!(
+                                "stage {stage} runs with all its metrics; ANTs gives IGDM, or the labelled point sets, no input and {}",
+                                if mismatch {
+                                    "throws (the stage is dropped)"
+                                } else {
+                                    "crashes"
+                                }
+                            ),
+                        ),
+                    );
+                } else if mismatch {
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ANTS_61,
+                            self.upstream_defects,
+                            format!(
+                                "stage {stage}: a point-set metric without an input, ITK's exception, as in ANTs"
+                            ),
+                        ),
+                    );
+                    failed_early = Some(ItkException::new(
+                        "Modules/Registration/RegistrationMethodsv4/include/itkImageRegistrationMethodv4.hxx",
+                        306,
+                        "ImageRegistrationMethodv4",
+                        "Mismatch between number of image pairs and the number of metrics.",
+                    ));
+                } else {
+                    return Err(self.crash(
+                        log,
+                        "a stage that combines IGDM with ICP, PSE or JHCT, or lists it after an image metric: ANTs casts a point-set metric to the other kind's type",
+                    ));
+                }
+            }
+            let result = match failed_early {
+                Some(e) => Err(e),
+                None => method::run_stage(
+                    &stage_spec,
+                    output,
+                    &mut optimizer,
+                    &mut observer,
+                    floor,
+                    &mut warnings,
+                    &mut events,
+                ),
+            };
+            self.point_set_notices(&events);
             let observed = std::mem::take(&mut observer.warnings);
             for w in &warnings {
                 log.cerr(w);
@@ -1243,6 +1312,74 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 linear(Kind::Affine)
             }
             _ => None,
+        }
+    }
+
+    /// The D13 notices of what a stage's point-set metrics met.
+    fn point_set_notices(&mut self, e: &PointSetEvents) {
+        let mode = self.upstream_defects;
+        let fix = mode.fix();
+        let mut add = |d: &'static defects::Defect, fixed: &str, reproduced: &str| {
+            push_once(
+                &mut self.notices,
+                Notice::new(d, mode, if fix { fixed } else { reproduced }),
+            );
+        };
+        if e.uncommon_labels {
+            add(
+                &defects::ITK_22,
+                "fixed points of labels the moving point set lacks take no part; ITK throws 'Label not found in common label set' and the stage fails",
+                "a fixed point's label is not in the moving point set: ITK's exception, as in ANTs",
+            );
+        }
+        if e.identity_gaussians {
+            add(
+                &defects::ITK_23,
+                "JHCT's Gaussians of identity covariance have the D-dimensional prefactor; ITK keeps 1/sqrt(2 pi)",
+                "JHCT's Gaussians of identity covariance keep the univariate prefactor 1/sqrt(2 pi), as in ITK",
+            );
+        }
+        if e.short_neighbourhood {
+            add(
+                &defects::ITK_25,
+                "a label has fewer points than JHCT's covariance neighbourhood (5): the neighbours there are are used; ITK reads past the end of its list",
+                "a label has fewer points than JHCT's covariance neighbourhood (5): ITK reads past the end of its list (undefined); larmorx uses the neighbours there are",
+            );
+        }
+        if e.covariances {
+            add(
+                &defects::ITK_26,
+                "JHCT's local covariances count each diagonal product once; ITK counts it twice",
+                "JHCT's local covariances count each diagonal product twice, as in ITK",
+            );
+        }
+        if e.alpha_near_one {
+            add(
+                &defects::ITK_28,
+                "JHCT's alpha is within 4 ulps of 1: its value and prefactor both take it as 1; ITK's prefactor divides by alpha - 1",
+                "JHCT's alpha is within 4 ulps of 1: the logarithm and a prefactor divided by alpha - 1, as in ITK",
+            );
+        }
+        if let Some((ants, range)) = e.igdm_sigma {
+            let f = OStream::default();
+            let fixed = format!(
+                "IGDM's intensity sigma is the intensities' range, {}; ANTs estimates {}",
+                f.float(range),
+                f.float(ants)
+            );
+            let reproduced = format!(
+                "IGDM's intensity sigma is ANTs' estimate, {} (the intensities' range is {})",
+                f.float(ants),
+                f.float(range)
+            );
+            add(&defects::ANTS_65, &fixed, &reproduced);
+        }
+        if e.igdm_centre {
+            add(
+                &defects::ANTS_66,
+                "IGDM's value reads the neighbourhood's centre intensity; ANTs reads memory before the intensity arrays (a negative index)",
+                "IGDM's value: ANTs reads memory before the intensity arrays (undefined); larmorx takes the two intensities as equal",
+            );
         }
     }
 

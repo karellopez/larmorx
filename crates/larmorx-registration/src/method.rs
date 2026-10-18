@@ -22,7 +22,7 @@ use crate::metric::mattes::Mattes;
 use crate::metric::neighborhood_correlation::NeighborhoodCorrelation;
 use crate::metric::{ImageMetricv4, correlation, mean_squares, no_valid_points_warning};
 use crate::optimizer::{ConjugateGradientLineSearch, Observer, Outcome, Problem, scales};
-use crate::pointset::PointSetMetric;
+use crate::pointset::{PointSetEvents, PointSetMetric};
 use crate::rng::{MersenneTwister, RandomIterator};
 use crate::transform::{Composite, Xfm};
 use crate::{Image, ItkException, Real, Space};
@@ -581,6 +581,55 @@ pub fn run_stage<R: Real, const D: usize, O>(
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
+    events: &mut PointSetEvents,
+) -> Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>
+where
+    O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
+{
+    let result = run_levels(stage, output, optimizer, observer, floor, warnings);
+    for p in &result.1 {
+        events.merge(&p.events);
+    }
+    result.0
+}
+
+/// The levels of [`run_stage`]; also the stage's point-set metrics as they end.
+fn run_levels<R: Real, const D: usize, O>(
+    stage: &Stage<R, D>,
+    output: Xfm<R, D>,
+    optimizer: &mut ConjugateGradientLineSearch<R>,
+    observer: &mut O,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+) -> (
+    Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>,
+    Vec<Box<PointSetMetric<R, D>>>,
+)
+where
+    O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
+{
+    // The point-set metrics live through the stage (ITK keeps one metric object).
+    let mut point_sets: Vec<Option<Box<PointSetMetric<R, D>>>> = stage
+        .metrics
+        .iter()
+        .map(|m| match m {
+            StageMetric::PointSet(p) => Some(Box::new(p.metric.clone())),
+            StageMetric::Image(_) => None,
+        })
+        .collect();
+    let result = levels(stage, output, optimizer, observer, floor, warnings, &mut point_sets);
+    (result, point_sets.into_iter().flatten().collect())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn levels<R: Real, const D: usize, O>(
+    stage: &Stage<R, D>,
+    output: Xfm<R, D>,
+    optimizer: &mut ConjugateGradientLineSearch<R>,
+    observer: &mut O,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+    point_sets: &mut [Option<Box<PointSetMetric<R, D>>>],
 ) -> Result<(Xfm<R, D>, Vec<Outcome<R>>), ItkException>
 where
     O: for<'a> Observer<R, LevelProblem<'a, R, D>>,
@@ -605,15 +654,6 @@ where
     let multi = stage.metrics.len() > 1;
     // ObjectToObjectMultiMetricv4's weights, normalised to sum 1 at each Initialize.
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
-    // The point-set metrics live through the stage (ITK keeps one metric object).
-    let mut point_sets: Vec<Option<Box<PointSetMetric<R, D>>>> = stage
-        .metrics
-        .iter()
-        .map(|m| match m {
-            StageMetric::PointSet(p) => Some(Box::new(p.metric.clone())),
-            StageMetric::Image(_) => None,
-        })
-        .collect();
     let mut current_seed = stage.seed;
     let mut outcomes = Vec::new();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
@@ -751,14 +791,18 @@ where
                 })(),
                 (_, StageMetric::PointSet(_)) => {
                     let mut p = point_sets[j].take().expect("kept between levels");
-                    match p.initialize(
+                    let r = p.initialize(
                         Some(virtual_space.clone()),
                         stage.fixed_initial.as_ref(),
                         &moving,
                         &mut level_warnings,
-                    ) {
+                    );
+                    match r {
                         Ok(()) => Ok(LevelEntry::PointSet(p)),
-                        Err(e) => Err(e),
+                        Err(e) => {
+                            point_sets[j] = Some(p);
+                            Err(e)
+                        }
                     }
                 }
                 (None, StageMetric::Image(_)) => unreachable!("built above"),
@@ -767,6 +811,11 @@ where
                 Ok(entry) => entries.push(entry),
                 Err(e) => {
                     warnings.append(&mut level_warnings);
+                    for (k, entry) in entries.into_iter().enumerate() {
+                        if let LevelEntry::PointSet(p) = entry {
+                            point_sets[k] = Some(p);
+                        }
+                    }
                     if multi {
                         return Err(e.wrapped(
                             "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",

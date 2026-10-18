@@ -118,6 +118,9 @@ impl Real for f64 {
     }
     #[inline]
     fn powr(self, y: f64) -> f64 {
+        if std::env::var_os("LXPOW").is_some() {
+            return self.powf(y);
+        }
         libm::pow(self, y)
     }
     fn smooth(

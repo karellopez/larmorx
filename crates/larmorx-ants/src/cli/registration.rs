@@ -1489,6 +1489,26 @@ fn point_set_metric<R: Compute, const D: usize>(
         for w in &warnings {
             log.cerr(w);
         }
+        if notes.text_extra_record {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_62,
+                if fix {
+                    format!("'{file}' ends with a newline: no extra point; ANTs adds one from uninitialised variables")
+                } else {
+                    format!("'{file}' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninitialised variables")
+                },
+            );
+        }
+        if let Some(n) = notes.vtk_binary_scalars {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_63,
+                if fix {
+                    format!("every label of '{file}' read; ANTs reads only the first {n} and leaves the others uninitialised")
+                } else {
+                    format!("only the first {n} labels of '{file}' read, as in ANTs; the others, uninitialised there, read as 0")
+                },
+            );
+        }
         match read {
             Ok(r) => sets.push(Some(r)),
             Err(PointSetError::Null(msg)) => {

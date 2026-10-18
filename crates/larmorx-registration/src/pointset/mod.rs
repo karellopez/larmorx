@@ -11,6 +11,6 @@ pub mod kdtree;
 pub mod metric;
 
 pub use metric::{
-    FixedInverse, IntensityPointSet, LabeledPointSet, PointSetCorrections, PointSetInputs,
-    PointSetMetric, PointSetMetricKind, PointSetValue,
+    FixedInverse, IntensityPointSet, LabeledPointSet, PointSetCorrections, PointSetEvents,
+    PointSetInputs, PointSetMetric, PointSetMetricKind, PointSetValue,
 };

@@ -110,7 +110,73 @@ impl<R, const D: usize> PointSetInputs<R, D> {
 /// larmorx's corrections of ITK's and ANTs' point-set metrics (D13); `Default` is the
 /// originals' behaviour.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct PointSetCorrections {}
+pub struct PointSetCorrections {
+    /// ITK-22: a fixed point whose label the moving set lacks takes no part (ITK throws
+    /// "Label not found in common label set").
+    pub skip_uncommon_labels: bool,
+    /// ITK-23: a Gaussian whose covariance is the identity gets the `D`-dimensional
+    /// prefactor (ITK keeps the univariate `1/√(2π)`).
+    pub normalise_identity: bool,
+    /// ITK-26: each product enters a local covariance's diagonal once (ITK adds it twice).
+    pub single_diagonal: bool,
+    /// ITK-28: JHCT's prefactor and value test `α = 1` alike (`AlmostEquals`); ITK tests the
+    /// prefactor with `!=`.
+    pub alpha_test: bool,
+    /// ANTS-65: IGDM's estimated intensity sigma is the range of both point sets' centre
+    /// intensities.
+    pub igdm_intensity_range: bool,
+    /// ANTS-66: IGDM's value reads the neighbourhood's centre intensity as its derivative
+    /// does (ANTs computes a negative index for neighbourhoods of more than one voxel).
+    pub igdm_value_centre: bool,
+}
+
+impl PointSetCorrections {
+    /// Every correction on (`fix`) or off.
+    pub fn all(fix: bool) -> Self {
+        PointSetCorrections {
+            skip_uncommon_labels: fix,
+            normalise_identity: fix,
+            single_diagonal: fix,
+            alpha_test: fix,
+            igdm_intensity_range: fix,
+            igdm_value_centre: fix,
+        }
+    }
+}
+
+/// Where the originals' defects met this registration (for larmorx's notices).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PointSetEvents {
+    /// ITK-22: a fixed point inside the virtual domain has a label the moving set lacks.
+    pub uncommon_labels: bool,
+    /// ITK-23: a Gaussian's covariance was the identity.
+    pub identity_gaussians: bool,
+    /// ITK-26: a local covariance was accumulated.
+    pub covariances: bool,
+    /// ITK-28: `α` is within 4 ulps of 1 without being 1.
+    pub alpha_near_one: bool,
+    /// ITK-25: a label's points are fewer than the covariance neighbourhood.
+    pub short_neighbourhood: bool,
+    /// ANTS-65: the estimated intensity sigma, ANTs' and the range of the intensities.
+    pub igdm_sigma: Option<(f64, f64)>,
+    /// ANTS-66: IGDM's value with a neighbourhood of more than one voxel.
+    pub igdm_centre: bool,
+}
+
+impl PointSetEvents {
+    /// Both events together.
+    pub fn merge(&mut self, o: &PointSetEvents) {
+        self.uncommon_labels |= o.uncommon_labels;
+        self.identity_gaussians |= o.identity_gaussians;
+        self.covariances |= o.covariances;
+        self.alpha_near_one |= o.alpha_near_one;
+        self.short_neighbourhood |= o.short_neighbourhood;
+        self.igdm_centre |= o.igdm_centre;
+        if self.igdm_sigma.is_none() {
+            self.igdm_sigma = o.igdm_sigma;
+        }
+    }
+}
 
 /// `PointsLocator::Initialize()`'s exception for an empty point set.
 fn no_points() -> ItkException {
@@ -189,8 +255,9 @@ impl<R: Real, const D: usize> LabelMetric<R, D> {
     fn new(
         kind: &PointSetMetricKind<R>,
         moving: &[[f32; D]],
+        corrections: &PointSetCorrections,
+        events: &mut PointSetEvents,
         warnings: &mut Vec<String>,
-        out_of_range: &mut bool,
     ) -> Result<Self, ItkException> {
         Ok(match *kind {
             PointSetMetricKind::Icp => LabelMetric::Icp {
@@ -229,13 +296,27 @@ impl<R: Real, const D: usize> LabelMetric<R, D> {
                     evaluation_k: k,
                     anisotropic,
                     normalize: true,
-                    normalise_identity: false,
+                    normalise_identity: corrections.normalise_identity,
+                    single_diagonal: corrections.single_diagonal,
                 };
-                let density = ParzenWindows::new(moving, &settings, warnings, out_of_range)?;
+                let mut density_events = super::gaussian::ParzenEvents::default();
+                let density = ParzenWindows::new(moving, &settings, warnings, &mut density_events)?;
+                events.identity_gaussians |= density_events.identity;
+                events.covariances |= density_events.covariances;
+                events.short_neighbourhood |= density_events.short_neighbourhood;
                 // m_NumberOfValidPoints is 0 here: the clone never runs InitializeForIteration.
                 let total = R::from_i64(moving.len() as i64);
                 let mut prefactor0 = -R::ONE / total;
-                if alpha != R::ONE {
+                let near_one = almost_equals(alpha, R::ONE);
+                if alpha != R::ONE && near_one {
+                    events.alpha_near_one = true;
+                }
+                let one = if corrections.alpha_test {
+                    near_one
+                } else {
+                    alpha == R::ONE
+                };
+                if !one {
                     prefactor0 = prefactor0 / (alpha - R::ONE);
                 }
                 let prefactor1 = R::ONE / (total * total);
@@ -458,10 +539,8 @@ pub struct PointSetMetric<R, const D: usize> {
     labels: Vec<u32>,
     clones: Vec<LabelMetric<R, D>>,
     igdm: Option<Igdm<R, D>>,
-    /// Whether ITK read past the end of a list of neighbours (JHCT's covariance
-    /// neighbourhood larger than a label's point set; class (a), the missing neighbours left
-    /// out here).
-    pub read_past_neighbours: bool,
+    /// Where the originals' defects met this metric.
+    pub events: PointSetEvents,
 }
 
 /// What one evaluation gives.
@@ -486,7 +565,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             labels: Vec::new(),
             clones: Vec::new(),
             igdm: None,
-            read_past_neighbours: false,
+            events: PointSetEvents::default(),
         }
     }
 
@@ -587,7 +666,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                     ));
                 }
                 let mut clones = Vec::with_capacity(common.len());
-                let mut past = false;
+                let mut events = self.events;
                 for &label in &common {
                     let subset: Vec<[f32; D]> = m
                         .points
@@ -596,9 +675,15 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                         .filter(|(_, l)| **l == label)
                         .map(|(p, _)| *p)
                         .collect();
-                    clones.push(LabelMetric::new(&self.kind, &subset, warnings, &mut past)?);
+                    clones.push(LabelMetric::new(
+                        &self.kind,
+                        &subset,
+                        &self.corrections,
+                        &mut events,
+                        warnings,
+                    )?);
                 }
-                self.read_past_neighbours |= past;
+                self.events = events;
                 self.labels = common;
                 self.clones = clones;
             }
@@ -623,7 +708,16 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 let mut is = intensity_sigma;
                 let mut es = euclidean_sigma;
                 if is <= R::ZERO {
-                    is = estimate_intensity_sigma(fixed_set, moving_set);
+                    let ants = estimate_intensity_sigma(fixed_set, moving_set);
+                    let range = intensity_range_sigma(fixed_set, moving_set);
+                    if ants.to_f64().to_bits() != range.to_f64().to_bits() {
+                        self.events.igdm_sigma = Some((ants.to_f64(), range.to_f64()));
+                    }
+                    is = if self.corrections.igdm_intensity_range {
+                        range
+                    } else {
+                        ants
+                    };
                 }
                 if es <= R::ZERO {
                     es = estimate_euclidean_sigma(&fixed_t, &tree)?;
@@ -650,7 +744,19 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         if fixed_t.is_empty() || self.moving_points().is_empty() {
             return Err(no_points());
         }
-        let valid = virt.iter().filter(|p| self.inside(p)).count();
+        let mut valid = 0;
+        for (i, p) in virt.iter().enumerate() {
+            if !self.inside(p) {
+                continue;
+            }
+            if !self.label_common(i) {
+                self.events.uncommon_labels = true;
+                if self.corrections.skip_uncommon_labels {
+                    continue;
+                }
+            }
+            valid += 1;
+        }
         if valid < fixed_t.len() && !self.have_warned {
             warnings.push(format!(
                 "WARNING: In {BASE_FILE}, line 136\n{} (0x0): Only {valid} of {} points are within the virtual domain, and will be used in the evaluation.\n\n",
@@ -660,6 +766,24 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             self.have_warned = true;
         }
         Ok((virt, fixed_t, valid))
+    }
+
+    /// Whether fixed point `index` has a label of both sets (always, for IGDM).
+    fn label_common(&self, index: usize) -> bool {
+        match &self.inputs {
+            PointSetInputs::Labeled { fixed, .. } => {
+                let label = fixed.labels.as_ref().map_or(0, |l| l[index]);
+                self.labels.contains(&label)
+            }
+            PointSetInputs::Intensity { .. } => true,
+        }
+    }
+
+    /// Whether fixed point `index` takes part (inside the virtual domain, and with ITK-22
+    /// corrected, of a common label).
+    fn takes_part(&self, index: usize, virt: &[[f32; D]]) -> bool {
+        self.inside(&virt[index])
+            && (!self.corrections.skip_uncommon_labels || self.label_common(index))
     }
 
     /// `VerifyNumberOfValidPoints`'s warning.
@@ -694,7 +818,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, warnings)?;
         let mut thread = CompensatedSum::default();
         for index in 0..fixed_t.len() {
-            if !self.inside(&virt[index]) {
+            if !self.takes_part(index, &virt) {
                 continue;
             }
             let v = match &self.inputs {
@@ -702,7 +826,11 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                     self.label_metric(index, 95)?.value(&fixed_t[index], warnings)
                 }
                 PointSetInputs::Intensity { fixed, moving: m } => {
-                    self.igdm_value(&fixed_t[index], &fixed.data[index], m)?
+                    let pixel = &fixed.data[index];
+                    if pixel.len() / (1 + D) > 1 {
+                        self.events.igdm_centre = true;
+                    }
+                    self.igdm_value(&fixed_t[index], pixel, m)
                 }
             };
             thread.add(v.to_f64());
@@ -731,7 +859,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let mut jac = vec![R::ZERO; D * np];
         let mut local_transform = vec![R::ZERO; np];
         for index in 0..fixed_t.len() {
-            if !self.inside(&virt[index]) {
+            if !self.takes_part(index, &virt) {
                 continue;
             }
             let (v, local) = match &self.inputs {
@@ -786,13 +914,12 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         (id, &moving.data[id])
     }
 
-    /// `GetLocalNeighborhoodValue(point, pixel)` (ANTs' IGDM).
-    fn igdm_value(
-        &self,
-        point: &[f32; D],
-        pixel: &[R],
-        moving: &IntensityPointSet<R, D>,
-    ) -> Result<R, ItkException> {
+    /// `GetLocalNeighborhoodValue(point, pixel)` (ANTs' IGDM). For a neighbourhood of more
+    /// than one voxel ANTs computes the centre index from `−0.5·voxels` (a negative number
+    /// converted to an unsigned index, undefined) and reads memory before both intensity
+    /// arrays (ANTS-66): corrected, the centre as the derivative reads it; reproduced, the two
+    /// values read as equal (the intensity term 1).
+    fn igdm_value(&self, point: &[f32; D], pixel: &[R], moving: &IntensityPointSet<R, D>) -> R {
         let igdm = self.igdm.as_ref().expect("initialised");
         let (id, closest_pixel) = self.igdm_closest(point, moving);
         let closest = &moving.points[id];
@@ -800,23 +927,18 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let ratio = distance / igdm.euclidean_sigma;
         let distance_probability = (R::from_f64(-0.5) * (ratio * ratio)).exp();
         let voxels = pixel.len() / (1 + D);
-        // static_cast<SizeValueType>(-0.5 * voxels): 0 for one voxel; for more, a negative
-        // value converted to an unsigned index (undefined; ITK reads before the array).
-        let centre_f = R::from_f64(-0.5) * R::from_i64(voxels as i64);
-        let centre = if centre_f.to_f64() > -1.0 {
-            0
+        let intensity_distance = if voxels <= 1 {
+            // static_cast<SizeValueType>(-0.5): 0.
+            pixel[0] - closest_pixel[0]
+        } else if self.corrections.igdm_value_centre {
+            let centre = ((0.5 * voxels as f64) as usize) * (D + 1);
+            pixel[centre] - closest_pixel[centre]
         } else {
-            return Err(ItkException::new(
-                IGDM_FILE,
-                346,
-                "MeanSquaresPointSetToPointSetIntensityMetricv4",
-                "GetValue's centre index is a negative number converted to an unsigned index (ANTs reads memory before the intensity array)",
-            ));
+            R::ZERO
         };
-        let intensity_distance = pixel[centre] - closest_pixel[centre];
         let r = intensity_distance / igdm.intensity_sigma;
         let intensity_probability = (R::from_f64(-0.5) * (r * r)).exp();
-        Ok(-R::ONE * intensity_probability * distance_probability)
+        -R::ONE * intensity_probability * distance_probability
     }
 
     /// `GetLocalNeighborhoodValueAndDerivative(point, pixel)` (ANTs' IGDM).
@@ -901,6 +1023,34 @@ fn estimate_intensity_sigma<R: Real, const D: usize>(
     let mut sigma = hi - lo;
     if almost_equals(sigma, R::ZERO) {
         sigma = hi;
+    }
+    sigma
+}
+
+/// ANTS-65 corrected: the range of both point sets' centre intensities,
+/// `max(maxFixed, maxMoving) − min(minFixed, minMoving)` (the larger maximum when that is 0,
+/// as ANTs falls back).
+fn intensity_range_sigma<R: Real, const D: usize>(
+    fixed: &IntensityPointSet<R, D>,
+    moving: &IntensityPointSet<R, D>,
+) -> R {
+    let mut max = -R::MAX;
+    let mut min = R::MAX;
+    for set in [fixed, moving] {
+        for pixel in &set.data {
+            let voxels = pixel.len() / (1 + D);
+            let v = pixel[((0.5 * voxels as f64) as usize) * (D + 1)];
+            if v > max {
+                max = v;
+            }
+            if v < min {
+                min = v;
+            }
+        }
+    }
+    let mut sigma = max - min;
+    if almost_equals(sigma, R::ZERO) {
+        sigma = max;
     }
     sigma
 }

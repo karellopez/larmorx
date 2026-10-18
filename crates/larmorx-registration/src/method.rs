@@ -244,6 +244,8 @@ pub struct LevelProblem<'a, R, const D: usize> {
     /// The scales estimator's samples: the corners of the virtual domain, or the first
     /// metric's fixed points when it is a point-set metric (`SetVirtualDomainPointSet`).
     samples: Vec<[f64; D]>,
+    /// Whether `samples` are the first metric's fixed points (`VirtualDomainPointSetSampling`).
+    point_set_samples: bool,
     /// The level's virtual domain.
     virtual_space: Space<D>,
     floor: &'a IndexFloor,
@@ -280,6 +282,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             weights: vec![R::ONE],
             moving,
             samples,
+            point_set_samples: false,
             virtual_space,
             floor,
             warnings: Vec::new(),
@@ -366,6 +369,21 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
     }
 }
 
+impl<R: Real, const D: usize> LevelProblem<'_, R, D> {
+    /// `SampleVirtualDomainWithPointSet`'s check: an empty point set throws.
+    fn check_samples(&self) -> Result<(), ItkException> {
+        if self.point_set_samples && self.samples.is_empty() {
+            return Err(ItkException::new(
+                "Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesEstimator.hxx",
+                609,
+                "RegistrationParameterScalesFromPhysicalShift",
+                "The virtual domain point set has no points.",
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     fn value_and_derivative(&mut self) -> Result<(R, Vec<R>), ItkException> {
         self.evaluate(true)
@@ -388,10 +406,12 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
+        self.check_samples()?;
         scales::estimate_scales(&mut self.moving, &self.samples)
     }
 
     fn estimate_step_scale(&mut self, step: &[R]) -> Result<R, ItkException> {
+        self.check_samples()?;
         scales::estimate_step_scale(&mut self.moving, &self.samples, step)
     }
 
@@ -838,11 +858,13 @@ where
                 .collect(),
             LevelEntry::Image(..) => scales::corners(&virtual_space),
         };
+        let point_set_samples = matches!(entries[0], LevelEntry::PointSet(_));
         let mut problem = LevelProblem {
             metrics: entries,
             weights: weights.clone(),
             moving,
             samples,
+            point_set_samples,
             virtual_space: virtual_space.clone(),
             floor,
             warnings: level_warnings,

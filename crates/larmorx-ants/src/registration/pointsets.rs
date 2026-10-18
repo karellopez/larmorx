@@ -129,6 +129,20 @@ pub fn read_labeled<const D: usize>(
                         " file {file} does not exist . \n"
                     )));
                 }
+                Err(ReadError::NotImage(_)) => return Err(reader_failure(image_io_failure(file))),
+                Err(ReadError::Unsupported { message, .. }) => {
+                    // A format ITK reads and larmorx does not, or none at all.
+                    let lower = file.to_ascii_lowercase();
+                    let itk_formats = [
+                        ".nrrd", ".nhdr", ".mha", ".mhd", ".mgh", ".mgz", ".mnc", ".mnc2", ".png",
+                        ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".dcm", ".gipl", ".gipl.gz",
+                        ".h5", ".hdf5", ".lsm", ".mrc", ".pic", ".spr", ".ge4", ".ge5",
+                    ];
+                    if itk_formats.iter().any(|e| lower.ends_with(e)) {
+                        return Err(PointSetError::Refused(format!("{file}: {message}")));
+                    }
+                    return Err(reader_failure(image_io_failure(file)));
+                }
                 Err(e) => return Err(reader_failure(e.to_string())),
             };
             let image = crate::cli::registration::to_image::<u32, D>(image)
@@ -176,6 +190,40 @@ pub fn read_labeled<const D: usize>(
 }
 
 const READER_FILE: &str = "Utilities/itkLabeledPointSetFileReader.hxx";
+
+/// `ImageFileReader`'s exception for a file no image IO of ANTs' build reads.
+fn image_io_failure(file: &str) -> String {
+    let ios = [
+        "BMPImageIO",
+        "BioRadImageIO",
+        "Bruker2dseqImageIO",
+        "GDCMImageIO",
+        "GE4ImageIO",
+        "GE5ImageIO",
+        "GiplImageIO",
+        "HDF5ImageIO",
+        "JPEGImageIO",
+        "JPEG2000ImageIO",
+        "LSMImageIO",
+        "MGHImageIO",
+        "MINCImageIO",
+        "MRCImageIO",
+        "MetaImageIO",
+        "NiftiImageIO",
+        "NrrdImageIO",
+        "PNGImageIO",
+        "StimulateImageIO",
+        "TIFFImageIO",
+        "VTKImageIO",
+    ];
+    let mut list = String::new();
+    for io in ios {
+        list.push_str(&format!("    {io}\n"));
+    }
+    format!(
+        "\nitk::ImageFileReaderException (0x0)\nLocation: \"unknown\" \nFile: Modules/IO/ImageBase/include/itkImageFileReader.hxx\nLine: 135\nDescription:  Could not create IO object for reading file {file}\n  Tried to create one of the following:\n{list}  You probably failed to set a file suffix, or\n    set the suffix to an unsupported type.\n\n\n"
+    )
+}
 
 /// An `itk::ExceptionObject` from ANTs' reader, as `operator<<` prints it.
 fn itk_print(file: &str, line: u32, description: &str) -> String {
@@ -225,10 +273,9 @@ fn read_text<const D: usize>(
             labels.push(label);
         }
     }
-    let labelled = !points.is_empty();
     Ok(LabeledPointSet {
         points,
-        labels: labelled.then_some(labels),
+        labels: Some(labels),
     })
 }
 
@@ -425,10 +472,9 @@ fn read_image<const D: usize>(
             labels.push(label);
         }
     }
-    let labelled = !points.is_empty();
     LabeledPointSet {
         points,
-        labels: labelled.then_some(labels),
+        labels: Some(labels),
     }
 }
 

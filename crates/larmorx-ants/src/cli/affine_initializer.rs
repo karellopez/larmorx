@@ -458,7 +458,10 @@ mod tests {
         assert_eq!(read(Fix, "0").0, Ok(0));
         assert_eq!(read(Fix, "7x").0, Ok(7));
         assert_eq!(read(Fix, "10").1, vec!["ANTS-54"]);
-        assert_eq!(read(Reproduce, "10"), (Ok(20), vec!["ANTS-54".into()], String::new()));
+        assert_eq!(
+            read(Reproduce, "10"),
+            (Ok(20), vec!["ANTS-54".into()], String::new())
+        );
         assert_eq!(read(Reproduce, "abc").0, Ok(20));
         for bad in ["abc", "-3", "99999999999"] {
             let (r, ids, err) = read(Fix, bad);

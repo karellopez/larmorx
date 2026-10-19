@@ -197,6 +197,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
   4. `pytest tests/parity` (the smoke tier against the real oracles).
   5. Re-run the new or changed tool's standard-tier parity yourself, from the committed merge (a clean tree, so the record's commit is clean), and compare with the agent's record.
   6. Commit, check for AI attribution, push, then watch CI on all six platforms.
+  7. Once CI is green, delete that agent worktree's Rust build caches (`target/`, `crates-gpl/target/`; regenerable), keeping only the newest worktree's cache as a seed for the next agent (user, 2026-10-19: 30 merged worktrees had grown to 190 GB). Never delete a worktree's source or branch.
 - **Reading CI results without a login:** GitHub serves job logs only to logged-in users. Golden mismatches, failing `cargo test` tests and build errors (`scripts/ci_cargo_failures.py`, since 2026-10-12) are printed as workflow annotations, which `https://api.github.com/repos/karellopez/larmorx/check-runs/<job id>/annotations` serves without a login. Each job's step results: `https://api.github.com/repos/karellopez/larmorx/actions/jobs/<job id>`. GitHub's Windows runners give the temporary directory as an 8.3 short path (`C:\Users\RUNNER~1\...`): tests must not assume a temporary path free of `~` or blanks.
 - **Detached jobs (`nohup ... &`) send no notice when they end.** Watch their log for a final line in a tracked background command.
 

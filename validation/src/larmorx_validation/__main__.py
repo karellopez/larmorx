@@ -98,6 +98,7 @@ def _summary(result) -> dict:
 
 def cmd_parity(args: argparse.Namespace) -> int:
     from larmorx_validation.parity import FAIL, run, summarise
+    from larmorx_validation.parity.harness import suite_by_name
     from larmorx_validation.parity.render import render
 
     suite = _parity_suite(args.suite, args.implementation)
@@ -120,7 +121,7 @@ def cmd_parity(args: argparse.Namespace) -> int:
         select=(lambda c: args.case in c.id) if args.case else None,
         progress=progress,
         jobs=args.jobs,
-        factory=functools.partial(_parity_suite, args.suite, args.implementation),
+        factory=functools.partial(suite_by_name, args.suite, args.implementation),
     )
     print(file=sys.stderr)
     counts = summarise(results)

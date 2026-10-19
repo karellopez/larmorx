@@ -66,6 +66,9 @@ PROGRAM = "antsRegistration"
 SEED = "42"
 #: How long a case whose ANTs never finishes runs before it is stopped.
 HANG_SECONDS = 30
+#: How long any other ANTs run may take: sMRIPrep's full-size template registration takes ANTs
+#: hours at one thread.
+ANTS_TIMEOUT = 12 * 3600
 LX_THREADS = 4
 #: The real cases' small versions keep every SMALL-th voxel of their images.
 SMALL = 3
@@ -1644,7 +1647,7 @@ def _run_ants(
     threads: int = 1,
     *,
     correctly_rounded: bool = False,
-    timeout: float = 7200,
+    timeout: float = ANTS_TIMEOUT,
 ):
     b = ants_bin()
     if b is None or not (b / PROGRAM).is_file():
@@ -1846,7 +1849,9 @@ def run_case(case: Case, checks: CheckList) -> None:
         a_dir.mkdir()
         l_dir.mkdir()
         a_args, l_args = _resolve(c, a_dir, tmp), _resolve(c, l_dir, tmp)
-        ants = _run_ants(a_args, c.seed, timeout=HANG_SECONDS if c.expect == "hang" else 7200)
+        ants = _run_ants(
+            a_args, c.seed, timeout=HANG_SECONDS if c.expect == "hang" else ANTS_TIMEOUT
+        )
         lx = _run_larmorx(l_args, c.seed)
         if c.expect == "hang":
             checks(

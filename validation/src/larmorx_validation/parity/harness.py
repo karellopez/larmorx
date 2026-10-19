@@ -142,6 +142,14 @@ def run(
     return results
 
 
+def suite_by_name(name: str, implementation: str = "original") -> Suite:
+    """The suite ``python -m larmorx_validation parity <name>`` runs, built in a worker
+    process (``__main__``'s own functions cannot be found there)."""
+    from larmorx_validation import __main__ as cli
+
+    return cli._parity_suite(name, implementation)
+
+
 def _run_in_worker(factory: Callable[[], Suite], case: Case) -> CaseResult:
     """A worker process's case: the suite built again, then the case run."""
     return run_one(factory(), case)

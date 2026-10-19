@@ -69,6 +69,27 @@ command-line binary. Code from different families is never linked into one binar
 - **Names:** no package may present itself as AFNI, FSL, Workbench or FreeSurfer (PLAN.md
   §12); "nc" stands for non-commercial.
 
+## Notes checked 2026-10-19
+
+- **FreeSurfer's licence key is not a licence term.** FreeSurfer's programs refuse to run
+  without `license.txt` (`FS_LICENSE`), but that is its own runtime check
+  (`utils/chklc.cpp`); its `LICENSE.txt` (FreeSurfer Software License v1.0) has no
+  registration or key requirement. `larmorx-freesurfer` therefore does not check for one. What
+  the licence does require is kept: its full text with the required preface ("All or portions
+  of this licensed product ... obtained under license from The General Hospital
+  Corporation..."), the notices, modifications marked; every user inherits its section 4
+  (research purposes only; clinical applications neither recommended nor advised;
+  commercialisation at the user's own risk) and its as-is terms. Still to check when the
+  FreeSurfer track starts: the terms of FreeSurfer's atlas files (GCA, parcellation and
+  folding atlases), on which recon-all's results depend.
+- **AFNI: one implementation or two is decided per file.** AFNI's `LICENSE.txt`: code written
+  at NIH is public domain; the "major portions" written at the Medical College of Wisconsin
+  are GPL-2, marked at the top of each file. A program needs a GPL replica and a clean-room
+  original only when the code to replicate comes from MCW files (`3dTshift.c` does);
+  `3dUnifize.c`, `3dAutomask.c` and `thd_automask.c` carry no MCW header, so one Apache replica
+  may suffice, unless their results depend on MCW library code (dataset I/O does not count:
+  larmorx has its own). The first step of each AFNI port checks the call graph.
+
 ## Publishing
 
 **Published in this repository:**

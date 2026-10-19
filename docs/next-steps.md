@@ -135,7 +135,14 @@ random seeding). With A4-A6, sMRIPrep's brain extraction and MNI normalisation r
 
 ## 5. The rest of the `--fs-no-reconall` path
 
-- AFNI: 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement), 3dvolreg. Check each
+- AFNI: 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
+  current fMRIPrep, niworkflows and sdcflows do not call 3dvolreg (to drop unless wanted);
+  optional paths of its libraries use 3dQwarp (sdcflows' alternative PEPOLAR estimator) and
+  3dSkullStrip with 3dcalc (niworkflows' legacy AFNI skull-stripping); not decided. Licence per
+  file (`docs/licensing.md`, "Notes checked 2026-10-19"): 3dUnifize and 3dAutomask may need
+  only one Apache replica. Candidates for a later analysis track (not fMRIPrep): 3dTproject,
+  3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit, 3dFWHMx/3dClustSim, 3dAllineate, 3dcalc,
+  3dTstat, 3dROIstats. Check each
   source file's licence: NIH public-domain files get one Apache replica; MCW (GPL) files a
   replica in `larmorx-gpl` and a clean-room original from a spec.
 - FSL: BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL licence, with FSL's

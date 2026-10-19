@@ -91,6 +91,8 @@ pub struct SynStage<R, const D: usize> {
     /// ITK-30: compute GC's derivative per voxel (corrected) or, as ITK, all of it in the
     /// first voxel's entries.
     pub correct_gc_derivative: bool,
+    /// ITK-31: a role without a mask has none (corrected) or keeps the previous call's mask.
+    pub correct_stale_masks: bool,
     pub n_threads: usize,
 }
 
@@ -129,6 +131,9 @@ pub struct SynOutput<R, const D: usize> {
     pub output: FieldXfm<R, D>,
     pub fixed_to_middle: FieldXfm<R, D>,
     pub moving_to_middle: FieldXfm<R, D>,
+    /// ITK-31's condition was met: a metric with only one of its two masks evaluated more
+    /// than once in a level.
+    pub stale_masks: bool,
 }
 
 impl<R: Real, const D: usize> SynStage<R, D> {
@@ -423,6 +428,11 @@ struct GradientCall<'a, R, const D: usize> {
     multi: bool,
     stage: &'a SynStage<R, D>,
     floor: &'a IndexFloor,
+    /// Each metric's fixed and moving masks as the metric object holds them between calls:
+    /// ITK sets a resampled mask only where the stage has one, so a role without a mask keeps
+    /// the mask the previous call set (ITK-31, reproduced when `stale_masks`).
+    masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
+    stale_masks: bool,
 }
 
 impl<R: Real, const D: usize> GradientCall<'_, R, D> {
@@ -476,6 +486,15 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                     r.moving_gradient.clone(),
                 )
             };
+            // SetFixedImageMask / SetMovingImageMask only for the roles that have a mask.
+            let state = &mut self.masks[j];
+            if fm.is_some() || !self.stale_masks {
+                state.0 = fm.clone();
+            }
+            if mm.is_some() || !self.stale_masks {
+                state.1 = mm.clone();
+            }
+            let (fm, mm) = (&state.0, &state.1);
             let (fg, mg) = if lm.use_gradient_filter {
                 (fg, mg)
             } else {
@@ -608,6 +627,7 @@ pub fn run_syn<R: Real, const D: usize>(
     let mut current_seed = stage.seed;
     let invert_settings = InvertSettings::<R>::syn();
     let mut state: Option<(FieldXfm<R, D>, FieldXfm<R, D>)> = None;
+    let mut stale_masks = false;
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         let sigma = stage.smoothing_sigmas[level];
@@ -685,9 +705,21 @@ pub fn run_syn<R: Real, const D: usize>(
                 adapt(&m, &virtual_space, floor),
             ),
         };
+        // The metric's masks as InitializeRegistrationAtEachLevel sets them (the stage's own).
+        let mut mask_state: Vec<(Option<Mask<D>>, Option<Mask<D>>)> = level_metrics
+            .iter()
+            .map(|lm| (lm.fixed_mask.clone(), lm.moving_mask.clone()))
+            .collect();
         // StartOptimization.
         let mut convergence = WindowConvergence::new(stage.convergence_window);
         let n_iterations = stage.iterations.get(level).copied().unwrap_or(0) as usize;
+        if n_iterations > 1
+            && level_metrics
+                .iter()
+                .any(|lm| lm.fixed_mask.is_some() != lm.moving_mask.is_some())
+        {
+            stale_masks = true;
+        }
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
@@ -747,6 +779,8 @@ pub fn run_syn<R: Real, const D: usize>(
                 multi,
                 stage,
                 floor,
+                masks: &mut mask_state,
+                stale_masks: !stage.correct_stale_masks,
             };
             // The fixed-to-middle update (the metric value is the "moving" one), then the
             // moving-to-middle update.
@@ -809,6 +843,7 @@ pub fn run_syn<R: Real, const D: usize>(
         output,
         fixed_to_middle: f2m,
         moving_to_middle: m2m,
+        stale_masks,
     })
 }
 

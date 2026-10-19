@@ -887,6 +887,17 @@ where
                 .iter()
                 .map(|q| std::array::from_fn(|k| f64::from(q[k])))
                 .collect(),
+            // A moving composite that is not linear (a displacement field before the stage's
+            // transform): `RandomSampling` of 1000 virtual voxels (`SizeOfSmallDomain`). ITK's
+            // iterator is seeded from the clock (ANTS-72); larmorx from the stage's seed.
+            LevelEntry::Image(..) if moving.transforms.iter().any(|t| !t.is_linear()) => {
+                let mut it =
+                    RandomIterator::new(virtual_space.size, virtual_space.start, stage.seed);
+                it.samples(1000)
+                    .iter()
+                    .map(|idx| virtual_space.index_to_point(idx))
+                    .collect()
+            }
             LevelEntry::Image(..) => scales::corners(&virtual_space),
         };
         let point_set_samples = matches!(entries[0], LevelEntry::PointSet(_));

@@ -242,6 +242,8 @@ defects! {
         "ManifoldParzenWindowsPointSetFunction adds each product to a local covariance's diagonal twice";
     ITK_28 = "ITK-28", "ITK", true,
         "JHCT tests alpha = 1 with != for its prefactor and with AlmostEquals for its value: an alpha within 4 ulps of 1 takes the logarithm and divides by alpha - 1";
+    ITK_31 = "ITK-31", "ITK", true,
+        "SyN sets the metric's resampled masks only for the roles that have one: with a fixed mask and no moving mask (or the reverse), the role without one keeps the mask of the previous evaluation, which from the second iteration of a level is the previous iteration's resampled mask";
     ITK_30 = "ITK-30", "ITK", true,
         "the global correlation metric (ANTs' GC) with a displacement field transform (SyN) adds every point's derivative into the first voxel's entries, so only that voxel's update is not zero (the check meant to refuse such transforms is in the constructor and never fires)";
     ITK_03 = "ITK-03", "ITK", true,

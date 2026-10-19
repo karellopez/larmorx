@@ -327,6 +327,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             restored,
             exact_floor: self.upstream_defects.fix(),
             correct_gc_derivative: correct_gc,
+            correct_stale_masks: self.upstream_defects.fix(),
             n_threads: self.n_threads,
         };
         let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
@@ -378,6 +379,21 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         }
         match result {
             Ok(out) => {
+                if out.stale_masks {
+                    let mode = self.upstream_defects;
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ITK_31,
+                            mode,
+                            if mode.fix() {
+                                format!("stage {stage} has only one of its two masks: the other role has none; ITK keeps the previous evaluation's resampled mask there")
+                            } else {
+                                format!("stage {stage} has only one of its two masks: the other role keeps the previous evaluation's resampled mask, as in ITK")
+                            },
+                        ),
+                    );
+                }
                 // m_RegistrationState: the composite as it is, then the two transforms.
                 let composite = self.composite.as_mut().expect("set by DoRegistration");
                 let mut state = composite.clone();

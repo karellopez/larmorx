@@ -82,6 +82,29 @@ command-line binary. Code from different families is never linked into one binar
   commercialisation at the user's own risk) and its as-is terms. Still to check when the
   FreeSurfer track starts: the terms of FreeSurfer's atlas files (GCA, parcellation and
   folding atlases), on which recon-all's results depend.
+- **FreeSurfer's data: what recon-all needs, its size and its terms** (measured in the
+  FreeSurfer 7.3.2 that fMRIPrep 25.2.6's image ships, trimmed to what fMRIPrep runs; FreeSurfer
+  8's atlases are the same files):
+
+  | Part | Unpacked | gzip-6 |
+  |---|---|---|
+  | `average/`: the two GCA atlases (2020), the parcellation atlases (`.gcs`, three pairs), the folding atlas, `mni305.cor.mgz`, the Talairach atlas images | 487 MB | 144 MB |
+  | `subjects/fsaverage` (BA labels, the Talairach check, `--subject fsaverage`) | 503 MB | 320 MB |
+  | `subjects/fsaverage6`, `fsaverage5` (fMRIPrep's surface output spaces) | 197 MB | 166 MB |
+  | `mni/` (MNI's N3 tools' data) | 57 MB | 20 MB |
+  | **total** | **about 1.24 GB** | **about 650 MB** |
+
+  Not needed: FreeSurfer's own `bin/` (348 MB), `python/` (500 MB), `lib/`. Most of it may be
+  redistributed under the FreeSurfer licence, on the same conditions as its code. **Exception:
+  the Talairach step** (`talairach_avi`, Washington University, A. Z. Snyder): its source says
+  "This software may not be reproduced, copied, or distributed without written permission of
+  Washington University", and its three atlas images (`711-2C_as_mni_average_305.4dfp.img`,
+  `711-2B_..._mask`, `3T18yoSchwartzReactN32_as_orig`, 192 MB unpacked) come with it. So no
+  replica of `talairach_avi`, and its atlases are not ours to ship: a clean-room original of
+  the step (an affine registration to MNI305, validated against recon-all's
+  `talairach.xfm`), WashU's written permission, or the atlases downloaded by the user from
+  FreeSurfer at first use. To decide when the FreeSurfer track starts. `mni305.cor.mgz` is
+  derived from MNI's MINC average (MNI's terms are permissive).
 - **AFNI: one implementation or two is decided per file.** AFNI's `LICENSE.txt`: code written
   at NIH is public domain; the "major portions" written at the Medical College of Wisconsin
   are GPL-2, marked at the top of each file. A program needs a GPL replica and a clean-room

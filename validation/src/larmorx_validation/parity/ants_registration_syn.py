@@ -664,4 +664,103 @@ def syn_cases(make) -> list:
             "refuses with a message",
         ),
     ]
-    return cases
+    return cases + _point_set_cases(make)
+
+
+# The point-set inputs of the suite's point-set cases (:mod:`ants_point_sets`).
+PSF, PSM = "{gen:ps-labels-fixed}", "{gen:ps-labels-moving}"
+PSK, PSKM = "{gen:ps-mask}", "{gen:ps-mask-moving}"
+PSI, PSIM = "{gen:ps-intensity-fixed}", "{gen:ps-intensity-moving}"
+F2D, M2D, K2D = "{gen:ps-labels-fixed-2d}", "{gen:ps-labels-moving-2d}", "{gen:ps-mask-2d}"
+
+
+def _point_set_cases(make) -> list:
+    """SyN with the point-set metrics: in tangent space, each point's derivative at its
+    nearest voxel (ITK-32 and ITK-33 reproduced)."""
+    PS = "syn-point-sets"
+    icp = f"ICP[{PSF},{PSM},1]"
+    igdm = f"IGDM[{PSI},{PSIM},1,{PSK},{PSKM}]"
+
+    def ps(name: str, description: str, *metrics: str, t: str = "SyN[0.3,2,0]", **kw):
+        extra = kw.pop("extra", ())
+        mask = kw.pop("mask", PSK)
+        stage = _stage(t, list(metrics), c=kw.pop("c", "[4x3,1e-6,3]"), f="2x1", s="1x0vox")
+        head = ("-x", mask) if mask else ()
+        return make(f"{PS}/{name}", PS, description, *head, *extra, *stage, out=PRE, **kw)
+
+    return [
+        ps("icp", "ICP alone: the fixed mask's grid as the virtual domain", icp, band=True),
+        ps("pse", "PSE (sigma 1, 20 neighbours)", f"PSE[{PSF},{PSM},1,1,0,1,20]"),
+        ps("jhct", "JHCT, anisotropic (sigma 1, alpha 1.1)", f"JHCT[{PSF},{PSM},1,1,0,1,20,1.1,1]"),
+        ps("icp-float", "ICP, --float 1", icp, extra=("--float", "1")),
+        ps(
+            "icp-moving-initial",
+            "ICP after -r (a matrix)",
+            icp,
+            extra=("-r", "{gen-transform:initial.mat}"),
+        ),
+        ps(
+            "icp-fixed-initial",
+            "ICP after -q (a matrix)",
+            icp,
+            extra=("-q", "{gen-transform:initial.mat}"),
+        ),
+        ps(
+            "icp-not-bijective",
+            "a fixed label the moving set lacks: ITK throws at the first such point (ITK-22)",
+            f"ICP[{PSF},{{gen:ps-labels-moving-partial}},1]",
+        ),
+        ps(
+            "icp-moving-extra-label",
+            "a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22)",
+            f"ICP[{{gen:ps-labels-moving-partial}},{PSM},1]",
+        ),
+        ps(
+            "cc-and-icp",
+            "CC and ICP: ITK gives ICP identity transforms (ITK-33)",
+            f"CC[{PSI},{PSIM},1,2]",
+            f"ICP[{PSF},{PSM},0.5]",
+        ),
+        ps(
+            "icp-and-cc",
+            "ICP first, then CC: ICP's virtual domain (ITK-33)",
+            f"ICP[{PSF},{PSM},0.5]",
+            f"CC[{PSI},{PSIM},1,2]",
+        ),
+        ps(
+            "cc-and-igdm",
+            "CC and IGDM: SyN holds labelled point sets only, IGDM gets no input (ANTS-61)",
+            f"CC[{PSI},{PSIM},1,2]",
+            igdm,
+        ),
+        ps(
+            "cc-igdm-icp",
+            "CC, IGDM and ICP: IGDM without point sets before a metric with them (ANTS-61)",
+            f"CC[{PSI},{PSIM},1,2]",
+            igdm,
+            icp,
+            expect="crash",
+        ),
+        ps("icp-2d", "ICP in 2D", f"ICP[{F2D},{M2D},1]", mask=K2D, d="2"),
+        ps(
+            "cc-regular-and-icp",
+            "CC sampled (Regular) and ICP: ANTs gives ICP's sample points to a null image metric",
+            f"CC[{PSI},{PSIM},1,2,Regular,0.5]",
+            icp,
+            expect="crash",
+        ),
+        ps(
+            "icp-field-initial",
+            "ICP after -r a displacement field without an inverse: ITK maps the moving points with a null transform",
+            icp,
+            extra=("-r", "{gen-syn:warp-3d.nii.gz}"),
+            expect="crash",
+        ),
+        ps(
+            "icp-no-mask",
+            "ICP alone without a fixed mask: no virtual domain",
+            icp,
+            mask=None,
+            expect="crash",
+        ),
+    ]

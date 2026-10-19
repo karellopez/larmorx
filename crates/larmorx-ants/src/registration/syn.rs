@@ -17,6 +17,7 @@ use larmorx_core::IndexFloor;
 use larmorx_core::defects::{self, Notice, push_once};
 use larmorx_registration::format::OStream;
 use larmorx_registration::method::{self, SamplingStrategy, StageMetric};
+use larmorx_registration::pointset::metric::PointSetEvents;
 use larmorx_registration::syn::{
     SynIteration, SynObserver, SynStage, full_scale_cc, output_transform, run_syn,
 };
@@ -33,8 +34,9 @@ pub(crate) struct SynInputs<R, const D: usize> {
     pub threshold: R,
     pub window: u32,
     pub levels: usize,
-    /// The stage's first metric kind (IGDM is refused).
-    pub first_kind: Option<MetricKind>,
+    /// The stage's metric kinds (`None`: a metric larmorx's parser did not name); IGDM first
+    /// is refused.
+    pub kinds: Vec<Option<MetricKind>>,
     pub prepared: Vec<StageMetric<R, D>>,
     pub shrink_factors: Vec<[usize; D]>,
     pub sigmas: Vec<R>,
@@ -218,7 +220,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         sink: Option<&'s mut (dyn IntervalSink<R, D> + 'k)>,
         x: SynInputs<R, D>,
     ) -> Result<(), RegistrationFailed> {
-        if x.first_kind == Some(MetricKind::Igdm) {
+        if x.kinds.first().copied().flatten() == Some(MetricKind::Igdm) {
             log.logger(
                 "Intensity point set metric is not implemented yet for the specified transform.\n",
             );
@@ -246,7 +248,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             let n = state.len();
             let pair = if n >= 2 {
                 match (&state[n - 2], &state[n - 1]) {
-                    (Xfm::Field(f), Xfm::Field(m)) if f.inverse.is_some() && m.inverse.is_some() => {
+                    (Xfm::Field(f), Xfm::Field(m))
+                        if f.inverse.is_some() && m.inverse.is_some() =>
+                    {
                         Some((f.clone(), m.clone()))
                     }
                     _ => None,
@@ -255,7 +259,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 None
             };
             if let Some(pair) = pair {
-                log.logger("Current SyN transform is directly initialized from the previous stage.\n");
+                log.logger(
+                    "Current SyN transform is directly initialized from the previous stage.\n",
+                );
                 restored = Some(pair);
                 state.truncate(n - 2);
             }
@@ -289,10 +295,63 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             log.f(update_variance.to_f64()),
             log.f(total_variance.to_f64())
         ));
+        // ANTS-61: the SyN method holds labelled point sets only, so an IGDM metric gets no
+        // input: the inputs end at the last metric that has one.
+        let mut failed_early = None;
+        let igdm: Vec<bool> = x
+            .kinds
+            .iter()
+            .map(|k| *k == Some(MetricKind::Igdm))
+            .collect();
+        if igdm.iter().any(|&w| w) {
+            let pairs = igdm.iter().rposition(|&w| !w).map_or(0, |i| i + 1);
+            let mismatch = pairs != igdm.len();
+            let mode = self.upstream_defects;
+            if mode.fix() {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_61,
+                        mode,
+                        format!(
+                            "stage {stage} runs with all its metrics; ANTs gives IGDM no input and {}",
+                            if mismatch {
+                                "throws (the stage is dropped)"
+                            } else {
+                                "crashes"
+                            }
+                        ),
+                    ),
+                );
+            } else if mismatch {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_61,
+                        mode,
+                        format!(
+                            "stage {stage}: a point-set metric without an input, ITK's exception, as in ANTs"
+                        ),
+                    ),
+                );
+                failed_early = Some(ItkException::new(
+                    "Modules/Registration/RegistrationMethodsv4/include/itkImageRegistrationMethodv4.hxx",
+                    306,
+                    "SyNImageRegistrationMethod",
+                    "Mismatch between number of image pairs and the number of metrics.",
+                ));
+            } else {
+                return Err(self.crash(
+                    log,
+                    "a SyN stage that lists IGDM before another metric: ANTs gives IGDM no point sets",
+                ));
+            }
+        }
         let correct_gc = self.upstream_defects.fix();
-        let has_gc = x.prepared.iter().any(|m| {
-            matches!(m, StageMetric::Image(i) if i.kind == method::MetricKind::Gc)
-        });
+        let has_gc = x
+            .prepared
+            .iter()
+            .any(|m| matches!(m, StageMetric::Image(i) if i.kind == method::MetricKind::Gc));
         if has_gc {
             push_once(
                 &mut self.notices,
@@ -300,9 +359,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     &defects::ITK_30,
                     self.upstream_defects,
                     if correct_gc {
-                        format!("stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel")
+                        format!(
+                            "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
+                        )
                     } else {
-                        format!("stage {stage}: GC's derivative is all in the first voxel, as in ITK")
+                        format!(
+                            "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                        )
                     },
                 ),
             );
@@ -330,6 +393,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             exact_floor: self.upstream_defects.fix(),
             correct_gc_derivative: correct_gc,
             correct_stale_masks: self.upstream_defects.fix(),
+            correct_point_set_transforms: self.upstream_defects.fix(),
             n_threads: self.n_threads,
         };
         let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
@@ -357,7 +421,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             ants_71: false,
         };
         let mut warnings = Vec::new();
-        let result = run_syn(&syn, &mut observer, floor, &mut warnings);
+        let mut events = PointSetEvents::default();
+        let result = match failed_early {
+            Some(e) => Err(e),
+            None => run_syn(&syn, &mut observer, floor, &mut warnings, &mut events),
+        };
         let observed = std::mem::take(&mut observer.warnings);
         let ants_71 = observer.ants_71;
         for w in &warnings {
@@ -365,6 +433,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         }
         self.warnings.extend(observed);
         self.warnings.extend(warnings);
+        self.point_set_notices(&events);
         if ants_71 {
             let mode = self.upstream_defects;
             push_once(
@@ -373,15 +442,38 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     &defects::ANTS_71,
                     mode,
                     if mode.fix() {
-                        format!("stage {stage}: the full-scale similarity is computed with the missing transforms as the identity; ANTs crashes")
+                        format!(
+                            "stage {stage}: the full-scale similarity is computed with the missing transforms as the identity; ANTs crashes"
+                        )
                     } else {
-                        format!("stage {stage}: ANTs crashes computing the full-scale similarity; larmorx stops there")
+                        format!(
+                            "stage {stage}: ANTs crashes computing the full-scale similarity; larmorx stops there"
+                        )
                     },
                 ),
             );
         }
         match result {
             Ok(out) => {
+                if out.identity_point_sets {
+                    let mode = self.upstream_defects;
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ITK_33,
+                            mode,
+                            if mode.fix() {
+                                format!(
+                                    "stage {stage}: the point-set metrics among several metrics are evaluated through the initial transforms and the deformation; ITK gives them identity transforms"
+                                )
+                            } else {
+                                format!(
+                                    "stage {stage}: the point-set metrics among several metrics are evaluated with identity transforms, as in ITK (they never see the initial transforms or the deformation)"
+                                )
+                            },
+                        ),
+                    );
+                }
                 if out.stale_masks {
                     let mode = self.upstream_defects;
                     push_once(
@@ -390,9 +482,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             &defects::ITK_31,
                             mode,
                             if mode.fix() {
-                                format!("stage {stage} has only one of its two masks: the other role has none; ITK keeps the previous evaluation's resampled mask there")
+                                format!(
+                                    "stage {stage} has only one of its two masks: the other role has none; ITK keeps the previous evaluation's resampled mask there"
+                                )
                             } else {
-                                format!("stage {stage} has only one of its two masks: the other role keeps the previous evaluation's resampled mask, as in ITK")
+                                format!(
+                                    "stage {stage} has only one of its two masks: the other role keeps the previous evaluation's resampled mask, as in ITK"
+                                )
                             },
                         ),
                     );

@@ -196,7 +196,8 @@ pub fn invert<R: Real, const D: usize>(
     };
     let space = inverse.space.clone();
     let n = space.len();
-    let inverse_spacing: [R; D] = std::array::from_fn(|d| R::from_f64(1.0 / field.space.spacing[d]));
+    let inverse_spacing: [R; D] =
+        std::array::from_fn(|d| R::from_f64(1.0 / field.space.spacing[d]));
     let mut max_error = R::MAX;
     let mut mean_error = R::MAX;
     let mut iteration = 0u32;
@@ -330,18 +331,14 @@ pub fn gaussian_smooth<R: Real, const D: usize>(field: &Field<R, D>, variance: R
     }
     let weight2 = R::ONE - weight1;
     let space = field.space.clone();
-    smooth
-        .data
-        .par_iter_mut()
-        .enumerate()
-        .for_each(|(o, s)| {
-            if on_boundary(&space, &space.index_of(o)) {
-                *s = [R::ZERO; D];
-            } else {
-                let f = field.data[o];
-                *s = std::array::from_fn(|d| s[d] * weight1 + f[d] * weight2);
-            }
-        });
+    smooth.data.par_iter_mut().enumerate().for_each(|(o, s)| {
+        if on_boundary(&space, &space.index_of(o)) {
+            *s = [R::ZERO; D];
+        } else {
+            let f = field.data[o];
+            *s = std::array::from_fn(|d| s[d] * weight1 + f[d] * weight2);
+        }
+    });
     smooth
 }
 
@@ -514,6 +511,19 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
     /// field's direction; the identity on and outside the region's border, or where a
     /// difference is not finite.
     pub fn jacobian_position(&self, p: &[R; D]) -> [[R; D]; D] {
+        self.jacobian_position_internal(p, false)
+    }
+
+    /// `ComputeInverseJacobianWithRespectToPosition(point)`: as
+    /// [`FieldXfm::jacobian_position`] with each difference negated (`dPixSign = −1`), the
+    /// first-order approximation `I − ∇u` of the inverse.
+    pub fn inverse_jacobian_position(&self, p: &[R; D]) -> [[R; D]; D] {
+        self.jacobian_position_internal(p, true)
+    }
+
+    /// `ComputeJacobianWithRespectToPositionInternal(index, jacobian, doInverseJacobian)`.
+    fn jacobian_position_internal(&self, p: &[R; D], inverse: bool) -> [[R; D]; D] {
+        let sign = if inverse { -R::ONE } else { R::ONE };
         let identity: [[R; D]; D] =
             std::array::from_fn(|i| std::array::from_fn(|j| if i == j { R::ONE } else { R::ZERO }));
         let field = &self.field;
@@ -546,7 +556,7 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
                 let a = pix[0][row] - R::from_f64(pix[1][row].to_f64() * 8.0);
                 let b = a + R::from_f64(pix[2][row].to_f64() * 8.0);
                 let c = b - pix[3][row];
-                let d = R::from_f64(c.to_f64() / denom) * R::ONE;
+                let d = R::from_f64(c.to_f64() / denom) * sign;
                 jacobian[row][col] = d;
                 if !d.to_f64().is_finite() {
                     return identity;

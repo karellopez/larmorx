@@ -83,6 +83,31 @@ impl<R: Real, const D: usize> Xfm<R, D> {
         }
     }
 
+    /// `TransformCovariantVector(vector, point)`: unchanged by the identity and a translation;
+    /// a matrix transform's inverse matrix transposed (vnl's inverse, [`linear::inverse_r`]);
+    /// a field's approximate inverse Jacobian at the voxel nearest `p`, transposed (ITK's
+    /// `Transform::TransformCovariantVector`). Each entry summed in `R` from 0.
+    pub fn transform_covariant(&self, v: &[R; D], p: &[R; D]) -> [R; D] {
+        let transposed = |m: &Matrix<R, D>| -> [R; D] {
+            std::array::from_fn(|i| {
+                let mut s = R::ZERO;
+                for j in 0..D {
+                    s = s + m[j][i] * v[j];
+                }
+                s
+            })
+        };
+        match self {
+            Xfm::Identity | Xfm::Translation { .. } => *v,
+            Xfm::Linear(l) => match linear::inverse_r(&l.matrix) {
+                Some(inv) => transposed(&inv),
+                // ITK keeps the last inverse it could compute; a singular matrix has none.
+                None => *v,
+            },
+            Xfm::Field(f) => transposed(&f.inverse_jacobian_position(p)),
+        }
+    }
+
     /// `ComputeJacobianWithRespectToPosition(p)`: the matrix (identity for a translation), a
     /// field's local Jacobian at the voxel nearest `p`.
     pub fn jacobian_position(&self, p: &[R; D]) -> Matrix<R, D> {
@@ -214,6 +239,18 @@ impl<R: Real, const D: usize> Composite<R, D> {
             q = t.transform_point(&q);
         }
         q
+    }
+
+    /// `TransformCovariantVector(vector, point)`: the queue in reverse order, each transform
+    /// at the point as the transforms before it moved it.
+    pub fn transform_covariant(&self, v: &[R; D], p: &[R; D]) -> [R; D] {
+        let mut out = *v;
+        let mut q = *p;
+        for t in self.transforms.iter().rev() {
+            out = t.transform_covariant(&out, &q);
+            q = t.transform_point(&q);
+        }
+        out
     }
 
     /// The optimised transform.

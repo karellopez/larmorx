@@ -27,9 +27,9 @@ use crate::rng::{MersenneTwister, RandomIterator};
 use crate::transform::{Composite, Xfm};
 use crate::{Image, ItkException, Real, Space};
 
-const FILE: &str =
+pub(crate) const FILE: &str =
     "Modules/Registration/RegistrationMethodsv4/include/itkImageRegistrationMethodv4.hxx";
-const CLASS: &str = "ImageRegistrationMethodv4";
+pub(crate) const CLASS: &str = "ImageRegistrationMethodv4";
 
 /// The metric sampling strategy (`MetricSamplingStrategyEnum`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

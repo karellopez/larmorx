@@ -242,6 +242,10 @@ defects! {
         "ManifoldParzenWindowsPointSetFunction adds each product to a local covariance's diagonal twice";
     ITK_28 = "ITK-28", "ITK", true,
         "JHCT tests alpha = 1 with != for its prefactor and with AlmostEquals for its value: an alpha within 4 ulps of 1 takes the logarithm and divides by alpha - 1";
+    ITK_32 = "ITK-32", "ITK", true,
+        "the labelled point-set metric (ANTs' ICP, PSE, JHCT) appends new per-label metrics at every Initialize and keeps using the first ones: in SyN, which initialises the metric twice per iteration, every evaluation compares with the moving points as the stage's first evaluation mapped them (in the moving-to-middle update, with the moving points themselves)";
+    ITK_33 = "ITK-33", "ITK", true,
+        "SyN with several metrics gives every metric identity displacement field transforms after setting the point-set metrics' transforms, so a point-set metric among several metrics never sees the initial transforms or the deformation: its points are compared where they were read";
     ITK_31 = "ITK-31", "ITK", true,
         "SyN sets the metric's resampled masks only for the roles that have one: with a fixed mask and no moving mask (or the reverse), the role without one keeps the mask of the previous evaluation, which from the second iteration of a level is the previous iteration's resampled mask";
     ITK_30 = "ITK-30", "ITK", true,

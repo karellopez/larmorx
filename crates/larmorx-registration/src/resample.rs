@@ -167,7 +167,9 @@ pub fn resample_nonlinear<R: Real, const D: usize>(
         transform,
         default,
         |c| match (interpolator, &other) {
-            (Interpolator::Linear, _) => cast(at_cindex_with(space, c, floor, |o| data[o].to_f64())),
+            (Interpolator::Linear, _) => {
+                cast(at_cindex_with(space, c, floor, |o| data[o].to_f64()))
+            }
             (Interpolator::NearestNeighbor, _) => {
                 let idx: [i64; D] = std::array::from_fn(|k| c[k].itk_round_half_up());
                 cast(data[space.offset(&idx)].to_f64())

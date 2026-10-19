@@ -72,11 +72,7 @@ impl<R: Real> BaseReduction<R> {
         compute_derivative: bool,
     ) -> Self {
         if m.local_support {
-            Self::new_local(
-                m.number_of_parameters(transform),
-                D,
-                compute_derivative,
-            )
+            Self::new_local(m.number_of_parameters(transform), D, compute_derivative)
         } else {
             Self::new(m.local_parameters(transform), compute_derivative)
         }

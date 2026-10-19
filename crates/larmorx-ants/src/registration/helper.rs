@@ -620,8 +620,8 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             sci4.float(now),
             sci4.float(now - self.last)
         );
-        let printed = self.full_scale.is_some()
-            && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64();
+        let printed =
+            self.full_scale.is_some() && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64();
         if printed {
             line.push_str(&sci12.float(full_scale_value.to_f64()));
         }
@@ -1081,7 +1081,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     threshold,
                     window,
                     levels,
-                    first_kind: stage_metrics[0].kind,
+                    kinds: stage_metrics.iter().map(|m| m.kind).collect(),
                     prepared,
                     shrink_factors: per_level,
                     sigmas: sigmas_r,
@@ -1349,7 +1349,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     }
 
     /// The D13 notices of what a stage's point-set metrics met.
-    fn point_set_notices(&mut self, e: &PointSetEvents) {
+    pub(crate) fn point_set_notices(&mut self, e: &PointSetEvents) {
         let mode = self.upstream_defects;
         let fix = mode.fix();
         let mut add = |d: &'static defects::Defect, fixed: &str, reproduced: &str| {
@@ -1407,6 +1407,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             );
             add(&defects::ANTS_65, &fixed, &reproduced);
         }
+        if e.stale_clones {
+            add(
+                &defects::ITK_32,
+                "SyN's point-set evaluations use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
+                "SyN's point-set evaluations use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
+            );
+        }
         if e.igdm_centre {
             add(
                 &defects::ANTS_66,
@@ -1431,7 +1438,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     }
 
     /// An ITK exception that `main` catches: "Exception Object caught: " and its print.
-    pub(crate) fn exception_in_main(&self, log: &mut Log<'_>, e: &ItkException) -> RegistrationFailed {
+    pub(crate) fn exception_in_main(
+        &self,
+        log: &mut Log<'_>,
+        e: &ItkException,
+    ) -> RegistrationFailed {
         log.cerr(&format!("Exception Object caught: \n{}\n", e.print()));
         RegistrationFailed(e.description.clone())
     }

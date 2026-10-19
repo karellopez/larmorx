@@ -714,11 +714,9 @@ fn load_transform<R: Compute, const D: usize>(
     if !recognized && Path::new(name).exists() {
         match read_field_image::<R, D>(ctx, name) {
             Ok(Some(field)) => {
-                return Ok(vec![Xfm::Field(larmorx_registration::field::FieldXfm::new(
-                    field,
-                    None,
-                    ctx.notices.fix(),
-                ))]);
+                return Ok(vec![Xfm::Field(
+                    larmorx_registration::field::FieldXfm::new(field, None, ctx.notices.fix()),
+                )]);
             }
             Ok(None) => {}
             Err(why) => return Err(LoadError::Unsupported(why)),
@@ -1376,8 +1374,7 @@ fn do_registration<R: Compute, const D: usize>(
         };
         let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
         if !method.is_linear() {
-            let variances =
-                parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+            let variances = parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
             if method == XfrmMethod::SyN {
                 // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
                 // floats read by the parser, held as RealType.
@@ -2205,7 +2202,9 @@ fn write_field_image<R: Compute, const D: usize>(
     let written = match R::PRECISION {
         Precision::Double => {
             let data: Vec<f64> = field.data.iter().flatten().map(|v| v.to_f64()).collect();
-            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &data, &options)
+            larmorx_io::nifti::itk::write_itk_vector_image(
+                name, &geometry, D, &meta, &data, &options,
+            )
         }
         Precision::Float => {
             let data: Vec<f32> = field
@@ -2214,7 +2213,9 @@ fn write_field_image<R: Compute, const D: usize>(
                 .flatten()
                 .map(|v| v.to_f64() as f32)
                 .collect();
-            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &data, &options)
+            larmorx_io::nifti::itk::write_itk_vector_image(
+                name, &geometry, D, &meta, &data, &options,
+            )
         }
     };
     if let Err(e) = written {

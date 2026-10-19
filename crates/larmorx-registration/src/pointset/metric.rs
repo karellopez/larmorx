@@ -131,6 +131,9 @@ pub struct PointSetCorrections {
     /// ANTS-66: IGDM's value reads the neighbourhood's centre intensity as its derivative
     /// does (ANTs computes a negative index for neighbourhoods of more than one voxel).
     pub igdm_value_centre: bool,
+    /// ITK-32: a SyN evaluation looks its points up in the label metrics of the same
+    /// `Initialize` (ITK appends new ones at every `Initialize` and keeps using the first).
+    pub current_clones: bool,
 }
 
 impl PointSetCorrections {
@@ -143,6 +146,7 @@ impl PointSetCorrections {
             alpha_test: fix,
             igdm_intensity_range: fix,
             igdm_value_centre: fix,
+            current_clones: fix,
         }
     }
 }
@@ -164,6 +168,9 @@ pub struct PointSetEvents {
     pub igdm_sigma: Option<(f64, f64)>,
     /// ANTS-66: IGDM's value with a neighbourhood of more than one voxel.
     pub igdm_centre: bool,
+    /// ITK-32: a SyN evaluation used label metrics whose moving points differ from the
+    /// current ones.
+    pub stale_clones: bool,
 }
 
 impl PointSetEvents {
@@ -175,6 +182,7 @@ impl PointSetEvents {
         self.alpha_near_one |= o.alpha_near_one;
         self.short_neighbourhood |= o.short_neighbourhood;
         self.igdm_centre |= o.igdm_centre;
+        self.stale_clones |= o.stale_clones;
         if self.igdm_sigma.is_none() {
             self.igdm_sigma = o.igdm_sigma;
         }
@@ -548,8 +556,34 @@ pub struct PointSetMetric<R, const D: usize> {
     labels: Vec<u32>,
     clones: Vec<LabelMetric<R, D>>,
     igdm: Option<Igdm<R, D>>,
+    /// The label metrics of the stage's first SyN `Initialize`, with their moving points
+    /// (ITK-32: ITK keeps using them).
+    syn_clones: Option<SynClones<R, D>>,
+    /// ITK-32 corrected: the label metrics of the latest `Initialize`.
+    syn_current: Option<Vec<LabelMetric<R, D>>>,
+    /// The state SyN's `Initialize()` leaves for the evaluation.
+    tangent: Option<TangentState<R, D>>,
     /// Where the originals' defects met this metric.
     pub events: PointSetEvents,
+}
+
+/// Label metrics and the moving points each was built from.
+type SynClones<R, const D: usize> = (Vec<Vec<[f32; D]>>, Vec<LabelMetric<R, D>>);
+
+/// One of SyN's evaluations of a point-set metric (`ComputeMetricGradientField`): in tangent
+/// space (both point sets mapped into the virtual domain by the inverses of their transforms),
+/// each point's derivative added to the virtual voxel nearest it
+/// (`SetCalculateValueAndDerivativeInTangentSpace(true)`,
+/// `SetStoreDerivativeAsSparseFieldForLocalSupportTransforms(true)`).
+pub struct TangentCall<'a, R, const D: usize> {
+    /// The point sets exchanged: the moving set in the fixed role (the moving-to-middle
+    /// update).
+    pub swapped: bool,
+    /// The metric's fixed and moving transforms.
+    pub fixed_transform: &'a Composite<R, D>,
+    pub moving_transform: &'a Composite<R, D>,
+    /// The level's virtual domain.
+    pub virtual_space: &'a Space<D>,
 }
 
 /// What one evaluation gives.
@@ -578,6 +612,9 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             labels: Vec::new(),
             clones: Vec::new(),
             igdm: None,
+            syn_clones: None,
+            syn_current: None,
+            tangent: None,
             events: PointSetEvents::default(),
         }
     }
@@ -1005,6 +1042,421 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                     * closest_pixel[centre + 1 + d];
         }
         Ok((measure, local))
+    }
+}
+
+/// A point-set metric's transform that ITK cannot invert in tangent space: its
+/// `GetInverseTransform()` is null and ITK crashes on it.
+fn no_inverse(which: &str) -> ItkException {
+    ItkException::new(
+        crate::method::CRASH_FILE,
+        0,
+        "",
+        format!(
+            "the {which} transform of a point-set metric in a SyN stage cannot be inverted (a linear transform with a singular matrix, or a displacement field without an inverse): ITK maps the points with a null transform and crashes"
+        ),
+    )
+}
+
+/// `DetermineCommonPointSetLabels()`: the sorted labels of `fixed` that `moving` has too, and
+/// ITK's warning when `fixed` has others.
+fn common_labels(fixed: &[u32], moving: &[u32], warnings: &mut Vec<String>) -> Vec<u32> {
+    let sorted_unique = |labels: &[u32]| {
+        let mut out: Vec<u32> = Vec::new();
+        for &l in labels {
+            if !out.contains(&l) {
+                out.push(l);
+            }
+        }
+        out.sort_unstable();
+        out
+    };
+    let fixed_labels = sorted_unique(fixed);
+    let moving_labels = sorted_unique(moving);
+    let mut common = Vec::new();
+    let mut uncommon = false;
+    for &l in &fixed_labels {
+        if moving_labels.contains(&l) {
+            common.push(l);
+        } else {
+            uncommon = true;
+        }
+    }
+    if uncommon {
+        warnings.push(format!(
+            "WARNING: In {LABELED_FILE}, line 235\nLabeledPointSetToPointSetMetricv4 (0x0): The label sets are not bijective.\n\n"
+        ));
+    }
+    common
+}
+
+impl<R: Real, const D: usize> FixedInverse<R, D> {
+    /// `TransformCovariantVector(vector, point)` of the inverse at `p` (a `Point<float>`).
+    fn covariant(&self, v: &[R; D], p: &[f32; D]) -> [R; D] {
+        match &self.0 {
+            None => *v,
+            Some(c) => {
+                let q: [R; D] = std::array::from_fn(|k| R::from_f64(f64::from(p[k])));
+                c.transform_covariant(v, &q)
+            }
+        }
+    }
+}
+
+/// What SyN's `Initialize()` of a point-set metric leaves for its evaluation.
+#[derive(Clone, Debug)]
+struct TangentState<R, const D: usize> {
+    swapped: bool,
+    fixed_inverse: FixedInverse<R, D>,
+    /// IGDM: the moving points and their gradients in the virtual domain.
+    moved: Option<IntensityPointSet<R, D>>,
+}
+
+impl<R: Real, const D: usize> PointSetMetric<R, D> {
+    /// SyN's `Initialize()` of this metric for one call (`ComputeMetricGradientField`): in
+    /// tangent space with the call's transforms. The labelled metrics build one metric per
+    /// common label on that label's moving points mapped into the virtual domain; IGDM maps
+    /// the moving points and their gradients and estimates its sigmas.
+    pub fn tangent_initialize(
+        &mut self,
+        call: &TangentCall<'_, R, D>,
+        warnings: &mut Vec<String>,
+    ) -> Result<(), ItkException> {
+        self.virtual_space = Some(call.virtual_space.clone());
+        // InitializePointSets maps the moving points first, then the fixed ones.
+        let moving_inverse =
+            FixedInverse::of(Some(call.moving_transform)).ok_or_else(|| no_inverse("moving"))?;
+        let fixed_inverse =
+            FixedInverse::of(Some(call.fixed_transform)).ok_or_else(|| no_inverse("fixed"))?;
+        let swapped = call.swapped;
+        let moved = match self.inputs.clone() {
+            PointSetInputs::Labeled { fixed, moving } => {
+                let (wf, wm) = if swapped {
+                    (moving, fixed)
+                } else {
+                    (fixed, moving)
+                };
+                self.labeled_initialize(&wf, &wm, &moving_inverse, warnings)?;
+                None
+            }
+            PointSetInputs::Intensity { fixed, moving } => {
+                let (wf, wm) = if swapped {
+                    (moving, fixed)
+                } else {
+                    (fixed, moving)
+                };
+                Some(self.igdm_initialize(&wf, &wm, &fixed_inverse, &moving_inverse)?)
+            }
+        };
+        self.tangent = Some(TangentState {
+            swapped,
+            fixed_inverse,
+            moved,
+        });
+        Ok(())
+    }
+
+    /// SyN's `GetValueAndDerivative()` after [`PointSetMetric::tangent_initialize`]: the
+    /// value and the derivative, `D` values per voxel of the virtual domain (each point's
+    /// local derivative added at the voxel nearest its virtual position, in point order).
+    pub fn tangent_evaluate(
+        &mut self,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        let state = self.tangent.take().expect("initialised");
+        let result = match self.inputs.clone() {
+            PointSetInputs::Labeled { fixed, moving } => {
+                let (wf, wm) = if state.swapped {
+                    (moving, fixed)
+                } else {
+                    (fixed, moving)
+                };
+                self.labeled_evaluate(&wf, &wm, &state.fixed_inverse, warnings)
+            }
+            PointSetInputs::Intensity { fixed, moving } => {
+                let wf = if state.swapped { moving } else { fixed };
+                let moved = state.moved.as_ref().expect("IGDM's moving set");
+                self.igdm_evaluate(&wf, moved, &state.fixed_inverse, warnings)
+            }
+        };
+        self.tangent = Some(state);
+        result
+    }
+
+    /// The fixed points' virtual positions checked, the "Only N of M points" warning (once
+    /// per stage) and the number of valid points; `label_ok(i)` tells whether point `i` has a
+    /// label of both sets.
+    fn tangent_valid(
+        &mut self,
+        virt: &[[f32; D]],
+        label_ok: impl Fn(usize) -> bool,
+        warnings: &mut Vec<String>,
+    ) -> Result<usize, ItkException> {
+        if virt.iter().any(|p| p.iter().any(|c| c.is_nan())) {
+            return Err(ItkException::new(
+                crate::method::CRASH_FILE,
+                0,
+                "",
+                "a point maps to a coordinate that is not a number (the transform's parameters are not numbers): ITK's nearest-neighbour search finds no point and reads past the end of the point set",
+            ));
+        }
+        let mut valid = 0;
+        for (i, p) in virt.iter().enumerate() {
+            if !self.inside(p) {
+                continue;
+            }
+            if !label_ok(i) {
+                self.events.uncommon_labels = true;
+                if self.corrections.skip_uncommon_labels {
+                    continue;
+                }
+            }
+            valid += 1;
+        }
+        if valid < virt.len() && !self.have_warned {
+            warnings.push(format!(
+                "WARNING: In {BASE_FILE}, line 136\n{} (0x0): Only {valid} of {} points are within the virtual domain, and will be used in the evaluation.\n\n",
+                self.class(),
+                virt.len()
+            ));
+            self.have_warned = true;
+        }
+        Ok(valid)
+    }
+
+    /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`.
+    fn store(&self, derivative: &mut [R], p: &[f32; D], local: &[R; D]) {
+        let space = self.virtual_space.as_ref().expect("set by the call");
+        let q: [f64; D] = std::array::from_fn(|k| f64::from(p[k]));
+        let o = space.offset(&space.point_to_index(&q)) * D;
+        for d in 0..D {
+            derivative[o + d] = derivative[o + d] + local[d];
+        }
+    }
+
+    /// `LabeledPointSetToPointSetMetricv4::Initialize()` in tangent space.
+    fn labeled_initialize(
+        &mut self,
+        wf: &LabeledPointSet<D>,
+        wm: &LabeledPointSet<D>,
+        moving_inverse: &FixedInverse<R, D>,
+        warnings: &mut Vec<String>,
+    ) -> Result<(), ItkException> {
+        let (Some(fl), Some(ml)) = (&wf.labels, &wm.labels) else {
+            return Err(ItkException::new(
+                LABELED_FILE,
+                51,
+                "LabeledPointSetToPointSetMetricv4",
+                "Each point of the point set must be associated with a label.",
+            ));
+        };
+        let common = common_labels(fl, ml, warnings);
+        if common.is_empty() && !fl.is_empty() && self.corrections.skip_uncommon_labels {
+            self.events.uncommon_labels = true;
+            return Err(ItkException::new(
+                LABELED_FILE,
+                116,
+                "LabeledPointSetToPointSetMetricv4",
+                "The fixed and moving point sets have no label in common",
+            ));
+        }
+        let mut subsets = Vec::with_capacity(common.len());
+        let mut clones = Vec::with_capacity(common.len());
+        let mut events = self.events;
+        for &label in &common {
+            let subset: Vec<[f32; D]> = wm
+                .points
+                .iter()
+                .zip(ml)
+                .filter(|(_, l)| **l == label)
+                .map(|(p, _)| moving_inverse.apply(p))
+                .collect();
+            clones.push(LabelMetric::new(
+                &self.kind,
+                &subset,
+                &self.corrections,
+                &mut events,
+                warnings,
+            )?);
+            subsets.push(subset);
+        }
+        self.events = events;
+        self.labels = common;
+        // ITK-32: ITK keeps the first Initialize's metrics; the notice whenever their moving
+        // points differ from the current ones.
+        match &self.syn_clones {
+            None => self.syn_clones = Some((subsets, clones)),
+            Some((first, _)) => {
+                if *first != subsets {
+                    self.events.stale_clones = true;
+                }
+                if self.corrections.current_clones {
+                    self.syn_current = Some(clones);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The labelled metrics' `GetValueAndDerivative()` in tangent space.
+    fn labeled_evaluate(
+        &mut self,
+        wf: &LabeledPointSet<D>,
+        wm: &LabeledPointSet<D>,
+        fixed_inverse: &FixedInverse<R, D>,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        // InitializeForIteration maps both sets again and builds the locators (the fixed
+        // points', then the moving points').
+        let virt: Vec<[f32; D]> = wf.points.iter().map(|p| fixed_inverse.apply(p)).collect();
+        if virt.is_empty() || wm.points.is_empty() {
+            return Err(no_points());
+        }
+        let fl = wf.labels.as_ref().expect("checked at Initialize");
+        let labels = self.labels.clone();
+        let valid = self.tangent_valid(&virt, |i| labels.contains(&fl[i]), warnings)?;
+        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
+        let mut derivative = vec![R::ZERO; D * space_len];
+        let mut thread = CompensatedSum::default();
+        let clones = match &self.syn_current {
+            Some(c) if self.corrections.current_clones => c,
+            _ => &self.syn_clones.as_ref().expect("set at Initialize").1,
+        };
+        for (index, p) in virt.iter().enumerate() {
+            if !self.inside(p) {
+                continue;
+            }
+            let Some(position) = labels.iter().position(|&l| l == fl[index]) else {
+                if self.corrections.skip_uncommon_labels {
+                    continue;
+                }
+                return Err(ItkException::new(
+                    LABELED_FILE,
+                    116,
+                    "LabeledPointSetToPointSetMetricv4",
+                    "Label not found in common label set",
+                ));
+            };
+            let (v, local) = clones[position].value_and_derivative(p, warnings);
+            thread.add(v.to_f64());
+            self.store(&mut derivative, p, &local);
+        }
+        let total = add_thread(&thread);
+        if valid == 0 {
+            warnings.push(self.no_valid_points());
+            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+        }
+        Ok((
+            R::from_f64(total.sum()) / R::from_i64(valid as i64),
+            derivative,
+        ))
+    }
+
+    /// ANTs' IGDM `Initialize()` in tangent space: the moving points and their gradients
+    /// mapped into the virtual domain (`TransformMovingPointSetGradients`, each gradient a
+    /// covariant vector at its point), then the sigmas.
+    fn igdm_initialize(
+        &mut self,
+        wf: &IntensityPointSet<R, D>,
+        wm: &IntensityPointSet<R, D>,
+        fixed_inverse: &FixedInverse<R, D>,
+        moving_inverse: &FixedInverse<R, D>,
+    ) -> Result<IntensityPointSet<R, D>, ItkException> {
+        let moved_points: Vec<[f32; D]> =
+            wm.points.iter().map(|p| moving_inverse.apply(p)).collect();
+        let virt: Vec<[f32; D]> = wf.points.iter().map(|p| fixed_inverse.apply(p)).collect();
+        if virt.is_empty() {
+            return Err(no_points());
+        }
+        let tree = tree(&moved_points)?;
+        let data: Vec<Vec<R>> = wm
+            .points
+            .iter()
+            .zip(&wm.data)
+            .map(|(p, pixel)| {
+                let mut out = pixel.clone();
+                let voxels = pixel.len() / (1 + D);
+                for n in 0..voxels {
+                    let base = n * (D + 1) + 1;
+                    let v: [R; D] = std::array::from_fn(|d| pixel[base + d]);
+                    let t = moving_inverse.covariant(&v, p);
+                    out[base..base + D].copy_from_slice(&t);
+                }
+                out
+            })
+            .collect();
+        let PointSetMetricKind::Igdm {
+            intensity_sigma,
+            euclidean_sigma,
+        } = self.kind
+        else {
+            unreachable!("an intensity point set is IGDM's")
+        };
+        let mut is = intensity_sigma;
+        let mut es = euclidean_sigma;
+        if is <= R::ZERO {
+            let ants = estimate_intensity_sigma(wf, wm);
+            let range = intensity_range_sigma(wf, wm);
+            if ants.to_f64().to_bits() != range.to_f64().to_bits() {
+                self.events.igdm_sigma = Some((ants.to_f64(), range.to_f64()));
+            }
+            is = if self.corrections.igdm_intensity_range {
+                range
+            } else {
+                ants
+            };
+        }
+        if es <= R::ZERO {
+            es = estimate_euclidean_sigma(&virt, &tree)?;
+        }
+        self.igdm = Some(Igdm {
+            tree,
+            intensity_sigma: is,
+            euclidean_sigma: es,
+        });
+        Ok(IntensityPointSet {
+            points: moved_points,
+            data,
+        })
+    }
+
+    /// ANTs' IGDM `GetValueAndDerivative()` in tangent space (the fixed points' data as
+    /// given).
+    fn igdm_evaluate(
+        &mut self,
+        wf: &IntensityPointSet<R, D>,
+        moved: &IntensityPointSet<R, D>,
+        fixed_inverse: &FixedInverse<R, D>,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        let virt: Vec<[f32; D]> = wf.points.iter().map(|p| fixed_inverse.apply(p)).collect();
+        if virt.is_empty() || moved.points.is_empty() {
+            return Err(no_points());
+        }
+        let valid = self.tangent_valid(&virt, |_| true, warnings)?;
+        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
+        let mut derivative = vec![R::ZERO; D * space_len];
+        let mut thread = CompensatedSum::default();
+        for (index, p) in virt.iter().enumerate() {
+            if !self.inside(p) {
+                continue;
+            }
+            if wf.data[index].len() / (1 + D) > 1 {
+                self.events.igdm_centre = true;
+            }
+            let (v, local) = self.igdm_value_and_derivative(p, &wf.data[index], moved)?;
+            thread.add(v.to_f64());
+            self.store(&mut derivative, p, &local);
+        }
+        let total = add_thread(&thread);
+        if valid == 0 {
+            warnings.push(self.no_valid_points());
+            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+        }
+        Ok((
+            R::from_f64(total.sum()) / R::from_i64(valid as i64),
+            derivative,
+        ))
     }
 }
 

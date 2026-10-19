@@ -39,8 +39,8 @@ use larmorx_core::IndexFloor;
 
 use crate::convergence::WindowConvergence;
 use crate::field::{
-    Field, FieldXfm, InvertSettings, compose, gaussian_smooth, invert, resample_to,
-    scale_update, zero_field,
+    Field, FieldXfm, InvertSettings, compose, gaussian_smooth, invert, resample_to, scale_update,
+    zero_field,
 };
 use crate::mask::Mask;
 use crate::method::{
@@ -48,6 +48,7 @@ use crate::method::{
     sample_points, shrink_space, smooth_for_level,
 };
 use crate::metric::{ImageMetricv4, demons, no_valid_points_warning};
+use crate::pointset::metric::{PointSetEvents, PointSetMetric, TangentCall};
 use crate::resample::{resample_mask_nearest, resample_nonlinear_with};
 use crate::transform::{Composite, Xfm};
 use crate::{Image, ItkException, Real, Space};
@@ -93,6 +94,9 @@ pub struct SynStage<R, const D: usize> {
     pub correct_gc_derivative: bool,
     /// ITK-31: a role without a mask has none (corrected) or keeps the previous call's mask.
     pub correct_stale_masks: bool,
+    /// ITK-33: a point-set metric among several metrics is evaluated through the fixed and
+    /// moving composites (corrected) or, as ITK, through identity displacement fields.
+    pub correct_point_set_transforms: bool,
     pub n_threads: usize,
 }
 
@@ -134,6 +138,8 @@ pub struct SynOutput<R, const D: usize> {
     /// ITK-31's condition was met: a metric with only one of its two masks evaluated more
     /// than once in a level.
     pub stale_masks: bool,
+    /// ITK-33's condition was met: a point-set metric among several metrics was evaluated.
+    pub identity_point_sets: bool,
 }
 
 impl<R: Real, const D: usize> SynStage<R, D> {
@@ -421,8 +427,17 @@ fn normalise_weights<R: Real>(weights: &mut [R]) -> Result<(), ItkException> {
 /// `swapped` gives the moving images the role of the fixed ones (the moving-to-middle
 /// update).
 struct GradientCall<'a, R, const D: usize> {
-    metrics: &'a [LevelImageMetric<R, D>],
-    resampled: &'a mut [Resampled<R, D>],
+    /// The image metrics (`None` where the stage has a point-set metric).
+    metrics: &'a [Option<LevelImageMetric<R, D>>],
+    resampled: &'a mut [Option<Resampled<R, D>>],
+    /// The point-set metrics (`None` where the stage has an image metric).
+    point_sets: &'a mut [Option<PointSetMetric<R, D>>],
+    /// The iteration's fixed and moving composites.
+    fixed_composite: &'a Composite<R, D>,
+    moving_composite: &'a Composite<R, D>,
+    /// The identity displacement field transform ITK gives every metric of a multi-metric
+    /// (ITK-33 reproduced), or `None`.
+    identity: Option<&'a Composite<R, D>>,
     virtual_space: &'a Space<D>,
     weights: &'a mut Vec<R>,
     multi: bool,
@@ -450,8 +465,35 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         let n = self.metrics.len();
         let mut initialized = Vec::with_capacity(n);
         for j in 0..n {
-            let lm = &self.metrics[j];
-            let r = &mut self.resampled[j];
+            let Some(lm) = &self.metrics[j] else {
+                // A point-set metric: SetFixedObject/SetMovingObject (exchanged in the swapped
+                // call), the transforms, tangent space; Initialize.
+                let (ft, mt) = match self.identity {
+                    Some(identity) => (identity, identity),
+                    None if swapped => (self.moving_composite, self.fixed_composite),
+                    None => (self.fixed_composite, self.moving_composite),
+                };
+                let call = TangentCall {
+                    swapped,
+                    fixed_transform: ft,
+                    moving_transform: mt,
+                    virtual_space: self.virtual_space,
+                };
+                let p = self.point_sets[j].as_mut().expect("a point-set metric");
+                match p.tangent_initialize(&call, warnings) {
+                    Ok(()) => initialized.push(None),
+                    Err(e) if self.multi => {
+                        return Err(e.wrapped(
+                            "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
+                            226,
+                            "Caught exception initializing metric: \n",
+                        ));
+                    }
+                    Err(e) => return Err(e),
+                }
+                continue;
+            };
+            let r = self.resampled[j].as_mut().expect("an image metric");
             if lm.use_gradient_filter {
                 // Initialize computes the gradient image of the image whose gradient the
                 // metric uses: its moving image (Demons: its fixed image). In the swapped call
@@ -512,7 +554,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 &lm.samples,
             );
             match result {
-                Ok(m) => initialized.push(m),
+                Ok(m) => initialized.push(Some(m)),
                 Err(e) if self.multi => {
                     return Err(e.wrapped(
                         "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
@@ -525,9 +567,16 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         }
         let mut values = Vec::with_capacity(n);
         let mut derivatives = Vec::with_capacity(n);
-        for m in &initialized {
-            let (v, d) =
-                metric_derivative(m, self.stage.correct_gc_derivative, self.floor, warnings)?;
+        for (j, m) in initialized.iter().enumerate() {
+            let (v, d) = match m {
+                Some(m) => {
+                    metric_derivative(m, self.stage.correct_gc_derivative, self.floor, warnings)?
+                }
+                None => self.point_sets[j]
+                    .as_mut()
+                    .expect("a point-set metric")
+                    .tangent_evaluate(warnings)?,
+            };
             values.push(v);
             derivatives.push(d);
         }
@@ -582,7 +631,11 @@ pub fn weights_are_identity<R: Real>(w: &[R]) -> bool {
 
 /// The adaptor of a level (`DisplacementFieldTransformParametersAdaptor`): the transform's
 /// fields (and inverse) resampled onto `space` unless their fixed parameters already equal it.
-fn adapt<R: Real, const D: usize>(t: &FieldXfm<R, D>, space: &Space<D>, floor: &IndexFloor) -> FieldXfm<R, D> {
+fn adapt<R: Real, const D: usize>(
+    t: &FieldXfm<R, D>,
+    space: &Space<D>,
+    floor: &IndexFloor,
+) -> FieldXfm<R, D> {
     let s = &t.field.space;
     let same = s.size == space.size
         && s.origin == space.origin
@@ -592,11 +645,20 @@ fn adapt<R: Real, const D: usize>(t: &FieldXfm<R, D>, space: &Space<D>, floor: &
         return t.clone();
     }
     // The resampled fields start at index 0 (`SetSize`).
-    let target = Space::new(space.size, [0; D], space.spacing, space.origin, space.direction)
-        .expect("the virtual domain's geometry");
+    let target = Space::new(
+        space.size,
+        [0; D],
+        space.spacing,
+        space.origin,
+        space.direction,
+    )
+    .expect("the virtual domain's geometry");
     FieldXfm {
         field: Arc::new(resample_to(&t.field, &target, floor)),
-        inverse: t.inverse.as_ref().map(|i| Arc::new(resample_to(i, &target, floor))),
+        inverse: t
+            .inverse
+            .as_ref()
+            .map(|i| Arc::new(resample_to(i, &target, floor))),
         exact_floor: t.exact_floor,
     }
 }
@@ -607,22 +669,39 @@ pub fn run_syn<R: Real, const D: usize>(
     observer: &mut dyn SynObserver<R, D>,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
+    events: &mut PointSetEvents,
+) -> Result<SynOutput<R, D>, ItkException> {
+    // The point-set metrics live through the stage (ITK keeps one metric object).
+    let mut point_sets: Vec<Option<PointSetMetric<R, D>>> = stage
+        .metrics
+        .iter()
+        .map(|m| match m {
+            StageMetric::PointSet(p) => Some(p.metric.clone()),
+            StageMetric::Image(_) => None,
+        })
+        .collect();
+    let result = run_syn_levels(stage, observer, floor, warnings, &mut point_sets);
+    for p in point_sets.iter().flatten() {
+        events.merge(&p.events);
+    }
+    result
+}
+
+fn run_syn_levels<R: Real, const D: usize>(
+    stage: &SynStage<R, D>,
+    observer: &mut dyn SynObserver<R, D>,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+    point_sets: &mut [Option<PointSetMetric<R, D>>],
 ) -> Result<SynOutput<R, D>, ItkException> {
     let Some(virtual_base) = stage.virtual_base() else {
         return Err(crash(
             "a stage of point-set metrics without a fixed mask has no virtual domain (ANTs reads its spacing from a null image)",
         ));
     };
-    if stage
-        .metrics
-        .iter()
-        .any(|m| matches!(m, StageMetric::PointSet(_)))
-    {
-        return Err(crash(
-            "point-set metrics in a SyN stage are not supported yet",
-        ));
-    }
     let multi = stage.metrics.len() > 1;
+    let has_point_sets = point_sets.iter().any(Option::is_some);
+    let mut identity_point_sets = false;
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
     let invert_settings = InvertSettings::<R>::syn();
@@ -634,9 +713,10 @@ pub fn run_syn<R: Real, const D: usize>(
         let mut level_metrics = Vec::with_capacity(stage.metrics.len());
         for sm in &stage.metrics {
             let StageMetric::Image(sm) = sm else {
-                unreachable!("refused above")
+                level_metrics.push(None);
+                continue;
             };
-            level_metrics.push(LevelImageMetric {
+            level_metrics.push(Some(LevelImageMetric {
                 kind: sm.kind,
                 fixed: smooth_for_level(
                     &sm.fixed,
@@ -654,11 +734,20 @@ pub fn run_syn<R: Real, const D: usize>(
                 moving_mask: sm.moving_mask.clone(),
                 use_gradient_filter: sm.use_gradient_filter,
                 samples: None,
-            });
+            }));
         }
-        // SetMetricSamplePoints: one set per metric from the first metric's fixed mask.
+        // SetMetricSamplePoints: one set per metric from the first metric's fixed mask, every
+        // metric cast to an image metric.
         if stage.sampling != SamplingStrategy::None {
-            let first_mask = level_metrics[0].fixed_mask.clone();
+            let Some(first) = &level_metrics[0] else {
+                return Err(ItkException::new(
+                    crate::method::FILE,
+                    if multi { 924 } else { 938 },
+                    crate::method::CLASS,
+                    "Invalid metric conversion.",
+                ));
+            };
+            let first_mask = first.fixed_mask.clone();
             for lm in &mut level_metrics {
                 let points = sample_points(
                     &virtual_space,
@@ -667,7 +756,14 @@ pub fn run_syn<R: Real, const D: usize>(
                     first_mask.as_ref(),
                     &mut current_seed,
                 );
-                lm.samples = Some(Arc::new(points));
+                match lm {
+                    Some(lm) => lm.samples = Some(Arc::new(points)),
+                    None => {
+                        return Err(crash(
+                            "a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes",
+                        ));
+                    }
+                }
             }
         }
         // SyN's InitializeRegistrationAtEachLevel.
@@ -708,7 +804,10 @@ pub fn run_syn<R: Real, const D: usize>(
         // The metric's masks as InitializeRegistrationAtEachLevel sets them (the stage's own).
         let mut mask_state: Vec<(Option<Mask<D>>, Option<Mask<D>>)> = level_metrics
             .iter()
-            .map(|lm| (lm.fixed_mask.clone(), lm.moving_mask.clone()))
+            .map(|lm| match lm {
+                Some(lm) => (lm.fixed_mask.clone(), lm.moving_mask.clone()),
+                None => (None, None),
+            })
             .collect();
         // StartOptimization.
         let mut convergence = WindowConvergence::new(stage.convergence_window);
@@ -716,121 +815,144 @@ pub fn run_syn<R: Real, const D: usize>(
         if n_iterations > 1
             && level_metrics
                 .iter()
+                .flatten()
                 .any(|lm| lm.fixed_mask.is_some() != lm.moving_mask.is_some())
         {
             stale_masks = true;
         }
+        if multi && has_point_sets && n_iterations > 0 {
+            identity_point_sets = true;
+        }
+        // ITK-33 reproduced: the identity displacement field transform of the level.
+        let identity =
+            (multi && has_point_sets && !stage.correct_point_set_transforms).then(|| {
+                Composite::new(vec![Xfm::Field(FieldXfm::new(
+                    zero_field(&virtual_space),
+                    Some(zero_field(&virtual_space)),
+                    stage.exact_floor,
+                ))])
+            });
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
             iteration += 1;
             let step = || -> Result<_, ItkException> {
-            let mut fixed_composite: Vec<Xfm<R, D>> = stage
-                .fixed_initial
-                .as_ref()
-                .map(|c| c.transforms.clone())
-                .unwrap_or_default();
-            fixed_composite.push(Xfm::Field(
-                f2m.inverse_transform().expect("the fields have inverses"),
-            ));
-            let fixed_composite = Composite::new(fixed_composite);
-            let mut moving_composite = stage.moving_initial.clone();
-            moving_composite.push(Xfm::Field(
-                m2m.inverse_transform().expect("the fields have inverses"),
-            ));
-            let moving_composite = Composite::new(moving_composite);
-            let mut resampled: Vec<Resampled<R, D>> = level_metrics
-                .iter()
-                .map(|lm| Resampled {
-                    fixed: Arc::new(resample_image(
-                        &lm.fixed,
-                        &virtual_space,
-                        &fixed_composite,
-                        floor,
-                    )),
-                    moving: Arc::new(resample_image(
-                        &lm.moving,
-                        &virtual_space,
-                        &moving_composite,
-                        floor,
-                    )),
-                    fixed_mask: lm.fixed_mask.as_ref().map(|m| {
-                        Mask::new(resample_mask_nearest(
-                            &m.image,
-                            &virtual_space,
-                            &fixed_composite,
-                        ))
-                    }),
-                    moving_mask: lm.moving_mask.as_ref().map(|m| {
-                        Mask::new(resample_mask_nearest(
-                            &m.image,
-                            &virtual_space,
-                            &moving_composite,
-                        ))
-                    }),
-                    fixed_gradient: None,
-                    moving_gradient: None,
-                })
-                .collect();
-            let mut call = GradientCall {
-                metrics: &level_metrics,
-                resampled: &mut resampled,
-                virtual_space: &virtual_space,
-                weights: &mut weights,
-                multi,
-                stage,
-                floor,
-                masks: &mut mask_state,
-                stale_masks: !stage.correct_stale_masks,
-            };
-            // The fixed-to-middle update (the metric value is the "moving" one), then the
-            // moving-to-middle update.
-            let (moving_value, fixed_gradient) = call.gradient_field(false, warnings)?;
-            let fixed_update = scale_update(
-                &gaussian_smooth(&fixed_gradient, stage.update_variance),
-                stage.learning_rate,
-            );
-            let (fixed_value, moving_gradient) = call.gradient_field(true, warnings)?;
-            let moving_update = scale_update(
-                &gaussian_smooth(&moving_gradient, stage.update_variance),
-                stage.learning_rate,
-            );
-            let fixed_total = gaussian_smooth(
-                &compose(&fixed_update, &f2m.field, floor),
-                stage.total_variance,
-            );
-            let moving_total = gaussian_smooth(
-                &compose(&moving_update, &m2m.field, floor),
-                stage.total_variance,
-            );
-            let fixed_inverse = invert(
-                &fixed_total,
-                f2m.inverse.as_deref(),
-                &invert_settings,
-                floor,
-            );
-            let fixed_field = invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
-            let moving_inverse = invert(
-                &moving_total,
-                m2m.inverse.as_deref(),
-                &invert_settings,
-                floor,
-            );
-            let moving_field =
-                invert(&moving_inverse, Some(&moving_total), &invert_settings, floor);
-            Ok((
-                FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
-                FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
-                moving_value,
-                fixed_value,
-            ))
+                let mut fixed_composite: Vec<Xfm<R, D>> = stage
+                    .fixed_initial
+                    .as_ref()
+                    .map(|c| c.transforms.clone())
+                    .unwrap_or_default();
+                fixed_composite.push(Xfm::Field(
+                    f2m.inverse_transform().expect("the fields have inverses"),
+                ));
+                let fixed_composite = Composite::new(fixed_composite);
+                let mut moving_composite = stage.moving_initial.clone();
+                moving_composite.push(Xfm::Field(
+                    m2m.inverse_transform().expect("the fields have inverses"),
+                ));
+                let moving_composite = Composite::new(moving_composite);
+                let mut resampled: Vec<Option<Resampled<R, D>>> = level_metrics
+                    .iter()
+                    .map(|lm| {
+                        lm.as_ref().map(|lm| Resampled {
+                            fixed: Arc::new(resample_image(
+                                &lm.fixed,
+                                &virtual_space,
+                                &fixed_composite,
+                                floor,
+                            )),
+                            moving: Arc::new(resample_image(
+                                &lm.moving,
+                                &virtual_space,
+                                &moving_composite,
+                                floor,
+                            )),
+                            fixed_mask: lm.fixed_mask.as_ref().map(|m| {
+                                Mask::new(resample_mask_nearest(
+                                    &m.image,
+                                    &virtual_space,
+                                    &fixed_composite,
+                                ))
+                            }),
+                            moving_mask: lm.moving_mask.as_ref().map(|m| {
+                                Mask::new(resample_mask_nearest(
+                                    &m.image,
+                                    &virtual_space,
+                                    &moving_composite,
+                                ))
+                            }),
+                            fixed_gradient: None,
+                            moving_gradient: None,
+                        })
+                    })
+                    .collect();
+                let mut call = GradientCall {
+                    metrics: &level_metrics,
+                    resampled: &mut resampled,
+                    point_sets: &mut *point_sets,
+                    fixed_composite: &fixed_composite,
+                    moving_composite: &moving_composite,
+                    identity: identity.as_ref(),
+                    virtual_space: &virtual_space,
+                    weights: &mut weights,
+                    multi,
+                    stage,
+                    floor,
+                    masks: &mut mask_state,
+                    stale_masks: !stage.correct_stale_masks,
+                };
+                // The fixed-to-middle update (the metric value is the "moving" one), then the
+                // moving-to-middle update.
+                let (moving_value, fixed_gradient) = call.gradient_field(false, warnings)?;
+                let fixed_update = scale_update(
+                    &gaussian_smooth(&fixed_gradient, stage.update_variance),
+                    stage.learning_rate,
+                );
+                let (fixed_value, moving_gradient) = call.gradient_field(true, warnings)?;
+                let moving_update = scale_update(
+                    &gaussian_smooth(&moving_gradient, stage.update_variance),
+                    stage.learning_rate,
+                );
+                let fixed_total = gaussian_smooth(
+                    &compose(&fixed_update, &f2m.field, floor),
+                    stage.total_variance,
+                );
+                let moving_total = gaussian_smooth(
+                    &compose(&moving_update, &m2m.field, floor),
+                    stage.total_variance,
+                );
+                let fixed_inverse = invert(
+                    &fixed_total,
+                    f2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let fixed_field =
+                    invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
+                let moving_inverse = invert(
+                    &moving_total,
+                    m2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let moving_field = invert(
+                    &moving_inverse,
+                    Some(&moving_total),
+                    &invert_settings,
+                    floor,
+                );
+                Ok((
+                    FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
+                    FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
+                    moving_value,
+                    fixed_value,
+                ))
             };
             // The iteration's work runs in a pool of the stage's thread count.
             let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;
             f2m = new_f2m;
             m2m = new_m2m;
-            let metric_value =
-                R::from_f64(0.5 * (moving_value.to_f64() + fixed_value.to_f64()));
+            let metric_value = R::from_f64(0.5 * (moving_value.to_f64() + fixed_value.to_f64()));
             convergence.add(metric_value.to_f64());
             let convergence_value = R::from_f64(convergence.value());
             if convergence_value < stage.convergence_threshold {
@@ -854,6 +976,7 @@ pub fn run_syn<R: Real, const D: usize>(
         fixed_to_middle: f2m,
         moving_to_middle: m2m,
         stale_masks,
+        identity_point_sets,
     })
 }
 
@@ -885,7 +1008,6 @@ pub fn output_transform<R: Real, const D: usize>(
         f2m.exact_floor,
     )
 }
-
 
 /// The observer's full-scale similarity of a SyN stage (`UpdateFullScaleMetricValue` with
 /// `DownsampleImagesForMetricDerivatives` on): the original fixed image resampled onto its own

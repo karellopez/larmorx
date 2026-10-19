@@ -700,6 +700,30 @@ fn load_transform<R: Compute, const D: usize>(
     ctx: &mut Context<'_, '_>,
     name: &str,
 ) -> Result<Vec<Xfm<R, D>>, LoadError> {
+    // `itk::ants::ReadTransform`: a name whose last extension is not a transform file's is read
+    // first as a displacement field image (`ImageFileReader<Image<Vector<R, D>, D>>`).
+    let last_extension = Path::new(name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.rfind('.').map(|i| n[i..].to_owned()))
+        .unwrap_or_default();
+    let recognized = matches!(
+        last_extension.as_str(),
+        ".h5" | ".hdf5" | ".hdf4" | ".mat" | ".txt" | ".xfm"
+    );
+    if !recognized && Path::new(name).exists() {
+        match read_field_image::<R, D>(ctx, name) {
+            Ok(Some(field)) => {
+                return Ok(vec![Xfm::Field(larmorx_registration::field::FieldXfm::new(
+                    field,
+                    None,
+                    ctx.notices.fix(),
+                ))]);
+            }
+            Ok(None) => {}
+            Err(why) => return Err(LoadError::Unsupported(why)),
+        }
+    }
     let parts = larmorx_io::itk_transform::read_itk_transform_parts(
         Path::new(name),
         R::PRECISION,
@@ -748,17 +772,139 @@ fn load_transform<R: Compute, const D: usize>(
     {
         return Err(LoadError::Report(String::new()));
     }
+    let exact_floor = ctx.notices.fix();
     if D != 3 {
         return parts
             .iter()
             .filter(|p| !p.name.starts_with("CompositeTransform"))
-            .map(|p| xfm_from_part::<R, D>(name, p))
+            .map(|p| {
+                if p.name.starts_with("DisplacementFieldTransform") {
+                    field_from_part::<R, D>(name, p, exact_floor)
+                } else {
+                    xfm_from_part::<R, D>(name, p)
+                }
+            })
             .collect();
     }
-    let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
+    if !parts
+        .iter()
+        .any(|p| p.name.starts_with("DisplacementFieldTransform"))
+    {
+        let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
+        let mut flat = Vec::new();
+        flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+        return Ok(flat);
+    }
     let mut flat = Vec::new();
-    flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+    for p in parts
+        .iter()
+        .filter(|p| !p.name.starts_with("CompositeTransform"))
+    {
+        if p.name.starts_with("DisplacementFieldTransform") {
+            flat.push(field_from_part::<R, D>(name, p, exact_floor)?);
+            continue;
+        }
+        let t = transform_from_parts(std::slice::from_ref(p))
+            .map_err(|e| LoadError::Report(format!("{e}\n")))?;
+        flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+    }
     Ok(flat)
+}
+
+/// A displacement field read as `ImageFileReader<Image<Vector<R, D>, D>>` reads it: `None` for
+/// a file that is not a NIfTI image (ANTs then tries the transform readers); an error for an
+/// image that is not a `D`-dimensional field of `D` components (ITK converts its pixels as
+/// gray, RGB or complex values and ANTs goes on with them; larmorx refuses).
+fn read_field_image<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+) -> Result<Option<larmorx_registration::field::Field<R, D>>, String> {
+    let lower = name.to_ascii_lowercase();
+    if !(lower.ends_with(".nii")
+        || lower.ends_with(".nii.gz")
+        || lower.ends_with(".hdr")
+        || lower.ends_with(".img")
+        || lower.ends_with(".img.gz"))
+    {
+        return Ok(None);
+    }
+    let image = match larmorx_io::nifti::itk::read_itk_image(name, ctx.n_threads) {
+        Ok(i) => i,
+        Err(_) => return Ok(None),
+    };
+    let g = &image.geometry;
+    let n: usize = g.size.iter().product();
+    if g.ndim != D || image.voxels.len() != D * n {
+        return Err(format!(
+            "'{name}' is read as a displacement field but it is not a {D}-dimensional image of {D}-component vectors ({} dimensions, {} values per voxel): ANTs converts its voxels to vectors (as gray, RGB or complex pixels) and goes on; larmorx refuses",
+            g.ndim,
+            image.voxels.len() / n.max(1)
+        ));
+    }
+    let value = |i: usize| -> R {
+        match &image.voxels {
+            larmorx_io::nifti::itk::ItkVoxels::F32(v) => R::r(f64::from(v[i])),
+            larmorx_io::nifti::itk::ItkVoxels::F64(v) => R::r(v[i]),
+        }
+    };
+    // NIfTI stores the components as the slowest axis; ITK interleaves them per voxel.
+    let data: Vec<[R; D]> = (0..n)
+        .map(|v| std::array::from_fn(|c| value(c * n + v)))
+        .collect();
+    let space = Space::new(
+        std::array::from_fn(|k| g.size[k]),
+        [0; D],
+        std::array::from_fn(|k| g.spacing[k]),
+        std::array::from_fn(|k| g.origin[k]),
+        std::array::from_fn(|i| std::array::from_fn(|j| g.direction[i][j])),
+    )
+    .map_err(|e| format!("'{name}': {}", e.description))?;
+    Ok(Some(Image::new(space, data)))
+}
+
+/// A `DisplacementFieldTransform` read from a transform file (`SetFixedParameters`: size,
+/// origin, spacing and direction; `SetParameters`: the vectors), without an inverse field.
+fn field_from_part<R: Compute, const D: usize>(
+    file: &str,
+    part: &ItkTransformParts,
+    exact_floor: bool,
+) -> Result<Xfm<R, D>, LoadError> {
+    let fixed = &part.fixed_parameters;
+    if fixed.len() != D * (D + 3) {
+        return Err(LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {} fixed parameters, {} expected\n",
+            part.name,
+            fixed.len(),
+            D * (D + 3)
+        )));
+    }
+    let size: [usize; D] = std::array::from_fn(|k| fixed[k] as usize);
+    let space = Space::new(
+        size,
+        [0; D],
+        std::array::from_fn(|k| fixed[2 * D + k]),
+        std::array::from_fn(|k| fixed[D + k]),
+        std::array::from_fn(|i| std::array::from_fn(|j| fixed[3 * D + i * D + j])),
+    )
+    .map_err(|e| LoadError::Report(format!("{}\n", e.description)))?;
+    let p = part.parameters.to_f64();
+    if p.len() != D * space.len() {
+        return Err(LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {} parameters, {} expected\n",
+            part.name,
+            p.len(),
+            D * space.len()
+        )));
+    }
+    let data = p
+        .chunks_exact(D)
+        .map(|c| std::array::from_fn(|k| R::r(c[k])))
+        .collect();
+    Ok(Xfm::Field(larmorx_registration::field::FieldXfm::new(
+        Image::new(space, data),
+        None,
+        exact_floor,
+    )))
 }
 
 /// One stored transform in 2 or 4 dimensions, as ITK's reader builds it (`SetParameters`,
@@ -1035,10 +1181,58 @@ fn do_registration<R: Compute, const D: usize>(
         if log.verbose {
             log.cout("+\n");
         }
-        helper.composite = Some(itk_clones(
-            log,
-            restored.into_iter().map(|i| i.transform).collect(),
-        )?);
+        let queue = itk_clones(log, restored.into_iter().map(|i| i.transform).collect())?;
+        // SetRestoreStateTransform: if the last four transforms are displacement fields (SyN's
+        // fixed-to-middle and moving-to-middle fields, each followed by its inverse), they
+        // become the registration state's two transforms, and the composite ends with SyN's
+        // output transform built from them. ANTs tests the categories from the last one on
+        // and stops at the first that is not a field.
+        let n = queue.len();
+        let mut four = true;
+        for k in 1..=4 {
+            if k > n {
+                return Err(refuse(
+                    log,
+                    "a restored state of fewer than four transforms ending with displacement fields: ANTs reads before the start of its transform queue and crashes",
+                ));
+            }
+            if !matches!(queue[n - k], Xfm::Field(_)) {
+                four = false;
+                break;
+            }
+        }
+        if four {
+            let field = |t: &Xfm<R, D>| match t {
+                Xfm::Field(f) => Arc::clone(&f.field),
+                _ => unreachable!("tested above"),
+            };
+            let exact = ctx.notices.fix();
+            let f2m = larmorx_registration::field::FieldXfm {
+                field: field(&queue[n - 4]),
+                inverse: Some(field(&queue[n - 3])),
+                exact_floor: exact,
+            };
+            let m2m = larmorx_registration::field::FieldXfm {
+                field: field(&queue[n - 2]),
+                inverse: Some(field(&queue[n - 1])),
+                exact_floor: exact,
+            };
+            log.logger(
+                "Initial FixedToMiddle and MovingToMiddle transforms are restored from the registration state file.\n",
+            );
+            let floor = IndexFloor::new(ctx.notices.mode());
+            let output = larmorx_registration::syn::output_transform(&f2m, &m2m, &floor);
+            let mut state: Vec<Xfm<R, D>> = queue[..n - 4].to_vec();
+            let mut composite = state.clone();
+            state.push(Xfm::Field(f2m));
+            state.push(Xfm::Field(m2m));
+            composite.push(Xfm::Field(output));
+            helper.registration_state = Some(state);
+            helper.composite = Some(composite);
+        } else {
+            helper.registration_state = None;
+            helper.composite = Some(queue);
+        }
         if log.verbose {
             log.cout("+\n");
         }
@@ -2076,8 +2270,16 @@ fn write_inverse_field<R: Compute, const D: usize>(
     f: &larmorx_registration::field::FieldXfm<R, D>,
 ) {
     let Some(inverse) = &f.inverse else {
+        // The writer is given a null image.
+        let e = ItkException::new(
+            "Modules/IO/ImageBase/include/itkImageFileWriter.hxx",
+            89,
+            "ImageFileWriter",
+            "No input to writer!",
+        );
         log.cerr(&format!(
-            "Can't write transform file {name}\nException Object caught: \nlarmorx: the displacement field has no inverse\n\n"
+            "Can't write transform file {name}\nException Object caught: \n{}\n",
+            e.print()
         ));
         return;
     };

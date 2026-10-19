@@ -103,7 +103,14 @@ command-line binary. Code from different families is never linked into one binar
   replica of `talairach_avi`, and its atlases are not ours to ship: a clean-room original of
   the step (an affine registration to MNI305, validated against recon-all's
   `talairach.xfm`), WashU's written permission, or the atlases downloaded by the user from
-  FreeSurfer at first use. To decide when the FreeSurfer track starts. `mni305.cor.mgz` is
+  FreeSurfer at first use. How fMRIPrep does it (checked 2026-10-19): its build downloads MGH's official FreeSurfer 7.3.2
+  release (`fmriprep/Dockerfile.base:52`) and its published image carries a trimmed, unmodified
+  copy, `talairach_avi` and the three atlas images included: FreeSurfer redistributed as
+  FreeSurfer, relying on MGH's arrangement with Washington University (not documented in the
+  sources; FreeSurfer's licence text is not under the image's `/opt/freesurfer` either). A Rust
+  translation of WashU's code is a derivative work that arrangement would not cover. Simplest
+  way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
+  port the code and ship the atlases. To decide when the FreeSurfer track starts. `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
 - **AFNI: one implementation or two is decided per file.** AFNI's `LICENSE.txt`: code written
   at NIH is public domain; the "major portions" written at the Medical College of Wisconsin

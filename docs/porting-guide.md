@@ -391,6 +391,25 @@ with the classes of the [defect register](findings/upstream-defects.md):
 - **Write every defect into the register** when you find it, with its evidence and what
   larmorx does, and into the tool's API page under "Deliberate differences".
 
+### Clean-room originals: the same behaviour, built for speed (user, 2026-10-19)
+
+A clean-room original is not a second replica. It must give the original's behaviour (the
+same options, messages and results within the validated thresholds), but it is designed from
+the start to be **much faster than a line-by-line replica**, with the best methods available:
+- **algorithms:** the efficient method for the same result (separable or recursive filters,
+  FFT-based convolution, early exits, avoiding recomputation, better data structures);
+- **memory:** cache-friendly layouts (contiguous, struct-of-arrays where it helps), no
+  needless copies or conversions, streaming over volumes instead of holding them twice;
+- **parallelism:** threads over independent work (voxels, slices, volumes, start points),
+  with deterministic reductions (rule 5: the same result at any thread count);
+- **SIMD:** auto-vectorisable inner loops and runtime CPU dispatch (AVX2/AVX-512, NEON), never
+  `target-cpu=native`;
+- **measured, not assumed:** a benchmark against the original program and the replica
+  (`docs/benchmarks/`), profiled where it matters.
+Optimisations must not change results beyond the original's own variability band (D11); where
+a faster method changes results more, it is opt-in. Replicas stay faithful first (bit-exact),
+and are optimised only where exactness is kept.
+
 ## 9. Determinism and platforms
 
 larmorx gives the same bits on all six platforms, independent of the thread count (rule 5,

@@ -18,6 +18,7 @@ mod set_matrix;
 
 pub use linear::{Kind, LinearXfm, collapse_linear, inverse_r};
 
+use crate::field::FieldXfm;
 use crate::{ItkException, Matrix, Real};
 
 /// One transform of a composite.
@@ -29,6 +30,19 @@ pub enum Xfm<R, const D: usize> {
     Translation { offset: [R; D] },
     /// A transform of the matrix-offset family.
     Linear(LinearXfm<R, D>),
+    /// `DisplacementFieldTransform` (SyN's output, or a field among the initial transforms).
+    Field(FieldXfm<R, D>),
+}
+
+/// The exception of operations a displacement field does not support here (a linear stage's
+/// optimizer never sees one).
+fn field_unsupported(what: &str) -> ItkException {
+    ItkException::new(
+        "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.hxx",
+        0,
+        "DisplacementFieldTransform",
+        format!("{what}: a displacement field is not optimised by a linear stage"),
+    )
 }
 
 /// ITK's `Matrix · Point` in `R` (each row summed from 0) plus the offset.
@@ -54,6 +68,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => "IdentityTransform",
             Xfm::Translation { .. } => "TranslationTransform",
             Xfm::Linear(l) => l.kind.class(),
+            Xfm::Field(_) => "DisplacementFieldTransform",
         }
     }
 
@@ -64,16 +79,19 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => *p,
             Xfm::Translation { offset } => std::array::from_fn(|i| p[i] + offset[i]),
             Xfm::Linear(l) => matrix_point(&l.matrix, p, &l.offset),
+            Xfm::Field(f) => f.transform_point(p),
         }
     }
 
-    /// `ComputeJacobianWithRespectToPosition`: the matrix (identity for a translation).
-    pub fn jacobian_position(&self) -> Matrix<R, D> {
+    /// `ComputeJacobianWithRespectToPosition(p)`: the matrix (identity for a translation), a
+    /// field's local Jacobian at the voxel nearest `p`.
+    pub fn jacobian_position(&self, p: &[R; D]) -> Matrix<R, D> {
         match self {
             Xfm::Identity | Xfm::Translation { .. } => std::array::from_fn(|i| {
                 std::array::from_fn(|j| if i == j { R::ONE } else { R::ZERO })
             }),
             Xfm::Linear(l) => l.matrix,
+            Xfm::Field(f) => f.jacobian_position(p),
         }
     }
 
@@ -83,6 +101,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => 0,
             Xfm::Translation { .. } => D,
             Xfm::Linear(l) => l.kind.number_of_parameters(D),
+            Xfm::Field(f) => D * f.field.space.len(),
         }
     }
 
@@ -104,6 +123,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => Vec::new(),
             Xfm::Translation { offset } => offset.to_vec(),
             Xfm::Linear(l) => l.parameters(),
+            Xfm::Field(f) => f.field.data.iter().flatten().copied().collect(),
         }
     }
 
@@ -116,6 +136,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.set_parameters(p),
+            Xfm::Field(_) => Err(field_unsupported("SetParameters")),
         }
     }
 
@@ -125,6 +146,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => Vec::new(),
             Xfm::Translation { .. } => vec![0.0; 0],
             Xfm::Linear(l) => l.fixed_parameters(),
+            Xfm::Field(f) => f.fixed_parameters(),
         }
     }
 
@@ -145,6 +167,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.update(update, factor),
+            Xfm::Field(_) => Err(field_unsupported("UpdateTransformParameters")),
         }
     }
 
@@ -153,7 +176,9 @@ impl<R: Real, const D: usize> Xfm<R, D> {
     pub fn jacobian_parameters(&self, p: &[R; D], out: &mut [R]) {
         match self {
             Xfm::Identity => {}
-            Xfm::Translation { .. } => {
+            // A displacement field's Jacobian is local: the identity for its D parameters at
+            // the point.
+            Xfm::Translation { .. } | Xfm::Field(_) => {
                 out.fill(R::ZERO);
                 for i in 0..D {
                     out[i * D + i] = R::ONE;
@@ -165,7 +190,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
 
     /// `IsLinear()`.
     pub fn is_linear(&self) -> bool {
-        true
+        !matches!(self, Xfm::Field(_))
     }
 }
 
@@ -216,11 +241,21 @@ impl<R: Real, const D: usize> Composite<R, D> {
             self.transforms[0].jacobian_parameters(p, out);
             return;
         }
-        // The last transform (applied first) is the only one optimised. The transforms here
-        // are linear, so their Jacobians with respect to position do not depend on the point.
+        // The last transform (applied first) is the only one optimised; each transform applied
+        // after it multiplies by its Jacobian with respect to position at the point mapped so
+        // far (a linear transform's does not depend on the point).
         self.transforms[n - 1].jacobian_parameters(p, out);
+        let nonlinear = self.transforms.iter().any(|t| !t.is_linear());
+        let mut q = if nonlinear {
+            self.transforms[n - 1].transform_point(p)
+        } else {
+            *p
+        };
         for t in self.transforms[..n - 1].iter().rev() {
-            let jp = t.jacobian_position();
+            let jp = t.jacobian_position(&q);
+            if nonlinear {
+                q = t.transform_point(&q);
+            }
             for c in 0..np {
                 let mut temp = [0.0f64; D];
                 for r in 0..D {

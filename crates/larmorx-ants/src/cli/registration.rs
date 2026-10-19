@@ -887,6 +887,7 @@ fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
             offset: std::array::from_fn(|i| -offset[i]),
         }),
         Xfm::Linear(l) => l.inverse().map(Xfm::Linear),
+        Xfm::Field(f) => f.inverse_transform().map(Xfm::Field),
     }
 }
 
@@ -1756,6 +1757,9 @@ fn chain_of<R: Compute, const D: usize>(
     for t in queue.iter().rev() {
         let (name, parameters, fixed) = match t {
             Xfm::Identity => continue,
+            Xfm::Field(_) => {
+                return Err("a displacement field goes through the per-voxel resampler".into());
+            }
             Xfm::Translation { offset } => (
                 "TranslationTransform_double_3_3".to_owned(),
                 offset.iter().map(|v| v.to_f64()).collect::<Vec<_>>(),

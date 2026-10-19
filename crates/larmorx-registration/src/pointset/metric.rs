@@ -506,6 +506,7 @@ impl<R: Real, const D: usize> FixedInverse<R, D> {
                     offset: std::array::from_fn(|k| -offset[k]),
                 },
                 Xfm::Linear(l) => Xfm::Linear(l.inverse()?),
+                Xfm::Field(f) => Xfm::Field(f.inverse_transform()?),
             });
         }
         Some(FixedInverse(Some(Composite::new(out))))

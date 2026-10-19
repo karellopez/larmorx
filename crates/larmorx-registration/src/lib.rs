@@ -37,6 +37,7 @@
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
 
 pub mod convergence;
+pub mod field;
 pub mod format;
 pub mod image;
 pub mod initializer;

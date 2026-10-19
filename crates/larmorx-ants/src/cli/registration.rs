@@ -832,32 +832,143 @@ fn read_field_image<R: Compute, const D: usize>(
     };
     let g = &image.geometry;
     let n: usize = g.size.iter().product();
-    if g.ndim != D || image.voxels.len() != D * n {
+    let components = image.voxels.len() / n.max(1);
+    let reproduce = !ctx.notices.fix();
+    let mismatch = g.ndim < D || components != D;
+    if g.ndim <= D && components != 0 && mismatch && !reproduce {
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_73,
+            format!(
+                "'{name}' ({} dimensions, {components} values per voxel) is not a {D}-dimensional field of {D}-component vectors: refused; ANTs converts its pixels and registers with them",
+                g.ndim
+            ),
+        );
+    }
+    if g.ndim > D || components == 0 || (mismatch && !reproduce) {
         return Err(format!(
-            "'{name}' is read as a displacement field but it is not a {D}-dimensional image of {D}-component vectors ({} dimensions, {} values per voxel): ANTs converts its voxels to vectors (as gray, RGB or complex pixels) and goes on; larmorx refuses",
+            "'{name}' is read as a displacement field but it is not a {D}-dimensional image of {D}-component vectors ({} dimensions, {components} values per voxel): ANTs converts its voxels to vectors (as gray, RGB or complex pixels) and registers with that field (ANTS-73); larmorx refuses{}",
             g.ndim,
-            image.voxels.len() / n.max(1)
+            if g.ndim <= D && components != 0 {
+                " (LARMORX_UPSTREAM_DEFECTS=reproduce converts them as ANTs does)"
+            } else {
+                ""
+            }
         ));
     }
-    let value = |i: usize| -> R {
+    let raw = |i: usize| -> f64 {
         match &image.voxels {
-            larmorx_io::nifti::itk::ItkVoxels::F32(v) => R::r(f64::from(v[i])),
-            larmorx_io::nifti::itk::ItkVoxels::F64(v) => R::r(v[i]),
+            larmorx_io::nifti::itk::ItkVoxels::F32(v) => f64::from(v[i]),
+            larmorx_io::nifti::itk::ItkVoxels::F64(v) => v[i],
         }
     };
     // NIfTI stores the components as the slowest axis; ITK interleaves them per voxel.
-    let data: Vec<[R; D]> = (0..n)
-        .map(|v| std::array::from_fn(|c| value(c * n + v)))
-        .collect();
+    let voxel = |v: usize| -> Vec<f64> { (0..components).map(|c| raw(c * n + v)).collect() };
+    let data: Vec<[R; D]> = if !mismatch {
+        (0..n)
+            .map(|v| std::array::from_fn(|c| R::r(raw(c * n + v))))
+            .collect()
+    } else {
+        // ANTS-73 reproduced: ITK's ConvertPixelBuffer from `components` values to `D`.
+        let alpha = default_alpha(name);
+        let mut out: Vec<[R; D]> = (0..n)
+            .map(|v| {
+                let x = voxel(v);
+                let converted = convert_pixel(&x, D, alpha);
+                std::array::from_fn(|c| R::r(converted[c]))
+            })
+            .collect();
+        if D == 4 && components == 2 {
+            // ConvertMultiComponentToRGBA with two components never advances its output: the
+            // first pixel holds the last voxel's conversion, the others are left unset
+            // (uninitialised memory); larmorx sets them to zero.
+            let last = out[n - 1];
+            for v in out.iter_mut() {
+                *v = [R::r(0.0); D];
+            }
+            out[0] = last;
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_73,
+                    format!(
+                        "'{name}' (two values per voxel) read as a 4D field: ITK sets only the first vector and leaves the others uninitialised; larmorx sets them to zero"
+                    ),
+            );
+        } else {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_73,
+                    format!(
+                        "'{name}' ({} dimensions, {components} values per voxel) read as a {D}-dimensional field of {D}-component vectors, converted as ITK converts pixels, as in ANTs",
+                        g.ndim
+                    ),
+            );
+        }
+        out
+    };
+    // An image of fewer dimensions: ImageFileReader gives the missing axes size 1, spacing
+    // 1, origin 0 and the identity direction.
+    let m = g.ndim;
     let space = Space::new(
-        std::array::from_fn(|k| g.size[k]),
+        std::array::from_fn(|k| if k < m { g.size[k] } else { 1 }),
         [0; D],
-        std::array::from_fn(|k| g.spacing[k]),
-        std::array::from_fn(|k| g.origin[k]),
-        std::array::from_fn(|i| std::array::from_fn(|j| g.direction[i][j])),
+        std::array::from_fn(|k| if k < m { g.spacing[k] } else { 1.0 }),
+        std::array::from_fn(|k| if k < m { g.origin[k] } else { 0.0 }),
+        std::array::from_fn(|i| {
+            std::array::from_fn(|j| {
+                if i < m && j < m {
+                    g.direction[i][j]
+                } else if i == j {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+        }),
     )
     .map_err(|e| format!("'{name}': {}", e.description))?;
     Ok(Some(Image::new(space, data)))
+}
+
+/// `ConvertPixelBuffer::Convert` of one voxel's `x.len()` values into `d` components (ITK
+/// treats 2 components as complex, 3 as RGB, 4 as RGBA): gray to all colour components (and
+/// both complex parts), gray and alpha multiplied for RGB, the first components otherwise;
+/// `alpha` the default alpha of the file's component type.
+fn convert_pixel(x: &[f64], d: usize, alpha: f64) -> Vec<f64> {
+    let c = x.len();
+    match (d, c) {
+        (2, 1) => vec![x[0], x[0]],
+        (2, _) => vec![x[0], x[1]],
+        (3, 1) => vec![x[0]; 3],
+        (3, 2) => vec![x[0] * x[1]; 3],
+        (3, _) => vec![x[0], x[1], x[2]],
+        (4, 1) => vec![x[0], x[0], x[0], alpha],
+        (4, 2) => vec![x[0], x[0], x[0], x[1]],
+        (4, 3) => vec![x[0], x[1], x[2], alpha],
+        (4, _) => vec![x[0], x[1], x[2], x[3]],
+        _ => x.to_vec(),
+    }
+}
+
+/// `DefaultAlphaValue<T>()` of a NIfTI file's component type: 1 for floating-point data (and
+/// for scaled data, which ITK reads as float), the type's maximum for integers.
+fn default_alpha(name: &str) -> f64 {
+    let Ok(h) = larmorx_io::nifti::read_header(name) else {
+        return 1.0;
+    };
+    let scaled =
+        h.scl_slope.is_finite() && h.scl_slope != 0.0 && (h.scl_slope != 1.0 || h.scl_inter != 0.0);
+    if scaled {
+        return 1.0;
+    }
+    match h.datatype {
+        2 => f64::from(u8::MAX),
+        4 => f64::from(i16::MAX),
+        8 => f64::from(i32::MAX),
+        256 => f64::from(i8::MAX),
+        512 => f64::from(u16::MAX),
+        768 => f64::from(u32::MAX),
+        1024 => i64::MAX as f64,
+        1280 => u64::MAX as f64,
+        _ => 1.0,
+    }
 }
 
 /// A `DisplacementFieldTransform` read from a transform file (`SetFixedParameters`: size,

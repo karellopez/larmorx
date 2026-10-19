@@ -27,6 +27,18 @@ PRE = "{out}/r"
 SYN = "syn"
 
 
+@ants_inputs.builder("reg-mask-2d")
+def _(t):
+    """The 2D phantom's head region (uint8)."""
+    import nibabel as nib
+
+    a = np.diag([2.0, 2.0, 1.0, 1.0])
+    a[:2, 3] = (-40, -44)
+    idx = np.indices((40, 44), dtype=float)
+    r2 = ((idx[0] - 19.5) / 15) ** 2 + ((idx[1] - 21.5) / 17) ** 2
+    nib.save(nib.Nifti1Image((r2 < 0.8).astype(np.uint8), a), t)
+
+
 @ants_inputs.builder("reg-mask-oblique")
 def _(t):
     """The phantom's head region on the oblique fixed grid (uint8): a mask whose grid is not the
@@ -611,15 +623,30 @@ def syn_cases(make) -> list:
         make(
             f"{SYN}/initial-scalar",
             SYN,
-            "-r a scalar image: ITK reads it as a field of equal components",
+            "-r a scalar image: ITK reads it as a field of equal components (ANTS-73)",
             "-r",
-            F,
+            "{gen:reg-mask}",
             *syn,
             out=PRE,
-            expect="divergence",
-            reason="ITK's reader converts a scalar image to vectors whose components all equal the "
-            "voxel's value and ANTs registers with that field; larmorx refuses an image that is "
-            "not a field of the registration's dimension (ANTS-73)",
+        ),
+        make(
+            f"{SYN}/initial-scalar-2d",
+            SYN,
+            "-r a 2D scalar image: ITK reads it as complex pixels, both parts equal (ANTS-73)",
+            "-r",
+            "{gen:reg-mask-2d}",
+            *_stage("SyN[0.3,2,0]", [f"CC[{F2},{M2},1,2]"]),
+            d="2",
+            out=PRE,
+        ),
+        make(
+            f"{SYN}/initial-field-2d-in-3d",
+            SYN,
+            "-r a 2D field in 3D: one slice, each vector the product of its components (ANTS-73)",
+            "-r",
+            "{gen-syn:warp-2d.nii.gz}",
+            *syn,
+            out=PRE,
         ),
         make(
             f"{SYN}/igdm",

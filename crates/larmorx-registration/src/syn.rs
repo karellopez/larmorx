@@ -609,16 +609,13 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
             && w.len() == D
             && !weights_are_identity(w)
         {
-            for chunk in derivative.chunks_exact_mut(D) {
+            for chunk in derivative.as_chunks_mut::<D>().0 {
                 for d in 0..D {
                     chunk[d] = chunk[d] * w[d];
                 }
             }
         }
-        let data = derivative
-            .chunks_exact(D)
-            .map(|c| std::array::from_fn(|d| c[d]))
-            .collect();
+        let data = derivative.as_chunks::<D>().0.to_vec();
         Ok((value, Image::new(self.virtual_space.clone(), data)))
     }
 }

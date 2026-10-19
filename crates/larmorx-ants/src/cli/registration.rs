@@ -1006,7 +1006,9 @@ fn field_from_part<R: Compute, const D: usize>(
         )));
     }
     let data = p
-        .chunks_exact(D)
+        .as_chunks::<D>()
+        .0
+        .iter()
         .map(|c| std::array::from_fn(|k| R::r(c[k])))
         .collect();
     Ok(Xfm::Field(larmorx_registration::field::FieldXfm::new(

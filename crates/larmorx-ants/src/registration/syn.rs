@@ -44,6 +44,9 @@ pub(crate) struct SynInputs<R, const D: usize> {
     pub percentage: R,
 }
 
+/// A pair of images: the fixed and the moving one.
+type ImagePair<R, const D: usize> = (Arc<Image<R, D>>, Arc<Image<R, D>>);
+
 /// ANTs' observer of a SyN stage.
 struct SynLog<'l, 'a, 's, 'k, R, const D: usize> {
     log: &'l mut Log<'a>,
@@ -53,7 +56,7 @@ struct SynLog<'l, 'a, 's, 'k, R, const D: usize> {
     /// `--print-similarity-measure-interval` (0: off).
     full_scale_interval: u32,
     /// The first metric's original images (`SetOrigFixedImage`, `SetOrigMovingImage`).
-    originals: Option<(Arc<Image<R, D>>, Arc<Image<R, D>>)>,
+    originals: Option<ImagePair<R, D>>,
     /// The stage's metric is an image metric (ANTs' observer casts it to one).
     single_image_metric: bool,
     /// `--write-interval-volumes` (0: off), the stage and the output prefix.

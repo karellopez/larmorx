@@ -7,18 +7,18 @@
 //! axes) per voxel, voxel `x` fastest, components interleaved. Every routine follows the ITK
 //! class it ports operation for operation, in the class's types:
 //!
-//! - [`vector_linear`]: `VectorLinearInterpolateImageFunction<Field, R>` (the `2^D`
+//! - [`vector_linear`][]: `VectorLinearInterpolateImageFunction<Field, R>` (the `2^D`
 //!   neighbours in ITK's order, overlaps in `R`, sums in double, stopping once the overlaps
 //!   reach 1);
-//! - [`transform_point`]: `DisplacementFieldTransform<R, D>::TransformPoint`;
-//! - [`compose`]: `ComposeDisplacementFieldsImageFilter`;
-//! - [`invert`]: `InvertDisplacementFieldImageFilter` (the fixed-point iteration with its
+//! - [`transform_point`][]: `DisplacementFieldTransform<R, D>::TransformPoint`;
+//! - [`compose`][]: `ComposeDisplacementFieldsImageFilter`;
+//! - [`invert`][]: `InvertDisplacementFieldImageFilter` (the fixed-point iteration with its
 //!   tolerances and boundary condition);
-//! - [`gaussian_smooth`]: `SyNImageRegistrationMethod::GaussianSmoothDisplacementField`
+//! - [`gaussian_smooth`][]: `SyNImageRegistrationMethod::GaussianSmoothDisplacementField`
 //!   (`GaussianOperator` along each axis through `VectorNeighborhoodOperatorImageFilter`, the
 //!   boundary pinned and the result blended for variances below 0.5);
-//! - [`scale_update`]: `SyNImageRegistrationMethod::ScaleUpdateField`;
-//! - [`resample_to`]: `DisplacementFieldTransformParametersAdaptor::AdaptTransformParameters`
+//! - [`scale_update`][]: `SyNImageRegistrationMethod::ScaleUpdateField`;
+//! - [`resample_to`][]: `DisplacementFieldTransformParametersAdaptor::AdaptTransformParameters`
 //!   (`ResampleImageFilter` with an identity transform and the linear interpolator).
 //!
 //! Each per-voxel step runs in parallel; every sum ITK accumulates over voxels is accumulated

@@ -218,6 +218,8 @@ defects! {
         "IGDM's estimated intensity sigma ignores both point sets' minima (they are never updated) and subtracts the moving maximum: it is the difference of the two maxima, or the larger maximum";
     ANTS_66 = "ANTS-66", "antsRegistration", true,
         "IGDM's value (the line search's) computes the neighbourhood's centre from a negative number for neighbourhoods of more than one voxel and reads memory before the intensity arrays";
+    ANTS_71 = "ANTS-71", "antsRegistration", true,
+        "--print-similarity-measure-interval in a SyN stage crashes unless the registration has an initial fixed transform (-q), a moving transform before the stage and a single image metric: the full-scale similarity's composites get a null transform, or the stage's metric is cast to an image metric and read through a null pointer";
     ITK_01 = "ITK-01", "ITK", true,
         "Math::Floor gives 0 instead of -1 for negative values closer to 0 than 2^-26 (float) or 2^-55 (double)";
     ITK_02 = "ITK-02", "ITK", true,
@@ -240,6 +242,8 @@ defects! {
         "ManifoldParzenWindowsPointSetFunction adds each product to a local covariance's diagonal twice";
     ITK_28 = "ITK-28", "ITK", true,
         "JHCT tests alpha = 1 with != for its prefactor and with AlmostEquals for its value: an alpha within 4 ulps of 1 takes the logarithm and divides by alpha - 1";
+    ITK_30 = "ITK-30", "ITK", true,
+        "the global correlation metric (ANTs' GC) with a displacement field transform (SyN) adds every point's derivative into the first voxel's entries, so only that voxel's update is not zero (the check meant to refuse such transforms is in the constructor and never fires)";
     ITK_03 = "ITK-03", "ITK", true,
         "components relabelled in a float image stop getting new labels at 2^24";
     ITK_08 = "ITK-08", "nifti_clib", true,

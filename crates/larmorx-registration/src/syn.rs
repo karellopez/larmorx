@@ -829,3 +829,57 @@ pub fn output_transform<R: Real, const D: usize>(
     )
 }
 
+
+/// The observer's full-scale similarity of a SyN stage (`UpdateFullScaleMetricValue` with
+/// `DownsampleImagesForMetricDerivatives` on): the original fixed image resampled onto its own
+/// grid through `fixed` (the fixed initial transform and the inverse of the fixed-to-middle
+/// field), the original moving image onto the fixed grid through `moving` (the moving
+/// initial transforms and the inverse of the moving-to-middle field), both linearly with
+/// default 0; then `ANTSNeighborhoodCorrelationImageToImageMetricv4` of radius 4 between them
+/// with identity transforms, every voxel of the fixed grid, its value. The "no valid points"
+/// warning goes to `warnings`.
+pub fn full_scale_cc<R: Real, const D: usize>(
+    original_fixed: &Image<R, D>,
+    original_moving: &Image<R, D>,
+    fixed: &Composite<R, D>,
+    moving: &Composite<R, D>,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+) -> Result<R, ItkException> {
+    let grid = &original_fixed.space;
+    let f = resample_image(original_fixed, grid, fixed, floor);
+    let m = resample_image(original_moving, grid, moving, floor);
+    let metric = ImageMetricv4 {
+        fixed: Arc::new(f),
+        moving: Arc::new(m),
+        fixed_mask: None,
+        moving_mask: None,
+        fixed_transform: None,
+        virtual_space: grid.clone(),
+        samples: None,
+        fixed_gradient_image: None,
+        moving_gradient_image: None,
+        pixel_f32: false,
+        local_support: true,
+    };
+    let r = crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }
+        .evaluate(&metric, &Composite::new(Vec::new()), false, floor)?;
+    if r.no_valid_points {
+        warnings.push(no_valid_points_warning(
+            VERIFY_FILE,
+            544,
+            "ANTSNeighborhoodCorrelationImageToImageMetricv4",
+        ));
+    }
+    Ok(r.value)
+}
+
+/// The resampler of SyN's images, for the helper's other uses.
+pub fn resample_linear_nonlinear<R: Real, const D: usize>(
+    image: &Image<R, D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+    floor: &IndexFloor,
+) -> Image<R, D> {
+    resample_image(image, output, transform, floor)
+}

@@ -270,3 +270,130 @@ impl<R: Real, const D: usize> Composite<R, D> {
         }
     }
 }
+
+/// ITK's transform categories as ANTs' collapse distinguishes them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Category {
+    Linear,
+    DisplacementField,
+}
+
+fn category<R: Real, const D: usize>(t: &Xfm<R, D>) -> Category {
+    if t.is_linear() {
+        Category::Linear
+    } else {
+        Category::DisplacementField
+    }
+}
+
+/// ANTs' `CollapseDisplacementFieldTransforms`: neighbouring fields that are both invertible
+/// or both not are composed into one ([`crate::field::compose`], the later transform of the
+/// queue warping the earlier one's field; their inverses composed the other way); a change of
+/// invertibility starts a new field.
+pub fn collapse_fields<R: Real, const D: usize>(
+    group: &[crate::field::FieldXfm<R, D>],
+    floor: &larmorx_core::IndexFloor,
+) -> Vec<crate::field::FieldXfm<R, D>> {
+    use crate::field::{FieldXfm, compose};
+    use std::sync::Arc;
+    let mut out = Vec::new();
+    let Some(first) = group.first() else {
+        return out;
+    };
+    let mut current = first.clone();
+    let mut invertible = current.inverse.is_some();
+    for nth in &group[1..] {
+        let same = invertible == nth.inverse.is_some();
+        if same {
+            let total = compose(&current.field, &nth.field, floor);
+            let total_inverse = if invertible {
+                Some(compose(
+                    nth.inverse.as_deref().expect("invertible"),
+                    current.inverse.as_deref().expect("invertible"),
+                    floor,
+                ))
+            } else {
+                None
+            };
+            current = FieldXfm {
+                field: Arc::new(total),
+                inverse: total_inverse.map(Arc::new),
+                exact_floor: current.exact_floor,
+            };
+        } else {
+            out.push(FieldXfm {
+                field: Arc::clone(&current.field),
+                inverse: if invertible {
+                    current.inverse.clone()
+                } else {
+                    None
+                },
+                exact_floor: current.exact_floor,
+            });
+            current = nth.clone();
+            invertible = current.inverse.is_some();
+        }
+    }
+    out.push(current);
+    out
+}
+
+/// ANTs' `CollapseCompositeTransform`: a queue of linear transforms becomes one
+/// `AffineTransform` ([`collapse_linear`]), a queue of displacement fields as few fields as
+/// [`collapse_fields`] makes; a mixed queue is split into runs of one category, each collapsed,
+/// except that the queue's last transform, when it starts a new run, is kept as it is. `None`
+/// where ANTs crashes (an `IdentityTransform` in a linear run, ANTS-48).
+pub fn collapse_composite<R: Real, const D: usize>(
+    queue: &[Xfm<R, D>],
+    floor: &larmorx_core::IndexFloor,
+) -> Option<Vec<Xfm<R, D>>> {
+    let collapse = |group: &[Xfm<R, D>], c: Category| -> Option<Vec<Xfm<R, D>>> {
+        match c {
+            Category::Linear => Some(vec![Xfm::Linear(collapse_linear(group)?)]),
+            Category::DisplacementField => {
+                let fields: Vec<_> = group
+                    .iter()
+                    .map(|t| match t {
+                        Xfm::Field(f) => f.clone(),
+                        _ => unreachable!("a run of fields"),
+                    })
+                    .collect();
+                Some(
+                    collapse_fields(&fields, floor)
+                        .into_iter()
+                        .map(Xfm::Field)
+                        .collect(),
+                )
+            }
+        }
+    };
+    if queue.iter().all(|t| t.is_linear()) {
+        return collapse(queue, Category::Linear);
+    }
+    if queue.iter().all(|t| !t.is_linear()) {
+        return collapse(queue, Category::DisplacementField);
+    }
+    let last = queue.len() - 1;
+    let mut out = Vec::new();
+    let mut current = category(&queue[0]);
+    let mut group = vec![queue[0].clone()];
+    for (n, t) in queue.iter().enumerate().skip(1) {
+        let c = category(t);
+        if c == current {
+            group.push(t.clone());
+            if n == last {
+                out.extend(collapse(&group, current)?);
+            }
+        } else {
+            out.extend(collapse(&group, current)?);
+            group.clear();
+            current = c;
+            if n < last {
+                group.push(t.clone());
+            } else {
+                out.push(t.clone());
+            }
+        }
+    }
+    Some(out)
+}

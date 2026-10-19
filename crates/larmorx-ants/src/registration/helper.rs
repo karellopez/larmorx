@@ -199,6 +199,9 @@ pub struct RegistrationHelper<R, const D: usize> {
     pub origins: Vec<Option<usize>>,
     /// `m_FixedInitialTransform`.
     pub fixed_initial: Option<Vec<Xfm<R, D>>>,
+    /// `m_RegistrationState`: set by SyN stages (the composite before the stage, then the
+    /// fixed-to-middle and moving-to-middle transforms) and by `--restore-state`.
+    pub registration_state: Option<Vec<Xfm<R, D>>>,
     pub fixed_masks: Vec<Option<Mask<D>>>,
     pub moving_masks: Vec<Option<Mask<D>>>,
     pub n_threads: usize,
@@ -235,6 +238,7 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
             composite: None,
             origins: Vec::new(),
             fixed_initial: None,
+            registration_state: None,
             fixed_masks: Vec::new(),
             moving_masks: Vec::new(),
             n_threads: 1,
@@ -1066,6 +1070,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             };
             let learning_rate = self.transforms[stage].gradient_step;
             let method = self.transforms[stage].method;
+            if method == XfrmMethod::SyN {
+                let inputs = super::syn::SynInputs {
+                    stage,
+                    iterations: iterations.clone(),
+                    threshold,
+                    window,
+                    levels,
+                    first_kind: stage_metrics[0].kind,
+                    prepared,
+                    shrink_factors: per_level,
+                    sigmas: sigmas_r,
+                    sampling,
+                    percentage: R::r(f64::from(percentage)),
+                };
+                self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                let elapsed = timer.elapsed().as_secs_f64();
+                log.logger(&format!(
+                    "  Elapsed time (stage {stage}): {}\n\n",
+                    log.f(elapsed)
+                ));
+                continue;
+            }
             let mut output = match self.new_transform(method) {
                 Some(t) => t,
                 None => return self.unsupported(log, &format!("{} stages", method.as_str())),
@@ -1401,7 +1427,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     }
 
     /// An ITK exception that `main` catches: "Exception Object caught: " and its print.
-    fn exception_in_main(&self, log: &mut Log<'_>, e: &ItkException) -> RegistrationFailed {
+    pub(crate) fn exception_in_main(&self, log: &mut Log<'_>, e: &ItkException) -> RegistrationFailed {
         log.cerr(&format!("Exception Object caught: \n{}\n", e.print()));
         RegistrationFailed(e.description.clone())
     }

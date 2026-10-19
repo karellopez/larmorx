@@ -23,16 +23,20 @@ helper's `case SyN` and its observer).
 - **ANTs' SyN is (almost) independent of its thread count.** The metric derivative of a
   displacement field is stored per voxel, not summed; only the metric values (and Mattes' joint
   histogram) are reduced per work unit. At 2, 4 and 8 threads the fields moved by 0 (CC,
-  MeanSquares) to 3.6e-14 mm (Mattes) from ANTs' one-thread fields. larmorx gives the one-thread
-  result at any thread count.
-- **Bit-identical to ANTs at one thread**: every compared SyN case of the standard tier, most
-  against the unmodified binary, the rest (Mattes, MI2, float runs: glibc's `logf`/`log`/`exp`)
-  once CORE-MATH's correctly rounded functions are preloaded.
-- **Seven defects found:** ANTS-71 (the full-scale similarity crashes), ANTS-72 (a linear stage
+  MeanSquares) to 3.6e-14 mm (Mattes) from ANTs' one-thread fields. Two exceptions: the
+  point-set metrics, whose points' derivatives race into the field (ITK-34: 0.025 mm with ICP,
+  different from run to run), and stages after thread-dependent linear stages (sMRIPrep's
+  registrations on every third voxel: 1.5 to 1.6 mm). larmorx gives the one-thread result at any
+  thread count.
+- **Bit-identical to ANTs at one thread**: every compared SyN case, most against the unmodified
+  binary, the rest (Mattes, MI2, float runs: glibc's `logf`/`log`/`exp`) once CORE-MATH's
+  correctly rounded functions are preloaded. On sMRIPrep's registrations glibc's few ulps of
+  difference grow into fields up to 1.6 mm apart, as far as ANTs' own thread band.
+- **Nine defects found:** ANTS-71 (the full-scale similarity crashes), ANTS-72 (a linear stage
   after a field is not repeatable), ANTS-73 (any image accepted as an initial field), ANTS-74
   (a stale saved state), ITK-30 (GC's derivative in one voxel), ITK-31 (stale masks), ITK-32
   (frozen point-set metrics), ITK-33 (point-set metrics among several metrics never see the
-  deformation). All in the [register](upstream-defects.md); every deterministic one has a
+  deformation), ITK-34 (point-set derivatives race into the field). All in the [register](upstream-defects.md); every deterministic one has a
   switch (`LARMORX_UPSTREAM_DEFECTS=reproduce`).
 - **Fast:** on a 96³ phantom pair (CC radius 4, 10 and 5 iterations at shrink 2 and 1) ANTs
   takes 122 s at one thread; larmorx about 24 s at one thread and 5 s at 12, bit-identical
@@ -186,6 +190,11 @@ every N-th iteration, `<prefix>Stage<n>_level<l>_Iter<iiii>.nii.gz`, and prints 
   ANTs differ, whatever `--random-seed` says. larmorx draws them with the stage's seed.
 
 ## Validation notes
+
+- sdcflows' fieldmap-less SyN (`sd_syn.json`: two SyN stages of two Mattes metrics, random
+  sampling 0.8 then dense, `-g` 1 along the phase-encoding axis and 0.1 across, both masks,
+  histogram matching, winsorizing) is a synthetic case (`syn/sdcflows-syn-sdc`); none of the
+  oracle runs used `--use-syn-sdc`.
 
 - Real data: sMRIPrep's brain extraction (`antsBrainExtraction`'s OASIS template, Rigid, Affine,
   then SyN with two CC metrics and the gradient filter) and template registration

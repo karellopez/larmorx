@@ -153,6 +153,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-31 | ITK `SyNImageRegistrationMethod` | a stage with only one of its two masks: the role without one keeps the previous evaluation's resampled mask | c | every run: sMRIPrep's brain extraction's SyN stage has a fixed mask only | corrected by default; `reproduce` as ITK (A5 part 1); the change on real data in the record's fix pass | – |
 | ITK-32 | ITK `LabeledPointSetToPointSetMetricv4` | appends per-label metrics at every `Initialize` and uses the first: in SyN every evaluation compares with the moving points as the first one mapped them | c | none | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
+| ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -1645,6 +1646,19 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** corrected by default (A5 part 1): the point-set metrics are evaluated through the
   composites, as a single point-set metric is; `reproduce` as ITK, with a notice.
 - **D13 / gap:** done. No gap.
+
+### ITK-34 Point-set derivatives added into the field without synchronisation — (b)
+- **What:** `CalculateValueAndDerivative` splits the fixed points into one range per work unit
+  and, for transforms of local support, adds each point's derivative into the shared derivative
+  array (`StorePointDerivative`, `field[offset + i] += ...`) from all the threads at once. Two
+  points of different ranges at the same virtual voxel race: SyN with ICP gave three different
+  fields in three runs at 4 threads (one of them the one-thread field) and two in two runs at 8
+  (`syn-point-sets/icp`; the record's thread band, 0.025 mm).
+- **Evidence:** read: `itkPointSetToPointSetMetricWithIndexv4.hxx:275-377, 437-466`; verified
+  (2026-10-19: seven runs of the same command at 1, 4 and 8 threads).
+- **fMRIPrep:** none (no point-set metric).
+- **larmorx:** the points in order, as one thread adds them, at any thread count.
+- **D13 / gap:** class (b), not reproduced. No gap.
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

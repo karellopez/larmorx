@@ -543,6 +543,38 @@ def syn_cases(make) -> list:
             out=PRE,
         ),
         make(
+            f"{SYN}/sdcflows-syn-sdc",
+            SYN,
+            "sdcflows' fieldmap-less SyN (sd_syn.json): two SyN stages of two Mattes metrics "
+            "(random sampling, then dense), -g along the phase-encoding axis, masks, histogram "
+            "matching, winsorizing",
+            "-w",
+            "[0.001,0.998]",
+            "-u",
+            "1",
+            "-x",
+            f"[{K},{K}]",
+            "-g",
+            "0.1x1x0.1",
+            *_stage(
+                "SyN[0.8,6,10]",
+                [f"Mattes[{F},{M},0.9,48,Random,0.8]", f"Mattes[{FO},{MO},0.1,48,Random,0.8]"],
+                c="[200x100,1e-6,5]",
+                f="1x1",
+                s="2x0vox",
+            ),
+            "-g",
+            "0.1x1x0.1",
+            *_stage(
+                "SyN[0.8,2,0.5]",
+                [f"Mattes[{F},{M},0.8,48]", f"Mattes[{FO},{MO},0.2,48]"],
+                c="[10,1e-8,2]",
+                f="1",
+                s="0vox",
+            ),
+            out=PRE,
+        ),
+        make(
             f"{SYN}/fixed-initial",
             SYN,
             "-q [fixed,moving,1]: the fixed images resampled through it",

@@ -112,11 +112,15 @@ def cmd_parity(args: argparse.Namespace) -> int:
         }[r.status]
         print(mark, end="", flush=True, file=sys.stderr)
 
+    import functools
+
     results = run(
         suite,
         args.tier,
         select=(lambda c: args.case in c.id) if args.case else None,
         progress=progress,
+        jobs=args.jobs,
+        factory=functools.partial(_parity_suite, args.suite, args.implementation),
     )
     print(file=sys.stderr)
     counts = summarise(results)
@@ -181,6 +185,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
     p.add_argument("--case", help="only cases whose id contains this text")
     p.add_argument("--out", help="write <suite>.md and <suite>.json to this directory")
+    p.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="run the cases in this many worker processes (each case's own thread counts are "
+        "unchanged; use on a machine with the cores to spare, never for benchmarks)",
+    )
     p.add_argument(
         "--implementation",
         default="original",

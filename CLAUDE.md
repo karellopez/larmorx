@@ -21,6 +21,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 **Naming rules:**
 - Always lowercase `larmorx` / `larmorprepx` in code and commands.
+- In prose the project may be written **LARMORX**, the acronym of *Library of Algorithmic Reimplementations for MRI through Open Rust eXecution* (user, 2026-10-19); tagline: "LARMORX — Bringing Neuroimaging Tools into Resonance. Reimplemented in Rust. Accessible through Python. Built for FAIR research." Its identity and FAIR4RS philosophy are set out in README.md.
 - Never use plain `larmor` for anything of ours: an unrelated NMR package already ships a `larmor` command.
 
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.

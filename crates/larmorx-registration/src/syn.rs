@@ -695,14 +695,14 @@ pub fn run_syn<R: Real, const D: usize>(
                         ));
                     }
                     (
-                        adapt(f, &virtual_space, floor),
-                        adapt(m, &virtual_space, floor),
+                        pooled(stage.n_threads, || adapt(f, &virtual_space, floor))?,
+                        pooled(stage.n_threads, || adapt(m, &virtual_space, floor))?,
                     )
                 }
             },
             Some((f, m)) => (
-                adapt(&f, &virtual_space, floor),
-                adapt(&m, &virtual_space, floor),
+                pooled(stage.n_threads, || adapt(&f, &virtual_space, floor))?,
+                pooled(stage.n_threads, || adapt(&m, &virtual_space, floor))?,
             ),
         };
         // The metric's masks as InitializeRegistrationAtEachLevel sets them (the stage's own).
@@ -724,6 +724,7 @@ pub fn run_syn<R: Real, const D: usize>(
         let mut converged = false;
         while iteration < n_iterations && !converged {
             iteration += 1;
+            let step = || -> Result<_, ItkException> {
             let mut fixed_composite: Vec<Xfm<R, D>> = stage
                 .fixed_initial
                 .as_ref()
@@ -817,8 +818,17 @@ pub fn run_syn<R: Real, const D: usize>(
             );
             let moving_field =
                 invert(&moving_inverse, Some(&moving_total), &invert_settings, floor);
-            f2m = FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor);
-            m2m = FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor);
+            Ok((
+                FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
+                FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
+                moving_value,
+                fixed_value,
+            ))
+            };
+            // The iteration's work runs in a pool of the stage's thread count.
+            let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;
+            f2m = new_f2m;
+            m2m = new_m2m;
             let metric_value =
                 R::from_f64(0.5 * (moving_value.to_f64() + fixed_value.to_f64()));
             convergence.add(metric_value.to_f64());
@@ -838,12 +848,24 @@ pub fn run_syn<R: Real, const D: usize>(
         state = Some((f2m, m2m));
     }
     let (f2m, m2m) = state.expect("at least one level");
-    let output = output_transform(&f2m, &m2m, floor);
+    let output = pooled(stage.n_threads, || output_transform(&f2m, &m2m, floor))?;
     Ok(SynOutput {
         output,
         fixed_to_middle: f2m,
         moving_to_middle: m2m,
         stale_masks,
+    })
+}
+
+/// `f` run in a pool of `n_threads` threads (0: every logical CPU).
+fn pooled<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> Result<T, ItkException> {
+    larmorx_core::parallel::with_threads(n_threads, f).map_err(|e| {
+        ItkException::new(
+            "Modules/Core/Common/src/itkMultiThreaderBase.cxx",
+            0,
+            "MultiThreaderBase",
+            e.to_string(),
+        )
     })
 }
 
@@ -879,26 +901,33 @@ pub fn full_scale_cc<R: Real, const D: usize>(
     fixed: &Composite<R, D>,
     moving: &Composite<R, D>,
     floor: &IndexFloor,
+    n_threads: usize,
     warnings: &mut Vec<String>,
 ) -> Result<R, ItkException> {
     let grid = &original_fixed.space;
-    let f = resample_image(original_fixed, grid, fixed, floor);
-    let m = resample_image(original_moving, grid, moving, floor);
-    let metric = ImageMetricv4 {
-        fixed: Arc::new(f),
-        moving: Arc::new(m),
-        fixed_mask: None,
-        moving_mask: None,
-        fixed_transform: None,
-        virtual_space: grid.clone(),
-        samples: None,
-        fixed_gradient_image: None,
-        moving_gradient_image: None,
-        pixel_f32: false,
-        local_support: true,
-    };
-    let r = crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }
-        .evaluate(&metric, &Composite::new(Vec::new()), false, floor)?;
+    let r = pooled(n_threads, || {
+        let f = resample_image(original_fixed, grid, fixed, floor);
+        let m = resample_image(original_moving, grid, moving, floor);
+        let metric = ImageMetricv4 {
+            fixed: Arc::new(f),
+            moving: Arc::new(m),
+            fixed_mask: None,
+            moving_mask: None,
+            fixed_transform: None,
+            virtual_space: grid.clone(),
+            samples: None,
+            fixed_gradient_image: None,
+            moving_gradient_image: None,
+            pixel_f32: false,
+            local_support: true,
+        };
+        crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }.evaluate(
+            &metric,
+            &Composite::new(Vec::new()),
+            false,
+            floor,
+        )
+    })??;
     if r.no_valid_points {
         warnings.push(no_valid_points_warning(
             VERIFY_FILE,

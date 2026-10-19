@@ -64,6 +64,7 @@ struct SynLog<'l, 'a, 's, 'k, R, const D: usize> {
     /// ANTS-71 reproduced: the full-scale similarity's crash.
     reproduce: bool,
     floor: &'s IndexFloor,
+    n_threads: usize,
     warnings: Vec<String>,
     /// The full-scale similarity met ANTS-71's condition.
     ants_71: bool,
@@ -137,6 +138,7 @@ impl<R: Compute, const D: usize> SynObserver<R, D> for SynLog<'_, '_, '_, '_, R,
                 &Composite::new(fixed_composite),
                 &Composite::new(moving_composite),
                 self.floor,
+                self.n_threads,
                 &mut printed,
             )?;
             for w in printed {
@@ -350,6 +352,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             moving_initial,
             reproduce: !self.upstream_defects.fix(),
             floor,
+            n_threads: self.n_threads,
             warnings: Vec::new(),
             ants_71: false,
         };

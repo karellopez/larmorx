@@ -690,6 +690,61 @@ pub fn read_displacement_field(path: &Path) -> Result<DisplacementField, Transfo
     )?)
 }
 
+/// A displacement field stored as a NIfTI vector image of 2, 3 or 4 dimensions (as many
+/// components), as the parts of a `DisplacementFieldTransform_double_D_D`: the vectors
+/// interleaved per voxel, and the fixed parameters (size, origin, spacing, direction row by
+/// row). 3D fields are read by [`read_displacement_field`].
+pub fn read_displacement_field_parts(
+    path: &Path,
+) -> Result<Vec<ItkTransformParts>, TransformFileError> {
+    let image = nifti::itk::read_itk_image(path, 1)?;
+    let g = &image.geometry;
+    let d = g.ndim;
+    if d == 3 {
+        return Ok(transform_to_parts(&Transform::DisplacementField(
+            read_displacement_field(path)?,
+        )));
+    }
+    let n: usize = g.size.iter().product();
+    if !(2..=4).contains(&d) || image.voxels.len() != d * n {
+        return Err(format_err(
+            path,
+            format!(
+                "a displacement field has as many components as dimensions (2, 3 or 4); ITK reads {:?} with {} values",
+                g.size,
+                image.voxels.len()
+            ),
+        ));
+    }
+    let planar: Vec<f64> = match &image.voxels {
+        nifti::itk::ItkVoxels::F32(v) => v.iter().map(|&x| f64::from(x)).collect(),
+        nifti::itk::ItkVoxels::F64(v) => v.clone(),
+    };
+    let mut values = vec![0.0f64; d * n];
+    for c in 0..d {
+        for v in 0..n {
+            values[d * v + c] = planar[c * n + v];
+        }
+    }
+    let mut fixed: Vec<f64> = g.size.iter().map(|&s| s as f64).collect();
+    fixed.extend_from_slice(&g.origin);
+    fixed.extend_from_slice(&g.spacing);
+    for row in &g.direction {
+        fixed.extend_from_slice(row);
+    }
+    let parameters = match &image.voxels {
+        nifti::itk::ItkVoxels::F32(_) => {
+            Parameters::F32(values.iter().map(|&x| x as f32).collect())
+        }
+        nifti::itk::ItkVoxels::F64(_) => Parameters::F64(values),
+    };
+    Ok(vec![ItkTransformParts {
+        name: format!("DisplacementFieldTransform_double_{d}_{d}"),
+        parameters,
+        fixed_parameters: fixed,
+    }])
+}
+
 /// Reads an ITK transform file as ANTs does ([`transform_from_parts`] of what the file
 /// stores), in double precision and with upstream defects corrected (notices are dropped; see
 /// [`read_itk_transform_parts`]).
@@ -736,9 +791,7 @@ pub fn read_itk_transform_parts(
         .unwrap_or("")
         .to_ascii_lowercase();
     if name.ends_with(".nii") || name.ends_with(".nii.gz") {
-        return Ok(transform_to_parts(&Transform::DisplacementField(
-            read_displacement_field(path)?,
-        )));
+        return read_displacement_field_parts(path);
     }
     let io = |source| TransformFileError::Io {
         path: path.to_path_buf(),

@@ -342,6 +342,40 @@ def syn_cases(make) -> list:
             out=PRE,
         ),
         make(
+            f"{SYN}/save-state-then-translation",
+            SYN,
+            "--save-state after SyN then Translation: ANTs saves the SyN state without the "
+            "translation (ANTS-74)",
+            "-a",
+            "1",
+            "--save-state",
+            "{out}/state.h5",
+            *syn,
+            *_stage("Translation[0.5]", [f"MeanSquares[{F},{M},1]"], c="[4,1e-6,3]", f="1", s="0"),
+            out=PRE,
+            expect="divergence",
+            reason="a linear stage after a displacement field: its learning rate comes from voxels "
+            "ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the "
+            "last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
+        ),
+        make(
+            f"{SYN}/restore-state-then-translation",
+            SYN,
+            "--restore-state of a SyN state, then Translation, --save-state (ANTS-74)",
+            "-a",
+            "1",
+            "-k",
+            "{gen-syn:state-3d.h5}",
+            "--save-state",
+            "{out}/state.h5",
+            *_stage("Translation[0.5]", [f"MeanSquares[{F},{M},1]"], c="[4,1e-6,3]", f="1", s="0"),
+            out=PRE,
+            expect="divergence",
+            reason="a linear stage after a displacement field: its learning rate comes from voxels "
+            "ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the "
+            "last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
+        ),
+        make(
             f"{SYN}/restore-state",
             SYN,
             "--restore-state of a SyN state: the composite ends with SyN's transform",

@@ -2558,8 +2558,26 @@ fn write_transforms<R: Compute, const D: usize>(
     queue: &[Xfm<R, D>],
 ) -> Result<Exit, Exit> {
     let p = ctx.p;
+    // ANTS-74: the registration state is set by SyN stages (and --restore-state) only, so after
+    // linear stages that follow them ANTs saves a state without those stages.
+    let last_is_syn = helper
+        .transforms
+        .last()
+        .is_some_and(|t| t.method == XfrmMethod::SyN);
+    let stale = helper.registration_state.is_some() && !last_is_syn;
+    if p.last("save-state").is_some() && stale {
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_74,
+            if ctx.notices.fix() {
+                "the saved state holds every transform of the registration; ANTs saves the last SyN stage's state (or the restored one) without the linear stages after it"
+            } else {
+                "the saved state is the last SyN stage's (or the restored one), without the linear stages after it, as in ANTs"
+            },
+        );
+    }
     if let Some(state) = p.last("save-state")
         && let Some(saved) = &helper.registration_state
+        && !(stale && ctx.notices.fix())
     {
         // The registration state of the last SyN stage (or of --restore-state): if its last two
         // transforms are displacement fields with inverses (SyN's fixed-to-middle and
@@ -2588,25 +2606,35 @@ fn write_transforms<R: Compute, const D: usize>(
     } else if let Some(state) = p.last("save-state") {
         // ANTs sets the registration state in SyN stages only: after linear stages it finds
         // none and returns EXIT_FAILURE, writing no transform (ANTS-50). Corrected, the state
-        // is the composite of every transform, as the option's description says.
-        if ctx.notices.reproduce() {
+        // is the composite of every transform, as the option's description says (and so after
+        // linear stages that follow a SyN stage, ANTS-74).
+        if stale {
+            let mut parts = vec![ItkTransformParts {
+                name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
+                parameters: Parameters::F64(Vec::new()),
+                fixed_parameters: Vec::new(),
+            }];
+            parts.extend(queue.iter().map(|t| xfm_parts(&forward_only(t))));
+            write_transform_file(log, ctx.notices, &state.name, &parts);
+        } else if ctx.notices.reproduce() {
             ctx.notices.add(
                 &larmorx_core::defects::ANTS_50,
                 "no state after linear stages: exit 1, no transform written, as in ANTs",
             );
             return Err(1);
+        } else {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_50,
+                "the state is written (every transform of the registration); ANTs exits 1 here",
+            );
+            let mut parts = vec![ItkTransformParts {
+                name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
+                parameters: Parameters::F64(Vec::new()),
+                fixed_parameters: Vec::new(),
+            }];
+            parts.extend(queue.iter().map(xfm_parts));
+            write_transform_file(log, ctx.notices, &state.name, &parts);
         }
-        ctx.notices.add(
-            &larmorx_core::defects::ANTS_50,
-            "the state is written (every transform of the registration); ANTs exits 1 here",
-        );
-        let mut parts = vec![ItkTransformParts {
-            name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
-            parameters: Parameters::F64(Vec::new()),
-            fixed_parameters: Vec::new(),
-        }];
-        parts.extend(queue.iter().map(xfm_parts));
-        write_transform_file(log, ctx.notices, &state.name, &parts);
     }
     if minc {
         return Err(refuse(

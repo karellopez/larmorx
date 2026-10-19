@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (linear
-stages).
+and SyN stages; the SyN cases are in :mod:`ants_registration_syn`).
 
 ANTs runs as its own binary with one thread and a fixed sampling seed
 (``ANTS_RANDOM_SEED``; without one ANTs seeds from the clock and is not repeatable); larmorx
@@ -14,8 +14,9 @@ ANTs' defects reproduced (``LARMORX_UPSTREAM_DEFECTS=reproduce``, D13). Compared
   source paths in exception prints, and the two output directories;
 - **standard error**, larmorx's notice lines removed;
 - **every file** each program writes: transform files byte for byte (``.mat``, ``.txt``),
-  HDF5 transform files dataset by dataset (``/OSName`` and ``/OSVersion`` aside), images by
-  their header bytes and every value.
+  HDF5 transform files dataset by dataset (``/OSName`` and ``/OSVersion`` aside), images
+  (warped images, ``Warp``/``InverseWarp`` displacement fields, interval volumes) by their
+  header bytes and every value.
 
 ANTs computes ``exp``, ``log``, ``sin`` and ``cos`` with glibc, which does not always round
 correctly; larmorx rounds correctly (CLAUDE.md rule 5). Where the first comparison is not
@@ -30,7 +31,9 @@ it names and what they changed.
 
 Real cases repeat the ``antsRegistration`` command lines fMRIPrep 25.2.6 ran in the oracle runs
 (``oracles/fmriprep-25.2.6``), on the inputs it ran them on; they are skipped where those runs
-are missing.
+are missing. sMRIPrep's brain extraction and template registration run whole (Rigid, Affine,
+SyN) at full size in the full tier, and on every third voxel of their images (``real-syn-small``)
+in the standard tier (its first run) and the full tier (the others).
 """
 
 from __future__ import annotations
@@ -46,6 +49,8 @@ import numpy as np
 
 from larmorx_validation.parity import ants_inputs, ants_point_sets, defects
 from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
+from larmorx_validation.parity.ants_registration_syn import syn_cases
+from larmorx_validation.parity.ants_registration_syn import transform_file as syn_transform_file
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -62,6 +67,8 @@ SEED = "42"
 #: How long a case whose ANTs never finishes runs before it is stopped.
 HANG_SECONDS = 30
 LX_THREADS = 4
+#: The real cases' small versions keep every SMALL-th voxel of their images.
+SMALL = 3
 BAND_THREADS = (2, 4, 8)
 _TIERS = ("smoke", "standard", "full")
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
@@ -268,6 +275,20 @@ def reg(
     case_id: str, category: str, description: str, *args: str, d: str = "3", out: str = OUT, **kw
 ) -> RegCase:
     return RegCase(case_id, category, description, ("-d", d, "-v", "1", "-o", out, *args), **kw)
+
+
+def _syn_case(
+    case_id: str,
+    category: str,
+    description: str,
+    *args: str,
+    d: str = "3",
+    out: str = OUT,
+    verbose: bool = True,
+    **kw,
+) -> RegCase:
+    head = ("-d", d, *(("-v", "1") if verbose else ()), "-o", out)
+    return RegCase(case_id, category, description, (*head, *args), **kw)
 
 
 def all_cases() -> list[RegCase]:
@@ -831,17 +852,10 @@ def all_cases() -> list[RegCase]:
             *stage("Rigid[0.1]", mattes()),
             expect="error",
         ),
-        reg(
-            f"{E}/syn",
-            E,
-            "a SyN stage: larmorx ports deformable stages in A5",
-            *stage("SyN[0.1,3,0]", f"CC[{F},{M},1,2]"),
-            expect="divergence",
-            reason="deformable registration is milestone A5; larmorx refuses with a message",
-        ),
     ]
     cases += _message_cases()
     cases += _point_set_cases()
+    cases += syn_cases(_syn_case)
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -901,6 +915,30 @@ def all_cases() -> list[RegCase]:
                     "(its SyN stage left out)",
                     (f"{{fmriprep-linear:{run}/{subject}/{node}}}",),
                     tier="standard" if first else "full",
+                )
+            )
+            # The whole command, its SyN stage included (A5): on every third voxel of its
+            # images (the standard tier's first run, the full tier's others), and as it ran.
+            name = run.split("-noreconall")[0]
+            cases.append(
+                RegCase(
+                    f"real-syn-small/{name}/{short}",
+                    "real-syn-small",
+                    f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run}, whole (Rigid, Affine, "
+                    f"SyN), on one voxel in {SMALL} along each axis of its images",
+                    (f"{{fmriprep-small:{run}/{subject}/{node}}}",),
+                    tier="standard" if run.startswith("ds000005") else "full",
+                    band=run.startswith("ds000005"),
+                )
+            )
+            cases.append(
+                RegCase(
+                    f"real-syn/{name}/{short}",
+                    "real-syn",
+                    f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run}, whole (Rigid, Affine, "
+                    "SyN), full size",
+                    (f"{{fmriprep-whole:{run}/{subject}/{node}}}",),
+                    tier="full",
                 )
             )
     return cases
@@ -1176,6 +1214,57 @@ def _masked(tmp: Path, name: str, image: Path, mask: Path) -> Path:
     return path
 
 
+def _laplacian(tmp: Path, image: Path) -> Path:
+    """The template's Laplacian as sMRIPrep's brain extraction makes it (``lap_tmpl``:
+    ``ImageMath 3 out Laplacian template 1.5 1``), by the ANTs oracle's ImageMath."""
+    path = tmp / image.name.replace(".nii.gz", "_maths.nii.gz")
+    if not path.exists():
+        b = ants_bin()
+        if b is None or not (b / "ImageMath").is_file():
+            raise Outcome(SKIPPED, "the ANTs oracle's ImageMath was not found")
+        subprocess.run(
+            [str(b / "ImageMath"), "3", str(path), "Laplacian", str(image), "1.5", "1"],
+            check=True,
+            capture_output=True,
+            env={**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1"},
+        )
+    return path
+
+
+def _decimated(tmp: Path, image: Path, k: int) -> Path:
+    """Every ``k``-th voxel of a 3D image along each axis, in the image's data type, its affine
+    scaled so that the voxels kept stay where they were: the small versions of real images."""
+    import hashlib
+
+    import nibabel as nib
+
+    d = tmp / "small"
+    d.mkdir(exist_ok=True)
+    path = d / f"{hashlib.sha1(str(image).encode()).hexdigest()[:10]}_{image.name}"
+    if not path.exists():
+        img = nib.load(image)
+        dtype = img.get_data_dtype()
+        data = np.asanyarray(img.dataobj)[::k, ::k, ::k]
+        if np.issubdtype(dtype, np.integer) and not np.issubdtype(data.dtype, np.integer):
+            dtype = np.dtype(np.float32)
+        a = img.affine.copy()
+        a[:3, :3] *= k
+        nib.save(nib.Nifti1Image(np.asarray(data, dtype=dtype), a), path)
+    return path
+
+
+def _small(args: list[str], tmp: Path, k: int) -> list[str]:
+    """``args`` with every image they name replaced by its every ``k``-th voxel."""
+
+    def replace(m: re.Match[str]) -> str:
+        p = m.group(0)
+        if p.endswith((".nii", ".nii.gz")) and Path(p).is_file():
+            return str(_decimated(tmp, Path(p), k))
+        return p
+
+    return [re.sub(r"[^\[\],]+", replace, a) for a in args]
+
+
 def _stand_ins(args: list[str], run_dir: Path, tmp: Path) -> list[str]:
     """``args`` with the intermediates nipype did not keep in the oracle's working directory
     replaced: the brain extraction's N4-corrected T1w by the run's ``desc-preproc_T1w`` (the
@@ -1212,6 +1301,9 @@ def _stand_ins(args: list[str], run_dir: Path, tmp: Path) -> list[str]:
             return str(moving)
         if name.endswith("_corrected.nii.gz"):
             return str(t1w)
+        if Path(path).parent.name == "lap_tmpl":
+            template = name.replace("_maths", "")
+            return str(_laplacian(tmp, td.get(f"templateflow/{template.split('_')[0]}/{template}")))
         return path
 
     out = []
@@ -1230,12 +1322,19 @@ def _stand_ins(args: list[str], run_dir: Path, tmp: Path) -> list[str]:
 
 
 def _fmriprep_args(
-    spec: str, out: Path, linear_only: bool = False, tmp: Path | None = None
+    spec: str,
+    out: Path,
+    linear_only: bool = False,
+    tmp: Path | None = None,
+    *,
+    stand_ins: bool = False,
+    small: int = 0,
 ) -> list[str]:
     """The ``antsRegistration`` arguments of an fMRIPrep node (``run/node``), its paths mapped to
     the oracle run and ``larmorx-testdata``, the output prefix moved to ``out``; with
-    ``linear_only``, without its deformable stages, and stand-ins (made in ``tmp``) for the
-    inputs nipype did not keep."""
+    ``linear_only``, without its deformable stages; with ``linear_only`` or ``stand_ins``,
+    stand-ins (made in ``tmp``) for the inputs nipype did not keep; with ``small``, every image
+    replaced by its every ``small``-th voxel."""
     import larmorx_testdata as td
 
     root = _oracle_root()
@@ -1255,7 +1354,11 @@ def _fmriprep_args(
     text = re.sub(r"/templateflow/[^\s,\]]+", template, text)
     args = text.split()
     if linear_only:
-        args = _stand_ins(_linear_stages(args), root / run, tmp or out)
+        args = _linear_stages(args)
+    if linear_only or stand_ins:
+        args = _stand_ins(args, root / run, tmp or out)
+    if small:
+        args = _small(args, tmp or out, small)
     i = args.index("--output")
     value = args[i + 1]
     if value.startswith("["):
@@ -1505,6 +1608,10 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
         return _fmriprep_args(c.args[0][10:-1], out)
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep-linear:"):
         return _fmriprep_args(c.args[0][17:-1], out, linear_only=True, tmp=tmp)
+    if len(c.args) == 1 and c.args[0].startswith("{fmriprep-whole:"):
+        return _fmriprep_args(c.args[0][16:-1], out, tmp=tmp, stand_ins=True)
+    if len(c.args) == 1 and c.args[0].startswith("{fmriprep-small:"):
+        return _fmriprep_args(c.args[0][16:-1], out, tmp=tmp, stand_ins=True, small=SMALL)
 
     def sub(m: re.Match[str]) -> str:
         key = m.group(1)
@@ -1524,6 +1631,8 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
             return str(tmp / key[8:])
         if key.startswith("gen-points:"):
             return str(ants_point_sets.write_points(key[11:], tmp))
+        if key.startswith("gen-syn:"):
+            return str(syn_transform_file(tmp, key[8:]))
         raise KeyError(f"unknown placeholder {{{key}}}")
 
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args]
@@ -1669,7 +1778,8 @@ def _outputs(d: Path) -> dict[str, Path]:
 
 
 def _parameters(d: Path) -> np.ndarray | None:
-    """Every transform parameter written, in file order (for the thread band)."""
+    """Every transform parameter written, in file order (for the thread band): the parameters
+    of transform files, and the vectors of displacement-field images."""
     import larmorx as lx
 
     vals = []
@@ -1677,6 +1787,10 @@ def _parameters(d: Path) -> np.ndarray | None:
         if p.suffix in (".mat", ".txt", ".h5"):
             for t in lx.transforms.read(p):
                 vals.append(np.asarray(t.parameters, dtype=np.float64))
+        elif p.name.endswith("Warp.nii.gz"):
+            import nibabel as nib
+
+            vals.append(np.asarray(nib.load(p).dataobj, dtype=np.float64).ravel())
     return np.concatenate(vals) if vals else None
 
 
@@ -1886,13 +2000,15 @@ def highlights(results: list[CaseResult]) -> list[str]:
             + "); larmorx gives the one-thread result at any thread count, within "
             f"{max(d for _, d, _ in band):.3g} of ANTs at one thread."
         )
+    lines.append("")
+    lines += defects.summary(results)
     return lines
 
 
 def suite() -> Suite:
     return Suite(
         name="ants-registration",
-        title="antsRegistration (linear stages)",
+        title="antsRegistration (linear and SyN stages)",
         tool="`larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, "
         "larmorx-ants)",
         reference=f"antsRegistration from {ants_version()}, the binary built by "

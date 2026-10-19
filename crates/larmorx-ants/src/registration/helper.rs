@@ -620,13 +620,17 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             sci4.float(now),
             sci4.float(now - self.last)
         );
-        if self.full_scale.is_some() && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64() {
+        let printed = self.full_scale.is_some()
+            && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64();
+        if printed {
             line.push_str(&sci12.float(full_scale_value.to_f64()));
         }
         line.push('\n');
         self.log.logger(&line);
+        // The stream keeps the last precision set: 4 (the time since the last line), or 12
+        // after the full-scale similarity.
         if self.log.verbose {
-            self.log.cout = sci4;
+            self.log.cout = if printed { sci12 } else { sci4 };
         }
         self.last = now;
         Ok(())

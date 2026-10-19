@@ -1301,6 +1301,121 @@ def _(ctx: Context) -> dict[str, Any]:
     return files
 
 
+@case("cli.ants.antsRegistration.syn", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """SyN: an affine stage then SyN with CC over two levels, collapsed (``0GenericAffine.mat``,
+    ``1Warp``, ``1InverseWarp``) with the warped images; then, in float, as composites and not
+    collapsed, SyN from the first run's field (``-r`` a displacement field image) with Mattes
+    and MeanSquares, a total-field variance and ``-g`` weighting the third axis, its state
+    saved."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    p = ctx.out("syn_")
+    w, iw = ctx.out("syn_warped.nii"), ctx.out("syn_inverse_warped.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", f"[{p},{w},{iw}]",
+        "-t", "Affine[0.2]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "SyN[0.25,3,0]", "-m", f"CC[{a},{b},1,2]",
+        "-c", "[3x2,1e-6,3]", "-f", "2x1", "-s", "1x0vox",
+    )  # fmt: skip
+    q = ctx.out("synf_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "--float", "1", "-a", "1", "-z", "0", "-o", q,
+        "--save-state", q + "state.h5", "-r", p + "1Warp.nii.gz",
+        "-t", "SyN[0.2,2,0.5]", "-m", f"Mattes[{a},{b},0.6,12]", "-m", f"MeanSquares[{a},{b},0.4,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "-g", "1x1x0.5",
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "affine": File(p + "0GenericAffine.mat"),
+        "warp": Nifti(p + "1Warp.nii.gz"),
+        "inverse_warp": Nifti(p + "1InverseWarp.nii.gz"),
+        "warped": Nifti(w),
+        "inverse_warped": Nifti(iw),
+    }
+    # The initial field has no inverse: no InverseComposite.h5.
+    for key, name in (("composite", "Composite.h5"), ("state", "state.h5")):
+        structure, values = _h5_structure(q + name)
+        out[f"{key}.structure"] = structure
+        out[f"{key}.values"] = values
+    return out
+
+
+@case("cli.ants.antsRegistration.syn.dimensions", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """SyN in 2D (CC, two levels, Demons in a second stage) and in 4D (MeanSquares): the
+    fields' interpolation, composition, inversion and smoothing outside 3D."""
+    plane, plane2 = ctx.file("plane.nii"), ctx.file("plane2.nii")
+    p2 = ctx.out("plane_syn_")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", p2,
+        "-t", "SyN[0.3,2,0.5]", "-m", f"CC[{plane},{plane2},1,2]",
+        "-c", "[3x2,1e-6,3]", "-f", "2x1", "-s", "1x0vox",
+        "-t", "SyN[0.2,3,0]", "-m", f"Demons[{plane},{plane2},1]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    bold = ctx.file("bold.nii")
+    p4 = ctx.out("bold_syn_")
+    cli(
+        "ants", "antsRegistration", "-d", "4", "-o", p4,
+        "-t", "SyN[0.3,2,0]", "-m", f"MeanSquares[{bold},{bold},1,0]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    return {
+        "2d.warp": Nifti(p2 + "0Warp.nii.gz"),
+        "2d.inverse_warp": Nifti(p2 + "0InverseWarp.nii.gz"),
+        "4d.warp": Nifti(p4 + "0Warp.nii.gz"),
+    }
+
+
+@case("cli.ants.antsRegistration.syn.pointsets", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """SyN with the point-set metrics, ANTs' defects corrected: ICP alone (in tangent space,
+    each evaluation's own label metrics, ITK-32), CC with ICP through the transforms (ITK-33),
+    CC with IGDM given its point sets (ANTS-61; IGDM's gradients mapped into the virtual
+    domain)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    m2 = ctx.file("mask2.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    files = {}
+    for name, metrics in [
+        ("icp", [f"ICP[{la},{lb},1]"]),
+        ("cc_icp", [f"CC[{a},{b},1,2]", f"ICP[{la},{lb},0.5]"]),
+        ("cc_igdm", [f"CC[{a},{b},1,2]", f"IGDM[{a},{b},1,{m},{m2}]"]),
+    ]:
+        prefix = ctx.out(f"{name}_")
+        args = [x for metric in metrics for x in ("-m", metric)]
+        cli(
+            "ants", "antsRegistration", "-d", "3", "-o", prefix, "-t", "SyN[0.3,2,0]", *args,
+            "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", "-x", m,
+        )  # fmt: skip
+        files[name] = Nifti(prefix + "0Warp.nii.gz")
+    return files
+
+
+@case("cli.ants.antsRegistration.syn.reproduce", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """SyN with ANTs' defects reproduced: GC's derivative all in the first voxel (ITK-30), a
+    moving mask only (the stale fixed mask, ITK-31), ICP's frozen label metrics (ITK-32), CC
+    with ICP given identity transforms (ITK-33)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    files = {}
+    for name, metrics, masks in [
+        ("gc", [f"GC[{a},{b},1]"], ()),
+        ("moving_mask", [f"MeanSquares[{a},{b},1,0]"], ("-x", f"[NULL,{m}]")),
+        ("icp", [f"ICP[{la},{lb},1]"], ("-x", m)),
+        ("cc_icp", [f"CC[{a},{b},1,2]", f"ICP[{la},{lb},0.5]"], ("-x", m)),
+    ]:
+        prefix = ctx.out(f"{name}_")
+        args = [x for metric in metrics for x in ("-m", metric)]
+        cli(
+            "ants", "antsRegistration", "-d", "3", "-o", prefix, "-t", "SyN[0.3,2,0]", *args,
+            "-c", "[3,1e-6,3]", "-f", "1", "-s", "0", *masks, upstream_defects=REPRODUCE,
+        )  # fmt: skip
+        files[name] = Nifti(prefix + "0Warp.nii.gz")
+    return files
+
+
 @case("cli.ants.antsAI", covers=("cli:ants antsAI",))
 def _(ctx: Context) -> dict[str, Any]:
     """``antsAI``'s paths: a rigid search from the principal axes with Mattes on regularly
@@ -1529,6 +1644,30 @@ def _(ctx: Context) -> dict[str, Any]:
         "files": "\n".join(sorted(res.files)),
         "warped": res.warped.data,
         "inverse_warped": res.inverse_warped.data,
+        "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
+    }
+    for name, xfms in res.files.items():
+        out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+    return out
+
+
+@case("py.ants.registration.syn", covers=("lx.ants.registration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.registration`` with a SyN stage (CC on an in-memory moving image, two levels,
+    the update and total variances): its field files and the warped image."""
+    stage = lx.ants.RegistrationStage
+    a = ctx.file("anat.nii")
+    res = lx.ants.registration(
+        [
+            stage("SyN", 0.25, lx.ants.RegistrationMetric("CC", a, anat2(), radius=2),
+                  iterations=[3, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+                  convergence_window=3, update_field_variance=2.5, total_field_variance=0.5),
+        ],
+        warped=True,
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "files": "\n".join(sorted(res.files)),
+        "warped": res.warped.data,
         "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
     }
     for name, xfms in res.files.items():

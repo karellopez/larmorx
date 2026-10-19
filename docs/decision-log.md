@@ -974,6 +974,23 @@ rule 10 has the exception.
 - **`antsAI -b`** (blob alignment): ported later, as its own task after A5/A6; refused with a
   message until then.
 
+## 2026-10-19: Apache-2.0 kept; the Talairach step and pretrained models
+
+- **Licence (user):** larmorx's main package stays **Apache-2.0** (D2 reaffirmed): it runs on
+  every platform and allows commercial use; the replicas keep their upstream licences.
+  Royalty or source-available schemes were discussed and declined: the project earns
+  indirectly (support, a validated edition, services, grants, citations).
+- **The Talairach step** (recon-all's affine registration to MNI305, used for eTIV and as a
+  starting point; Washington University's `talairach_avi`, which may not be copied or
+  redistributed): a clean-room original of the step, its three atlas images fetched by the user
+  from FreeSurfer's official site on first use (MGH distributes them; larmorx only downloads).
+  The official per-file location is to be confirmed when the FreeSurfer track starts.
+- **Pretrained models** (SynthSeg, SynthStrip, SynthMorph, ANTsXNet, ...): the networks'
+  inference re-implemented in pure Rust (an own engine or a pure-Rust one such as `tract` or
+  `burn`), the original weights reused (shipped or fetched per their licence), validated as
+  equivalence (labels, volumes, downstream results within the original's own CPU/GPU
+  variability), not bit-identity.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

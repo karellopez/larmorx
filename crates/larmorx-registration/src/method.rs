@@ -156,7 +156,7 @@ const VERIFY_FILE: &str = "Modules/Numerics/Optimizersv4/include/itkObjectToObje
 
 impl<R: Real> LevelMetric<R> {
     /// `Initialize()` of the level's metric (Demons throws for a linear transform).
-    fn initialize<const D: usize>(
+    pub(crate) fn initialize<const D: usize>(
         kind: MetricKind,
         metric: &ImageMetricv4<R, D>,
     ) -> Result<Self, ItkException> {
@@ -185,7 +185,7 @@ impl<R: Real> LevelMetric<R> {
     }
 
     /// `GetValue` or `GetValueAndDerivative`.
-    fn evaluate<const D: usize>(
+    pub(crate) fn evaluate<const D: usize>(
         &self,
         metric: &ImageMetricv4<R, D>,
         moving: &Composite<R, D>,
@@ -220,7 +220,7 @@ impl<R: Real> LevelMetric<R> {
 }
 
 /// `vnl_vector<R>::magnitude()`: the squares summed in `R`, the root in double.
-fn magnitude<R: Real>(v: &[R]) -> R {
+pub(crate) fn magnitude<R: Real>(v: &[R]) -> R {
     let mut sum = R::ZERO;
     for &x in v {
         sum = sum + x * x;
@@ -420,6 +420,46 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 }
 
+/// A level's smoothed image (`InitializeRegistrationAtEachLevel`):
+/// `SmoothingRecursiveGaussianImageFilter` with the level's sigma times each axis's spacing
+/// (or in millimetres); the image itself for a sigma ≤ 0.
+pub fn smooth_for_level<R: Real, const D: usize>(
+    image: &Arc<Image<R, D>>,
+    sigma: R,
+    physical: bool,
+    n_threads: usize,
+) -> Result<Arc<Image<R, D>>, ItkException> {
+    if sigma <= R::ZERO {
+        return Ok(Arc::clone(image));
+    }
+    let sigmas: Vec<f64> = (0..D)
+        .map(|i| {
+            let s = sigma.to_f64();
+            if physical {
+                s
+            } else {
+                s * image.space.spacing[i]
+            }
+        })
+        .collect();
+    let data = R::smooth(
+        &image.data,
+        &image.space.size,
+        &image.space.spacing,
+        &sigmas,
+        n_threads,
+    )
+    .map_err(|e| {
+        ItkException::new(
+            "Modules/Filtering/Smoothing/include/itkSmoothingRecursiveGaussianImageFilter.hxx",
+            214,
+            "SmoothingRecursiveGaussianImageFilter",
+            e.to_string(),
+        )
+    })?;
+    Ok(Arc::new(image.with_data(data)))
+}
+
 /// The shrunk virtual domain of a level (`ShrinkImageFilter::GenerateOutputInformation`).
 pub fn shrink_space<const D: usize>(
     space: &Space<D>,
@@ -560,6 +600,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         fixed_gradient_image: None,
         moving_gradient_image: None,
         pixel_f32: false,
+        local_support: false,
     };
     let r =
         NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
@@ -692,35 +733,12 @@ where
         let virtual_space = shrink_space(&virtual_base, factors)?;
         let sigma = stage.smoothing_sigmas[level];
         let smooth = |image: &Arc<Image<R, D>>| -> Result<Arc<Image<R, D>>, ItkException> {
-            if sigma <= R::ZERO {
-                return Ok(Arc::clone(image));
-            }
-            let sigmas: Vec<f64> = (0..D)
-                .map(|i| {
-                    let s = sigma.to_f64();
-                    if stage.sigmas_in_physical_units {
-                        s
-                    } else {
-                        s * image.space.spacing[i]
-                    }
-                })
-                .collect();
-            let data = R::smooth(
-                &image.data,
-                &image.space.size,
-                &image.space.spacing,
-                &sigmas,
+            smooth_for_level(
+                image,
+                sigma,
+                stage.sigmas_in_physical_units,
                 stage.n_threads,
             )
-            .map_err(|e| {
-                ItkException::new(
-                    "Modules/Filtering/Smoothing/include/itkSmoothingRecursiveGaussianImageFilter.hxx",
-                    214,
-                    "SmoothingRecursiveGaussianImageFilter",
-                    e.to_string(),
-                )
-            })?;
-            Ok(Arc::new(image.with_data(data)))
         };
         let mut images: Vec<Option<ImageMetricv4<R, D>>> = Vec::with_capacity(stage.metrics.len());
         for sm in &stage.metrics {
@@ -736,6 +754,7 @@ where
                     fixed_gradient_image: None,
                     moving_gradient_image: None,
                     pixel_f32: false,
+                    local_support: false,
                 }),
                 StageMetric::PointSet(_) => None,
             });

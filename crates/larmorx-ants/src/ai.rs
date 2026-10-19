@@ -960,6 +960,7 @@ pub fn search<const D: usize>(
         fixed_gradient_image: None,
         moving_gradient_image: Some(moving_gradient),
         pixel_f32: true,
+        local_support: false,
     };
     let StartPoints {
         mut list,

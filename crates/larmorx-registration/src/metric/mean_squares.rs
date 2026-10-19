@@ -11,12 +11,17 @@ use crate::transform::Composite;
 use crate::{CompensatedSum, ItkException, Real};
 
 /// `ImageToImageMetricv4GetValueAndDerivativeThreaderBase` for one work unit: the measure
-/// summed in `R`, each derivative component in a compensated sum, then
-/// `AfterThreadedExecution`'s averages.
+/// summed in `R`; for a transform of global support each derivative component in a
+/// compensated sum, then `AfterThreadedExecution`'s averages; for a transform of local
+/// support ([`BaseReduction::new_local`]) each point's derivative added (in `R`) to its
+/// voxel's entries of the whole derivative, which is not averaged.
 pub struct BaseReduction<R> {
     pub valid: usize,
     pub measure: R,
     pub derivatives: Vec<CompensatedSum>,
+    /// Local support: the derivative over the virtual domain and the number of local
+    /// parameters (`D`).
+    local: Option<(Vec<R>, usize)>,
 }
 
 /// The outcome of a reduction: the value and derivative, or ITK's "no valid points" case
@@ -37,24 +42,98 @@ impl<R: Real> BaseReduction<R> {
             } else {
                 Vec::new()
             },
+            local: None,
+        }
+    }
+
+    /// A reduction for a transform of local support: `total` derivative entries (zeros),
+    /// `local` per voxel.
+    pub fn new_local(total: usize, local: usize, compute_derivative: bool) -> Self {
+        BaseReduction {
+            valid: 0,
+            measure: R::ZERO,
+            derivatives: Vec::new(),
+            local: Some((
+                if compute_derivative {
+                    vec![R::ZERO; total]
+                } else {
+                    Vec::new()
+                },
+                local,
+            )),
+        }
+    }
+
+    /// The reduction `m` needs: [`BaseReduction::new_local`] with local support, else
+    /// [`BaseReduction::new`].
+    pub fn for_metric<const D: usize>(
+        m: &ImageMetricv4<R, D>,
+        transform: &Composite<R, D>,
+        compute_derivative: bool,
+    ) -> Self {
+        if m.local_support {
+            Self::new_local(
+                m.number_of_parameters(transform),
+                D,
+                compute_derivative,
+            )
+        } else {
+            Self::new(m.local_parameters(transform), compute_derivative)
         }
     }
 
     /// One valid point: `NumberOfValidPoints++`, `Measure += value`, and its local
-    /// derivative into the compensated sums.
+    /// derivative into the compensated sums (global support) or into the entries of its
+    /// virtual voxel `voxel` (local support; `None`: outside the virtual region).
     #[inline]
-    pub fn add(&mut self, value: R, local: &[R]) {
+    pub fn add_point(&mut self, value: R, local: &[R], voxel: Option<usize>) {
         self.valid += 1;
         self.measure = self.measure + value;
-        for (s, &d) in self.derivatives.iter_mut().zip(local) {
-            s.add(d.to_f64());
+        match &mut self.local {
+            None => {
+                for (s, &d) in self.derivatives.iter_mut().zip(local) {
+                    s.add(d.to_f64());
+                }
+            }
+            Some((derivative, n)) => {
+                if let Some(v) = voxel
+                    && !derivative.is_empty()
+                {
+                    for (i, &d) in local.iter().enumerate().take(*n) {
+                        let cell = &mut derivative[v * *n + i];
+                        *cell = *cell + d;
+                    }
+                }
+            }
         }
     }
 
-    /// `AfterThreadedExecution`: the derivative of the work unit added to a compensated sum
-    /// (the per-unit sum converted to `R` on the way) and to the zeroed result; then, if any
-    /// point was valid, the measure and the derivative divided by their number.
+    /// [`BaseReduction::add_point`] for a transform of global support.
+    #[inline]
+    pub fn add(&mut self, value: R, local: &[R]) {
+        self.add_point(value, local, None);
+    }
+
+    /// `AfterThreadedExecution`: for global support, the derivative of the work unit added to
+    /// a compensated sum (the per-unit sum converted to `R` on the way) and to the zeroed
+    /// result; then, if any point was valid, the measure divided by their number, and the
+    /// derivative too for global support.
     pub fn finish(self, compute_derivative: bool, np: usize) -> Reduced<R> {
+        if let Some((derivative, _)) = self.local {
+            if self.valid == 0 {
+                return Reduced {
+                    value: R::MAX,
+                    derivative: vec![R::ZERO; derivative.len()],
+                    no_valid_points: true,
+                };
+            }
+            let n = R::from_i64(self.valid as i64);
+            return Reduced {
+                value: (R::ZERO + self.measure) / n,
+                derivative,
+                no_valid_points: false,
+            };
+        }
         let mut derivative = if compute_derivative {
             vec![R::ZERO; np]
         } else {
@@ -95,12 +174,12 @@ pub fn evaluate<R: Real, const D: usize>(
     compute_derivative: bool,
     floor: &IndexFloor,
 ) -> Result<Reduced<R>, ItkException> {
-    let np = transform.number_of_parameters();
+    let np = m.local_parameters(transform);
     let gradients = GradientSource {
         fixed: false,
         moving: true,
     };
-    let process = |i: usize| -> Option<(R, Vec<R>)> {
+    let process = |i: usize| -> Option<(R, Vec<R>, Option<usize>)> {
         let s = m.sample(i, transform, gradients, compute_derivative, floor)?;
         let diff = s.fixed_value - s.moving_value;
         let value = R::ZERO + diff * diff;
@@ -108,7 +187,7 @@ pub fn evaluate<R: Real, const D: usize>(
         if compute_derivative {
             let mut jac = vec![R::ZERO; D * np];
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
-            transform.jacobian(&vp, &mut jac);
+            m.moving_jacobian(transform, &vp, &mut jac);
             local = (0..np)
                 .map(|par| {
                     let mut l = R::ZERO;
@@ -123,11 +202,16 @@ pub fn evaluate<R: Real, const D: usize>(
                 })
                 .collect();
         }
-        Some((value, local))
+        let voxel = if m.local_support {
+            m.voxel_of(&s.virtual_index)
+        } else {
+            None
+        };
+        Some((value, local, voxel))
     };
-    let mut reduction = BaseReduction::new(np, compute_derivative);
-    m.for_each_sample(process, |(v, l)| {
-        reduction.add(v, &l);
+    let mut reduction = BaseReduction::for_metric(m, transform, compute_derivative);
+    m.for_each_sample(process, |(v, l, voxel)| {
+        reduction.add_point(v, &l, voxel);
         Ok(())
     })?;
     Ok(reduction.finish(compute_derivative, np))

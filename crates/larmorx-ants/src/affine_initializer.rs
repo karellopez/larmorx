@@ -335,6 +335,7 @@ pub fn search<const D: usize>(
         fixed_gradient_image: None,
         moving_gradient_image: Some(moving_gradient),
         pixel_f32: true,
+        local_support: false,
     };
     // The scales, estimated once for the search transform as it is then: centred at 0, with
     // the initial transform's parameters.

@@ -15,6 +15,7 @@
 //! sampled points in their order.
 
 pub mod correlation;
+pub mod demons;
 pub mod joint_histogram;
 pub mod mattes;
 pub mod mean_squares;
@@ -55,6 +56,13 @@ pub struct ImageMetricv4<R, const D: usize> {
     /// `FixedImagePixelType` / `MovingImagePixelType` (`TransformAndEvaluateFixedPoint`), so
     /// they are rounded to float. In `antsRegistration` the pixel type is `R`.
     pub pixel_f32: bool,
+    /// The moving transform is a displacement field transform on the virtual domain (SyN's
+    /// identity field, `DownsampleImagesForMetricDerivatives`): it maps every point to itself
+    /// (pass an empty composite), has `D` local parameters with the identity as their Jacobian,
+    /// and each point's derivative is added to its voxel's `D` entries of a derivative over the
+    /// whole virtual domain, which is not averaged (`StorePointDerivativeResult` for a
+    /// transform of local support).
+    pub local_support: bool,
 }
 
 /// One virtual point as the metric sees it (`ProcessVirtualPoint`'s locals).
@@ -78,6 +86,50 @@ pub struct GradientSource {
 }
 
 impl<R: Real, const D: usize> ImageMetricv4<R, D> {
+    /// `GetNumberOfLocalParameters()`: `D` with local support, else the transform's.
+    #[inline]
+    pub fn local_parameters(&self, transform: &Composite<R, D>) -> usize {
+        if self.local_support {
+            D
+        } else {
+            transform.number_of_parameters()
+        }
+    }
+
+    /// `GetNumberOfParameters()`: the size of the derivative (`D` per virtual voxel with local
+    /// support).
+    #[inline]
+    pub fn number_of_parameters(&self, transform: &Composite<R, D>) -> usize {
+        if self.local_support {
+            D * self.virtual_space.len()
+        } else {
+            transform.number_of_parameters()
+        }
+    }
+
+    /// `ComputeJacobianWithRespectToParametersCachedTemporaries(virtualPoint)`: `D` rows of
+    /// [`ImageMetricv4::local_parameters`] values (the identity with local support).
+    #[inline]
+    pub fn moving_jacobian(&self, transform: &Composite<R, D>, vp: &[R; D], out: &mut [R]) {
+        if self.local_support {
+            out.fill(R::ZERO);
+            for i in 0..D {
+                out[i * D + i] = R::ONE;
+            }
+        } else {
+            transform.jacobian(vp, out);
+        }
+    }
+
+    /// `ComputeParameterOffsetFromVirtualIndex(index, D) / D`: the virtual voxel of `index`
+    /// (`None` outside the virtual region, where ITK would write outside its derivative).
+    #[inline]
+    pub fn voxel_of(&self, index: &[i64; D]) -> Option<usize> {
+        self.virtual_space
+            .contains(index)
+            .then(|| self.virtual_space.offset(index))
+    }
+
     /// The number of domain points (`GetNumberOfDomainPoints`).
     pub fn number_of_domain_points(&self) -> usize {
         match &self.samples {

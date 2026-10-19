@@ -52,6 +52,7 @@ pub mod preprocess;
 pub mod resample;
 pub mod rng;
 pub mod space;
+pub mod syn;
 pub mod transform;
 
 use larmorx_core::ItkReal;

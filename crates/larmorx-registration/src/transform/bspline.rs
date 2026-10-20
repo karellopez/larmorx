@@ -294,7 +294,30 @@ impl<R: Real, const D: usize> BSplineXfm<R, D> {
                 50,
                 "BSplineTransform",
                 format!(
-                    "Mismatch between parameters size {} and expected number of parameters {n}",
+                    "Mismatch between parameters size {} and expected number of parameters {n}{}",
+                    p.len(),
+                    if self.grid.is_empty() {
+                        ". \nSince the size of the grid region is 0, perhaps you forgot to SetGridRegion or SetFixedParameters before setting the Parameters."
+                    } else {
+                        ""
+                    }
+                ),
+            ));
+        }
+        self.coefficients.copy_from_slice(p);
+        Ok(())
+    }
+
+    /// `SetParametersByValue(p)` (the transform readers, after `SetFixedParameters`).
+    pub fn set_parameters_by_value(&mut self, p: &[R]) -> Result<(), ItkException> {
+        let n = self.number_of_parameters();
+        if p.len() != n {
+            return Err(ItkException::new(
+                FILE,
+                83,
+                "BSplineTransform",
+                format!(
+                    "Mismatched between parameters size {} and region size {n}",
                     p.len()
                 ),
             ));

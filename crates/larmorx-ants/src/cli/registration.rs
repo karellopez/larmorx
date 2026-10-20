@@ -29,7 +29,7 @@ use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
 use larmorx_registration::initializer::{Feature, initialize};
 use larmorx_registration::mask::Mask;
-use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
+use larmorx_registration::transform::{BSplineXfm, Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Space};
 
 use super::TransformLoader;
@@ -844,16 +844,17 @@ fn load_transform<R: Compute, const D: usize>(
             .map(|p| {
                 if p.name.starts_with("DisplacementFieldTransform") {
                     field_from_part::<R, D>(name, p, exact_floor)
+                } else if p.name.starts_with("BSplineTransform") {
+                    bspline_from_part::<R, D>(name, p)
                 } else {
                     xfm_from_part::<R, D>(name, p)
                 }
             })
             .collect();
     }
-    if !parts
-        .iter()
-        .any(|p| p.name.starts_with("DisplacementFieldTransform"))
-    {
+    if !parts.iter().any(|p| {
+        p.name.starts_with("DisplacementFieldTransform") || p.name.starts_with("BSplineTransform")
+    }) {
         let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
         let mut flat = Vec::new();
         flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
@@ -866,6 +867,10 @@ fn load_transform<R: Compute, const D: usize>(
     {
         if p.name.starts_with("DisplacementFieldTransform") {
             flat.push(field_from_part::<R, D>(name, p, exact_floor)?);
+            continue;
+        }
+        if p.name.starts_with("BSplineTransform") {
+            flat.push(bspline_from_part::<R, D>(name, p)?);
             continue;
         }
         let t = transform_from_parts(std::slice::from_ref(p))
@@ -1082,6 +1087,29 @@ fn field_from_part<R: Compute, const D: usize>(
         None,
         exact_floor,
     )))
+}
+
+/// A `BSplineTransform` (of order 3) read from a transform file as ITK's readers build it:
+/// `SetFixedParameters` (the grid), then `SetParametersByValue` (the coefficients).
+fn bspline_from_part<R: Compute, const D: usize>(
+    file: &str,
+    part: &ItkTransformParts,
+) -> Result<Xfm<R, D>, LoadError> {
+    let report = |e: ItkException| {
+        LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}",
+            e.print()
+        ))
+    };
+    let p: Vec<R> = match &part.parameters {
+        Parameters::F64(v) => v.iter().map(|&x| R::r(x)).collect(),
+        Parameters::F32(v) => v.iter().map(|&x| R::r(f64::from(x))).collect(),
+    };
+    let mut b = BSplineXfm::<R, D>::new_default();
+    b.set_fixed_parameters(&part.fixed_parameters)
+        .map_err(report)?;
+    b.set_parameters_by_value(&p).map_err(report)?;
+    Ok(Xfm::BSpline(b))
 }
 
 /// One stored transform in 2 or 4 dimensions, as ITK's reader builds it (`SetParameters`,

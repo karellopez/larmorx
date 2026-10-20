@@ -160,7 +160,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         if scales.len() != nl {
             return Err(ItkException::new(
                 "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                100,
+                118,
                 "ConjugateGradientLineSearchOptimizerv4Template",
                 format!(
                     "Size of scales ({}) must equal number of local parameters ({nl}).",
@@ -173,7 +173,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             if s <= R::EPSILON {
                 return Err(ItkException::new(
                     "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                    114,
+                    130,
                     "ConjugateGradientLineSearchOptimizerv4Template",
                     format!(
                         "m_Scales values must be > epsilon.{}",
@@ -193,7 +193,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             if self.weights.len() != nl {
                 return Err(ItkException::new(
                     "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                    137,
+                    158,
                     "ConjugateGradientLineSearchOptimizerv4Template",
                     format!(
                         "Size of weights ({}) must equal number of local parameters ({nl}).",

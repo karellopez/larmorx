@@ -29,10 +29,18 @@ line, standard error, every file), most against the unmodified binary, the rest 
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
-| standard | 298 | 193 | 32 | 57 | 16 | 0 |
+| standard | 403 | 273 | 36 | 77 | 17 | 0 |
 | full | 327 | 194 | 59 | 57 | 17 | 0 |
 
-Both records were re-run by A5 part 1 (2026-10-19 and 20, from `a3c6cd6`), with the SyN cases (the
+The standard record was re-run by A5 part 2 (2026-10-20, from `9a4d65a`) with the B-spline and
+displacement-field cases (the `bspline-syn`, `displacement-field` and `bspline` categories: every
+metric, masks, sampling, 2D and float, the outputs and the collapse, B-spline transforms among the
+initial transforms, every message and failure; `real-bsplinesyn-small`: sMRIPrep's template
+registration with antsRegistrationSyN.sh's `BSplineSyN[0.1,26,0,3]` for its SyN stage, on every
+third voxel, identical to ANTs with CORE-MATH); every one of the 106 new cases agrees (84
+compared: 80 identical to the unmodified ANTs, 4 with CORE-MATH (glibc's `log` and `exp`, which
+the Mattes and joint-histogram metrics call); 20 rejected by both; 2 expected divergences, ANTS-77). The full tier adds 4D cases, the other four runs on every third voxel and
+the first run at full size. Both records were re-run by A5 part 1 (2026-10-19 and 20, from `a3c6cd6`), with the SyN cases (the
 `syn` and `syn-point-sets` categories: every metric, masks, outputs, initial fields, states,
 messages and failures; `real-syn-small` and, in the full tier, `real-syn`: sMRIPrep's brain
 extraction and template registration whole, Rigid, Affine and SyN, as fMRIPrep 25.2.6 ran
@@ -57,12 +65,16 @@ ANTS-45's silent failures, MINC transforms (refused), a point set's random fract
 it from the clock, ANTS-64), IGDM's value for neighbourhoods of more than one voxel (ANTs reads
 before its arrays, ANTS-66), a text point set ANTs reads forever (ANTS-69), four linear stages
 after a displacement field (ANTs seeds their voxel sample from the clock, ANTS-72) and the
-deformable stages of A5 parts 2 and 3 (refused).
+velocity-field stages of A5 part 3 (refused); A5 part 2 added ANTS-77's two B-spline meshes
+(a size of 0, fewer sizes than dimensions: ANTs fails on garbage, larmorx refuses).
 
 **ANTs' own thread band** (the standard record's 24 cases, 2, 4 and 8 threads against one):
 about 1e-13 to 1e-12 in a transform parameter in double, 3.9e-10 on fMRIPrep's BOLD-reference
 affine (3.5e-9 in A4 part 2's run: the band itself changes from run to run), 4.9e-3 on a float
-affine and up to 1.1e-16 with the point-set metrics; SyN (A5 part 1): 0 to 3.6e-14 mm in a
+affine and up to 1.1e-16 with the point-set metrics; the B-spline stages (A5 part 2): 8.9e-16 for
+a `BSpline` transform, 6.7e-7 to 2.3e-6 mm for B-spline SyN and the B-spline displacement field
+(ITK's B-spline fit adds each work unit's lattice), 1.18 mm on sMRIPrep's template registration
+with B-spline SyN on every third voxel; SyN (A5 part 1): 0 to 3.6e-14 mm in a
 field, 0.023 to 0.025 mm with ICP (ANTs adds the points' derivatives into the field from several threads
 without synchronisation: two runs at 4 threads differ, ITK-34), and 1.4 to 1.7 mm on sMRIPrep's
 registrations on every third voxel (the linear stages' thread dependence carried through SyN;

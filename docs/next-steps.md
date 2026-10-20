@@ -146,9 +146,25 @@ ANTS-71 to ANTS-74, ITK-30 to ITK-34. Benchmark report pending (busy machine; on
 96³ CC 10x5, ANTs 122 s at one thread; larmorx 24 to 41 s at one thread and 5 to 9 s at 12,
 bit-identical, in two runs on a loaded machine).
 
-**Part 2:** BSplineSyN, `BSpline`, `GaussianDisplacementField`, `BSplineDisplacementField`
-(refused today, naming part 2). **Part 3:** the time-varying velocity fields and the
-exponential transforms. Then A6, Atropos (k-means, EM, MRF; ANTs' random seeding). With A4-A6,
+**Part 2, the B-spline and displacement-field stages (done 2026-10-20, branch
+`a5-part2-bspline`, not merged yet).** `BSplineSyN`, `GaussianDisplacementField`,
+`BSplineDisplacementField` and `BSpline` to full completeness: ITK's B-spline approximation of
+fields and scattered points (`larmorx_registration::bspline_field`, ITK's one-thread result on any
+thread count), B-spline SyN with weighted masks and point-set fits, displacement fields with
+Gaussian and B-spline smoothing on update in `ImageRegistrationMethodv4` (the field scales, the
+in-place smoothing), the cubic `BSplineTransform` (domain, level adaptor, scales, a sparse
+Jacobian with ITK's compensated sums bit for bit), knot spacings, `BSplineTransform` files read
+and written, the collapse with B-spline transforms; the Python API (`mesh_size`,
+`total_mesh_size`, `spline_order`). `ants-registration` standard re-recorded from `9a4d65a`:
+403 cases (273 identical to the unmodified ANTs, 36 with CORE-MATH, 77 rejected by both, 17
+expected divergences, 0 failures; the 106 new cases: 80, 4, 20, 2), with sMRIPrep's template
+registration with antsRegistrationSyN.sh's `BSplineSyN[0.1,26,0,3]` on every third voxel; the
+full tier adds 4D, the other runs and full size. Register: ANTS-75 (extended), ANTS-76, ANTS-77;
+**to decide:** ANTS-78 (BSplineDisplacementField doubles its base mesh) and ITK-35 (no Jacobian
+with respect to position for B-spline transforms: later stages fail). 4D `BSpline` on a small
+phantom: ANTs 461 s, larmorx 23 s at one thread, identical (informal; benchmark report pending).
+Left: `antsApplyTransforms` does not read `BSplineTransform` files yet. **Part 3:** the
+time-varying velocity fields and the exponential transforms. Then A6, Atropos (k-means, EM, MRF; ANTs' random seeding). With A4-A6,
 sMRIPrep's brain extraction and MNI normalisation run in larmorx.
 
 ## 5. The rest of the `--fs-no-reconall` path
@@ -172,7 +188,10 @@ sMRIPrep's brain extraction and MNI normalisation run in larmorx.
 ## Smaller items, when they fit
 
 - Benchmarks on a quiet machine: N4 against the new oracle; `antsApplyTransforms` after
-  `--float`; the BOLD resampler.
+  `--float`; the BOLD resampler; `antsRegistration`'s SyN (A5 part 1) and B-spline and
+  displacement-field stages (A5 part 2).
+- `antsApplyTransforms` (and `lx.ants.apply_transforms`) with `BSplineTransform` files (the
+  `BSpline` stage's output), with parity cases.
 - Coverage: a copy of ds005752 with `IntendedFor` added, so the direct-`fieldmap` path is
   covered (fMRIPrep ignored its field map); ds001600's four field-map N4s.
 

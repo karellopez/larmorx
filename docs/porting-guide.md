@@ -519,20 +519,24 @@ never leaves a partial output.
 
 ## 10. Working safely
 
-Each of these cost work at least once.
+Each of these cost work at least once. The rules every agent follows are collected in
+CLAUDE.md, "Agent working rules"; this section explains why.
 
 - **Commit early and often.** Agents have been killed mid-task by usage limits; one lost its
   worktree, another had 24 uncommitted files. Commit as soon as something passes the gates,
   as "WIP checkpoint (...)" commits if needed.
-- **At most two agents at a time** (CLAUDE.md, "Working on this machine"), and back to one if
-  a usage limit hits again: four parallel agents once exhausted the session limit in 1.5
-  hours.
+- **One agent at a time, in bounded parts with a stop after each** (CLAUDE.md, "The user's
+  direction"): four parallel agents once exhausted the session limit in 1.5 hours, and a
+  two-agent trial was stopped the same evening. A run stopped by the weekly limit was resumed
+  from its commits and `NOTES.md`.
 - **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"`
   matches its own command line and never ends; four such loops ran for a day. Write
   `pgrep -f "[l]armorx_validation bench"`.
-- **Never delete work products** (code, drafts, ports, harnesses, reports, build caches).
-  Archive what must leave the build in `<workspace>/archive/<date>-<topic>/` and say so. A
-  verified port was once deleted and had to be recovered from transcripts.
+- **Never delete work products** (code, drafts, ports, harnesses, reports). Archive what must
+  leave the build in `<workspace>/archive/<date>-<topic>/` and say so. A verified port was once
+  deleted and had to be recovered from transcripts. The one exception, decided by the user on
+  2026-10-19: the Rust build caches (`target/`) of merged, clean agent worktrees, deleted after
+  CI is green (merge checklist step 7; 190 GB had built up).
 - **Know which larmorx you import.** The workspace venv (`<workspace>/.venv`) imports larmorx
   from the main checkout (an editable install of `larmorx/python` and `validation/src`). In a
   worktree, put the worktree's `python/` (with its own built `_core`) and `validation/src`
@@ -551,6 +555,17 @@ Each of these cost work at least once.
   `nohup` or `tmux`, logs in `oracles/logs/`, with the command, versions, seeds and thread
   counts recorded next to the outputs. Do not touch a run someone else started.
 - **Never ask for sudo.** Containers run with Apptainer as the user.
+- **Never run `maturin develop` in an agent's worktree:** it repoints the shared venv at that
+  worktree while other runs use it. Build the wheel elsewhere and copy its `_core.abi3.so`.
+- **Records only from a clean commit.** Two agents' records were once stamped `-dirty` and had
+  to be redone from the merge.
+- **Finish when a long run ends.** An agent once waited out its last test run and then stopped
+  without recording the results; the orchestrator finished its steps. Wait with one background
+  wait on the log's final line, then act.
+- **Mind the folder a helper script runs from.** A scratch script named `types.py` shadowed the
+  standard module when another script beside it ran (`python -P` prevents it).
+- **Launch worktree agents from inside the repository they work on:** the worktree is created
+  in the repository of the current directory (one agent landed in `larmorx_documentation`).
 - **Gates before committing:** `ruff check`, `ruff format --check`,
   `python scripts/check_spdx.py`, the Rust and Python tests that apply, and no AI attribution
   in commits (rule 9).

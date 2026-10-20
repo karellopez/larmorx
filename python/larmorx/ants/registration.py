@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``antsRegistration``'s linear and SyN stages: :func:`registration`.
+"""``antsRegistration``'s linear, SyN, B-spline and displacement-field stages:
+:func:`registration`.
 
 The function builds ``antsRegistration``'s command line from typed arguments and runs exactly
 the command-line code (``larmorx ants antsRegistration``) in-process: in-memory images are
@@ -40,7 +41,18 @@ __all__ = [
 
 MetricType = Literal["Mattes", "MI", "MI2", "MeanSquares", "CC", "GC", "Demons"]
 PointSetMetricType = Literal["ICP", "PSE", "JHCT"]
-TransformType = Literal["Translation", "Rigid", "Similarity", "Affine", "CompositeAffine", "SyN"]
+TransformType = Literal[
+    "Translation",
+    "Rigid",
+    "Similarity",
+    "Affine",
+    "CompositeAffine",
+    "SyN",
+    "BSplineSyN",
+    "GaussianDisplacementField",
+    "BSplineDisplacementField",
+    "BSpline",
+]
 Sampling = Literal["None", "Regular", "Random"]
 Precision = Literal["float64", "float32"]
 
@@ -157,10 +169,24 @@ class RegistrationStage:
     ``(fixed, moving)`` where ``None`` means no mask. ``restrict_deformation`` weighs each
     parameter of the stage's transform (``-g``); for ``SyN``, each axis of the displacement.
 
-    ``SyN`` (symmetric normalisation, ``-t SyN[gradientStep,updateFieldVariance,
-    totalFieldVariance]``) takes ``update_field_variance`` and ``total_field_variance``: the
-    variances (in voxels²) of the Gaussian smoothing of each update and of the total fields
-    (ANTs' defaults 3 and 0). The linear transforms ignore them.
+    The deformable transforms take their own parameters (the others ignore them):
+
+    - ``SyN`` (symmetric normalisation, ``-t SyN[gradientStep,updateFieldVariance,
+      totalFieldVariance]``) and ``GaussianDisplacementField`` (a displacement field, each
+      update and the total field smoothed by a Gaussian, ``-t GaussianDisplacementField[...]``
+      with the same parameters) take ``update_field_variance`` and ``total_field_variance``:
+      the variances (in voxels²) of the Gaussian smoothing of each update and of the total
+      field (ANTs' defaults 3 and 0; 0 does not smooth).
+    - ``BSplineSyN`` (``-t BSplineSyN[gradientStep,updateFieldMesh,totalFieldMesh,
+      splineOrder]``) and ``BSplineDisplacementField`` (``-t BSplineDisplacementField[...]``)
+      smooth each update and the total field by a B-spline approximation instead:
+      ``mesh_size`` is the update field's mesh at the base level (one size per axis, e.g.
+      ``(2, 2, 2)``, or one number, a knot spacing in millimetres that ANTs turns into a mesh
+      over the fixed image), ``total_mesh_size`` the total field's (``None`` or 0: not
+      smoothed), ``spline_order`` the B-splines' order (3).
+    - ``BSpline`` (a cubic B-spline transform, ``-t BSpline[gradientStep,meshSize]``) takes
+      ``mesh_size``, its control-point mesh at the base level over the fixed image (sizes or a
+      knot spacing); the mesh doubles at each level.
     """
 
     transform: TransformType
@@ -176,6 +202,9 @@ class RegistrationStage:
     restrict_deformation: Sequence[float] | None = None
     update_field_variance: float = 3.0
     total_field_variance: float = 0.0
+    mesh_size: Sequence[int] | float | None = None
+    total_mesh_size: Sequence[int] | float | None = None
+    spline_order: int = 3
 
 
 @dataclass(frozen=True)
@@ -216,9 +245,11 @@ class RegistrationResult:
     - ``inverse_transforms``: the inverse composite (with ``write_composite_transform``).
     - ``files``: every transform file, by its name after the output prefix
       (``"0GenericAffine.mat"``, ``"1Warp.nii.gz"``, ``"1InverseWarp.nii.gz"``, ``"Composite.h5"``,
-      ``"0DerivedInitialMovingTranslation.mat"``). A SyN stage's transform is a displacement
-      field (``1Warp.nii.gz``, read as a ``DisplacementFieldTransform``) and its inverse field
-      (``1InverseWarp.nii.gz``, not in ``transforms``).
+      ``"0DerivedInitialMovingTranslation.mat"``). A SyN or BSplineSyN stage's transform is a
+      displacement field (``1Warp.nii.gz``, read as a ``DisplacementFieldTransform``) and its
+      inverse field (``1InverseWarp.nii.gz``, not in ``transforms``); a
+      GaussianDisplacementField or BSplineDisplacementField stage's a field without an inverse
+      (``1Warp.nii.gz``); a BSpline stage's a ``BSplineTransform`` (``1BSpline.txt``).
     - ``warped``, ``inverse_warped``: the moving image on the fixed grid and the other way
       round, when asked for.
     - ``iterations``: every optimizer iteration; ``log``: what the program printed.
@@ -348,6 +379,13 @@ def _metric(args: _Args, m: AnyMetric, dimension: int) -> str:
     return f"{m.type}[{','.join(fields)}]"
 
 
+def _mesh(value: Sequence[int] | float) -> str:
+    """A mesh (sizes per axis, ``2x2x2``) or a knot spacing (one number)."""
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return _num(float(value))
+    return "x".join(str(int(v)) for v in value)
+
+
 def _mask(args: _Args, value: Any) -> str:
     if isinstance(value, tuple):
         names = ["NULL" if v is None else args.image(v) for v in value]
@@ -407,16 +445,18 @@ def registration(
     n_threads: int = 1,
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> RegistrationResult:
-    """Register the moving images to the fixed ones in linear and SyN stages, as
-    ``antsRegistration`` (ANTs v2.6.5) does.
+    """Register the moving images to the fixed ones in linear, SyN, B-spline and
+    displacement-field stages, as ``antsRegistration`` (ANTs v2.6.5) does.
 
     Each :class:`RegistrationStage` optimises one transform (``Translation``, ``Rigid``,
-    ``Similarity``, ``Affine``, ``CompositeAffine``, or ``SyN``'s symmetric displacement
-    fields) against its metrics (image metrics, :class:`RegistrationMetric`; point-set metrics,
-    :class:`PointSetMetric` and :class:`IntensityPointSetMetric`, in linear stages), level by
-    level (shrunk and smoothed images); the stages chain, each starting where the previous
-    left. The other deformable stages (``BSplineSyN``, ``BSpline``, displacement and velocity
-    fields) come in milestone A5's next parts.
+    ``Similarity``, ``Affine``, ``CompositeAffine``; ``SyN``'s or ``BSplineSyN``'s symmetric
+    displacement fields; a displacement field smoothed by a Gaussian or a B-spline,
+    ``GaussianDisplacementField``, ``BSplineDisplacementField``; a cubic B-spline transform,
+    ``BSpline``) against its metrics (image metrics, :class:`RegistrationMetric`; point-set
+    metrics, :class:`PointSetMetric` and :class:`IntensityPointSetMetric`), level by level
+    (shrunk and smoothed images); the stages chain, each starting where the previous left.
+    The velocity-field stages (``TimeVaryingVelocityField``, ``Exponential`` and their B-spline
+    forms) come in milestone A5's third part.
 
     - ``initial_moving_transforms`` (``-r``): transform files, transform lists,
       ``(transform, invert)`` pairs or :class:`AlignCenters`; ``initial_fixed_transforms``
@@ -495,12 +535,19 @@ def registration(
         if restore_state is not None:
             argv += ["-k", _initial(a, restore_state)]
         for s in stage_list:
-            if s.transform == "SyN":
+            if s.transform in ("SyN", "GaussianDisplacementField"):
                 parameters = [
                     _num(s.gradient_step),
                     _num(s.update_field_variance),
                     _num(s.total_field_variance),
                 ]
+            elif s.transform in ("BSplineSyN", "BSplineDisplacementField", "BSpline"):
+                if s.mesh_size is None:
+                    raise ValueError(f"a {s.transform} stage needs mesh_size")
+                parameters = [_num(s.gradient_step), _mesh(s.mesh_size)]
+                if s.transform != "BSpline":
+                    total = 0 if s.total_mesh_size is None else s.total_mesh_size
+                    parameters += [_mesh(total), str(int(s.spline_order))]
             else:
                 parameters = [_num(s.gradient_step)]
             argv += ["-t", f"{s.transform}[{','.join(parameters)}]"]

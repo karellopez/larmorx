@@ -217,7 +217,12 @@ impl<R: Compute, const D: usize> SynObserver<R, D> for SynLog<'_, '_, '_, '_, R,
 impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     /// The notices of a SyN or B-spline SyN stage's outcome: ITK-33 (point-set metrics among
     /// several metrics) and ITK-31 (stale masks).
-    pub(crate) fn syn_notices(&mut self, stage: usize, identity_point_sets: bool, stale_masks: bool) {
+    pub(crate) fn syn_notices(
+        &mut self,
+        stage: usize,
+        identity_point_sets: bool,
+        stale_masks: bool,
+    ) {
         let mode = self.upstream_defects;
         if identity_point_sets {
             push_once(

@@ -531,8 +531,12 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
     pub fn class(&self) -> &'static str {
         match &self.smoothing {
             None => "DisplacementFieldTransform",
-            Some(FieldSmoothing::Gaussian { .. }) => "GaussianSmoothingOnUpdateDisplacementFieldTransform",
-            Some(FieldSmoothing::BSpline { .. }) => "BSplineSmoothingOnUpdateDisplacementFieldTransform",
+            Some(FieldSmoothing::Gaussian { .. }) => {
+                "GaussianSmoothingOnUpdateDisplacementFieldTransform"
+            }
+            Some(FieldSmoothing::BSpline { .. }) => {
+                "BSplineSmoothingOnUpdateDisplacementFieldTransform"
+            }
         }
     }
 
@@ -575,9 +579,8 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
             ));
         }
         let space = self.field.space.clone();
-        let as_field = |u: &[R]| -> Field<R, D> {
-            Image::new(space.clone(), u.as_chunks::<D>().0.to_vec())
-        };
+        let as_field =
+            |u: &[R]| -> Field<R, D> { Image::new(space.clone(), u.as_chunks::<D>().0.to_vec()) };
         // Transform::UpdateTransformParameters: += update (· factor).
         let add = |field: &mut Field<R, D>, u: &[R]| {
             for (v, c) in field.data.iter_mut().zip(u.as_chunks::<D>().0) {

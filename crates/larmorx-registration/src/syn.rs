@@ -924,10 +924,18 @@ fn run_syn_levels<R: Real, const D: usize>(
                         call.bspline_point_update(true, &cps, b.order, warnings)?;
                     let moving_update = scale_update(&update, stage.learning_rate);
                     let tcp = BSplineSynSmoothing::control_points(&b.total_mesh, level, b.order);
-                    let fixed_total =
-                        bspline_smooth(&compose(&fixed_update, &f2m.field, floor), &tcp, b.order, None)?;
-                    let moving_total =
-                        bspline_smooth(&compose(&moving_update, &m2m.field, floor), &tcp, b.order, None)?;
+                    let fixed_total = bspline_smooth(
+                        &compose(&fixed_update, &f2m.field, floor),
+                        &tcp,
+                        b.order,
+                        None,
+                    )?;
+                    let moving_total = bspline_smooth(
+                        &compose(&moving_update, &m2m.field, floor),
+                        &tcp,
+                        b.order,
+                        None,
+                    )?;
                     return Ok(finish(fixed_total, moving_total, moving_value, fixed_value));
                 }
                 // The fixed-to-middle update (the metric value is the "moving" one), then the
@@ -944,7 +952,11 @@ fn run_syn_levels<R: Real, const D: usize>(
                                 mask.map(|m| weighted_mask(m, &virtual_space, composite, floor));
                             bspline_smooth(
                                 gradient,
-                                &BSplineSynSmoothing::control_points(&b.update_mesh, level, b.order),
+                                &BSplineSynSmoothing::control_points(
+                                    &b.update_mesh,
+                                    level,
+                                    b.order,
+                                ),
                                 b.order,
                                 weighted.as_ref(),
                             )?

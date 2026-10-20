@@ -143,6 +143,9 @@ pub struct Stage<R, const D: usize> {
     /// A B-spline displacement field's meshes per level (`BSplineDisplacementField`); `None`
     /// for other transforms.
     pub field_meshes: Option<FieldMeshes>,
+    /// A B-spline transform's mesh at the base level and physical dimensions
+    /// (`BSplineTransformParametersAdaptor` per level); `None` for other transforms.
+    pub bspline_mesh: Option<BSplineMesh<D>>,
     /// ITK-30 corrected: GC's derivative for a displacement field is each voxel's own.
     pub correct_gc_derivative: bool,
     pub n_threads: usize,
@@ -170,6 +173,15 @@ impl FieldMeshes {
             })
             .collect()
     }
+}
+
+/// The adaptors of a `BSpline` stage (`BSplineTransformParametersAdaptor`): at level `l` the
+/// mesh `mesh << l`, on the level's virtual domain (its origin and direction) with the stage's
+/// physical dimensions.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BSplineMesh<const D: usize> {
+    pub mesh: [usize; D],
+    pub physical: [f64; D],
 }
 
 /// A metric, initialised for a level.
@@ -346,17 +358,58 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         floor: &IndexFloor,
         warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
-        match entry {
+        // A B-spline transform after the active one throws at the first point whose
+        // derivative is computed (any valid point).
+        let jacobian_error = if derivative {
+            moving.position_jacobian_error()
+        } else {
+            None
+        };
+        let before = warnings.len();
+        let result = match entry {
             LevelEntry::Image(m, state) => state.evaluate(m, moving, derivative, floor, warnings),
             LevelEntry::PointSet(p) => {
                 if derivative {
-                    let v = p.value_and_derivative(moving, warnings)?;
-                    Ok((v.value, v.derivative))
+                    p.value_and_derivative(moving, warnings)
+                        .map(|v| (v.value, v.derivative))
                 } else {
                     Ok((p.value(moving, warnings)?, Vec::new()))
                 }
             }
+        };
+        let Some(e) = jacobian_error else {
+            return result;
+        };
+        let no_valid = warnings[before..]
+            .iter()
+            .any(|w| w.contains("No valid points were found"));
+        if let (LevelEntry::Image(_, LevelMetric::Mattes(_)), Err(m)) = (&*entry, &result)
+            && m.description.starts_with("All samples map outside")
+        {
+            return result;
         }
+        if no_valid {
+            return result;
+        }
+        warnings.truncate(before);
+        const BASE: &str = "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4GetValueAndDerivativeThreaderBase.hxx";
+        const PROCESS: &str = "Exception in GetValueAndDerivativeProcessPoint:\n";
+        Err(match entry {
+            LevelEntry::Image(m, state) => match state {
+                LevelMetric::Gc { .. } => e.wrapped(
+                    "Modules/Registration/Metricsv4/include/itkCorrelationImageToImageMetricv4GetValueAndDerivativeThreader.hxx",
+                    250,
+                    PROCESS,
+                ),
+                LevelMetric::Cc(_) => e.wrapped(
+                    "Modules/Registration/Metricsv4/include/itkANTSNeighborhoodCorrelationImageToImageMetricv4GetValueAndDerivativeThreader.hxx",
+                    if m.samples.is_some() { 628 } else { 82 },
+                    "Caught exception: \n",
+                ),
+                _ => e.wrapped(BASE, 259, PROCESS),
+            },
+            LevelEntry::PointSet(_) => e,
+        })
     }
 
     /// `GetValue`/`GetValueAndDerivative`; with several metrics
@@ -452,6 +505,16 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
         self.check_samples()?;
+        if self.moving.active().is_bspline() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first); every parameter.
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::central_region(&self.virtual_space)
+            };
+            return scales::estimate_bspline_scales(&mut self.moving, &samples);
+        }
         if self.moving.active().has_local_support() {
             // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
             // first), the parameters of the central voxel (the first point's).
@@ -480,7 +543,7 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
 
     fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException> {
         self.check_samples()?;
-        if self.moving.active().has_local_support() {
+        if self.moving.active().has_local_support() || self.moving.active().is_bspline() {
             // FullDomainSampling (the point set with a point-set metric first).
             let samples = if self.point_set_samples {
                 self.samples.clone()
@@ -813,15 +876,29 @@ where
         // numbers of control points.
         if let Xfm::Field(f) = &mut output {
             *f = crate::field::adapt(f, &virtual_space, floor);
-            if let (Some(meshes), Some(crate::field::FieldSmoothing::BSpline {
-                update_control_points,
-                total_control_points,
-                ..
-            })) = (&stage.field_meshes, &mut f.smoothing)
+            if let (
+                Some(meshes),
+                Some(crate::field::FieldSmoothing::BSpline {
+                    update_control_points,
+                    total_control_points,
+                    ..
+                }),
+            ) = (&stage.field_meshes, &mut f.smoothing)
             {
                 *update_control_points = meshes.control_points(&meshes.update_mesh, level);
                 *total_control_points = meshes.control_points(&meshes.total_mesh, level);
             }
+        }
+        // A B-spline transform's adaptor: the level's mesh on the level's virtual domain.
+        if let (Xfm::BSpline(b), Some(m)) = (&mut output, &stage.bspline_mesh) {
+            let mesh: [usize; D] = std::array::from_fn(|d| m.mesh[d] << level);
+            let required = crate::transform::bspline::required_fixed(
+                &mesh,
+                &virtual_space.origin,
+                &m.physical,
+                &virtual_space.direction,
+            );
+            crate::transform::bspline::adapt(b, &required, floor)?;
         }
         let local_support = output.has_local_support();
         let sigma = stage.smoothing_sigmas[level];

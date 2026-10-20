@@ -250,6 +250,85 @@ pub fn estimate_local_scales<R: Real, const D: usize>(
     Ok(scales)
 }
 
+/// `EstimateScales` for a B-spline transform (`IsBSplineTransform`): for every parameter, the
+/// largest shift of the `samples` when that parameter alone changes by 0.01; every scale is
+/// then the smallest of those shifts above epsilon (`Fill(minNonZeroShift)`, neither squared
+/// nor normalised), or 1 when every shift is zero.
+///
+/// A parameter moves only the samples whose support holds its control point; those are mapped
+/// again (the whole composite, as ITK maps every sample), the others do not move.
+pub fn estimate_bspline_scales<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+) -> Result<Vec<R>, ItkException> {
+    let n = transform.number_of_parameters();
+    let small = R::from_f64(SMALL);
+    let points: Vec<[R; D]> = samples
+        .iter()
+        .map(|p| std::array::from_fn(|k| R::from_f64(p[k])))
+        .collect();
+    let old: Vec<[R; D]> = points
+        .iter()
+        .map(|p| transform.transform_point(p))
+        .collect();
+    let (per, affected) = {
+        let crate::transform::Xfm::BSpline(b) = transform.active() else {
+            return estimate_scales(transform, samples);
+        };
+        let per = b.parameters_per_dimension();
+        let mut affected: Vec<Vec<usize>> = vec![Vec::new(); per];
+        for (s, p) in points.iter().enumerate() {
+            if let Some(support) = b.support(p) {
+                for o in b.support_offsets(&support) {
+                    affected[o].push(s);
+                }
+            }
+        }
+        (per, affected)
+    };
+    let shift = |a: &[R; D], b: &[R; D]| -> R {
+        let mut sum = 0.0f64;
+        for k in 0..D {
+            let d = a[k].to_f64() - b[k].to_f64();
+            sum += d * d;
+        }
+        R::from_f64(sum.sqrt())
+    };
+    let mut min_nonzero = R::MAX;
+    for i in 0..n {
+        let o = i % per;
+        if affected[o].is_empty() {
+            continue;
+        }
+        let saved = match transform.active_mut() {
+            crate::transform::Xfm::BSpline(b) => {
+                let saved = b.coefficients[i];
+                b.coefficients[i] = saved + small;
+                saved
+            }
+            _ => unreachable!("a B-spline transform"),
+        };
+        let mut max = R::ZERO;
+        for &s in &affected[o] {
+            let moved = transform.transform_point(&points[s]);
+            let d = shift(&moved, &old[s]);
+            if max < d {
+                max = d;
+            }
+        }
+        if let crate::transform::Xfm::BSpline(b) = transform.active_mut() {
+            b.coefficients[i] = saved;
+        }
+        if max > R::EPSILON && max < min_nonzero {
+            min_nonzero = max;
+        }
+    }
+    if min_nonzero == R::MAX {
+        return Ok(vec![R::ONE; n]);
+    }
+    Ok(vec![min_nonzero; n])
+}
+
 /// `EstimateStepScale(step)` for a transform with local support: the largest shift of every
 /// sample (no scaling of the step), `step` possibly smoothed in place.
 pub fn estimate_local_step_scale<R: Real, const D: usize>(

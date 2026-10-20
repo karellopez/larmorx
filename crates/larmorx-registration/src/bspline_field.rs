@@ -38,7 +38,8 @@ use crate::field::Field;
 use crate::format::format_g;
 use crate::{Image, ItkException, Real, Space};
 
-const SCATTERED: &str = "Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.hxx";
+const SCATTERED: &str =
+    "Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.hxx";
 const SCATTERED_CLASS: &str = "BSplineScatteredDataPointSetToImageFilter";
 const TO_BSPLINE: &str =
     "Modules/Filtering/DisplacementField/include/itkDisplacementFieldToBSplineImageFilter.hxx";
@@ -591,7 +592,9 @@ pub fn points_to_bspline<R: Real, const D: usize>(
         for o in 0..domain_space.len() {
             let idx = domain_space.index_of(o);
             if on_boundary(&idx, &start, &domain.size) {
-                input.points.push(index_to_point_f32(&parametric_space, &idx));
+                input
+                    .points
+                    .push(index_to_point_f32(&parametric_space, &idx));
                 input.data.push([R::ZERO; D]);
                 input.weights.push(BOUNDARY_WEIGHT);
             }
@@ -689,8 +692,8 @@ mod tests {
                 bs.push((dg, b));
             }
             for (dg, t) in bs {
-                let cell = (first[0] + dg[0])
-                    + c[0] * ((first[1] + dg[1]) + c[1] * (first[2] + dg[2]));
+                let cell =
+                    (first[0] + dg[0]) + c[0] * ((first[1] + dg[1]) + c[1] * (first[2] + dg[2]));
                 let wc = input.weights[i];
                 omega[cell] += wc * t * t;
                 let f = f64::from(t * t * t * wc / w2);
@@ -752,10 +755,9 @@ mod tests {
                             d = [0.0; 3];
                             w = BOUNDARY_WEIGHT;
                         }
-                        input.points.push(parametric_point(
-                            &space,
-                            &index_to_point_f32(&space, &idx),
-                        ));
+                        input
+                            .points
+                            .push(parametric_point(&space, &index_to_point_f32(&space, &idx)));
                         input.data.push(d);
                         input.weights.push(w);
                     }

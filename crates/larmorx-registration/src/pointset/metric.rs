@@ -515,6 +515,7 @@ impl<R: Real, const D: usize> FixedInverse<R, D> {
                 },
                 Xfm::Linear(l) => Xfm::Linear(l.inverse()?),
                 Xfm::Field(f) => Xfm::Field(f.inverse_transform()?),
+                Xfm::BSpline(_) => return None,
             });
         }
         Some(FixedInverse(Some(Composite::new(out))))
@@ -1327,7 +1328,10 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 }
             }
         };
-        points.iter().map(|p| state.fixed_inverse.apply(p)).collect()
+        points
+            .iter()
+            .map(|p| state.fixed_inverse.apply(p))
+            .collect()
     }
 
     /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`; without the

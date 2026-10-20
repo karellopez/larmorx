@@ -24,7 +24,9 @@ use larmorx_registration::transform::{Composite, Xfm};
 use larmorx_registration::{ItkException, Real};
 
 use super::MetricKind;
-use super::helper::{Compute, Log, RegistrationFailed, RegistrationHelper, initialize_with_previous};
+use super::helper::{
+    Compute, Log, RegistrationFailed, RegistrationHelper, initialize_with_previous,
+};
 use super::syn::SynInputs;
 
 /// ANTs' observer of the stages that run an `ImageRegistrationMethodv4` subclass with their
@@ -125,7 +127,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         let wrong: Vec<bool> = kinds
             .iter()
             .map(|k| {
-                k.is_some_and(|k| k.is_point_set()) && ((*k == Some(MetricKind::Igdm)) != intensity_kind)
+                k.is_some_and(|k| k.is_point_set())
+                    && ((*k == Some(MetricKind::Igdm)) != intensity_kind)
             })
             .collect();
         if !wrong.iter().any(|&w| w) {
@@ -233,7 +236,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
                         )
                     } else {
-                        format!("stage {stage}: GC's derivative is all in the first voxel, as in ITK")
+                        format!(
+                            "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                        )
                     },
                 ),
             );

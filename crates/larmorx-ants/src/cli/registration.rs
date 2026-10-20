@@ -50,7 +50,7 @@ use larmorx_io::itk_transform::{
     ItkTransformParts, Parameters, transform_from_parts, write_itk_transform_parts,
 };
 use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry};
-use larmorx_registration::transform::collapse_composite;
+use larmorx_registration::transform::{collapse_composite, collapse_composite_ants};
 
 /// What ends a run early: the exit status (the messages are already printed).
 type Exit = u8;
@@ -1211,6 +1211,8 @@ fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
         }),
         Xfm::Linear(l) => l.inverse().map(Xfm::Linear),
         Xfm::Field(f) => f.inverse_transform().map(Xfm::Field),
+        // BSplineBaseTransform::GetInverse returns false: no inverse.
+        Xfm::BSpline(_) => None,
     }
 }
 
@@ -1588,22 +1590,18 @@ fn do_registration<R: Compute, const D: usize>(
                         order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
                     }
                     // A single value (read as float) is a knot spacing in millimetres.
-                    let read_mesh = |log: &mut Log<'_>,
-                                     i: usize,
-                                     knots: &mut dyn FnMut(
-                        &mut Log<'_>,
-                        R,
-                        u32,
-                    )
-                        -> Result<Vec<u32>, Exit>|
-                     -> Result<Vec<u32>, Exit> {
-                        let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
-                        if v.len() == 1 {
-                            knots(log, R::r(f64::from(v[0])), order)
-                        } else {
-                            Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
-                        }
-                    };
+                    let read_mesh =
+                        |log: &mut Log<'_>,
+                         i: usize,
+                         knots: &mut dyn FnMut(&mut Log<'_>, R, u32) -> Result<Vec<u32>, Exit>|
+                         -> Result<Vec<u32>, Exit> {
+                            let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
+                            if v.len() == 1 {
+                                knots(log, R::r(f64::from(v[0])), order)
+                            } else {
+                                Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
+                            }
+                        };
                     transform_method.update_field_mesh = read_mesh(log, 1, &mut knots)?;
                     transform_method.total_field_mesh = if n > 2 {
                         read_mesh(log, 2, &mut knots)?
@@ -2230,8 +2228,8 @@ fn chain_of<R: Compute, const D: usize>(
     for t in queue.iter().rev() {
         let (name, parameters, fixed) = match t {
             Xfm::Identity => continue,
-            Xfm::Field(_) => {
-                return Err("a displacement field goes through the per-voxel resampler".into());
+            Xfm::Field(_) | Xfm::BSpline(_) => {
+                return Err("a displacement field or a B-spline transform goes through the per-voxel resampler".into());
             }
             Xfm::Translation { offset } => (
                 "TranslationTransform_double_3_3".to_owned(),
@@ -2799,16 +2797,34 @@ fn write_transforms<R: Compute, const D: usize>(
     }
     let (to_write, names): (Vec<Xfm<R, D>>, Vec<String>) = if collapse {
         let floor = IndexFloor::new(ctx.notices.mode());
-        match collapse_composite(queue, &floor) {
+        let ants = collapse_composite_ants(queue, &floor);
+        let collapsed = if queue.iter().any(Xfm::is_bspline) {
+            let fixed = collapse_composite(queue, &floor);
+            if fixed != ants {
+                ctx.notices.add(
+                    &larmorx_core::defects::ANTS_76,
+                    if ctx.notices.fix() {
+                        "every transform is kept in the collapsed composite; ANTs' collapse loses or mixes some of them around B-spline transforms"
+                    } else {
+                        "the transforms are collapsed as ANTs collapses them around B-spline transforms"
+                    },
+                );
+            }
+            if ctx.notices.fix() { fixed } else { ants }
+        } else {
+            ants
+        };
+        match collapsed {
             Some(ts) => {
                 // The names by category: linear transforms are generic affine ones, fields
                 // with an inverse are named as SyN's, without one as a Gaussian
-                // displacement field's.
+                // displacement field's, B-spline transforms as B-spline ones.
                 let names = ts
                     .iter()
                     .map(|t| match t {
                         Xfm::Field(f) if f.inverse.is_some() => "syn".to_owned(),
                         Xfm::Field(_) => "gdf".to_owned(),
+                        Xfm::BSpline(_) => "bspline".to_owned(),
                         _ => "genericaffine".to_owned(),
                     })
                     .collect();
@@ -2817,7 +2833,11 @@ fn write_transforms<R: Compute, const D: usize>(
             None => {
                 return Err(refuse(
                     log,
-                    "an IdentityTransform cannot be collapsed (ANTs crashes here)",
+                    if queue.iter().any(Xfm::is_bspline) {
+                        "these transforms cannot be collapsed as ANTs collapses them: a B-spline transform joins a run of linear transforms or fields, and ANTs' collapse throws outside a try block (ANTS-76; ANTs crashes here)"
+                    } else {
+                        "an IdentityTransform cannot be collapsed (ANTs crashes here)"
+                    },
                 ));
             }
         }

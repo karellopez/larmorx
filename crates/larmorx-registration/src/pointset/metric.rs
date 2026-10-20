@@ -563,6 +563,8 @@ pub struct PointSetMetric<R, const D: usize> {
     syn_current: Option<Vec<LabelMetric<R, D>>>,
     /// The state SyN's `Initialize()` leaves for the evaluation.
     tangent: Option<TangentState<R, D>>,
+    /// The tangent-space derivative's layout (`TangentCall::sparse`).
+    sparse: bool,
     /// Where the originals' defects met this metric.
     pub events: PointSetEvents,
 }
@@ -584,6 +586,10 @@ pub struct TangentCall<'a, R, const D: usize> {
     pub moving_transform: &'a Composite<R, D>,
     /// The level's virtual domain.
     pub virtual_space: &'a Space<D>,
+    /// `SetStoreDerivativeAsSparseFieldForLocalSupportTransforms`: each point's derivative
+    /// added at its nearest virtual voxel (SyN), or stored at the point's index, `D` values per
+    /// fixed point (the B-spline SyN method, which fits a B-spline to the points).
+    pub sparse: bool,
 }
 
 /// What one evaluation gives.
@@ -615,6 +621,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             syn_clones: None,
             syn_current: None,
             tangent: None,
+            sparse: true,
             events: PointSetEvents::default(),
         }
     }
@@ -1148,6 +1155,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 Some(self.igdm_initialize(&wf, &wm, &fixed_inverse, &moving_inverse)?)
             }
         };
+        self.sparse = call.sparse;
         self.tangent = Some(TangentState {
             swapped,
             fixed_inverse,
@@ -1224,8 +1232,49 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         Ok(valid)
     }
 
-    /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`.
-    fn store(&self, derivative: &mut [R], p: &[f32; D], local: &[R; D]) {
+    /// The size of a tangent-space derivative: `D` per virtual voxel (sparse) or per fixed
+    /// point.
+    fn tangent_len(&self, points: usize) -> usize {
+        if self.sparse {
+            D * self.virtual_space.as_ref().map_or(0, Space::len)
+        } else {
+            D * points
+        }
+    }
+
+    /// The fixed points' virtual positions of the latest tangent-space call
+    /// (`GetModifiableFixedTransformedPointSet`, in tangent space).
+    pub fn tangent_fixed_points(&self) -> Vec<[f32; D]> {
+        let Some(state) = &self.tangent else {
+            return Vec::new();
+        };
+        let points: &[[f32; D]] = match &self.inputs {
+            PointSetInputs::Labeled { fixed, moving } => {
+                if state.swapped {
+                    &moving.points
+                } else {
+                    &fixed.points
+                }
+            }
+            PointSetInputs::Intensity { fixed, moving } => {
+                if state.swapped {
+                    &moving.points
+                } else {
+                    &fixed.points
+                }
+            }
+        };
+        points.iter().map(|p| state.fixed_inverse.apply(p)).collect()
+    }
+
+    /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`; without the
+    /// sparse field (`StoreDerivativeAsSparseFieldForLocalSupportTransforms` off), `local`
+    /// stored at the point's index.
+    fn store(&self, derivative: &mut [R], index: usize, p: &[f32; D], local: &[R; D]) {
+        if !self.sparse {
+            derivative[index * D..(index + 1) * D].copy_from_slice(local);
+            return;
+        }
         let space = self.virtual_space.as_ref().expect("set by the call");
         let q: [f64; D] = std::array::from_fn(|k| f64::from(p[k]));
         let o = space.offset(&space.point_to_index(&q)) * D;
@@ -1315,8 +1364,8 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let fl = wf.labels.as_ref().expect("checked at Initialize");
         let labels = self.labels.clone();
         let valid = self.tangent_valid(&virt, |i| labels.contains(&fl[i]), warnings)?;
-        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
-        let mut derivative = vec![R::ZERO; D * space_len];
+        let total_len = self.tangent_len(virt.len());
+        let mut derivative = vec![R::ZERO; total_len];
         let mut thread = CompensatedSum::default();
         let clones = match &self.syn_current {
             Some(c) if self.corrections.current_clones => c,
@@ -1339,12 +1388,12 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             };
             let (v, local) = clones[position].value_and_derivative(p, warnings);
             thread.add(v.to_f64());
-            self.store(&mut derivative, p, &local);
+            self.store(&mut derivative, index, p, &local);
         }
         let total = add_thread(&thread);
         if valid == 0 {
             warnings.push(self.no_valid_points());
-            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+            return Ok((R::MAX, vec![R::ZERO; total_len]));
         }
         Ok((
             R::from_f64(total.sum()) / R::from_i64(valid as i64),
@@ -1434,8 +1483,8 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             return Err(no_points());
         }
         let valid = self.tangent_valid(&virt, |_| true, warnings)?;
-        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
-        let mut derivative = vec![R::ZERO; D * space_len];
+        let total_len = self.tangent_len(virt.len());
+        let mut derivative = vec![R::ZERO; total_len];
         let mut thread = CompensatedSum::default();
         for (index, p) in virt.iter().enumerate() {
             if !self.inside(p) {
@@ -1446,12 +1495,12 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             }
             let (v, local) = self.igdm_value_and_derivative(p, &wf.data[index], moved)?;
             thread.add(v.to_f64());
-            self.store(&mut derivative, p, &local);
+            self.store(&mut derivative, index, p, &local);
         }
         let total = add_thread(&thread);
         if valid == 0 {
             warnings.push(self.no_valid_points());
-            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+            return Ok((R::MAX, vec![R::ZERO; total_len]));
         }
         Ok((
             R::from_f64(total.sum()) / R::from_i64(valid as i64),

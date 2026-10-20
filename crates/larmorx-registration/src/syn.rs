@@ -542,6 +542,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                     fixed_transform: ft,
                     moving_transform: mt,
                     virtual_space: self.virtual_space,
+                    sparse: true,
                 };
                 let p = self.point_sets[j].as_mut().expect("a point-set metric");
                 match p.tangent_initialize(&call, warnings) {
@@ -684,6 +685,63 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
     }
 }
 
+impl<R: Real, const D: usize> GradientCall<'_, R, D> {
+    /// `BSplineSyNImageRegistrationMethod::ComputeUpdateField` for a stage whose only metric is
+    /// a point-set metric: the metric in tangent space with each fixed point's derivative kept
+    /// at the point (`SetStoreDerivativeAsSparseFieldForLocalSupportTransforms(false)`), times
+    /// the optimizer weights, and the B-spline fitted to the fixed points' virtual positions
+    /// (`SetBSplineDomainFromImage` of the virtual domain); a zero field without fixed points
+    /// or with 0 control points.
+    fn bspline_point_update(
+        &mut self,
+        swapped: bool,
+        control_points: &[u32; D],
+        order: u32,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Field<R, D>), ItkException> {
+        let (ft, mt) = if swapped {
+            (self.moving_composite, self.fixed_composite)
+        } else {
+            (self.fixed_composite, self.moving_composite)
+        };
+        let call = TangentCall {
+            swapped,
+            fixed_transform: ft,
+            moving_transform: mt,
+            virtual_space: self.virtual_space,
+            sparse: false,
+        };
+        let p = self.point_sets[0].as_mut().expect("a point-set metric");
+        p.tangent_initialize(&call, warnings)?;
+        let (value, mut derivative) = p.tangent_evaluate(warnings)?;
+        if let Some(w) = &self.stage.optimizer_weights
+            && w.len() == D
+            && !weights_are_identity(w)
+        {
+            for chunk in derivative.as_chunks_mut::<D>().0 {
+                for d in 0..D {
+                    chunk[d] = chunk[d] * w[d];
+                }
+            }
+        }
+        let points = p.tangent_fixed_points();
+        let zero = zero_field(self.virtual_space);
+        if points.is_empty() || control_points.contains(&0) {
+            return Ok((value, zero));
+        }
+        let data: Vec<[R; D]> = derivative.as_chunks::<D>().0.to_vec();
+        let field = crate::bspline_field::points_to_bspline(
+            self.virtual_space,
+            &points,
+            &data,
+            control_points,
+            order,
+            true,
+        )?;
+        Ok((value, field))
+    }
+}
+
 /// `m_OptimizerWeightsAreIdentity`: every weight within 1e-4 of 1.
 pub fn weights_are_identity<R: Real>(w: &[R]) -> bool {
     let tolerance = R::from_f64(1e-4);
@@ -762,6 +820,8 @@ fn run_syn_levels<R: Real, const D: usize>(
     };
     let multi = stage.metrics.len() > 1;
     let has_point_sets = point_sets.iter().any(Option::is_some);
+    // A single point-set metric (`POINT_SET_METRIC`): B-spline SyN's own path.
+    let point_set_only = !multi && has_point_sets;
     let mut identity_point_sets = false;
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
@@ -897,6 +957,39 @@ fn run_syn_levels<R: Real, const D: usize>(
         let mut converged = false;
         while iteration < n_iterations && !converged {
             iteration += 1;
+            // Each total field inverted from the previous inverse, and that inverse inverted
+            // again from the total field.
+            let finish = |fixed_total: Field<R, D>,
+                          moving_total: Field<R, D>,
+                          moving_value: R,
+                          fixed_value: R| {
+                let fixed_inverse = invert(
+                    &fixed_total,
+                    f2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let fixed_field =
+                    invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
+                let moving_inverse = invert(
+                    &moving_total,
+                    m2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let moving_field = invert(
+                    &moving_inverse,
+                    Some(&moving_total),
+                    &invert_settings,
+                    floor,
+                );
+                (
+                    FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
+                    FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
+                    moving_value,
+                    fixed_value,
+                )
+            };
             let step = || -> Result<_, ItkException> {
                 let mut fixed_composite: Vec<Xfm<R, D>> = stage
                     .fixed_initial
@@ -962,6 +1055,25 @@ fn run_syn_levels<R: Real, const D: usize>(
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
                 };
+                // B-spline SyN with a single point-set metric: the B-spline fitted to the
+                // points' derivatives.
+                if let Some(b) = &stage.bspline
+                    && point_set_only
+                {
+                    let cps = BSplineSynSmoothing::control_points(&b.update_mesh, level, b.order);
+                    let (moving_value, update) =
+                        call.bspline_point_update(false, &cps, b.order, warnings)?;
+                    let fixed_update = scale_update(&update, stage.learning_rate);
+                    let (fixed_value, update) =
+                        call.bspline_point_update(true, &cps, b.order, warnings)?;
+                    let moving_update = scale_update(&update, stage.learning_rate);
+                    let tcp = BSplineSynSmoothing::control_points(&b.total_mesh, level, b.order);
+                    let fixed_total =
+                        bspline_smooth(&compose(&fixed_update, &f2m.field, floor), &tcp, b.order, None)?;
+                    let moving_total =
+                        bspline_smooth(&compose(&moving_update, &m2m.field, floor), &tcp, b.order, None)?;
+                    return Ok(finish(fixed_total, moving_total, moving_value, fixed_value));
+                }
                 // The fixed-to-middle update (the metric value is the "moving" one), then the
                 // moving-to-middle update.
                 let (moving_value, fixed_gradient) = call.gradient_field(false, warnings)?;
@@ -1010,32 +1122,7 @@ fn run_syn_levels<R: Real, const D: usize>(
                 );
                 let fixed_total = smooth_total(&compose(&fixed_update, &f2m.field, floor))?;
                 let moving_total = smooth_total(&compose(&moving_update, &m2m.field, floor))?;
-                let fixed_inverse = invert(
-                    &fixed_total,
-                    f2m.inverse.as_deref(),
-                    &invert_settings,
-                    floor,
-                );
-                let fixed_field =
-                    invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
-                let moving_inverse = invert(
-                    &moving_total,
-                    m2m.inverse.as_deref(),
-                    &invert_settings,
-                    floor,
-                );
-                let moving_field = invert(
-                    &moving_inverse,
-                    Some(&moving_total),
-                    &invert_settings,
-                    floor,
-                );
-                Ok((
-                    FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
-                    FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
-                    moving_value,
-                    fixed_value,
-                ))
+                Ok(finish(fixed_total, moving_total, moving_value, fixed_value))
             };
             // The iteration's work runs in a pool of the stage's thread count.
             let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;

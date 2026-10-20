@@ -215,6 +215,48 @@ impl<R: Compute, const D: usize> SynObserver<R, D> for SynLog<'_, '_, '_, '_, R,
 }
 
 impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
+    /// The notices of a SyN or B-spline SyN stage's outcome: ITK-33 (point-set metrics among
+    /// several metrics) and ITK-31 (stale masks).
+    pub(crate) fn syn_notices(&mut self, stage: usize, identity_point_sets: bool, stale_masks: bool) {
+        let mode = self.upstream_defects;
+        if identity_point_sets {
+            push_once(
+                &mut self.notices,
+                Notice::new(
+                    &defects::ITK_33,
+                    mode,
+                    if mode.fix() {
+                        format!(
+                            "stage {stage}: the point-set metrics among several metrics are evaluated through the initial transforms and the deformation; ITK gives them identity transforms"
+                        )
+                    } else {
+                        format!(
+                            "stage {stage}: the point-set metrics among several metrics are evaluated with identity transforms, as in ITK (they never see the initial transforms or the deformation)"
+                        )
+                    },
+                ),
+            );
+        }
+        if stale_masks {
+            push_once(
+                &mut self.notices,
+                Notice::new(
+                    &defects::ITK_31,
+                    mode,
+                    if mode.fix() {
+                        format!(
+                            "stage {stage} has only one of its two masks: the other role has none; ITK keeps the previous evaluation's resampled mask there"
+                        )
+                    } else {
+                        format!(
+                            "stage {stage} has only one of its two masks: the other role keeps the previous evaluation's resampled mask, as in ITK"
+                        )
+                    },
+                ),
+            );
+        }
+    }
+
     /// The `case SyN` of `DoRegistration`.
     pub(crate) fn syn_stage<'s, 'k>(
         &mut self,
@@ -397,6 +439,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             correct_gc_derivative: correct_gc,
             correct_stale_masks: self.upstream_defects.fix(),
             correct_point_set_transforms: self.upstream_defects.fix(),
+            bspline: None,
             n_threads: self.n_threads,
         };
         let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
@@ -458,44 +501,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         }
         match result {
             Ok(out) => {
-                if out.identity_point_sets {
-                    let mode = self.upstream_defects;
-                    push_once(
-                        &mut self.notices,
-                        Notice::new(
-                            &defects::ITK_33,
-                            mode,
-                            if mode.fix() {
-                                format!(
-                                    "stage {stage}: the point-set metrics among several metrics are evaluated through the initial transforms and the deformation; ITK gives them identity transforms"
-                                )
-                            } else {
-                                format!(
-                                    "stage {stage}: the point-set metrics among several metrics are evaluated with identity transforms, as in ITK (they never see the initial transforms or the deformation)"
-                                )
-                            },
-                        ),
-                    );
-                }
-                if out.stale_masks {
-                    let mode = self.upstream_defects;
-                    push_once(
-                        &mut self.notices,
-                        Notice::new(
-                            &defects::ITK_31,
-                            mode,
-                            if mode.fix() {
-                                format!(
-                                    "stage {stage} has only one of its two masks: the other role has none; ITK keeps the previous evaluation's resampled mask there"
-                                )
-                            } else {
-                                format!(
-                                    "stage {stage} has only one of its two masks: the other role keeps the previous evaluation's resampled mask, as in ITK"
-                                )
-                            },
-                        ),
-                    );
-                }
+                self.syn_notices(stage, out.identity_point_sets, out.stale_masks);
                 // m_RegistrationState: the composite as it is, then the two transforms.
                 let composite = self.composite.as_mut().expect("set by DoRegistration");
                 let mut state = composite.clone();

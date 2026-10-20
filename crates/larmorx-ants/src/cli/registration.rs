@@ -484,6 +484,72 @@ fn read_image<R: Compute, const D: usize>(
     }
 }
 
+/// `CalculateMeshSizeForSpecifiedKnotSpacing(fixedImage, knotSpacing, splineOrder)`: per axis
+/// `ceil((size − 1)·spacing / knotSpacing)` in the computation type (0 for a spacing almost 0),
+/// of the stage's first fixed image, read again as ANTs reads it. Where that image cannot be
+/// read ANTs dereferences the null image and crashes. A quotient that is negative, not a
+/// number or out of `unsigned int`'s range is clamped (ANTS-06; `reproduce` converts it as
+/// x86-64 does).
+fn knot_spacing_mesh<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    log: &mut Log<'_>,
+    fixed_name: &str,
+    knot_spacing: R,
+    _order: u32,
+) -> Result<Vec<u32>, Exit> {
+    let Some(image) = read_image::<R, D>(ctx, log, fixed_name) else {
+        return Err(refuse(
+            log,
+            "a mesh size given as a knot spacing needs the stage's fixed image, which could not be read (ANTs crashes: it uses the missing image)",
+        ));
+    };
+    let zero = match R::PRECISION {
+        larmorx_core::Precision::Double => {
+            larmorx_image::itk_math::almost_equal_f64(knot_spacing.to_f64(), 0.0)
+        }
+        larmorx_core::Precision::Float => {
+            larmorx_image::itk_math::almost_equal_f32(knot_spacing.to_f64() as f32, 0.0)
+        }
+    };
+    let mut out = Vec::with_capacity(D);
+    let mut wrapped = 0;
+    for d in 0..D {
+        if zero {
+            out.push(0);
+            continue;
+        }
+        let domain = R::r((image.space.size[d] - 1) as f64) * R::r(image.space.spacing[d]);
+        let q = (domain / knot_spacing).to_f64().ceil();
+        let q = R::r(q).to_f64();
+        if q.is_nan() || !(0.0..=f64::from(u32::MAX)).contains(&q) {
+            wrapped += 1;
+            out.push(if ctx.notices.fix() {
+                if q.is_nan() || q < 0.0 { 0 } else { u32::MAX }
+            } else {
+                crate::image::x86_to_i64(q) as u32
+            });
+        } else {
+            out.push(q as u32);
+        }
+    }
+    if wrapped > 0 {
+        let fix = ctx.notices.fix();
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_06,
+            if fix {
+                format!(
+                    "{wrapped} mesh size(s) from a knot spacing outside unsigned int's range are clamped; ANTs on x86-64 wraps them around"
+                )
+            } else {
+                format!(
+                    "{wrapped} mesh size(s) from a knot spacing outside unsigned int's range wrap around as ANTs on x86-64 converts them"
+                )
+            },
+        );
+    }
+    Ok(out)
+}
+
 /// An image as the registration holds it.
 pub fn to_image<T: Copy, const D: usize>(img: AntsImage<T>) -> Result<Image<T, D>, ItkException> {
     let g = &img.geometry;
@@ -1487,15 +1553,98 @@ fn do_registration<R: Compute, const D: usize>(
         };
         let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
         if !method.is_linear() {
-            let variances = parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
-            if method == XfrmMethod::SyN {
-                // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
-                // floats read by the parser, held as RealType.
-                let (update, total) = variances.unwrap_or((3.0, 0.0));
-                transform_method.update_field_variance = R::r(f64::from(update));
-                transform_method.total_field_variance = R::r(f64::from(total));
-            } else {
-                deformable.get_or_insert(method);
+            // The stage's first metric's fixed image (`fixedImageFileName`), read where a mesh
+            // is given as a knot spacing.
+            let fixed_name = (0..metrics.len())
+                .rev()
+                .find(|&k| metric_stages[k] == current)
+                .map(|k| param(&metrics[k], 0).to_owned())
+                .unwrap_or_default();
+            let mut knots = |log: &mut Log<'_>, spacing: R, order: u32| {
+                knot_spacing_mesh::<R, D>(&mut ctx, log, &fixed_name, spacing, order)
+            };
+            match method {
+                XfrmMethod::SyN => {
+                    let variances =
+                        parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+                    // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
+                    // floats read by the parser, held as RealType.
+                    let (update, total) = variances.unwrap_or((3.0, 0.0));
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.total_field_variance = R::r(f64::from(total));
+                }
+                XfrmMethod::GaussianDisplacementField => {
+                    let update = Conv::f32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    let total = Conv::f32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.total_field_variance = R::r(f64::from(total));
+                }
+                XfrmMethod::BSplineSyN => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as float) is a knot spacing in millimetres.
+                    let read_mesh = |log: &mut Log<'_>,
+                                     i: usize,
+                                     knots: &mut dyn FnMut(
+                        &mut Log<'_>,
+                        R,
+                        u32,
+                    )
+                        -> Result<Vec<u32>, Exit>|
+                     -> Result<Vec<u32>, Exit> {
+                        let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
+                        if v.len() == 1 {
+                            knots(log, R::r(f64::from(v[0])), order)
+                        } else {
+                            Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
+                        }
+                    };
+                    transform_method.update_field_mesh = read_mesh(log, 1, &mut knots)?;
+                    transform_method.total_field_mesh = if n > 2 {
+                        read_mesh(log, 2, &mut knots)?
+                    } else {
+                        vec![0; D]
+                    };
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::BSplineDisplacementField => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as unsigned int) is a knot spacing.
+                    let mut update = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if update.len() == 1 {
+                        update = knots(log, R::r(f64::from(update[0])), order)?;
+                    }
+                    let total = if n > 2 {
+                        let mut total = Conv::vec_u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                        if total.len() == 1 {
+                            total = knots(log, R::r(f64::from(total[0])), order)?;
+                        }
+                        total
+                    } else {
+                        vec![0; D]
+                    };
+                    transform_method.update_field_mesh = update;
+                    transform_method.total_field_mesh = total;
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::BSpline => {
+                    let mut mesh = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if mesh.len() == 1 {
+                        mesh = knots(log, R::r(f64::from(mesh[0])), 3)?;
+                    }
+                    transform_method.mesh_size = mesh;
+                }
+                _ => {
+                    parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+                    deformable.get_or_insert(method);
+                }
             }
         }
         helper.transforms.push(transform_method);

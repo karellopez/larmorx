@@ -19,6 +19,7 @@
 
 use larmorx_core::Precision;
 
+pub mod bspline_syn;
 pub mod config;
 pub mod helper;
 pub mod pointsets;

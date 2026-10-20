@@ -97,7 +97,71 @@ pub struct SynStage<R, const D: usize> {
     /// ITK-33: a point-set metric among several metrics is evaluated through the fixed and
     /// moving composites (corrected) or, as ITK, through identity displacement fields.
     pub correct_point_set_transforms: bool,
+    /// `BSplineSyNImageRegistrationMethod`: the update and total fields smoothed by B-spline
+    /// approximations instead of Gaussians (the variances are then not used).
+    pub bspline: Option<BSplineSynSmoothing<D>>,
     pub n_threads: usize,
+}
+
+/// The B-spline smoothing of a B-spline SyN stage (`BSplineSyN[step,update,total,order]`): the
+/// mesh sizes at the base level, doubled at each level (`meshSize << level`), and the spline
+/// order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BSplineSynSmoothing<const D: usize> {
+    pub order: u32,
+    pub update_mesh: [u32; D],
+    pub total_mesh: [u32; D],
+}
+
+impl<const D: usize> BSplineSynSmoothing<D> {
+    /// `BSplineSmoothingOnUpdateDisplacementFieldTransformParametersAdaptor::SetMeshSize...`
+    /// of a level: `mesh << level` plus the order where it is positive, else 0.
+    pub fn control_points(mesh: &[u32; D], level: usize, order: u32) -> [u32; D] {
+        std::array::from_fn(|d| {
+            let m = mesh[d].wrapping_shl(level as u32);
+            if m > 0 { m + order } else { 0 }
+        })
+    }
+}
+
+/// `BSplineSyNImageRegistrationMethod::BSplineSmoothDisplacementField`: a copy when a number
+/// of control points is 0, else the field's B-spline approximation (one fitting level, the
+/// boundary stationary) weighted by `mask`.
+pub fn bspline_smooth<R: Real, const D: usize>(
+    field: &Field<R, D>,
+    control_points: &[u32; D],
+    order: u32,
+    mask: Option<&Image<f64, D>>,
+) -> Result<Field<R, D>, ItkException> {
+    if control_points.contains(&0) {
+        return Ok(field.clone());
+    }
+    crate::bspline_field::field_to_bspline(field, mask, control_points, order, true)
+}
+
+/// The weighted mask of `BSplineSyNImageRegistrationMethod::ComputeUpdateField`: the first
+/// metric's mask resampled onto the virtual domain through `transform`
+/// (`ResampleImageFilter<Image<uchar>, Image<double>, R>`, its default linear interpolator,
+/// default 0).
+fn weighted_mask<R: Real, const D: usize>(
+    mask: &Mask<D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+    floor: &IndexFloor,
+) -> Image<f64, D> {
+    let image = &mask.image;
+    let data = resample_nonlinear_with(&image.space, output, transform, 0.0f64, |c| {
+        crate::interp::at_cindex_with(&image.space, c, floor, |o| f64::from(image.data[o]))
+    });
+    let space = Space::new(
+        output.size,
+        [0; D],
+        output.spacing,
+        output.origin,
+        output.direction,
+    )
+    .expect("the virtual domain's geometry");
+    Image::new(space, data)
 }
 
 /// What the iteration observer sees after each iteration (`IterationEvent`).
@@ -901,23 +965,51 @@ fn run_syn_levels<R: Real, const D: usize>(
                 // The fixed-to-middle update (the metric value is the "moving" one), then the
                 // moving-to-middle update.
                 let (moving_value, fixed_gradient) = call.gradient_field(false, warnings)?;
+                let smooth_update = |gradient: &Field<R, D>,
+                                     mask: Option<&Mask<D>>,
+                                     composite: &Composite<R, D>|
+                 -> Result<Field<R, D>, ItkException> {
+                    Ok(match &stage.bspline {
+                        None => gaussian_smooth(gradient, stage.update_variance),
+                        Some(b) => {
+                            let weighted =
+                                mask.map(|m| weighted_mask(m, &virtual_space, composite, floor));
+                            bspline_smooth(
+                                gradient,
+                                &BSplineSynSmoothing::control_points(&b.update_mesh, level, b.order),
+                                b.order,
+                                weighted.as_ref(),
+                            )?
+                        }
+                    })
+                };
+                let smooth_total = |total: &Field<R, D>| -> Result<Field<R, D>, ItkException> {
+                    Ok(match &stage.bspline {
+                        None => gaussian_smooth(total, stage.total_variance),
+                        Some(b) => bspline_smooth(
+                            total,
+                            &BSplineSynSmoothing::control_points(&b.total_mesh, level, b.order),
+                            b.order,
+                            None,
+                        )?,
+                    })
+                };
+                // The first metric's masks (BSplineSyN's weighted masks).
+                let (first_fixed_mask, first_moving_mask) = match &level_metrics[0] {
+                    Some(lm) => (lm.fixed_mask.as_ref(), lm.moving_mask.as_ref()),
+                    None => (None, None),
+                };
                 let fixed_update = scale_update(
-                    &gaussian_smooth(&fixed_gradient, stage.update_variance),
+                    &smooth_update(&fixed_gradient, first_fixed_mask, &fixed_composite)?,
                     stage.learning_rate,
                 );
                 let (fixed_value, moving_gradient) = call.gradient_field(true, warnings)?;
                 let moving_update = scale_update(
-                    &gaussian_smooth(&moving_gradient, stage.update_variance),
+                    &smooth_update(&moving_gradient, first_moving_mask, &moving_composite)?,
                     stage.learning_rate,
                 );
-                let fixed_total = gaussian_smooth(
-                    &compose(&fixed_update, &f2m.field, floor),
-                    stage.total_variance,
-                );
-                let moving_total = gaussian_smooth(
-                    &compose(&moving_update, &m2m.field, floor),
-                    stage.total_variance,
-                );
+                let fixed_total = smooth_total(&compose(&fixed_update, &f2m.field, floor))?;
+                let moving_total = smooth_total(&compose(&moving_update, &m2m.field, floor))?;
                 let fixed_inverse = invert(
                     &fixed_total,
                     f2m.inverse.as_deref(),

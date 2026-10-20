@@ -152,6 +152,15 @@ pub struct TransformMethod<R> {
     pub update_field_time_sigma: R,
     pub total_field_time_sigma: R,
     pub number_of_time_indices: u32,
+    /// `BSplineSyN`, `BSplineDisplacementField`: `m_SplineOrder` (default 3).
+    pub spline_order: u32,
+    /// `BSplineSyN`, `BSplineDisplacementField`: `m_UpdateFieldMeshSizeAtBaseLevel` and
+    /// `m_TotalFieldMeshSizeAtBaseLevel` (any length; ANTs checks it against the dimension
+    /// when the stage runs).
+    pub update_field_mesh: Vec<u32>,
+    pub total_field_mesh: Vec<u32>,
+    /// `BSpline`: `m_MeshSizeAtBaseLevel`.
+    pub mesh_size: Vec<u32>,
 }
 
 impl<R: Real> TransformMethod<R> {
@@ -165,6 +174,10 @@ impl<R: Real> TransformMethod<R> {
             update_field_time_sigma: R::ZERO,
             total_field_time_sigma: R::ZERO,
             number_of_time_indices: 0,
+            spline_order: 3,
+            update_field_mesh: Vec::new(),
+            total_field_mesh: Vec::new(),
+            mesh_size: Vec::new(),
         }
     }
 }
@@ -253,7 +266,7 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
 /// `Transform`: `name`) set from the composite's last transform where ANTs knows how
 /// (translation to translation, rigid or affine; rigid to rigid or affine; affine to affine);
 /// `false`, after ANTs' messages, otherwise.
-fn initialize_with_previous<R: Compute, const D: usize>(
+pub(crate) fn initialize_with_previous<R: Compute, const D: usize>(
     log: &mut Log<'_>,
     previous: Option<&Xfm<R, D>>,
     name: &str,
@@ -1074,7 +1087,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             };
             let learning_rate = self.transforms[stage].gradient_step;
             let method = self.transforms[stage].method;
-            if method == XfrmMethod::SyN {
+            if matches!(method, XfrmMethod::SyN | XfrmMethod::BSplineSyN) {
                 let inputs = super::syn::SynInputs {
                     stage,
                     iterations: iterations.clone(),
@@ -1088,7 +1101,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     sampling,
                     percentage: R::r(f64::from(percentage)),
                 };
-                self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                if method == XfrmMethod::SyN {
+                    self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                } else {
+                    self.bspline_syn_stage(log, floor, inputs)?;
+                }
                 let elapsed = timer.elapsed().as_secs_f64();
                 log.logger(&format!(
                     "  Elapsed time (stage {stage}): {}\n\n",

@@ -991,6 +991,21 @@ rule 10 has the exception.
   equivalence (labels, volumes, downstream results within the original's own CPU/GPU
   variability), not bit-identity.
 
+## 2026-10-20: Figures for every tool; the documentation site `larmorx_documentation`
+
+**Decided by the user:** every software family and program gets visual evidence besides its
+benchmark: elegant, professional figures showing clearly how the replicas and clean-room
+originals compare with the originals, adapted to each program (agreement overviews, difference
+distributions, registration overlays and difference maps, the original's own variability,
+speed). They are part of the per-tool contract (CLAUDE.md rule 7).
+**Where:** the numbers and the code that draws the figures stay in this repository (validation
+records, `larmorx_validation`), so every figure is reproducible from a commit; the rendered
+figures and a documentation website live in a separate repository, **`larmorx_documentation`**
+(the user's choice of name), in the style of the lab's `bids_manager_documentation` site (warm
+paper, light and dark themes, serif titles, a particle hero). Its first version, a landing page
+whose hero shows spins of the different toolkits coming into resonance and forming a brain, was
+started the same day.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

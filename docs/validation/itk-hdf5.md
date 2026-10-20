@@ -1,14 +1,14 @@
 # Parity: ITK's HDF5 transform files
 
-**All cases agree.** 144 cases on the `standard` tier: 123 pass, 16 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 149 cases on the `standard` tier: 128 pass, 16 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** `lx.transforms.read`/`write`, `lx.transforms.load_itk_composite`, `-t x.h5` of `larmorx ants antsApplyTransforms` (crates larmorx-hdf5, larmorx-io)
 - **Reference:** ITK 5.4.5 on HDF5 1.12.1 through ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0 (antsApplyTransforms, CompositeTransformUtil), h5py 3.16.0 on HDF5 2.0.0, nitransforms 25.1.0
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-16 on Linux x86_64, with `python -m larmorx_validation parity itk-hdf5 --tier standard`
+- **Generated:** 2026-10-20 on Linux x86_64, with `python -m larmorx_validation parity itk-hdf5 --tier standard`
 
 Datasets as h5py reads them, bit for bit: 73 of 73 files
-HDF5 storage features (every chunk index, the n-bit and scale-offset filters, dense groups' fractal heaps, filtered or not, shared messages) as h5py reads them, bit for bit: 49 of 49 files
+HDF5 storage features (every chunk index, the n-bit and scale-offset filters, dense groups' fractal heaps, filtered or not, shared messages) as h5py reads them, bit for bit: 54 of 54 files
 Transforms as ITK reads them (double), bit for bit: 57 of 57 files
 Transforms as ITK reads them (float), bit for bit: 57 of 57 files
 nitransforms' chain, bit for bit: 57 of 57 files
@@ -32,7 +32,7 @@ Files written with larmorx's deflate: 12 of 17 byte-identical (object times set 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | errors | 20 | 0 | 16 | 4 | 0 |
-| hdf5 | 49 | 49 | 0 | 0 | 0 |
+| hdf5 | 54 | 54 | 0 | 0 | 0 |
 | read/catalog | 4 | 4 | 0 | 0 | 0 |
 | read/fmriprep-25.2.6 | 10 | 10 | 0 | 0 | 0 |
 | read/h5py | 26 | 26 | 0 | 0 | 0 |
@@ -62,7 +62,7 @@ Files written with larmorx's deflate: 12 of 17 byte-identical (object times set 
 | `errors/h5py/lzf` | written by h5py, refused by ITK: lzf | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dread failed |
 | `errors/h5py/missing-parameters` | written by h5py, refused by ITK: missing-parameters | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dopen2 failed |
 | `errors/h5py/no-precision-in-name` | written by h5py, refused by ITK: no-precision-in-name | basic_string::replace: __pos (which is 18446744073709551615) > this->size() (which is 15) |
-| `errors/h5py/no-transform-group` | written by h5py, refused by ITK: no-transform-group | failed to read file: /tmp/lx-h5-s3nun2h0/no-transform-group.h5 |
+| `errors/h5py/no-transform-group` | written by h5py, refused by ITK: no-transform-group | failed to read file: /tmp/lx-h5-bk9snul_/no-transform-group.h5 |
 | `errors/h5py/not-hdf5` | written by h5py, refused by ITK: not-hdf5 | set the suffix to an unsupported type. |
 | `errors/h5py/scalar-parameters` | written by h5py, refused by ITK: scalar-parameters | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): Wrong # of dims for TransformType in HDF5 File |
 | `errors/h5py/superblock3-chunked` | written by h5py, refused by ITK: superblock3-chunked | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dopen2 failed |
@@ -74,7 +74,7 @@ Files written with larmorx's deflate: 12 of 17 byte-identical (object times set 
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (729c5c28f58c) |
+| larmorx | 0.0.1 (7f2a61ee7630) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -112,6 +112,11 @@ larmorx reads in `reproduce` mode for the comparisons (ITK's defects reproduced,
 | `errors/h5py/two-strings` | both-error | 5/5 | written by h5py, refused by ITK: two-strings |
 | `errors/h5py/unknown-type` | both-error | 5/5 | written by h5py, refused by ITK: unknown-type |
 | `errors/h5py/virtual` | expected-divergence | 5/5 | written by h5py, read by ITK, refused by larmorx: parameters in a virtual dataset (mapping another dataset of the same … |
+| `hdf5/fixture/sb0` | pass | 2/2 | a golden-test fixture (tests/golden/hdf5/sb0.h5.gz) |
+| `hdf5/fixture/sb1` | pass | 2/2 | a golden-test fixture (tests/golden/hdf5/sb1.h5.gz) |
+| `hdf5/fixture/sb3-datasets` | pass | 2/2 | a golden-test fixture (tests/golden/hdf5/sb3-datasets.h5.gz) |
+| `hdf5/fixture/sb3-groups` | pass | 2/2 | a golden-test fixture (tests/golden/hdf5/sb3-groups.h5.gz) |
+| `hdf5/fixture/sohm` | pass | 4/4 | a golden-test fixture (tests/golden/hdf5/sohm.h5.gz) |
 | `hdf5/group/deflate-direct` | pass | 1/1 | an HDF5 storage feature written by h5py: group:deflate-direct |
 | `hdf5/group/deflate-fletcher32-direct` | pass | 1/1 | an HDF5 storage feature written by h5py: group:deflate-fletcher32-direct |
 | `hdf5/group/deflate-fletcher32-huge` | pass | 1/1 | an HDF5 storage feature written by h5py: group:deflate-fletcher32-huge |

@@ -150,7 +150,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-28 | ITK JHCT metric | `alpha` is tested with `!= 1` for the prefactor and with `AlmostEquals` for the value: an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | c | none | corrected by default: both test `AlmostEquals`, a notice; `reproduce` as ITK (A4 part 4) | – |
 | ITK-29 | ITK `ManifoldParzenWindowsPointSetFunction` | the kernel sigma multiplies the covariance unsquared (a variance of 10), where the regularisation sigma is squared | c? | none | reproduces | decide |
 | ITK-30 | ITK `CorrelationImageToImageMetricv4` (ANTs' `GC`) | with a displacement field (SyN) every point's derivative is added to the first voxel's entries: only that voxel moves | c | none (fMRIPrep's SyN uses CC) | corrected by default: each voxel its own derivative; `reproduce` as ITK (A5 part 1) | – |
-| ITK-31 | ITK `SyNImageRegistrationMethod` | a stage with only one of its two masks: the role without one keeps the previous evaluation's resampled mask | c | every run: sMRIPrep's brain extraction's SyN stage has a fixed mask only | corrected by default; `reproduce` as ITK (A5 part 1); the change on real data in the record's fix pass | – |
+| ITK-31 | ITK `SyNImageRegistrationMethod` | a stage with only one of its two masks: the role without one keeps the previous evaluation's resampled mask | c | every run: sMRIPrep's brain extraction's SyN stage has a fixed mask only (corrected: the field moves by at most 0.18 mm, median 0.0004 mm, on ds000005) | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-32 | ITK `LabeledPointSetToPointSetMetricv4` | appends per-label metrics at every `Initialize` and uses the first: in SyN every evaluation compares with the moving points as the first one mapped them | c | none | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
 | ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
@@ -1610,9 +1610,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   with the switch).
 - **fMRIPrep:** every run: sMRIPrep's brain extraction (`antsBrainExtraction`) gives its SyN
   stage a fixed mask only (`--masks [template mask, NULL]`), so from the second evaluation the
-  metric's moving role keeps the fixed mask resampled for the previous evaluation. What the
-  correction changes on fMRIPrep's own command lines is in the record's fix pass (the
-  `real-syn` cases).
+  metric's moving role keeps the fixed mask resampled for the previous evaluation. Corrected,
+  ds000005's brain extraction (full size) keeps its affine transform and its field moves in 79 %
+  of the voxels by a median of 0.0004 mm, at most 0.18 mm (0.02 % of the voxels by more than
+  0.1 mm), well inside ANTs' own thread band; the full record's fix pass names ITK-31 in all ten
+  brain extractions (small and full size).
 - **larmorx:** corrected by default (A5 part 1): a role without a mask has none; `reproduce` as
   ITK, with a notice.
 - **D13 / gap:** done. No gap.
@@ -1653,7 +1655,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   array (`StorePointDerivative`, `field[offset + i] += ...`) from all the threads at once. Two
   points of different ranges at the same virtual voxel race: SyN with ICP gave three different
   fields in three runs at 4 threads (one of them the one-thread field) and two in two runs at 8
-  (`syn-point-sets/icp`; the record's thread band, 0.025 mm).
+  (`syn-point-sets/icp`; the records' thread band, 0.023 to 0.025 mm).
 - **Evidence:** read: `itkPointSetToPointSetMetricWithIndexv4.hxx:275-377, 437-466`; verified
   (2026-10-19: seven runs of the same command at 1, 4 and 8 threads).
 - **fMRIPrep:** none (no point-set metric).

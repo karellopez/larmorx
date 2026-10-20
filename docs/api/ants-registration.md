@@ -27,13 +27,17 @@ line, standard error, every file), most against the unmodified binary, the rest 
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
-| standard | 224 | 145 | 24 | 44 | 11 | 0 |
-| full | 235 | 146 | 33 | 44 | 12 | 0 |
+| standard | 298 | 193 | 32 | 57 | 16 | 0 |
+| full | 327 | 194 | 59 | 57 | 17 | 0 |
 
-Both records were re-run by A4 part 4 (2026-10-18, from `8bac0bf`), with the point-set
-metrics' cases (57 standard, 59 full; all 42 compared ones identical to
-the unmodified ANTs) and A4 part 3's two cases of the gradient filter on oblique grids (its
-float components, [findings](../findings/ants-ai.md)).
+Both records were re-run by A5 part 1 (2026-10-19 and 20, from `a3c6cd6`), with the SyN cases (the
+`syn` and `syn-point-sets` categories: every metric, masks, outputs, initial fields, states,
+messages and failures; `real-syn-small` and, in the full tier, `real-syn`: sMRIPrep's brain
+extraction and template registration whole, Rigid, Affine and SyN, as fMRIPrep 25.2.6 ran
+them: all 20, small and full size, identical to ANTs with CORE-MATH, as their Mattes and MI
+stages call glibc's `log`). A4 part 4 (2026-10-18, from `8bac0bf`) had added the point-set
+metrics' cases and A4 part 3 two cases of the gradient filter on oblique grids
+([findings](../findings/ants-ai.md)).
 
 The cases cover every transform in 2D, 3D and 4D, double and float, every metric and sampling,
 masks, the initial transforms and their files, every output and interpolator, every
@@ -42,16 +46,25 @@ command-line check and message, fMRIPrep 25.2.6's own command lines of four orac
 five oracle runs, and (A4 part 4) the point-set metrics: each metric alone and with the
 others and image metrics, label images (with boundary points), text and VTK point sets
 (ASCII, binary, without scalars), in-memory points, 2D, 3D and 4D, double and float, initial
-transforms, several levels and stages, and every message, failure and crash. The expected
-divergences: no seed (ANTs from the clock), ANTS-51's crash, SyN (A5), `--version`, three of
+transforms, several levels and stages, and every message, failure and crash; and (A5 part 1)
+SyN stages with each metric, several metrics, masks, sampling, 2D, 3D and 4D, double and float,
+the collapse and every output, displacement fields among the initial transforms, saved and
+restored states, the point-set metrics in tangent space, and sMRIPrep's two SyN registrations.
+The expected divergences: no seed (ANTs from the clock), ANTS-51's crash, `--version`, three of
 ANTS-45's silent failures, MINC transforms (refused), a point set's random fraction (ANTs seeds
 it from the clock, ANTS-64), IGDM's value for neighbourhoods of more than one voxel (ANTs reads
-before its arrays, ANTS-66) and a text point set ANTs reads forever (ANTS-69).
+before its arrays, ANTS-66), a text point set ANTs reads forever (ANTS-69), four linear stages
+after a displacement field (ANTs seeds their voxel sample from the clock, ANTS-72) and the
+deformable stages of A5 parts 2 and 3 (refused).
 
-**ANTs' own thread band** (the standard record's 18 cases, 2, 4 and 8 threads against one):
+**ANTs' own thread band** (the standard record's 24 cases, 2, 4 and 8 threads against one):
 about 1e-13 to 1e-12 in a transform parameter in double, 3.9e-10 on fMRIPrep's BOLD-reference
 affine (3.5e-9 in A4 part 2's run: the band itself changes from run to run), 4.9e-3 on a float
-affine and up to 1.1e-16 with the point-set metrics; larmorx gives the one-thread result at any thread count.
+affine and up to 1.1e-16 with the point-set metrics; SyN (A5 part 1): 0 to 3.6e-14 mm in a
+field, 0.023 to 0.025 mm with ICP (ANTs adds the points' derivatives into the field from several threads
+without synchronisation: two runs at 4 threads differ, ITK-34), and 1.4 to 1.7 mm on sMRIPrep's
+registrations on every third voxel (the linear stages' thread dependence carried through SyN;
+glibc's maths moves the fields as far). larmorx gives the one-thread result at any thread count.
 
 **Results do not depend on threads.** ANTs' do (its metrics sum per work unit); larmorx always
 gives ANTs' one-thread result. **Without a seed ANTs is not repeatable** (its sampling is seeded

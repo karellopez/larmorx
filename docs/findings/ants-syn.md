@@ -26,7 +26,7 @@ helper's `case SyN` and its observer).
   MeanSquares) to 3.6e-14 mm (Mattes) from ANTs' one-thread fields. Two exceptions: the
   point-set metrics, whose points' derivatives race into the field (ITK-34: 0.025 mm with ICP,
   different from run to run), and stages after thread-dependent linear stages (sMRIPrep's
-  registrations on every third voxel: 1.5 to 1.6 mm). larmorx gives the one-thread result at any
+  registrations on every third voxel: 1.4 to 1.7 mm). larmorx gives the one-thread result at any
   thread count.
 - **Bit-identical to ANTs at one thread**: every compared SyN case, most against the unmodified
   binary, the rest (Mattes, MI2, float runs: glibc's `logf`/`log`/`exp`) once CORE-MATH's
@@ -39,8 +39,8 @@ helper's `case SyN` and its observer).
   deformation), ITK-34 (point-set derivatives race into the field). All in the [register](upstream-defects.md); every deterministic one has a
   switch (`LARMORX_UPSTREAM_DEFECTS=reproduce`).
 - **Fast:** on a 96³ phantom pair (CC radius 4, 10 and 5 iterations at shrink 2 and 1) ANTs
-  takes 122 s at one thread; larmorx about 24 s at one thread and 5 s at 12, bit-identical
-  (one measurement on a busy machine; the benchmark report is pending).
+  takes 122 s at one thread; larmorx 24 to 41 s at one thread and 5 to 9 s at 12, bit-identical
+  (two runs on a loaded machine; the benchmark report is pending).
 
 ## One iteration (`SyNImageRegistrationMethod::StartOptimization`)
 
@@ -202,3 +202,12 @@ every N-th iteration, `<prefix>Stage<n>_level<l>_Iter<iiii>.nii.gz`, and prints 
   every third voxel of their images (standard tier, ds000005) and at full size (full tier).
   The intermediates nipype did not keep are stood in for as in the linear stages' real cases
   (A4), plus the template's Laplacian (`lap_tmpl`), made by the oracle's `ImageMath`.
+  **All 20 cases (five runs, two registrations, small and full size) are identical to ANTs**
+  (every DIAGNOSTIC line, the transforms, the warped image) once ANTs uses CORE-MATH's
+  functions: their Mattes and MI stages call glibc's `log`. At one thread ANTs took about 55
+  minutes for a full-size brain extraction and 2.5 to 3 hours for a template registration
+  (from the record's case times, where ANTs runs twice, on a loaded machine).
+- ITK-31 on fMRIPrep's own brain extraction (ds000005, full size; the SyN stage has a fixed
+  mask only): the correction leaves the affine transform unchanged and moves the field in 79 %
+  of its voxels, by a median of 0.0004 mm and at most 0.18 mm (0.02 % of the voxels by more than
+  0.1 mm), well inside ANTs' own thread band (1.4 to 1.7 mm on the small version).

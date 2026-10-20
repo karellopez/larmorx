@@ -297,8 +297,16 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         match result {
             Ok(out) => {
                 self.syn_notices(stage, out.identity_point_sets, out.stale_masks);
+                // The output is a BSplineSmoothingOnUpdateDisplacementFieldTransform (its class
+                // shows in later stages' --initialize-transforms-per-stage listings).
+                let mut output = out.output;
+                output.smoothing = Some(larmorx_registration::field::FieldSmoothing::BSpline {
+                    order: self.transforms[stage].spline_order,
+                    update_control_points: Vec::new(),
+                    total_control_points: Vec::new(),
+                });
                 let composite = self.composite.as_mut().expect("set by DoRegistration");
-                composite.push(Xfm::Field(out.output));
+                composite.push(Xfm::Field(output));
                 self.origins.push(Some(stage));
                 Ok(())
             }

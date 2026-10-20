@@ -36,8 +36,10 @@ Real cases repeat the ``antsRegistration`` command lines fMRIPrep 25.2.6 ran in 
 are missing. sMRIPrep's brain extraction and template registration run whole (Rigid, Affine,
 SyN) at full size in the full tier, and on every third voxel of their images (``real-syn-small``)
 in the standard tier (its first run) and the full tier (the others). The template registration
-runs again with its SyN stage replaced by antsRegistrationSyN.sh's ``BSplineSyN[0.1,26,0,3]``
-(``real-bsplinesyn-small`` and ``real-bsplinesyn``), as that script's ``-t b`` would run it.
+runs again with its SyN stage replaced by antsRegistrationSyN.sh's ``BSplineSyN[0.1,26,0,3]``,
+as that script's ``-t b`` would run it: on every third voxel (``real-bsplinesyn-small``: the
+first run in the standard tier, the others in the full tier) and, for the first run, full size
+(``real-bsplinesyn``, full tier).
 """
 
 from __future__ import annotations
@@ -967,16 +969,18 @@ def all_cases() -> list[RegCase]:
                         band=run.startswith("ds000005"),
                     )
                 )
-                cases.append(
-                    RegCase(
-                        f"real-bsplinesyn/{name}/{short}",
-                        "real-bsplinesyn",
-                        f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
-                        "BSplineSyN[0.1,26,0,3] for its SyN stage, full size",
-                        (f"{{fmriprep-whole-bsplinesyn:{run}/{subject}/{node}}}",),
-                        tier="full",
+                # Full size: the first run only (hours per run in ANTs at one thread).
+                if run.startswith("ds000005"):
+                    cases.append(
+                        RegCase(
+                            f"real-bsplinesyn/{name}/{short}",
+                            "real-bsplinesyn",
+                            f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
+                            "BSplineSyN[0.1,26,0,3] for its SyN stage, full size",
+                            (f"{{fmriprep-whole-bsplinesyn:{run}/{subject}/{node}}}",),
+                            tier="full",
+                        )
                     )
-                )
     return cases
 
 

@@ -246,6 +246,8 @@ defects! {
         "an image given as an initial transform whose voxels are not vectors of the registration's dimension (a scalar image, a 2D field in 3D) is read as a displacement field anyway: ITK converts the pixels as gray, complex, RGB or RGBA values and ANTs registers with the result";
     ANTS_74 = "ANTS-74", "ANTs", true,
         "--save-state after linear stages that follow a SyN stage (or a restored state) saves that SyN stage's state, without the later stages, although the option's description says the state is the composite transform unless the last transform is SyN's";
+    ANTS_75 = "ANTS-75", "ANTs", true,
+        "--print-similarity-measure-interval and --write-interval-volumes copy the stage's transforms by setting each copy's parameters before its fixed parameters, which a displacement field refuses: with a field among the transforms (an initial field, or a GaussianDisplacementField or BSplineDisplacementField stage) the stage fails at its first iteration";
     ITK_32 = "ITK-32", "ITK", true,
         "the labelled point-set metric (ANTs' ICP, PSE, JHCT) appends new per-label metrics at every Initialize and keeps using the first ones: in SyN, which initialises the metric twice per iteration, every evaluation compares with the moving points as the stage's first evaluation mapped them (in the moving-to-middle update, with the moving points themselves)";
     ITK_33 = "ITK-33", "ITK", true,

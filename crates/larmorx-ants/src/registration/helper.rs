@@ -514,22 +514,21 @@ struct FullScale<R, const D: usize> {
 
 /// The observer's copy of a composite's transforms (`CreateAnother()`, `SetParameters`, then
 /// `SetFixedParameters`): a new displacement field transform has no field when its
-/// parameters are set, and `SetParameters` throws.
-fn field_copy_check<R: Real, const D: usize>(transforms: &[Xfm<R, D>]) -> Result<(), ItkException> {
-    for t in transforms {
-        if let Xfm::Field(f) = t {
-            return Err(ItkException::new(
-                "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.h",
-                281,
-                f.class(),
-                format!(
-                    "Input parameters size ({}) does not match internal size (0).",
-                    t.number_of_parameters()
-                ),
-            ));
-        }
-    }
-    Ok(())
+/// parameters are set, and `SetParameters` throws (ANTS-75). The exception of the first field,
+/// if any.
+fn field_copy_error<R: Real, const D: usize>(transforms: &[Xfm<R, D>]) -> Option<ItkException> {
+    transforms.iter().find_map(|t| match t {
+        Xfm::Field(f) => Some(ItkException::new(
+            "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.h",
+            281,
+            f.class(),
+            format!(
+                "Input parameters size ({}) does not match internal size (0).",
+                t.number_of_parameters()
+            ),
+        )),
+        _ => None,
+    })
 }
 
 /// ANTs' iteration observer of a linear stage (`antsRegistrationOptimizerCommandIterationUpdate`).
@@ -553,6 +552,24 @@ struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     fixed_initial: Option<Composite<R, D>>,
     floor: &'s IndexFloor,
     warnings: Vec<String>,
+    /// ANTS-75 reproduced: the transform copies throw on a displacement field.
+    reproduce_copies: bool,
+    /// ANTS-75's condition met.
+    ants_75: bool,
+}
+
+impl<R: Compute, const D: usize> IterationObserver<'_, '_, '_, '_, R, D> {
+    /// The observer's copies of `transforms` (ANTS-75): ITK's exception when reproduced,
+    /// else the transforms used as they are.
+    fn copy(&mut self, transforms: &[Xfm<R, D>]) -> Result<(), ItkException> {
+        if let Some(e) = field_copy_error(transforms) {
+            self.ants_75 = true;
+            if self.reproduce_copies {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
@@ -606,16 +623,18 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
                 },
             ));
         }
-        if let Some(f) = &self.full_scale
-            && due(f.interval)
-        {
+        if self.full_scale.as_ref().is_some_and(|f| due(f.interval)) {
             // UpdateFullScaleMetricValue copies the fixed composite's and the moving
             // composite's transforms (CreateAnother, SetParameters, SetFixedParameters): a
             // displacement field has no field yet when its parameters are set, and throws.
-            if let Some(fixed) = &self.fixed_initial {
-                field_copy_check(&fixed.transforms)?;
+            if let Some(fixed) = self.fixed_initial.clone() {
+                self.copy(&fixed.transforms)?;
             }
-            field_copy_check(&_problem.moving.transforms)?;
+            self.copy(&_problem.moving.transforms)?;
+        }
+        if let Some(f) = &self.full_scale
+            && due(f.interval)
+        {
             let mut printed = Vec::new();
             full_scale_value = larmorx_registration::method::full_scale_cc(
                 &f.fixed,
@@ -632,7 +651,7 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
         }
         if due(self.write_interval) {
             // WriteIntervalVolumes copies the moving composite's transforms first.
-            field_copy_check(&_problem.moving.transforms)?;
+            self.copy(&_problem.moving.transforms)?;
             let name = format!(
                 "{}Stage{}_level{}_Iter{:04}.nii.gz",
                 self.prefix,
@@ -1339,6 +1358,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 fixed_initial: stage_spec.fixed_initial.clone(),
                 floor,
                 warnings: Vec::new(),
+                reproduce_copies: !self.upstream_defects.fix(),
+                ants_75: false,
             };
             let mut warnings = Vec::new();
             let mut events = PointSetEvents::default();
@@ -1411,6 +1432,25 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ),
             };
             self.point_set_notices(&events);
+            if observer.ants_75 {
+                let mode = self.upstream_defects;
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_75,
+                        mode,
+                        if mode.fix() {
+                            format!(
+                                "stage {stage}: the full-scale similarity or the interval volumes use the displacement field as it is; ANTs fails copying it and the stage fails"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: copying the displacement field for the full-scale similarity or the interval volumes fails, as in ANTs"
+                            )
+                        },
+                    ),
+                );
+            }
             let observed = std::mem::take(&mut observer.warnings);
             for w in &warnings {
                 log.cerr(w);

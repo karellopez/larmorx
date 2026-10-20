@@ -124,5 +124,3 @@ Still to do:
 - **The point-set metrics' defects** (A4.4; fMRIPrep does not use these metrics): ANTS-67,
   ANTS-68, ANTS-70, ITK-24, ITK-29, each kept faithful until decided (the register says what each
   is).
-- **GitHub Pages** for `larmorx_documentation`: Settings → Pages → Source: GitHub Actions. Two
-  commits wait to be pushed once it is on (the workflow's actions updated, `.claude/` ignored).

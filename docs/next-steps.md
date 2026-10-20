@@ -127,6 +127,19 @@ ITK-29 (all in the point-set metrics, which fMRIPrep does not use). Left: `larmo
 B-spline prefilter still calls the `libm` crate's `pow` (switching it needs `antsApplyTransforms`'
 B-spline cases re-run).
 
+## Order from here (user, 2026-10-20)
+
+1. **A5 part 2** (running): BSplineSyN, BSpline, Gaussian and B-spline displacement fields.
+2. **The visual reports**, before the next program: the shared figure code in `larmorx_validation`
+   (one style, every figure drawn from the validation records, reproducible from a commit);
+   figures for every tool already ported (agreement overviews, difference distributions, image
+   comparisons such as N4 bias fields, registration overlays, warp-field differences and 3dTshift
+   time series, the originals' own variability, speed); per-tool pages on the documentation site
+   (`larmorx_documentation`), with the landing page's two fixes (the hero on phones mid-scroll,
+   a font with Greek letters).
+3. **A5 part 3** (velocity fields, exponential), then **A6** (Atropos), each with its figures.
+Each is one bounded agent run with a stop after it, for the user's usage check.
+
 ## 4. A5: `antsRegistration`'s deformable stages; A6: Atropos
 
 **Part 1, SyN (done 2026-10-19, branch `worktree-agent-aca867b0b4aec5f3f`, not merged yet).**

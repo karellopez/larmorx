@@ -103,10 +103,12 @@ stages), and `larmorx_ants::registration::{bspline_syn, helper}`.
   (`DisplacementFieldTransformParametersAdaptor`); `BSplineDisplacementField`'s meshes are
   `mesh << (level + 1)` (ANTS-78: doubled already at the base level, against the option's name
   and B-spline SyN's `mesh << level`).
-- **A coarse total-field mesh fails in ANTs:** the stationary boundary's weight (1e10) dominates
-  a fit with few control points, so the scales estimator's 0.01 perturbation shifts no voxel by
-  more than about 1e-13 mm, the scales fall below epsilon and the optimizer throws (`m_Scales
-  values must be > epsilon`; `displacement-field/bspline-coarse-total`). larmorx fails alike.
+- **A coarse mesh fails in ANTs:** the stationary boundary's weight (1e10) dominates a fit with
+  few control points, so the scales estimator's 0.01 perturbation of one voxel, smoothed by the
+  update (and total) fit, shifts no voxel by more than about 1e-13 mm; the scales fall below
+  epsilon and the optimizer throws (`m_Scales values must be > epsilon`). A total mesh of
+  1x1x1 in 3D (`displacement-field/bspline-coarse-total`), or a 4D update mesh of 2x2x2x1 on
+  four volumes, fails so; larmorx fails alike.
 - **Messages and failures:** IGDM first is refused (`Intensity point set metric is not
   implemented yet for the specified transform.`); a point-set metric first makes ANTs allocate
   the field on a null image (a crash; larmorx stops); `--print-similarity-measure-interval` and

@@ -1307,6 +1307,29 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 f.smoothing = Some(smoothing);
                 output = Xfm::Field(f);
             }
+            // ITK-30: GC's derivative with a displacement field being optimised.
+            if field_stage
+                && prepared
+                    .iter()
+                    .any(|m| matches!(m, StageMetric::Image(i) if i.kind == MethodMetric::Gc))
+            {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_30,
+                        self.upstream_defects,
+                        if self.upstream_defects.fix() {
+                            format!(
+                                "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                            )
+                        },
+                    ),
+                );
+            }
             // The B-spline transform: its domain is the stage's first fixed image (origin,
             // direction, and physical dimensions `spacing·(size − 1)` in R), its mesh the
             // stage's; then the identity. ANTs reads as many mesh sizes as dimensions.

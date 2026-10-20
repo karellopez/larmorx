@@ -431,6 +431,15 @@ rule 10).
   order (N4: blocks of control points; DenoiseImage: a window of contributions summed per
   voxel in raster order of the centres). Parity checks that 1 and 4 threads give the same
   bits.
+- **Skip the zeros only where skipping is exact.** Where the original adds whole vectors that
+  are zero but for a few entries (ITK's metrics add a B-spline transform's derivative for every
+  parameter at every point, almost all zeros), compute only the non-zero entries, but check what
+  adding a zero does to the accumulator: to a plain sum nothing, to a compensated sum
+  (`CompensatedSummation`) possibly something (it folds the compensation into the sum). larmorx
+  defers each parameter's zeros until the parameter is next touched and applies them then
+  (`CompensatedSum::add_zeros`, which stops at the fixed point it reaches at once), so the sums
+  are the original's bit for bit (A5 part 2: the `BSpline` stage, 20 times faster than ANTs at
+  one thread on a 4D case).
 - **No platform BLAS or LAPACK for results.** numpy's 4×4 products and inverses differ by CPU
   and platform; larmorx computes them in Rust in OpenBLAS's Haswell order
   (`larmorx_transform::openblas`, [findings/numpy-blas.md](findings/numpy-blas.md)).

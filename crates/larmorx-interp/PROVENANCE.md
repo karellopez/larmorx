@@ -11,6 +11,7 @@ handling and operation order
 | `linear`, `LinearYz` (the same arithmetic, the y/z part computed once per row) | ITK v5.4.5: `itkLinearInterpolateImageFunction.h/.hxx` (3D optimized path) | Apache-2.0 |
 | `nearest`, `NearestYz` | ITK v5.4.5: `itkNearestNeighborInterpolateImageFunction.h` | Apache-2.0 |
 | `bspline` (prefilter, weights for orders 0–5, mirror boundary) | ITK v5.4.5: `itkBSplineDecompositionImageFilter.hxx`, `itkBSplineInterpolateImageFunction.hxx` | Apache-2.0 |
+| `nd::InterpolationNd::BSplineCoefficients`, `bspline_line_to_coefficients` (the image taken as the coefficients, no prefilter; one line of the decomposition) | ITK v5.4.5: `itkBSplineResampleImageFunction.h`, `itkBSplineDecompositionImageFilter.hxx` (`DataToCoefficients1D`) | Apache-2.0 |
 | `gaussian` | ITK v5.4.5: `itkGaussianInterpolateImageFunction.hxx` | Apache-2.0 |
 | `multi_label` | ITK v5.4.5: `itkLabelImageGaussianInterpolateImageFunction.hxx` | Apache-2.0 |
 | `generic_label` | ITK remote module ITKGenericLabelInterpolator at `ebf2436469cc` (pinned by ITK v5.4.5's `Modules/Remote/GenericLabelInterpolator.remote.cmake`): `itkLabelImageGenericInterpolateImageFunction.h/.hxx` | Apache-2.0 |

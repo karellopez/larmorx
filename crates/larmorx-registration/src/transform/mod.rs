@@ -334,6 +334,41 @@ impl<R: Real, const D: usize> Composite<R, D> {
         // after it multiplies by its Jacobian with respect to position at the point mapped so
         // far (a linear transform's does not depend on the point).
         self.transforms[n - 1].jacobian_parameters(p, out);
+        self.position_products(p, out, np);
+    }
+
+    /// [`Composite::jacobian`] for a B-spline transform being optimised: only the columns of
+    /// the parameters whose control points support `p` (every other column is zero), as
+    /// `(parameters, D × k values row by row)`; `None` for another active transform.
+    pub fn sparse_jacobian(&self, p: &[R; D]) -> Option<(Vec<usize>, Vec<R>)> {
+        let Xfm::BSpline(b) = self.active() else {
+            return None;
+        };
+        let Some(support) = b.support(p) else {
+            return Some((Vec::new(), Vec::new()));
+        };
+        let offsets = b.support_offsets(&support);
+        let per = b.parameters_per_dimension();
+        let s = offsets.len();
+        let k = D * s;
+        let mut cols = Vec::with_capacity(k);
+        let mut out = vec![R::ZERO; D * k];
+        for d in 0..D {
+            for (i, &o) in offsets.iter().enumerate() {
+                cols.push(d * per + o);
+                out[d * k + d * s + i] = R::from_f64(support.weights[i]);
+            }
+        }
+        if self.transforms.len() > 1 {
+            self.position_products(p, &mut out, k);
+        }
+        Some((cols, out))
+    }
+
+    /// The active transform's Jacobian `out` (`D` rows of `np` columns) left-multiplied by the
+    /// Jacobian with respect to position of each transform applied after it.
+    fn position_products(&self, p: &[R; D], out: &mut [R], np: usize) {
+        let n = self.transforms.len();
         let nonlinear = self.transforms.iter().any(|t| !t.is_linear());
         let mut q = if nonlinear {
             self.transforms[n - 1].transform_point(p)

@@ -77,8 +77,10 @@ struct Contribution<R> {
     /// The four B-spline weights and, with the derivative, their derivatives.
     weights: [R; 4],
     derivatives: [R; 4],
-    /// `Σ_dim J[dim][mu]·∇m[dim]` for each parameter `mu`.
+    /// `Σ_dim J[dim][mu]·∇m[dim]` for each parameter `mu` (or each of `cols`).
     inner: Vec<R>,
+    /// The parameters of `inner` (a B-spline transform's; the others' are zero).
+    cols: Option<Vec<usize>>,
 }
 
 impl<R: Real> Mattes<R> {
@@ -291,6 +293,7 @@ impl<R: Real> Mattes<R> {
                     weights,
                     derivatives,
                     inner,
+                    cols: None,
                 },
                 m.voxel_of(&s.virtual_index),
             ))
@@ -436,19 +439,20 @@ impl<R: Real> Mattes<R> {
                 arg = R::from_f64(arg.to_f64() + 1.0);
             }
             let mut inner = Vec::new();
+            let mut cols = None;
             if compute_derivative {
-                let mut jac = vec![R::ZERO; D * np];
                 let local: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
-                transform.jacobian(&local, &mut jac);
-                inner = (0..np)
+                let jac = m.jacobian_columns(transform, &local);
+                inner = (0..jac.n)
                     .map(|mu| {
                         let mut ip = R::ZERO;
                         for dim in 0..D {
-                            ip = ip + jac[dim * np + mu] * s.moving_gradient[dim];
+                            ip = ip + jac.at(dim, mu) * s.moving_gradient[dim];
                         }
                         ip
                     })
                     .collect();
+                cols = jac.cols;
             }
             Some(Contribution {
                 fixed_index,
@@ -456,6 +460,7 @@ impl<R: Real> Mattes<R> {
                 weights,
                 derivatives,
                 inner,
+                cols,
             })
         };
         m.for_each_sample(process, |c| {
@@ -465,10 +470,12 @@ impl<R: Real> Mattes<R> {
                 let bin = row + c.moving_index + b;
                 joint[bin] = joint[bin] + c.weights[b];
                 if compute_derivative {
+                    // Plain sums: a B-spline transform's zero columns add nothing.
                     let offset = c.fixed_index * np * bins + (c.moving_index + b) * np;
-                    for mu in 0..np {
+                    for (k, &ip) in c.inner.iter().enumerate() {
+                        let mu = c.cols.as_ref().map_or(k, |cols| cols[k]);
                         let cell = &mut joint_derivatives[offset + mu];
-                        *cell = *cell + c.inner[mu] * c.derivatives[b];
+                        *cell = *cell + ip * c.derivatives[b];
                     }
                 }
             }

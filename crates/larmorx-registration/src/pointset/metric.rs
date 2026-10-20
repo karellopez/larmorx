@@ -935,9 +935,10 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         }
         let np = moving.number_of_parameters();
         let mut thread = CompensatedSum::default();
-        let mut sums = vec![CompensatedSum::default(); np];
-        let mut jac = vec![R::ZERO; D * np];
-        let mut local_transform = vec![R::ZERO; np];
+        let mut sums = crate::CompensatedSums::new(np);
+        let sparse = moving.active().is_bspline();
+        let mut jac = vec![R::ZERO; if sparse { 0 } else { D * np }];
+        let mut local_transform = vec![R::ZERO; if sparse { 0 } else { np }];
         for index in 0..fixed_t.len() {
             if !self.takes_part(index, &virt) {
                 continue;
@@ -955,16 +956,30 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 *x = R::ZERO;
             }
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(f64::from(virt[index][k])));
+            if let Some((cols, columns)) = moving.sparse_jacobian(&vp) {
+                // A B-spline transform: zero but for the parameters around the point.
+                let k = cols.len();
+                let values: Vec<R> = (0..k)
+                    .map(|par| {
+                        let mut v = R::ZERO;
+                        for d in 0..D {
+                            v = v + columns[d * k + par] * local[d];
+                        }
+                        v
+                    })
+                    .collect();
+                sums.add_sparse(&cols, &values);
+                continue;
+            }
             moving.jacobian(&vp, &mut jac);
             for par in 0..np {
                 for d in 0..D {
                     local_transform[par] = local_transform[par] + jac[d * np + par] * local[d];
                 }
             }
-            for par in 0..np {
-                sums[par].add(local_transform[par].to_f64());
-            }
+            sums.add_dense(&local_transform);
         }
+        sums.flush();
         let total = add_thread(&thread);
         let mut value = R::from_f64(total.sum());
         if valid == 0 {
@@ -976,6 +991,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         }
         let n = R::from_i64(valid as i64);
         let derivative = sums
+            .sums
             .iter()
             .map(|s| R::from_f64(add_thread(s).sum() / n.to_f64()))
             .collect();

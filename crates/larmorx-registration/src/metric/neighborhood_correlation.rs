@@ -43,7 +43,7 @@ struct Column<R> {
 type Values<R> = Option<(R, R)>;
 
 /// A voxel's local correlation and derivative, or `None` where it does not count.
-type PointResult<R> = Option<(R, Vec<R>, Option<usize>)>;
+type PointResult<R> = Option<(R, Vec<R>, Option<usize>, Option<Vec<usize>>)>;
 
 /// The metric's state for a level: its radius.
 #[derive(Clone, Copy, Debug)]
@@ -144,23 +144,32 @@ impl NeighborhoodCorrelation {
             R::ONE
         };
         let mut derivative = Vec::new();
+        let mut cols = None;
         if compute_derivative {
-            derivative = vec![R::ZERO; np];
+            // A B-spline transform's derivative is zero away from the point's control points.
+            let sparse = !m.local_support && transform.active().is_bspline();
+            if sparse {
+                cols = Some(Vec::new());
+            } else {
+                derivative = vec![R::ZERO; np];
+            }
             if s_ff > eps && s_mm > eps {
                 let factor = 2.0 * s_fm.to_f64() / ff_mm.to_f64()
                     * (fixed_a - s_fm / s_mm * moving_a).to_f64();
                 let wrt_image: [R; D] =
                     std::array::from_fn(|q| R::from_f64(factor * s.moving_gradient[q].to_f64()));
-                let mut jac = vec![R::ZERO; D * np];
                 let vp: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
-                m.moving_jacobian(transform, &vp, &mut jac);
-                for (par, d) in derivative.iter_mut().enumerate() {
-                    let mut v = R::ZERO;
-                    for dim in 0..D {
-                        v = v + wrt_image[dim] * jac[dim * np + par];
-                    }
-                    *d = v;
-                }
+                let jac = m.jacobian_columns(transform, &vp);
+                derivative = (0..jac.n)
+                    .map(|par| {
+                        let mut v = R::ZERO;
+                        for dim in 0..D {
+                            v = v + wrt_image[dim] * jac.at(dim, par);
+                        }
+                        v
+                    })
+                    .collect();
+                cols = jac.cols;
             }
         }
         let voxel = if m.local_support {
@@ -168,7 +177,7 @@ impl NeighborhoodCorrelation {
         } else {
             None
         };
-        Some((local_cc, derivative, voxel))
+        Some((local_cc, derivative, voxel, cols))
     }
 
     /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`.
@@ -245,8 +254,8 @@ impl NeighborhoodCorrelation {
                     })
                     .collect();
                 for line in lines {
-                    for (cc, d, voxel) in line.into_iter().flatten() {
-                        reduction.add_point(-cc, &d, voxel);
+                    for (cc, d, voxel, cols) in line.into_iter().flatten() {
+                        reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
                     }
                 }
             }
@@ -275,8 +284,8 @@ impl NeighborhoodCorrelation {
                         self.point(m, transform, &queue, &center, compute_derivative, floor, np)
                     })
                     .collect();
-                for (cc, d, voxel) in results.into_iter().flatten() {
-                    reduction.add_point(-cc, &d, voxel);
+                for (cc, d, voxel, cols) in results.into_iter().flatten() {
+                    reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
                 }
             }
         }

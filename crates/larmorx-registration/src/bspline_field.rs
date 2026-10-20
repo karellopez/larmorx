@@ -520,7 +520,9 @@ pub fn field_scattered<R: Real, const D: usize>(
         space.origin,
         space.direction,
     )?;
-    let selected: Vec<Option<([f32; D], [R; D], f32)>> = (0..space.len())
+    // Per voxel: its parametric point, its vector and its weight, if it is a point.
+    type Point<R, const D: usize> = ([f32; D], [R; D], f32);
+    let selected: Vec<Option<Point<R, D>>> = (0..space.len())
         .into_par_iter()
         .with_min_len(1024)
         .map(|o| {

@@ -1416,6 +1416,131 @@ def _(ctx: Context) -> dict[str, Any]:
     return files
 
 
+@case("cli.ants.antsRegistration.bsplinesyn", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """B-spline SyN: CC over two levels with update and total meshes (the B-spline fits of the
+    fields, their adaptors), then MeanSquares with masks (the fits weighted by the resampled
+    masks) and a knot spacing, in float; and ICP alone (each point's derivative fitted at the
+    point)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    p, q, r = ctx.out("bsyn_"), ctx.out("bsynf_"), ctx.out("bsynp_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", p,
+        "-t", "BSplineSyN[0.25,2x2x2,1x1x1,3]", "-m", f"CC[{a},{b},1,2]",
+        "-c", "[3x2,1e-6,3]", "-f", "2x1", "-s", "1x0vox",
+    )  # fmt: skip
+    cli(
+        "ants", "antsRegistration", "-d", "3", "--float", "1", "-o", q,
+        "-x", f"[{m},{ctx.file('mask2.nii')}]",
+        "-t", "BSplineSyN[0.25,20,0,2]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", r, "-x", m,
+        "-t", "BSplineSyN[0.3,2x2x2,0,3]", "-m", f"ICP[{la},{lb},1]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    return {
+        "warp": Nifti(p + "0Warp.nii.gz"),
+        "inverse_warp": Nifti(p + "0InverseWarp.nii.gz"),
+        "float.warp": Nifti(q + "0Warp.nii.gz"),
+        "icp.warp": Nifti(r + "0Warp.nii.gz"),
+    }
+
+
+@case("cli.ants.antsRegistration.fields", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The displacement-field stages: a Gaussian field (Mattes, two levels, the field adaptor,
+    the smoothing on update, the scales of a field), then a B-spline field after it (a knot
+    spacing, CC), collapsed into one field and written as a composite; in 2D a B-spline field
+    with MeanSquares."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    p = ctx.out("fields_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-a", "1", "-o", p,
+        "-t", "GaussianDisplacementField[0.25,2,0.5]", "-m", f"Mattes[{a},{b},1,12]",
+        "-c", "[3x2,1e-6,3]", "-f", "2x1", "-s", "1x0vox",
+        "-t", "BSplineDisplacementField[0.25,15,0,3]", "-m", f"CC[{a},{b},1,2]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    plane, plane2 = ctx.file("plane.nii"), ctx.file("plane2.nii")
+    p2 = ctx.out("plane_bdf_")
+    cli(
+        "ants", "antsRegistration", "-d", "2", "-o", p2,
+        "-t", "BSplineDisplacementField[0.3,3x2,0,3]", "-m", f"MeanSquares[{plane},{plane2},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    structure, values = _h5_structure(p + "Composite.h5")
+    return {
+        "composite.structure": structure,
+        "composite.values": values,
+        "2d.warp": Nifti(p2 + "0Warp.nii.gz"),
+    }
+
+
+@case("cli.ants.antsRegistration.bspline", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The B-spline transform: an affine stage then BSpline with MeanSquares over two levels
+    (the domain, the adaptor's resampling and decomposition, the scales of a B-spline
+    transform, its sparse derivative), collapsed (``0GenericAffine.mat``, ``1BSpline.txt``), the
+    warped image; in float with CC and ICP; then that B-spline transform as an initial
+    transform (read back) before a SyN stage, collapsed with ANTS-76 corrected (both kept)."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    la, lb = ctx.file("labels.nii"), ctx.file("labels2.nii")
+    p, w = ctx.out("bsp_"), ctx.out("bsp_warped.nii")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", f"[{p},{w}]",
+        "-t", "Affine[0.2]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+        "-t", "BSpline[0.2,2x2x1]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[3x2,1e-6,3]", "-f", "2x1", "-s", "1x0vox",
+    )  # fmt: skip
+    q = ctx.out("bspf_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "--float", "1", "-o", q,
+        "-t", "BSpline[0.2,20]", "-m", f"CC[{a},{b},1,2]", "-m", f"ICP[{la},{lb},0.5]",
+        "-c", "[3,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    r = ctx.out("bspr_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", r, "-r", p + "1BSpline.txt",
+        "-t", "SyN[0.25,3,0]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0",
+    )  # fmt: skip
+    return {
+        "affine": File(p + "0GenericAffine.mat"),
+        "bspline": File(p + "1BSpline.txt"),
+        "warped": Nifti(w),
+        "float.bspline": File(q + "0BSpline.txt"),
+        "initial.bspline": File(r + "0BSpline.txt"),
+        "initial.warp": Nifti(r + "1Warp.nii.gz"),
+    }
+
+
+@case("cli.ants.antsRegistration.bspline.reproduce", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The B-spline stages with ANTs' defects reproduced: the collapse after an initial
+    B-spline transform loses the SyN stage's fields (ANTS-76)."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    p = ctx.out("bsp1_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", p,
+        "-t", "BSpline[0.2,1x1x1]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    r = ctx.out("bsp1r_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", r, "-r", p + "0BSpline.txt",
+        "-t", "SyN[0.25,3,0]", "-m", f"MeanSquares[{a},{b},1,0]",
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", upstream_defects=REPRODUCE,
+    )  # fmt: skip
+    return {
+        "bspline": File(p + "0BSpline.txt"),
+        "files": "\n".join(sorted(x.name for x in Path(r).parent.glob("bsp1r_*"))),
+    }
+
+
 @case("cli.ants.antsAI", covers=("cli:ants antsAI",))
 def _(ctx: Context) -> dict[str, Any]:
     """``antsAI``'s paths: a rigid search from the principal axes with Mattes on regularly
@@ -1668,6 +1793,33 @@ def _(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {
         "files": "\n".join(sorted(res.files)),
         "warped": res.warped.data,
+        "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
+    }
+    for name, xfms in res.files.items():
+        out[f"{name}.parameters"] = np.concatenate([np.asarray(t.parameters) for t in xfms])
+    return out
+
+
+@case("py.ants.registration.bspline", covers=("lx.ants.registration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.registration`` with the B-spline and displacement-field stages: BSplineSyN (a
+    knot spacing), then BSpline (a mesh), not collapsed; the files and the iterations."""
+    stage = lx.ants.RegistrationStage
+    a = ctx.file("anat.nii")
+    metric = lx.ants.RegistrationMetric("MeanSquares", a, anat2())
+    res = lx.ants.registration(
+        [
+            stage("BSplineSyN", 0.25, metric, iterations=[3], shrink_factors=[1],
+                  smoothing_sigmas=[0], convergence_window=3, mesh_size=20.0),
+            stage("GaussianDisplacementField", 0.25, metric, iterations=[2], shrink_factors=[1],
+                  smoothing_sigmas=[0], convergence_window=3, update_field_variance=2.0),
+            stage("BSpline", 0.2, metric, iterations=[2], shrink_factors=[1],
+                  smoothing_sigmas=[0], convergence_window=3, mesh_size=(2, 2, 1)),
+        ],
+        collapse_output_transforms=False,
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "files": "\n".join(sorted(res.files)),
         "iterations": np.array([[i.stage, i.level, i.iteration, i.value] for i in res.iterations]),
     }
     for name, xfms in res.files.items():

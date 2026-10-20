@@ -247,9 +247,7 @@ impl<R: Real, const D: usize> BSplineXfm<R, D> {
 
     /// `SetIdentity()`.
     pub fn set_identity(&mut self) {
-        for c in &mut self.coefficients {
-            *c = R::ZERO;
-        }
+        self.coefficients.fill(R::ZERO);
     }
 
     /// `SetFixedParameters(p)`: ITK's exception for a wrong count; the coefficients reset to
@@ -562,4 +560,107 @@ pub fn adapt<R: Real, const D: usize>(
     t.fixed = required.to_vec();
     t.coefficients = coefficients;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::CompensatedSums;
+    use crate::rng::MersenneTwister;
+    use crate::transform::{Composite, Kind, LinearXfm, Xfm};
+
+    fn transform(rng: &mut MersenneTwister) -> BSplineXfm<f64, 3> {
+        let mut b = BSplineXfm::<f64, 3>::new_default();
+        let direction = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
+        b.set_domain_origin([-10.0, 4.0, 2.5]).unwrap();
+        b.set_domain_physical([30.0, 22.0, 17.0]).unwrap();
+        b.set_domain_mesh([3, 2, 2]).unwrap();
+        b.set_domain_direction(direction).unwrap();
+        for c in &mut b.coefficients {
+            *c = 4.0 * (rng.closed() - 0.5);
+        }
+        b
+    }
+
+    /// The sparse Jacobian's columns are the dense Jacobian's non-zero ones, through a
+    /// composite with a linear transform after the B-spline one too.
+    #[test]
+    fn sparse_jacobian_matches_the_dense_one() {
+        let mut rng = MersenneTwister::from_int(7);
+        let b = transform(&mut rng);
+        let mut affine = LinearXfm::<f64, 3>::new(Kind::Affine);
+        affine.set_matrix([[1.1, 0.1, 0.0], [-0.05, 0.95, 0.02], [0.0, 0.03, 1.02]]);
+        affine.set_offset([1.0, -2.0, 0.5]);
+        let mut inside = 0;
+        for queue in [
+            vec![Xfm::BSpline(b.clone())],
+            vec![Xfm::Linear(affine), Xfm::BSpline(b.clone())],
+        ] {
+            let c = Composite::new(queue);
+            let np = c.number_of_parameters();
+            for _ in 0..200 {
+                let p = [
+                    -42.0 + 40.0 * rng.closed(),
+                    -6.0 + 40.0 * rng.closed(),
+                    1.0 + 19.0 * rng.closed(),
+                ];
+                let mut dense = vec![0.0; 3 * np];
+                c.jacobian(&p, &mut dense);
+                let (cols, values) = c.sparse_jacobian(&p).unwrap();
+                let k = cols.len();
+                if k > 0 {
+                    inside += 1;
+                }
+                let mut rebuilt = vec![0.0; 3 * np];
+                for (j, &col) in cols.iter().enumerate() {
+                    for r in 0..3 {
+                        rebuilt[r * np + col] = values[r * k + j];
+                    }
+                }
+                assert_eq!(
+                    dense.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                    rebuilt.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+                );
+            }
+        }
+        assert!(inside > 50, "{inside} points inside the grid");
+    }
+
+    /// Sparse additions with the zeros deferred give the dense sums bit for bit.
+    #[test]
+    fn deferred_zeros_give_the_dense_sums() {
+        let mut rng = MersenneTwister::from_int(3);
+        let n = 40;
+        let mut dense = CompensatedSums::new(n);
+        let mut sparse = CompensatedSums::new(n);
+        for _ in 0..3000 {
+            let mut local = vec![0.0f64; n];
+            let mut cols = Vec::new();
+            for (c, v) in local.iter_mut().enumerate() {
+                if rng.closed() < 0.2 {
+                    // Values over many magnitudes, so the compensations matter.
+                    *v = (rng.closed() - 0.5) * 10f64.powi((rng.closed() * 12.0) as i32 - 6);
+                    cols.push(c);
+                }
+            }
+            let values: Vec<f64> = cols.iter().map(|&c| local[c]).collect();
+            dense.add_dense(&local);
+            sparse.add_sparse(&cols, &values);
+        }
+        sparse.flush();
+        for (a, b) in dense.sums.iter().zip(&sparse.sums) {
+            assert_eq!(a.sum().to_bits(), b.sum().to_bits());
+            assert_eq!(a.compensation().to_bits(), b.compensation().to_bits());
+        }
+    }
+
+    /// The decomposition of a constant is the constant (order 3), axis by axis.
+    #[test]
+    fn decomposition_of_a_constant() {
+        let data = vec![2.5f64; 5 * 4 * 3];
+        let c = decompose(&data, &[5, 4, 3], 3);
+        for v in c {
+            assert!((v - 2.5).abs() < 1e-12);
+        }
+    }
 }

@@ -15,11 +15,12 @@
 //! - the option values are read newest first (`GetFunction(0)` is the last one given), the
 //!   stages are numbered from the last on the command line (`AssignStages`).
 //!
-//! **Scope (A4 part 2).** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
-//! `CompositeAffine`) with the image metrics (`MI`/`Mattes`, `MI2`, `MeanSquares`, `GC`, `CC`;
-//! `Demons` fails in a linear stage as in ANTs), in 2, 3 and 4 dimensions, float and double.
-//! The deformable transforms are parsed as ANTs parses them and refused before the
-//! registration runs (A5). What is not ported yet is refused with a message naming it.
+//! **Scope.** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
+//! `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
+//! `BSplineDisplacementField` and `BSpline`, with every image metric and point-set metric, in 2,
+//! 3 and 4 dimensions, float and double. The velocity-field transforms are parsed as ANTs
+//! parses them and refused before the registration runs (A5 part 3). What is not ported yet is
+//! refused with a message naming it.
 
 use std::io::Write;
 use std::path::Path;
@@ -1618,18 +1619,19 @@ fn do_registration<R: Compute, const D: usize>(
                         order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
                     }
                     // A single value (read as float) is a knot spacing in millimetres.
-                    let read_mesh =
-                        |log: &mut Log<'_>,
-                         i: usize,
-                         knots: &mut dyn FnMut(&mut Log<'_>, R, u32) -> Result<Vec<u32>, Exit>|
-                         -> Result<Vec<u32>, Exit> {
-                            let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
-                            if v.len() == 1 {
-                                knots(log, R::r(f64::from(v[0])), order)
-                            } else {
-                                Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
-                            }
-                        };
+                    type Knots<'k, R> =
+                        dyn FnMut(&mut Log<'_>, R, u32) -> Result<Vec<u32>, Exit> + 'k;
+                    let read_mesh = |log: &mut Log<'_>,
+                                     i: usize,
+                                     knots: &mut Knots<'_, R>|
+                     -> Result<Vec<u32>, Exit> {
+                        let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
+                        if v.len() == 1 {
+                            knots(log, R::r(f64::from(v[0])), order)
+                        } else {
+                            Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
+                        }
+                    };
                     transform_method.update_field_mesh = read_mesh(log, 1, &mut knots)?;
                     transform_method.total_field_mesh = if n > 2 {
                         read_mesh(log, 2, &mut knots)?
@@ -1775,17 +1777,10 @@ fn do_registration<R: Compute, const D: usize>(
         helper.metrics.push(metric);
     }
     if let Some(method) = deformable {
-        let part = match method {
-            XfrmMethod::BSplineSyN
-            | XfrmMethod::BSpline
-            | XfrmMethod::GaussianDisplacementField
-            | XfrmMethod::BSplineDisplacementField => "A5 part 2",
-            _ => "A5 part 3",
-        };
         return Err(refuse(
             log,
             &format!(
-                "{} stages are deformable registration that larmorx ports in milestone {part}; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine) and SyN",
+                "{} stages are deformable registration that larmorx ports in milestone A5 part 3; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine), SyN, BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline",
                 method.as_str()
             ),
         ));

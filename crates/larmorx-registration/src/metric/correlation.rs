@@ -161,36 +161,40 @@ pub fn evaluate<R: Real, const D: usize>(
         fixed: false,
         moving: true,
     };
-    let process = |i: usize| -> Option<(R, R, Vec<R>)> {
+    type Point<R> = (R, R, Vec<R>, Option<Vec<usize>>);
+    let process = |i: usize| -> Option<Point<R>> {
         let s = m.sample(i, transform, gradients, compute_derivative, floor)?;
         let f1 = s.fixed_value - average_fix;
         let m1 = s.moving_value - average_mov;
         let mut projected = Vec::new();
+        let mut cols = None;
         if compute_derivative {
-            let mut jac = vec![R::ZERO; D * np];
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
-            transform.jacobian(&vp, &mut jac);
-            projected = (0..np)
+            let jac = m.jacobian_columns(transform, &vp);
+            projected = (0..jac.n)
                 .map(|par| {
                     let mut sum = R::ZERO;
                     for dim in 0..D {
-                        sum = sum + s.moving_gradient[dim] * jac[dim * np + par];
+                        sum = sum + s.moving_gradient[dim] * jac.at(dim, par);
                     }
                     sum
                 })
                 .collect();
+            cols = jac.cols;
         }
-        Some((f1, m1, projected))
+        Some((f1, m1, projected, cols))
     };
     let (mut f2, mut m2, mut fm) = (R::ZERO, R::ZERO, R::ZERO);
     let mut fdm = vec![R::ZERO; if compute_derivative { np } else { 0 }];
     let mut mdm = fdm.clone();
     let mut valid: usize = 0;
-    m.for_each_sample(process, |(f1, m1, projected)| {
+    m.for_each_sample(process, |(f1, m1, projected, cols)| {
         f2 = f2 + f1 * f1;
         m2 = m2 + m1 * m1;
         fm = fm + f1 * m1;
-        for (par, &sum) in projected.iter().enumerate() {
+        // Plain sums: the zero columns of a B-spline transform's Jacobian add nothing.
+        for (c, &sum) in projected.iter().enumerate() {
+            let par = cols.as_ref().map_or(c, |cols| cols[c]);
             fdm[par] = fdm[par] + f1 * sum;
             mdm[par] = mdm[par] + m1 * sum;
         }

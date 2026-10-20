@@ -512,6 +512,26 @@ struct FullScale<R, const D: usize> {
     moving: Arc<Image<R, D>>,
 }
 
+/// The observer's copy of a composite's transforms (`CreateAnother()`, `SetParameters`, then
+/// `SetFixedParameters`): a new displacement field transform has no field when its
+/// parameters are set, and `SetParameters` throws.
+fn field_copy_check<R: Real, const D: usize>(transforms: &[Xfm<R, D>]) -> Result<(), ItkException> {
+    for t in transforms {
+        if let Xfm::Field(f) = t {
+            return Err(ItkException::new(
+                "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.h",
+                281,
+                f.class(),
+                format!(
+                    "Input parameters size ({}) does not match internal size (0).",
+                    t.number_of_parameters()
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// ANTs' iteration observer of a linear stage (`antsRegistrationOptimizerCommandIterationUpdate`).
 struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     log: &'l mut Log<'a>,
@@ -589,6 +609,13 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
         if let Some(f) = &self.full_scale
             && due(f.interval)
         {
+            // UpdateFullScaleMetricValue copies the fixed composite's and the moving
+            // composite's transforms (CreateAnother, SetParameters, SetFixedParameters): a
+            // displacement field has no field yet when its parameters are set, and throws.
+            if let Some(fixed) = &self.fixed_initial {
+                field_copy_check(&fixed.transforms)?;
+            }
+            field_copy_check(&_problem.moving.transforms)?;
             let mut printed = Vec::new();
             full_scale_value = larmorx_registration::method::full_scale_cc(
                 &f.fixed,
@@ -604,6 +631,8 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             }
         }
         if due(self.write_interval) {
+            // WriteIntervalVolumes copies the moving composite's transforms first.
+            field_copy_check(&_problem.moving.transforms)?;
             let name = format!(
                 "{}Stage{}_level{}_Iter{:04}.nii.gz",
                 self.prefix,

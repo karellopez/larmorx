@@ -929,6 +929,9 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         warnings: &mut Vec<String>,
     ) -> Result<PointSetValue<R>, ItkException> {
         let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, warnings)?;
+        if moving.active().has_local_support() {
+            return self.local_value_and_derivative(moving, &virt, &fixed_t, valid, warnings);
+        }
         let np = moving.number_of_parameters();
         let mut thread = CompensatedSum::default();
         let mut sums = vec![CompensatedSum::default(); np];
@@ -976,6 +979,66 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             .map(|s| R::from_f64(add_thread(s).sum() / n.to_f64()))
             .collect();
         value = value / n;
+        Ok(PointSetValue { value, derivative })
+    }
+
+    /// `GetValueAndDerivative()` with a moving transform of local support (a displacement
+    /// field a stage optimises): each point's derivative turned by the composite's Jacobian
+    /// (`D` local parameters) and added at the virtual voxel nearest its virtual position
+    /// (`StorePointDerivative`), not averaged.
+    fn local_value_and_derivative(
+        &mut self,
+        moving: &Composite<R, D>,
+        virt: &[[f32; D]],
+        fixed_t: &[[f32; D]],
+        valid: usize,
+        warnings: &mut Vec<String>,
+    ) -> Result<PointSetValue<R>, ItkException> {
+        let n_all = moving.number_of_parameters();
+        let mut derivative = vec![R::ZERO; n_all];
+        let mut thread = CompensatedSum::default();
+        let mut jac = [R::ZERO; 16];
+        let space = self
+            .virtual_space
+            .clone()
+            .expect("a point-set metric has a virtual domain");
+        for index in 0..fixed_t.len() {
+            if !self.takes_part(index, virt) {
+                continue;
+            }
+            let (v, local) = match &self.inputs {
+                PointSetInputs::Labeled { .. } => self
+                    .label_metric(index, 116)?
+                    .value_and_derivative(&fixed_t[index], warnings),
+                PointSetInputs::Intensity { fixed, moving: m } => {
+                    self.igdm_value_and_derivative(&fixed_t[index], &fixed.data[index], m)?
+                }
+            };
+            thread.add(v.to_f64());
+            let vp: [R; D] = std::array::from_fn(|k| R::from_f64(f64::from(virt[index][k])));
+            moving.jacobian(&vp, &mut jac[..D * D]);
+            let transformed: [R; D] = std::array::from_fn(|par| {
+                let mut s = R::ZERO;
+                for d in 0..D {
+                    s = s + jac[d * D + par] * local[d];
+                }
+                s
+            });
+            let q: [f64; D] = std::array::from_fn(|k| f64::from(virt[index][k]));
+            let o = space.offset(&space.point_to_index(&q)) * D;
+            for d in 0..D {
+                derivative[o + d] = derivative[o + d] + transformed[d];
+            }
+        }
+        let total = add_thread(&thread);
+        if valid == 0 {
+            warnings.push(self.no_valid_points());
+            return Ok(PointSetValue {
+                value: R::MAX,
+                derivative: vec![R::ZERO; n_all],
+            });
+        }
+        let value = R::from_f64(total.sum()) / R::from_i64(valid as i64);
         Ok(PointSetValue { value, derivative })
     }
 

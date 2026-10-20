@@ -112,12 +112,12 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 |---|---|---|---|
 | NIfTI-1/2 I/O | `lx.load`, `lx.save`, `lx.Image` | own implementation | [252 files](docs/validation/nifti-io.md), data bit-identical to nibabel; [4–8× faster](docs/benchmarks/nifti-io.md) on compressed writes with threads |
 | antsApplyTransforms | `larmorx ants antsApplyTransforms`, `lx.ants.apply_transforms` | port (ANTs/ITK) | [220 cases](docs/validation/ants-apply-transforms.md): 160 of 174 compared bit-identical to ANTs, the rest differ only through glibc's maths |
-| ITK transform files (`.mat`, `.txt`, `.h5`) | `lx.transforms` | port (ITK, HDF5) | [144 cases](docs/validation/itk-hdf5.md), 0 failures; HDF5 read and written in pure Rust |
+| ITK transform files (`.mat`, `.txt`, `.h5`) | `lx.transforms` | port (ITK, HDF5) | [149 cases](docs/validation/itk-hdf5.md), 0 failures; HDF5 read and written in pure Rust |
 | N4BiasFieldCorrection | `larmorx ants N4BiasFieldCorrection`, `lx.ants.n4_bias_field_correction` | port | [29 of 45](docs/validation/ants-n4.md) bit-identical to ANTs, 45 of 45 with correctly rounded maths |
 | DenoiseImage | `larmorx ants DenoiseImage`, `lx.ants.denoise_image` | port | [7 of 40](docs/validation/ants-denoise.md) bit-identical to ANTs, 40 of 40 with correctly rounded maths |
 | ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call) | `larmorx ants ImageMath`, `lx.ants.image_math` | port | [327 cases](docs/validation/ants-image-math.md): values bit-identical in 296 of 301, headers in 301 of 301 |
 | ThresholdImage, MultiplyImages, SmoothImage, ResampleImage, ResampleImageBySpacing | `larmorx ants ...` | port | bit-identical in every compared case ([threshold](docs/validation/ants-threshold-image.md), [multiply](docs/validation/ants-multiply-images.md), [smooth](docs/validation/ants-smooth-image.md), [resample](docs/validation/ants-resample-image.md), [by spacing](docs/validation/ants-resample-image-by-spacing.md)) |
-| antsRegistration (linear stages, image and point-set metrics) | `larmorx ants antsRegistration`, `lx.ants.registration` | port | [224 cases](docs/validation/ants-registration.md): 145 of 169 compared identical to ANTs (outputs and messages), 24 more with correctly rounded maths; deformable stages planned |
+| antsRegistration (linear and SyN stages, image and point-set metrics) | `larmorx ants antsRegistration`, `lx.ants.registration` | port | [298 cases](docs/validation/ants-registration.md): 193 of 225 compared identical to ANTs (outputs and messages), 32 more with correctly rounded maths; the other deformable stages planned |
 | antsAI, antsAffineInitializer | `larmorx ants antsAI`, `larmorx ants antsAffineInitializer` | port | [antsAI](docs/validation/ants-ai.md): 51 of 52 compared identical; [antsAffineInitializer](docs/validation/ants-affine-initializer.md): 26 of 26 |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original; exact replica in `larmorx-gpl` | original: [279 of 279](docs/validation/afni-tshift.md) compared agree, 176 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [279 of 279](docs/validation/afni-tshift-replica.md) bit-identical |
@@ -127,7 +127,7 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 
 The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 
-1. **ANTs:** antsRegistration's deformable stages (SyN and the others), then Atropos.
+1. **ANTs:** antsRegistration's remaining deformable stages (BSplineSyN, displacement-field, velocity-field and exponential transforms), then Atropos.
 2. **AFNI:** 3dUnifize and 3dAutomask (fMRIPrep's BOLD reference), then 3dQwarp, 3dSkullStrip,
    3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit,
    3dFWHMx/3dClustSim, ...).

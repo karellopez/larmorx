@@ -227,6 +227,166 @@ impl<R: Real> Mattes<R> {
         Ok(())
     }
 
+    /// `GetValueAndDerivative` for a transform of local support (SyN's identity field): each
+    /// point's four B-spline derivative contributions `Σ_dim J[dim][mu]·∇m[dim] · β′` are kept
+    /// per moving bin at its voxel (`m_LocalDerivativeByParzenBin`), with the joint
+    /// histogram's row-and-column index of its first bin (`m_JointPdfIndex1DArray`); after the
+    /// histogram, each entry of the derivative subtracts, for each of the four bins,
+    /// its contribution times `log(p(f,m)/p(m)) / (binSize·N)` of that bin (`m_PRatioArray`, 0
+    /// for empty bins). Points outside the virtual region (ITK writes outside its arrays)
+    /// keep only their histogram contribution.
+    pub fn evaluate_local<const D: usize>(
+        &self,
+        m: &ImageMetricv4<R, D>,
+        transform: &Composite<R, D>,
+        floor: &IndexFloor,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        self.check_joint_pdf_spacing()?;
+        let bins = self.bins;
+        let total = D * m.virtual_space.len();
+        let gradients = GradientSource {
+            fixed: false,
+            moving: true,
+        };
+        let mut fixed_marginal = vec![R::ZERO; bins];
+        let mut joint = vec![R::ZERO; bins * bins];
+        let mut pdf_index = vec![0usize; total];
+        let mut by_bin: [Vec<R>; 4] = std::array::from_fn(|_| vec![R::ZERO; total]);
+        let mut valid: usize = 0;
+        let process = |i: usize| -> Option<(Contribution<R>, Option<usize>)> {
+            let s = m.sample(i, transform, gradients, true, floor)?;
+            let mv = s.moving_value;
+            if mv < self.moving_true_min || mv > self.moving_true_max {
+                return None;
+            }
+            let term = mv / self.moving_bin_size - self.moving_normalized_min;
+            let parzen = self.parzen_index(term);
+            let moving_index = parzen - 1;
+            let fterm = s.fixed_value / self.fixed_bin_size - self.fixed_normalized_min;
+            let fixed_index = self.parzen_index(fterm);
+            let mut arg = R::from_i64(moving_index as i64) - term;
+            let mut weights = [R::ZERO; 4];
+            let mut derivatives = [R::ZERO; 4];
+            for b in 0..4 {
+                weights[b] = cubic(arg);
+                derivatives[b] = cubic_derivative(arg);
+                arg = R::from_f64(arg.to_f64() + 1.0);
+            }
+            let mut jac = vec![R::ZERO; D * D];
+            let local: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
+            m.moving_jacobian(transform, &local, &mut jac);
+            let inner = (0..D)
+                .map(|mu| {
+                    let mut ip = R::ZERO;
+                    for dim in 0..D {
+                        ip = ip + jac[dim * D + mu] * s.moving_gradient[dim];
+                    }
+                    ip
+                })
+                .collect();
+            Some((
+                Contribution {
+                    fixed_index,
+                    moving_index,
+                    weights,
+                    derivatives,
+                    inner,
+                },
+                m.voxel_of(&s.virtual_index),
+            ))
+        };
+        m.for_each_sample(process, |(c, voxel)| {
+            fixed_marginal[c.fixed_index] = fixed_marginal[c.fixed_index] + R::ONE;
+            let row = c.fixed_index * bins;
+            if let Some(v) = voxel {
+                for i in 0..D {
+                    pdf_index[v * D + i] = c.moving_index + row;
+                }
+            }
+            for b in 0..4 {
+                let bin = row + c.moving_index + b;
+                joint[bin] = joint[bin] + c.weights[b];
+                if let Some(v) = voxel {
+                    for mu in 0..D {
+                        let cell = &mut by_bin[b][v * D + mu];
+                        *cell = *cell + c.inner[mu] * c.derivatives[b];
+                    }
+                }
+            }
+            valid += 1;
+            Ok(())
+        })?;
+        // GetValueCommonAfterThreadedExecution.
+        let mut sum = CompensatedSum::default();
+        for &v in &joint {
+            sum.add(v.to_f64());
+        }
+        let joint_sum = R::from_f64(sum.sum());
+        // ComputeResults.
+        if valid == 0 {
+            return Err(ItkException::new(
+                FILE,
+                307,
+                CLASS,
+                "All samples map outside moving image buffer. The images do not sufficiently \
+                 overlap. They need to be initialized to have more overlap before this metric \
+                 will work. For instance, you can align the image centers by translation.\n",
+            ));
+        }
+        if joint_sum < R::EPSILON {
+            return Err(ItkException::new(
+                FILE,
+                315,
+                CLASS,
+                "Joint PDF summed to zero",
+            ));
+        }
+        let normalization = R::from_f64(1.0 / joint_sum.to_f64());
+        for v in joint.iter_mut() {
+            *v = *v * normalization;
+        }
+        for v in fixed_marginal.iter_mut() {
+            *v = *v * normalization;
+        }
+        let mut moving_marginal = vec![R::ZERO; bins];
+        for (col, mm) in moving_marginal.iter_mut().enumerate() {
+            let mut s = R::ZERO;
+            let mut i = col;
+            while i < bins * bins {
+                s = s + joint[i];
+                i += bins;
+            }
+            *mm = s;
+        }
+        let close = R::EPSILON;
+        let n_factor =
+            R::from_f64(1.0 / (self.moving_bin_size * R::from_i64(valid as i64)).to_f64());
+        let mut p_ratio = vec![R::ZERO; bins * bins];
+        let mut total_value = R::ZERO;
+        for f in 0..bins {
+            let fm = fixed_marginal[f];
+            if fm > close {
+                let log_fm = fm.ln();
+                for mi in 0..bins {
+                    let mm = moving_marginal[mi];
+                    let j = joint[f * bins + mi];
+                    if mm > close && j > close {
+                        let ratio = (j / mm).ln();
+                        total_value = total_value + j * (ratio - log_fm);
+                        p_ratio[mi + f * bins] = ratio * n_factor;
+                    }
+                }
+            }
+        }
+        let mut derivative = vec![R::ZERO; total];
+        for (i, d) in derivative.iter_mut().enumerate() {
+            for b in 0..4 {
+                *d = *d - by_bin[b][i] * p_ratio[pdf_index[i] + b];
+            }
+        }
+        Ok((R::from_f64(-total_value.to_f64()), derivative))
+    }
+
     /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`: the value and the
     /// derivative (empty without it).
     pub fn evaluate<const D: usize>(
@@ -236,6 +396,9 @@ impl<R: Real> Mattes<R> {
         compute_derivative: bool,
         floor: &IndexFloor,
     ) -> Result<(R, Vec<R>), ItkException> {
+        if m.local_support && compute_derivative {
+            return self.evaluate_local(m, transform, floor);
+        }
         self.check_joint_pdf_spacing()?;
         let bins = self.bins;
         let np = transform.number_of_parameters();

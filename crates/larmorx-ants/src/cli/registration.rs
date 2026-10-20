@@ -50,7 +50,7 @@ use larmorx_io::itk_transform::{
     ItkTransformParts, Parameters, transform_from_parts, write_itk_transform_parts,
 };
 use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry};
-use larmorx_registration::transform::collapse_linear;
+use larmorx_registration::transform::collapse_composite;
 
 /// What ends a run early: the exit status (the messages are already printed).
 type Exit = u8;
@@ -700,6 +700,28 @@ fn load_transform<R: Compute, const D: usize>(
     ctx: &mut Context<'_, '_>,
     name: &str,
 ) -> Result<Vec<Xfm<R, D>>, LoadError> {
+    // `itk::ants::ReadTransform`: a name whose last extension is not a transform file's is read
+    // first as a displacement field image (`ImageFileReader<Image<Vector<R, D>, D>>`).
+    let last_extension = Path::new(name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.rfind('.').map(|i| n[i..].to_owned()))
+        .unwrap_or_default();
+    let recognized = matches!(
+        last_extension.as_str(),
+        ".h5" | ".hdf5" | ".hdf4" | ".mat" | ".txt" | ".xfm"
+    );
+    if !recognized && Path::new(name).exists() {
+        match read_field_image::<R, D>(ctx, name) {
+            Ok(Some(field)) => {
+                return Ok(vec![Xfm::Field(
+                    larmorx_registration::field::FieldXfm::new(field, None, ctx.notices.fix()),
+                )]);
+            }
+            Ok(None) => {}
+            Err(why) => return Err(LoadError::Unsupported(why)),
+        }
+    }
     let parts = larmorx_io::itk_transform::read_itk_transform_parts(
         Path::new(name),
         R::PRECISION,
@@ -748,17 +770,252 @@ fn load_transform<R: Compute, const D: usize>(
     {
         return Err(LoadError::Report(String::new()));
     }
+    let exact_floor = ctx.notices.fix();
     if D != 3 {
         return parts
             .iter()
             .filter(|p| !p.name.starts_with("CompositeTransform"))
-            .map(|p| xfm_from_part::<R, D>(name, p))
+            .map(|p| {
+                if p.name.starts_with("DisplacementFieldTransform") {
+                    field_from_part::<R, D>(name, p, exact_floor)
+                } else {
+                    xfm_from_part::<R, D>(name, p)
+                }
+            })
             .collect();
     }
-    let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
+    if !parts
+        .iter()
+        .any(|p| p.name.starts_with("DisplacementFieldTransform"))
+    {
+        let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
+        let mut flat = Vec::new();
+        flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+        return Ok(flat);
+    }
     let mut flat = Vec::new();
-    flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+    for p in parts
+        .iter()
+        .filter(|p| !p.name.starts_with("CompositeTransform"))
+    {
+        if p.name.starts_with("DisplacementFieldTransform") {
+            flat.push(field_from_part::<R, D>(name, p, exact_floor)?);
+            continue;
+        }
+        let t = transform_from_parts(std::slice::from_ref(p))
+            .map_err(|e| LoadError::Report(format!("{e}\n")))?;
+        flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
+    }
     Ok(flat)
+}
+
+/// A displacement field read as `ImageFileReader<Image<Vector<R, D>, D>>` reads it: `None` for
+/// a file that is not a NIfTI image (ANTs then tries the transform readers); an error for an
+/// image that is not a `D`-dimensional field of `D` components (ITK converts its pixels as
+/// gray, RGB or complex values and ANTs goes on with them; larmorx refuses).
+fn read_field_image<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+) -> Result<Option<larmorx_registration::field::Field<R, D>>, String> {
+    let lower = name.to_ascii_lowercase();
+    if !(lower.ends_with(".nii")
+        || lower.ends_with(".nii.gz")
+        || lower.ends_with(".hdr")
+        || lower.ends_with(".img")
+        || lower.ends_with(".img.gz"))
+    {
+        return Ok(None);
+    }
+    let image = match larmorx_io::nifti::itk::read_itk_image(name, ctx.n_threads) {
+        Ok(i) => i,
+        Err(_) => return Ok(None),
+    };
+    let g = &image.geometry;
+    let n: usize = g.size.iter().product();
+    let components = image.voxels.len() / n.max(1);
+    let reproduce = !ctx.notices.fix();
+    let mismatch = g.ndim < D || components != D;
+    if g.ndim <= D && components != 0 && mismatch && !reproduce {
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_73,
+            format!(
+                "'{name}' ({} dimensions, {components} values per voxel) is not a {D}-dimensional field of {D}-component vectors: refused; ANTs converts its pixels and registers with them",
+                g.ndim
+            ),
+        );
+    }
+    if g.ndim > D || components == 0 || (mismatch && !reproduce) {
+        return Err(format!(
+            "'{name}' is read as a displacement field but it is not a {D}-dimensional image of {D}-component vectors ({} dimensions, {components} values per voxel): ANTs converts its voxels to vectors (as gray, RGB or complex pixels) and registers with that field (ANTS-73); larmorx refuses{}",
+            g.ndim,
+            if g.ndim <= D && components != 0 {
+                " (LARMORX_UPSTREAM_DEFECTS=reproduce converts them as ANTs does)"
+            } else {
+                ""
+            }
+        ));
+    }
+    let raw = |i: usize| -> f64 {
+        match &image.voxels {
+            larmorx_io::nifti::itk::ItkVoxels::F32(v) => f64::from(v[i]),
+            larmorx_io::nifti::itk::ItkVoxels::F64(v) => v[i],
+        }
+    };
+    // NIfTI stores the components as the slowest axis; ITK interleaves them per voxel.
+    let voxel = |v: usize| -> Vec<f64> { (0..components).map(|c| raw(c * n + v)).collect() };
+    let data: Vec<[R; D]> = if !mismatch {
+        (0..n)
+            .map(|v| std::array::from_fn(|c| R::r(raw(c * n + v))))
+            .collect()
+    } else {
+        // ANTS-73 reproduced: ITK's ConvertPixelBuffer from `components` values to `D`.
+        let alpha = default_alpha(name);
+        let mut out: Vec<[R; D]> = (0..n)
+            .map(|v| {
+                let x = voxel(v);
+                let converted = convert_pixel(&x, D, alpha);
+                std::array::from_fn(|c| R::r(converted[c]))
+            })
+            .collect();
+        if D == 4 && components == 2 {
+            // ConvertMultiComponentToRGBA with two components never advances its output: the
+            // first pixel holds the last voxel's conversion, the others are left unset
+            // (uninitialised memory); larmorx sets them to zero.
+            let last = out[n - 1];
+            for v in out.iter_mut() {
+                *v = [R::r(0.0); D];
+            }
+            out[0] = last;
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_73,
+                    format!(
+                        "'{name}' (two values per voxel) read as a 4D field: ITK sets only the first vector and leaves the others uninitialised; larmorx sets them to zero"
+                    ),
+            );
+        } else {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_73,
+                    format!(
+                        "'{name}' ({} dimensions, {components} values per voxel) read as a {D}-dimensional field of {D}-component vectors, converted as ITK converts pixels, as in ANTs",
+                        g.ndim
+                    ),
+            );
+        }
+        out
+    };
+    // An image of fewer dimensions: ImageFileReader gives the missing axes size 1, spacing
+    // 1, origin 0 and the identity direction.
+    let m = g.ndim;
+    let space = Space::new(
+        std::array::from_fn(|k| if k < m { g.size[k] } else { 1 }),
+        [0; D],
+        std::array::from_fn(|k| if k < m { g.spacing[k] } else { 1.0 }),
+        std::array::from_fn(|k| if k < m { g.origin[k] } else { 0.0 }),
+        std::array::from_fn(|i| {
+            std::array::from_fn(|j| {
+                if i < m && j < m {
+                    g.direction[i][j]
+                } else if i == j {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+        }),
+    )
+    .map_err(|e| format!("'{name}': {}", e.description))?;
+    Ok(Some(Image::new(space, data)))
+}
+
+/// `ConvertPixelBuffer::Convert` of one voxel's `x.len()` values into `d` components (ITK
+/// treats 2 components as complex, 3 as RGB, 4 as RGBA): gray to all colour components (and
+/// both complex parts), gray and alpha multiplied for RGB, the first components otherwise;
+/// `alpha` the default alpha of the file's component type.
+fn convert_pixel(x: &[f64], d: usize, alpha: f64) -> Vec<f64> {
+    let c = x.len();
+    match (d, c) {
+        (2, 1) => vec![x[0], x[0]],
+        (2, _) => vec![x[0], x[1]],
+        (3, 1) => vec![x[0]; 3],
+        (3, 2) => vec![x[0] * x[1]; 3],
+        (3, _) => vec![x[0], x[1], x[2]],
+        (4, 1) => vec![x[0], x[0], x[0], alpha],
+        (4, 2) => vec![x[0], x[0], x[0], x[1]],
+        (4, 3) => vec![x[0], x[1], x[2], alpha],
+        (4, _) => vec![x[0], x[1], x[2], x[3]],
+        _ => x.to_vec(),
+    }
+}
+
+/// `DefaultAlphaValue<T>()` of a NIfTI file's component type: 1 for floating-point data (and
+/// for scaled data, which ITK reads as float), the type's maximum for integers.
+fn default_alpha(name: &str) -> f64 {
+    let Ok(h) = larmorx_io::nifti::read_header(name) else {
+        return 1.0;
+    };
+    let scaled =
+        h.scl_slope.is_finite() && h.scl_slope != 0.0 && (h.scl_slope != 1.0 || h.scl_inter != 0.0);
+    if scaled {
+        return 1.0;
+    }
+    match h.datatype {
+        2 => f64::from(u8::MAX),
+        4 => f64::from(i16::MAX),
+        8 => f64::from(i32::MAX),
+        256 => f64::from(i8::MAX),
+        512 => f64::from(u16::MAX),
+        768 => f64::from(u32::MAX),
+        1024 => i64::MAX as f64,
+        1280 => u64::MAX as f64,
+        _ => 1.0,
+    }
+}
+
+/// A `DisplacementFieldTransform` read from a transform file (`SetFixedParameters`: size,
+/// origin, spacing and direction; `SetParameters`: the vectors), without an inverse field.
+fn field_from_part<R: Compute, const D: usize>(
+    file: &str,
+    part: &ItkTransformParts,
+    exact_floor: bool,
+) -> Result<Xfm<R, D>, LoadError> {
+    let fixed = &part.fixed_parameters;
+    if fixed.len() != D * (D + 3) {
+        return Err(LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {} fixed parameters, {} expected\n",
+            part.name,
+            fixed.len(),
+            D * (D + 3)
+        )));
+    }
+    let size: [usize; D] = std::array::from_fn(|k| fixed[k] as usize);
+    let space = Space::new(
+        size,
+        [0; D],
+        std::array::from_fn(|k| fixed[2 * D + k]),
+        std::array::from_fn(|k| fixed[D + k]),
+        std::array::from_fn(|i| std::array::from_fn(|j| fixed[3 * D + i * D + j])),
+    )
+    .map_err(|e| LoadError::Report(format!("{}\n", e.description)))?;
+    let p = part.parameters.to_f64();
+    if p.len() != D * space.len() {
+        return Err(LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}: {} parameters, {} expected\n",
+            part.name,
+            p.len(),
+            D * space.len()
+        )));
+    }
+    let data = p
+        .as_chunks::<D>()
+        .0
+        .iter()
+        .map(|c| std::array::from_fn(|k| R::r(c[k])))
+        .collect();
+    Ok(Xfm::Field(larmorx_registration::field::FieldXfm::new(
+        Image::new(space, data),
+        None,
+        exact_floor,
+    )))
 }
 
 /// One stored transform in 2 or 4 dimensions, as ITK's reader builds it (`SetParameters`,
@@ -887,6 +1144,7 @@ fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
             offset: std::array::from_fn(|i| -offset[i]),
         }),
         Xfm::Linear(l) => l.inverse().map(Xfm::Linear),
+        Xfm::Field(f) => f.inverse_transform().map(Xfm::Field),
     }
 }
 
@@ -1034,10 +1292,58 @@ fn do_registration<R: Compute, const D: usize>(
         if log.verbose {
             log.cout("+\n");
         }
-        helper.composite = Some(itk_clones(
-            log,
-            restored.into_iter().map(|i| i.transform).collect(),
-        )?);
+        let queue = itk_clones(log, restored.into_iter().map(|i| i.transform).collect())?;
+        // SetRestoreStateTransform: if the last four transforms are displacement fields (SyN's
+        // fixed-to-middle and moving-to-middle fields, each followed by its inverse), they
+        // become the registration state's two transforms, and the composite ends with SyN's
+        // output transform built from them. ANTs tests the categories from the last one on
+        // and stops at the first that is not a field.
+        let n = queue.len();
+        let mut four = true;
+        for k in 1..=4 {
+            if k > n {
+                return Err(refuse(
+                    log,
+                    "a restored state of fewer than four transforms ending with displacement fields: ANTs reads before the start of its transform queue and crashes",
+                ));
+            }
+            if !matches!(queue[n - k], Xfm::Field(_)) {
+                four = false;
+                break;
+            }
+        }
+        if four {
+            let field = |t: &Xfm<R, D>| match t {
+                Xfm::Field(f) => Arc::clone(&f.field),
+                _ => unreachable!("tested above"),
+            };
+            let exact = ctx.notices.fix();
+            let f2m = larmorx_registration::field::FieldXfm {
+                field: field(&queue[n - 4]),
+                inverse: Some(field(&queue[n - 3])),
+                exact_floor: exact,
+            };
+            let m2m = larmorx_registration::field::FieldXfm {
+                field: field(&queue[n - 2]),
+                inverse: Some(field(&queue[n - 1])),
+                exact_floor: exact,
+            };
+            log.logger(
+                "Initial FixedToMiddle and MovingToMiddle transforms are restored from the registration state file.\n",
+            );
+            let floor = IndexFloor::new(ctx.notices.mode());
+            let output = larmorx_registration::syn::output_transform(&f2m, &m2m, &floor);
+            let mut state: Vec<Xfm<R, D>> = queue[..n - 4].to_vec();
+            let mut composite = state.clone();
+            state.push(Xfm::Field(f2m));
+            state.push(Xfm::Field(m2m));
+            composite.push(Xfm::Field(output));
+            helper.registration_state = Some(state);
+            helper.composite = Some(composite);
+        } else {
+            helper.registration_state = None;
+            helper.composite = Some(queue);
+        }
         if log.verbose {
             log.cout("+\n");
         }
@@ -1179,13 +1485,20 @@ fn do_registration<R: Compute, const D: usize>(
             );
             return Err(1);
         };
+        let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
         if !method.is_linear() {
-            parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
-            deformable.get_or_insert(method);
+            let variances = parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+            if method == XfrmMethod::SyN {
+                // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
+                // floats read by the parser, held as RealType.
+                let (update, total) = variances.unwrap_or((3.0, 0.0));
+                transform_method.update_field_variance = R::r(f64::from(update));
+                transform_method.total_field_variance = R::r(f64::from(total));
+            } else {
+                deformable.get_or_insert(method);
+            }
         }
-        helper
-            .transforms
-            .push(TransformMethod::linear(method, R::r(f64::from(step))));
+        helper.transforms.push(transform_method);
     }
     helper.output_prefix = prefix.clone();
     // The metrics, oldest first.
@@ -1285,10 +1598,17 @@ fn do_registration<R: Compute, const D: usize>(
         helper.metrics.push(metric);
     }
     if let Some(method) = deformable {
+        let part = match method {
+            XfrmMethod::BSplineSyN
+            | XfrmMethod::BSpline
+            | XfrmMethod::GaussianDisplacementField
+            | XfrmMethod::BSplineDisplacementField => "A5 part 2",
+            _ => "A5 part 3",
+        };
         return Err(refuse(
             log,
             &format!(
-                "{} stages are deformable registration, which larmorx ports in milestone A5; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine) only",
+                "{} stages are deformable registration that larmorx ports in milestone {part}; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine) and SyN",
                 method.as_str()
             ),
         ));
@@ -1536,7 +1856,7 @@ fn parse_deformable(
     t: &OptionValue,
     method: XfrmMethod,
     all: &[OptionValue],
-) -> Result<(), ItkException> {
+) -> Result<Option<(f32, f32)>, ItkException> {
     let n = t.parameters.len();
     match method {
         XfrmMethod::GaussianDisplacementField => {
@@ -1572,12 +1892,15 @@ fn parse_deformable(
             }
         }
         XfrmMethod::SyN => {
+            let mut update = 3.0f32;
+            let mut total = 0.0f32;
             if n > 1 {
-                Conv::f32(param(t, 1))?;
+                update = Conv::f32(param(t, 1))?;
             }
             if n > 2 {
-                Conv::f32(param(t, 2))?;
+                total = Conv::f32(param(t, 2))?;
             }
+            return Ok(Some((update, total)));
         }
         XfrmMethod::BSplineSyN => {
             if n > 3 {
@@ -1617,7 +1940,7 @@ fn parse_deformable(
     }
     let _ = atof;
     let _ = Conv::u16;
-    Ok(())
+    Ok(None)
 }
 
 /// `ReadImage<MaskImageType>` (`unsigned char`).
@@ -1756,6 +2079,9 @@ fn chain_of<R: Compute, const D: usize>(
     for t in queue.iter().rev() {
         let (name, parameters, fixed) = match t {
             Xfm::Identity => continue,
+            Xfm::Field(_) => {
+                return Err("a displacement field goes through the per-voxel resampler".into());
+            }
             Xfm::Translation { offset } => (
                 "TranslationTransform_double_3_3".to_owned(),
                 offset.iter().map(|v| v.to_f64()).collect::<Vec<_>>(),
@@ -1796,10 +2122,11 @@ fn resample<R: Compute, const D: usize>(
     interpolation: &OutputInterpolation<D>,
     ctx: &mut Context<'_, '_>,
 ) -> Result<Vec<R>, String> {
-    if D != 3 {
+    let nonlinear = queue.iter().any(|t| !t.is_linear());
+    if D != 3 || nonlinear {
         use larmorx_interp::Interpolation as I;
         use larmorx_interp::nd::InterpolationNd as N;
-        use larmorx_registration::resample::{Interpolator, resample_linear};
+        use larmorx_registration::resample::{Interpolator, resample_linear, resample_nonlinear};
         let sigma = interpolation.sigma;
         let interpolator = match &interpolation.method {
             I::Linear => Interpolator::Linear,
@@ -1820,7 +2147,12 @@ fn resample<R: Compute, const D: usize>(
         let floor = IndexFloor::new(ctx.notices.mode());
         let composite = Composite::new(queue.to_vec());
         let data = larmorx_core::parallel::with_threads(ctx.n_threads, || {
-            resample_linear(
+            let run = if nonlinear {
+                resample_nonlinear::<R, D>
+            } else {
+                resample_linear::<R, D>
+            };
+            run(
                 input,
                 &reference.space,
                 &composite,
@@ -1914,16 +2246,171 @@ fn output_image<R: Compute, const D: usize>(reference: &Image<R, D>, data: Vec<R
     }
 }
 
-/// `RegTypeToFileName` for the linear transforms (without MINC).
+/// `RegTypeToFileName` (without MINC).
 fn file_suffix(kind: &str) -> &'static str {
     match kind {
         "rigid" => "Rigid.mat",
         "affine" | "compositeaffine" | "compaff" => "Affine.mat",
         "similarity" => "Similarity.mat",
         "translation" => "Translation.mat",
+        "bspline" | "ffd" => "BSpline.txt",
         "genericaffine" => "GenericAffine.mat",
+        "gaussiandisplacementfield"
+        | "gdf"
+        | "bsplinedisplacementfield"
+        | "dmffd"
+        | "syn"
+        | "symmetricnormalization"
+        | "bsplinesyn"
+        | "exp"
+        | "exponential"
+        | "bsplineexponential"
+        | "timevaryingvelocityfield"
+        | "tvf"
+        | "timevaryingbsplinevelocityfield"
+        | "tvdmffd" => "Warp.nii.gz",
         _ => "BOGUS.XXXX",
     }
+}
+
+/// `RegTypeToFileName`'s `writeInverse`.
+fn writes_inverse(kind: &str) -> bool {
+    matches!(
+        kind,
+        "syn"
+            | "symmetricnormalization"
+            | "bsplinesyn"
+            | "timevaryingbsplinevelocityfield"
+            | "tvdmffd"
+            | "timevaryingvelocityfield"
+            | "tvf"
+            | "exponential"
+            | "bsplineexponential"
+    )
+}
+
+/// A displacement field as ITK's `ImageFileWriter<Image<Vector<R, D>, D>>` writes it (a NIfTI
+/// vector image); on failure ANTs' "Can't write transform file" report.
+fn write_field_image<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+    field: &larmorx_registration::field::Field<R, D>,
+) {
+    let s = &field.space;
+    let geometry = ItkGeometry {
+        ndim: D,
+        size: s.size.to_vec(),
+        spacing: s.spacing.to_vec(),
+        origin: s.origin.to_vec(),
+        direction: s.direction.iter().map(|r| r.to_vec()).collect(),
+        source: GeometrySource::Sform,
+        flipped: vec![false; D],
+    };
+    let options = larmorx_io::nifti::WriteOptions {
+        n_threads: ctx.n_threads,
+        ..Default::default()
+    };
+    let meta = larmorx_io::nifti::itk::ItkMeta::default();
+    let written = match R::PRECISION {
+        Precision::Double => {
+            let data: Vec<f64> = field.data.iter().flatten().map(|v| v.to_f64()).collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(
+                name, &geometry, D, &meta, &data, &options,
+            )
+        }
+        Precision::Float => {
+            let data: Vec<f32> = field
+                .data
+                .iter()
+                .flatten()
+                .map(|v| v.to_f64() as f32)
+                .collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(
+                name, &geometry, D, &meta, &data, &options,
+            )
+        }
+    };
+    if let Err(e) = written {
+        log.cerr(&format!(
+            "Can't write transform file {name}\nException Object caught: \n{e}\n\n"
+        ));
+    }
+}
+
+/// `itk::ants::WriteTransform` of one transform: a displacement field goes to an image unless
+/// the name holds `.mat`, `.txt` (then ITK's transform writer), `.xfm`, `.h5`, `.hdf5` or
+/// `.hdf4` (a `DisplacementFieldTransform` in a transform file); other transforms to transform
+/// files.
+fn write_one_transform<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+    t: &Xfm<R, D>,
+) {
+    if let Xfm::Field(f) = t
+        && !name.contains(".mat")
+        && !name.contains(".txt")
+        && !name.contains(".xfm")
+        && !name.contains(".h5")
+        && !name.contains(".hdf5")
+        && !name.contains(".hdf4")
+    {
+        write_field_image(log, ctx, name, &f.field);
+        return;
+    }
+    write_transform_file(log, ctx.notices, name, &[xfm_parts(&forward_only(t))]);
+}
+
+/// The transform ANTs' writers store for a displacement field: a new
+/// `DisplacementFieldTransform` given only the forward field.
+fn forward_only<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Xfm<R, D> {
+    match t {
+        Xfm::Field(f) => Xfm::Field(larmorx_registration::field::FieldXfm {
+            field: Arc::clone(&f.field),
+            inverse: None,
+            exact_floor: f.exact_floor,
+        }),
+        other => other.clone(),
+    }
+}
+
+/// `itk::ants::WriteInverseTransform`: a displacement field's inverse field, as an image (or a
+/// transform file for `.xfm`, `.h5`, `.hdf5`, `.hdf4` names).
+fn write_inverse_field<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+    f: &larmorx_registration::field::FieldXfm<R, D>,
+) {
+    let Some(inverse) = &f.inverse else {
+        // The writer is given a null image.
+        let e = ItkException::new(
+            "Modules/IO/ImageBase/include/itkImageFileWriter.hxx",
+            89,
+            "ImageFileWriter",
+            "No input to writer!",
+        );
+        log.cerr(&format!(
+            "Can't write transform file {name}\nException Object caught: \n{}\n",
+            e.print()
+        ));
+        return;
+    };
+    if !name.contains(".xfm")
+        && !name.contains(".h5")
+        && !name.contains(".hdf5")
+        && !name.contains(".hdf4")
+    {
+        write_field_image(log, ctx, name, inverse);
+        return;
+    }
+    let t = Xfm::Field(larmorx_registration::field::FieldXfm {
+        field: Arc::clone(inverse),
+        inverse: None,
+        exact_floor: f.exact_floor,
+    });
+    write_transform_file(log, ctx.notices, name, &[xfm_parts(&t)]);
 }
 
 /// `itk::ants::WriteTransform` of `parts` to `name`: a failure is reported and the run goes
@@ -2073,28 +2560,83 @@ fn write_transforms<R: Compute, const D: usize>(
     queue: &[Xfm<R, D>],
 ) -> Result<Exit, Exit> {
     let p = ctx.p;
-    if let Some(state) = p.last("save-state") {
-        // ANTs sets the registration state in SyN stages only: after linear stages it finds
-        // none and returns EXIT_FAILURE, writing no transform (ANTS-50). Corrected, the state
-        // is the composite of every transform, as the option's description says.
-        if ctx.notices.reproduce() {
-            ctx.notices.add(
-                &larmorx_core::defects::ANTS_50,
-                "no state after linear stages: exit 1, no transform written, as in ANTs",
-            );
-            return Err(1);
-        }
+    // ANTS-74: the registration state is set by SyN stages (and --restore-state) only, so after
+    // linear stages that follow them ANTs saves a state without those stages.
+    let last_is_syn = helper
+        .transforms
+        .last()
+        .is_some_and(|t| t.method == XfrmMethod::SyN);
+    let stale = helper.registration_state.is_some() && !last_is_syn;
+    if p.last("save-state").is_some() && stale {
         ctx.notices.add(
-            &larmorx_core::defects::ANTS_50,
-            "the state is written (every transform of the registration); ANTs exits 1 here",
+            &larmorx_core::defects::ANTS_74,
+            if ctx.notices.fix() {
+                "the saved state holds every transform of the registration; ANTs saves the last SyN stage's state (or the restored one) without the linear stages after it"
+            } else {
+                "the saved state is the last SyN stage's (or the restored one), without the linear stages after it, as in ANTs"
+            },
         );
+    }
+    if let Some(state) = p.last("save-state")
+        && let Some(saved) = &helper.registration_state
+        && !(stale && ctx.notices.fix())
+    {
+        // The registration state of the last SyN stage (or of --restore-state): if its last two
+        // transforms are displacement fields with inverses (SyN's fixed-to-middle and
+        // moving-to-middle transforms), each is followed by its inverse.
+        let mut queue = saved.clone();
+        let n = queue.len();
+        if n >= 2
+            && let (Xfm::Field(f), Xfm::Field(m)) = (&queue[n - 2], &queue[n - 1])
+            && f.inverse.is_some()
+            && m.inverse.is_some()
+        {
+            let (f, m) = (f.clone(), m.clone());
+            queue.truncate(n - 2);
+            queue.push(Xfm::Field(f.clone()));
+            queue.push(Xfm::Field(f.inverse_transform().expect("an inverse")));
+            queue.push(Xfm::Field(m.clone()));
+            queue.push(Xfm::Field(m.inverse_transform().expect("an inverse")));
+        }
         let mut parts = vec![ItkTransformParts {
             name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
             parameters: Parameters::F64(Vec::new()),
             fixed_parameters: Vec::new(),
         }];
-        parts.extend(queue.iter().map(xfm_parts));
+        parts.extend(queue.iter().map(|t| xfm_parts(&forward_only(t))));
         write_transform_file(log, ctx.notices, &state.name, &parts);
+    } else if let Some(state) = p.last("save-state") {
+        // ANTs sets the registration state in SyN stages only: after linear stages it finds
+        // none and returns EXIT_FAILURE, writing no transform (ANTS-50). Corrected, the state
+        // is the composite of every transform, as the option's description says (and so after
+        // linear stages that follow a SyN stage, ANTS-74).
+        if stale {
+            let mut parts = vec![ItkTransformParts {
+                name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
+                parameters: Parameters::F64(Vec::new()),
+                fixed_parameters: Vec::new(),
+            }];
+            parts.extend(queue.iter().map(|t| xfm_parts(&forward_only(t))));
+            write_transform_file(log, ctx.notices, &state.name, &parts);
+        } else if ctx.notices.reproduce() {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_50,
+                "no state after linear stages: exit 1, no transform written, as in ANTs",
+            );
+            return Err(1);
+        } else {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_50,
+                "the state is written (every transform of the registration); ANTs exits 1 here",
+            );
+            let mut parts = vec![ItkTransformParts {
+                name: format!("CompositeTransform_{}_{D}_{D}", R::ITK_NAME),
+                parameters: Parameters::F64(Vec::new()),
+                fixed_parameters: Vec::new(),
+            }];
+            parts.extend(queue.iter().map(xfm_parts));
+            write_transform_file(log, ctx.notices, &state.name, &parts);
+        }
     }
     if minc {
         return Err(refuse(
@@ -2103,8 +2645,22 @@ fn write_transforms<R: Compute, const D: usize>(
         ));
     }
     let (to_write, names): (Vec<Xfm<R, D>>, Vec<String>) = if collapse {
-        match collapse_linear(queue) {
-            Some(t) => (vec![Xfm::Linear(t)], vec!["genericaffine".into()]),
+        let floor = IndexFloor::new(ctx.notices.mode());
+        match collapse_composite(queue, &floor) {
+            Some(ts) => {
+                // The names by category: linear transforms are generic affine ones, fields
+                // with an inverse are named as SyN's, without one as a Gaussian
+                // displacement field's.
+                let names = ts
+                    .iter()
+                    .map(|t| match t {
+                        Xfm::Field(f) if f.inverse.is_some() => "syn".to_owned(),
+                        Xfm::Field(_) => "gdf".to_owned(),
+                        _ => "genericaffine".to_owned(),
+                    })
+                    .collect();
+                (ts, names)
+            }
             None => {
                 return Err(refuse(
                     log,
@@ -2127,12 +2683,12 @@ fn write_transforms<R: Compute, const D: usize>(
             fixed_parameters: Vec::new(),
         };
         let mut parts = vec![head.clone()];
-        parts.extend(to_write.iter().map(xfm_parts));
+        parts.extend(to_write.iter().map(|t| xfm_parts(&forward_only(t))));
         write_transform_file(log, ctx.notices, &format!("{prefix}Composite.h5"), &parts);
         let inverse: Option<Vec<Xfm<R, D>>> = to_write.iter().rev().map(invert_xfm).collect();
         if let Some(inverse) = inverse {
             let mut parts = vec![head];
-            parts.extend(inverse.iter().map(xfm_parts));
+            parts.extend(inverse.iter().map(|t| xfm_parts(&forward_only(t))));
             write_transform_file(
                 log,
                 ctx.notices,
@@ -2141,8 +2697,16 @@ fn write_transforms<R: Compute, const D: usize>(
             );
         }
     } else if collapse {
-        let name = format!("{prefix}0{}", file_suffix("genericaffine"));
-        write_transform_file(log, ctx.notices, &name, &[xfm_parts(&to_write[0])]);
+        for (i, (t, kind)) in to_write.iter().zip(&names).enumerate() {
+            let name = format!("{prefix}{i}{}", file_suffix(kind));
+            write_one_transform(log, ctx, &name, t);
+            if writes_inverse(kind)
+                && let Xfm::Field(f) = t
+            {
+                let name = format!("{prefix}{i}Inverse{}", file_suffix(kind));
+                write_inverse_field(log, ctx, &name, f);
+            }
+        }
     } else {
         // ANTs: skip as many transforms as there are -r options, then name each file after
         // the next stage (ANTS-51). Corrected: every transform a stage computed, named after
@@ -2187,7 +2751,13 @@ fn write_transforms<R: Compute, const D: usize>(
         };
         for (i, kind) in &files {
             let name = format!("{prefix}{i}{}", file_suffix(kind));
-            write_transform_file(log, ctx.notices, &name, &[xfm_parts(&to_write[*i])]);
+            write_one_transform(log, ctx, &name, &to_write[*i]);
+            if writes_inverse(kind)
+                && let Xfm::Field(f) = &to_write[*i]
+            {
+                let name = format!("{prefix}{i}Inverse{}", file_suffix(kind));
+                write_inverse_field(log, ctx, &name, f);
+            }
         }
         if runs_out && ctx.notices.reproduce() {
             log.cerr(

@@ -6,6 +6,7 @@ linear stage, found while porting them (milestone A4, part 2; the point-set metr
 [ants-registration](../validation/ants-registration.md), the API page
 [ants-registration](../api/ants-registration.md). How ANTs parses its command line is in
 [ants-cli.md](ants-cli.md); ITK's transform classes in [itk-transforms.md](itk-transforms.md).
+The SyN stages (milestone A5, part 1) are in [ants-syn.md](ants-syn.md).
 
 ## In short
 

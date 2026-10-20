@@ -88,6 +88,102 @@ fn generic_label<R: Real, const D: usize>(
     best_label
 }
 
+/// `ResampleImageFilter::NonlinearThreadedGenerateData` (a transform that is not linear: a
+/// composite holding a displacement field): for each output voxel, its physical point (double)
+/// mapped by `transform` (a point of `R`), turned into a continuous index of the input in `R`;
+/// inside the input's buffer the value `evaluate` gives there, else `default`. In parallel,
+/// in output order.
+pub fn resample_nonlinear_with<R: Real, const D: usize, T: Copy + Send + Sync>(
+    input: &Space<D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+    default: T,
+    evaluate: impl Fn(&[R; D]) -> T + Sync,
+) -> Vec<T> {
+    (0..output.len())
+        .into_par_iter()
+        .map(|o| {
+            let idx = output.index_of(o);
+            let p = output.index_to_point(&idx);
+            let pr: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
+            let q = transform.transform_point(&pr);
+            let qf: [f64; D] = std::array::from_fn(|k| q[k].to_f64());
+            let c = input.point_to_cindex::<R>(&qf);
+            if input.is_inside_buffer(&c) {
+                evaluate(&c)
+            } else {
+                default
+            }
+        })
+        .collect()
+}
+
+/// `ResampleImageFilter<Image<unsigned char>, Image<unsigned char>, R>` with
+/// `NearestNeighborInterpolateImageFunction` and default 0, through a transform that is not
+/// linear (SyN's resampled masks): the voxel at the continuous index rounded half up.
+pub fn resample_mask_nearest<R: Real, const D: usize>(
+    mask: &Image<u8, D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+) -> Image<u8, D> {
+    let data = resample_nonlinear_with(&mask.space, output, transform, 0u8, |c| {
+        let idx: [i64; D] = std::array::from_fn(|k| c[k].itk_round_half_up());
+        mask.data[mask.space.offset(&idx)]
+    });
+    Image::new(output.clone(), data)
+}
+
+/// [`resample_linear`] for a transform that is not linear (per voxel,
+/// [`resample_nonlinear_with`]).
+pub fn resample_nonlinear<R: Real, const D: usize>(
+    input: &Image<R, D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+    interpolator: &Interpolator<D>,
+    default: R,
+    floor: &IndexFloor,
+) -> Result<Vec<R>, String> {
+    if output.is_empty() {
+        return Ok(Vec::new());
+    }
+    let other = match interpolator {
+        Interpolator::Other(method) => Some(
+            InterpolatorNd::with_precision(
+                &input.data,
+                input.space.size,
+                method,
+                input.space.spacing,
+                R::PRECISION,
+            )
+            .map_err(|e| e.to_string())?,
+        ),
+        _ => None,
+    };
+    let data = &input.data;
+    let space = &input.space;
+    Ok(resample_nonlinear_with(
+        space,
+        output,
+        transform,
+        default,
+        |c| match (interpolator, &other) {
+            (Interpolator::Linear, _) => {
+                cast(at_cindex_with(space, c, floor, |o| data[o].to_f64()))
+            }
+            (Interpolator::NearestNeighbor, _) => {
+                let idx: [i64; D] = std::array::from_fn(|k| c[k].itk_round_half_up());
+                cast(data[space.offset(&idx)].to_f64())
+            }
+            (Interpolator::GenericLabel, _) => cast(generic_label(input, c, floor)),
+            (Interpolator::Other(_), Some(interp)) => {
+                let ci: [f64; D] = std::array::from_fn(|k| c[k].to_f64() - space.start[k] as f64);
+                cast(interp.evaluate(ci, floor))
+            }
+            (Interpolator::Other(_), None) => unreachable!("prepared above"),
+        },
+    ))
+}
+
 /// `input` resampled onto `output` through `transform` (a linear composite), with
 /// `interpolator` and the value `default` outside the input. Fails where the interpolator
 /// cannot be built (a B-spline order above 5, a non-positive Gaussian sigma or alpha).

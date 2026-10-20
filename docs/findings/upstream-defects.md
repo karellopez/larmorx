@@ -116,6 +116,10 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-68 | antsRegistration IGDM | the derivative lacks the Gaussians' `1/σ²` factors, so it is not the value's gradient and its two terms are weighed by `σ²` | c? | none | reproduces | decide |
 | ANTS-69 | antsRegistration point sets | crashes and a hang: no fixed mask, warped outputs, `--print-similarity-measure-interval` or `--write-interval-volumes` with a point-set metric first, an unreadable point set, image sampling in a stage with a point-set metric, NaN parameters; a text file with a word among its numbers loops forever | a | none | refuses with a message where ANTs crashes (its output up to there); refuses a hanging read | – |
 | ANTS-70 | antsRegistration IGDM | the estimated distance sigma is the standard deviation of the nearest distances: 0 when they are all equal (identical point sets), and the registration's parameters become NaN | c? | none | reproduces the estimate; stops where the parameters become NaN (ANTS-69) | decide |
+| ANTS-71 | antsRegistration SyN | `--print-similarity-measure-interval` crashes without an initial fixed transform (`-q`), without a moving transform before the stage, or with several metrics (null pointers in the observer) | a | none | stops with a message where ANTs crashes; corrected, the missing transforms are the identity and the first metric's images are used (A5 part 1) | – |
+| ANTS-72 | antsRegistration | a linear stage after a displacement field (a SyN stage, `-r field`) estimates its parameter scales and learning rate from 1000 voxels drawn with a generator ITK seeds from the clock: not repeatable, whatever the seed | b | none (fMRIPrep's linear stages come first) | draws them with the stage's seed | – |
+| ANTS-73 | antsRegistration | an initial transform image that is not a field of the registration's dimension (a scalar image, a 2D field in 3D) is read as one: ITK converts the pixels as gray, complex, RGB or RGBA values | e | none | corrected by default: refused; `reproduce` converts as ITK (A5 part 1) | – |
+| ANTS-74 | antsRegistration | `--save-state` after linear stages that follow a SyN stage (or a restored state) saves that SyN state, without the later stages | c | none (fMRIPrep does not save states) | corrected by default: every transform, as after linear stages (ANTS-50); `reproduce` as ANTs (A5 part 1) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -145,6 +149,11 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-27 | ITK `CompensatedSummation` | adding one compensated sum to another adds its compensation first, then its sum | d | none | reproduces (one work unit) | – (D11) |
 | ITK-28 | ITK JHCT metric | `alpha` is tested with `!= 1` for the prefactor and with `AlmostEquals` for the value: an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | c | none | corrected by default: both test `AlmostEquals`, a notice; `reproduce` as ITK (A4 part 4) | – |
 | ITK-29 | ITK `ManifoldParzenWindowsPointSetFunction` | the kernel sigma multiplies the covariance unsquared (a variance of 10), where the regularisation sigma is squared | c? | none | reproduces | decide |
+| ITK-30 | ITK `CorrelationImageToImageMetricv4` (ANTs' `GC`) | with a displacement field (SyN) every point's derivative is added to the first voxel's entries: only that voxel moves | c | none (fMRIPrep's SyN uses CC) | corrected by default: each voxel its own derivative; `reproduce` as ITK (A5 part 1) | – |
+| ITK-31 | ITK `SyNImageRegistrationMethod` | a stage with only one of its two masks: the role without one keeps the previous evaluation's resampled mask | c | every run: sMRIPrep's brain extraction's SyN stage has a fixed mask only (corrected: the field moves by at most 0.18 mm, median 0.0004 mm, on ds000005) | corrected by default; `reproduce` as ITK (A5 part 1) | – |
+| ITK-32 | ITK `LabeledPointSetToPointSetMetricv4` | appends per-label metrics at every `Initialize` and uses the first: in SyN every evaluation compares with the moving points as the first one mapped them | c | none | corrected by default; `reproduce` as ITK (A5 part 1) | – |
+| ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
+| ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -1220,7 +1229,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** corrected by default (A4 part 4): every metric of the stage gets its own inputs,
   with a notice (on the synthetic cases the corrected stage moves the transform by 2e-6 to 0.56
   from ANTs' dropped stage). `reproduce` throws ITK's exception as ANTs, or stops with a message
-  where ANTs crashes.
+  where ANTs crashes. SyN stages (A5 part 1): ANTs' SyN method holds labelled point sets only,
+  so every IGDM metric is without input (IGDM first is refused by ANTs itself, "Intensity point
+  set metric is not implemented yet for the specified transform."); corrected, IGDM runs in
+  tangent space with its own inputs (`syn-point-sets/cc-and-igdm`, `cc-igdm-icp`).
 - **D13 / gap:** done. No gap.
 
 ### ANTS-62 A text point set's final newline adds a record — (a)
@@ -1349,6 +1361,67 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **D13 / gap:** decide: a defect (a typical distance, e.g. the mean, or a floor) or the
   heuristic as intended.
 
+
+### ANTS-71 `--print-similarity-measure-interval` in SyN stages crashes — (a)
+- **What:** the SyN observer computes the full-scale similarity (CC of radius 4 between the
+  original images) with the registration's fixed initial transform and the moving composite's
+  transforms as it finds them: without `-q` the fixed transform is a null pointer, without a
+  moving transform before the stage the composite it reads is empty, and with several metrics
+  it casts the multi-metric to an image metric (null). Each is a segmentation fault after the
+  first `DIAGNOSTIC` line of the interval.
+- **Evidence:** read: `antsDisplacementAndVelocityFieldRegistrationCommandIterationUpdate.h` (the SyN observer's
+  `UpdateFullScaleMetricValue`); verified; validated (`syn/print-similarity-crash`,
+  `-multi-crash`: rejected by both, ANTs' output up to the crash identical).
+- **fMRIPrep:** none (fMRIPrep does not print the similarity).
+- **larmorx:** `reproduce` prints what ANTs printed up to the crash and stops with a message;
+  corrected (the default), the missing transforms are the identity and the first metric's
+  images are compared.
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### ANTS-72 Linear stages after a displacement field are not repeatable — (b)
+- **What:** `RegistrationParameterScalesFromPhysicalShift` estimates the scales and the
+  learning rate from the corners of the virtual domain only when the moving transform is
+  linear; when the composite holds a displacement field (a SyN stage before, `-r field.nii.gz`,
+  a restored state), it samples 1000 voxels (`SizeOfSmallDomain`) with
+  `ImageRandomConstIteratorWithIndex`, whose Mersenne twister ITK seeds from the clock. Two runs
+  of ANTs differ from the first iteration of that stage, `--random-seed` or not.
+- **Evidence:** read: `itkRegistrationParameterScalesEstimator.hxx` (`SampleVirtualDomainRandomly`);
+  verified (two ANTs runs of `syn/then-linear` differ).
+- **fMRIPrep:** none: its linear stages come before SyN.
+- **larmorx:** draws the voxels with the stage's seed, so the result is repeatable; the parity
+  cases are expected divergences.
+- **D13 / gap:** class (b), not reproduced. No gap.
+
+### ANTS-73 Any image is read as an initial displacement field — (e)
+- **What:** `itk::ants::ReadTransform` reads a file whose last extension is not a transform
+  file's as `Image<Vector<R, D>, D>`. ITK's reader converts whatever the file holds
+  (`ConvertPixelBuffer`): a scalar image gives vectors whose components all equal the voxel's
+  value (in 2D both "complex" parts), two components in 3D their product in all three
+  ("intensity and alpha"), two in 4D only the first vector (the conversion never advances its
+  output; the others are uninitialised), more components the first `D`, and an image of fewer
+  dimensions is one slice thick. ANTs registers with the result without a word.
+- **Evidence:** read: `itkConvertPixelBuffer.hxx:47-160, 290-490, 540-615`; validated
+  (`syn/initial-scalar`, `-scalar-2d`, `-field-2d-in-3d`: identical to ANTs with the switch).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A5 part 1): refused with a message naming ANTS-73;
+  `reproduce` converts as ITK (the unset vectors of the 4D case are zeros, with a notice).
+- **D13 / gap:** done. No gap.
+
+### ANTS-74 `--save-state` after linear stages that follow SyN — (c)
+- **What:** the registration state is set only by SyN stages (and `--restore-state`). After a
+  SyN stage followed by linear stages, `--save-state` writes the SyN stage's state (its
+  composite, fixed-to-middle and moving-to-middle transforms) without the linear stages,
+  although the option's description says the state is the composite transform unless the last
+  transform is SyN's.
+- **Evidence:** read: `antsRegistrationTemplateHeader.h:1301-1341`,
+  `itkantsRegistrationHelper.hxx:2197-2205`; validated (`syn/save-state-then-translation`,
+  `syn/restore-state-then-translation`: the saved state identical to ANTs' with the switch,
+  checked by hand; the cases are expected divergences through ANTS-72).
+- **fMRIPrep:** none (fMRIPrep does not save states).
+- **larmorx:** corrected by default (A5 part 1): the state holds every transform, as ANTS-50's
+  correction does after linear stages; `reproduce` writes ANTs' stale state.
+- **D13 / gap:** done. No gap.
+
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
   the joint density along its first index (the fixed image's bin) into what it calls the
@@ -1425,7 +1498,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** none.
 - **larmorx:** corrected by default (A4 part 4): fixed points of labels the moving set lacks take
   no part, with a notice (an error when no label is common, where nothing can be matched).
-  `reproduce` throws ITK's exception, as ANTs.
+  `reproduce` throws ITK's exception, as ANTs. In SyN stages (A5 part 1) the moving-to-middle
+  update swaps the sets, so a label only the moving set has throws too (in the second
+  evaluation; `syn-point-sets/icp-moving-extra-label`); the correction applies both ways. A SyN
+  stage's exception is not dropped (ANTs exits 1).
 - **D13 / gap:** done. No gap.
 
 ### ITK-23 An identity covariance keeps the univariate prefactor — (c)
@@ -1506,6 +1582,85 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** reproduces.
 - **D13 / gap:** decide (a width of √10 instead of 10; it weighs the neighbours of the local
   covariances).
+
+
+### ITK-30 GC with a displacement field: the whole derivative in one voxel — (c)
+- **What:** `CorrelationImageToImageMetricv4` is meant to refuse transforms of local support
+  (its constructor checks, before any transform is set, so the check never fires). With SyN's
+  displacement fields its per-thread sums are sized for every parameter but indexed by the
+  local parameter, so every point's `f·g` and `m·g` terms go to the first `D` entries and the
+  whole vector is then scaled: only the first voxel's update is not 0, and the stage barely
+  moves.
+- **Evidence:** read: `itkCorrelationImageToImageMetricv4HelperThreader.hxx`,
+  `itkCorrelationImageToImageMetricv4.hxx` (constructor); validated (`syn/gc`: identical to
+  ANTs with the switch).
+- **fMRIPrep:** none (fMRIPrep's SyN stages use CC).
+- **larmorx:** corrected by default (A5 part 1): each voxel gets its own point's terms;
+  `reproduce` as ITK, with a notice.
+- **D13 / gap:** done. No gap.
+
+### ITK-31 SyN keeps a stale mask for the role without one — (c)
+- **What:** `SyNImageRegistrationMethod::ComputeMetricGradientField` resamples and sets the
+  fixed and moving masks only for the roles that have one (`if (fixedImageMasks[n])`). With a
+  fixed mask and no moving mask (or the reverse), the metric object keeps the mask set by the
+  previous call; since SyN swaps the roles, the second call of each iteration, and every call
+  from the second iteration on, sees a resampled mask where the stage has none.
+- **Evidence:** read: `itkSyNImageRegistrationMethod.hxx:368-426, 502-557`; validated
+  (`syn/fixed-mask-only`, `syn/moving-mask-only` on a mask of another grid: identical to ANTs
+  with the switch).
+- **fMRIPrep:** every run: sMRIPrep's brain extraction (`antsBrainExtraction`) gives its SyN
+  stage a fixed mask only (`--masks [template mask, NULL]`), so from the second evaluation the
+  metric's moving role keeps the fixed mask resampled for the previous evaluation. Corrected,
+  ds000005's brain extraction (full size) keeps its affine transform and its field moves in 79 %
+  of the voxels by a median of 0.0004 mm, at most 0.18 mm (0.02 % of the voxels by more than
+  0.1 mm), well inside ANTs' own thread band; the full record's fix pass names ITK-31 in all ten
+  brain extractions (small and full size).
+- **larmorx:** corrected by default (A5 part 1): a role without a mask has none; `reproduce` as
+  ITK, with a notice.
+- **D13 / gap:** done. No gap.
+
+### ITK-32 The labelled point-set metric keeps its first per-label metrics — (c)
+- **What:** `LabeledPointSetToPointSetMetricv4::Initialize` clones one metric per common label,
+  initialises it (in tangent space, its moving points mapped into the virtual domain) and
+  appends it to `m_PointSetMetricClones`, which is never cleared; the evaluations look a label
+  up by its position in the common labels and use the first clones. SyN initialises the metric
+  twice per iteration, so every evaluation compares with the moving points as the stage's first
+  evaluation mapped them, and the moving-to-middle update compares the moving points with
+  themselves. (In linear stages the clones' moving points are not mapped, so it does not
+  matter.)
+- **Evidence:** read: `itkLabeledPointSetToPointSetMetricv4.hxx:44-124`; validated
+  (`syn-point-sets/icp`, `pse`, `jhct` and the others: identical to ANTs with the switch).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A5 part 1): each evaluation uses its own initialisation's
+  metrics; `reproduce` as ITK, with a notice.
+- **D13 / gap:** done. No gap.
+
+### ITK-33 Point-set metrics among several metrics get identity transforms in SyN — (c)
+- **What:** in `ComputeMetricGradientField`, a point-set metric of a multi-metric is given the
+  fixed and moving composites (`multiMetric->SetFixedTransform`, which sets every metric's),
+  then, because the multi-metric is not itself a point-set metric, every metric of it gets the
+  identity displacement field transforms meant for the pre-resampled images. A point-set metric
+  among several is thus evaluated where its points were read: it never sees the initial
+  transforms or the deformation (the single-metric path excludes point sets from the identity).
+- **Evidence:** read: `itkSyNImageRegistrationMethod.hxx:316-328, 566-590`; validated
+  (`syn-point-sets/cc-and-icp`, `icp-and-cc`: identical to ANTs with the switch).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (A5 part 1): the point-set metrics are evaluated through the
+  composites, as a single point-set metric is; `reproduce` as ITK, with a notice.
+- **D13 / gap:** done. No gap.
+
+### ITK-34 Point-set derivatives added into the field without synchronisation — (b)
+- **What:** `CalculateValueAndDerivative` splits the fixed points into one range per work unit
+  and, for transforms of local support, adds each point's derivative into the shared derivative
+  array (`StorePointDerivative`, `field[offset + i] += ...`) from all the threads at once. Two
+  points of different ranges at the same virtual voxel race: SyN with ICP gave three different
+  fields in three runs at 4 threads (one of them the one-thread field) and two in two runs at 8
+  (`syn-point-sets/icp`; the records' thread band, 0.023 to 0.025 mm).
+- **Evidence:** read: `itkPointSetToPointSetMetricWithIndexv4.hxx:275-377, 437-466`; verified
+  (2026-10-19: seven runs of the same command at 1, 4 and 8 threads).
+- **fMRIPrep:** none (no point-set metric).
+- **larmorx:** the points in order, as one thread adds them, at any thread count.
+- **D13 / gap:** class (b), not reproduced. No gap.
 
 ### ITK-01 `Math::Floor` of tiny negative values — (c)
 - **What:** on x86-64 `itk::Math::Floor` (and `vnl_math::floor`) is

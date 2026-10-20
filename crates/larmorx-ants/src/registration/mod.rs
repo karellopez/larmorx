@@ -22,6 +22,7 @@ use larmorx_core::Precision;
 pub mod config;
 pub mod helper;
 pub mod pointsets;
+pub mod syn;
 
 pub use config::*;
 

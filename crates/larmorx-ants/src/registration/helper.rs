@@ -199,6 +199,9 @@ pub struct RegistrationHelper<R, const D: usize> {
     pub origins: Vec<Option<usize>>,
     /// `m_FixedInitialTransform`.
     pub fixed_initial: Option<Vec<Xfm<R, D>>>,
+    /// `m_RegistrationState`: set by SyN stages (the composite before the stage, then the
+    /// fixed-to-middle and moving-to-middle transforms) and by `--restore-state`.
+    pub registration_state: Option<Vec<Xfm<R, D>>>,
     pub fixed_masks: Vec<Option<Mask<D>>>,
     pub moving_masks: Vec<Option<Mask<D>>>,
     pub n_threads: usize,
@@ -235,6 +238,7 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
             composite: None,
             origins: Vec::new(),
             fixed_initial: None,
+            registration_state: None,
             fixed_masks: Vec::new(),
             moving_masks: Vec::new(),
             n_threads: 1,
@@ -616,13 +620,17 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             sci4.float(now),
             sci4.float(now - self.last)
         );
-        if self.full_scale.is_some() && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64() {
+        let printed =
+            self.full_scale.is_some() && full_scale_value.to_f64().abs() > R::r(1e-7).to_f64();
+        if printed {
             line.push_str(&sci12.float(full_scale_value.to_f64()));
         }
         line.push('\n');
         self.log.logger(&line);
+        // The stream keeps the last precision set: 4 (the time since the last line), or 12
+        // after the full-scale similarity.
         if self.log.verbose {
-            self.log.cout = sci4;
+            self.log.cout = if printed { sci12 } else { sci4 };
         }
         self.last = now;
         Ok(())
@@ -1066,6 +1074,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             };
             let learning_rate = self.transforms[stage].gradient_step;
             let method = self.transforms[stage].method;
+            if method == XfrmMethod::SyN {
+                let inputs = super::syn::SynInputs {
+                    stage,
+                    iterations: iterations.clone(),
+                    threshold,
+                    window,
+                    levels,
+                    kinds: stage_metrics.iter().map(|m| m.kind).collect(),
+                    prepared,
+                    shrink_factors: per_level,
+                    sigmas: sigmas_r,
+                    sampling,
+                    percentage: R::r(f64::from(percentage)),
+                };
+                self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                let elapsed = timer.elapsed().as_secs_f64();
+                log.logger(&format!(
+                    "  Elapsed time (stage {stage}): {}\n\n",
+                    log.f(elapsed)
+                ));
+                continue;
+            }
             let mut output = match self.new_transform(method) {
                 Some(t) => t,
                 None => return self.unsupported(log, &format!("{} stages", method.as_str())),
@@ -1319,7 +1349,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     }
 
     /// The D13 notices of what a stage's point-set metrics met.
-    fn point_set_notices(&mut self, e: &PointSetEvents) {
+    pub(crate) fn point_set_notices(&mut self, e: &PointSetEvents) {
         let mode = self.upstream_defects;
         let fix = mode.fix();
         let mut add = |d: &'static defects::Defect, fixed: &str, reproduced: &str| {
@@ -1377,6 +1407,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             );
             add(&defects::ANTS_65, &fixed, &reproduced);
         }
+        if e.stale_clones {
+            add(
+                &defects::ITK_32,
+                "SyN's point-set evaluations use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
+                "SyN's point-set evaluations use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
+            );
+        }
         if e.igdm_centre {
             add(
                 &defects::ANTS_66,
@@ -1401,7 +1438,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
     }
 
     /// An ITK exception that `main` catches: "Exception Object caught: " and its print.
-    fn exception_in_main(&self, log: &mut Log<'_>, e: &ItkException) -> RegistrationFailed {
+    pub(crate) fn exception_in_main(
+        &self,
+        log: &mut Log<'_>,
+        e: &ItkException,
+    ) -> RegistrationFailed {
         log.cerr(&format!("Exception Object caught: \n{}\n", e.print()));
         RegistrationFailed(e.description.clone())
     }

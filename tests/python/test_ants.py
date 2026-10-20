@@ -224,3 +224,31 @@ def test_combine_transforms(tmp_path):
     lx.transforms.write(tmp_path / "c.txt", composite)
     back = lx.transforms.read(tmp_path / "c.txt")
     np.testing.assert_array_equal(back[1].parameters, composite[1].parameters)
+
+
+def test_registration_syn_stage_does_not_depend_on_threads(tmp_path):
+    """A SyN stage: the Warp and InverseWarp files, the transforms antsApplyTransforms takes,
+    and the same fields at any thread count."""
+    rng = np.random.default_rng(5)
+    fixed = 100.0 + 20.0 * rng.random((14, 12, 10))
+    fixed[4:10, 3:9, 3:7] += 200.0
+    moving = np.roll(fixed, 1, axis=0)
+    affine = np.diag([2.0, 2.0, 2.5, 1.0])
+    f = lx.Image(fixed.astype(np.float32), affine)
+    m = lx.Image(moving.astype(np.float32), affine)
+    stage = lx.ants.RegistrationStage(
+        "SyN", 0.3, lx.ants.RegistrationMetric("CC", f, m, radius=2),
+        iterations=[3, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+        convergence_window=3, update_field_variance=2.0, total_field_variance=0.5,
+    )  # fmt: skip
+    one = lx.ants.registration([stage], warped=True, n_threads=1)
+    many = lx.ants.registration([stage], warped=True, n_threads=3)
+    assert sorted(one.files) == ["0InverseWarp.nii.gz", "0Warp.nii.gz"]
+    for name in one.files:
+        a = np.asarray(one.files[name][0].parameters)
+        b = np.asarray(many.files[name][0].parameters)
+        assert np.array_equal(a, b)
+    assert one.files["0Warp.nii.gz"][0].name.startswith("DisplacementFieldTransform")
+    assert np.array_equal(one.warped.data, many.warped.data)
+    warped = lx.ants.apply_transforms(m, f, one.transforms)
+    assert warped.shape == f.shape

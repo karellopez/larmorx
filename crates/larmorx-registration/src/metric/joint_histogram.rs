@@ -314,7 +314,7 @@ impl<R: Real> JointHistogramMi<R> {
         warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
         let d = self.densities(m, transform, floor)?;
-        let np = transform.number_of_parameters();
+        let np = m.local_parameters(transform);
         if !compute_derivative {
             // GetValue: the histogram's count is the number of valid points; with none,
             // ITK returns m_Value unchanged.
@@ -341,7 +341,7 @@ impl<R: Real> JointHistogramMi<R> {
             moving: true,
         };
         let eps = R::from_f64(1.0e-16);
-        let process = |i: usize| -> Option<Vec<R>> {
+        let process = |i: usize| -> Option<(Vec<R>, Option<usize>)> {
             let s = m.sample(i, transform, gradients, true, floor)?;
             if s.moving_value < self.moving_min || s.moving_value > self.moving_max {
                 return None;
@@ -365,8 +365,13 @@ impl<R: Real> JointHistogramMi<R> {
             };
             let mut jac = vec![R::ZERO; D * np];
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
-            transform.jacobian(&vp, &mut jac);
-            Some(
+            m.moving_jacobian(transform, &vp, &mut jac);
+            let voxel = if m.local_support {
+                m.voxel_of(&s.virtual_index)
+            } else {
+                None
+            };
+            Some((
                 (0..np)
                     .map(|par| {
                         let mut sum = R::ZERO;
@@ -376,11 +381,12 @@ impl<R: Real> JointHistogramMi<R> {
                         sum
                     })
                     .collect(),
-            )
+                voxel,
+            ))
         };
-        let mut reduction = BaseReduction::new(np, true);
-        m.for_each_sample(process, |local| {
-            reduction.add(R::ZERO, &local);
+        let mut reduction = BaseReduction::for_metric(m, transform, true);
+        m.for_each_sample(process, |(local, voxel)| {
+            reduction.add_point(R::ZERO, &local, voxel);
             Ok(())
         })?;
         let reduced = reduction.finish(true, np);

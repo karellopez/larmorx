@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "e53126ca1a5dad92cf7655fa41b4f3af6a3b815d", "date": "2026-10-18", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "89da6c92dc71352712ad71b238d612bd48f49d22", "date": "2026-10-19", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
@@ -355,6 +355,47 @@
   "cli.ants.antsRegistration.reproduce": {
    "rigid": {"bytes": 193, "sha256": "1cc3724f8ad5da8ffbe7ffd7f77fe413fde1c83fa9dd6bf4da677435e00a318b"}
   },
+  "cli.ants.antsRegistration.syn": {
+   "affine": {"bytes": 193, "sha256": "178de7b17338715bbf408d369ce3ef9a66b418e64de55f3915782ab296a40023"},
+   "composite.structure": {"bytes": 709, "sha256": "45c03891da955f248f65b115d1d8793c82c7fcb404e7f428a7ed22885602ca46"},
+   "composite.values": {"dtype": "<f8", "sample": "000000000000384000000020690cb53f000000e0a4bd563f00000060dff5b6bf00000000fc38a43f000000000000000000000000a27095bf0000000000000000", "sha256": "e9c25bb4c841a5b72139107eb16543f837eb64ed01af5a725081b931f089f9be", "shape": [46116], "sum": "-4125.705046928802"},
+   "inverse_warp:data": {"dtype": "<f8", "sample": "00000000000000000021bbedef9cca3f000cd0e66f00a03f20001a59a9a2b83f80b008eb491fa33f00105f139c1e943f0084d281e33d863f0000000000000000", "sha256": "5e5d645233125fe2119118c7de4430a1f622751082de2b804a0f851c51464904", "shape": [24, 20, 16, 1, 3], "sum": "597.7970406132666"},
+   "inverse_warp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "inverse_warped:data": {"dtype": "<f8", "sample": "00000000000000004ecae51225b030404b54b51f61f47a40a070b73da00d20400cd53f83457420407574fe664d427b4071997aca820d23402c981177cd252c40", "sha256": "79d05ad80b7957143d3477a8d30c3bb697a8a75f90086239ca57e3aac6659c9d", "shape": [24, 20, 16], "sum": "809010.1136539496"},
+   "inverse_warped:header": {"bytes": 352, "sha256": "45ba69875754017bbf046789a6729c8e80c69143e7b3d8978f6dbf6deb74dce5"},
+   "state.structure": {"bytes": 1357, "sha256": "8ac6a4e7d77dab7cb2b4dd7f93ecf489dcc12952c03f1ca3c1871e6ceea4fe13"},
+   "state.values": {"dtype": "<f8", "sample": "000000000000384000000000b254943f0000000000000000000000a0c832a2bf000000805123b43f0000004073c78e3f000000003af9c03f0000000000000000", "sha256": "d7ee3bfa459e5b3998092415eea612c6bfcdfebf70a165bb85e45d0c79e64f29", "shape": [115290], "sum": "-260.0337331524396"},
+   "warp:data": {"dtype": "<f8", "sample": "00000000000000000045c797b172cabf00500abb0245a0bff06ee0740461b8bf804216aee414a3bf008c9b00c17893bf00cefa49c90087bf0000000000000000", "sha256": "7f417c63ba1533960add2681e479cbcf8528a41e6518e9e2ae1736601462efe7", "shape": [24, 20, 16, 1, 3], "sum": "-598.0760056629478"},
+   "warp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "warped:data": {"dtype": "<f8", "sample": "810055a8112b0d40fca4ad8b5ed61b40226ef679ea936940f5f443271ecc144093303c7c874c1c40fe0e3319854f6a405a67398af61821400000000000000000", "sha256": "faeb5e5585f4390f4bc6f03d3aef9f2e4b624efb1ef7756104309df02dd6f171", "shape": [24, 20, 16], "sum": "393076.7295924949"},
+   "warped:header": {"bytes": 352, "sha256": "45ba69875754017bbf046789a6729c8e80c69143e7b3d8978f6dbf6deb74dce5"}
+  },
+  "cli.ants.antsRegistration.syn.dimensions": {
+   "2d.inverse_warp:data": {"dtype": "<f8", "sample": "000000000000000060b9fc46cec3ee3fe89e9eae9b19f33f9050e96e5164cf3f0088288e968f87bf4031a2d7d212c33fe0392c21e886d7bf0000000000000000", "sha256": "8641bfb6d6b01839172bd8b2786983900a0ccea40c257ec806f4111f98cf33cc", "shape": [32, 24, 1, 1, 2], "sum": "552.4119360498319"},
+   "2d.inverse_warp:header": {"bytes": 352, "sha256": "6421e94c6731d3bac6ef5153a0c0e782300f4579800ead82f6cdbec4b6b21389"},
+   "2d.warp:data": {"dtype": "<f8", "sample": "000000000000000060ef334fdb2cedbf28322728ab2ff5bf20543e3023a1d0bf00afb12f746db23f80ac893e7cfdc8bf00df532bf7e1db3f0000000000000000", "sha256": "caa9a9dab8e9a60c2e1983705cda910b1b5bdccede3463348a4833261aa51e29", "shape": [32, 24, 1, 1, 2], "sum": "-553.0332711407304"},
+   "2d.warp:header": {"bytes": 352, "sha256": "6421e94c6731d3bac6ef5153a0c0e782300f4579800ead82f6cdbec4b6b21389"},
+   "4d.warp:data": {"dtype": "<f8", "sample": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "sha256": "0cc5f11e4d6807acffd5f9167d709d2bf1e91700460cdc33161486ce3ccc22d9", "shape": [16, 14, 12, 4, 4], "sum": "0.0"},
+   "4d.warp:header": {"bytes": 352, "sha256": "7b2f16fde15a783ab427965caf534614170b071fd07be3a0db3f42cefe3b5453"}
+  },
+  "cli.ants.antsRegistration.syn.pointsets": {
+   "cc_icp:data": {"dtype": "<f8", "sample": "000000000000000000c05352e7486bbf008e71c4ac49b7bf60a607298d71acbff04969e58b17d6bf006052adea6d90bf0020678e62de373f0000000000000000", "sha256": "34a9af3f266784e1d9c1d9211fd8edb95818d5656e4b3e41e6ab96a5486e90e0", "shape": [24, 20, 16, 1, 3], "sum": "-1499.3334567688782"},
+   "cc_icp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "cc_igdm:data": {"dtype": "<f8", "sample": "00000000000000000080e7bcf6ed70bf8016fee6ae0bb1bf90e157c1b989b2bf206936356571d8bf807842f95f7dd33f0040897842d06b3f0000000000000000", "sha256": "b84f6fad3d41d689c4f650fe20af51350eaa379164b9b0bb156d374fbb0bc8cb", "shape": [24, 20, 16, 1, 3], "sum": "-372.21593426051754"},
+   "cc_igdm:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "icp:data": {"dtype": "<f8", "sample": "00000000000000000020e8aded466ebf0030e8a6473aadbfa0ce5e2da961d4bf5032bfb5620ae7bf000000000000000000000000000000000000000000000000", "sha256": "12ac23176f050583e4d0c3842735cd0ac1a03ba9b1c622407a0f220696c4bfcb", "shape": [24, 20, 16, 1, 3], "sum": "-2456.7097555199007"},
+   "icp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"}
+  },
+  "cli.ants.antsRegistration.syn.reproduce": {
+   "cc_icp:data": {"dtype": "<f8", "sample": "000000000000000000505808361c70bf00310b2a0c45babfb8c66f3dcc2dddbfe0de7cade88fdbbf0084787ede5999bf0020db6a5b3831bf0000000000000000", "sha256": "c25f538588e64f024461cb6cd6a72549fdcd7efb6905ed556fcff71901da1e5a", "shape": [24, 20, 16, 1, 3], "sum": "-1758.724027065755"},
+   "cc_icp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "gc:data": {"dtype": "<f8", "sample": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "sha256": "325f7713d275974101c34da17381aeb1ffe6a10a50a5e1ee94995c4163cb88a7", "shape": [24, 20, 16, 1, 3], "sum": "-11.86431781611253"},
+   "gc:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "icp:data": {"dtype": "<f8", "sample": "000000000000000000503b66742274bf00bec93c2981b3bf80cbd1706f8594bf1098b7b77b22dabf000000000000000000000000000000000000000000000000", "sha256": "5a73edcf17f73b69ea4a55236a0bf8506d4cfbe665fd2121f3ee1b238eb7f974", "shape": [24, 20, 16, 1, 3], "sum": "-1203.5404384989622"},
+   "icp:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"},
+   "moving_mask:data": {"dtype": "<f8", "sample": "000000000000000000f0fd24fcfb89bf40ec5d4ca03bc5bf20ab313a07a7d4bf00227bf8b934b3bf0050d33760f3903f008047754015233f0000000000000000", "sha256": "60136f5895813fdfbaae5cdc4cd3f50bbaa25f17e8418e16cec195505f4f916c", "shape": [24, 20, 16, 1, 3], "sum": "-1740.394540085843"},
+   "moving_mask:header": {"bytes": 352, "sha256": "e34d4889a71720fdab10eaaff4b45488207f72690c089fc4bbd5cf7bfdc5b0d1"}
+  },
   "cli.mri.hmc": {
    "MAT_0000": {"bytes": 153, "sha256": "4fb903a112b0acc5a6a03151a386f83b65490d8437a9868375199001c153e315"},
    "MAT_0001": {"bytes": 148, "sha256": "c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c"},
@@ -619,6 +660,13 @@
   "py.ants.registration.pointsets": {
    "0GenericAffine.mat.parameters": {"dtype": "<f8", "sample": "700a5325fed0ef3f95ec85a4c3553a3fa7eeded9b11f4fbf5674157515d8ef3f7cb5a28a23046cbf736230916f56423f9ed01c1e4513df3f624eec8721bfab3f", "sha256": "47149d369eaef9047dbef1c72eae00d22361b354acb2b0d7eff5642139bf5207", "shape": [12], "sum": "3.2616465962083088"},
    "iterations": {"dtype": "<f8", "sample": "0000000000000000000000000000000000000000000000000000000000000000000000000000f03f000000000000f03fa0a07da6a418eb3fadf5cd13daf1d9bf", "sha256": "b94149694061a6f28a0f7ba7a7989679b8afcc3fb453a520cab745ef6b143d9e", "shape": [5, 4], "sum": "12.6812507833544"}
+  },
+  "py.ants.registration.syn": {
+   "0InverseWarp.nii.gz.parameters": {"dtype": "<f8", "sample": "0000000000000000e0691626a144da3f887d6d400440e73fc02361fae9a4d63fb884881cd920c83f08bfecf2e479e33f605fbcff1d57d63f0000000000000000", "sha256": "1d86c4714661c75ddc2322b02ab93e1bc808b715a46b5a3d1c09729c91caae92", "shape": [23040], "sum": "5247.787999903372"},
+   "0Warp.nii.gz.parameters": {"dtype": "<f8", "sample": "0000000000000000e053e397e344d8bfd03be746cac5e5bfc0faf3e83e2ad9bf66a4bcdc417ac4bfb02b895533e0e2bfe0c8dde42f5dd8bf0000000000000000", "sha256": "e190b0851872737cb18fa11a651e5a0a258f72529f0ac339e53303884416f88c", "shape": [23040], "sum": "-5233.85467000809"},
+   "files": {"bytes": 32, "sha256": "4702fc1bbd22ff72045c4ee207c0c8c6e21e986860fc12b02aaf831e617a6ec1"},
+   "iterations": {"dtype": "<f8", "sample": "000000000000000000000000000000000000000000000000000000000000f03f000000000000f03f000000000000f03fb784a5219961efbf0618e308d7d7e5bf", "sha256": "069cab45a2106329a7b2ec69104942b236be71229f50da1eaf3dca5dc5e20087", "shape": [5, 4], "sum": "6.7540475872751"},
+   "warped": {"dtype": "<f8", "sample": "15e8a14d74d11340d642a83976fb1140394ceaf37db2694056788b1f6013204058e64e92ccd70a406a430c4cd3276a40a6ae0b9acdc718401a2bf80f74d11f40", "sha256": "2d45ec9a79ff70ddba5008e3afed1e8106a7d69d3a13dc5154162ec3c8a0328f", "shape": [24, 20, 16], "sum": "395111.3197468304"}
   },
   "py.ants.resample": {
    "bspline": {"dtype": "<f4", "sample": "2549923f051d5b436761da4151856143a9b6ec3fff308941b721b44224f42341", "sha256": "2bf8b92e83b2da5e0f9d351abbf8eefa9ca0224f1f8df591ac99d0af3f333964", "shape": [18, 24, 17], "sum": "769383.481296856"},

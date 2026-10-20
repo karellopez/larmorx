@@ -43,7 +43,7 @@ struct Column<R> {
 type Values<R> = Option<(R, R)>;
 
 /// A voxel's local correlation and derivative, or `None` where it does not count.
-type PointResult<R> = Option<(R, Vec<R>)>;
+type PointResult<R> = Option<(R, Vec<R>, Option<usize>)>;
 
 /// The metric's state for a level: its radius.
 #[derive(Clone, Copy, Debug)]
@@ -153,7 +153,7 @@ impl NeighborhoodCorrelation {
                     std::array::from_fn(|q| R::from_f64(factor * s.moving_gradient[q].to_f64()));
                 let mut jac = vec![R::ZERO; D * np];
                 let vp: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
-                transform.jacobian(&vp, &mut jac);
+                m.moving_jacobian(transform, &vp, &mut jac);
                 for (par, d) in derivative.iter_mut().enumerate() {
                     let mut v = R::ZERO;
                     for dim in 0..D {
@@ -163,7 +163,12 @@ impl NeighborhoodCorrelation {
                 }
             }
         }
-        Some((local_cc, derivative))
+        let voxel = if m.local_support {
+            m.voxel_of(center)
+        } else {
+            None
+        };
+        Some((local_cc, derivative, voxel))
     }
 
     /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`.
@@ -174,14 +179,14 @@ impl NeighborhoodCorrelation {
         compute_derivative: bool,
         floor: &IndexFloor,
     ) -> Result<Reduced<R>, ItkException> {
-        let np = transform.number_of_parameters();
+        let np = m.local_parameters(transform);
         let space = &m.virtual_space;
         let none = GradientSource {
             fixed: false,
             moving: false,
         };
         let r = self.radius as i64;
-        let mut reduction = BaseReduction::new(np, compute_derivative);
+        let mut reduction = BaseReduction::for_metric(m, transform, compute_derivative);
         match &m.samples {
             None => {
                 // Every voxel's values once.
@@ -240,8 +245,8 @@ impl NeighborhoodCorrelation {
                     })
                     .collect();
                 for line in lines {
-                    for (cc, d) in line.into_iter().flatten() {
-                        reduction.add(-cc, &d);
+                    for (cc, d, voxel) in line.into_iter().flatten() {
+                        reduction.add_point(-cc, &d, voxel);
                     }
                 }
             }
@@ -270,8 +275,8 @@ impl NeighborhoodCorrelation {
                         self.point(m, transform, &queue, &center, compute_derivative, floor, np)
                     })
                     .collect();
-                for (cc, d) in results.into_iter().flatten() {
-                    reduction.add(-cc, &d);
+                for (cc, d, voxel) in results.into_iter().flatten() {
+                    reduction.add_point(-cc, &d, voxel);
                 }
             }
         }

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``antsRegistration``'s linear stages: :func:`registration`.
+"""``antsRegistration``'s linear and SyN stages: :func:`registration`.
 
 The function builds ``antsRegistration``'s command line from typed arguments and runs exactly
 the command-line code (``larmorx ants antsRegistration``) in-process: in-memory images are
@@ -40,7 +40,7 @@ __all__ = [
 
 MetricType = Literal["Mattes", "MI", "MI2", "MeanSquares", "CC", "GC", "Demons"]
 PointSetMetricType = Literal["ICP", "PSE", "JHCT"]
-TransformType = Literal["Translation", "Rigid", "Similarity", "Affine", "CompositeAffine"]
+TransformType = Literal["Translation", "Rigid", "Similarity", "Affine", "CompositeAffine", "SyN"]
 Sampling = Literal["None", "Regular", "Random"]
 Precision = Literal["float64", "float32"]
 
@@ -155,7 +155,12 @@ class RegistrationStage:
     (``-c [10x5,...]``, ``-f 2x1``, ``-s 1x0vox``); ``sigmas_in_mm`` gives the sigmas in
     millimetres (``mm``) instead of voxels (``vox``). ``masks`` is a fixed mask, or a pair
     ``(fixed, moving)`` where ``None`` means no mask. ``restrict_deformation`` weighs each
-    parameter of the stage's transform (``-g``).
+    parameter of the stage's transform (``-g``); for ``SyN``, each axis of the displacement.
+
+    ``SyN`` (symmetric normalisation, ``-t SyN[gradientStep,updateFieldVariance,
+    totalFieldVariance]``) takes ``update_field_variance`` and ``total_field_variance``: the
+    variances (in voxels²) of the Gaussian smoothing of each update and of the total fields
+    (ANTs' defaults 3 and 0). The linear transforms ignore them.
     """
 
     transform: TransformType
@@ -169,6 +174,8 @@ class RegistrationStage:
     convergence_window: int = 10
     masks: Any = None
     restrict_deformation: Sequence[float] | None = None
+    update_field_variance: float = 3.0
+    total_field_variance: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -208,7 +215,10 @@ class RegistrationResult:
       ``DerivedInitialMovingTranslation``).
     - ``inverse_transforms``: the inverse composite (with ``write_composite_transform``).
     - ``files``: every transform file, by its name after the output prefix
-      (``"0GenericAffine.mat"``, ``"Composite.h5"``, ``"0DerivedInitialMovingTranslation.mat"``).
+      (``"0GenericAffine.mat"``, ``"1Warp.nii.gz"``, ``"1InverseWarp.nii.gz"``, ``"Composite.h5"``,
+      ``"0DerivedInitialMovingTranslation.mat"``). A SyN stage's transform is a displacement
+      field (``1Warp.nii.gz``, read as a ``DisplacementFieldTransform``) and its inverse field
+      (``1InverseWarp.nii.gz``, not in ``transforms``).
     - ``warped``, ``inverse_warped``: the moving image on the fixed grid and the other way
       round, when asked for.
     - ``iterations``: every optimizer iteration; ``log``: what the program printed.
@@ -345,7 +355,7 @@ def _mask(args: _Args, value: Any) -> str:
     return args.image(value)
 
 
-_DIAGNOSTIC = re.compile(r"^ ?\*?2DIAGNOSTIC,\s+(\d+), ([^,]+), ([^,]+), [^,]+, [^,]+, ?(.*)$")
+_DIAGNOSTIC = re.compile(r"^ ?\*?[12]DIAGNOSTIC,\s+(\d+), ([^,]+), ([^,]+), [^,]+, [^,]+, ?(.*)$")
 
 
 def _iterations(log: str) -> list[RegistrationIteration]:
@@ -356,7 +366,8 @@ def _iterations(log: str) -> list[RegistrationIteration]:
         if line.startswith("Stage ") and line[6:].strip().isdigit():
             stage = int(line[6:])
             level = -1
-        elif line.startswith("DIAGNOSTIC,Iteration"):
+        elif line.startswith(("DIAGNOSTIC,Iteration", "XXDIAGNOSTIC,Iteration")):
+            # A linear stage's header (2DIAGNOSTIC lines) or SyN's (1DIAGNOSTIC lines).
             level += 1
         else:
             m = _DIAGNOSTIC.match(line)
@@ -396,15 +407,16 @@ def registration(
     n_threads: int = 1,
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> RegistrationResult:
-    """Register the moving images to the fixed ones in linear stages, as ``antsRegistration``
-    (ANTs v2.6.5) does.
+    """Register the moving images to the fixed ones in linear and SyN stages, as
+    ``antsRegistration`` (ANTs v2.6.5) does.
 
-    Each :class:`RegistrationStage` optimises one transform (``Translation``, ``Rigid``, ``Similarity``,
-    ``Affine`` or ``CompositeAffine``) against its metrics (image metrics,
-    :class:`RegistrationMetric`; point-set metrics, :class:`PointSetMetric` and
-    :class:`IntensityPointSetMetric`), level by level (shrunk and smoothed images); the stages
-    chain, each starting where the previous left.
-    The deformable stages (``SyN``, ``BSpline``, ...) come in milestone A5.
+    Each :class:`RegistrationStage` optimises one transform (``Translation``, ``Rigid``,
+    ``Similarity``, ``Affine``, ``CompositeAffine``, or ``SyN``'s symmetric displacement
+    fields) against its metrics (image metrics, :class:`RegistrationMetric`; point-set metrics,
+    :class:`PointSetMetric` and :class:`IntensityPointSetMetric`, in linear stages), level by
+    level (shrunk and smoothed images); the stages chain, each starting where the previous
+    left. The other deformable stages (``BSplineSyN``, ``BSpline``, displacement and velocity
+    fields) come in milestone A5's next parts.
 
     - ``initial_moving_transforms`` (``-r``): transform files, transform lists,
       ``(transform, invert)`` pairs or :class:`AlignCenters`; ``initial_fixed_transforms``
@@ -483,7 +495,15 @@ def registration(
         if restore_state is not None:
             argv += ["-k", _initial(a, restore_state)]
         for s in stage_list:
-            argv += ["-t", f"{s.transform}[{_num(s.gradient_step)}]"]
+            if s.transform == "SyN":
+                parameters = [
+                    _num(s.gradient_step),
+                    _num(s.update_field_variance),
+                    _num(s.total_field_variance),
+                ]
+            else:
+                parameters = [_num(s.gradient_step)]
+            argv += ["-t", f"{s.transform}[{','.join(parameters)}]"]
             metrics = [s.metrics] if isinstance(s.metrics, AnyMetric) else list(s.metrics)
             for m in metrics:
                 argv += ["-m", _metric(a, m, int(dimension))]
@@ -518,7 +538,8 @@ def registration(
             ours = path.name.startswith("lx") and not path.name.startswith(
                 ("lx-initial-", "lx-input-", "lx-points-")
             )
-            if ours and path.suffix in (".mat", ".txt", ".h5"):
+            field = path.name.endswith(("Warp.nii.gz", "Warp.nii"))
+            if ours and (path.suffix in (".mat", ".txt", ".h5") or field):
                 files[path.name[2:]] = read(path, upstream_defects=upstream_defects)
 
         def index(name: str) -> int:
@@ -529,7 +550,11 @@ def registration(
             transforms = [files["Composite.h5"]]
             inverse = [files["InverseComposite.h5"]] if "InverseComposite.h5" in files else None
         else:
-            numbered = [n for n in files if index(n) >= 0 and "DerivedInitialFixed" not in n]
+            numbered = [
+                n
+                for n in files
+                if index(n) >= 0 and "DerivedInitialFixed" not in n and "InverseWarp" not in n
+            ]
             transforms = [files[n] for n in sorted(numbered, key=index, reverse=True)]
             inverse = None
 

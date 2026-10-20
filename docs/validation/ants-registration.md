@@ -1,15 +1,31 @@
-# Parity: antsRegistration (linear stages)
+# Parity: antsRegistration (linear and SyN stages)
 
-**All cases agree.** 224 cases on the `standard` tier: 169 pass, 44 rejected by both, 11 expected divergences, 0 failures.
+**All cases agree.** 298 cases on the `standard` tier: 225 pass, 57 rejected by both, 16 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, larmorx-ants)
 - **Reference:** antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-18 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
+- **Generated:** 2026-10-19 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
 
-169 cases compared: 145 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 24 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
+225 cases compared: 193 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 32 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
 
-Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.00488 in a transform parameter (`smoke/rigid` 7.04e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 6.79e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 1.06e-15, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `real/ds000005-sub-01/boldref-affine` 3.9e-10, `real/ds005040-sub-002/coregister` 4.68e-13); larmorx gives the one-thread result at any thread count, within 3.47e-18 of ANTs at one thread.
+Thread band, 24 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.72 in a transform parameter (`smoke/rigid` 9.08e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 6.76e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 3.94e-16, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `syn/cc` 0, `syn/meansquares-total` 0, `syn/mattes` 3.55e-14, `syn-point-sets/icp` 0.00891, `real/ds000005-sub-01/boldref-affine` 8.44e-10, `real/ds005040-sub-002/coregister` 1.09e-12, `real-syn-small/ds000005-sub-01/brain-extraction` 1.72, `real-syn-small/ds000005-sub-01/template` 1.33); larmorx gives the one-thread result at any thread count, within 1.63 of ANTs at one thread.
+
+- **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
+  - ANTS-49: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N -> N; files ['rNGenericAffine.mat']): `metrics/demons`, `metrics/no-overlap`, `point-sets/icp-vtk-no-scalars`, `point-sets/icp-empty`, `point-sets/pse-sigma-zero`
+  - ANTS-61: 2 case(s) named it, 2 with changed values (largest difference 0.281): `point-sets/icp-then-igdm`, `point-sets/mattes-then-igdm`
+  - ANTS-62: 4 case(s) named it, 3 with changed values (largest difference 0.689): `point-sets/icp-text`, `point-sets/icp-text-no-final-newline`, `point-sets/pse-text-2d`, `point-sets/jhct-text`
+  - ANTS-63: 1 case(s) named it, 1 with changed values (largest difference 1.66): `point-sets/icp-vtk-binary`
+  - ANTS-65: 6 case(s) named it, 6 with changed values (largest difference 0.281): `point-sets/igdm`, `point-sets/igdm-fixed-initial`, `point-sets/igdm-2d-radius-0`, `point-sets/igdm-then-mattes`, `point-sets/icp-then-igdm`, `point-sets/mattes-then-igdm`
+  - ANTS-73: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (exit N -> N; files ['rNWarp.nii.gz', 'rNInverseWarp.nii.gz', 'rNWarp.nii.gz']): `syn/initial-scalar`, `syn/initial-scalar-2d`, `syn/initial-field-2d-in-3d`
+  - ITK-18: 6 case(s) named it, 6 with changed values (largest difference 2.8): `metrics/mi2`, `metrics/mi2-dense`, `metrics/mi2-2d`, `metrics/mi2-4d-gradient-filter`, `metrics/mi2-float`, `syn/mi2`
+  - ITK-22: 2 case(s) named it, 1 with changed values (largest difference 2.19e-06), 1 with other changes (exit N -> N; files ['rNGenericAffine.mat']): `point-sets/icp-vtk-no-scalars`, `point-sets/icp-not-bijective`
+  - ITK-23: 3 case(s) named it, 3 with changed values (largest difference 1.35e-14): `point-sets/jhct-isotropic`, `point-sets/jhct-alpha-1`, `point-sets/jhct-alpha-2`
+  - ITK-26: 5 case(s) named it, 5 with changed values (largest difference 2.88): `point-sets/jhct`, `point-sets/jhct-anisotropic-sigma-2`, `point-sets/jhct-text`, `point-sets/jhct-2d`, `syn-point-sets/jhct`
+  - ITK-30: 1 case(s) named it, 1 with changed values (largest difference 3.06): `syn/gc`
+  - ITK-31: 6 case(s) named it, 6 with changed values (largest difference 2.24): `syn/fixed-mask-only`, `syn/moving-mask-only`, `syn/float-mattes-mask`, `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc`, `real-syn-small/ds000005-sub-01/brain-extraction`
+  - ITK-32: 9 case(s) named it, 9 with changed values (largest difference 3.19): `syn-point-sets/icp`, `syn-point-sets/pse`, `syn-point-sets/jhct`, `syn-point-sets/icp-float`, `syn-point-sets/icp-moving-initial`, `syn-point-sets/icp-fixed-initial`, `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc` …
+  - ITK-33: 2 case(s) named it, 2 with changed values (largest difference 2.24): `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc`
 
 ## Thresholds
 
@@ -28,15 +44,18 @@ Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 |---|---|---|---|---|---|
 | dimensions-2d | 24 | 22 | 2 | 0 | 0 |
 | dimensions-4d | 10 | 10 | 0 | 0 | 0 |
-| errors | 36 | 2 | 28 | 6 | 0 |
+| errors | 35 | 2 | 28 | 5 | 0 |
 | initial | 11 | 9 | 1 | 1 | 0 |
 | metrics | 22 | 22 | 0 | 0 | 0 |
 | outputs | 7 | 7 | 0 | 0 | 0 |
 | point-sets | 57 | 41 | 13 | 3 | 0 |
 | real | 4 | 4 | 0 | 0 | 0 |
 | real-linear | 1 | 1 | 0 | 0 | 0 |
+| real-syn-small | 2 | 2 | 0 | 0 | 0 |
 | sampling | 11 | 10 | 0 | 1 | 0 |
 | smoke | 3 | 3 | 0 | 0 | 0 |
+| syn | 57 | 45 | 6 | 6 | 0 |
+| syn-point-sets | 16 | 9 | 7 | 0 | 0 |
 | transforms | 38 | 38 | 0 | 0 | 0 |
 
 ## Expected divergences
@@ -45,7 +64,6 @@ Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 |---|---|
 | `sampling/no-seed` | without a seed ANTs seeds its sampling from the clock and its result changes from run to run; larmorx uses a fixed seed |
 | `initial/names-restored` | ANTs reads past the end of its list of file names and crashes (ANTS-51); larmorx writes the same files up to there and stops with an error |
-| `errors/syn` | deformable registration is milestone A5; larmorx refuses with a message |
 | `errors/version` | larmorx prints its own version and the ANTs version it ports |
 | `errors/version-0` | ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45) |
 | `errors/no-dimension-quiet` | ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45) |
@@ -54,6 +72,12 @@ Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `point-sets/icp-sampled` | ANTs draws the points of a sampling percentage below 1 with a generator seeded from the clock (ANTS-64): two runs differ; larmorx seeds it from the registration's seed |
 | `point-sets/igdm-neighbourhood` | ANTs' line search computes IGDM's centre index from a negative number and reads memory before the intensity arrays (ANTS-66, undefined); larmorx takes the two intensities as equal |
 | `point-sets/igdm-2d` | ANTs reads memory before IGDM's intensity arrays for neighbourhoods of more than one voxel (ANTS-66) |
+| `syn/save-state-then-translation` | a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19) |
+| `syn/restore-state-then-translation` | a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19) |
+| `syn/then-linear` | a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72): two runs of ANTs differ; larmorx seeds it from the registration's seed |
+| `syn/initial-field-linear` | a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72) |
+| `syn/bsplinesyn` | B-spline SyN is milestone A5 part 2; larmorx refuses with a message |
+| `syn/exponential` | the exponential and velocity-field transforms are milestone A5 part 3; larmorx refuses with a message |
 
 ## Rejected by both
 
@@ -65,7 +89,7 @@ Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/no-arguments` | no arguments: the short menu | 1 |
 | `errors/bad-number` | -c [1x,1e-6,5]: a number that does not convert | 1 |
 | `errors/levels-mismatch` | two shrink factors for one level | 1 |
-| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-8tiyuzyh/none.nii.gz does not exist . |
+| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-08ehh_nj/none.nii.gz does not exist . |
 | `errors/unknown-transform` | an unknown transform name | Unknown registration method "foo" |
 | `errors/save-state-without-composite` | --save-state without -a 1 | because the the output transform will contain the this processes initializer |
 | `errors/per-stage-with-collapse` | -i 1 -a 1 with collapsing | ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive. |
@@ -88,27 +112,40 @@ Thread band, 18 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/bad-sampling` | an unknown sampling strategy | ERROR: invalid sampling strategy specified: sparse |
 | `errors/sigmas-mismatch` | three sigmas for two levels | 1 |
 | `errors/stage-without-metric` | a second -t without its -m | The number of transforms is 2 and the last stage ID as determined by the metrics is 0. |
-| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5a16a0812bc0): sampling percentage outside expected (0,1] range |
-| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-ubp11596/none.mat |
+| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5c821ab13bc0): sampling percentage outside expected (0,1] range |
+| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-dkzj7jrm/none.mat |
 | `point-sets/igdm-few-parameters` | IGDM with three parameters | The expected number of parameters aren't specified. Please see help menu. |
 | `point-sets/igdm-radius-dimension` | IGDM with a 2D radius in 3D | The neighborhood size must equal the dimension. |
-| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x62c7eb93de60): sampling percentage outside expected (0,1] range |
+| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5c681326de60): sampling percentage outside expected (0,1] range |
 | `point-sets/icp-no-mask` | Point-set metrics without a fixed mask: no virtual domain | larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs cras… |
 | `point-sets/icp-missing` | A point set that does not exist | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
 | `point-sets/icp-short-name` | A point set named with fewer than 3 characters | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
-| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-d16qg81c/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
+| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-z7vxcpa0/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
 | `point-sets/icp-vtk-no-points` | A VTK file without POINTS: libstdc++'s out_of_range | larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
 | `point-sets/igdm-missing-mask` | An IGDM mask that does not exist | larmorx: antsRegistration: an intensity point set could not be read: ANTs goes on with a null point set and crashes |
 | `point-sets/icp-warped` | Warped images with a point-set metric first | larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops |
 | `point-sets/icp-print-similarity` | --print-similarity-measure-interval with a point-set metric first | larmorx: antsRegistration: --print-similarity-measure-interval with a point-set metric first: ANTs' observer computes the full-scale similarity of null images;… |
 | `point-sets/icp-interval-volumes` | --write-interval-volumes with a point-set metric first | larmorx: antsRegistration: --write-interval-volumes with a point-set metric first: ANTs' observer resamples a null image; ANTs crashes here, larmorx stops |
 | `point-sets/mattes-regular-then-icp` | Regular sampling with a point-set metric in the stage | larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric an… |
+| `syn/print-similarity-crash` | --print-similarity-measure-interval without -q: a null transform (ANTS-71) | larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREA… |
+| `syn/print-similarity-multi-crash` | --print-similarity-measure-interval with two metrics: a null metric (ANTS-71) | larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREA… |
+| `syn/initial-field-inverse` | -r [field,1]: a field without an inverse | 1 |
+| `syn/initial-composite-inverse` | -r [composite,1]: its field has no inverse | 1 |
+| `syn/igdm` | IGDM first in a SyN stage: not implemented in ANTs | 1 |
+| `syn/bad-variance` | SyN[0.2,3x]: a variance that does not convert | ERROR: Unable to convert '3x' to type 'f' as float |
+| `syn-point-sets/icp-not-bijective` | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x64b4560769d0): The label sets are not bijective. |
+| `syn-point-sets/icp-moving-extra-label` | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x58e53588e3b0): The label sets are not bijective. |
+| `syn-point-sets/cc-and-igdm` | CC and IGDM: SyN holds labelled point sets only, IGDM gets no input (ANTS-61) | 1 |
+| `syn-point-sets/cc-igdm-icp` | CC, IGDM and ICP: IGDM without point sets before a metric with them (ANTS-61) | larmorx: antsRegistration: a SyN stage that lists IGDM before another metric: ANTs gives IGDM no point sets; ANTs crashes here, larmorx stops |
+| `syn-point-sets/cc-regular-and-icp` | CC sampled (Regular) and ICP: ANTs gives ICP's sample points to a null image metric | larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric an… |
+| `syn-point-sets/icp-field-initial` | ICP after -r a displacement field without an inverse: ITK maps the moving points with a null transform | larmorx: antsRegistration: the moving transform of a point-set metric in a SyN stage cannot be inverted (a linear transform with a singular matrix, or a displa… |
+| `syn-point-sets/icp-no-mask` | ICP alone without a fixed mask: no virtual domain | larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs cras… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (8bac0bf019bc) |
+| larmorx | 0.0.1 (a3c6cd64229c) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -260,7 +297,6 @@ Inputs named `gen:<name>` are built by this suite (seeded phantoms); the real ca
 | `errors/save-state-without-composite` | both-error | 2/2 | --save-state without -a 1 |
 | `errors/per-stage-with-collapse` | both-error | 2/2 | -i 1 -a 1 with collapsing |
 | `errors/restore-with-r` | both-error | 2/2 | --restore-state with -r |
-| `errors/syn` | expected-divergence | 1/1 | a SyN stage: larmorx ports deformable stages in A5 |
 | `errors/short-help` | pass | 5/5 | -h: the short menu, exit 0 |
 | `errors/version` | expected-divergence | 1/1 | --version |
 | `errors/version-0` | expected-divergence | 1/1 | --version 0: no version, then no dimension |
@@ -344,8 +380,83 @@ Inputs named `gen:<name>` are built by this suite (seeded phantoms); the real ca
 | `point-sets/icp-print-similarity` | both-error | 4/4 | --print-similarity-measure-interval with a point-set metric first |
 | `point-sets/icp-interval-volumes` | both-error | 4/4 | --write-interval-volumes with a point-set metric first |
 | `point-sets/mattes-regular-then-icp` | both-error | 4/4 | Regular sampling with a point-set metric in the stage |
+| `syn/cc` | pass | 10/10 | SyN with CC (radius 2), 2 levels, warped images |
+| `syn/meansquares-total` | pass | 8/8 | SyN with MeanSquares, a total field variance of 0.5 |
+| `syn/mattes` | pass | 14/14 | SyN with Mattes (24 bins), every voxel |
+| `syn/mattes-regular` | pass | 13/13 | SyN with Mattes, regular sampling 0.5 |
+| `syn/mattes-random` | pass | 7/7 | SyN with Mattes, random sampling 0.6 |
+| `syn/mi2` | pass | 13/13 | SyN with the joint-histogram MI (MI2, ITK-18 reproduced) |
+| `syn/demons` | pass | 7/7 | SyN with Demons (the fixed image's gradient) |
+| `syn/gc` | pass | 7/7 | SyN with GC: ITK adds every point's derivative to the first voxel (ITK-30) |
+| `syn/multi` | pass | 7/7 | two metrics (CC 0.7, Mattes 0.3): the weights normalised at each evaluation |
+| `syn/masks` | pass | 7/7 | -x [mask,mask]: both masks resampled through the fields |
+| `syn/fixed-mask-only` | pass | 7/7 | a fixed mask on another grid, no moving mask (ITK-31) |
+| `syn/moving-mask-only` | pass | 7/7 | -x [NULL,mask] with the mask on another grid (ITK-31) |
+| `syn/rigid-affine-syn` | pass | 10/10 | Rigid, Affine then SyN, collapsed: 0GenericAffine.mat, 1Warp, 1InverseWarp |
+| `syn/no-collapse` | pass | 10/10 | Affine then SyN, -z 0 |
+| `syn/composite` | pass | 7/7 | Affine then SyN, -a 1: the composite and its inverse hold the fields |
+| `syn/composite-no-collapse` | pass | 7/7 | Affine then SyN, -a 1 -z 0 |
+| `syn/two-stages` | pass | 9/9 | two SyN stages, collapsed into one field |
+| `syn/two-stages-no-collapse` | pass | 9/9 | two SyN stages, -z 0 |
+| `syn/save-state` | pass | 8/8 | --save-state after SyN: the fixed-to-middle and moving-to-middle fields and inverses |
+| `syn/save-state-then-translation` | expected-divergence | 1/1 | --save-state after SyN then Translation: ANTs saves the SyN state without the translation (ANTS-74) |
+| `syn/restore-state-then-translation` | expected-divergence | 1/1 | --restore-state of a SyN state, then Translation, --save-state (ANTS-74) |
+| `syn/restore-state` | pass | 7/7 | --restore-state of a SyN state: the composite ends with SyN's transform |
+| `syn/restore-state-per-stage` | pass | 7/7 | --restore-state with -i 1: SyN starts from the restored fields |
+| `syn/per-stage` | pass | 7/7 | -i 1: the second SyN stage starts from the first one's fields |
+| `syn/interval-volumes` | pass | 13/13 | --write-interval-volumes 2 |
+| `syn/print-similarity` | pass | 8/8 | --print-similarity-measure-interval 2 with initial transforms on both sides |
+| `syn/print-similarity-crash` | both-error | 4/4 | --print-similarity-measure-interval without -q: a null transform (ANTS-71) |
+| `syn/print-similarity-multi-crash` | both-error | 4/4 | --print-similarity-measure-interval with two metrics: a null metric (ANTS-71) |
+| `syn/restrict-deformation` | pass | 7/7 | -g 1x0.5x0: the update weighted per axis |
+| `syn/2d` | pass | 9/9 | SyN in 2D, three levels |
+| `syn/2d-float` | pass | 7/7 | SyN in 2D, --float 1 |
+| `syn/4d` | pass | 8/8 | SyN in 4D |
+| `syn/float` | pass | 9/9 | SyN, --float 1 |
+| `syn/float-mattes-mask` | pass | 13/13 | SyN with Mattes and a fixed mask, --float 1 |
+| `syn/gradient-filter` | pass | 7/7 | CC and Demons with the gradient filter |
+| `syn/mm-winsorize-histogram` | pass | 7/7 | sigmas in mm, -w and -u, an update variance of 0 |
+| `syn/sdcflows-syn-sdc` | pass | 13/13 | sdcflows' fieldmap-less SyN (sd_syn.json): two SyN stages of two Mattes metrics (random sampling, then dense), -g along… |
+| `syn/fixed-initial` | pass | 9/9 | -q [fixed,moving,1]: the fixed images resampled through it |
+| `syn/convergence` | pass | 7/7 | a level stopped by the convergence test, a level of 0 iterations |
+| `syn/oblique` | pass | 9/9 | SyN between oblique grids |
+| `syn/default-variances` | pass | 7/7 | SyN[0.2]: the variances default to 3 and 0 |
+| `syn/quiet` | pass | 10/10 | Affine then SyN without -v |
+| `syn/then-linear` | expected-divergence | 1/1 | SyN then Affine: the linear stage's scales from random voxels (ANTS-72) |
+| `syn/initial-field` | pass | 9/9 | -r a displacement field image |
+| `syn/initial-field-linear` | expected-divergence | 1/1 | -r a displacement field image, then Affine (ANTS-72) |
+| `syn/initial-field-inverse` | both-error | 2/2 | -r [field,1]: a field without an inverse |
+| `syn/initial-composite` | pass | 10/10 | -r a composite holding an affine transform and a field |
+| `syn/initial-composite-inverse` | both-error | 2/2 | -r [composite,1]: its field has no inverse |
+| `syn/fixed-field` | pass | 9/9 | -q a displacement field image |
+| `syn/initial-field-2d` | pass | 9/9 | -r a 2D displacement field image |
+| `syn/initial-scalar` | pass | 8/8 | -r a scalar image: ITK reads it as a field of equal components (ANTS-73) |
+| `syn/initial-scalar-2d` | pass | 8/8 | -r a 2D scalar image: ITK reads it as complex pixels, both parts equal (ANTS-73) |
+| `syn/initial-field-2d-in-3d` | pass | 8/8 | -r a 2D field in 3D: one slice, each vector the product of its components (ANTS-73) |
+| `syn/igdm` | both-error | 2/2 | IGDM first in a SyN stage: not implemented in ANTs |
+| `syn/bad-variance` | both-error | 2/2 | SyN[0.2,3x]: a variance that does not convert |
+| `syn/bsplinesyn` | expected-divergence | 1/1 | BSplineSyN: A5 part 2 |
+| `syn/exponential` | expected-divergence | 1/1 | Exponential: A5 part 3 |
+| `syn-point-sets/icp` | pass | 8/8 | ICP alone: the fixed mask's grid as the virtual domain |
+| `syn-point-sets/pse` | pass | 7/7 | PSE (sigma 1, 20 neighbours) |
+| `syn-point-sets/jhct` | pass | 13/13 | JHCT, anisotropic (sigma 1, alpha 1.1) |
+| `syn-point-sets/icp-float` | pass | 7/7 | ICP, --float 1 |
+| `syn-point-sets/icp-moving-initial` | pass | 8/8 | ICP after -r (a matrix) |
+| `syn-point-sets/icp-fixed-initial` | pass | 7/7 | ICP after -q (a matrix) |
+| `syn-point-sets/icp-not-bijective` | both-error | 2/2 | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) |
+| `syn-point-sets/icp-moving-extra-label` | both-error | 2/2 | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) |
+| `syn-point-sets/cc-and-icp` | pass | 7/7 | CC and ICP: ITK gives ICP identity transforms (ITK-33) |
+| `syn-point-sets/icp-and-cc` | pass | 7/7 | ICP first, then CC: ICP's virtual domain (ITK-33) |
+| `syn-point-sets/cc-and-igdm` | both-error | 2/2 | CC and IGDM: SyN holds labelled point sets only, IGDM gets no input (ANTS-61) |
+| `syn-point-sets/cc-igdm-icp` | both-error | 4/4 | CC, IGDM and ICP: IGDM without point sets before a metric with them (ANTS-61) |
+| `syn-point-sets/icp-2d` | pass | 7/7 | ICP in 2D |
+| `syn-point-sets/cc-regular-and-icp` | both-error | 4/4 | CC sampled (Regular) and ICP: ANTs gives ICP's sample points to a null image metric |
+| `syn-point-sets/icp-field-initial` | both-error | 4/4 | ICP after -r a displacement field without an inverse: ITK maps the moving points with a null transform |
+| `syn-point-sets/icp-no-mask` | both-error | 4/4 | ICP alone without a fixed mask: no virtual domain |
 | `real/ds000005-sub-01/boldref-affine` | pass | 7/7 | fMRIPrep 25.2.6's enhance_and_skullstrip_bold_wf/norm of ds000005-sub-01-noreconall |
 | `real/ds005040-sub-002/boldref-affine` | pass | 11/11 | fMRIPrep 25.2.6's enhance_and_skullstrip_bold_wf/norm of ds005040-sub-002-noreconall |
 | `real/ds005040-sub-002/coregister` | pass | 7/7 | fMRIPrep 25.2.6's fmapreg_wf/coregister of ds005040-sub-002-noreconall |
 | `real/ds005454-sub-16/coregister` | pass | 6/6 | fMRIPrep 25.2.6's fmapreg_wf/coregister of ds005454-sub-16-noreconall |
+| `real-syn-small/ds000005-sub-01/brain-extraction` | pass | 18/18 | fMRIPrep 25.2.6's norm of ds000005-sub-01-noreconall, whole (Rigid, Affine, SyN), on one voxel in 3 along each axis of … |
 | `real-linear/ds000005-sub-01/template` | pass | 15/15 | the linear stages of fMRIPrep 25.2.6's registration of ds000005-sub-01-noreconall (its SyN stage left out) |
+| `real-syn-small/ds000005-sub-01/template` | pass | 16/16 | fMRIPrep 25.2.6's registration of ds000005-sub-01-noreconall, whole (Rigid, Affine, SyN), on one voxel in 3 along each … |

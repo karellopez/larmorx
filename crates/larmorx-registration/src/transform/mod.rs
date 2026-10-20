@@ -18,6 +18,7 @@ mod set_matrix;
 
 pub use linear::{Kind, LinearXfm, collapse_linear, inverse_r};
 
+use crate::field::FieldXfm;
 use crate::{ItkException, Matrix, Real};
 
 /// One transform of a composite.
@@ -29,6 +30,19 @@ pub enum Xfm<R, const D: usize> {
     Translation { offset: [R; D] },
     /// A transform of the matrix-offset family.
     Linear(LinearXfm<R, D>),
+    /// `DisplacementFieldTransform` (SyN's output, or a field among the initial transforms).
+    Field(FieldXfm<R, D>),
+}
+
+/// The exception of operations a displacement field does not support here (a linear stage's
+/// optimizer never sees one).
+fn field_unsupported(what: &str) -> ItkException {
+    ItkException::new(
+        "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.hxx",
+        0,
+        "DisplacementFieldTransform",
+        format!("{what}: a displacement field is not optimised by a linear stage"),
+    )
 }
 
 /// ITK's `Matrix · Point` in `R` (each row summed from 0) plus the offset.
@@ -54,6 +68,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => "IdentityTransform",
             Xfm::Translation { .. } => "TranslationTransform",
             Xfm::Linear(l) => l.kind.class(),
+            Xfm::Field(_) => "DisplacementFieldTransform",
         }
     }
 
@@ -64,16 +79,44 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => *p,
             Xfm::Translation { offset } => std::array::from_fn(|i| p[i] + offset[i]),
             Xfm::Linear(l) => matrix_point(&l.matrix, p, &l.offset),
+            Xfm::Field(f) => f.transform_point(p),
         }
     }
 
-    /// `ComputeJacobianWithRespectToPosition`: the matrix (identity for a translation).
-    pub fn jacobian_position(&self) -> Matrix<R, D> {
+    /// `TransformCovariantVector(vector, point)`: unchanged by the identity and a translation;
+    /// a matrix transform's inverse matrix transposed (vnl's inverse, [`linear::inverse_r`]);
+    /// a field's approximate inverse Jacobian at the voxel nearest `p`, transposed (ITK's
+    /// `Transform::TransformCovariantVector`). Each entry summed in `R` from 0.
+    pub fn transform_covariant(&self, v: &[R; D], p: &[R; D]) -> [R; D] {
+        let transposed = |m: &Matrix<R, D>| -> [R; D] {
+            std::array::from_fn(|i| {
+                let mut s = R::ZERO;
+                for j in 0..D {
+                    s = s + m[j][i] * v[j];
+                }
+                s
+            })
+        };
+        match self {
+            Xfm::Identity | Xfm::Translation { .. } => *v,
+            Xfm::Linear(l) => match linear::inverse_r(&l.matrix) {
+                Some(inv) => transposed(&inv),
+                // ITK keeps the last inverse it could compute; a singular matrix has none.
+                None => *v,
+            },
+            Xfm::Field(f) => transposed(&f.inverse_jacobian_position(p)),
+        }
+    }
+
+    /// `ComputeJacobianWithRespectToPosition(p)`: the matrix (identity for a translation), a
+    /// field's local Jacobian at the voxel nearest `p`.
+    pub fn jacobian_position(&self, p: &[R; D]) -> Matrix<R, D> {
         match self {
             Xfm::Identity | Xfm::Translation { .. } => std::array::from_fn(|i| {
                 std::array::from_fn(|j| if i == j { R::ONE } else { R::ZERO })
             }),
             Xfm::Linear(l) => l.matrix,
+            Xfm::Field(f) => f.jacobian_position(p),
         }
     }
 
@@ -83,6 +126,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => 0,
             Xfm::Translation { .. } => D,
             Xfm::Linear(l) => l.kind.number_of_parameters(D),
+            Xfm::Field(f) => D * f.field.space.len(),
         }
     }
 
@@ -104,6 +148,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => Vec::new(),
             Xfm::Translation { offset } => offset.to_vec(),
             Xfm::Linear(l) => l.parameters(),
+            Xfm::Field(f) => f.field.data.iter().flatten().copied().collect(),
         }
     }
 
@@ -116,6 +161,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.set_parameters(p),
+            Xfm::Field(_) => Err(field_unsupported("SetParameters")),
         }
     }
 
@@ -125,6 +171,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => Vec::new(),
             Xfm::Translation { .. } => vec![0.0; 0],
             Xfm::Linear(l) => l.fixed_parameters(),
+            Xfm::Field(f) => f.fixed_parameters(),
         }
     }
 
@@ -145,6 +192,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.update(update, factor),
+            Xfm::Field(_) => Err(field_unsupported("UpdateTransformParameters")),
         }
     }
 
@@ -153,7 +201,9 @@ impl<R: Real, const D: usize> Xfm<R, D> {
     pub fn jacobian_parameters(&self, p: &[R; D], out: &mut [R]) {
         match self {
             Xfm::Identity => {}
-            Xfm::Translation { .. } => {
+            // A displacement field's Jacobian is local: the identity for its D parameters at
+            // the point.
+            Xfm::Translation { .. } | Xfm::Field(_) => {
                 out.fill(R::ZERO);
                 for i in 0..D {
                     out[i * D + i] = R::ONE;
@@ -165,7 +215,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
 
     /// `IsLinear()`.
     pub fn is_linear(&self) -> bool {
-        true
+        !matches!(self, Xfm::Field(_))
     }
 }
 
@@ -189,6 +239,18 @@ impl<R: Real, const D: usize> Composite<R, D> {
             q = t.transform_point(&q);
         }
         q
+    }
+
+    /// `TransformCovariantVector(vector, point)`: the queue in reverse order, each transform
+    /// at the point as the transforms before it moved it.
+    pub fn transform_covariant(&self, v: &[R; D], p: &[R; D]) -> [R; D] {
+        let mut out = *v;
+        let mut q = *p;
+        for t in self.transforms.iter().rev() {
+            out = t.transform_covariant(&out, &q);
+            q = t.transform_point(&q);
+        }
+        out
     }
 
     /// The optimised transform.
@@ -216,11 +278,21 @@ impl<R: Real, const D: usize> Composite<R, D> {
             self.transforms[0].jacobian_parameters(p, out);
             return;
         }
-        // The last transform (applied first) is the only one optimised. The transforms here
-        // are linear, so their Jacobians with respect to position do not depend on the point.
+        // The last transform (applied first) is the only one optimised; each transform applied
+        // after it multiplies by its Jacobian with respect to position at the point mapped so
+        // far (a linear transform's does not depend on the point).
         self.transforms[n - 1].jacobian_parameters(p, out);
+        let nonlinear = self.transforms.iter().any(|t| !t.is_linear());
+        let mut q = if nonlinear {
+            self.transforms[n - 1].transform_point(p)
+        } else {
+            *p
+        };
         for t in self.transforms[..n - 1].iter().rev() {
-            let jp = t.jacobian_position();
+            let jp = t.jacobian_position(&q);
+            if nonlinear {
+                q = t.transform_point(&q);
+            }
             for c in 0..np {
                 let mut temp = [0.0f64; D];
                 for r in 0..D {
@@ -234,4 +306,131 @@ impl<R: Real, const D: usize> Composite<R, D> {
             }
         }
     }
+}
+
+/// ITK's transform categories as ANTs' collapse distinguishes them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Category {
+    Linear,
+    DisplacementField,
+}
+
+fn category<R: Real, const D: usize>(t: &Xfm<R, D>) -> Category {
+    if t.is_linear() {
+        Category::Linear
+    } else {
+        Category::DisplacementField
+    }
+}
+
+/// ANTs' `CollapseDisplacementFieldTransforms`: neighbouring fields that are both invertible
+/// or both not are composed into one ([`crate::field::compose`], the later transform of the
+/// queue warping the earlier one's field; their inverses composed the other way); a change of
+/// invertibility starts a new field.
+pub fn collapse_fields<R: Real, const D: usize>(
+    group: &[crate::field::FieldXfm<R, D>],
+    floor: &larmorx_core::IndexFloor,
+) -> Vec<crate::field::FieldXfm<R, D>> {
+    use crate::field::{FieldXfm, compose};
+    use std::sync::Arc;
+    let mut out = Vec::new();
+    let Some(first) = group.first() else {
+        return out;
+    };
+    let mut current = first.clone();
+    let mut invertible = current.inverse.is_some();
+    for nth in &group[1..] {
+        let same = invertible == nth.inverse.is_some();
+        if same {
+            let total = compose(&current.field, &nth.field, floor);
+            let total_inverse = if invertible {
+                Some(compose(
+                    nth.inverse.as_deref().expect("invertible"),
+                    current.inverse.as_deref().expect("invertible"),
+                    floor,
+                ))
+            } else {
+                None
+            };
+            current = FieldXfm {
+                field: Arc::new(total),
+                inverse: total_inverse.map(Arc::new),
+                exact_floor: current.exact_floor,
+            };
+        } else {
+            out.push(FieldXfm {
+                field: Arc::clone(&current.field),
+                inverse: if invertible {
+                    current.inverse.clone()
+                } else {
+                    None
+                },
+                exact_floor: current.exact_floor,
+            });
+            current = nth.clone();
+            invertible = current.inverse.is_some();
+        }
+    }
+    out.push(current);
+    out
+}
+
+/// ANTs' `CollapseCompositeTransform`: a queue of linear transforms becomes one
+/// `AffineTransform` ([`collapse_linear`]), a queue of displacement fields as few fields as
+/// [`collapse_fields`] makes; a mixed queue is split into runs of one category, each collapsed,
+/// except that the queue's last transform, when it starts a new run, is kept as it is. `None`
+/// where ANTs crashes (an `IdentityTransform` in a linear run, ANTS-48).
+pub fn collapse_composite<R: Real, const D: usize>(
+    queue: &[Xfm<R, D>],
+    floor: &larmorx_core::IndexFloor,
+) -> Option<Vec<Xfm<R, D>>> {
+    let collapse = |group: &[Xfm<R, D>], c: Category| -> Option<Vec<Xfm<R, D>>> {
+        match c {
+            Category::Linear => Some(vec![Xfm::Linear(collapse_linear(group)?)]),
+            Category::DisplacementField => {
+                let fields: Vec<_> = group
+                    .iter()
+                    .map(|t| match t {
+                        Xfm::Field(f) => f.clone(),
+                        _ => unreachable!("a run of fields"),
+                    })
+                    .collect();
+                Some(
+                    collapse_fields(&fields, floor)
+                        .into_iter()
+                        .map(Xfm::Field)
+                        .collect(),
+                )
+            }
+        }
+    };
+    if queue.iter().all(|t| t.is_linear()) {
+        return collapse(queue, Category::Linear);
+    }
+    if queue.iter().all(|t| !t.is_linear()) {
+        return collapse(queue, Category::DisplacementField);
+    }
+    let last = queue.len() - 1;
+    let mut out = Vec::new();
+    let mut current = category(&queue[0]);
+    let mut group = vec![queue[0].clone()];
+    for (n, t) in queue.iter().enumerate().skip(1) {
+        let c = category(t);
+        if c == current {
+            group.push(t.clone());
+            if n == last {
+                out.extend(collapse(&group, current)?);
+            }
+        } else {
+            out.extend(collapse(&group, current)?);
+            group.clear();
+            current = c;
+            if n < last {
+                group.push(t.clone());
+            } else {
+                out.push(t.clone());
+            }
+        }
+    }
+    Some(out)
 }

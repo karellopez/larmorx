@@ -37,6 +37,7 @@
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
 
 pub mod convergence;
+pub mod field;
 pub mod format;
 pub mod image;
 pub mod initializer;
@@ -51,6 +52,7 @@ pub mod preprocess;
 pub mod resample;
 pub mod rng;
 pub mod space;
+pub mod syn;
 pub mod transform;
 
 use larmorx_core::ItkReal;

@@ -83,6 +83,9 @@ def test_the_registry_lists_the_ants_entries():
         "ANTS-54",
         "ANTS-55",
         "ANTS-56",
+        "ANTS-71",
+        "ANTS-73",
+        "ANTS-74",
         "ITK-01",
         "ITK-02",
         "ITK-08",
@@ -91,6 +94,10 @@ def test_the_registry_lists_the_ants_entries():
         "ITK-19",
         "ITK-20",
         "ITK-21",
+        "ITK-30",
+        "ITK-31",
+        "ITK-32",
+        "ITK-33",
         "SCI-02",
     ):
         assert entry in ids, entry
@@ -612,3 +619,40 @@ def test_scipy_integer_outputs():
     # Without a NaN, nothing to say.
     _, w = entries(lx.ndimage.map_coordinates, data[:1], coords[:, :1] * 0, output=np.int32)
     assert w == []
+
+
+def _syn(tmp_path, mode, *extra):
+    """A small SyN registration in mode ``mode``: ``(code, stderr, prefix)``."""
+    f = save(phantom(seed=1), tmp_path / "f.nii.gz")
+    m = save(phantom(seed=2), tmp_path / "m.nii.gz")
+    prefix = tmp_path / f"{mode}_"
+    metric = extra[0] if extra else "GC[{f},{m},1]"
+    code, _, err = ants(
+        "antsRegistration", "-d", "3", "-o", prefix, *extra[1:],
+        "-t", "SyN[0.3,2,0]", "-m", metric.format(f=f, m=m),
+        "-c", "[2,1e-6,3]", "-f", "1", "-s", "0", env=mode,
+    )  # fmt: skip
+    return code, err, prefix
+
+
+def test_syn_gc_derivative_is_corrected_by_default(tmp_path):
+    """ITK-30: GC's derivative with a displacement field, all in the first voxel in ITK."""
+    fields = {}
+    for mode in (FIX, REPRODUCE):
+        code, err, prefix = _syn(tmp_path, mode)
+        assert code == 0, err
+        assert "ITK-30" in err
+        fields[mode] = np.asanyarray(nib.load(f"{prefix}0Warp.nii.gz").dataobj)
+    assert not np.array_equal(fields[FIX], fields[REPRODUCE])
+
+
+def test_syn_scalar_initial_field_is_refused_by_default(tmp_path):
+    """ANTS-73: a scalar image given as an initial displacement field."""
+    scalar = save(phantom(seed=3) / 100, tmp_path / "scalar.nii.gz")
+    code, err, _ = _syn(tmp_path, FIX, "MeanSquares[{f},{m},1]", "-r", scalar)
+    assert code == 1
+    assert "ANTS-73" in err
+    code, err, _ = _syn(tmp_path, REPRODUCE, "MeanSquares[{f},{m},1]", "-r", scalar)
+    assert code == 0, err
+    assert "ANTS-73" in err
+    assert (tmp_path / f"{REPRODUCE}_0Warp.nii.gz").exists()

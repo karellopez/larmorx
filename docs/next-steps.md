@@ -129,9 +129,27 @@ B-spline cases re-run).
 
 ## 4. A5: `antsRegistration`'s deformable stages; A6: Atropos
 
-SyN, BSplineSyN, the exponential, Gaussian and B-spline displacement-field and time-varying
-transforms, their composite outputs (part 1's HDF5); then Atropos (k-means, EM, MRF; ANTs'
-random seeding). With A4-A6, sMRIPrep's brain extraction and MNI normalisation run in larmorx.
+**Part 1, SyN (done 2026-10-19, branch `worktree-agent-aca867b0b4aec5f3f`, not merged yet).**
+`SyN[step,update,total]` stages to full completeness: ITK's `SyNImageRegistrationMethod`
+(`larmorx_registration::syn`, `::field`), every image metric with local support (`Demons`
+included), several metrics, masks, sampling, the point-set metrics in tangent space, 2D/3D/4D,
+double and float; displacement fields among the initial transforms (images and composites),
+`Warp`/`InverseWarp` outputs, the collapse with fields, composites, `--save-state` and
+`--restore-state` of SyN states, `--initialize-transforms-per-stage`, the SyN observer, every
+message and failure. `ants-registration` re-recorded from `a3c6cd6`: standard 298 cases
+(193 identical to the unmodified ANTs, 32 with CORE-MATH, 57 rejected by both,
+16 expected divergences, 0 failures), full 327 (194, 59, 57, 17, 0), with
+sMRIPrep's brain extraction and template registration whole on the five oracle runs (on every
+third voxel: ds000005 in the standard tier, all five in the full tier; full size in the full
+tier; all 20 identical to ANTs with CORE-MATH) and sdcflows' fieldmap-less SyN settings. Register:
+ANTS-71 to ANTS-74, ITK-30 to ITK-34. Benchmark report pending (busy machine; one measurement:
+96³ CC 10x5, ANTs 122 s at one thread; larmorx 24 to 41 s at one thread and 5 to 9 s at 12,
+bit-identical, in two runs on a loaded machine).
+
+**Part 2:** BSplineSyN, `BSpline`, `GaussianDisplacementField`, `BSplineDisplacementField`
+(refused today, naming part 2). **Part 3:** the time-varying velocity fields and the
+exponential transforms. Then A6, Atropos (k-means, EM, MRF; ANTs' random seeding). With A4-A6,
+sMRIPrep's brain extraction and MNI normalisation run in larmorx.
 
 ## 5. The rest of the `--fs-no-reconall` path
 

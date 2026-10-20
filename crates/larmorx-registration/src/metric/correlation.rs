@@ -57,6 +57,96 @@ fn averages<R: Real, const D: usize>(
     Ok(((R::ZERO + fix_sum) / n, (R::ZERO + mov_sum) / n))
 }
 
+/// `GetValueAndDerivative` with a moving transform of local support (a displacement field:
+/// SyN's identity field, or the field a stage optimises). ITK accumulates every point's
+/// `f·g` and `m·g` into the derivative's first `D` entries (its per-thread sums are sized for
+/// all the parameters but indexed by the local parameter) and scales the whole vector, so
+/// only the first voxel gets a derivative (ITK-30, reproduced with `correct` false);
+/// corrected, each voxel gets its own point's terms. `g` is the moving gradient projected on
+/// the transform's Jacobian (`D` local parameters).
+pub fn local_derivative<R: Real, const D: usize>(
+    metric: &ImageMetricv4<R, D>,
+    transform: &Composite<R, D>,
+    correct: bool,
+    floor: &IndexFloor,
+    warnings: &mut Vec<String>,
+) -> Result<(R, Vec<R>), ItkException> {
+    let total = D * metric.virtual_space.len();
+    let (average_fix, average_mov) = averages(metric, transform, floor, warnings)?;
+    let gradients = GradientSource {
+        fixed: false,
+        moving: true,
+    };
+    let (mut f2, mut m2, mut fm) = (R::ZERO, R::ZERO, R::ZERO);
+    let mut fdm = vec![R::ZERO; total];
+    let mut mdm = vec![R::ZERO; total];
+    let mut count = 0usize;
+    metric.for_each_sample(
+        |i| {
+            let s = metric.sample(i, transform, gradients, true, floor)?;
+            let f1 = s.fixed_value - average_fix;
+            let m1 = s.moving_value - average_mov;
+            // Σ_dim ∇m[dim]·J[dim][par].
+            let mut jac = [R::ZERO; 16];
+            let vp: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
+            metric.moving_jacobian(transform, &vp, &mut jac[..D * D]);
+            let projected: [R; D] = std::array::from_fn(|par| {
+                let mut sum = R::ZERO;
+                for dim in 0..D {
+                    sum = sum + s.moving_gradient[dim] * jac[dim * D + par];
+                }
+                sum
+            });
+            Some((f1, m1, projected, metric.voxel_of(&s.virtual_index)))
+        },
+        |(f1, m1, projected, voxel)| {
+            f2 = f2 + f1 * f1;
+            m2 = m2 + m1 * m1;
+            fm = fm + f1 * m1;
+            let base = if correct {
+                match voxel {
+                    Some(v) => v * D,
+                    None => return Ok(()),
+                }
+            } else {
+                0
+            };
+            for par in 0..D {
+                fdm[base + par] = fdm[base + par] + f1 * projected[par];
+                mdm[base + par] = mdm[base + par] + m1 * projected[par];
+            }
+            count += 1;
+            Ok(())
+        },
+    )?;
+    let mut derivative = vec![R::ZERO; total];
+    if count == 0 {
+        warnings.push(no_valid_points_warning(
+            "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
+            544,
+            CLASS,
+        ));
+        return Ok((R::MAX, derivative));
+    }
+    let (fm, f2, m2) = (R::ZERO + fm, R::ZERO + f2, R::ZERO + m2);
+    let m2f2 = m2 * f2;
+    if m2f2 <= R::EPSILON {
+        // m_Value keeps its previous value; ANTs' SyN reads it as the value of this call.
+        return Ok((R::ZERO, derivative));
+    }
+    let value = R::from_f64(-fm.to_f64() * fm.to_f64() / m2f2.to_f64());
+    // m_DerivativeResult += fc * fm / (f2 * m2) * (fdm - fm / m2 * mdm), element by element.
+    let fc = R::from_f64(2.0);
+    let a = fc * fm / (f2 * m2);
+    let b = fm / m2;
+    for i in 0..total {
+        let fd = R::ZERO + fdm[i];
+        let md = R::ZERO + mdm[i];
+        derivative[i] = derivative[i] + a * (fd - b * md);
+    }
+    Ok((value, derivative))
+}
+
 /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`.
 pub fn evaluate<R: Real, const D: usize>(
     m: &ImageMetricv4<R, D>,

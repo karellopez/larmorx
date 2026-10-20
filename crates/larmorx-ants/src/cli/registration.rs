@@ -1388,11 +1388,13 @@ fn do_registration<R: Compute, const D: usize>(
                 field: field(&queue[n - 4]),
                 inverse: Some(field(&queue[n - 3])),
                 exact_floor: exact,
+                smoothing: None,
             };
             let m2m = larmorx_registration::field::FieldXfm {
                 field: field(&queue[n - 2]),
                 inverse: Some(field(&queue[n - 1])),
                 exact_floor: exact,
+                smoothing: None,
             };
             log.logger(
                 "Initial FixedToMiddle and MovingToMiddle transforms are restored from the registration state file.\n",
@@ -2519,6 +2521,7 @@ fn forward_only<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Xfm<R, D> {
             field: Arc::clone(&f.field),
             inverse: None,
             exact_floor: f.exact_floor,
+            smoothing: None,
         }),
         other => other.clone(),
     }
@@ -2558,6 +2561,7 @@ fn write_inverse_field<R: Compute, const D: usize>(
         field: Arc::clone(inverse),
         inverse: None,
         exact_floor: f.exact_floor,
+        smoothing: None,
     });
     write_transform_file(log, ctx.notices, name, &[xfm_parts(&t)]);
 }

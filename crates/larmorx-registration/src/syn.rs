@@ -39,7 +39,7 @@ use larmorx_core::IndexFloor;
 
 use crate::convergence::WindowConvergence;
 use crate::field::{
-    Field, FieldXfm, InvertSettings, compose, gaussian_smooth, invert, resample_to, scale_update,
+    Field, FieldXfm, InvertSettings, adapt, compose, gaussian_smooth, invert, scale_update,
     zero_field,
 };
 use crate::mask::Mask;
@@ -333,7 +333,13 @@ fn metric_derivative<R: Real, const D: usize>(
     let identity = Composite::new(Vec::new());
     match (&m.state, m.kind) {
         (Some(state), _) => state.evaluate(&m.metric, &identity, true, floor, warnings),
-        (None, MetricKind::Gc) => gc_derivative(&m.metric, correct_gc, floor, warnings),
+        (None, MetricKind::Gc) => crate::metric::correlation::local_derivative(
+            &m.metric,
+            &Composite::new(Vec::new()),
+            correct_gc,
+            floor,
+            warnings,
+        ),
         (None, _) => {
             let r = demons::evaluate(&m.metric, &identity, true, floor)?;
             if r.no_valid_points {
@@ -346,122 +352,6 @@ fn metric_derivative<R: Real, const D: usize>(
             Ok((r.value, r.derivative))
         }
     }
-}
-
-/// `CorrelationImageToImageMetricv4::GetValueAndDerivative` with a transform of local
-/// support. ITK accumulates every point's `f·g` and `m·g` into the derivative's first `D`
-/// entries (its per-thread sums are sized for all the parameters but indexed by the local
-/// parameter) and scales the whole vector, so only the first voxel gets a derivative
-/// (ITK-30, reproduced with `correct` false); corrected, each voxel gets its own point's terms.
-fn gc_derivative<R: Real, const D: usize>(
-    metric: &ImageMetricv4<R, D>,
-    correct: bool,
-    floor: &IndexFloor,
-    warnings: &mut Vec<String>,
-) -> Result<(R, Vec<R>), ItkException> {
-    use crate::metric::GradientSource;
-    let identity = Composite::new(Vec::new());
-    let total = D * metric.virtual_space.len();
-    // The first pass: the averages.
-    let none = GradientSource {
-        fixed: false,
-        moving: false,
-    };
-    let (mut fix_sum, mut mov_sum, mut valid) = (R::ZERO, R::ZERO, 0usize);
-    metric.for_each_sample(
-        |i| {
-            metric
-                .sample(i, &identity, none, false, floor)
-                .map(|s| (s.fixed_value, s.moving_value))
-        },
-        |(f, m)| {
-            fix_sum = fix_sum + f;
-            mov_sum = mov_sum + m;
-            valid += 1;
-            Ok(())
-        },
-    )?;
-    let (average_fix, average_mov) = if valid == 0 {
-        warnings.push(
-            "WARNING: In Modules/Registration/Metricsv4/include/itkCorrelationImageToImageMetricv4HelperThreader.hxx, line 77\n\
-             CorrelationImageToImageMetricv4HelperThreader (0x0): collected only zero points\n\n"
-                .to_string(),
-        );
-        (R::ZERO, R::ZERO)
-    } else {
-        let n = R::from_i64(valid as i64);
-        ((R::ZERO + fix_sum) / n, (R::ZERO + mov_sum) / n)
-    };
-    let gradients = GradientSource {
-        fixed: false,
-        moving: true,
-    };
-    let (mut f2, mut m2, mut fm) = (R::ZERO, R::ZERO, R::ZERO);
-    let mut fdm = vec![R::ZERO; total];
-    let mut mdm = vec![R::ZERO; total];
-    let mut count = 0usize;
-    metric.for_each_sample(
-        |i| {
-            let s = metric.sample(i, &identity, gradients, true, floor)?;
-            let f1 = s.fixed_value - average_fix;
-            let m1 = s.moving_value - average_mov;
-            // Σ_dim ∇m[dim]·J[dim][par] with the identity Jacobian.
-            let projected: [R; D] = std::array::from_fn(|par| {
-                let mut sum = R::ZERO;
-                for dim in 0..D {
-                    let j = if dim == par { R::ONE } else { R::ZERO };
-                    sum = sum + s.moving_gradient[dim] * j;
-                }
-                sum
-            });
-            Some((f1, m1, projected, metric.voxel_of(&s.virtual_index)))
-        },
-        |(f1, m1, projected, voxel)| {
-            f2 = f2 + f1 * f1;
-            m2 = m2 + m1 * m1;
-            fm = fm + f1 * m1;
-            let base = if correct {
-                match voxel {
-                    Some(v) => v * D,
-                    None => return Ok(()),
-                }
-            } else {
-                0
-            };
-            for par in 0..D {
-                fdm[base + par] = fdm[base + par] + f1 * projected[par];
-                mdm[base + par] = mdm[base + par] + m1 * projected[par];
-            }
-            count += 1;
-            Ok(())
-        },
-    )?;
-    let mut derivative = vec![R::ZERO; total];
-    if count == 0 {
-        warnings.push(no_valid_points_warning(
-            VERIFY_FILE,
-            544,
-            "CorrelationImageToImageMetricv4",
-        ));
-        return Ok((R::MAX, derivative));
-    }
-    let (fm, f2, m2) = (R::ZERO + fm, R::ZERO + f2, R::ZERO + m2);
-    let m2f2 = m2 * f2;
-    if m2f2 <= R::EPSILON {
-        // m_Value keeps its previous value; ANTs' SyN reads it as the value of this call.
-        return Ok((R::ZERO, derivative));
-    }
-    let value = R::from_f64(-fm.to_f64() * fm.to_f64() / m2f2.to_f64());
-    // m_DerivativeResult += fc * fm / (f2 * m2) * (fdm - fm / m2 * mdm), element by element.
-    let fc = R::from_f64(2.0);
-    let a = fc * fm / (f2 * m2);
-    let b = fm / m2;
-    for i in 0..total {
-        let fd = R::ZERO + fdm[i];
-        let md = R::ZERO + mdm[i];
-        derivative[i] = derivative[i] + a * (fd - b * md);
-    }
-    Ok((value, derivative))
 }
 
 /// The multi-metric's weights, normalised at each `Initialize` (`m_MetricWeights / sum`).
@@ -746,40 +636,6 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
 pub fn weights_are_identity<R: Real>(w: &[R]) -> bool {
     let tolerance = R::from_f64(1e-4);
     w.iter().all(|&x| (R::ONE - x).abs() <= tolerance)
-}
-
-/// The adaptor of a level (`DisplacementFieldTransformParametersAdaptor`): the transform's
-/// fields (and inverse) resampled onto `space` unless their fixed parameters already equal it.
-fn adapt<R: Real, const D: usize>(
-    t: &FieldXfm<R, D>,
-    space: &Space<D>,
-    floor: &IndexFloor,
-) -> FieldXfm<R, D> {
-    let s = &t.field.space;
-    let same = s.size == space.size
-        && s.origin == space.origin
-        && s.spacing == space.spacing
-        && s.direction == space.direction;
-    if same {
-        return t.clone();
-    }
-    // The resampled fields start at index 0 (`SetSize`).
-    let target = Space::new(
-        space.size,
-        [0; D],
-        space.spacing,
-        space.origin,
-        space.direction,
-    )
-    .expect("the virtual domain's geometry");
-    FieldXfm {
-        field: Arc::new(resample_to(&t.field, &target, floor)),
-        inverse: t
-            .inverse
-            .as_ref()
-            .map(|i| Arc::new(resample_to(i, &target, floor))),
-        exact_floor: t.exact_floor,
-    }
 }
 
 /// Runs a SyN stage: the output transform and the state, or ITK's exception.

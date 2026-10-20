@@ -15,6 +15,7 @@ use std::time::Instant;
 use larmorx_core::IndexFloor;
 use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects, push_once};
 use larmorx_registration::format::OStream;
+use larmorx_registration::field::{FieldSmoothing, FieldXfm};
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{
     self, ImageStageMetric, LevelProblem, MetricKind as MethodMetric, PointSetStageMetric,
@@ -1113,12 +1114,46 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
                 continue;
             }
-            let mut output = match self.new_transform(method) {
-                Some(t) => t,
-                None => return self.unsupported(log, &format!("{} stages", method.as_str())),
+            // GaussianDisplacementField, BSplineDisplacementField: ImageRegistrationMethodv4
+            // optimising a displacement field with smoothing on update.
+            let field_stage = matches!(
+                method,
+                XfrmMethod::GaussianDisplacementField | XfrmMethod::BSplineDisplacementField
+            );
+            if field_stage && stage_metrics[0].kind == Some(MetricKind::Igdm) {
+                log.logger(
+                    "Intensity point set metric is not implemented yet for the specified transform.\n",
+                );
+                return Err(RegistrationFailed(
+                    "Intensity point set metric is not implemented yet for the specified transform."
+                        .into(),
+                ));
+            }
+            let mut output = if field_stage {
+                // A placeholder until the field is allocated (after PrepareRegistrationMethod).
+                Xfm::Identity
+            } else {
+                match self.new_transform(method) {
+                    Some(t) => t,
+                    None => return self.unsupported(log, &format!("{} stages", method.as_str())),
+                }
             };
-            let class = output.class();
-            let n_parameters = output.number_of_parameters();
+            let class = match method {
+                XfrmMethod::GaussianDisplacementField => {
+                    "GaussianSmoothingOnUpdateDisplacementFieldTransform"
+                }
+                XfrmMethod::BSplineDisplacementField => {
+                    "BSplineSmoothingOnUpdateDisplacementFieldTransform"
+                }
+                _ => output.class(),
+            };
+            // PrepareRegistrationMethod's parametersDimensionSize: the dimension for the
+            // displacement fields.
+            let n_parameters = if field_stage {
+                D
+            } else {
+                output.number_of_parameters()
+            };
             let percentage_r = R::r(f64::from(percentage));
             if let Err(e) = method::check_sampling_percentage_levels(percentage_r.to_f64(), levels)
             {
@@ -1164,6 +1199,52 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     }
                 }
             }
+            // The displacement field: zero vectors on the stage's first fixed image (a
+            // point-set metric first has none: ANTs allocates on a null image).
+            let mut field_meshes = None;
+            if field_stage {
+                let Some(space) = prepared.first().and_then(|m| match m {
+                    StageMetric::Image(i) => Some(i.fixed.space.clone()),
+                    StageMetric::PointSet(_) => None,
+                }) else {
+                    return Err(self.crash(
+                        log,
+                        "a displacement field stage whose first metric is a point-set metric: ANTs allocates the field on the null image of its first metric",
+                    ));
+                };
+                let t = &self.transforms[stage];
+                let smoothing = if method == XfrmMethod::GaussianDisplacementField {
+                    FieldSmoothing::Gaussian {
+                        update_variance: t.update_field_variance,
+                        total_variance: t.total_field_variance,
+                    }
+                } else {
+                    if t.update_field_mesh.len() != D || t.total_field_mesh.len() != D {
+                        log.logger("ERROR:  The mesh size(s) don't match the ImageDimension.\n");
+                        return Err(RegistrationFailed(
+                            "The mesh size(s) don't match the ImageDimension.".into(),
+                        ));
+                    }
+                    field_meshes = Some(method::FieldMeshes {
+                        order: t.spline_order,
+                        update_mesh: t.update_field_mesh.clone(),
+                        total_mesh: t.total_field_mesh.clone(),
+                        shift: 1,
+                    });
+                    FieldSmoothing::BSpline {
+                        order: t.spline_order,
+                        update_control_points: vec![4; D],
+                        total_control_points: vec![0; D],
+                    }
+                };
+                let mut f = FieldXfm::new(
+                    larmorx_registration::field::zero_field(&space),
+                    None,
+                    self.upstream_defects.fix(),
+                );
+                f.smoothing = Some(smoothing);
+                output = Xfm::Field(f);
+            }
             let composite = self.composite.as_ref().expect("set above").clone();
             let fixed_initial = self.fixed_initial.as_ref().expect("set above").clone();
             let seed = if self.random_seed != 0 {
@@ -1182,9 +1263,24 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 fixed_initial: (!fixed_initial.is_empty()).then(|| Composite::new(fixed_initial)),
                 moving_initial: composite.clone(),
                 initialize_center: true,
+                field_meshes,
+                correct_gc_derivative: self.upstream_defects.fix(),
                 n_threads: self.n_threads,
             };
-            log.logger(&format!("\n*** Running {class} registration ***\n\n"));
+            let t = &self.transforms[stage];
+            match method {
+                XfrmMethod::GaussianDisplacementField => log.logger(&format!(
+                    "\n*** Running gaussian displacement field registration (varianceForUpdateField = {}, varianceForTotalField = {}) ***\n\n",
+                    log.f(t.update_field_variance.to_f64()),
+                    log.f(t.total_field_variance.to_f64())
+                )),
+                XfrmMethod::BSplineDisplacementField => log.logger(&format!(
+                    "\n*** Running bspline displacement field registration (updateMeshSizeAtBaseLevel = {}, totalMeshSizeAtBaseLevel = {}) ***\n\n",
+                    super::bspline_syn::print_array(&t.update_field_mesh),
+                    super::bspline_syn::print_array(&t.total_field_mesh)
+                )),
+                _ => log.logger(&format!("\n*** Running {class} registration ***\n\n")),
+            }
             // SetOrigFixedImage/SetOrigMovingImage: the first metric's images, as read.
             let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
                 (Some(f), Some(m)) => Some((Arc::clone(f), Arc::clone(m))),
@@ -1299,6 +1395,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 }
                 Err(e) if e.file == method::CRASH_FILE => {
                     return Err(self.crash(log, &e.description));
+                }
+                Err(e) if field_stage => {
+                    // The displacement field stages return EXIT_FAILURE themselves.
+                    log.logger(&format!("Exception caught: {}\n", e.print()));
+                    return Err(RegistrationFailed(e.description));
                 }
                 Err(e) => {
                     // AddLinearTransformToCompositeTransform logs the exception and returns

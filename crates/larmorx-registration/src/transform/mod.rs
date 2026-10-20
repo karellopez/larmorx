@@ -34,17 +34,6 @@ pub enum Xfm<R, const D: usize> {
     Field(FieldXfm<R, D>),
 }
 
-/// The exception of operations a displacement field does not support here (a linear stage's
-/// optimizer never sees one).
-fn field_unsupported(what: &str) -> ItkException {
-    ItkException::new(
-        "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.hxx",
-        0,
-        "DisplacementFieldTransform",
-        format!("{what}: a displacement field is not optimised by a linear stage"),
-    )
-}
-
 /// ITK's `Matrix · Point` in `R` (each row summed from 0) plus the offset.
 #[inline]
 pub fn matrix_point<R: Real, const D: usize>(
@@ -68,7 +57,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             Xfm::Identity => "IdentityTransform",
             Xfm::Translation { .. } => "TranslationTransform",
             Xfm::Linear(l) => l.kind.class(),
-            Xfm::Field(_) => "DisplacementFieldTransform",
+            Xfm::Field(f) => f.class(),
         }
     }
 
@@ -120,6 +109,14 @@ impl<R: Real, const D: usize> Xfm<R, D> {
         }
     }
 
+    /// `GetNumberOfLocalParameters()`: `D` for a displacement field, else every parameter.
+    pub fn number_of_local_parameters(&self) -> usize {
+        match self {
+            Xfm::Field(_) => D,
+            _ => self.number_of_parameters(),
+        }
+    }
+
     /// `GetNumberOfParameters()`.
     pub fn number_of_parameters(&self) -> usize {
         match self {
@@ -161,7 +158,7 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.set_parameters(p),
-            Xfm::Field(_) => Err(field_unsupported("SetParameters")),
+            Xfm::Field(f) => f.set_parameters(p),
         }
     }
 
@@ -192,7 +189,19 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 Ok(())
             }
             Xfm::Linear(l) => l.update(update, factor),
-            Xfm::Field(_) => Err(field_unsupported("UpdateTransformParameters")),
+            Xfm::Field(f) => {
+                let mut copy = update.to_vec();
+                f.update(&mut copy, factor)
+            }
+        }
+    }
+
+    /// `UpdateTransformParameters(update, factor)` with ITK's side effect on the caller's
+    /// array: a Gaussian-smoothing displacement field smooths `update` in place.
+    pub fn update_in_place(&mut self, update: &mut [R], factor: R) -> Result<(), ItkException> {
+        match self {
+            Xfm::Field(f) => f.update(update, factor),
+            other => other.update(update, factor),
         }
     }
 
@@ -211,6 +220,12 @@ impl<R: Real, const D: usize> Xfm<R, D> {
             }
             Xfm::Linear(l) => l.jacobian_parameters(p, out),
         }
+    }
+
+    /// Whether the scales estimator treats the transform as one of local support
+    /// (`TransformHasLocalSupportForScalesEstimation`: a displacement field).
+    pub fn has_local_support(&self) -> bool {
+        matches!(self, Xfm::Field(_))
     }
 
     /// `IsLinear()`.
@@ -267,13 +282,18 @@ impl<R: Real, const D: usize> Composite<R, D> {
         self.active().number_of_parameters()
     }
 
+    /// `GetNumberOfLocalParameters()` of the optimised part.
+    pub fn number_of_local_parameters(&self) -> usize {
+        self.active().number_of_local_parameters()
+    }
+
     /// `ComputeJacobianWithRespectToParametersCachedTemporaries`: the active transform's
     /// Jacobian at `p`, then, for each transform applied after it, left-multiplied by that
     /// transform's Jacobian with respect to position (each product in `R`, summed in a
     /// double, stored in `R`).
     pub fn jacobian(&self, p: &[R; D], out: &mut [R]) {
         let n = self.transforms.len();
-        let np = self.number_of_parameters();
+        let np = self.number_of_local_parameters();
         if n == 1 {
             self.transforms[0].jacobian_parameters(p, out);
             return;
@@ -356,6 +376,7 @@ pub fn collapse_fields<R: Real, const D: usize>(
                 field: Arc::new(total),
                 inverse: total_inverse.map(Arc::new),
                 exact_floor: current.exact_floor,
+                smoothing: current.smoothing.clone(),
             };
         } else {
             out.push(FieldXfm {
@@ -366,6 +387,7 @@ pub fn collapse_fields<R: Real, const D: usize>(
                     None
                 },
                 exact_floor: current.exact_floor,
+                smoothing: None,
             });
             current = nth.clone();
             invertible = current.inverse.is_some();

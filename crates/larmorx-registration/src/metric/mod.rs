@@ -111,7 +111,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     /// [`ImageMetricv4::local_parameters`] values (the identity with local support).
     #[inline]
     pub fn moving_jacobian(&self, transform: &Composite<R, D>, vp: &[R; D], out: &mut [R]) {
-        if self.local_support {
+        if self.local_support && transform.transforms.is_empty() {
             out.fill(R::ZERO);
             for i in 0..D {
                 out[i * D + i] = R::ONE;

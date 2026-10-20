@@ -31,7 +31,7 @@ use larmorx_core::IndexFloor;
 use rayon::prelude::*;
 
 use crate::interp::at_cindex_with;
-use crate::{Image, Real, Space};
+use crate::{Image, ItkException, Real, Space};
 
 /// A displacement field: `Image<Vector<R, D>, D>`.
 pub type Field<R, const D: usize> = Image<[R; D], D>;
@@ -448,6 +448,62 @@ pub fn resample_to<R: Real, const D: usize>(
     Image::new(output.clone(), rows.into_iter().flatten().collect())
 }
 
+/// The adaptor of a level (`DisplacementFieldTransformParametersAdaptor`): the transform's
+/// fields (and inverse) resampled onto `space` unless their fixed parameters already equal it.
+pub fn adapt<R: Real, const D: usize>(
+    t: &FieldXfm<R, D>,
+    space: &Space<D>,
+    floor: &IndexFloor,
+) -> FieldXfm<R, D> {
+    let s = &t.field.space;
+    let same = s.size == space.size
+        && s.origin == space.origin
+        && s.spacing == space.spacing
+        && s.direction == space.direction;
+    if same {
+        return t.clone();
+    }
+    // The resampled fields start at index 0 (`SetSize`).
+    let target = Space::new(
+        space.size,
+        [0; D],
+        space.spacing,
+        space.origin,
+        space.direction,
+    )
+    .expect("the virtual domain's geometry");
+    FieldXfm {
+        field: Arc::new(resample_to(&t.field, &target, floor)),
+        inverse: t
+            .inverse
+            .as_ref()
+            .map(|i| Arc::new(resample_to(i, &target, floor))),
+        exact_floor: t.exact_floor,
+        smoothing: t.smoothing.clone(),
+    }
+}
+
+/// How a displacement field transform smooths a parameter update
+/// (`UpdateTransformParameters`), for the subclasses ANTs optimises.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FieldSmoothing<R> {
+    /// `GaussianSmoothingOnUpdateDisplacementFieldTransform`: the update smoothed in place
+    /// with the update variance (voxels²), added, and the total field smoothed with the total
+    /// variance (each skipped when ≤ 0).
+    Gaussian {
+        update_variance: R,
+        total_variance: R,
+    },
+    /// `BSplineSmoothingOnUpdateDisplacementFieldTransform`: the update replaced by its
+    /// B-spline approximation, added, and the total field replaced by its own (each skipped
+    /// when a number of control points is at most the order); the boundary stationary.
+    BSpline {
+        order: u32,
+        update_control_points: Vec<u32>,
+        total_control_points: Vec<u32>,
+    },
+}
+
 /// `DisplacementFieldTransform<R, D>` as SyN and ANTs use it: the displacement field and,
 /// for an invertible transform, its inverse field.
 #[derive(Clone, Debug, PartialEq)]
@@ -457,6 +513,8 @@ pub struct FieldXfm<R, const D: usize> {
     /// The floor of the interpolator's base index: the exact one (ITK-01 corrected), or
     /// ITK's.
     pub exact_floor: bool,
+    /// The subclass that smooths its updates (`None`: `DisplacementFieldTransform`).
+    pub smoothing: Option<FieldSmoothing<R>>,
 }
 
 impl<R: Real, const D: usize> FieldXfm<R, D> {
@@ -465,7 +523,127 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
             field: Arc::new(field),
             inverse: inverse.map(Arc::new),
             exact_floor,
+            smoothing: None,
         }
+    }
+
+    /// `GetNameOfClass()`.
+    pub fn class(&self) -> &'static str {
+        match &self.smoothing {
+            None => "DisplacementFieldTransform",
+            Some(FieldSmoothing::Gaussian { .. }) => "GaussianSmoothingOnUpdateDisplacementFieldTransform",
+            Some(FieldSmoothing::BSpline { .. }) => "BSplineSmoothingOnUpdateDisplacementFieldTransform",
+        }
+    }
+
+    /// `SetParameters(params)`: the field's vectors replaced by `p` (the voxels' components in
+    /// buffer order); ITK's exception when the sizes differ.
+    pub fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException> {
+        let n = D * self.field.data.len();
+        if p.len() != n {
+            return Err(ItkException::new(
+                "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.h",
+                282,
+                self.class(),
+                format!(
+                    "Input parameters size ({}) does not match internal size ({n}).",
+                    p.len()
+                ),
+            ));
+        }
+        let field = Arc::make_mut(&mut self.field);
+        for (v, c) in field.data.iter_mut().zip(p.as_chunks::<D>().0) {
+            *v = *c;
+        }
+        Ok(())
+    }
+
+    /// `UpdateTransformParameters(update, factor)` of the transform's class. The Gaussian
+    /// smoothing replaces `update` with its smoothed copy, as ITK smooths the caller's array in
+    /// place; the plain class and the B-spline one leave it as it is.
+    pub fn update(&mut self, update: &mut [R], factor: R) -> Result<(), ItkException> {
+        let n = D * self.field.data.len();
+        if update.len() != n {
+            return Err(ItkException::new(
+                "Modules/Core/Transform/include/itkTransform.hxx",
+                76,
+                self.class(),
+                format!(
+                    "Parameter update size, {}, must  be same as transform parameter size, {n}\n",
+                    update.len()
+                ),
+            ));
+        }
+        let space = self.field.space.clone();
+        let as_field = |u: &[R]| -> Field<R, D> {
+            Image::new(space.clone(), u.as_chunks::<D>().0.to_vec())
+        };
+        // Transform::UpdateTransformParameters: += update (· factor).
+        let add = |field: &mut Field<R, D>, u: &[R]| {
+            for (v, c) in field.data.iter_mut().zip(u.as_chunks::<D>().0) {
+                for d in 0..D {
+                    v[d] = if factor == R::ONE {
+                        v[d] + c[d]
+                    } else {
+                        v[d] + c[d] * factor
+                    };
+                }
+            }
+        };
+        match self.smoothing.clone() {
+            None => {
+                add(Arc::make_mut(&mut self.field), update);
+            }
+            Some(FieldSmoothing::Gaussian {
+                update_variance,
+                total_variance,
+            }) => {
+                if update_variance > R::ZERO {
+                    let smoothed = gaussian_smooth(&as_field(update), update_variance);
+                    for (u, v) in update.as_chunks_mut::<D>().0.iter_mut().zip(&smoothed.data) {
+                        *u = *v;
+                    }
+                }
+                add(Arc::make_mut(&mut self.field), update);
+                if total_variance > R::ZERO {
+                    let smoothed = gaussian_smooth(&self.field, total_variance);
+                    self.field = Arc::new(smoothed);
+                }
+            }
+            Some(FieldSmoothing::BSpline {
+                order,
+                update_control_points,
+                total_control_points,
+            }) => {
+                let cps = |v: &[u32]| -> [u32; D] { std::array::from_fn(|d| v[d]) };
+                let smooth_update = update_control_points.iter().all(|&c| c > order);
+                if smooth_update {
+                    let smoothed = crate::bspline_field::field_to_bspline(
+                        &as_field(update),
+                        None,
+                        &cps(&update_control_points),
+                        order,
+                        true,
+                    )?;
+                    let flat: Vec<R> = smoothed.data.iter().flatten().copied().collect();
+                    add(Arc::make_mut(&mut self.field), &flat);
+                } else {
+                    add(Arc::make_mut(&mut self.field), update);
+                }
+                if total_control_points.iter().all(|&c| c > order) {
+                    let smoothed = crate::bspline_field::field_to_bspline(
+                        &self.field,
+                        None,
+                        &cps(&total_control_points),
+                        order,
+                        true,
+                    )?;
+                    let field = Arc::make_mut(&mut self.field);
+                    field.data = smoothed.data;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The interpolator's floor.
@@ -485,6 +663,7 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
             field: Arc::clone(inv),
             inverse: Some(Arc::clone(&self.field)),
             exact_floor: self.exact_floor,
+            smoothing: None,
         })
     }
 

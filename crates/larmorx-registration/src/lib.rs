@@ -36,6 +36,7 @@
 // ITK's loops index several arrays at once; they are kept as written.
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
 
+pub mod bspline_field;
 pub mod convergence;
 pub mod field;
 pub mod format;

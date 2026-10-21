@@ -76,7 +76,7 @@ class Context:
 
 
 DTYPES = {"f4": "<f4", "f8": "<f8", "i2": "<i2", "u2": "<u2", "u1": "u1", "i4": "<i4", "u4": "<u4"}
-BITS = {"f4": "<u4", "i2": "<u2", "u2": "<u2", "u1": "u1", "i4": "<u4", "u4": "<u4"}
+BITS = {"f4": "<u4", "f8": "<u8", "i2": "<u2", "u2": "<u2", "u1": "u1", "i4": "<u4", "u4": "<u4"}
 
 
 def dtype_code(a: np.ndarray) -> str:

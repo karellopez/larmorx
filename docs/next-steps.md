@@ -28,10 +28,13 @@ starts no other agent.
 ## The order from here
 
 1. **Visual reports, part 2: interactive evidence** (user, 2026-10-21; decision log). Part 2a, a
-   pilot: the Validation guide (method, terms, the verdict taxonomy, a tool-by-implementation
-   summary), the shared interactive components (image viewer, charts, case explorer, verdict
-   legend) and the pages of N4BiasFieldCorrection and 3dTshift; then the user's review. Part 2b:
-   every other tool. Each later part brings its tool's evidence in the same form.
+   pilot (merged 2026-10-21, waiting for the user's review): the Validation guide (method, terms,
+   the verdict taxonomy, a tool-by-implementation summary), the shared interactive components
+   (image viewer, time series, charts, case explorer, verdict legend) and the pages of
+   N4BiasFieldCorrection and 3dTshift. Part 2b: every other tool, and the cases the summary
+   counts "within thresholds, not yet classified" (antsApplyTransforms 28, ImageMath 5, ITK
+   transform files 1, head-motion correction 121) given their verdicts; N4's benchmark re-run
+   against the current oracle. Each later part brings its tool's evidence in the same form.
 2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
    corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
@@ -128,6 +131,10 @@ Still to do:
 
 ## Waiting for the user
 
+- **The evidence pilot** (part 2a): the pages, and one choice in the taxonomy: the clean-room
+  3dTshift's last-unit differences from computing its Fourier shift in double precision (AFNI:
+  float32; 189 of 10,321,920 values on the pilot's run, 103 record cases) are shown as an "open
+  difference" (cause known, not closed: computing in float32 would make them identical).
 - **ANTS-30:** review ResampleImage's corrected command line (`docs/api/ants-resample-image.md`,
   "The seventh argument").
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with

@@ -86,8 +86,11 @@ def _redacted(result):
 
 
 def _summary(result) -> dict:
-    """What the JSON record keeps of a case: its status and anything that did not pass."""
-    return {
+    """What the JSON record keeps of a case: its status, anything that did not pass, and the
+    values a suite reports without a threshold (``threshold="reported"``, e.g. the number of
+    values that differ from the original's where a case passes within tolerances), which the
+    documentation site's case explorer reads (``python -m larmorx_validation evidence``)."""
+    out = {
         "case": result.case,
         "category": result.category,
         "status": result.status,
@@ -97,6 +100,10 @@ def _summary(result) -> dict:
         "failed_checks": [c.__dict__ for c in result.failed_checks],
         "seconds": round(result.seconds, 3),
     }
+    reported = {c.name: c.value for c in result.checks if c.threshold == "reported"}
+    if reported:
+        out["reported"] = reported
+    return out
 
 
 def cmd_parity(args: argparse.Namespace) -> int:
@@ -187,6 +194,12 @@ def cmd_figures(args: argparse.Namespace) -> int:
     return figures.main(args)
 
 
+def cmd_evidence(args: argparse.Namespace) -> int:
+    from larmorx_validation import evidence
+
+    return evidence.main(args)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m larmorx_validation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -254,6 +267,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="never compute a missing cache entry: skip the figures that need one",
     )
     fg.set_defaults(func=cmd_figures)
+    ev = sub.add_parser(
+        "evidence",
+        help="export a tool's validation evidence (worked examples, metrics, verdicts, cases) "
+        "for the documentation site's interactive pages",
+    )
+    ev.add_argument("tool", help="a tool (larmorx_validation.evidence.TOOLS), 'summary' or 'all'")
+    ev.add_argument("--site", required=True, help="the documentation site's checkout")
+    ev.add_argument(
+        "--cache",
+        help="the figures cache (default: LARMORX_FIGURES_CACHE, else the workspace's "
+        "oracles/figures-cache)",
+    )
+    ev.add_argument(
+        "--no-compute",
+        action="store_true",
+        help="never compute a missing cache entry: skip the tools that need one",
+    )
+    ev.set_defaults(func=cmd_evidence)
     args = parser.parse_args(argv)
     return args.func(args)
 

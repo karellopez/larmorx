@@ -1,109 +1,126 @@
-# Figures: the visual evidence of every tool
+# Figures and evidence: what the documentation site shows of each tool
 
-Every tool's contract includes figures (CLAUDE.md rule 7): how the port, the clean-room
-original and the replica compare with the original program, drawn from the committed records
-and published on the documentation site (`larmorx_documentation`, one page per tool under
-*Tools*). The code that draws them lives here, in `larmorx_validation.figures`, so every figure
-can be drawn again from a commit of larmorx; the rendered files live in the site's repository.
-Figures never run in CI (rule 10).
+Every tool's contract includes visual evidence (CLAUDE.md rule 7): how the port, the clean-room
+original and the replica compare with the original program. Since 2026-10-21 (decision log,
+"Validation evidence, interactive and explained") it is **interactive evidence**: for each tool,
+worked examples on real data that a reader inspects in an image viewer (the input, the original
+program's outputs, larmorx's outputs, the differences, each panel labelled with the exact
+program, version, build, thread count and mode), the metrics of every comparison computed
+offline in float64, a verdict per comparison and per parity case from one taxonomy with its
+reason, and every parity case in a searchable table. N4BiasFieldCorrection and 3dTshift were the
+pilot (part 2a); the other tools still show the static figures of part 1 until their pages are
+redone (part 2b, below).
 
-## Run
+The code that computes everything lives here, in `larmorx_validation`, so the evidence can be
+exported again from a commit of larmorx; the site's repository (`larmorx_documentation`) holds
+the exported data and the components that display it, and computes nothing of its own. Neither
+runs in CI (rule 10).
+
+## Export
 
 ```bash
-pip install -e "validation[figures]"   # matplotlib, fonttools, nibabel, scipy
-# larmorx itself: a release build of this checkout (maturin build, or maturin develop in the
-# main checkout); the oracles named in CLAUDE.md for the image figures
-python -m larmorx_validation figures ants-n4 --out ../larmorx_documentation/static/figures
-python -m larmorx_validation figures all --out ../larmorx_documentation/static/figures
+pip install -e "validation[figures]"   # matplotlib, fonttools, nibabel, scipy (and Pillow)
+# larmorx itself: a release build of this checkout; the oracles named in CLAUDE.md
+python -m larmorx_validation evidence ants-n4 --site ../larmorx_documentation
+python -m larmorx_validation evidence all --site ../larmorx_documentation   # every pilot tool + summary
 ```
 
-| Option | Effect |
+| Argument | Effect |
 |---|---|
-| `<tool>` or `all` | a page's figures (`larmorx_validation.figures.TOOLS`), or every page's |
-| `--out DIR` | writes `DIR/<tool>/<figure>-{light,dark}[-narrow].svg` and `DIR/<tool>/<figure>.json` |
-| `--only NAME ...` | only these figures of the tool |
-| `--cache DIR` | the figures cache (default: `LARMORX_FIGURES_CACHE`, else the workspace's `oracles/figures-cache`, else `~/.cache/larmorx-figures`) |
-| `--no-compute` | never compute a missing cache entry; the figures that need one are skipped (exit status 1) |
+| `<tool>`, `summary` or `all` | a tool of `larmorx_validation.evidence.TOOLS`; `summary` writes the Validation page's matrix of every tool; `all` does every tool and then the summary |
+| `--site DIR` | the site's checkout: writes `static/evidence/<tool>.json`, `static/evidence/summary.json` and the images in `static/evidence/blobs/`, and removes the blobs no JSON refers to any more |
+| `--cache DIR` | the figures cache (default: `LARMORX_FIGURES_CACHE`, else the workspace's `oracles/figures-cache`) |
+| `--no-compute` | never compute a missing cache entry: skip the tools that need one |
 
-A tool's figures take seconds to draw from the records. An image figure needs real outputs:
-the first run computes them into the cache (minutes: the original program, at one thread and
-at others where its thread band is the story, with CORE-MATH preloaded, and larmorx), and later
-runs reuse them.
+The first export of a tool computes its cache entry (minutes: the original programs at the
+thread counts and maths libraries the comparison needs, fMRIPrep's own tools in its image,
+larmorx's implementations in both modes); later exports reuse it and take seconds. Then build
+the site (`tools/build.py`, 0 problems) and run its number check (its README, "The validation
+evidence").
 
-## What a figure is made of
+## What a tool's evidence is made of
 
-- **Records.** The agreement overviews, the differences against the original's thread band and
-  the speed charts read `docs/validation/<suite>.json` and `.md` and `docs/benchmarks/<suite>.json`
-  (`figures/records.py`). The Markdown records' tables are read by their column names; a figure
-  fails loudly when the table it needs is missing. Numbers are never typed into figure code.
-- **The cache** (`figures/cache.py`): `<cache>/<tool>/<case>/` holds the outputs of the original
-  program and of larmorx on one or two real cases per tool, and `RUN_INFO.json`, written last:
-  every command with its environment, threads, seed, exit status and time, the program versions,
-  the larmorx commit and the inputs' SHA-256. An entry without `RUN_INFO.json` is computed again.
-  Never commit cache contents (image data).
-- **Provenance** (`<figure>.json` beside the files): the records (path, SHA-256, the commit
-  they were generated from), the cache entries (commands, versions), the data (dataset, subject,
-  licence, files; the MNI notice where the template is shown), the larmorx commit the figure was
-  drawn from, the command and the package versions. The site links it under each figure.
+- **Cache entries** (`figures/cache.py`): `<cache>/<tool>/<case>/` holds the outputs of every run
+  and `RUN_INFO.json`, written last: each command with its environment, threads, exit status
+  and time, the program versions, the larmorx commit and the inputs' SHA-256. An entry without
+  `RUN_INFO.json` is computed again. Never commit cache contents (image data).
+- **A worked example** (`evidence/example.py`): the pipeline's own call where there is one (read
+  from an fMRIPrep oracle run's working directory: `command.txt` and the node's input files,
+  plus fMRIPrep's own output as a panel), run by the original program (as built, with CORE-MATH
+  preloaded, at other thread counts, fMRIPrep's own build in its image) and by larmorx (each
+  implementation, default and `reproduce` modes, 1 and 12 threads). `Example.add` stores each
+  panel once; `Example.compare` computes A − B over every voxel of the files (largest |Δ| and
+  where, values that differ and their share, RMS, |Δ| over B's range, 1 − NCC) and where the
+  shown brain differs most. Each comparison's verdict is decided by code from these metrics
+  (e.g. *identical with correctly rounded maths* only when larmorx − original-with-CORE-MATH is
+  bit-identical), never typed; the chain of causes asserts every identity it shows.
+- **The display data**: the file's voxels reoriented to RAS (flips and transposes only) and
+  cropped to the brain (fMRIPrep's mask, dilated: no face can show), zero outside it; stored as
+  raw little-endian values in byte planes, zlib-compressed, or as the exclusive or of their bits
+  with a reference (another panel, or a float32 quotient such as N4's input ÷ bias field), or
+  as `same`/`neg` of another panel, whichever is smallest: lossless, and float32 or int16 as the
+  outputs are, so the viewer reads exact values. Blobs are named by their SHA-256 (byte-
+  deterministic with this machine's zlib), so an unchanged result changes nothing in git. Still
+  posters (lossless WebP) of the default view serve readers without JavaScript. Budget: about
+  25 MB per page of examples in the site's repository (the pilot: 18 MB for both tools).
+- **The cases** (`evidence/<tool>.py`, `_cases`): every case of the tool's records with its
+  description and command line (from the parity suite's own definitions), outcome, checks and a
+  verdict: the records' JSON keeps each case's *reported* values (`__main__._summary`, e.g. how
+  many values differ from the original's where a case passes within tolerances), so a case's
+  verdict is read, not inferred from totals.
+- **Charts' data**: the agreement overview (cases by category and verdict), the differences
+  against the original's thread band (from the record's table), speed (from the benchmark
+  report, never from informal timings).
+- **Provenance** inside each tool's JSON: the records (path, SHA-256, commit), the benchmark
+  reports, the cache entries (commands, versions, threads), the data (dataset, subject, licence)
+  and the exporter's git tree hash.
 
-## The style
+## The verdicts
 
-One style for every figure (`figures/style.py`), the site's design language:
+One taxonomy for the whole site (`larmorx_validation.evidence.core.VERDICTS`; definitions,
+labels and colours in the site's `data/verdicts.yml`): bit-identical; identical with correctly
+rounded maths; within the original's own variability; deliberate correction (D13); expected
+divergence; rejected by both; open difference (not accounted for by the others, or above the
+thresholds: it can still be improved, and what is known is stated). Rows comparing the original
+with itself (thread counts, builds, versions) carry no verdict: they are the yardstick.
 
-- **Two themes, two widths.** Each figure is drawn for the light and the dark theme, on the
-  colour of the site's figure card (`--bg-elev`), at the text column's width (720 px) and a
-  phone's (360 px). The site shows the version of its current theme (the switch and the system
-  setting) and the narrow one below 560 px.
-- **Type.** Instrument Serif for numerals that matter, Inter for text, JetBrains Mono for labels
-  and ticks, fetched once from Google Fonts' repository at a pinned commit (`figures/fonts.py`,
-  SIL Open Font License) and drawn as outlines, so the SVG shows them anywhere.
-- **Colour has one job per chart.** Programs: the original in ink, larmorx in apricot, a replica
-  in blue, a second reference (e.g. SimpleITK) in grey. Agreement states: identical to the
-  unmodified original in apricot, identical with correctly rounded maths in apricot with a hatch,
-  within the record's thresholds in blue, an expected divergence in ochre, a failure in magenta,
-  rejected by both in a hatched grey. Signed differences: blue, the paper at zero, apricot, on a
-  symmetric scale whose range the figure states. Magnitudes: from the paper to apricot. The
-  palette passes a colour-vision-deficiency check in both themes (neighbours ΔE ≥ 13 under
-  protanopia and deuteranopia, normal vision ΔE ≥ 15, 3:1 against the card); identity never
-  rests on colour alone (legends, hatches, labels).
-- **Brain images.** Slices only, masked to a slightly dilated brain mask on a transparent
-  background, so no slice can show a face; neurological convention, true voxel sizes; a
-  hairline outline of the brain on difference maps; a difference map that is zero says
-  "bit-identical". Rasters are embedded at their own resolution as lossless WebP.
-- **Honesty.** `experimental` tools are shown as experimental; expected divergences and D13
-  corrections are drawn as what they are; a tool without a benchmark report gets no speed chart
-  (its page says the benchmark is pending): no charts from informal timings.
+## Add a tool (part 2b and later)
+
+1. Create `validation/src/larmorx_validation/evidence/<tool>.py` with `export(ctx) -> dict`, and
+   add it to `TOOLS` in `evidence/__init__.py`; take `ants_n4.py` (a port, one output pair, a
+   thread band) or `afni_tshift.py` (two implementations, 4D, a D13 correction) as the model.
+2. The cache entry: the pipeline's real call on real data where there is one (an fMRIPrep
+   oracle run's node), the original as built, with CORE-MATH, at the thread counts its record's
+   band uses, fMRIPrep's own build if it differs; larmorx in both modes and at 1 and 12 threads.
+   Keep it to minutes.
+3. The example: panels (`Example.add`; order them so the closest references come first), the
+   comparisons (`_diffs`), their verdicts from the metrics, the chain of causes where larmorx
+   and fMRIPrep differ, a default view worth seeing (a slice through tissue where the tool
+   acts, the crosshair on a difference), the facts (data, node, command, programs, grid) and
+   the provenance. A D13 correction gets an example of its own where a real input can carry the
+   defect (as AFNI-01's re-stored run).
+4. The cases: each case's verdict from the record (re-generate the record from a clean commit if
+   it predates the *reported* values), its description and command line from the suite.
+5. The summary: move the tool in `evidence/summary.py` from its part-1 figure to its evidence.
+6. The page `content/tools/<tool>.md` in the site, `evidence: true` and `wide: true`, placing
+   `ev.agreement`, `ev.example`, `ev.band`/`ev.speed`, `ev.cases`; remove the tool's part-1
+   figures from `static/figures/<tool>/`. Export, build (0 problems), run the number check, and
+   look at every component: desktop and phone, light and dark, several slices and compare modes.
+
+## The part-1 figures (the tools not redone yet)
+
+`python -m larmorx_validation figures <tool>|all --out <site>/static/figures` draws a tool's
+static figures from its records, benchmark reports and cache entries
+(`larmorx_validation.figures`): SVG in both themes and two widths, text as outlines, brain
+images as lossless WebP, each with a provenance JSON; a page places one with
+`{{ figure('<tool>/<name>', 'caption') }}`. Their style (`figures/style.py`): the site's
+fonts, programs in ink (the original), apricot (larmorx) and blue (a replica), signed
+differences blue–paper–apricot on a stated symmetric scale. They are replaced tool by tool.
 
 ## Data
 
 Only shareable data: OpenNeuro datasets whose `dataset_description.json` gives a public-domain
 dedication (CC0-1.0, PDDL-1.0) or CC-BY (credited), and templates with their notices (the MNI
-ICBM 152 notice). The provenance names the dataset, subject and licence of every image shown.
-The cases used so far: ds000005 sub-01 (PDDL-1.0; T1w, BOLD run 1, fMRIPrep 25.2.6's oracle
-run), ds005040 sub-002 (CC0-1.0; BOLD with slice timing, PEPOLAR field map), MNI152NLin2009cAsym.
-
-## Add a tool
-
-1. Create `validation/src/larmorx_validation/figures/<tool>.py` with
-   `figures(ctx) -> list[Figure]`, and add it to `TOOLS` in `figures/__init__.py`.
-2. Start from what the record gives, with the shared figures in `figures/common.py`:
-   - `agreement_figure(rec, split=...)`: one bar per category; `split` says how a category's
-     passing cases divide among identical to the unmodified original, identical with
-     correctly rounded maths, and within the thresholds (`split_by_cases`,
-     `split_by_category_table`, or the record's own sentences);
-   - `band_figure(rec, ...)`: an ANTs record's differences divided by the original's thread
-     band;
-   - `speed_figure(bench, series=..., labels=...)`: one row per input, short labels.
-3. Add what is particular to the program: an image comparison on a real case (a cache entry
-   computed by `cache.entry(ctx, tool, case, description, compute)`, drawn with
-   `brain.Grid`), time series, a variability band. Compute what the record compared (the same
-   command lines, `upstream_defects` in `reproduce` mode, the original at one thread), plus
-   the original's own variability, and keep each case to minutes.
-4. Draw it, then look at it: both themes and both widths (`rsvg-convert -b '#f0ebe0' x.svg -o
-   x.png`, or the site's review screenshots). Fix overlaps and clipped labels before
-   publishing; keep each file small (the text outlines and the images are most of it).
-5. Publish on the site (`larmorx_documentation`): the files in `static/figures/<tool>/`, a page
-   `content/tools/<tool>.md` that places them with `{{ figure('<tool>/<name>', 'caption') }}`
-   (what is shown, on which data), its entry in `site.yml` (`tools`) and the status table's link
-   (`data/status.yml`, `page:`); `tools/build.py` must report 0 problems. A record that changes
-   means its figures are drawn again from the commit that has it.
+ICBM 152 notice). Brain slices only, masked, never a face. The cases used so far: ds000005 sub-01
+(PDDL-1.0; T1w, fMRIPrep 25.2.6's oracle run, its final N4), ds005040 sub-002 (CC0-1.0; BOLD with
+slice timing, fMRIPrep's 3dTshift node), MNI152NLin2009cAsym (part-1 figures).

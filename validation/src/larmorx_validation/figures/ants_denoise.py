@@ -161,7 +161,7 @@ def threads_figure(ctx: Context) -> tuple[Figure, Figure]:
         for n, v in zip(xs, ys, strict=True):
             if n > 1:
                 ax.annotate(
-                    f"{v:.0f} %",
+                    f"{v:.1f} %",
                     (n, v),
                     xytext=(0, 9),
                     textcoords="offset points",

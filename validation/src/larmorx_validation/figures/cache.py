@@ -153,7 +153,7 @@ def provenance(e: Entry) -> dict:
             {
                 "label": r["label"],
                 "argv": [_short(a) for a in r["argv"]],
-                "env": r["env"],
+                "env": {k: _short(str(v)) for k, v in r["env"].items()},
                 "exit": r["exit"],
                 "seconds": r["seconds"],
             }

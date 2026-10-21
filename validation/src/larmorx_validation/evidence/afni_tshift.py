@@ -655,7 +655,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             },
             {
                 "label": "Programs",
-                "text": f"AFNI {vers.get('afni', '?')} (the repository's oracle "
+                "text": f"{vers.get('afni', '?').replace('AFNI_', 'AFNI ')} (the repository's oracle "
                 f"build); {vers.get('larmorx-gpl', '?')} (the replica); larmorx's clean-room original "
                 f"at commit `{info['larmorx_commit'][:12]}`",
             },
@@ -975,7 +975,7 @@ def _provenance(info: dict) -> list[str]:
         f"oracle run `{RUN}` for its own output and the brain mask",
         "Inputs: " + "; ".join(f"{k} (sha256 {v}…)" for k, v in sha.items()),
         f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with larmorx "
-        f"`{info['larmorx_commit'][:12]}`, AFNI {vers.get('afni', '?')}, "
+        f"`{info['larmorx_commit'][:12]}`, {vers.get('afni', '?').replace('AFNI_', 'AFNI ')}, "
         f"{vers.get('larmorx-gpl', '?')}; every command, its environment, threads and exit "
         "status are in its `RUN_INFO.json`",
     ]

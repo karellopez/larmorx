@@ -86,8 +86,11 @@ def _redacted(result):
 
 
 def _summary(result) -> dict:
-    """What the JSON record keeps of a case: its status and anything that did not pass."""
-    return {
+    """What the JSON record keeps of a case: its status, anything that did not pass, and the
+    values a suite reports without a threshold (``threshold="reported"``, e.g. the number of
+    values that differ from the original's where a case passes within tolerances), which the
+    documentation site's case explorer reads (``python -m larmorx_validation evidence``)."""
+    out = {
         "case": result.case,
         "category": result.category,
         "status": result.status,
@@ -97,6 +100,10 @@ def _summary(result) -> dict:
         "failed_checks": [c.__dict__ for c in result.failed_checks],
         "seconds": round(result.seconds, 3),
     }
+    reported = {c.name: c.value for c in result.checks if c.threshold == "reported"}
+    if reported:
+        out["reported"] = reported
+    return out
 
 
 def cmd_parity(args: argparse.Namespace) -> int:

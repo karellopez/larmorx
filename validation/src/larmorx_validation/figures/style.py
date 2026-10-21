@@ -3,8 +3,8 @@
 
 Warm paper, ink text, hairlines; Instrument Serif for titles and numerals, Inter for text,
 JetBrains Mono for labels and ticks. Every figure is drawn twice, once for each of the site's
-themes; the figure itself has no background, so it sits on the site's paper (the figure
-component's card, ``--bg-elev``), and its colours are chosen against that paper.
+themes, on the colour of the site's figure card (``--bg-elev``), and its colours are chosen
+against that paper.
 
 Colours have one job each (validated with a colour-vision-deficiency check: OKLab ΔE ≥ 13
 between neighbours under protanopia and deuteranopia, normal-vision ΔE ≥ 15, 3:1 against the

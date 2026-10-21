@@ -1,11 +1,12 @@
 # larmorx-validation
 
-Development-only package (not shipped in the wheel) that checks larmorx against the tools it re-implements, and measures its speed. It produces the **validation record** of the per-tool contract (PLAN.md §4) in `docs/validation/` and the benchmark reports in `docs/benchmarks/`.
+Development-only package (not shipped in the wheel) that checks larmorx against the tools it re-implements, and measures its speed. It produces the **validation record** of the per-tool contract (PLAN.md §4) in `docs/validation/`, the benchmark reports in `docs/benchmarks/`, and the figures of the documentation site ([docs/figures.md](../docs/figures.md)).
 
 ```bash
 pip install -e ../larmorx-testdata -e "validation[oracles]"     # from the larmorx repo
 python -m larmorx_validation parity nifti-io --tier standard --out docs/validation
 python -m larmorx_validation bench nifti-io --tier full --out docs/benchmarks
+python -m larmorx_validation figures nifti-io --out ../larmorx_documentation/static/figures   # the [figures] extra
 pytest tests/parity                                             # the parity suites as tests (tier from LARMORX_PARITY_TIER)
 ```
 
@@ -43,4 +44,5 @@ src/larmorx_validation/
   report.py           Markdown/JSON helpers
   parity/             harness (cases, checks, statuses), comparisons, rendering, suites
   bench/              timing harness, benchmark definitions
+  figures/            the documentation site's figures: style, records, charts, brain images, cache, one module per page
 ```

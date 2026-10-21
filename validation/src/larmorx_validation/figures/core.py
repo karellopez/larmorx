@@ -108,11 +108,39 @@ def _svg_size(path: Path) -> tuple[float, float]:
 
 
 def _tidy_svg(path: Path) -> None:
-    """Drop what changes between identical renders (matplotlib's date and version comment)."""
+    """Make the file small and reproducible: drop what changes between identical renders
+    (matplotlib's date and version comment) and the comments, indentation and line breaks;
+    round path coordinates to 1/100 of a unit; store embedded images as lossless WebP."""
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"<dc:date>[^<]*</dc:date>\s*", "", text)
-    text = re.sub(r"<!-- Created with matplotlib[^>]*-->\n?", "", text)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    text = re.sub(r"\n\s*", "\n", text)
+
+    def rounded(m: re.Match[str]) -> str:
+        nums = re.sub(
+            r"-?\d+\.\d{3,}", lambda n: f"{float(n.group(0)):.2f}".rstrip("0").rstrip("."), m[1]
+        )
+        return f' d="{" ".join(nums.split())}"'
+
+    text = re.sub(r' d="([^"]*)"', rounded, text)
+    text = re.sub(r'(xlink:href="data:image/png;base64,)([^"]+)"', _compact_image, text)
     path.write_text(text, encoding="utf-8")
+
+
+def _compact_image(m: re.Match[str]) -> str:
+    """An embedded PNG re-encoded losslessly as WebP (about half the size; every browser
+    the site supports shows WebP in an SVG), kept as it was when that is not smaller."""
+    import base64
+    import io
+
+    from PIL import Image
+
+    raw = base64.b64decode(m[2])
+    buf = io.BytesIO()
+    Image.open(io.BytesIO(raw)).save(buf, format="WEBP", lossless=True, method=6)
+    if len(buf.getvalue()) >= len(raw):
+        return m[0]
+    return f'xlink:href="data:image/webp;base64,{base64.b64encode(buf.getvalue()).decode("ascii")}"'
 
 
 def render(fig: Figure, tool: str, ctx: Context) -> Path:

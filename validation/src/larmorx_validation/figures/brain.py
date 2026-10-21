@@ -196,11 +196,13 @@ def _show(ax, p: Panel, theme: style.Theme) -> None:
         ys = (np.arange(h) + 0.5) * p.spacing[1]
         xs = (np.arange(w) + 0.5) * p.spacing[0]
         ax.contour(xs, ys, oimg, levels=[0.5], colors=[theme.ink3], linewidths=0.6)
-    if p.note:
+    # a difference map that is zero everywhere says so
+    note = p.note or ("bit-identical" if p.subtitle.startswith("identical") else "")
+    if note:
         ax.text(
             0.5,
             0.5,
-            p.note,
+            note,
             transform=ax.transAxes,
             ha="center",
             va="center",

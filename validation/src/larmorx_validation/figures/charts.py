@@ -83,6 +83,7 @@ def agreement(
     unit: str = "cases",
     note: str | None = None,
     state_labels: dict[str, str] | None = None,
+    label_max: float = 200,
 ) -> object:
     """Stacked bars, one per row, each case's state as a share of the row; the count at the
     right. The headline row first, then a hairline, then the categories."""
@@ -90,7 +91,9 @@ def agreement(
     names = {**style.STATE_LABELS, **(state_labels or {})}
     narrow = width < 500
     pad = 0
-    label_w = 0 if narrow else min(200, max(text_width(r.label, style.MONO, 11) for r in rows) + 16)
+    label_w = (
+        0 if narrow else min(label_max, max(text_width(r.label, style.MONO, 11) for r in rows) + 16)
+    )
     count_w = 74
     right = width - 4  # text set flush right keeps a margin
     bar_x = pad + label_w
@@ -343,7 +346,12 @@ def speed(
     row_h = 46 if narrow else 30
     height = top + row_h * len(rows) + 50
     c = Canvas(theme, width, height)
-    colours = {"original": theme.original, "larmorx": theme.larmorx, "replica": theme.replica}
+    colours = {
+        "original": theme.original,
+        "larmorx": theme.larmorx,
+        "replica": theme.replica,
+        "other": theme.both,  # a second reference (e.g. SimpleITK beside nibabel)
+    }
     x = 0.0
     y = 4.0
     for name, role, marker in series:

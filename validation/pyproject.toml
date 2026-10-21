@@ -13,6 +13,8 @@ dependencies = ["numpy>=1.26", "larmorx-testdata"]
 [project.optional-dependencies]
 # Reference implementations used as oracles.
 oracles = ["nibabel>=5.3", "SimpleITK>=2.4"]
+# The figures of the documentation site (python -m larmorx_validation figures; docs/figures.md).
+figures = ["matplotlib>=3.10", "fonttools>=4.50", "nibabel>=5.3", "scipy>=1.11"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/larmorx_validation"]

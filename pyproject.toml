@@ -68,4 +68,4 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 # Line length is enforced by the formatter; it leaves long string literals alone.
 ignore = ["E501"]
 # Typographic characters used on purpose in report text.
-allowed-confusables = ["×", "–"]
+allowed-confusables = ["×", "–", "−"]

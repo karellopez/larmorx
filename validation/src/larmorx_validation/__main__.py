@@ -4,6 +4,9 @@
 ``python -m larmorx_validation pipeline-stages --oracle <run dir> --out DIR`` compares larmorx
 with a real fMRIPrep run, stage by stage (:mod:`larmorx_validation.stages`).
 
+``python -m larmorx_validation figures <tool>|all --out DIR`` draws a tool's figures from the
+committed records and the figures cache (:mod:`larmorx_validation.figures`, ``docs/figures.md``).
+
 ``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, which
 larmorx runs as a separate process) instead of the clean-room original, where a suite has one.
 """
@@ -178,6 +181,12 @@ def cmd_bench(args: argparse.Namespace) -> int:
     return bench.main(args)
 
 
+def cmd_figures(args: argparse.Namespace) -> int:
+    from larmorx_validation import figures
+
+    return figures.main(args)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m larmorx_validation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -227,6 +236,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     add_arguments(st)
     st.set_defaults(func=cmd_pipeline_stages)
+    fg = sub.add_parser(
+        "figures",
+        help="draw a tool's figures (records, benchmarks, real outputs) for the documentation site",
+    )
+    fg.add_argument("tool", help="a tool (larmorx_validation.figures.TOOLS) or 'all'")
+    fg.add_argument("--out", required=True, help="write <tool>/<figure>-<theme>.svg and .json here")
+    fg.add_argument(
+        "--cache",
+        help="the figures cache (default: LARMORX_FIGURES_CACHE, else the workspace's "
+        "oracles/figures-cache)",
+    )
+    fg.add_argument("--only", nargs="+", help="only these figures (their names)")
+    fg.add_argument(
+        "--no-compute",
+        action="store_true",
+        help="never compute a missing cache entry: skip the figures that need one",
+    )
+    fg.set_defaults(func=cmd_figures)
     args = parser.parse_args(argv)
     return args.func(args)
 

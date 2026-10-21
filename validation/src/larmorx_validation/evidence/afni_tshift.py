@@ -185,7 +185,7 @@ FOURIER_WHY = (
 #: their bits with it.
 RUNS = [
     ("afni", "afni", "original", "AFNI 25.2.09, 3dTshift", "the repository's oracle build"),
-    ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6's own output", "AFNI 25.2.09 in its image"),
+    ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran", "AFNI 25.2.09 in its image"),
     ("replica", "replica", "larmorx", "larmorx-gpl replica", "default mode, 12 threads"),
     ("replica-1", "replica-1", "larmorx", "larmorx-gpl replica", "default mode, 1 thread"),
     ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica",
@@ -326,14 +326,20 @@ def _where_to_look(ex, info: dict) -> tuple[int, int, int, int]:
     from AFNI, in the slice acquired farthest from the target time, with the most varying
     signal; the first volume where they differ there."""
     afni, orig = ex.shown[ex.key("afni", "series")], ex.shown[ex.key("original", "series")]
-    differ = np.any(afni != orig, axis=3) & ex.grid.take(ex.brain)
+    brain = ex.grid.take(ex.brain)
+    area = brain.sum(axis=(0, 1))
+    differ = np.any(afni != orig, axis=3) & brain
     timing = _timing(info, ex.grid)
     lag = np.abs(np.array(timing["slice_times"]) - timing["tzero"])
     std = ex.values(ex.key("bold", "series")).std(axis=3)
-    score = np.where(differ, std * lag[None, None, :], -1.0)
-    x, y, z = (int(v) for v in np.unravel_index(int(np.argmax(score)), score.shape))
-    t = int(np.argmax(afni[x, y, z] != orig[x, y, z]))
-    return x, y, z, t
+    # slices with most of the brain's extent, the latest or earliest acquired first
+    for z in sorted(np.flatnonzero(area >= 0.75 * area.max()), key=lambda k: -lag[k]):
+        if differ[:, :, z].any():
+            s = np.where(differ[:, :, z], std[:, :, z], -1.0)
+            x, y = (int(v) for v in np.unravel_index(int(np.argmax(s)), s.shape))
+            t = int(np.argmax(afni[x, y, z] != orig[x, y, z]))
+            return x, y, int(z), t
+    raise AssertionError(f"{TOOL}: no brain slice where the original differs from AFNI")
 
 
 def _timing(info: dict, grid: core.Grid) -> dict:
@@ -356,7 +362,7 @@ def _finish(ctx, ex, exm, diffs, verdict, default, extra) -> dict:
     m4 = np.broadcast_to(ex.m[..., None], ex.shown[ex.key("afni", "series")].shape)
     outputs = [{
         "id": "series", "label": "Slice-time corrected series", "unit": "",
-        "stored_unit": "stored units",
+        "stored_unit": "stored unit",
         "windows": exm.windows(ex.values(ex.key("afni", "series"))[m4]),
     }]
     panels = ex.describe_panels()
@@ -364,6 +370,7 @@ def _finish(ctx, ex, exm, diffs, verdict, default, extra) -> dict:
         if p["role"] == "input":
             w = exm.windows(ex.values(f"{p['id']}:all")[m4])[0]
             p["window"] = [w["lo"], w["hi"]]
+    exm.own_windows(ex, panels, outputs)
     by = {d["id"]: d for d in diffs}
     plane, (x, y, z, t) = default["plane"], default["voxel"] + [default["t"]]
     ow = outputs[0]["windows"][0]
@@ -414,7 +421,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     run, img, ex, exm = _setup(ctx, e)
     raw, slope, inter = _load_raw(e.dir / "afni.nii.gz")
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
-    ex.add(exm.Panel("bold", "input", "Input: ds005040 sub-002 BOLD, task clip run 1",
+    ex.add(exm.Panel("bold", "input", "ds005040 sub-002 BOLD, task clip run 1",
                      "int16 × scale factor; 40 ascending slices over 1.95 s, TR 2 s",
                      {"all": braw}, scale=bslope, inter=binter))
     _add_runs(ex, exm, e, run, RUNS)
@@ -458,6 +465,12 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                 "replica-threads": "The same bytes on any number of threads.",
                 "original-threads": "The same bytes on any number of threads.",
             }.get(i, "The same values, every one.")
+        elif i == "original-fmriprep" and d["metrics"]["series"].get("max_abs_stored") == 1.0:
+            d["verdict"] = "open"
+            d["reason"] = (
+                "The same values as against AFNI above: fMRIPrep's AFNI gives the repository "
+                "AFNI's bytes."
+            )
         elif i.startswith("original-") and d["metrics"]["series"].get("max_abs_stored") == 1.0:
             m = d["metrics"]["series"]
             d["verdict"] = "open"
@@ -509,7 +522,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "title": "Who gives which bytes on this run",
             "steps": [
                 {"nodes": [
-                    {"label": "fMRIPrep 25.2.6's own output", "sub": "AFNI 25.2.09 in its image",
+                    {"label": "fMRIPrep 25.2.6, as it ran", "sub": "AFNI 25.2.09 in its image",
                      "role": "fmriprep"},
                     {"label": "AFNI 25.2.09", "sub": "the repository's oracle build",
                      "role": "original"},
@@ -557,9 +570,9 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     run, img, ex, exm = _setup(ctx, e)
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
     nraw, nslope, ninter = _load_raw(e.dir / NEG)
-    ex.add(exm.Panel("bold", "input", "Input: the run as stored", "int16 × scale factor 47.67",
+    ex.add(exm.Panel("bold", "input", "The run, as stored", "int16 × scale factor 47.67",
                      {"all": braw}, scale=bslope, inter=binter))
-    ex.add(exm.Panel("bold-neg", "input", "Input: the same run, negative scale factor",
+    ex.add(exm.Panel("bold-neg", "input", "The same run, negative scale factor",
                      "stored integers negated, scale factor −47.67: the same values",
                      {"all": nraw}, scale=nslope, inter=ninter))
     _add_runs(ex, exm, e, run, NEG_RUNS)
@@ -646,7 +659,7 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             {"label": "Input", "text": "the run above, re-stored by "
              "`larmorx_validation.evidence.afni_tshift.negative_slope`: only `scl_slope` and the "
              "data bytes change"},
-            {"label": "Defect", "text": f"[AFNI-01]({afni01['link']}): {afni01['title']}; "
+            {"label": "Defect", "text": f"[AFNI-01](repo:{afni01['link']}): {afni01['title']}; "
              "corrected by default in both implementations, with a warning"},
             {"label": "Command", "text": "fMRIPrep's, as in the example above"},
         ],

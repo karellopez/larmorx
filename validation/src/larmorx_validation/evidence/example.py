@@ -160,6 +160,24 @@ class Example:
         ]
 
 
+def own_windows(ex: Example, panels: list[dict], outputs: list[dict]) -> None:
+    """Each output image's own window (0.5 to 99.5 % of its shown brain), for the viewer's
+    *each image's own* preset: an image far off the others' range stays readable."""
+    for p in panels:
+        if p["role"] == "input":
+            continue
+        own = {}
+        for o in outputs:
+            key = ex.key(p["id"], o["id"])
+            v = ex.values(key)
+            m = ex.m if v.ndim == 3 else np.broadcast_to(ex.m[..., None], v.shape)
+            lo, hi = np.percentile(v[m], [0.5, 99.5])
+            own[o["id"]] = [float(lo), float(hi)]
+        p["own"] = own
+    for o in outputs:
+        o["windows"].append({"id": "own", "label": "each image's own 0.5–99.5 %", "lo": 0, "hi": 1})
+
+
 def windows(values: np.ndarray, label: str = "brain") -> list[dict]:
     """An output's intensity windows: 0.5 to 99.5 % of the shown brain, and its full range."""
     v = values.astype(np.float64)
@@ -199,10 +217,19 @@ def poster_gray(ctx: Context, a: np.ndarray, mask: np.ndarray, lo: float, hi: fl
     return _webp(np.dstack([g, g, g, np.where(mask, 255, 0).astype(np.uint8)]), ctx)
 
 
-def poster_diff(ctx: Context, d: np.ndarray, mask: np.ndarray, rng: float) -> str:
+def poster_diff(ctx: Context, d: np.ndarray, mask: np.ndarray, rng: float, log: bool = False) -> str:
     """A still difference: blue below zero, apricot above, opaque in proportion to |Δ| / rng
-    (any non-zero difference visible), a faint grey brain; the page's paper shows through."""
-    t = np.where(d != 0, np.maximum(0.12, np.minimum(1.0, np.abs(d) / (rng or 1.0))), 0.0)
+    (or, on a log scale, to its place in the six decades below rng), any non-zero difference
+    visible, a faint grey brain; the page's paper shows through. As the viewer draws it."""
+    a = np.abs(d.astype(np.float64))
+    rng = rng or 1.0
+    if log:
+        lo = rng * 1e-6
+        with np.errstate(divide="ignore"):
+            t = np.where(a > lo, np.log(np.maximum(a, lo) / lo) / np.log(rng / lo), 0.0)
+    else:
+        t = a / rng
+    t = np.where(d != 0, np.maximum(0.12, np.minimum(1.0, t)), 0.0)
     col = np.where((d < 0)[..., None], np.array([70, 125, 234]), np.array([199, 103, 23]))
     col = np.where((t > 0)[..., None], col, np.array([128, 128, 128])).astype(np.uint8)
     alpha = np.where(mask, np.where(t > 0, 60 + 195 * t, 28), 0).astype(np.uint8)

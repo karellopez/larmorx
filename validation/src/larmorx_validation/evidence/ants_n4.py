@@ -190,7 +190,7 @@ RUNS = [
      "conda-forge's build, glibc's maths"),
     ("ants-8", "ants-8", "original", "ANTs 2.6.5, 8 threads",
      "the repository's oracle build, glibc's maths"),
-    ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6's own output",
+    ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran",
      "ANTs 2.6.2 in its image, 8 threads (NSLOTS=8), glibc's maths"),
 ]
 OUTPUTS = [
@@ -245,14 +245,11 @@ def _verdict(d: dict, same: dict[str, bool], reg: dict) -> None:
     if d["kind"] == "variability":
         d["verdict"] = None
         if same[i]:
-            d["reason"] = (
-                "The same bytes: ANTs' version (2.6.2 from conda-forge, 2.6.5 built here) and "
-                "build do not change this result at the same thread count and maths."
-            )
+            d["reason"] = "ANTs' version and build play no part at equal threads and maths."
         else:
             d["reason"] = (
-                "ANTs' own result moves with its thread count: ITK's B-spline fit sums "
-                "per-thread lattices, and float addition is not associative."
+                "ANTs' result moves with its thread count: ITK's B-spline fit sums per-thread "
+                "lattices."
             )
             links.append({"label": "ANTS-37", "href": reg["ANTS-37"]["link"]})
     elif same[i]:
@@ -287,6 +284,12 @@ def _verdict(d: dict, same: dict[str, bool], reg: dict) -> None:
     d["links"] = links
 
 
+def _image_ants(versions: dict) -> str:
+    """ANTs in fMRIPrep's image, from its ``--version`` (``ANTs Version: 2.6.2.dev1-...``)."""
+    m = re.search(r"Version:\s*(\S+)", versions.get("ants_in_fmriprep_image", ""))
+    return f"ANTs {m.group(1)} (conda-forge)" if m else "ANTs (version not recorded)"
+
+
 def _short_command(command: str) -> str:
     """fMRIPrep's command line, its working directory's long paths shortened."""
     out = command.replace("/work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/", "…/")
@@ -314,7 +317,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         return ref, {"div": ["t1w:all", f"{pid}:bias"]}
 
     ex.predict["corrected"] = quotient
-    ex.add(exm.Panel("t1w", "input", "Input: ds000005 sub-01 T1w",
+    ex.add(exm.Panel("t1w", "input", "ds000005 sub-01 T1w",
                      "as fMRIPrep passed it, after its DenoiseImage",
                      {"all": _load(str(run / INPUT))}))
     ex.add(exm.Panel("weight", "input", "Weight image (-w)",
@@ -380,9 +383,13 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "maths, on any number of threads.",
     }
 
-    # the default view: an axial slice through the largest shown difference from ANTs as built
-    at = by["lx-ants1"]["display"]["corrected"]["at"]
-    plane, k = "axial", at[2]
+    # the default view: the axial slice with the most brain, the crosshair where larmorx and
+    # ANTs as built differ most in it ("Go to the largest difference" finds the whole maximum)
+    plane = "axial"
+    k = int(np.argmax(ex.m.sum(axis=(0, 1))))
+    dk = np.abs(ex.values("larmorx:corrected") - ex.values("ants-1:corrected"))[:, :, k]
+    i, j = np.unravel_index(int(np.argmax(np.where(ex.m[:, :, k], dk, -1))), dk.shape)
+    at = [int(i), int(j), k]
     outputs = []
     for o in OUTPUTS:
         vals = ex.values(f"larmorx:{o['id']}")[ex.m]
@@ -392,6 +399,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         if p["role"] == "input":
             w = exm.windows(ex.values(f"{p['id']}:all")[ex.m])[0]
             p["window"] = [w["lo"], w["hi"]] if p["id"] == "t1w" else [0.0, w["hi"]]
+    exm.own_windows(ex, panels, outputs)
     default_panels = ["t1w", "fmriprep", "ants-1", "larmorx"]
     default_diffs = ["lx-ants1", "ants8-ants1", "lx-cr", "lx-fmriprep"]
     win = {p["id"]: p.get("window") for p in panels}
@@ -409,7 +417,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         x = by[i]
         dv = ex.values(ex.key(x["a"], "corrected")) - ex.values(ex.key(x["b"], "corrected"))
         post_d[i] = exm.poster_diff(ctx, exm.plane_slice(dv, plane, k),
-                                    exm.plane_slice(ex.m, plane, k), rng)
+                                    exm.plane_slice(ex.m, plane, k), rng, log=True)
         ranges[i] = rng
     shape = grid.describe()["shape"]
     n_vox = int(np.prod(t1_img.shape))
@@ -433,7 +441,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
              "atropos_wf/inu_n4_final` (sMRIPrep's final N4), run with `NSLOTS=8`"},
             {"label": "Command", "text": "`" + _short_command(info["command"]) + "`"},
             {"label": "Programs", "text": f"{vers.get('ants', '?')}; "
-             f"{vers.get('ants_in_fmriprep_image', '?')} in fMRIPrep's image; CORE-MATH's "
+             f"{_image_ants(vers)} in fMRIPrep's image; CORE-MATH's "
              "correctly rounded functions preloaded where stated; larmorx at commit "
              f"`{info['larmorx_commit'][:12]}`"},
             {"label": "Grid", "text": f"{' × '.join(map(str, t1_img.shape))} voxels of "
@@ -448,14 +456,16 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "default": {
             "output": "corrected", "plane": plane, "voxel": at[:3],
             "panels": default_panels, "diffs": default_diffs,
-            "compare": {"a": "ants-1", "b": "larmorx"},
+            "compare": {"a": "ants-1", "b": "larmorx"}, "scale": "log",
         },
         "poster": {
             "plane": plane, "slice": k, "aspect": exm.aspect(grid, plane),
             "panels": post_p, "diffs": post_d, "ranges": ranges,
-            "caption": f"Axial slice {k + 1} of {shape[2]} of the shown grid, through the largest "
-            "difference between larmorx and ANTs as built; the corrected image, in the brain's "
-            "0.5–99.5 % window.",
+            "caption": f"Axial slice {k + 1} of {shape[2]} of the shown grid (the one with the most "
+            "brain), the crosshair where larmorx and ANTs as built differ most in it; the "
+            "corrected image, in the brain's "
+            "0.5–99.5 % window; the differences on one symmetric log scale over six decades "
+            f"below ±{rng:.3g}, any non-zero difference tinted.",
         },
         "chain": chain,
         "metrics_note": (

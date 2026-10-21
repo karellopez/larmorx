@@ -27,17 +27,22 @@ starts no other agent.
 
 ## The order from here
 
-1. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
+1. **Visual reports, part 2: interactive evidence** (user, 2026-10-21; decision log). Part 2a, a
+   pilot: the Validation guide (method, terms, the verdict taxonomy, a tool-by-implementation
+   summary), the shared interactive components (image viewer, charts, case explorer, verdict
+   legend) and the pages of N4BiasFieldCorrection and 3dTshift; then the user's review. Part 2b:
+   every other tool. Each later part brings its tool's evidence in the same form.
+2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
    corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
    point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
    ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
-2. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
+3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
    extraction and MNI normalisation run in larmorx.
-3. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
+4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
    (`docs/findings/ants-ai.md`, "Blobs").
-4. **AFNI:** 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
+5. **AFNI:** 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
    current fMRIPrep, niworkflows and sdcflows do not call 3dvolreg (to drop unless wanted);
    optional paths of its libraries use 3dQwarp (sdcflows' alternative PEPOLAR estimator) and
    3dSkullStrip with 3dcalc (niworkflows' legacy AFNI skull-stripping): **planned for later**
@@ -48,17 +53,17 @@ starts no other agent.
    3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority). Check each source file's licence:
    NIH public-domain files get one Apache replica; MCW (GPL) files a replica in `larmorx-gpl`
    and a clean-room original from a spec.
-5. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
+6. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each.
-6. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
+7. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
    as a clean-room original with its atlas fetched on first use, its data packaged apart from the
    wheels; `docs/licensing.md`); pretrained models as Rust inference with the original weights
    (decision log 2026-10-19); Connectome Workbench- and MSM-compatible surface tools; the
    confounds (CompCor, DVARS, framewise displacement, ...).
-7. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
-8. **Releases on PyPI** (below).
+8. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
+9. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
 

@@ -1031,6 +1031,27 @@ switch to reproduce the original exactly) as for ANTS-54:
 (`docs/next-steps.md`). Still the user's: the review of ANTS-30's command line and filing the
 PIPE-02 and PIPE-03 reports.
 
+## 2026-10-21: Validation evidence, interactive and explained
+
+**The user**, after the first figures were published: "It is really hard to understand what is
+going on in validation. Figures are not well organized or clear. And we have lack of evidence.
+We need clear example and labels in which we show the raw inputs, the outputs from the original
+oracles, the outputs from larmorx (replicas and clean rooms) and also comparison metrics or
+figures to clearly see how they different and why and if that different is important, expected,
+or can still be improved. I think figures should be interactive, not static [...] follow the
+website style, make sure all looks accurate, with high quality and elegant."
+**Decided:** the site's validation becomes evidence the reader can inspect: for each tool, worked
+examples on real data with the raw input, the original program's output, larmorx's outputs
+(port, replica, clean-room original, in their default and `reproduce` modes) and the differences
+side by side in an interactive viewer (planes, slices, volumes, windowing, cursor values,
+swipe/blink), with metrics computed offline and a verdict per difference from one taxonomy
+(bit-identical; identical once the original uses correctly rounded maths; within the original's
+own variability; a deliberate correction (D13); an expected divergence; rejected by both; an open
+difference that can still be improved), each with its reason; every parity case browsable. The
+static figures of part 1 are replaced. **How:** a pilot first (the validation guide page, the
+shared components, N4BiasFieldCorrection and 3dTshift), reviewed by the user, then the other
+tools.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

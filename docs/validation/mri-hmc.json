@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "2ef5e9cc3613-dirty",
+  "larmorx_commit": "1dfe56c0dc60",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -21,8 +21,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0212",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0019 / 0.0028",
+    "out_mcf.nii.gz.par: median difference": "0.0017 / 0.0028",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0206",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0007",
+    "out_mcf.nii.gz_rel.rms: values": "0.0249",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0008"
+   },
    "reason": "",
-   "seconds": 19.576,
+   "reported": {
+    "D13 fix pass": 5874229,
+    "FD (Power, 50 mm) correlation": "0.8855",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
+   },
+   "seconds": 42.881,
    "status": "pass"
   },
   {
@@ -31,8 +46,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 18.934,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 48.351,
    "status": "pass"
   },
   {
@@ -41,8 +66,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 18.248,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 49.375,
    "status": "pass"
   },
   {
@@ -51,8 +86,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 19.201,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 36.565,
    "status": "pass"
   },
   {
@@ -61,8 +106,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 18.817,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 33.385,
    "status": "pass"
   },
   {
@@ -71,8 +131,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0143",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0004 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0187",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0007",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
+   },
    "reason": "",
-   "seconds": 14.352,
+   "reported": {
+    "D13 fix pass": 5932575,
+    "FD (Power, 50 mm) correlation": "0.8984",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 29.871,
    "status": "pass"
   },
   {
@@ -81,8 +156,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 18.063,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 48.788,
    "status": "pass"
   },
   {
@@ -91,8 +181,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0662",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0030 / 0.0056",
+    "out_mcf.nii.gz.par: median difference": "0.0029 / 0.0056",
+    "out_mcf.nii.gz: voxel values": "0.999997",
+    "out_mcf.nii.gz_abs.rms: values": "0.0607",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0075",
+    "out_mcf.nii.gz_rel.rms: values": "0.0611",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+   },
    "reason": "",
-   "seconds": 18.789,
+   "reported": {
+    "D13 fix pass": 5946651,
+    "FD (Power, 50 mm) correlation": "0.5782",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 47.753,
    "status": "pass"
   },
   {
@@ -101,8 +206,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9991",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0220",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0003 / 0.0006",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0006",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0088",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0373",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0005"
+   },
    "reason": "",
-   "seconds": 19.962,
+   "reported": {
+    "D13 fix pass": 6158618,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 50.369,
    "status": "pass"
   },
   {
@@ -111,8 +231,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0489",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0069 / 0.0045",
+    "out_mcf.nii.gz.par: median difference": "0.0069 / 0.0044",
+    "out_mcf.nii.gz: voxel values": "0.999995",
+    "out_mcf.nii.gz_abs.rms: values": "0.0253",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0086",
+    "out_mcf.nii.gz_rel.rms: values": "0.0244",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0015"
+   },
    "reason": "",
-   "seconds": 43.196,
+   "reported": {
+    "D13 fix pass": 5918333,
+    "FD (Power, 50 mm) correlation": "0.6358",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 104.879,
    "status": "pass"
   },
   {
@@ -121,8 +256,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 19.983,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 47.777,
    "status": "pass"
   },
   {
@@ -131,8 +281,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0653",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0103 / 0.0083",
+    "out_mcf.nii.gz.par: median difference": "0.0073 / 0.0083",
+    "out_mcf.nii.gz: voxel values": "0.999990",
+    "out_mcf.nii.gz_abs.rms: values": "0.0416",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0224",
+    "out_mcf.nii.gz_rel.rms: values": "0.0304",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0136"
+   },
    "reason": "",
-   "seconds": 38.079,
+   "reported": {
+    "D13 fix pass": 5733033,
+    "FD (Power, 50 mm) correlation": "0.5358",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 85.156,
    "status": "pass"
   },
   {
@@ -142,7 +307,11 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.424,
+   "reported": {
+    "D13 fix pass": 4365570,
+    "no parameter is identifiable": "48.21 / 50.64"
+   },
+   "seconds": 15.631,
    "status": "pass"
   },
   {
@@ -151,8 +320,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0220",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0049",
+    "out_mcf.nii.gz.par: median difference": "0.0023 / 0.0048",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0141",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0187",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 30.181,
+   "reported": {
+    "D13 fix pass": 6450969,
+    "FD (Power, 50 mm) correlation": "0.8329",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 46.413,
    "status": "pass"
   },
   {
@@ -161,8 +345,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0208",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0021 / 0.0030",
+    "out_mcf.nii.gz.par: median difference": "0.0020 / 0.0030",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0125",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0205",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0008"
+   },
    "reason": "",
-   "seconds": 22.538,
+   "reported": {
+    "D13 fix pass": 6474117,
+    "FD (Power, 50 mm) correlation": "0.8562",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 32.393,
    "status": "pass"
   },
   {
@@ -171,8 +370,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0206",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0034",
+    "out_mcf.nii.gz.par: median difference": "0.0023 / 0.0034",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0145",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0010",
+    "out_mcf.nii.gz_rel.rms: values": "0.0201",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0005"
+   },
    "reason": "",
-   "seconds": 26.79,
+   "reported": {
+    "D13 fix pass": 6452868,
+    "FD (Power, 50 mm) correlation": "0.9008",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 38.565,
    "status": "pass"
   },
   {
@@ -181,8 +395,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0147",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0001",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0001",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0210",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0005",
+    "out_mcf.nii.gz_rel.rms: values": "0.0285",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+   },
    "reason": "",
-   "seconds": 18.524,
+   "reported": {
+    "D13 fix pass": 5819409,
+    "FD (Power, 50 mm) correlation": "0.9658",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 28.138,
    "status": "pass"
   },
   {
@@ -192,7 +421,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: terminate called after throwing an instance of 'NiftiIO::NiftiException' what(): Error: cant open file grefvol_~/VScode_projects/super_fmriprep/oracl; larmorx exit [1]: Error: -gdt (registration of gradient images) is not supported",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -201,8 +430,24 @@
    "checks_passed": 18,
    "checks_total": 18,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0205",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0034",
+    "out_mcf.nii.gz.par: median difference": "0.0022 / 0.0034",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0152",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0020",
+    "out_mcf.nii.gz_mean_reg.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0568",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0007"
+   },
    "reason": "",
-   "seconds": 32.374,
+   "reported": {
+    "D13 fix pass": 6267393,
+    "FD (Power, 50 mm) correlation": "0.9061",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 63.762,
    "status": "pass"
   },
   {
@@ -211,8 +456,24 @@
    "checks_passed": 18,
    "checks_total": 18,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0226",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0021 / 0.0037",
+    "out_mcf.nii.gz.par: median difference": "0.0021 / 0.0037",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0168",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_mean_reg.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0535",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0008"
+   },
    "reason": "",
-   "seconds": 32.962,
+   "reported": {
+    "D13 fix pass": 6209711,
+    "FD (Power, 50 mm) correlation": "0.8801",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 63.553,
    "status": "pass"
   },
   {
@@ -221,8 +482,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 18.859,
+   "reported": {
+    "D13 fix pass": 0,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 38.568,
    "status": "pass"
   },
   {
@@ -231,8 +507,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0204",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0018 / 0.0040",
+    "out_mcf.nii.gz.par: median difference": "0.0017 / 0.0040",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0207",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0003",
+    "out_mcf.nii.gz_rel.rms: values": "0.0185",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 20.583,
+   "reported": {
+    "D13 fix pass": 5992824,
+    "FD (Power, 50 mm) correlation": "0.8876",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
+   },
+   "seconds": 32.253,
    "status": "pass"
   },
   {
@@ -241,8 +532,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0234",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0020 / 0.0020",
+    "out_mcf.nii.gz.par: median difference": "0.0017 / 0.0020",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0236",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0047",
+    "out_mcf.nii.gz_rel.rms: values": "0.0165",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0005"
+   },
    "reason": "",
-   "seconds": 18.355,
+   "reported": {
+    "D13 fix pass": 5841332,
+    "FD (Power, 50 mm) correlation": "0.9141",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 30.033,
    "status": "pass"
   },
   {
@@ -251,8 +557,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 19.541,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 32.767,
    "status": "pass"
   },
   {
@@ -261,8 +582,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0247",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0013 / 0.0001",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0001",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0231",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0392",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0002"
+   },
    "reason": "",
-   "seconds": 18.01,
+   "reported": {
+    "D13 fix pass": 5985666,
+    "FD (Power, 50 mm) correlation": "0.9393",
+    "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
+   },
+   "seconds": 32.237,
    "status": "pass"
   },
   {
@@ -271,8 +607,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0247",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0013 / 0.0017",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0017",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0326",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0010",
+    "out_mcf.nii.gz_rel.rms: values": "0.0216",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 19.218,
+   "reported": {
+    "D13 fix pass": 5861007,
+    "FD (Power, 50 mm) correlation": "0.8842",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 33.283,
    "status": "pass"
   },
   {
@@ -281,8 +632,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 20.467,
+   "reported": {
+    "D13 fix pass": 6846710,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 38.453,
    "status": "pass"
   },
   {
@@ -291,8 +657,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0271",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0003 / 0.0003",
+    "out_mcf.nii.gz.par: median difference": "0.0003 / 0.0003",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0230",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0015",
+    "out_mcf.nii.gz_rel.rms: values": "0.0455",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 9.548,
+   "reported": {
+    "D13 fix pass": 5876378,
+    "FD (Power, 50 mm) correlation": "0.9845",
+    "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
+   },
+   "seconds": 14.781,
    "status": "pass"
   },
   {
@@ -301,8 +682,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0308",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0003 / 0.0003",
+    "out_mcf.nii.gz.par: median difference": "0.0003 / 0.0003",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0230",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0019",
+    "out_mcf.nii.gz_rel.rms: values": "0.0401",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0005"
+   },
    "reason": "",
-   "seconds": 14.692,
+   "reported": {
+    "D13 fix pass": 5868560,
+    "FD (Power, 50 mm) correlation": "0.9463",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 24.09,
    "status": "pass"
   },
   {
@@ -311,8 +707,26 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0280",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_meanvol.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003",
+    "out_mcf.nii.gz_sigma.nii.gz: voxel values": "0.999979",
+    "out_mcf.nii.gz_variance.nii.gz: voxel values": "0.999956"
+   },
    "reason": "",
-   "seconds": 25.176,
+   "reported": {
+    "D13 fix pass": 5850047,
+    "FD (Power, 50 mm) correlation": "0.8869",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+   },
+   "seconds": 39.24,
    "status": "pass"
   },
   {
@@ -321,8 +735,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0220",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0037",
+    "out_mcf.nii.gz.par: median difference": "0.0023 / 0.0036",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0200",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0296",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 17.129,
+   "reported": {
+    "D13 fix pass": 13687219,
+    "FD (Power, 50 mm) correlation": "0.8763",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/208"
+   },
+   "seconds": 30.052,
    "status": "pass"
   },
   {
@@ -331,8 +760,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0191",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0031",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 15.638,
+   "reported": {
+    "D13 fix pass": 13881496,
+    "FD (Power, 50 mm) correlation": "0.8991",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
+   },
+   "seconds": 31.701,
    "status": "pass"
   },
   {
@@ -341,8 +780,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0191",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0031",
+    "out_mcf.nii.gz.par: median difference": "0.0024 / 0.0031",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0202",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0205",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0002"
+   },
    "reason": "",
-   "seconds": 16.438,
+   "reported": {
+    "D13 fix pass": 13881496,
+    "FD (Power, 50 mm) correlation": "0.8991",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
+   },
+   "seconds": 26.607,
    "status": "pass"
   },
   {
@@ -351,8 +805,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0288",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0028 / 0.0053",
+    "out_mcf.nii.gz.par: median difference": "0.0026 / 0.0053",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0247",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0315",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0001"
+   },
    "reason": "",
-   "seconds": 17.431,
+   "reported": {
+    "D13 fix pass": 13472005,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/258"
+   },
+   "seconds": 29.019,
    "status": "pass"
   },
   {
@@ -361,8 +830,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9985",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0299",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0048",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 17.102,
+   "reported": {
+    "D13 fix pass": 13626067,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
+   },
+   "seconds": 29.333,
    "status": "pass"
   },
   {
@@ -371,8 +850,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9985",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0299",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0048",
+    "out_mcf.nii.gz.par: median difference": "0.0018 / 0.0047",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0330",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0003",
+    "out_mcf.nii.gz_rel.rms: values": "0.0374",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
+   },
    "reason": "",
-   "seconds": 17.364,
+   "reported": {
+    "D13 fix pass": 13626067,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
+   },
+   "seconds": 27.935,
    "status": "pass"
   },
   {
@@ -381,8 +875,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9911",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0210",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0021 / 0.0033",
+    "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0033",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0267",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0002",
+    "out_mcf.nii.gz_rel.rms: values": "0.0229",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0001"
+   },
    "reason": "",
-   "seconds": 23.774,
+   "reported": {
+    "D13 fix pass": 22400000,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/204"
+   },
+   "seconds": 36.109,
    "status": "pass"
   },
   {
@@ -391,8 +900,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9820",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0226",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0039",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 22.741,
+   "reported": {
+    "D13 fix pass": 22719460,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
+   },
+   "seconds": 33.358,
    "status": "pass"
   },
   {
@@ -401,8 +920,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9820",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0226",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0039",
+    "out_mcf.nii.gz.par: median difference": "0.0018 / 0.0039",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0200",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0003",
+    "out_mcf.nii.gz_rel.rms: values": "0.0268",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0011"
+   },
    "reason": "",
-   "seconds": 25.309,
+   "reported": {
+    "D13 fix pass": 22719460,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
+   },
+   "seconds": 28.487,
    "status": "pass"
   },
   {
@@ -411,8 +945,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9966",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0178",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0013 / 0.0017",
+    "out_mcf.nii.gz.par: median difference": "0.0010 / 0.0017",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0166",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0002",
+    "out_mcf.nii.gz_rel.rms: values": "0.0181",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 21.516,
+   "reported": {
+    "D13 fix pass": 13938331,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/239"
+   },
+   "seconds": 28.734,
    "status": "pass"
   },
   {
@@ -421,8 +970,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9949",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0181",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0014 / 0.0021",
+    "out_mcf.nii.gz: voxel values": "0.999998"
+   },
    "reason": "",
-   "seconds": 21.043,
+   "reported": {
+    "D13 fix pass": 14245902,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
+   },
+   "seconds": 30.865,
    "status": "pass"
   },
   {
@@ -431,8 +990,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9949",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0181",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0014 / 0.0021",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0020",
+    "out_mcf.nii.gz: voxel values": "0.999998",
+    "out_mcf.nii.gz_abs.rms: values": "0.0196",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0192",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0008"
+   },
    "reason": "",
-   "seconds": 21.53,
+   "reported": {
+    "D13 fix pass": 14245902,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
+   },
+   "seconds": 30.277,
    "status": "pass"
   },
   {
@@ -450,8 +1024,23 @@
      "value": "0.9885"
     }
    ],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9885",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0279",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0020 / 0.0040",
+    "out_mcf.nii.gz.par: median difference": "0.0019 / 0.0039",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0260",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0006",
+    "out_mcf.nii.gz_rel.rms: values": "0.0332",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
+   },
    "reason": "",
-   "seconds": 16.365,
+   "reported": {
+    "D13 fix pass": 13922149,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/216"
+   },
+   "seconds": 24.846,
    "status": "fail"
   },
   {
@@ -460,8 +1049,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9867",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0259",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0040",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 16.47,
+   "reported": {
+    "D13 fix pass": 14107184,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
+   },
+   "seconds": 23.132,
    "status": "pass"
   },
   {
@@ -470,8 +1069,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9867",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0259",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0023 / 0.0040",
+    "out_mcf.nii.gz.par: median difference": "0.0022 / 0.0040",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0266",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0582",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0009"
+   },
    "reason": "",
-   "seconds": 16.04,
+   "reported": {
+    "D13 fix pass": 14107184,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
+   },
+   "seconds": 24.66,
    "status": "pass"
   },
   {
@@ -481,7 +1095,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #22 :: Failed to read volume <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz Erro; larmorx exit [1]: Error: <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream",
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -490,8 +1104,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0260",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0029 / 0.0051",
+    "out_mcf.nii.gz.par: median difference": "0.0029 / 0.0051",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0139",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0010",
+    "out_mcf.nii.gz_rel.rms: values": "0.0360",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0020"
+   },
    "reason": "",
-   "seconds": 5.729,
+   "reported": {
+    "D13 fix pass": 155605,
+    "FD (Power, 50 mm) correlation": "0.7816",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/63"
+   },
+   "seconds": 10.01,
    "status": "pass"
   },
   {
@@ -500,8 +1129,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0252",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0028 / 0.0032",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 5.809,
+   "reported": {
+    "D13 fix pass": 155576,
+    "FD (Power, 50 mm) correlation": "0.8539",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
+   },
+   "seconds": 13.544,
    "status": "pass"
   },
   {
@@ -510,8 +1149,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0252",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0028 / 0.0032",
+    "out_mcf.nii.gz.par: median difference": "0.0026 / 0.0032",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0171",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0234",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+   },
    "reason": "",
-   "seconds": 5.769,
+   "reported": {
+    "D13 fix pass": 155576,
+    "FD (Power, 50 mm) correlation": "0.8539",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
+   },
+   "seconds": 7.683,
    "status": "pass"
   },
   {
@@ -520,8 +1174,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0130",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0009 / 0.0001",
+    "out_mcf.nii.gz.par: median difference": "0.0005 / 0.0001",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0091",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0152",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
+   },
    "reason": "",
-   "seconds": 26.718,
+   "reported": {
+    "D13 fix pass": 35524577,
+    "FD (Power, 50 mm) correlation": "0.9012",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/113"
+   },
+   "seconds": 31.651,
    "status": "pass"
   },
   {
@@ -530,8 +1199,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0142",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0010 / 0.0010",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 26.996,
+   "reported": {
+    "D13 fix pass": 35787179,
+    "FD (Power, 50 mm) correlation": "0.9263",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
+   },
+   "seconds": 34.046,
    "status": "pass"
   },
   {
@@ -540,8 +1219,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0142",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0010 / 0.0010",
+    "out_mcf.nii.gz.par: median difference": "0.0004 / 0.0009",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0105",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0167",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0001"
+   },
    "reason": "",
-   "seconds": 28.244,
+   "reported": {
+    "D13 fix pass": 35787179,
+    "FD (Power, 50 mm) correlation": "0.9263",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
+   },
+   "seconds": 37.967,
    "status": "pass"
   },
   {
@@ -550,8 +1244,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9991",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0189",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0018 / 0.0031",
+    "out_mcf.nii.gz.par: median difference": "0.0015 / 0.0031",
+    "out_mcf.nii.gz: voxel values": "0.999996",
+    "out_mcf.nii.gz_abs.rms: values": "0.0162",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0001",
+    "out_mcf.nii.gz_rel.rms: values": "0.0259",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
+   },
    "reason": "",
-   "seconds": 9.555,
+   "reported": {
+    "D13 fix pass": 8276506,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/69"
+   },
+   "seconds": 13.981,
    "status": "pass"
   },
   {
@@ -560,8 +1269,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9987",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0252",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0021 / 0.0038",
+    "out_mcf.nii.gz: voxel values": "0.999997"
+   },
    "reason": "",
-   "seconds": 9.896,
+   "reported": {
+    "D13 fix pass": 8423431,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
+   },
+   "seconds": 14.45,
    "status": "pass"
   },
   {
@@ -570,8 +1289,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9987",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0252",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0021 / 0.0038",
+    "out_mcf.nii.gz.par: median difference": "0.0023 / 0.0038",
+    "out_mcf.nii.gz: voxel values": "0.999997",
+    "out_mcf.nii.gz_abs.rms: values": "0.0162",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0008",
+    "out_mcf.nii.gz_rel.rms: values": "0.0203",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0003"
+   },
    "reason": "",
-   "seconds": 9.999,
+   "reported": {
+    "D13 fix pass": 8423431,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
+   },
+   "seconds": 16.365,
    "status": "pass"
   },
   {
@@ -580,8 +1314,18 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 0.584,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.245,
    "status": "pass"
   },
   {
@@ -590,8 +1334,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.876,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.089,
    "status": "pass"
   },
   {
@@ -611,6 +1371,9 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.035,
    "status": "pass"
   },
@@ -630,8 +1393,15 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 0.91,
+   "reported": {
+    "D13 fix pass": 172287
+   },
+   "seconds": 1.027,
    "status": "pass"
   },
   {
@@ -640,8 +1410,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.919,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 0.978,
    "status": "pass"
   },
   {
@@ -651,7 +1436,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol -2: invalid volume index for a series of 12 volumes",
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -660,8 +1445,19 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0000",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.91,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
+   },
+   "seconds": 1.07,
    "status": "pass"
   },
   {
@@ -671,7 +1467,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtime_error' what(): Att; larmorx exit [1]: Error: -stages 0 with a reference file: nothing would be registered",
-   "seconds": 0.006,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -690,8 +1486,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "1.0000",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0864",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0036 / 0.0126",
+    "out_mcf.nii.gz.par: median difference": "0.0071 / 0.0127",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0185",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0056",
+    "out_mcf.nii.gz_rel.rms: values": "0.0332",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0040"
+   },
    "reason": "",
-   "seconds": 0.618,
+   "reported": {
+    "D13 fix pass": 194047,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
+   },
+   "seconds": 0.763,
    "status": "pass"
   },
   {
@@ -700,8 +1511,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "1.0000",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.6088",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0870",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0089",
+    "out_mcf.nii.gz.par: median difference": "0.0033 / 0.0089",
+    "out_mcf.nii.gz: voxel values": "0.999998",
+    "out_mcf.nii.gz_abs.rms: values": "0.0238",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0052",
+    "out_mcf.nii.gz_rel.rms: values": "0.0150",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0078"
+   },
    "reason": "",
-   "seconds": 0.651,
+   "reported": {
+    "D13 fix pass": 204094,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
+   },
+   "seconds": 0.689,
    "status": "pass"
   },
   {
@@ -710,8 +1537,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9991",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0567",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0082",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0082",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.99,
+   "reported": {
+    "D13 fix pass": 166364,
+    "out_mcf.nii.gz.mat: matrices identical as text": "2/12"
+   },
+   "seconds": 1.136,
    "status": "pass"
   },
   {
@@ -720,8 +1562,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0585",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0109",
+    "out_mcf.nii.gz.par: median difference": "0.0017 / 0.0109",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0307",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0715",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 1.019,
+   "reported": {
+    "D13 fix pass": 300837,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.171,
    "status": "pass"
   },
   {
@@ -730,8 +1587,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "the identifiable translation": "0.1808"
+   },
    "reason": "",
-   "seconds": 0.58,
+   "reported": {
+    "D13 fix pass": 71616
+   },
+   "seconds": 0.615,
    "status": "pass"
   },
   {
@@ -741,7 +1604,11 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.573,
+   "reported": {
+    "D13 fix pass": 71683,
+    "no parameter is identifiable": "10.82 / 2.56"
+   },
+   "seconds": 0.708,
    "status": "pass"
   },
   {
@@ -750,8 +1617,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.968,
+   "reported": {
+    "D13 fix pass": 33357,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.243,
    "status": "pass"
   },
   {
@@ -760,8 +1642,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.981,
+   "reported": {
+    "D13 fix pass": 33483,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.281,
    "status": "pass"
   },
   {
@@ -770,8 +1667,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.997,
+   "reported": {
+    "D13 fix pass": 33357,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.316,
    "status": "pass"
   },
   {
@@ -780,8 +1692,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 1.073,
+   "reported": {
+    "D13 fix pass": 33483,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.439,
    "status": "pass"
   },
   {
@@ -790,8 +1717,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.97,
+   "reported": {
+    "D13 fix pass": 33357,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.123,
    "status": "pass"
   },
   {
@@ -800,8 +1742,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.984,
+   "reported": {
+    "D13 fix pass": 33483,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.282,
    "status": "pass"
   },
   {
@@ -810,8 +1767,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.875,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.118,
    "status": "pass"
   },
   {
@@ -820,8 +1792,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.818,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.138,
    "status": "pass"
   },
   {
@@ -830,8 +1817,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9991",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0395",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0025 / 0.0101",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0102",
+    "out_mcf.nii.gz: voxel values": "0.999997",
+    "out_mcf.nii.gz_abs.rms: values": "0.0226",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0016",
+    "out_mcf.nii.gz_rel.rms: values": "0.0350",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+   },
    "reason": "",
-   "seconds": 0.541,
+   "reported": {
+    "D13 fix pass": 163689,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.107,
    "status": "pass"
   },
   {
@@ -840,8 +1842,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9986",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0961",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0032 / 0.0121",
+    "out_mcf.nii.gz.par: median difference": "0.0011 / 0.0122",
+    "out_mcf.nii.gz: voxel values": "0.999997",
+    "out_mcf.nii.gz_abs.rms: values": "0.0340",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0038",
+    "out_mcf.nii.gz_rel.rms: values": "0.0544",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0114"
+   },
    "reason": "",
-   "seconds": 0.837,
+   "reported": {
+    "D13 fix pass": 180934,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.132,
    "status": "pass"
   },
   {
@@ -850,8 +1867,22 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0000",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0000",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.071,
+   "reported": {
+    "D13 fix pass": 0,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -860,8 +1891,22 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0104",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0012 / 0.0055",
+    "out_mcf.nii.gz.par: median difference": "0.0007 / 0.0055",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0014",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0014",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.289,
+   "reported": {
+    "D13 fix pass": 15784,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
+   },
+   "seconds": 0.365,
    "status": "pass"
   },
   {
@@ -870,8 +1915,22 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0000",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0000",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.065,
+   "reported": {
+    "D13 fix pass": 0,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
+   },
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -880,8 +1939,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.1492",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0104",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0012 / 0.0055",
+    "out_mcf.nii.gz.par: median difference": "0.0007 / 0.0055",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0014",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0014",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.294,
+   "reported": {
+    "D13 fix pass": 15784,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
+   },
+   "seconds": 0.387,
    "status": "pass"
   },
   {
@@ -890,8 +1964,23 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9998",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0347",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0083",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0176",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0026"
+   },
    "reason": "",
-   "seconds": 0.12,
+   "reported": {
+    "D13 fix pass": 22502,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
+   },
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -900,8 +1989,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9998",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0347",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0083",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0176",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0026"
+   },
    "reason": "",
-   "seconds": 0.153,
+   "reported": {
+    "D13 fix pass": 22502,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
+   },
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -910,8 +2014,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9997",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0550",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0005 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0144",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
+    "out_mcf.nii.gz_rel.rms: values": "0.0143",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+   },
    "reason": "",
-   "seconds": 0.142,
+   "reported": {
+    "D13 fix pass": 22611,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
+   },
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -920,8 +2039,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9995",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.1130",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0029 / 0.0278",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0278",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0701",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0081",
+    "out_mcf.nii.gz_rel.rms: values": "0.0903",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0401"
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 799,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
+   },
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -930,8 +2064,22 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0514",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0015 / 0.0005",
+    "out_mcf.nii.gz.par: median difference": "0.0007 / 0.0004",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0330",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0165",
+    "out_mcf.nii.gz_rel.rms: values": "0.0330",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0330"
+   },
    "reason": "",
-   "seconds": 0.328,
+   "reported": {
+    "D13 fix pass": 15778,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/2"
+   },
+   "seconds": 0.395,
    "status": "pass"
   },
   {
@@ -940,8 +2088,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3656",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0578",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0251",
+    "out_mcf.nii.gz.par: median difference": "0.0007 / 0.0251",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0177",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0115",
+    "out_mcf.nii.gz_rel.rms: values": "0.0261",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0261"
+   },
    "reason": "",
-   "seconds": 0.363,
+   "reported": {
+    "D13 fix pass": 34233,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/2"
+   },
+   "seconds": 0.404,
    "status": "pass"
   },
   {
@@ -950,8 +2113,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0000",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0000",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.606,
+   "reported": {
+    "D13 fix pass": 74170,
+    "FD (Power, 50 mm) correlation": "1.0000",
+    "out_mcf.nii.gz.mat: matrices identical as text": "6/6"
+   },
+   "seconds": 0.732,
    "status": "pass"
   },
   {
@@ -960,8 +2138,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.2308",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0575",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0063 / 0.0168",
+    "out_mcf.nii.gz.par: median difference": "0.0032 / 0.0168",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0168",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0032",
+    "out_mcf.nii.gz_rel.rms: values": "0.0120",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0065"
+   },
    "reason": "",
-   "seconds": 0.581,
+   "reported": {
+    "D13 fix pass": 97335,
+    "FD (Power, 50 mm) correlation": "0.8368",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
+   },
+   "seconds": 0.673,
    "status": "pass"
   },
   {
@@ -970,8 +2164,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.2084",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0228",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0099 / 0.0050",
+    "out_mcf.nii.gz.par: median difference": "0.0101 / 0.0051",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0121",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0121",
+    "out_mcf.nii.gz_rel.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0000"
+   },
    "reason": "",
-   "seconds": 0.558,
+   "reported": {
+    "D13 fix pass": 95622,
+    "FD (Power, 50 mm) correlation": "1.0000",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
+   },
+   "seconds": 0.674,
    "status": "pass"
   },
   {
@@ -980,8 +2190,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9989",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0463",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0026 / 0.0133",
+    "out_mcf.nii.gz.par: median difference": "0.0015 / 0.0133",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0249",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0021",
+    "out_mcf.nii.gz_rel.rms: values": "0.0595",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0014"
+   },
    "reason": "",
-   "seconds": 0.922,
+   "reported": {
+    "D13 fix pass": 175179,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.047,
    "status": "pass"
   },
   {
@@ -990,8 +2215,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9993",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.2236",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0646",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0042 / 0.0118",
+    "out_mcf.nii.gz.par: median difference": "0.0018 / 0.0118",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0225",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0038",
+    "out_mcf.nii.gz_rel.rms: values": "0.0161",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0013"
+   },
    "reason": "",
-   "seconds": 0.941,
+   "reported": {
+    "D13 fix pass": 191396,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.262,
    "status": "pass"
   },
   {
@@ -1000,8 +2241,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9967",
+    "accuracy against the synthetic truth (mean RMS deviation)": "1.3423",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0667",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0004 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0250",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0029",
+    "out_mcf.nii.gz_rel.rms: values": "0.0630",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0157"
+   },
    "reason": "",
-   "seconds": 0.738,
+   "reported": {
+    "D13 fix pass": 208736,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 0.831,
    "status": "pass"
   },
   {
@@ -1010,8 +2267,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.903,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.164,
    "status": "pass"
   },
   {
@@ -1020,8 +2292,23 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.875,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.109,
    "status": "pass"
   },
   {
@@ -1030,8 +2317,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9975",
+    "accuracy against the synthetic truth (mean RMS deviation)": "1.3704",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.1252",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0054 / 0.0267",
+    "out_mcf.nii.gz.par: median difference": "0.0018 / 0.0168",
+    "out_mcf.nii.gz: voxel values": "0.999998",
+    "out_mcf.nii.gz_abs.rms: values": "0.0294",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0014",
+    "out_mcf.nii.gz_rel.rms: values": "0.0596",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0055"
+   },
    "reason": "",
-   "seconds": 1.584,
+   "reported": {
+    "D13 fix pass": 202281,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.959,
    "status": "pass"
   },
   {
@@ -1040,8 +2343,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9961",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3515",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0707",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0026 / 0.0185",
+    "out_mcf.nii.gz.par: median difference": "0.0010 / 0.0185",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0301",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
+    "out_mcf.nii.gz_rel.rms: values": "0.0480",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0044"
+   },
    "reason": "",
-   "seconds": 1.043,
+   "reported": {
+    "D13 fix pass": 192701,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.309,
    "status": "pass"
   },
   {
@@ -1050,8 +2369,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145",
+    "out_mcf.nii: voxel values": "0.999999"
+   },
    "reason": "",
-   "seconds": 0.783,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 0.959,
    "status": "pass"
   },
   {
@@ -1060,8 +2395,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9994",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3494",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0486",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0028 / 0.0139",
+    "out_mcf.nii.gz.par: median difference": "0.0007 / 0.0139",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0307",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0071",
+    "out_mcf.nii.gz_rel.rms: values": "0.0386",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0058"
+   },
    "reason": "",
-   "seconds": 0.902,
+   "reported": {
+    "D13 fix pass": 189810,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.153,
    "status": "pass"
   },
   {
@@ -1070,8 +2421,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.937,
+   "reported": {
+    "D13 fix pass": 194807,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.073,
    "status": "pass"
   },
   {
@@ -1080,8 +2447,24 @@
    "checks_passed": 18,
    "checks_total": 18,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9737",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.2811",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0054 / 0.0109",
+    "out_mcf.nii.gz.par: median difference": "0.0028 / 0.0108",
+    "out_mcf.nii.gz: voxel values": "0.999991",
+    "out_mcf.nii.gz_abs.rms: values": "0.0301",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0024",
+    "out_mcf.nii.gz_mean_reg.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_rel.rms: values": "0.3056",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0340"
+   },
    "reason": "",
-   "seconds": 1.145,
+   "reported": {
+    "D13 fix pass": 215508,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 2.075,
    "status": "pass"
   },
   {
@@ -1090,8 +2473,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.746,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.122,
    "status": "pass"
   },
   {
@@ -1100,8 +2499,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999862",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.698,
+   "reported": {
+    "D13 fix pass": 642,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.265,
    "status": "pass"
   },
   {
@@ -1111,7 +2526,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default).",
-   "seconds": 0.302,
+   "seconds": 0.495,
    "status": "expected-divergence"
   },
   {
@@ -1121,7 +2536,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [2]: Input filename not found; larmorx exit [2]: Input filename not found",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1130,8 +2545,19 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "small_mcf.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "small_mcf.mat: median parameter difference": "0.0008 / 0.0088",
+    "small_mcf.nii.gz: voxel values": "0.999999",
+    "small_mcf.par: median difference": "0.0006 / 0.0088"
+   },
    "reason": "",
-   "seconds": 0.731,
+   "reported": {
+    "D13 fix pass": 172287,
+    "small_mcf.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 0.965,
    "status": "pass"
   },
   {
@@ -1140,8 +2566,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "plain.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "plain.mat: median parameter difference": "0.0027 / 0.0164",
+    "plain.nii.gz: voxel values": "0.999999",
+    "plain.par: median difference": "0.0012 / 0.0165",
+    "plain_abs.rms: values": "0.0367",
+    "plain_abs_mean.rms: values": "0.0000",
+    "plain_rel.rms: values": "0.0843",
+    "plain_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.674,
+   "reported": {
+    "D13 fix pass": 193139,
+    "plain.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.179,
    "status": "pass"
   },
   {
@@ -1150,8 +2592,27 @@
    "checks_passed": 24,
    "checks_total": 24,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat+: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat+: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 1.137,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat+: matrices identical as text": "0/12",
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 2.102,
    "status": "pass"
   },
   {
@@ -1160,8 +2621,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.625,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.135,
    "status": "pass"
   },
   {
@@ -1170,8 +2647,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9983",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0560",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0039 / 0.0161",
+    "out_mcf.nii.gz.par: median difference": "0.0021 / 0.0161",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0290",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
+    "out_mcf.nii.gz_rel.rms: values": "0.0408",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0106"
+   },
    "reason": "",
-   "seconds": 0.664,
+   "reported": {
+    "D13 fix pass": 191010,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.021,
    "status": "pass"
   },
   {
@@ -1181,7 +2673,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to c; larmorx exit [1]: Error: the reference has 57600 voxels and the volumes of the series 73216: the corrected series would not fit (resample=False estimates only)",
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1190,8 +2682,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.624,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.194,
    "status": "pass"
   },
   {
@@ -1200,8 +2707,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9984",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0560",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0039 / 0.0108",
+    "out_mcf.nii.gz.par: median difference": "0.0021 / 0.0108",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0290",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0006",
+    "out_mcf.nii.gz_rel.rms: values": "0.0408",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0094"
+   },
    "reason": "",
-   "seconds": 0.614,
+   "reported": {
+    "D13 fix pass": 176016,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 0.919,
    "status": "pass"
   },
   {
@@ -1211,7 +2733,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol 12: invalid volume index for a series of 12 volumes",
-   "seconds": 0.005,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -1220,8 +2742,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.601,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.087,
    "status": "pass"
   },
   {
@@ -1230,8 +2768,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.961,
+   "reported": {
+    "D13 fix pass": 206100,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.822,
    "status": "pass"
   },
   {
@@ -1240,8 +2794,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9981",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3813",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0585",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0029 / 0.0151",
+    "out_mcf.nii.gz.par: median difference": "0.0028 / 0.0151",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0275",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
+    "out_mcf.nii.gz_rel.rms: values": "0.0728",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0110"
+   },
    "reason": "",
-   "seconds": 0.568,
+   "reported": {
+    "D13 fix pass": 190876,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.038,
    "status": "pass"
   },
   {
@@ -1250,8 +2820,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.654,
+   "reported": {
+    "D13 fix pass": 228063,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.298,
    "status": "pass"
   },
   {
@@ -1260,8 +2846,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9964",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.5058",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0694",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0022 / 0.0043",
+    "out_mcf.nii.gz.par: median difference": "0.0008 / 0.0043",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0366",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0063",
+    "out_mcf.nii.gz_rel.rms: values": "0.0583",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0112"
+   },
    "reason": "",
-   "seconds": 0.253,
+   "reported": {
+    "D13 fix pass": 199922,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 0.416,
    "status": "pass"
   },
   {
@@ -1270,8 +2872,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.1755",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0539",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0030 / 0.0098",
+    "out_mcf.nii.gz.par: median difference": "0.0018 / 0.0098",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0172",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
+    "out_mcf.nii.gz_rel.rms: values": "0.0281",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0005"
+   },
    "reason": "",
-   "seconds": 9.972,
+   "reported": {
+    "D13 fix pass": 190882,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 17.077,
    "status": "pass"
   },
   {
@@ -1280,8 +2898,27 @@
    "checks_passed": 23,
    "checks_total": 23,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_meanvol.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145",
+    "out_mcf.nii.gz_sigma.nii.gz: voxel values": "0.999939",
+    "out_mcf.nii.gz_variance.nii.gz: voxel values": "0.999903"
+   },
    "reason": "",
-   "seconds": 0.671,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.242,
    "status": "pass"
   },
   {
@@ -1290,8 +2927,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.322,
+   "reported": {
+    "D13 fix pass": 0,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 0.636,
    "status": "pass"
   },
   {
@@ -1310,8 +2963,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.585,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 0.966,
    "status": "pass"
   },
   {
@@ -1320,8 +2988,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.603,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.017,
    "status": "pass"
   },
   {
@@ -1330,8 +3013,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9990",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0515",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0022 / 0.0064",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0064",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0134",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0013",
+    "out_mcf.nii.gz_rel.rms: values": "0.0182",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0037"
+   },
    "reason": "",
-   "seconds": 0.593,
+   "reported": {
+    "D13 fix pass": 172919,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.162,
    "status": "pass"
   },
   {
@@ -1340,8 +3038,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9983",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0660",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0024 / 0.0108",
+    "out_mcf.nii.gz.par: median difference": "0.0019 / 0.0108",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0250",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0018",
+    "out_mcf.nii.gz_rel.rms: values": "0.0736",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0059"
+   },
    "reason": "",
-   "seconds": 0.65,
+   "reported": {
+    "D13 fix pass": 196646,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.245,
    "status": "pass"
   },
   {
@@ -1350,8 +3063,23 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9988",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0488",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0088",
+    "out_mcf.nii.gz.par: median difference": "0.0006 / 0.0088",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0186",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0023",
+    "out_mcf.nii.gz_rel.rms: values": "0.0226",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0038"
+   },
    "reason": "",
-   "seconds": 0.661,
+   "reported": {
+    "D13 fix pass": 172287,
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
+   },
+   "seconds": 1.232,
    "status": "pass"
   },
   {
@@ -1360,8 +3088,24 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "FD (Power, 50 mm) correlation": "0.9971",
+    "accuracy against the synthetic truth (mean RMS deviation)": "0.3415",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
+    "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0367",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0843",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0145"
+   },
    "reason": "",
-   "seconds": 0.645,
+   "reported": {
+    "D13 fix pass": 193139,
+    "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
+   },
+   "seconds": 1.263,
    "status": "pass"
   }
  ],

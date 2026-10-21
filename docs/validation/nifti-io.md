@@ -1,11 +1,11 @@
 # Parity: NIfTI reading and writing
 
-**All cases agree.** 252 cases on the `standard` tier: 230 pass, 17 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 254 cases on the `standard` tier: 232 pass, 17 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** larmorx.io.load / larmorx.io.save (crate larmorx-io)
 - **Reference:** nibabel 5.4.2
-- **Test data:** larmorx-testdata `db846de5f34a`, tier `standard`
-- **Generated:** 2026-10-09 on Linux x86_64, with `python -m larmorx_validation parity nifti-io --tier standard`
+- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
+- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity nifti-io --tier standard`
 
 ## Thresholds
 
@@ -72,6 +72,7 @@
 | synthetic/orientation | 23 | 22 | 1 | 0 | 0 |
 | synthetic/scaling | 15 | 14 | 1 | 0 | 0 |
 | synthetic/shapes | 13 | 13 | 0 | 0 | 0 |
+| synthetic/transforms | 2 | 2 | 0 | 0 | 0 |
 | templateflow-MNI152Lin | 2 | 2 | 0 | 0 | 0 |
 | templateflow-MNI152NLin2009cAsym | 9 | 9 | 0 | 0 | 0 |
 | templateflow-OASIS30ANTs | 4 | 4 | 0 | 0 | 0 |
@@ -112,8 +113,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4fe591cf4057) |
-| larmorx-testdata | db846de5f34a |
+| larmorx | 0.0.1 (1dfe56c0dc60) |
+| larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -368,6 +369,8 @@
 | `synthetic/nifti/shapes/freesurfer-ico7.nii` | pass | 22/22 | FreeSurfer's ico7 convention: 163842 x 1 x 1 stored as 27307 x 1 x 6. |
 | `synthetic/nifti/shapes/freesurfer-large-vector.nii` | pass | 22/22 | FreeSurfer's long-vector convention: 40000 x 1 x 1 stored as dim[1] = -1, glmin = 40000. |
 | `synthetic/nifti/shapes/nifti2-large-dim.nii.gz` | pass | 19/19 | NIfTI-2 with a dimension (40000) that NIfTI-1's int16 cannot hold. |
+| `synthetic/resampling/transforms/warp-lps-vector.nii.gz` | pass | 22/22 | Displacement field as ANTs writes it: a 5D NIfTI vector image (intent VECTOR) with LPS vectors, on an oblique 2 mm grid. |
+| `synthetic/resampling/transforms/warp-ras-dispvect.nii.gz` | pass | 22/22 | The same displacement as a RAS field with intent DISPVECT (written by nibabel), which ITK converts to LPS when reading. |
 | `templateflow/tpl-MNI152Lin/tpl-MNI152Lin_res-02_T1w.nii.gz` | pass | 22/22 | Linear ICBM152 T1w at 2 mm on the classic 91x109x91 grid (int16, qform=sform=4). Substitute for the requested MNI152NLi… |
 | `templateflow/tpl-MNI152Lin/tpl-MNI152Lin_res-02_desc-brain_mask.nii.gz` | pass | 22/22 | 2 mm brain mask on the 91x109x91 grid (uint8). |
 | `templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz` | pass | 22/22 | The 1 mm MNI152NLin2009cAsym T1w (193x229x193, int16, qform=sform=4): full-resolution registration target used by fMRIP… |

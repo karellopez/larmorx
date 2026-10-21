@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "9a4d65ae2dab",
+  "larmorx_commit": "1dfe56c0dc60",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,8 +22,15 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 2.021,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 2.863,
    "status": "pass"
   },
   {
@@ -32,8 +39,15 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.937,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 1.799,
    "status": "pass"
   },
   {
@@ -42,8 +56,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 0.845,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.511,
    "status": "pass"
   },
   {
@@ -52,8 +72,16 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 191,
+    "unmodified ANTs: standard output": 191
+   },
    "reason": "",
-   "seconds": 1.911,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 1.528,
    "status": "pass"
   },
   {
@@ -62,8 +90,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 1.695,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.397,
    "status": "pass"
   },
   {
@@ -72,8 +106,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 1.105,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.854,
    "status": "pass"
   },
   {
@@ -82,8 +122,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.139,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.136,
    "status": "pass"
   },
   {
@@ -92,8 +138,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.113,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -102,8 +154,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.138,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -112,8 +170,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.679,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.385,
    "status": "pass"
   },
   {
@@ -122,8 +186,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 0.872,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.438,
    "status": "pass"
   },
   {
@@ -132,8 +202,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 0.899,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.515,
    "status": "pass"
   },
   {
@@ -142,8 +218,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 0.689,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.38,
    "status": "pass"
   },
   {
@@ -152,8 +234,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.145,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -162,8 +250,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.133,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -172,8 +266,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.081,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -182,8 +282,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 195,
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.929,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 0.52,
    "status": "pass"
   },
   {
@@ -192,8 +300,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 191
+   },
    "reason": "",
-   "seconds": 0.796,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.398,
    "status": "pass"
   },
   {
@@ -202,8 +316,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 0.818,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.463,
    "status": "pass"
   },
   {
@@ -212,8 +332,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 0.705,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.348,
    "status": "pass"
   },
   {
@@ -222,8 +348,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.182,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -232,8 +364,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 179
+   },
    "reason": "",
-   "seconds": 0.163,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -242,8 +380,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.138,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -252,8 +396,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 195,
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.827,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 0.431,
    "status": "pass"
   },
   {
@@ -262,8 +414,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 0.787,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.431,
    "status": "pass"
   },
   {
@@ -272,8 +430,16 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 189,
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 1.527,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r1Affine.mat": null
+   },
+   "seconds": 0.741,
    "status": "pass"
   },
   {
@@ -282,8 +448,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 0.794,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.396,
    "status": "pass"
   },
   {
@@ -292,8 +464,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.102,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -302,8 +480,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 0.068,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -312,8 +496,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.067,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -322,8 +512,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 195,
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.748,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 0.452,
    "status": "pass"
   },
   {
@@ -332,8 +530,18 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 192,
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.36,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: r0GenericAffine.mat": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.687,
    "status": "pass"
   },
   {
@@ -342,8 +550,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 0.919,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.454,
    "status": "pass"
   },
   {
@@ -352,8 +566,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 0.761,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.371,
    "status": "pass"
   },
   {
@@ -362,8 +582,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.087,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -372,8 +598,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 0.079,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -382,8 +614,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
    "reason": "",
-   "seconds": 0.082,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -392,8 +630,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 195,
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.98,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 0.431,
    "status": "pass"
   },
   {
@@ -402,8 +648,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 368
+   },
    "reason": "",
-   "seconds": 1.772,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.828,
    "status": "pass"
   },
   {
@@ -412,8 +664,16 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 347,
+    "unmodified ANTs: standard output": 347
+   },
    "reason": "",
-   "seconds": 1.599,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r1Affine.mat": null
+   },
+   "seconds": 0.742,
    "status": "pass"
   },
   {
@@ -422,8 +682,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.264,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.45,
    "status": "pass"
   },
   {
@@ -432,8 +698,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.618,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.663,
    "status": "pass"
   },
   {
@@ -442,8 +715,17 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 192,
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 2.688,
+   "reported": {
+    "D13 fix pass": 12,
+    "thread band": "3.47e-18",
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 1.011,
    "status": "pass"
   },
   {
@@ -452,8 +734,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 191
+   },
    "reason": "",
-   "seconds": 4.516,
+   "reported": {
+    "D13 fix pass": 12,
+    "thread band": "0"
+   },
+   "seconds": 1.791,
    "status": "pass"
   },
   {
@@ -462,8 +751,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.467,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.53,
    "status": "pass"
   },
   {
@@ -472,8 +768,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 2.159,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.735,
    "status": "pass"
   },
   {
@@ -482,8 +785,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 4.221,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 1.971,
    "status": "pass"
   },
   {
@@ -492,8 +802,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 25.373,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 14.883,
    "status": "pass"
   },
   {
@@ -502,8 +819,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 38.171,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 20.963,
    "status": "pass"
   },
   {
@@ -512,8 +836,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 191
+   },
    "reason": "",
-   "seconds": 2.409,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.96,
    "status": "pass"
   },
   {
@@ -522,8 +853,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 47.727,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 25.957,
    "status": "pass"
   },
   {
@@ -532,8 +870,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 1.063,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.621,
    "status": "pass"
   },
   {
@@ -542,8 +886,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 14.23,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.964,
    "status": "pass"
   },
   {
@@ -552,8 +902,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.138,
+   "reported": {
+    "D13 fix pass": 6
+   },
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -562,8 +918,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.19,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -572,8 +934,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.082,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -582,8 +950,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 200
+   },
    "reason": "",
-   "seconds": 1.722,
+   "reported": {
+    "D13 fix pass": 20
+   },
+   "seconds": 0.706,
    "status": "pass"
   },
   {
@@ -592,8 +966,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 1.269,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.479,
    "status": "pass"
   },
   {
@@ -602,8 +982,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 28.288,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 15.071,
    "status": "pass"
   },
   {
@@ -612,8 +998,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 0.9,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.551,
    "status": "pass"
   },
   {
@@ -622,8 +1014,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 1.318,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.608,
    "status": "pass"
   },
   {
@@ -632,8 +1030,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.129,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -642,8 +1046,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.162,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.203,
    "status": "pass"
   },
   {
@@ -652,8 +1062,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 0.855,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.513,
    "status": "pass"
   },
   {
@@ -662,8 +1078,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 3.153,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.102,
    "status": "pass"
   },
   {
@@ -672,8 +1094,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 0.502,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.368,
    "status": "pass"
   },
   {
@@ -682,8 +1110,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 197
+   },
    "reason": "",
-   "seconds": 0.818,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null,
+    "unmodified ANTs: standard output": 197
+   },
+   "seconds": 0.479,
    "status": "pass"
   },
   {
@@ -692,8 +1128,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 194
+   },
    "reason": "",
-   "seconds": 0.501,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.332,
    "status": "pass"
   },
   {
@@ -702,8 +1144,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 196
+   },
    "reason": "",
-   "seconds": 0.204,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -712,8 +1160,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 0.607,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.408,
    "status": "pass"
   },
   {
@@ -722,8 +1176,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 196,
+    "unmodified ANTs: standard output": 196
+   },
    "reason": "",
-   "seconds": 0.483,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 0.381,
    "status": "pass"
   },
   {
@@ -732,8 +1194,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 191
+   },
    "reason": "",
-   "seconds": 1.766,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null,
+    "unmodified ANTs: standard output": 191
+   },
+   "seconds": 0.586,
    "status": "pass"
   },
   {
@@ -742,8 +1212,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 175
+   },
    "reason": "",
-   "seconds": 0.164,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -753,7 +1229,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "without a seed ANTs seeds its sampling from the clock and its result changes from run to run; larmorx uses a fixed seed",
-   "seconds": 0.791,
+   "seconds": 0.232,
    "status": "expected-divergence"
   },
   {
@@ -762,8 +1238,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 196
+   },
    "reason": "",
-   "seconds": 1.014,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.511,
    "status": "pass"
   },
   {
@@ -772,8 +1254,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 193
+   },
    "reason": "",
-   "seconds": 0.823,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.468,
    "status": "pass"
   },
   {
@@ -782,8 +1270,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 196
+   },
    "reason": "",
-   "seconds": 0.958,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.431,
    "status": "pass"
   },
   {
@@ -792,8 +1286,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.674,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.27,
    "status": "pass"
   },
   {
@@ -802,8 +1302,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.584,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.266,
    "status": "pass"
   },
   {
@@ -812,8 +1318,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 0.63,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.241,
    "status": "pass"
   },
   {
@@ -822,8 +1334,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 525
+   },
    "reason": "",
-   "seconds": 3.464,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.813,
    "status": "pass"
   },
   {
@@ -832,8 +1350,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 1.136,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.356,
    "status": "pass"
   },
   {
@@ -842,8 +1366,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 1.008,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.241,
    "status": "pass"
   },
   {
@@ -853,7 +1383,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.534,
+   "seconds": 0.204,
    "status": "both-error"
   },
   {
@@ -863,7 +1393,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads past the end of its list of file names and crashes (ANTS-51); larmorx writes the same files up to there and stops with an error",
-   "seconds": 0.822,
+   "seconds": 0.204,
    "status": "expected-divergence"
   },
   {
@@ -872,8 +1402,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 179
+   },
    "reason": "",
-   "seconds": 0.247,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -882,8 +1418,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 179
+   },
    "reason": "",
-   "seconds": 0.188,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -892,8 +1434,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 179
+   },
    "reason": "",
-   "seconds": 0.224,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -902,8 +1450,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.111,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -912,8 +1466,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.211,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -922,8 +1482,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.105,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -932,8 +1498,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.191,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -942,8 +1514,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.242,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -952,8 +1530,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.296,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -962,8 +1546,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.296,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -972,8 +1562,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.284,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -983,7 +1579,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "\t\"VersorTransform_float_3_3\"",
-   "seconds": 0.069,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -993,7 +1589,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.036,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -1002,8 +1598,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 0.23,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -1012,8 +1614,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
    "reason": "",
-   "seconds": 0.188,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1022,8 +1630,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.138,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1032,8 +1646,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.135,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1042,8 +1662,16 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 171,
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.309,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null
+   },
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -1052,8 +1680,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 171,
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.245,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1062,8 +1699,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 171,
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.246,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1072,8 +1718,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.158,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -1082,8 +1734,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 171,
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.207,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -1092,8 +1753,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.595,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.176,
    "status": "pass"
   },
   {
@@ -1102,8 +1769,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 171
+   },
    "reason": "",
-   "seconds": 0.271,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -1112,8 +1785,18 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 195,
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 2.343,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: r0GenericAffine.mat": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.564,
    "status": "pass"
   },
   {
@@ -1122,8 +1805,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 195
+   },
    "reason": "",
-   "seconds": 2.152,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.38,
    "status": "pass"
   },
   {
@@ -1132,8 +1821,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 199
+   },
    "reason": "",
-   "seconds": 1.851,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.345,
    "status": "pass"
   },
   {
@@ -1142,8 +1837,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 1.129,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.278,
    "status": "pass"
   },
   {
@@ -1152,8 +1853,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 187,
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 1.686,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 0.606,
    "status": "pass"
   },
   {
@@ -1162,8 +1872,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 187,
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 12.569,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 6.686,
    "status": "pass"
   },
   {
@@ -1172,8 +1891,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 343.405,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 256.111,
    "status": "pass"
   },
   {
@@ -1182,8 +1907,16 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 187,
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 157.772,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 146.183,
    "status": "pass"
   },
   {
@@ -1192,8 +1925,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 199
+   },
    "reason": "",
-   "seconds": 0.722,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.612,
    "status": "pass"
   },
   {
@@ -1202,8 +1941,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 0.791,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.337,
    "status": "pass"
   },
   {
@@ -1212,8 +1957,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 0.971,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.568,
    "status": "pass"
   },
   {
@@ -1222,8 +1973,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 1.117,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.737,
    "status": "pass"
   },
   {
@@ -1232,8 +1989,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 180,
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 2.952,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 2.854,
    "status": "pass"
   },
   {
@@ -1242,8 +2008,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 35.834,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 32.887,
    "status": "pass"
   },
   {
@@ -1252,8 +2024,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 180,
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 1.622,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: iw.nii.gz": null,
+    "unmodified ANTs: w.nii.gz": null
+   },
+   "seconds": 1.718,
    "status": "pass"
   },
   {
@@ -1262,8 +2043,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 7.169,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.33,
    "status": "pass"
   },
   {
@@ -1272,8 +2059,14 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 193
+   },
    "reason": "",
-   "seconds": 0.915,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.125,
    "status": "pass"
   },
   {
@@ -1282,8 +2075,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 231
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -1293,7 +2092,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.035,
+   "seconds": 0.054,
    "status": "both-error"
   },
   {
@@ -1303,7 +2102,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.074,
+   "seconds": 0.107,
    "status": "both-error"
   },
   {
@@ -1313,7 +2112,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.074,
+   "seconds": 0.096,
    "status": "both-error"
   },
   {
@@ -1339,8 +2138,8 @@
      "value": null
     }
    ],
-   "reason": "file /tmp/lx-reg-bwxa0o6n/none.nii.gz does not exist .",
-   "seconds": 0.033,
+   "reason": "file /tmp/lx-reg-lsu21pwl/none.nii.gz does not exist .",
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -1350,7 +2149,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unknown registration method \"foo\"",
-   "seconds": 0.021,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -1360,7 +2159,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the the output transform will contain the this processes initializer",
-   "seconds": 0.021,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -1370,7 +2169,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive.",
-   "seconds": 0.02,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -1380,7 +2179,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "restore-state option is mutually exclusive with initial-moving-transform & initial-fixed-transform options.",
-   "seconds": 0.024,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -1389,8 +2188,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 70
+   },
    "reason": "",
-   "seconds": 0.026,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1400,7 +2205,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "larmorx prints its own version and the ANTs version it ports",
-   "seconds": 0.021,
+   "seconds": 0.03,
    "status": "expected-divergence"
   },
   {
@@ -1410,7 +2215,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.02,
+   "seconds": 0.034,
    "status": "expected-divergence"
   },
   {
@@ -1420,7 +2225,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.021,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1430,7 +2235,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.021,
+   "seconds": 0.035,
    "status": "expected-divergence"
   },
   {
@@ -1440,7 +2245,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "bad image dimension 5",
-   "seconds": 0.02,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -1450,7 +2255,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR:  Invalid command line flags found! Aborting execution.",
-   "seconds": 0.02,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -1460,7 +2265,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.02,
+   "seconds": 0.031,
    "status": "expected-divergence"
   },
   {
@@ -1470,7 +2275,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
-   "seconds": 0.02,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -1480,7 +2285,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the transform option ('-t') must be specified.  See help menu.",
-   "seconds": 0.021,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -1490,7 +2295,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
-   "seconds": 0.021,
+   "seconds": 0.045,
    "status": "both-error"
   },
   {
@@ -1500,7 +2305,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the convergence option ('-c') must be specified.  See help menu.",
-   "seconds": 0.031,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -1510,7 +2315,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the shrink factors option ('-f') must be specified.  See help menu.",
-   "seconds": 0.028,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -1520,7 +2325,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the smoothing sigmas option ('-s') must be specified.  See help menu.",
-   "seconds": 0.026,
+   "seconds": 0.045,
    "status": "both-error"
   },
   {
@@ -1530,7 +2335,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the output option ('-o') must be specified.  See help menu.",
-   "seconds": 0.021,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1540,7 +2345,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the initializizing transform is collapsed into each stage for optimization",
-   "seconds": 0.022,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -1550,7 +2355,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: smoothing sigmas, shrink factors, and convergence options must be set once for each transform.",
-   "seconds": 0.026,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -1560,7 +2365,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Convergence Window Size must be greater than or equal to 2",
-   "seconds": 0.02,
+   "seconds": 0.045,
    "status": "both-error"
   },
   {
@@ -1570,7 +2375,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert '1o' to type 'j' as unsigned int",
-   "seconds": 0.021,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -1580,7 +2385,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.056,
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -1590,7 +2395,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: invalid sampling strategy specified: sparse",
-   "seconds": 0.066,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -1600,7 +2405,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.084,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -1610,7 +2415,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The number of transforms is 2 and the last stage ID  as determined by the metrics is 0.",
-   "seconds": 0.032,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -1619,8 +2424,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x598982ff7bc0): sampling percentage outside expected (0,1] range",
-   "seconds": 0.083,
+   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x590f071e0bc0): sampling percentage outside expected (0,1] range",
+   "seconds": 0.088,
    "status": "both-error"
   },
   {
@@ -1629,8 +2434,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Transform file does not exist: /tmp/lx-reg-o4t_oaqs/none.mat",
-   "seconds": 0.028,
+   "reason": "Transform file does not exist: /tmp/lx-reg-71wc9ohh/none.mat",
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1640,7 +2445,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "the oracle has no MINC transform IO (it prints ITK's error and exits 0); larmorx refuses MINC transform files with a message",
-   "seconds": 3.135,
+   "seconds": 1.655,
    "status": "expected-divergence"
   },
   {
@@ -1649,8 +2454,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.756,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.578,
    "status": "pass"
   },
   {
@@ -1659,8 +2471,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 112
+   },
    "reason": "",
-   "seconds": 0.354,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.351,
    "status": "pass"
   },
   {
@@ -1669,8 +2487,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.149,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.213,
    "status": "pass"
   },
   {
@@ -1679,8 +2503,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.071,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.149,
    "status": "pass"
   },
   {
@@ -1689,8 +2519,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -1699,8 +2535,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -1709,8 +2551,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 107
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -1719,8 +2567,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 107
+   },
    "reason": "",
-   "seconds": 0.05,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -1729,8 +2583,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.116,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.149,
    "status": "pass"
   },
   {
@@ -1739,8 +2599,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 107
+   },
    "reason": "",
-   "seconds": 0.079,
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -1749,8 +2615,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 107
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1760,7 +2632,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs draws the points of a sampling percentage below 1 with a generator seeded from the clock (ANTS-64): two runs differ; larmorx seeds it from the registration's seed",
-   "seconds": 0.076,
+   "seconds": 0.07,
    "status": "expected-divergence"
   },
   {
@@ -1769,8 +2641,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.078,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -1779,8 +2657,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 103
+   },
    "reason": "",
-   "seconds": 0.121,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.185,
    "status": "pass"
   },
   {
@@ -1789,8 +2673,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.109,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1799,8 +2689,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.115,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -1809,8 +2705,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.245,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.256,
    "status": "pass"
   },
   {
@@ -1819,8 +2721,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.106,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -1829,8 +2737,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.864,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 0.899,
    "status": "pass"
   },
   {
@@ -1839,8 +2754,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.189,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -1849,8 +2770,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 107
+   },
    "reason": "",
-   "seconds": 0.056,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1859,8 +2786,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.103,
+   "reported": {
+    "D13 fix pass": 6
+   },
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -1869,8 +2802,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.993,
+   "reported": {
+    "D13 fix pass": 12,
+    "thread band": "0"
+   },
+   "seconds": 1.223,
    "status": "pass"
   },
   {
@@ -1879,8 +2819,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.459,
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.676,
    "status": "pass"
   },
   {
@@ -1889,8 +2835,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.519,
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.64,
    "status": "pass"
   },
   {
@@ -1899,8 +2851,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.502,
+   "reported": {
+    "D13 fix pass": 8
+   },
+   "seconds": 0.645,
    "status": "pass"
   },
   {
@@ -1909,8 +2867,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.472,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.669,
    "status": "pass"
   },
   {
@@ -1919,8 +2883,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.48,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.732,
    "status": "pass"
   },
   {
@@ -1929,8 +2899,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.078,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -1939,8 +2915,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 6
+   },
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -1949,8 +2931,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 102
+   },
    "reason": "",
-   "seconds": 0.45,
+   "reported": {
+    "D13 fix pass": 9,
+    "thread band": "0"
+   },
+   "seconds": 0.532,
    "status": "pass"
   },
   {
@@ -1959,8 +2948,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 102
+   },
    "reason": "",
-   "seconds": 0.179,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.19,
    "status": "pass"
   },
   {
@@ -1969,8 +2964,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 106
+   },
    "reason": "",
-   "seconds": 0.147,
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -1980,7 +2981,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs' line search computes IGDM's centre index from a negative number and reads memory before the intensity arrays (ANTS-66, undefined); larmorx takes the two intensities as equal",
-   "seconds": 0.162,
+   "seconds": 0.166,
    "status": "expected-divergence"
   },
   {
@@ -1990,7 +2991,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads memory before IGDM's intensity arrays for neighbourhoods of more than one voxel (ANTS-66)",
-   "seconds": 0.049,
+   "seconds": 0.08,
    "status": "expected-divergence"
   },
   {
@@ -1999,8 +3000,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 102
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 4
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -2009,8 +3016,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 0.138,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.17,
    "status": "pass"
   },
   {
@@ -2019,8 +3032,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 108
+   },
    "reason": "",
-   "seconds": 0.304,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.378,
    "status": "pass"
   },
   {
@@ -2029,8 +3048,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 108
+   },
    "reason": "",
-   "seconds": 0.247,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.317,
    "status": "pass"
   },
   {
@@ -2039,8 +3064,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.259,
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.327,
    "status": "pass"
   },
   {
@@ -2049,8 +3080,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 110
+   },
    "reason": "",
-   "seconds": 0.105,
+   "reported": {
+    "D13 fix pass": 11
+   },
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -2059,8 +3096,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 0.086,
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -2069,8 +3112,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 0.227,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.321,
    "status": "pass"
   },
   {
@@ -2079,8 +3128,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 0.123,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.202,
    "status": "pass"
   },
   {
@@ -2090,7 +3145,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The expected number of parameters aren't specified.  Please see help menu.",
-   "seconds": 0.022,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -2100,7 +3155,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The neighborhood size must equal the dimension.",
-   "seconds": 0.023,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -2109,8 +3164,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x5fe115260e60): sampling percentage outside expected (0,1] range",
-   "seconds": 0.028,
+   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x5c518a422e60): sampling percentage outside expected (0,1] range",
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -2120,7 +3175,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs crashes here, larmorx stops",
-   "seconds": 0.025,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -2130,7 +3185,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.023,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -2140,7 +3195,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.016,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -2149,8 +3204,8 @@
    "checks_passed": 4,
    "checks_total": 4,
    "failed_checks": [],
-   "reason": "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-3hi2p3q1/moving.txt' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninit",
-   "seconds": 0.021,
+   "reason": "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-zp6bx1zs/moving.txt' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninit",
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -2160,7 +3215,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.017,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -2170,7 +3225,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: an intensity point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.022,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -2180,7 +3235,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops",
-   "seconds": 0.096,
+   "seconds": 0.166,
    "status": "both-error"
   },
   {
@@ -2190,7 +3245,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: --print-similarity-measure-interval with a point-set metric first: ANTs' observer computes the full-scale similarity of null images; ANTs crashes here, larmorx stops",
-   "seconds": 0.049,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -2200,7 +3255,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: --write-interval-volumes with a point-set metric first: ANTs' observer resamples a null image; ANTs crashes here, larmorx stops",
-   "seconds": 0.049,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -2210,7 +3265,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes; ANTs crashes here, larmorx sto",
-   "seconds": 0.05,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -2219,8 +3274,15 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 9.716,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 11.255,
    "status": "pass"
   },
   {
@@ -2229,8 +3291,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 4.454,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 5.027,
    "status": "pass"
   },
   {
@@ -2239,8 +3308,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 184,
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.676,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "2.13e-14",
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 6.038,
    "status": "pass"
   },
   {
@@ -2249,8 +3328,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 184,
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 4.516,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 3.247,
    "status": "pass"
   },
   {
@@ -2259,8 +3347,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 3.43,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.739,
    "status": "pass"
   },
   {
@@ -2269,8 +3363,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 184,
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 4.811,
+   "reported": {
+    "D13 fix pass": 325584,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 2.97,
    "status": "pass"
   },
   {
@@ -2279,8 +3382,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 2.617,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.41,
    "status": "pass"
   },
   {
@@ -2289,8 +3398,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 2.371,
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.187,
    "status": "pass"
   },
   {
@@ -2299,8 +3414,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 9.054,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.743,
    "status": "pass"
   },
   {
@@ -2309,8 +3430,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 2.298,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.458,
    "status": "pass"
   },
   {
@@ -2319,8 +3446,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 2.309,
+   "reported": {
+    "D13 fix pass": 145439
+   },
+   "seconds": 1.59,
    "status": "pass"
   },
   {
@@ -2329,8 +3462,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 2.328,
+   "reported": {
+    "D13 fix pass": 143259
+   },
+   "seconds": 1.583,
    "status": "pass"
   },
   {
@@ -2339,8 +3478,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 528
+   },
    "reason": "",
-   "seconds": 10.251,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.159,
    "status": "pass"
   },
   {
@@ -2349,8 +3494,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 8.807,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.19,
    "status": "pass"
   },
   {
@@ -2359,8 +3510,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 7.071,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.847,
    "status": "pass"
   },
   {
@@ -2369,8 +3526,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 6.626,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.493,
    "status": "pass"
   },
   {
@@ -2379,8 +3542,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 349
+   },
    "reason": "",
-   "seconds": 7.672,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.271,
    "status": "pass"
   },
   {
@@ -2389,8 +3558,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 349
+   },
    "reason": "",
-   "seconds": 8.029,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.528,
    "status": "pass"
   },
   {
@@ -2399,8 +3574,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 8.289,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.243,
    "status": "pass"
   },
   {
@@ -2410,7 +3591,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
-   "seconds": 6.115,
+   "seconds": 4.895,
    "status": "expected-divergence"
   },
   {
@@ -2420,7 +3601,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
-   "seconds": 2.898,
+   "seconds": 2.606,
    "status": "expected-divergence"
   },
   {
@@ -2429,8 +3610,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 196
+   },
    "reason": "",
-   "seconds": 5.716,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.768,
    "status": "pass"
   },
   {
@@ -2439,8 +3626,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 197
+   },
    "reason": "",
-   "seconds": 6.011,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.753,
    "status": "pass"
   },
   {
@@ -2449,8 +3642,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 518
+   },
    "reason": "",
-   "seconds": 8.279,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 9.749,
    "status": "pass"
   },
   {
@@ -2459,8 +3658,14 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 6.314,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.676,
    "status": "pass"
   },
   {
@@ -2469,8 +3674,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 192
+   },
    "reason": "",
-   "seconds": 11.775,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 13.117,
    "status": "pass"
   },
   {
@@ -2480,7 +3691,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.266,
+   "seconds": 0.277,
    "status": "both-error"
   },
   {
@@ -2490,7 +3701,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.375,
+   "seconds": 0.428,
    "status": "both-error"
   },
   {
@@ -2499,8 +3710,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.037,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.637,
    "status": "pass"
   },
   {
@@ -2509,8 +3726,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 0.169,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.226,
    "status": "pass"
   },
   {
@@ -2519,8 +3742,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 176
+   },
    "reason": "",
-   "seconds": 0.115,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.173,
    "status": "pass"
   },
   {
@@ -2529,8 +3758,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 2.229,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.324,
    "status": "pass"
   },
   {
@@ -2539,8 +3774,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.533,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.955,
    "status": "pass"
   },
   {
@@ -2549,8 +3790,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 187
+   },
    "reason": "",
-   "seconds": 4.031,
+   "reported": {
+    "D13 fix pass": 325584,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null,
+    "unmodified ANTs: standard output": 187
+   },
+   "seconds": 4.268,
    "status": "pass"
   },
   {
@@ -2559,8 +3809,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 5.959,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.06,
    "status": "pass"
   },
   {
@@ -2569,8 +3825,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 2.566,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.641,
    "status": "pass"
   },
   {
@@ -2579,8 +3841,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 394
+   },
    "reason": "",
-   "seconds": 54.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null,
+    "unmodified ANTs: standard output": 394
+   },
+   "seconds": 53.46,
    "status": "pass"
   },
   {
@@ -2589,8 +3860,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 5.351,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.242,
    "status": "pass"
   },
   {
@@ -2599,8 +3876,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 6.125,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.13,
    "status": "pass"
   },
   {
@@ -2609,8 +3892,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 7.345,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.33,
    "status": "pass"
   },
   {
@@ -2619,8 +3908,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 3.733,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.312,
    "status": "pass"
   },
   {
@@ -2629,8 +3924,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 5.169,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.634,
    "status": "pass"
   },
   {
@@ -2640,7 +3941,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72): two runs of ANTs differ; larmorx seeds it from the registration's seed",
-   "seconds": 4.756,
+   "seconds": 3.027,
    "status": "expected-divergence"
   },
   {
@@ -2649,8 +3950,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 4.629,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.075,
    "status": "pass"
   },
   {
@@ -2660,7 +3967,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72)",
-   "seconds": 1.034,
+   "seconds": 0.773,
    "status": "expected-divergence"
   },
   {
@@ -2670,7 +3977,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.176,
+   "seconds": 0.094,
    "status": "both-error"
   },
   {
@@ -2679,8 +3986,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 189
+   },
    "reason": "",
-   "seconds": 4.333,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.955,
    "status": "pass"
   },
   {
@@ -2690,7 +4003,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.121,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -2699,8 +4012,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 4.144,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.893,
    "status": "pass"
   },
   {
@@ -2709,8 +4028,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 0.117,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -2719,8 +4044,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 3.529,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.483,
    "status": "pass"
   },
   {
@@ -2729,8 +4060,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
    "reason": "",
-   "seconds": 0.165,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -2739,8 +4076,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 3.865,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.626,
    "status": "pass"
   },
   {
@@ -2750,7 +4093,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.104,
+   "seconds": 0.055,
    "status": "both-error"
   },
   {
@@ -2760,7 +4103,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert '3x' to type 'f' as float",
-   "seconds": 0.021,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -2770,7 +4113,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "the exponential and velocity-field transforms are milestone A5 part 3; larmorx refuses with a message",
-   "seconds": 1.322,
+   "seconds": 0.951,
    "status": "expected-divergence"
   },
   {
@@ -2779,8 +4122,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.746,
+   "reported": {
+    "D13 fix pass": 33264,
+    "thread band": "0"
+   },
+   "seconds": 0.734,
    "status": "pass"
   },
   {
@@ -2789,8 +4139,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.385,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.242,
    "status": "pass"
   },
   {
@@ -2799,8 +4155,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 109,
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 1.182,
+   "reported": {
+    "D13 fix pass": 33264,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 0.689,
    "status": "pass"
   },
   {
@@ -2809,8 +4174,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.249,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.162,
    "status": "pass"
   },
   {
@@ -2819,8 +4190,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 113
+   },
    "reason": "",
-   "seconds": 0.361,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -2829,8 +4206,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 113
+   },
    "reason": "",
-   "seconds": 0.3,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -2839,8 +4222,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "LabeledPointSetToPointSetMetricv4 (0x5c111b0eb9d0): The label sets are not bijective.",
-   "seconds": 0.04,
+   "reason": "LabeledPointSetToPointSetMetricv4 (0x58e420a979d0): The label sets are not bijective.",
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -2849,8 +4232,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "LabeledPointSetToPointSetMetricv4 (0x603ffed0e3b0): The label sets are not bijective.",
-   "seconds": 0.046,
+   "reason": "LabeledPointSetToPointSetMetricv4 (0x59491c20e3b0): The label sets are not bijective.",
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -2859,8 +4242,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 0.754,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.332,
    "status": "pass"
   },
   {
@@ -2869,8 +4258,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 111
+   },
    "reason": "",
-   "seconds": 0.657,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.312,
    "status": "pass"
   },
   {
@@ -2880,7 +4275,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.058,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -2890,7 +4285,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a SyN stage that lists IGDM before another metric: ANTs gives IGDM no point sets; ANTs crashes here, larmorx stops",
-   "seconds": 0.054,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -2899,8 +4294,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 109
+   },
    "reason": "",
-   "seconds": 0.077,
+   "reported": {
+    "D13 fix pass": 2320
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -2910,7 +4311,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes; ANTs crashes here, larmorx sto",
-   "seconds": 0.049,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -2920,7 +4321,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: the moving transform of a point-set metric in a SyN stage cannot be inverted (a linear transform with a singular matrix, or a displacement field without an inverse): ITK map",
-   "seconds": 0.142,
+   "seconds": 0.098,
    "status": "both-error"
   },
   {
@@ -2930,7 +4331,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs crashes here, larmorx stops",
-   "seconds": 0.025,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -2939,8 +4340,15 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 14.013,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 8.914,
    "status": "pass"
   },
   {
@@ -2949,8 +4357,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 8.789,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 6.365,
    "status": "pass"
   },
   {
@@ -2959,8 +4374,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 7.389,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.469,
    "status": "pass"
   },
   {
@@ -2969,8 +4390,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 3.138,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.927,
    "status": "pass"
   },
   {
@@ -2979,8 +4406,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 35.756,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 16.546,
    "status": "pass"
   },
   {
@@ -2989,8 +4422,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 2.072,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.919,
    "status": "pass"
   },
   {
@@ -2999,8 +4438,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 184
+   },
    "reason": "",
-   "seconds": 8.842,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null,
+    "unmodified ANTs: standard output": 184
+   },
+   "seconds": 5.241,
    "status": "pass"
   },
   {
@@ -3009,8 +4457,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.569,
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 3.315,
    "status": "pass"
   },
   {
@@ -3019,8 +4473,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.559,
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.72,
    "status": "pass"
   },
   {
@@ -3029,8 +4489,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 6.321,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.029,
    "status": "pass"
   },
   {
@@ -3039,8 +4505,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 187
+   },
    "reason": "",
-   "seconds": 10.476,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.327,
    "status": "pass"
   },
   {
@@ -3049,8 +4521,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 3.866,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.927,
    "status": "pass"
   },
   {
@@ -3059,8 +4537,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 3.772,
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.773,
    "status": "pass"
   },
   {
@@ -3069,8 +4553,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 5.931,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.06,
    "status": "pass"
   },
   {
@@ -3079,8 +4569,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 6.444,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.238,
    "status": "pass"
   },
   {
@@ -3089,8 +4585,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 9.637,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.841,
    "status": "pass"
   },
   {
@@ -3099,8 +4601,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 176
+   },
    "reason": "",
-   "seconds": 0.135,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -3109,8 +4617,14 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 10.36,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.22,
    "status": "pass"
   },
   {
@@ -3119,8 +4633,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 10.234,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.083,
    "status": "pass"
   },
   {
@@ -3129,8 +4649,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 11.151,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.161,
    "status": "pass"
   },
   {
@@ -3139,8 +4665,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 347
+   },
    "reason": "",
-   "seconds": 8.97,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.64,
    "status": "pass"
   },
   {
@@ -3149,8 +4681,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 6.475,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.645,
    "status": "pass"
   },
   {
@@ -3160,7 +4698,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the the output transform will contain the this processes initializer",
-   "seconds": 0.035,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -3169,8 +4707,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 7.392,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.075,
    "status": "pass"
   },
   {
@@ -3179,8 +4723,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 6.923,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.619,
    "status": "pass"
   },
   {
@@ -3189,8 +4739,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 108
+   },
    "reason": "",
-   "seconds": 0.684,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.266,
    "status": "pass"
   },
   {
@@ -3199,8 +4755,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 190
+   },
    "reason": "",
-   "seconds": 1.298,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.53,
    "status": "pass"
   },
   {
@@ -3209,8 +4771,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 105
+   },
    "reason": "",
-   "seconds": 0.544,
+   "reported": {
+    "D13 fix pass": 33264
+   },
+   "seconds": 0.32,
    "status": "pass"
   },
   {
@@ -3220,7 +4788,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.104,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -3230,7 +4798,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.254,
+   "seconds": 0.133,
    "status": "both-error"
   },
   {
@@ -3240,7 +4808,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert 'a' to type 'f' as float",
-   "seconds": 0.035,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -3249,8 +4817,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 14.504,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 8.625,
    "status": "pass"
   },
   {
@@ -3259,8 +4834,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 3.702,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.324,
    "status": "pass"
   },
   {
@@ -3269,8 +4850,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 3.012,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.556,
    "status": "pass"
   },
   {
@@ -3279,8 +4866,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 184,
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 7.51,
+   "reported": {
+    "D13 fix pass": 162792,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 4.574,
    "status": "pass"
   },
   {
@@ -3289,8 +4884,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 9.097,
+   "reported": {
+    "D13 fix pass": 162792
+   },
+   "seconds": 3.839,
    "status": "pass"
   },
   {
@@ -3299,8 +4900,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 2.953,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.71,
    "status": "pass"
   },
   {
@@ -3309,8 +4916,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 8.282,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.074,
    "status": "pass"
   },
   {
@@ -3319,8 +4932,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 3.364,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.964,
    "status": "pass"
   },
   {
@@ -3329,8 +4948,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 3.577,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.427,
    "status": "pass"
   },
   {
@@ -3339,8 +4964,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 3.391,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.522,
    "status": "pass"
   },
   {
@@ -3349,8 +4980,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 7.581,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.231,
    "status": "pass"
   },
   {
@@ -3359,8 +4996,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 176
+   },
    "reason": "",
-   "seconds": 0.306,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -3369,8 +5012,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 2.16,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.532,
    "status": "pass"
   },
   {
@@ -3379,8 +5028,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 5.277,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.412,
    "status": "pass"
   },
   {
@@ -3389,8 +5044,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 5.134,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.521,
    "status": "pass"
   },
   {
@@ -3399,8 +5060,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
    "reason": "",
-   "seconds": 5.263,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.441,
    "status": "pass"
   },
   {
@@ -3409,8 +5076,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 3.963,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.672,
    "status": "pass"
   },
   {
@@ -3419,8 +5092,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
    "reason": "",
-   "seconds": 6.16,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.541,
    "status": "pass"
   },
   {
@@ -3429,8 +5108,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 2.779,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.65,
    "status": "pass"
   },
   {
@@ -3440,7 +5125,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.998,
+   "seconds": 0.592,
    "status": "both-error"
   },
   {
@@ -3450,7 +5135,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.875,
+   "seconds": 0.6,
    "status": "both-error"
   },
   {
@@ -3460,7 +5145,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the the output transform will contain the this processes initializer",
-   "seconds": 0.019,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -3470,7 +5155,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.04,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -3480,7 +5165,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a displacement field stage whose first metric is a point-set metric: ANTs allocates the field on the null image of its first metric; ANTs crashes here, larmorx stops",
-   "seconds": 0.023,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -3490,7 +5175,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert '' to type 'f' as float",
-   "seconds": 0.02,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -3499,8 +5184,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 23.434,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 13.14,
    "status": "pass"
   },
   {
@@ -3509,8 +5201,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 17.038,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 9.61,
    "status": "pass"
   },
   {
@@ -3519,8 +5217,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 24.333,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 12.78,
    "status": "pass"
   },
   {
@@ -3530,7 +5234,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.563,
+   "seconds": 0.426,
    "status": "both-error"
   },
   {
@@ -3539,8 +5243,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 4.936,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.351,
    "status": "pass"
   },
   {
@@ -3549,8 +5259,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 15.559,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.266,
    "status": "pass"
   },
   {
@@ -3559,8 +5275,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 15.699,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.944,
    "status": "pass"
   },
   {
@@ -3569,8 +5291,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 11.805,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.469,
    "status": "pass"
   },
   {
@@ -3579,8 +5307,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
    "reason": "",
-   "seconds": 11.376,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.484,
    "status": "pass"
   },
   {
@@ -3589,8 +5323,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 176
+   },
    "reason": "",
-   "seconds": 0.376,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -3600,7 +5340,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.122,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -3610,7 +5350,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.14,
+   "seconds": 0.074,
    "status": "both-error"
   },
   {
@@ -3619,8 +5359,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 355
+   },
    "reason": "",
-   "seconds": 13.847,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.638,
    "status": "pass"
   },
   {
@@ -3629,8 +5375,15 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 65.641,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 47.294,
    "status": "pass"
   },
   {
@@ -3639,8 +5392,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 51.563,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 36.161,
    "status": "pass"
   },
   {
@@ -3649,8 +5408,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 9.839,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.258,
    "status": "pass"
   },
   {
@@ -3659,8 +5424,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 178,
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 16.369,
+   "reported": {
+    "D13 fix pass": 375,
+    "unmodified ANTs: r0BSpline.txt": null
+   },
+   "seconds": 10.684,
    "status": "pass"
   },
   {
@@ -3669,8 +5442,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 10.475,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.708,
    "status": "pass"
   },
   {
@@ -3680,7 +5459,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.074,
+   "seconds": 0.056,
    "status": "both-error"
   },
   {
@@ -3689,8 +5468,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 54.513,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 40.123,
    "status": "pass"
   },
   {
@@ -3699,8 +5484,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 4.965,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.377,
    "status": "pass"
   },
   {
@@ -3709,8 +5500,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 5.988,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.617,
    "status": "pass"
   },
   {
@@ -3719,8 +5516,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 6.614,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.763,
    "status": "pass"
   },
   {
@@ -3729,8 +5532,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 19.856,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 14.72,
    "status": "pass"
   },
   {
@@ -3739,8 +5548,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
    "reason": "",
-   "seconds": 0.09,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -3749,8 +5564,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 7.797,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.65,
    "status": "pass"
   },
   {
@@ -3759,8 +5580,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 11.485,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.238,
    "status": "pass"
   },
   {
@@ -3769,8 +5596,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 6.596,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.584,
    "status": "pass"
   },
   {
@@ -3779,8 +5612,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 15.382,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 9.342,
    "status": "pass"
   },
   {
@@ -3789,8 +5628,14 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
    "reason": "",
-   "seconds": 10.974,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.117,
    "status": "pass"
   },
   {
@@ -3799,8 +5644,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
    "reason": "",
-   "seconds": 12.252,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.233,
    "status": "pass"
   },
   {
@@ -3809,8 +5660,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
    "reason": "",
-   "seconds": 11.878,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.149,
    "status": "pass"
   },
   {
@@ -3819,8 +5676,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 350
+   },
    "reason": "",
-   "seconds": 11.985,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.134,
    "status": "pass"
   },
   {
@@ -3829,8 +5692,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 349
+   },
    "reason": "",
-   "seconds": 10.061,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.432,
    "status": "pass"
   },
   {
@@ -3840,7 +5709,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 12.83,
+   "seconds": 9.155,
    "status": "both-error"
   },
   {
@@ -3850,7 +5719,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 4.908,
+   "seconds": 3.971,
    "status": "both-error"
   },
   {
@@ -3859,8 +5728,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
    "reason": "",
-   "seconds": 36.976,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 23.857,
    "status": "pass"
   },
   {
@@ -3870,7 +5745,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 4.371,
+   "seconds": 2.739,
    "status": "both-error"
   },
   {
@@ -3880,7 +5755,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the the output transform will contain the this processes initializer",
-   "seconds": 0.024,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -3889,8 +5764,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
    "reason": "",
-   "seconds": 2.333,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.55,
    "status": "pass"
   },
   {
@@ -3899,8 +5780,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
    "reason": "",
-   "seconds": 2.201,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.483,
    "status": "pass"
   },
   {
@@ -3909,8 +5796,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 188
+   },
    "reason": "",
-   "seconds": 0.455,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.309,
    "status": "pass"
   },
   {
@@ -3919,8 +5812,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 4.918,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.322,
    "status": "pass"
   },
   {
@@ -3930,7 +5829,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.023,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -3939,8 +5838,14 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
    "reason": "",
-   "seconds": 2.385,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.894,
    "status": "pass"
   },
   {
@@ -3949,8 +5854,14 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
    "reason": "",
-   "seconds": 7.952,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.051,
    "status": "pass"
   },
   {
@@ -3960,7 +5871,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs computes a grid of NaN and infinite geometry, prints vnl's SVD warnings and fails with an exception on garbage indices (ANTS-77); larmorx stops with an error after the same messages",
-   "seconds": 0.07,
+   "seconds": 0.056,
    "status": "expected-divergence"
   },
   {
@@ -3970,7 +5881,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads the missing mesh size past the end of its vector (here a 0) and fails as with a mesh size of 0 (ANTS-77); larmorx stops with an error",
-   "seconds": 0.076,
+   "seconds": 0.056,
    "status": "expected-divergence"
   },
   {
@@ -3980,7 +5891,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a BSpline stage whose first metric is a point-set metric: ANTs reads the spacing and size of the null image of its first metric; ANTs crashes here, larmorx stops",
-   "seconds": 0.027,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -3989,8 +5900,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 217
+   },
    "reason": "",
-   "seconds": 9.329,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 4.919,
    "status": "pass"
   },
   {
@@ -3999,8 +5917,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 229
+   },
    "reason": "",
-   "seconds": 11.988,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: standard output": 229,
+    "unmodified ANTs: transform0GenericAffine.mat": null
+   },
+   "seconds": 5.486,
    "status": "pass"
   },
   {
@@ -4009,8 +5935,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 390
+   },
    "reason": "",
-   "seconds": 10.28,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 5.174,
    "status": "pass"
   },
   {
@@ -4019,8 +5952,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 385
+   },
    "reason": "",
-   "seconds": 21.229,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 13.988,
    "status": "pass"
   },
   {
@@ -4029,8 +5968,20 @@
    "checks_passed": 18,
    "checks_total": 18,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 1264
+   },
    "reason": "",
-   "seconds": 319.308,
+   "reported": {
+    "D13 fix pass": 3236602,
+    "thread band": "1.63",
+    "unmodified ANTs: anat_to_template_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 1873,
+    "unmodified ANTs: transform0GenericAffine.mat": null,
+    "unmodified ANTs: transform1InverseWarp.nii.gz": null,
+    "unmodified ANTs: transform1Warp.nii.gz": null
+   },
+   "seconds": 252.153,
    "status": "pass"
   },
   {
@@ -4039,8 +5990,18 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 491
+   },
    "reason": "",
-   "seconds": 690.849,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 491,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 544.677,
    "status": "pass"
   },
   {
@@ -4049,8 +6010,19 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 865
+   },
    "reason": "",
-   "seconds": 918.044,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0.945",
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 807,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 740.48,
    "status": "pass"
   },
   {
@@ -4059,8 +6031,19 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 857
+   },
    "reason": "",
-   "seconds": 1133.77,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0.51",
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 815,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 953.332,
    "status": "pass"
   }
  ],

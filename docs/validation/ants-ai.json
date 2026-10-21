@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "084b61d240f5",
+  "larmorx_commit": "1dfe56c0dc60",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,8 +22,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.324,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.421,
    "status": "pass"
   },
   {
@@ -32,8 +38,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 4
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -42,8 +54,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 4
+   },
    "reason": "",
-   "seconds": 0.047,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -52,8 +70,16 @@
    "checks_passed": 11,
    "checks_total": 11,
    "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 4,
+    "unmodified ANTs: standard output": 4
+   },
    "reason": "",
-   "seconds": 0.08,
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: t.mat": null
+   },
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -62,8 +88,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.038,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -72,8 +104,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -82,8 +120,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 4
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -92,8 +136,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.019,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -102,8 +152,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 4
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -112,8 +168,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 32.87,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 38.632,
    "status": "pass"
   },
   {
@@ -122,8 +185,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 2.397,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.86,
    "status": "pass"
   },
   {
@@ -132,8 +201,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 5.026,
+   "reported": {
+    "D13 fix pass": 12,
+    "thread band": "0"
+   },
+   "seconds": 5.784,
    "status": "pass"
   },
   {
@@ -142,8 +218,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 23
+   },
    "reason": "",
-   "seconds": 5.631,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 6.616,
    "status": "pass"
   },
   {
@@ -152,8 +235,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 23
+   },
    "reason": "",
-   "seconds": 2.243,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.854,
    "status": "pass"
   },
   {
@@ -162,8 +251,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 0.69,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.878,
    "status": "pass"
   },
   {
@@ -172,8 +267,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 0.484,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.542,
    "status": "pass"
   },
   {
@@ -182,8 +283,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.68,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.98,
    "status": "pass"
   },
   {
@@ -192,8 +299,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 14
+   },
    "reason": "",
-   "seconds": 1.791,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.1,
    "status": "pass"
   },
   {
@@ -202,8 +315,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 14
+   },
    "reason": "",
-   "seconds": 2.396,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.833,
    "status": "pass"
   },
   {
@@ -212,8 +331,15 @@
    "checks_passed": 7,
    "checks_total": 7,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 1.751,
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 2.006,
    "status": "pass"
   },
   {
@@ -222,8 +348,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 0.224,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.291,
    "status": "pass"
   },
   {
@@ -232,8 +364,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 17
+   },
    "reason": "",
-   "seconds": 0.207,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.257,
    "status": "pass"
   },
   {
@@ -242,8 +380,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 13
+   },
    "reason": "",
-   "seconds": 0.179,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -252,8 +396,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 15
+   },
    "reason": "",
-   "seconds": 0.154,
+   "reported": {
+    "D13 fix pass": 6
+   },
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -262,8 +412,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 4.621,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.456,
    "status": "pass"
   },
   {
@@ -272,8 +428,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 10.675,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 11.647,
    "status": "pass"
   },
   {
@@ -282,8 +444,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 3.519,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.928,
    "status": "pass"
   },
   {
@@ -292,8 +460,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 7
+   },
    "reason": "",
-   "seconds": 0.137,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.136,
    "status": "pass"
   },
   {
@@ -302,8 +476,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 0.121,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -312,8 +492,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.6,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.996,
    "status": "pass"
   },
   {
@@ -322,8 +508,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.662,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.881,
    "status": "pass"
   },
   {
@@ -332,8 +524,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.716,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.979,
    "status": "pass"
   },
   {
@@ -342,8 +540,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 6.422,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.385,
    "status": "pass"
   },
   {
@@ -352,8 +556,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 1.664,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.01,
    "status": "pass"
   },
   {
@@ -362,8 +572,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.639,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.06,
    "status": "pass"
   },
   {
@@ -372,8 +588,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 1.677,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.92,
    "status": "pass"
   },
   {
@@ -382,8 +604,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 7.238,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.659,
    "status": "pass"
   },
   {
@@ -392,8 +620,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.05,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -402,8 +636,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -412,8 +652,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -422,8 +668,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 2
+   },
    "reason": "",
-   "seconds": 0.076,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -432,8 +684,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 2
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -442,8 +700,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -452,8 +716,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 2
+   },
    "reason": "",
-   "seconds": 0.02,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -462,8 +732,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 2
+   },
    "reason": "",
-   "seconds": 0.05,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -472,8 +748,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 10.25,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 12.107,
    "status": "pass"
   },
   {
@@ -482,8 +764,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 19
+   },
    "reason": "",
-   "seconds": 6.117,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.994,
    "status": "pass"
   },
   {
@@ -493,7 +781,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "          Print the help menu.",
-   "seconds": 0.016,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -502,8 +790,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 30
+   },
    "reason": "",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -512,8 +806,14 @@
    "checks_passed": 5,
    "checks_total": 5,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 74
+   },
    "reason": "",
-   "seconds": 0.016,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -523,7 +823,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -533,7 +833,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -543,7 +843,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.014,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -553,7 +853,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized dimensionality.  Please see help menu.",
-   "seconds": 0.014,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -563,7 +863,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized dimensionality.  Please see help menu.",
-   "seconds": 0.023,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -573,7 +873,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Input metric not specified.",
-   "seconds": 0.019,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -612,7 +912,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized sampling strategy.",
-   "seconds": 0.036,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -622,7 +922,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized transform option.",
-   "seconds": 0.036,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -672,7 +972,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Please specify a greater number of blobs (>=3).",
-   "seconds": 0.035,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -682,7 +982,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Please specify a greater number of blobs (>=3).",
-   "seconds": 0.035,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -692,7 +992,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR:  Invalid flag provided bogus",
-   "seconds": 0.015,
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -702,7 +1002,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.023,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -732,7 +1032,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.032,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -752,7 +1052,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.017,
+   "seconds": 0.013,
    "status": "both-error"
   },
   {
@@ -762,7 +1062,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.042,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -772,7 +1072,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.038,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -782,7 +1082,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.037,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -792,7 +1092,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.029,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -801,8 +1101,14 @@
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -822,7 +1128,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.026,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -832,7 +1138,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 1.181,
+   "seconds": 1.401,
    "status": "both-error"
   },
   {
@@ -842,7 +1148,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.044,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -852,7 +1158,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.048,
+   "seconds": 0.05,
    "status": "both-error"
   },
   {
@@ -872,7 +1178,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.051,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -882,7 +1188,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
-   "seconds": 0.059,
+   "seconds": 0.058,
    "status": "both-error"
   },
   {
@@ -902,7 +1208,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.045,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -912,7 +1218,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.045,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -922,7 +1228,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.045,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -962,7 +1268,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [16.229, -2.43059e+37]); ITK's Mattes metric is ",
-   "seconds": 0.069,
+   "seconds": 0.064,
    "status": "both-error"
   },
   {
@@ -972,7 +1278,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: every start point threw: ANTs' observer reads the best metric value from an empty list and crashes",
-   "seconds": 0.062,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -982,7 +1288,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-06 (ANTs) reproduced: the Regular sampling step: unsigned long of inf is undefined; 9223372036854775808, as x86-64 converts it [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.052,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -992,7 +1298,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.257,
+   "seconds": 20.274,
    "status": "expected-divergence"
   },
   {
@@ -1002,7 +1308,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.734,
+   "seconds": 20.635,
    "status": "expected-divergence"
   },
   {
@@ -1012,7 +1318,10 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
-   "seconds": 2.273,
+   "reported": {
+    "ANTs' own runs": "0.0098"
+   },
+   "seconds": 2.778,
    "status": "expected-divergence"
   },
   {
@@ -1022,7 +1331,10 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
-   "seconds": 2.04,
+   "reported": {
+    "ANTs' own runs": "0.0314"
+   },
+   "seconds": 2.376,
    "status": "expected-divergence"
   },
   {
@@ -1031,8 +1343,16 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 197.372,
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own transform": "1.56e-13",
+    "thread band": "0"
+   },
+   "seconds": 286.673,
    "status": "pass"
   },
   {
@@ -1041,8 +1361,16 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 16
+   },
    "reason": "",
-   "seconds": 362.023,
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own transform": "1.28e-13",
+    "thread band": "0"
+   },
+   "seconds": 676.416,
    "status": "pass"
   }
  ],

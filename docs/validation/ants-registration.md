@@ -5,11 +5,11 @@
 - **Validated:** `larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, larmorx-ants)
 - **Reference:** antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-20 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
+- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
 
 309 cases compared: 273 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 36 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
 
-Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.87 in a transform parameter (`smoke/rigid` 6.61e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 6.68e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 4.44e-16, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `syn/cc` 0, `syn/meansquares-total` 0, `syn/mattes` 3.55e-14, `syn-point-sets/icp` 0.037, `bspline-syn/cc` 2.33e-06, `bspline-syn/knot-spacing` 6.65e-07, `displacement-field/gaussian-cc` 0, `displacement-field/bspline-meansquares` 8.87e-07, `bspline/meansquares` 8.88e-16, `real/ds000005-sub-01/boldref-affine` 8.38e-10, `real/ds005040-sub-002/coregister` 6.21e-13, `real-syn-small/ds000005-sub-01/brain-extraction` 1.87, `real-syn-small/ds000005-sub-01/template` 1.54, `real-bsplinesyn-small/ds000005-sub-01/template` 1.18); larmorx gives the one-thread result at any thread count, within 1.63 of ANTs at one thread.
+Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.52 in a transform parameter (`smoke/rigid` 8.78e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 8.78e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 4.41e-16, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `syn/cc` 0, `syn/meansquares-total` 0, `syn/mattes` 3.55e-14, `syn-point-sets/icp` 0.035, `bspline-syn/cc` 2.33e-06, `bspline-syn/knot-spacing` 6.65e-07, `displacement-field/gaussian-cc` 0, `displacement-field/bspline-meansquares` 8.87e-07, `bspline/meansquares` 8.88e-16, `real/ds000005-sub-01/boldref-affine` 9.24e-10, `real/ds005040-sub-002/coregister` 4.05e-13, `real-syn-small/ds000005-sub-01/brain-extraction` 1.48, `real-syn-small/ds000005-sub-01/template` 1.52, `real-bsplinesyn-small/ds000005-sub-01/template` 1.11); larmorx gives the one-thread result at any thread count, within 1.63 of ANTs at one thread.
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-49: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (exit N -> N; files ['rNBSpline.txt', 'w.nii.gz']; files ['rNGenericAffine.mat']): `metrics/demons`, `metrics/no-overlap`, `point-sets/icp-vtk-no-scalars`, `point-sets/icp-empty`, `point-sets/pse-sigma-zero`, `bspline/then-affine`, `bspline/initial-bspline-affine`
@@ -95,7 +95,7 @@ Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/no-arguments` | no arguments: the short menu | 1 |
 | `errors/bad-number` | -c [1x,1e-6,5]: a number that does not convert | 1 |
 | `errors/levels-mismatch` | two shrink factors for one level | 1 |
-| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-bwxa0o6n/none.nii.gz does not exist . |
+| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-lsu21pwl/none.nii.gz does not exist . |
 | `errors/unknown-transform` | an unknown transform name | Unknown registration method "foo" |
 | `errors/save-state-without-composite` | --save-state without -a 1 | because the the output transform will contain the this processes initializer |
 | `errors/per-stage-with-collapse` | -i 1 -a 1 with collapsing | ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive. |
@@ -118,15 +118,15 @@ Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/bad-sampling` | an unknown sampling strategy | ERROR: invalid sampling strategy specified: sparse |
 | `errors/sigmas-mismatch` | three sigmas for two levels | 1 |
 | `errors/stage-without-metric` | a second -t without its -m | The number of transforms is 2 and the last stage ID as determined by the metrics is 0. |
-| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x598982ff7bc0): sampling percentage outside expected (0,1] range |
-| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-o4t_oaqs/none.mat |
+| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x590f071e0bc0): sampling percentage outside expected (0,1] range |
+| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-71wc9ohh/none.mat |
 | `point-sets/igdm-few-parameters` | IGDM with three parameters | The expected number of parameters aren't specified. Please see help menu. |
 | `point-sets/igdm-radius-dimension` | IGDM with a 2D radius in 3D | The neighborhood size must equal the dimension. |
-| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5fe115260e60): sampling percentage outside expected (0,1] range |
+| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5c518a422e60): sampling percentage outside expected (0,1] range |
 | `point-sets/icp-no-mask` | Point-set metrics without a fixed mask: no virtual domain | larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs cras… |
 | `point-sets/icp-missing` | A point set that does not exist | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
 | `point-sets/icp-short-name` | A point set named with fewer than 3 characters | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
-| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-3hi2p3q1/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
+| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-zp6bx1zs/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
 | `point-sets/icp-vtk-no-points` | A VTK file without POINTS: libstdc++'s out_of_range | larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
 | `point-sets/igdm-missing-mask` | An IGDM mask that does not exist | larmorx: antsRegistration: an intensity point set could not be read: ANTs goes on with a null point set and crashes |
 | `point-sets/icp-warped` | Warped images with a point-set metric first | larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops |
@@ -139,8 +139,8 @@ Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `syn/initial-composite-inverse` | -r [composite,1]: its field has no inverse | 1 |
 | `syn/igdm` | IGDM first in a SyN stage: not implemented in ANTs | 1 |
 | `syn/bad-variance` | SyN[0.2,3x]: a variance that does not convert | ERROR: Unable to convert '3x' to type 'f' as float |
-| `syn-point-sets/icp-not-bijective` | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x5c111b0eb9d0): The label sets are not bijective. |
-| `syn-point-sets/icp-moving-extra-label` | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x603ffed0e3b0): The label sets are not bijective. |
+| `syn-point-sets/icp-not-bijective` | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x58e420a979d0): The label sets are not bijective. |
+| `syn-point-sets/icp-moving-extra-label` | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x59491c20e3b0): The label sets are not bijective. |
 | `syn-point-sets/cc-and-igdm` | CC and IGDM: SyN holds labelled point sets only, IGDM gets no input (ANTS-61) | 1 |
 | `syn-point-sets/cc-igdm-icp` | CC, IGDM and ICP: IGDM without point sets before a metric with them (ANTS-61) | larmorx: antsRegistration: a SyN stage that lists IGDM before another metric: ANTs gives IGDM no point sets; ANTs crashes here, larmorx stops |
 | `syn-point-sets/cc-regular-and-icp` | CC sampled (Regular) and ICP: ANTs gives ICP's sample points to a null image metric | larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric an… |
@@ -171,7 +171,7 @@ Thread band, 30 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (9a4d65ae2dab) |
+| larmorx | 0.0.1 (1dfe56c0dc60) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

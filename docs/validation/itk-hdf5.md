@@ -5,7 +5,7 @@
 - **Validated:** `lx.transforms.read`/`write`, `lx.transforms.load_itk_composite`, `-t x.h5` of `larmorx ants antsApplyTransforms` (crates larmorx-hdf5, larmorx-io)
 - **Reference:** ITK 5.4.5 on HDF5 1.12.1 through ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0 (antsApplyTransforms, CompositeTransformUtil), h5py 3.16.0 on HDF5 2.0.0, nitransforms 25.1.0
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-20 on Linux x86_64, with `python -m larmorx_validation parity itk-hdf5 --tier standard`
+- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity itk-hdf5 --tier standard`
 
 Datasets as h5py reads them, bit for bit: 73 of 73 files
 HDF5 storage features (every chunk index, the n-bit and scale-offset filters, dense groups' fractal heaps, filtered or not, shared messages) as h5py reads them, bit for bit: 54 of 54 files
@@ -62,7 +62,7 @@ Files written with larmorx's deflate: 12 of 17 byte-identical (object times set 
 | `errors/h5py/lzf` | written by h5py, refused by ITK: lzf | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dread failed |
 | `errors/h5py/missing-parameters` | written by h5py, refused by ITK: missing-parameters | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dopen2 failed |
 | `errors/h5py/no-precision-in-name` | written by h5py, refused by ITK: no-precision-in-name | basic_string::replace: __pos (which is 18446744073709551615) > this->size() (which is 15) |
-| `errors/h5py/no-transform-group` | written by h5py, refused by ITK: no-transform-group | failed to read file: /tmp/lx-h5-bk9snul_/no-transform-group.h5 |
+| `errors/h5py/no-transform-group` | written by h5py, refused by ITK: no-transform-group | failed to read file: /tmp/lx-h5-sdd15ydg/no-transform-group.h5 |
 | `errors/h5py/not-hdf5` | written by h5py, refused by ITK: not-hdf5 | set the suffix to an unsupported type. |
 | `errors/h5py/scalar-parameters` | written by h5py, refused by ITK: scalar-parameters | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): Wrong # of dims for TransformType in HDF5 File |
 | `errors/h5py/superblock3-chunked` | written by h5py, refused by ITK: superblock3-chunked | Description: ITK ERROR: HDF5TransformIOTemplate(0x0): H5Dopen2 failed |
@@ -74,7 +74,7 @@ Files written with larmorx's deflate: 12 of 17 byte-identical (object times set 
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (7f2a61ee7630) |
+| larmorx | 0.0.1 (1dfe56c0dc60) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

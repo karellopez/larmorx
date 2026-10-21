@@ -63,7 +63,7 @@ def negative_slope(src: Path, dst: Path) -> None:
     if raw.min() <= np.iinfo(raw.dtype).min:
         raise ValueError("the input's most negative value cannot be negated")
     hdr = img.header
-    offset = int(hdr["vox_offset"])
+    offset = int(img.dataobj.offset)
     with gzip.open(src, "rb") as f:
         head = bytearray(f.read(offset))
     # scl_slope: the float32 at byte 112 of the header, in the file's byte order

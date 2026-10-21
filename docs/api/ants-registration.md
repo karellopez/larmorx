@@ -30,7 +30,7 @@ line, standard error, every file), most against the unmodified binary, the rest 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
 | standard | 403 | 273 | 36 | 77 | 17 | 0 |
-| full | 327 | 194 | 59 | 57 | 17 | 0 |
+| full | 441 | 278 | 68 | 77 | 18 | 0 |
 
 The standard record was re-run by A5 part 2 (2026-10-20, from `9a4d65a`) with the B-spline and
 displacement-field cases (the `bspline-syn`, `displacement-field` and `bspline` categories: every
@@ -39,8 +39,10 @@ initial transforms, every message and failure; `real-bsplinesyn-small`: sMRIPrep
 registration with antsRegistrationSyN.sh's `BSplineSyN[0.1,26,0,3]` for its SyN stage, on every
 third voxel, identical to ANTs with CORE-MATH); every one of the 106 new cases agrees (84
 compared: 80 identical to the unmodified ANTs, 4 with CORE-MATH (glibc's `log` and `exp`, which
-the Mattes and joint-histogram metrics call); 20 rejected by both; 2 expected divergences, ANTS-77). The full tier adds 4D cases, the other four runs on every third voxel and
-the first run at full size. Both records were re-run by A5 part 1 (2026-10-19 and 20, from `a3c6cd6`), with the SyN cases (the
+the Mattes and joint-histogram metrics call); 20 rejected by both; 2 expected divergences, ANTS-77). The full record was re-run from `fc87e0e` (2026-10-20 and 21): it adds 4D cases of
+the four stages, B-spline SyN on the template registration of the other four oracle runs on
+every third voxel and of the first run at full size, all identical to ANTs with CORE-MATH
+(their Mattes stages call glibc's `log`; the full-size case ran 7.3 hours in the harness). Both records were re-run by A5 part 1 (2026-10-19 and 20, from `a3c6cd6`), with the SyN cases (the
 `syn` and `syn-point-sets` categories: every metric, masks, outputs, initial fields, states,
 messages and failures; `real-syn-small` and, in the full tier, `real-syn`: sMRIPrep's brain
 extraction and template registration whole, Rigid, Affine and SyN, as fMRIPrep 25.2.6 ran

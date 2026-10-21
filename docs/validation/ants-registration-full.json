@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "a3c6cd64229c",
+  "larmorx_commit": "fc87e0e71efb",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -23,7 +23,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.113,
+   "seconds": 2.086,
    "status": "pass"
   },
   {
@@ -33,7 +33,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.056,
+   "seconds": 2.085,
    "status": "pass"
   },
   {
@@ -43,7 +43,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.799,
+   "seconds": 0.663,
    "status": "pass"
   },
   {
@@ -53,7 +53,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.996,
+   "seconds": 2.013,
    "status": "pass"
   },
   {
@@ -63,7 +63,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.74,
+   "seconds": 1.774,
    "status": "pass"
   },
   {
@@ -73,7 +73,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.233,
+   "seconds": 1.273,
    "status": "pass"
   },
   {
@@ -83,7 +83,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.132,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -93,7 +93,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.114,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -103,7 +103,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.129,
+   "seconds": 0.175,
    "status": "pass"
   },
   {
@@ -113,7 +113,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.539,
+   "seconds": 0.587,
    "status": "pass"
   },
   {
@@ -123,7 +123,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.816,
+   "seconds": 0.853,
    "status": "pass"
   },
   {
@@ -133,7 +133,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.784,
+   "seconds": 0.87,
    "status": "pass"
   },
   {
@@ -143,7 +143,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.647,
+   "seconds": 0.67,
    "status": "pass"
   },
   {
@@ -153,7 +153,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.126,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -163,7 +163,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.177,
+   "seconds": 0.207,
    "status": "pass"
   },
   {
@@ -173,7 +173,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.153,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -183,7 +183,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.984,
+   "seconds": 0.916,
    "status": "pass"
   },
   {
@@ -193,7 +193,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.751,
+   "seconds": 0.706,
    "status": "pass"
   },
   {
@@ -203,7 +203,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.981,
+   "seconds": 0.827,
    "status": "pass"
   },
   {
@@ -213,7 +213,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.745,
+   "seconds": 0.627,
    "status": "pass"
   },
   {
@@ -233,7 +233,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.132,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -243,7 +243,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.116,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -253,7 +253,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.968,
+   "seconds": 0.888,
    "status": "pass"
   },
   {
@@ -263,7 +263,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.793,
+   "seconds": 0.817,
    "status": "pass"
   },
   {
@@ -273,7 +273,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.344,
+   "seconds": 1.448,
    "status": "pass"
   },
   {
@@ -283,7 +283,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.695,
+   "seconds": 0.652,
    "status": "pass"
   },
   {
@@ -293,7 +293,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.131,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -303,7 +303,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -313,7 +313,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -323,7 +323,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.951,
+   "seconds": 0.983,
    "status": "pass"
   },
   {
@@ -333,7 +333,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.147,
+   "seconds": 1.203,
    "status": "pass"
   },
   {
@@ -343,7 +343,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.919,
+   "seconds": 1.004,
    "status": "pass"
   },
   {
@@ -353,7 +353,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.728,
+   "seconds": 0.873,
    "status": "pass"
   },
   {
@@ -363,7 +363,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.097,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -373,7 +373,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -383,7 +383,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -393,7 +393,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.736,
+   "seconds": 0.941,
    "status": "pass"
   },
   {
@@ -403,7 +403,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.285,
+   "seconds": 1.35,
    "status": "pass"
   },
   {
@@ -413,7 +413,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.485,
+   "seconds": 1.335,
    "status": "pass"
   },
   {
@@ -423,7 +423,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.919,
+   "seconds": 0.841,
    "status": "pass"
   },
   {
@@ -433,7 +433,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.061,
+   "seconds": 1.091,
    "status": "pass"
   },
   {
@@ -443,7 +443,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.914,
+   "seconds": 1.892,
    "status": "pass"
   },
   {
@@ -453,7 +453,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.464,
+   "seconds": 3.29,
    "status": "pass"
   },
   {
@@ -463,7 +463,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.029,
+   "seconds": 1.039,
    "status": "pass"
   },
   {
@@ -473,7 +473,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.473,
+   "seconds": 1.489,
    "status": "pass"
   },
   {
@@ -483,7 +483,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.276,
+   "seconds": 3.205,
    "status": "pass"
   },
   {
@@ -493,7 +493,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 24.339,
+   "seconds": 23.246,
    "status": "pass"
   },
   {
@@ -503,7 +503,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 35.53,
+   "seconds": 35.93,
    "status": "pass"
   },
   {
@@ -513,7 +513,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.077,
+   "seconds": 2.073,
    "status": "pass"
   },
   {
@@ -523,7 +523,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 45.794,
+   "seconds": 45.754,
    "status": "pass"
   },
   {
@@ -533,7 +533,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.922,
+   "seconds": 0.888,
    "status": "pass"
   },
   {
@@ -543,7 +543,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.318,
+   "seconds": 12.537,
    "status": "pass"
   },
   {
@@ -553,7 +553,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.144,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -563,7 +563,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.163,
+   "seconds": 0.182,
    "status": "pass"
   },
   {
@@ -573,7 +573,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.091,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -583,7 +583,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.894,
+   "seconds": 0.847,
    "status": "pass"
   },
   {
@@ -593,7 +593,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.603,
+   "seconds": 0.559,
    "status": "pass"
   },
   {
@@ -603,7 +603,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 27.132,
+   "seconds": 27.021,
    "status": "pass"
   },
   {
@@ -613,7 +613,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.605,
+   "seconds": 0.615,
    "status": "pass"
   },
   {
@@ -623,7 +623,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.734,
+   "seconds": 0.717,
    "status": "pass"
   },
   {
@@ -633,7 +633,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.093,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -643,7 +643,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.103,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -653,7 +653,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.695,
+   "seconds": 0.63,
    "status": "pass"
   },
   {
@@ -663,7 +663,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.212,
+   "seconds": 1.232,
    "status": "pass"
   },
   {
@@ -673,7 +673,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.406,
+   "seconds": 0.382,
    "status": "pass"
   },
   {
@@ -683,7 +683,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.54,
+   "seconds": 0.902,
    "status": "pass"
   },
   {
@@ -693,7 +693,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.828,
+   "seconds": 1.581,
    "status": "pass"
   },
   {
@@ -703,7 +703,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.381,
+   "seconds": 0.239,
    "status": "pass"
   },
   {
@@ -723,7 +723,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.419,
+   "seconds": 0.588,
    "status": "pass"
   },
   {
@@ -733,7 +733,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.846,
+   "seconds": 0.908,
    "status": "pass"
   },
   {
@@ -743,7 +743,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.117,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -753,7 +753,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "without a seed ANTs seeds its sampling from the clock and its result changes from run to run; larmorx uses a fixed seed",
-   "seconds": 0.335,
+   "seconds": 0.326,
    "status": "expected-divergence"
   },
   {
@@ -763,7 +763,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.077,
+   "seconds": 1.053,
    "status": "pass"
   },
   {
@@ -773,7 +773,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.1,
+   "seconds": 1.166,
    "status": "pass"
   },
   {
@@ -783,7 +783,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.166,
+   "seconds": 1.167,
    "status": "pass"
   },
   {
@@ -793,7 +793,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.679,
+   "seconds": 0.704,
    "status": "pass"
   },
   {
@@ -803,7 +803,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.575,
+   "seconds": 0.526,
    "status": "pass"
   },
   {
@@ -813,7 +813,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.631,
+   "seconds": 0.535,
    "status": "pass"
   },
   {
@@ -823,7 +823,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.007,
+   "seconds": 1.847,
    "status": "pass"
   },
   {
@@ -833,7 +833,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.613,
+   "seconds": 0.672,
    "status": "pass"
   },
   {
@@ -843,7 +843,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.564,
+   "seconds": 0.591,
    "status": "pass"
   },
   {
@@ -853,7 +853,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.436,
+   "seconds": 0.49,
    "status": "both-error"
   },
   {
@@ -863,7 +863,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads past the end of its list of file names and crashes (ANTS-51); larmorx writes the same files up to there and stops with an error",
-   "seconds": 0.42,
+   "seconds": 0.574,
    "status": "expected-divergence"
   },
   {
@@ -873,7 +873,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -883,7 +883,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.174,
    "status": "pass"
   },
   {
@@ -893,7 +893,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.118,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -903,7 +903,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -913,7 +913,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -923,7 +923,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.107,
+   "seconds": 0.233,
    "status": "pass"
   },
   {
@@ -933,7 +933,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.137,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -943,7 +943,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.155,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -953,7 +953,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.234,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -963,7 +963,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.199,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -973,7 +973,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.154,
+   "seconds": 0.172,
    "status": "pass"
   },
   {
@@ -983,7 +983,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "\t\"VersorTransform_float_3_3\"",
-   "seconds": 0.055,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -1003,7 +1003,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.17,
+   "seconds": 0.189,
    "status": "pass"
   },
   {
@@ -1013,7 +1013,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.154,
+   "seconds": 0.205,
    "status": "pass"
   },
   {
@@ -1023,7 +1023,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.161,
+   "seconds": 0.134,
    "status": "pass"
   },
   {
@@ -1033,7 +1033,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.201,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -1043,7 +1043,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.259,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
@@ -1053,7 +1053,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.224,
+   "seconds": 0.176,
    "status": "pass"
   },
   {
@@ -1063,7 +1063,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.249,
+   "seconds": 0.218,
    "status": "pass"
   },
   {
@@ -1083,7 +1083,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.211,
+   "seconds": 0.19,
    "status": "pass"
   },
   {
@@ -1093,7 +1093,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.425,
+   "seconds": 0.44,
    "status": "pass"
   },
   {
@@ -1103,7 +1103,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.212,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -1113,7 +1113,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.767,
+   "seconds": 2.196,
    "status": "pass"
   },
   {
@@ -1123,7 +1123,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.396,
+   "seconds": 2.113,
    "status": "pass"
   },
   {
@@ -1133,7 +1133,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.306,
+   "seconds": 2.257,
    "status": "pass"
   },
   {
@@ -1143,7 +1143,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.704,
+   "seconds": 1.25,
    "status": "pass"
   },
   {
@@ -1153,7 +1153,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.95,
+   "seconds": 2.0,
    "status": "pass"
   },
   {
@@ -1163,7 +1163,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 12.956,
+   "seconds": 12.639,
    "status": "pass"
   },
   {
@@ -1173,7 +1173,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 338.991,
+   "seconds": 362.828,
    "status": "pass"
   },
   {
@@ -1183,7 +1183,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 182.723,
+   "seconds": 160.398,
    "status": "pass"
   },
   {
@@ -1193,7 +1193,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.883,
+   "seconds": 0.847,
    "status": "pass"
   },
   {
@@ -1203,7 +1203,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.649,
+   "seconds": 0.417,
    "status": "pass"
   },
   {
@@ -1213,7 +1213,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.99,
+   "seconds": 0.956,
    "status": "pass"
   },
   {
@@ -1223,7 +1223,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.272,
+   "seconds": 1.271,
    "status": "pass"
   },
   {
@@ -1233,7 +1233,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.586,
+   "seconds": 2.938,
    "status": "pass"
   },
   {
@@ -1243,7 +1243,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 40.151,
+   "seconds": 35.273,
    "status": "pass"
   },
   {
@@ -1253,7 +1253,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.587,
+   "seconds": 1.685,
    "status": "pass"
   },
   {
@@ -1263,7 +1263,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.672,
+   "seconds": 6.244,
    "status": "pass"
   },
   {
@@ -1273,7 +1273,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.851,
+   "seconds": 0.962,
    "status": "pass"
   },
   {
@@ -1283,7 +1283,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1293,7 +1293,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.027,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1303,7 +1303,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.092,
+   "seconds": 0.076,
    "status": "both-error"
   },
   {
@@ -1313,7 +1313,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.095,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -1339,8 +1339,8 @@
      "value": null
     }
    ],
-   "reason": "file /tmp/lx-reg-j7cfdviy/none.nii.gz does not exist .",
-   "seconds": 0.045,
+   "reason": "file /tmp/lx-reg-r_bh727t/none.nii.gz does not exist .",
+   "seconds": 0.032,
    "status": "both-error"
   },
   {
@@ -1350,7 +1350,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unknown registration method \"foo\"",
-   "seconds": 0.027,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1360,7 +1360,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the the output transform will contain the this processes initializer",
-   "seconds": 0.022,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1370,7 +1370,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive.",
-   "seconds": 0.022,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1380,7 +1380,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "restore-state option is mutually exclusive with initial-moving-transform & initial-fixed-transform options.",
-   "seconds": 0.035,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -1390,7 +1390,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.026,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1400,7 +1400,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "larmorx prints its own version and the ANTs version it ports",
-   "seconds": 0.029,
+   "seconds": 0.022,
    "status": "expected-divergence"
   },
   {
@@ -1410,7 +1410,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.026,
+   "seconds": 0.029,
    "status": "expected-divergence"
   },
   {
@@ -1430,7 +1430,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.03,
+   "seconds": 0.025,
    "status": "expected-divergence"
   },
   {
@@ -1440,7 +1440,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "bad image dimension 5",
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -1450,7 +1450,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR:  Invalid command line flags found! Aborting execution.",
-   "seconds": 0.03,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -1460,7 +1460,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exits 1 without a word (the reason is printed only with --verbose, which this command line does not set); larmorx prints the reason (ANTS-45)",
-   "seconds": 0.03,
+   "seconds": 0.02,
    "status": "expected-divergence"
   },
   {
@@ -1470,7 +1470,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1480,7 +1480,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the transform option ('-t') must be specified.  See help menu.",
-   "seconds": 0.025,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1490,7 +1490,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the metric option ('-m') must be specified.  See help menu.",
-   "seconds": 0.027,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -1500,7 +1500,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the convergence option ('-c') must be specified.  See help menu.",
-   "seconds": 0.027,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1510,7 +1510,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the shrink factors option ('-f') must be specified.  See help menu.",
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -1520,7 +1520,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the smoothing sigmas option ('-s') must be specified.  See help menu.",
-   "seconds": 0.029,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -1530,7 +1530,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: the output option ('-o') must be specified.  See help menu.",
-   "seconds": 0.03,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -1540,7 +1540,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "        because the initializizing transform is collapsed into each stage for optimization",
-   "seconds": 0.03,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -1550,7 +1550,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: smoothing sigmas, shrink factors, and convergence options must be set once for each transform.",
-   "seconds": 0.021,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -1560,7 +1560,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Convergence Window Size must be greater than or equal to 2",
-   "seconds": 0.029,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1570,7 +1570,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert '1o' to type 'j' as unsigned int",
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -1580,7 +1580,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.06,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -1590,7 +1590,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: invalid sampling strategy specified: sparse",
-   "seconds": 0.058,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1600,7 +1600,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.076,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -1610,7 +1610,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The number of transforms is 2 and the last stage ID  as determined by the metrics is 0.",
-   "seconds": 0.035,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1619,8 +1619,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x61caa8d3ebc0): sampling percentage outside expected (0,1] range",
-   "seconds": 0.077,
+   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x63362b3a4bc0): sampling percentage outside expected (0,1] range",
+   "seconds": 0.069,
    "status": "both-error"
   },
   {
@@ -1629,8 +1629,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Transform file does not exist: /tmp/lx-reg-aq2ihied/none.mat",
-   "seconds": 0.031,
+   "reason": "Transform file does not exist: /tmp/lx-reg-4u01n4ob/none.mat",
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -1640,7 +1640,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "the oracle has no MINC transform IO (it prints ITK's error and exits 0); larmorx refuses MINC transform files with a message",
-   "seconds": 2.287,
+   "seconds": 1.763,
    "status": "expected-divergence"
   },
   {
@@ -1650,7 +1650,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.899,
+   "seconds": 0.831,
    "status": "pass"
   },
   {
@@ -1660,7 +1660,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.355,
+   "seconds": 0.3,
    "status": "pass"
   },
   {
@@ -1670,7 +1670,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.139,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -1680,7 +1680,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.055,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -1690,7 +1690,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -1700,7 +1700,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -1710,7 +1710,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.048,
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -1720,7 +1720,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -1730,7 +1730,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.142,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1740,7 +1740,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.087,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -1750,7 +1750,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.068,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -1760,7 +1760,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs draws the points of a sampling percentage below 1 with a generator seeded from the clock (ANTS-64): two runs differ; larmorx seeds it from the registration's seed",
-   "seconds": 0.067,
+   "seconds": 0.056,
    "status": "expected-divergence"
   },
   {
@@ -1770,7 +1770,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.077,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -1780,7 +1780,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.119,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -1790,7 +1790,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.115,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -1800,7 +1800,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.11,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1810,7 +1810,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.219,
+   "seconds": 0.241,
    "status": "pass"
   },
   {
@@ -1820,7 +1820,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.101,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1830,7 +1830,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.053,
+   "seconds": 1.115,
    "status": "pass"
   },
   {
@@ -1840,7 +1840,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.195,
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -1850,7 +1850,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.217,
+   "seconds": 3.51,
    "status": "pass"
   },
   {
@@ -1860,7 +1860,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.053,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1870,7 +1870,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.105,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -1880,7 +1880,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.112,
+   "seconds": 1.32,
    "status": "pass"
   },
   {
@@ -1890,7 +1890,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.5,
+   "seconds": 0.509,
    "status": "pass"
   },
   {
@@ -1900,7 +1900,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.418,
+   "seconds": 0.471,
    "status": "pass"
   },
   {
@@ -1910,7 +1910,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.469,
+   "seconds": 0.455,
    "status": "pass"
   },
   {
@@ -1920,7 +1920,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.436,
+   "seconds": 0.432,
    "status": "pass"
   },
   {
@@ -1930,7 +1930,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.524,
+   "seconds": 0.474,
    "status": "pass"
   },
   {
@@ -1940,7 +1940,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.062,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1950,7 +1950,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.068,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -1960,7 +1960,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.409,
+   "seconds": 0.503,
    "status": "pass"
   },
   {
@@ -1970,7 +1970,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.171,
+   "seconds": 0.2,
    "status": "pass"
   },
   {
@@ -1980,7 +1980,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.177,
+   "seconds": 0.202,
    "status": "pass"
   },
   {
@@ -1990,7 +1990,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs' line search computes IGDM's centre index from a negative number and reads memory before the intensity arrays (ANTS-66, undefined); larmorx takes the two intensities as equal",
-   "seconds": 0.132,
+   "seconds": 0.166,
    "status": "expected-divergence"
   },
   {
@@ -2000,7 +2000,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads memory before IGDM's intensity arrays for neighbourhoods of more than one voxel (ANTS-66)",
-   "seconds": 0.049,
+   "seconds": 0.047,
    "status": "expected-divergence"
   },
   {
@@ -2010,7 +2010,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.045,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -2020,7 +2020,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.148,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -2030,7 +2030,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.297,
+   "seconds": 0.286,
    "status": "pass"
   },
   {
@@ -2040,7 +2040,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.255,
+   "seconds": 0.235,
    "status": "pass"
   },
   {
@@ -2050,7 +2050,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.291,
+   "seconds": 0.274,
    "status": "pass"
   },
   {
@@ -2060,7 +2060,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.113,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -2070,7 +2070,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.099,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -2080,7 +2080,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.252,
+   "seconds": 0.214,
    "status": "pass"
   },
   {
@@ -2090,7 +2090,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.145,
+   "seconds": 0.134,
    "status": "pass"
   },
   {
@@ -2100,7 +2100,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The expected number of parameters aren't specified.  Please see help menu.",
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -2110,7 +2110,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "The neighborhood size must equal the dimension.",
-   "seconds": 0.027,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -2119,8 +2119,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x5ad368f2fe60): sampling percentage outside expected (0,1] range",
-   "seconds": 0.032,
+   "reason": "Description: ITK ERROR: ImageRegistrationMethodv4(0x558530cc6e60): sampling percentage outside expected (0,1] range",
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -2140,7 +2140,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.019,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -2150,7 +2150,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.02,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -2159,7 +2159,7 @@
    "checks_passed": 4,
    "checks_total": 4,
    "failed_checks": [],
-   "reason": "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-w4n5z0gu/moving.txt' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninit",
+   "reason": "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-2w9kuj5f/moving.txt' ends with a newline: an extra point, a copy of the last one, as the oracle's build adds it from uninit",
    "seconds": 0.02,
    "status": "both-error"
   },
@@ -2170,7 +2170,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -2180,7 +2180,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: an intensity point set could not be read: ANTs goes on with a null point set and crashes",
-   "seconds": 0.023,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -2190,7 +2190,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops",
-   "seconds": 0.113,
+   "seconds": 0.105,
    "status": "both-error"
   },
   {
@@ -2200,7 +2200,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: --print-similarity-measure-interval with a point-set metric first: ANTs' observer computes the full-scale similarity of null images; ANTs crashes here, larmorx stops",
-   "seconds": 0.049,
+   "seconds": 0.074,
    "status": "both-error"
   },
   {
@@ -2210,7 +2210,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: --write-interval-volumes with a point-set metric first: ANTs' observer resamples a null image; ANTs crashes here, larmorx stops",
-   "seconds": 0.048,
+   "seconds": 0.069,
    "status": "both-error"
   },
   {
@@ -2220,7 +2220,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes; ANTs crashes here, larmorx sto",
-   "seconds": 0.035,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -2230,7 +2230,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 30.242,
+   "seconds": 30.373,
    "status": "expected-divergence"
   },
   {
@@ -2240,7 +2240,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 9.994,
+   "seconds": 9.652,
    "status": "pass"
   },
   {
@@ -2250,7 +2250,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.092,
+   "seconds": 4.083,
    "status": "pass"
   },
   {
@@ -2260,7 +2260,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.091,
+   "seconds": 7.299,
    "status": "pass"
   },
   {
@@ -2270,7 +2270,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.919,
+   "seconds": 4.736,
    "status": "pass"
   },
   {
@@ -2280,7 +2280,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.834,
+   "seconds": 4.336,
    "status": "pass"
   },
   {
@@ -2290,7 +2290,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.742,
+   "seconds": 7.003,
    "status": "pass"
   },
   {
@@ -2300,7 +2300,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.796,
+   "seconds": 4.253,
    "status": "pass"
   },
   {
@@ -2310,7 +2310,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.179,
+   "seconds": 2.907,
    "status": "pass"
   },
   {
@@ -2320,7 +2320,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.7,
+   "seconds": 6.58,
    "status": "pass"
   },
   {
@@ -2330,7 +2330,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.431,
+   "seconds": 2.497,
    "status": "pass"
   },
   {
@@ -2340,7 +2340,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.635,
+   "seconds": 1.628,
    "status": "pass"
   },
   {
@@ -2350,7 +2350,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.746,
+   "seconds": 1.448,
    "status": "pass"
   },
   {
@@ -2360,7 +2360,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.947,
+   "seconds": 9.205,
    "status": "pass"
   },
   {
@@ -2370,7 +2370,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.987,
+   "seconds": 6.661,
    "status": "pass"
   },
   {
@@ -2380,7 +2380,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.682,
+   "seconds": 6.988,
    "status": "pass"
   },
   {
@@ -2390,7 +2390,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.738,
+   "seconds": 6.184,
    "status": "pass"
   },
   {
@@ -2400,7 +2400,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.812,
+   "seconds": 7.454,
    "status": "pass"
   },
   {
@@ -2410,7 +2410,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.778,
+   "seconds": 7.534,
    "status": "pass"
   },
   {
@@ -2420,7 +2420,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.793,
+   "seconds": 8.542,
    "status": "pass"
   },
   {
@@ -2430,7 +2430,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
-   "seconds": 6.273,
+   "seconds": 6.819,
    "status": "expected-divergence"
   },
   {
@@ -2440,7 +2440,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field: its learning rate comes from voxels ANTs draws with a generator seeded from the clock (ANTS-72); the saved state, the last SyN stage's, is identical to ANTs' (checked by hand, 2026-10-19)",
-   "seconds": 2.475,
+   "seconds": 2.572,
    "status": "expected-divergence"
   },
   {
@@ -2450,7 +2450,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.177,
+   "seconds": 6.391,
    "status": "pass"
   },
   {
@@ -2460,7 +2460,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.431,
+   "seconds": 6.378,
    "status": "pass"
   },
   {
@@ -2470,7 +2470,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 8.39,
+   "seconds": 8.043,
    "status": "pass"
   },
   {
@@ -2480,7 +2480,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.373,
+   "seconds": 6.795,
    "status": "pass"
   },
   {
@@ -2490,7 +2490,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.227,
+   "seconds": 10.651,
    "status": "pass"
   },
   {
@@ -2500,7 +2500,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.33,
+   "seconds": 0.276,
    "status": "both-error"
   },
   {
@@ -2510,7 +2510,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-71 (antsRegistration) reproduced: stage 0: ANTs crashes computing the full-scale similarity; larmorx stops there [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.392,
+   "seconds": 0.345,
    "status": "both-error"
   },
   {
@@ -2520,7 +2520,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.754,
+   "seconds": 4.941,
    "status": "pass"
   },
   {
@@ -2530,7 +2530,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.186,
+   "seconds": 0.242,
    "status": "pass"
   },
   {
@@ -2540,7 +2540,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.175,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -2550,7 +2550,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.083,
+   "seconds": 2.184,
    "status": "pass"
   },
   {
@@ -2560,7 +2560,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.331,
+   "seconds": 5.887,
    "status": "pass"
   },
   {
@@ -2570,7 +2570,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.443,
+   "seconds": 3.985,
    "status": "pass"
   },
   {
@@ -2580,7 +2580,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.919,
+   "seconds": 5.526,
    "status": "pass"
   },
   {
@@ -2590,7 +2590,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2.428,
+   "seconds": 1.916,
    "status": "pass"
   },
   {
@@ -2600,7 +2600,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 52.609,
+   "seconds": 55.86,
    "status": "pass"
   },
   {
@@ -2610,7 +2610,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.013,
+   "seconds": 4.153,
    "status": "pass"
   },
   {
@@ -2620,7 +2620,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.735,
+   "seconds": 4.526,
    "status": "pass"
   },
   {
@@ -2630,7 +2630,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7.542,
+   "seconds": 5.961,
    "status": "pass"
   },
   {
@@ -2640,7 +2640,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.084,
+   "seconds": 3.391,
    "status": "pass"
   },
   {
@@ -2650,7 +2650,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6.33,
+   "seconds": 4.933,
    "status": "pass"
   },
   {
@@ -2660,7 +2660,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72): two runs of ANTs differ; larmorx seeds it from the registration's seed",
-   "seconds": 5.466,
+   "seconds": 4.749,
    "status": "expected-divergence"
   },
   {
@@ -2670,7 +2670,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 5.427,
+   "seconds": 4.625,
    "status": "pass"
   },
   {
@@ -2680,7 +2680,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "a linear stage after a displacement field estimates its parameter scales from voxels drawn with a generator ANTs seeds from the clock (ANTS-72)",
-   "seconds": 1.525,
+   "seconds": 1.103,
    "status": "expected-divergence"
   },
   {
@@ -2690,7 +2690,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.163,
+   "seconds": 0.114,
    "status": "both-error"
   },
   {
@@ -2700,7 +2700,7 @@
    "checks_total": 10,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.201,
+   "seconds": 4.668,
    "status": "pass"
   },
   {
@@ -2710,7 +2710,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.114,
+   "seconds": 0.094,
    "status": "both-error"
   },
   {
@@ -2720,7 +2720,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 4.34,
+   "seconds": 4.272,
    "status": "pass"
   },
   {
@@ -2730,7 +2730,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.112,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -2740,7 +2740,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.688,
+   "seconds": 3.432,
    "status": "pass"
   },
   {
@@ -2750,7 +2750,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.181,
+   "seconds": 0.19,
    "status": "pass"
   },
   {
@@ -2760,7 +2760,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3.795,
+   "seconds": 3.746,
    "status": "pass"
   },
   {
@@ -2770,7 +2770,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.079,
+   "seconds": 0.086,
    "status": "both-error"
   },
   {
@@ -2780,18 +2780,8 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unable to convert '3x' to type 'f' as float",
-   "seconds": 0.021,
+   "seconds": 0.029,
    "status": "both-error"
-  },
-  {
-   "case": "syn/bsplinesyn",
-   "category": "syn",
-   "checks_passed": 1,
-   "checks_total": 1,
-   "failed_checks": [],
-   "reason": "B-spline SyN is milestone A5 part 2; larmorx refuses with a message",
-   "seconds": 4.935,
-   "status": "expected-divergence"
   },
   {
    "case": "syn/exponential",
@@ -2800,7 +2790,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "the exponential and velocity-field transforms are milestone A5 part 3; larmorx refuses with a message",
-   "seconds": 1.138,
+   "seconds": 1.372,
    "status": "expected-divergence"
   },
   {
@@ -2810,7 +2800,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.745,
+   "seconds": 0.678,
    "status": "pass"
   },
   {
@@ -2830,7 +2820,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.246,
+   "seconds": 1.184,
    "status": "pass"
   },
   {
@@ -2840,7 +2830,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.247,
+   "seconds": 0.311,
    "status": "pass"
   },
   {
@@ -2850,7 +2840,7 @@
    "checks_total": 8,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.283,
+   "seconds": 0.301,
    "status": "pass"
   },
   {
@@ -2860,7 +2850,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.323,
+   "seconds": 0.277,
    "status": "pass"
   },
   {
@@ -2869,8 +2859,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "LabeledPointSetToPointSetMetricv4 (0x6249c70d09d0): The label sets are not bijective.",
-   "seconds": 0.033,
+   "reason": "LabeledPointSetToPointSetMetricv4 (0x5aead2fa09d0): The label sets are not bijective.",
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -2879,8 +2869,8 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
-   "reason": "LabeledPointSetToPointSetMetricv4 (0x5f5e22a2d3b0): The label sets are not bijective.",
-   "seconds": 0.033,
+   "reason": "LabeledPointSetToPointSetMetricv4 (0x561f481fa3b0): The label sets are not bijective.",
+   "seconds": 0.057,
    "status": "both-error"
   },
   {
@@ -2890,7 +2880,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.583,
+   "seconds": 0.737,
    "status": "pass"
   },
   {
@@ -2900,7 +2890,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.525,
+   "seconds": 0.66,
    "status": "pass"
   },
   {
@@ -2910,7 +2900,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "1",
-   "seconds": 0.057,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -2920,7 +2910,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a SyN stage that lists IGDM before another metric: ANTs gives IGDM no point sets; ANTs crashes here, larmorx stops",
-   "seconds": 0.05,
+   "seconds": 0.056,
    "status": "both-error"
   },
   {
@@ -2930,7 +2920,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.081,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -2940,7 +2930,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric and crashes; ANTs crashes here, larmorx sto",
-   "seconds": 0.047,
+   "seconds": 0.05,
    "status": "both-error"
   },
   {
@@ -2950,7 +2940,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: the moving transform of a point-set metric in a SyN stage cannot be inverted (a linear transform with a singular matrix, or a displacement field without an inverse): ITK map",
-   "seconds": 0.192,
+   "seconds": 0.155,
    "status": "both-error"
   },
   {
@@ -2960,7 +2950,1097 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs crashes here, larmorx stops",
+   "seconds": 0.035,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-syn/cc",
+   "category": "bspline-syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.427,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/knot-spacing",
+   "category": "bspline-syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.19,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/total-mesh",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.847,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/order-2",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.428,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/order-5",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 38.933,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/mesh-0",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.549,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/mattes",
+   "category": "bspline-syn",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.836,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/mi2",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.547,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/gc",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.935,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/demons",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.045,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/multi",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.267,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/masks",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.202,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/fixed-mask-only",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.812,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/regular",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.19,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/random",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.746,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/float",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.358,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/2d",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.238,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/4d",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.907,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/affine-then",
+   "category": "bspline-syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.448,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/composite",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.8,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/no-collapse",
+   "category": "bspline-syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.772,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/per-stage",
+   "category": "bspline-syn",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.655,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/restrict-deformation",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.57,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/save-state",
+   "category": "bspline-syn",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the the output transform will contain the this processes initializer",
+   "seconds": 0.029,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-syn/initial-field",
+   "category": "bspline-syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.975,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/initial-bspline",
+   "category": "bspline-syn",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.297,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/icp",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.618,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/cc-and-icp",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.907,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/igdm",
+   "category": "bspline-syn",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.65,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-syn/mesh-dimension",
+   "category": "bspline-syn",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.105,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-syn/order-0",
+   "category": "bspline-syn",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.221,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-syn/bad-mesh",
+   "category": "bspline-syn",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unable to convert 'a' to type 'f' as float",
+   "seconds": 0.032,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-cc",
+   "category": "displacement-field",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 14.4,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-meansquares",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.142,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-mattes",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.158,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-mi2",
+   "category": "displacement-field",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.192,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-gc",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.512,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-demons",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.913,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-multi",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.443,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-masks",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.636,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-regular",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.147,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-random",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.566,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-float",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.825,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-2d",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.26,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-oblique",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.516,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-4d",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.007,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-4d",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 25.897,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-affine-then",
+   "category": "displacement-field",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.866,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-composite",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.198,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-no-collapse",
+   "category": "displacement-field",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.341,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-restrict",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 3.579,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-icp",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.433,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-initial-field",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.838,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/gaussian-print-similarity",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.945,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-interval-volumes",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 1.062,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-save-state",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the the output transform will contain the this processes initializer",
    "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-igdm",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-icp-first",
+   "category": "displacement-field",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: antsRegistration: a displacement field stage whose first metric is a point-set metric: ANTs allocates the field on the null image of its first metric; ANTs crashes here, larmorx stops",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-variance-missing",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unable to convert '' to type 'f' as float",
+   "seconds": 0.054,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/bspline-meansquares",
+   "category": "displacement-field",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 24.982,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-cc",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 18.611,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-total-mesh",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 25.106,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-coarse-total",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.535,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/bspline-order-2",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.92,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-knot",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.012,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-mattes",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 13.978,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-masks",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 13.324,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-float",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.692,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-2d",
+   "category": "displacement-field",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.326,
+   "status": "pass"
+  },
+  {
+   "case": "displacement-field/bspline-mesh-dimension",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.118,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/bspline-order-0",
+   "category": "displacement-field",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.141,
+   "status": "both-error"
+  },
+  {
+   "case": "displacement-field/gaussian-then-bspline",
+   "category": "displacement-field",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 14.904,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/meansquares",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 66.238,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/cc",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 52.189,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/mattes",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.43,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/mi2",
+   "category": "bspline",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 16.766,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/gc",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 10.463,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/demons",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.066,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/multi",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 54.626,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/masks",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.128,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/regular",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 5.932,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/random",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.69,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/float",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 19.815,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/2d",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/oblique",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 8.058,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/4d",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 647.586,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/knot-spacing",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.256,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/mesh-1",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 6.381,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/icp",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 15.223,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/affine-then",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.603,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/composite",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.737,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/no-collapse",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.771,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/per-stage",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 11.804,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/then-affine",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 9.813,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/then-bspline",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 12.841,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/print-similarity",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 5.673,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/print-similarity-mesh-1",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 35.473,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/restrict",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 3.83,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/save-state",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the the output transform will contain the this processes initializer",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/initial-bspline-syn",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.126,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/initial-bspline-syn-composite",
+   "category": "bspline",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.183,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/initial-bspline-affine",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.457,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/fixed-bspline",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 4.879,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/initial-bspline-inverse",
+   "category": "bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.04,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline/restore-bspline",
+   "category": "bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 2.49,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/interval-volumes-mesh-1",
+   "category": "bspline",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 7.505,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/mesh-0",
+   "category": "bspline",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs computes a grid of NaN and infinite geometry, prints vnl's SVD warnings and fails with an exception on garbage indices (ANTS-77); larmorx stops with an error after the same messages",
+   "seconds": 0.067,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bspline/mesh-short",
+   "category": "bspline",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs reads the missing mesh size past the end of its vector (here a 0) and fails as with a mesh size of 0 (ANTS-77); larmorx stops with an error",
+   "seconds": 0.065,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bspline/icp-first",
+   "category": "bspline",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: antsRegistration: a BSpline stage whose first metric is a point-set metric: ANTs reads the spacing and size of the null image of its first metric; ANTs crashes here, larmorx stops",
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -2970,7 +4050,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 9.522,
+   "seconds": 8.89,
    "status": "pass"
   },
   {
@@ -2980,7 +4060,7 @@
    "checks_total": 11,
    "failed_checks": [],
    "reason": "",
-   "seconds": 11.232,
+   "seconds": 11.935,
    "status": "pass"
   },
   {
@@ -2990,7 +4070,7 @@
    "checks_total": 7,
    "failed_checks": [],
    "reason": "",
-   "seconds": 10.155,
+   "seconds": 9.826,
    "status": "pass"
   },
   {
@@ -3000,7 +4080,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "",
-   "seconds": 26.155,
+   "seconds": 21.997,
    "status": "pass"
   },
   {
@@ -3010,7 +4090,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2903.845,
+   "seconds": 2994.363,
    "status": "pass"
   },
   {
@@ -3020,7 +4100,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 366.332,
+   "seconds": 359.334,
    "status": "pass"
   },
   {
@@ -3030,7 +4110,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7584.621,
+   "seconds": 7408.469,
    "status": "pass"
   },
   {
@@ -3040,7 +4120,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 842.222,
+   "seconds": 853.742,
    "status": "pass"
   },
   {
@@ -3050,7 +4130,7 @@
    "checks_total": 16,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1097.316,
+   "seconds": 1126.599,
    "status": "pass"
   },
   {
@@ -3060,7 +4140,27 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 21691.165,
+   "seconds": 21686.571,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn-small/ds000005-sub-01/template",
+   "category": "real-bsplinesyn-small",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1505.595,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn/ds000005-sub-01/template",
+   "category": "real-bsplinesyn",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 26279.94,
    "status": "pass"
   },
   {
@@ -3070,7 +4170,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3349.839,
+   "seconds": 3315.243,
    "status": "pass"
   },
   {
@@ -3080,7 +4180,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 347.697,
+   "seconds": 275.669,
    "status": "pass"
   },
   {
@@ -3090,7 +4190,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7665.865,
+   "seconds": 7569.475,
    "status": "pass"
   },
   {
@@ -3100,7 +4200,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1028.219,
+   "seconds": 969.504,
    "status": "pass"
   },
   {
@@ -3110,7 +4210,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 812.614,
+   "seconds": 822.145,
    "status": "pass"
   },
   {
@@ -3120,7 +4220,17 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 21161.361,
+   "seconds": 21409.063,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn-small/ds001600-sub-1/template",
+   "category": "real-bsplinesyn-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 848.768,
    "status": "pass"
   },
   {
@@ -3130,7 +4240,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2938.39,
+   "seconds": 2876.744,
    "status": "pass"
   },
   {
@@ -3140,7 +4250,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 256.887,
+   "seconds": 221.988,
    "status": "pass"
   },
   {
@@ -3150,7 +4260,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7644.116,
+   "seconds": 7437.392,
    "status": "pass"
   },
   {
@@ -3160,7 +4270,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 869.808,
+   "seconds": 874.626,
    "status": "pass"
   },
   {
@@ -3170,7 +4280,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 909.185,
+   "seconds": 831.231,
    "status": "pass"
   },
   {
@@ -3180,7 +4290,17 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 19794.235,
+   "seconds": 20717.595,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn-small/ds005040-sub-002/template",
+   "category": "real-bsplinesyn-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1075.423,
    "status": "pass"
   },
   {
@@ -3190,7 +4310,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 2515.421,
+   "seconds": 2643.694,
    "status": "pass"
   },
   {
@@ -3200,7 +4320,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 284.796,
+   "seconds": 254.658,
    "status": "pass"
   },
   {
@@ -3210,7 +4330,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 6839.826,
+   "seconds": 6736.122,
    "status": "pass"
   },
   {
@@ -3220,7 +4340,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1203.435,
+   "seconds": 987.313,
    "status": "pass"
   },
   {
@@ -3230,7 +4350,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 764.501,
+   "seconds": 682.808,
    "status": "pass"
   },
   {
@@ -3240,7 +4360,17 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 18671.928,
+   "seconds": 18825.645,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn-small/ds005454-sub-16/template",
+   "category": "real-bsplinesyn-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 939.735,
    "status": "pass"
   },
   {
@@ -3250,7 +4380,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 3052.224,
+   "seconds": 2847.929,
    "status": "pass"
   },
   {
@@ -3260,7 +4390,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 298.968,
+   "seconds": 255.367,
    "status": "pass"
   },
   {
@@ -3270,7 +4400,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 7064.086,
+   "seconds": 7263.865,
    "status": "pass"
   },
   {
@@ -3280,7 +4410,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1137.528,
+   "seconds": 1693.427,
    "status": "pass"
   },
   {
@@ -3290,7 +4420,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 753.522,
+   "seconds": 956.178,
    "status": "pass"
   },
   {
@@ -3300,16 +4430,26 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 17082.69,
+   "seconds": 16127.177,
+   "status": "pass"
+  },
+  {
+   "case": "real-bsplinesyn-small/ds005752-sub-ON01016/template",
+   "category": "real-bsplinesyn-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 957.188,
    "status": "pass"
   }
  ],
  "suite": "ants-registration",
  "summary": {
-  "both-error": 57,
-  "expected-divergence": 17,
+  "both-error": 77,
+  "expected-divergence": 18,
   "fail": 0,
-  "pass": 253,
+  "pass": 346,
   "skipped": 0
  },
  "tier": "full"

@@ -976,7 +976,8 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   to the output and count of its whole patch and overwrites the bias image there, so near each
   slab border two units write the same voxels in an order that depends on scheduling. On a T1w:
   21 % of voxels change at 2 threads (by up to 97), 85 % at 12 (up to 271); from 8 threads the
-  result changes from run to run.
+  result can change from run to run (seen 2026-10-12; six runs at 8 threads and three at 12 gave
+  the same bytes on 2026-10-21, `docs/findings/ants-denoise.md`).
 - **Evidence:** read: AdaptiveDenoising `itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx:61`,
   ITK `itkPoolMultiThreader.cxx:88-95`; verified (three runs per thread count).
 - **fMRIPrep:** sMRIPrep denoises the T1w with `NSLOTS=8`: fMRIPrep's denoised T1w is not

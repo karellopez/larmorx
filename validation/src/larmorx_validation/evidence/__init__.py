@@ -15,8 +15,17 @@ from __future__ import annotations
 
 #: Evidence pages: tool -> module in this package (each has ``export(ctx) -> dict``).
 TOOLS: dict[str, str] = {
+    "ants-registration": "ants_registration",
     "ants-n4": "ants_n4",
+    "ants-denoise": "ants_denoise",
+    "ants-apply-transforms": "ants_apply_transforms",
+    "ants-programs": "ants_programs",
+    "ants-ai": "ants_ai",
+    "itk-hdf5": "itk_hdf5",
     "afni-tshift": "afni_tshift",
+    "mri-hmc": "mri_hmc",
+    "resample-series": "resample_series",
+    "nifti-io": "nifti_io",
 }
 
 

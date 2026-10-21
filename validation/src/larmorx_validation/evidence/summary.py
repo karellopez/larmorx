@@ -2,12 +2,11 @@
 """The Validation page's summary: every tool ported so far × its implementations × how many
 of its record's cases have each verdict (``static/evidence/summary.json``).
 
-The pilot tools (``TOOLS`` of this package) count their own evidence's verdicts, case by case.
-The others count the classification their part-1 agreement figures draw from their records
-(``larmorx_validation.figures``: identical to the unmodified original, identical with correctly
-rounded maths, within the record's thresholds, an expected divergence, rejected by both, a
-failure), mapped onto the verdicts; what a record calls *within its thresholds* is kept apart
-as not yet classified until that tool's evidence page is redone.
+Every tool counts its own evidence's verdicts, case by case (``static/evidence/<tool>.json``:
+each case's verdict decided from its record's reported and measured values). A tool whose page
+still shows part-1 figures (none since part 2b) would count the classification its agreement
+figure draws from its record (``larmorx_validation.figures``), mapped onto the verdicts, what a
+record calls *within its thresholds* kept apart as not yet classified.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ PAGES = [
         "/tools/ants-registration/",
         "antsRegistration",
         "ants",
-        [("port", "ants-registration", "validated", "ants_registration", "agreement")],
+        [("port", "ants-registration", "validated", None, None)],
     ),
     (
         "/tools/ants-n4/",
@@ -36,13 +35,13 @@ PAGES = [
         "/tools/ants-denoise/",
         "DenoiseImage",
         "ants",
-        [("port", "ants-denoise", "validated", "ants_denoise", "agreement")],
+        [("port", "ants-denoise", "validated", None, None)],
     ),
     (
         "/tools/ants-apply-transforms/",
         "antsApplyTransforms",
         "ants",
-        [("port", "ants-apply-transforms", "validated", "ants_apply_transforms", "agreement")],
+        [("port", "ants-apply-transforms", "validated", None, None)],
     ),
     (
         "/tools/ants-programs/",
@@ -53,43 +52,43 @@ PAGES = [
                 "ImageMath (port)",
                 "ants-image-math",
                 "validated",
-                "ants_programs",
-                "overview#ImageMath",
+                None,
+                None,
             ),
             (
                 "ThresholdImage (port)",
                 "ants-threshold-image",
                 "validated",
-                "ants_programs",
-                "overview#ThresholdImage",
+                None,
+                None,
             ),
             (
                 "MultiplyImages (port)",
                 "ants-multiply-images",
                 "validated",
-                "ants_programs",
-                "overview#MultiplyImages",
+                None,
+                None,
             ),
             (
                 "SmoothImage (port)",
                 "ants-smooth-image",
                 "validated",
-                "ants_programs",
-                "overview#SmoothImage",
+                None,
+                None,
             ),
             (
                 "ResampleImage (port)",
                 "ants-resample-image",
                 "validated",
-                "ants_programs",
-                "overview#ResampleImage",
+                None,
+                None,
             ),
             (
                 "ResampleImageBySpacing (port)",
                 "ants-resample-image-by-spacing",
                 "validated",
-                "ants_programs",
-                "overview#ResampleImageBySpacing",
+                None,
+                None,
             ),
         ],
     ),
@@ -98,13 +97,13 @@ PAGES = [
         "antsAI, antsAffineInitializer",
         "ants",
         [
-            ("antsAI (port)", "ants-ai", "validated", "ants_ai", "agreement-ai"),
+            ("antsAI (port)", "ants-ai", "validated", None, None),
             (
                 "antsAffineInitializer (port)",
                 "ants-affine-initializer",
                 "validated",
-                "ants_ai",
-                "agreement-initializer",
+                None,
+                None,
             ),
         ],
     ),
@@ -112,7 +111,7 @@ PAGES = [
         "/tools/itk-hdf5/",
         "ITK transform files",
         "ants",
-        [("port", "itk-hdf5", "validated", "itk_hdf5", "agreement")],
+        [("port", "itk-hdf5", "validated", None, None)],
     ),
     (
         "/tools/afni-tshift/",
@@ -127,19 +126,19 @@ PAGES = [
         "/tools/mri-hmc/",
         "Head-motion correction",
         "fsl",
-        [("clean-room original", "mri-hmc", "experimental", "mri_hmc", "agreement")],
+        [("clean-room original", "mri-hmc", "experimental", None, None)],
     ),
     (
         "/tools/resample-series/",
         "One-shot BOLD resampler",
         "larmorx",
-        [("port", "resample-series", "validated", "resample_series", "agreement")],
+        [("port", "resample-series", "validated", None, None)],
     ),
     (
         "/tools/nifti-io/",
         "NIfTI I/O",
         "larmorx",
-        [("own implementation", "nifti-io", "validated", "nifti_io", "agreement")],
+        [("own implementation", "nifti-io", "validated", None, None)],
     ),
 ]
 STATE = {
@@ -231,10 +230,9 @@ def export(ctx: core.Context) -> dict:
     return {
         "schema": 1,
         "tools": tools,
-        "note": "N4BiasFieldCorrection and 3dTshift count their evidence pages' verdicts, case by "
-        "case. The other tools count what their records establish today: identical to the "
-        "unmodified original, identical with correctly rounded maths, expected divergences, "
-        "rejected by both, failures; a case its record passes *within its thresholds* is "
-        "counted as not yet classified until that tool's page is redone with this taxonomy.",
+        "note": "Every tool counts its evidence page's verdicts, case by case: each case's verdict "
+        "is decided from what its record reports and measures (identical to the unmodified "
+        "original, identical once it uses correctly rounded maths, within the original's own "
+        "variability, an expected divergence, rejected by both, an open difference).",
         "pilot": sorted(TOOLS),
     }

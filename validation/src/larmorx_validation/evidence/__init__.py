@@ -27,10 +27,12 @@ def main(args) -> int:
     from larmorx_validation.evidence.core import Context, prune, write_tool
     from larmorx_validation.figures.core import REPO, default_cache
 
-    tools = list(TOOLS) if args.tool == "all" else [args.tool]
+    tools = list(TOOLS) if args.tool == "all" else [] if args.tool == "summary" else [args.tool]
     for tool in tools:
         if tool not in TOOLS:
-            raise SystemExit(f"unknown tool {tool!r}; choose from {', '.join(TOOLS)} or all")
+            raise SystemExit(
+                f"unknown tool {tool!r}; choose from {', '.join(TOOLS)}, summary or all"
+            )
     ctx = Context(
         repo=REPO,
         site=Path(args.site),
@@ -48,6 +50,10 @@ def main(args) -> int:
             continue
         path = write_tool(ctx, tool, doc)
         print(f"{tool}: {path}")
+    if args.tool in ("all", "summary"):
+        from larmorx_validation.evidence import summary
+
+        print(f"summary: {write_tool(ctx, 'summary', summary.export(ctx))}")
     removed = prune(ctx)
     if removed:
         print(f"removed {removed} blob(s) no evidence file refers to any more")

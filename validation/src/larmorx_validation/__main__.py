@@ -194,6 +194,12 @@ def cmd_figures(args: argparse.Namespace) -> int:
     return figures.main(args)
 
 
+def cmd_evidence(args: argparse.Namespace) -> int:
+    from larmorx_validation import evidence
+
+    return evidence.main(args)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m larmorx_validation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -261,6 +267,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="never compute a missing cache entry: skip the figures that need one",
     )
     fg.set_defaults(func=cmd_figures)
+    ev = sub.add_parser(
+        "evidence",
+        help="export a tool's validation evidence (worked examples, metrics, verdicts, cases) "
+        "for the documentation site's interactive pages",
+    )
+    ev.add_argument("tool", help="a tool (larmorx_validation.evidence.TOOLS), 'summary' or 'all'")
+    ev.add_argument("--site", required=True, help="the documentation site's checkout")
+    ev.add_argument(
+        "--cache",
+        help="the figures cache (default: LARMORX_FIGURES_CACHE, else the workspace's "
+        "oracles/figures-cache)",
+    )
+    ev.add_argument(
+        "--no-compute",
+        action="store_true",
+        help="never compute a missing cache entry: skip the tools that need one",
+    )
+    ev.set_defaults(func=cmd_evidence)
     args = parser.parse_args(argv)
     return args.func(args)
 

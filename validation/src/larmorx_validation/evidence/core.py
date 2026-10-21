@@ -105,30 +105,32 @@ def put(ctx: Context, data: bytes, ext: str) -> str:
     return name
 
 
-def blob(ctx: Context, a: np.ndarray, **meta) -> dict:
-    """``a`` stored as a blob; how to read it back."""
+def encode(a: np.ndarray, ref: np.ndarray | None = None, ref_spec=None) -> tuple[bytes, dict]:
+    """``a``'s blob bytes and how to read them back: its values, or (with ``ref``, of the same
+    type and shape) the exclusive or of its bits with the reference's."""
     code = dtype_code(a)
     a = np.asarray(a, dtype=DTYPES[code])
-    data = zlib.compress(_shuffled(a), 9)
-    return {"blob": put(ctx, data, "bin"), "dtype": code, "bytes": len(data), **meta}
+    if ref is None:
+        return zlib.compress(_shuffled(a), 9), {"dtype": code}
+    bits = BITS[code]
+    x = a.view(bits) ^ np.asarray(ref, dtype=DTYPES[code]).view(bits)
+    spec = {"dtype": code, "xor": ref_spec, "zero": not bool(x.any())}
+    return zlib.compress(_shuffled(x), 9), spec
+
+
+def store(ctx: Context, encoded: tuple[bytes, dict], **meta) -> dict:
+    data, spec = encoded
+    return {"blob": put(ctx, data, "bin"), **spec, "bytes": len(data), **meta}
+
+
+def blob(ctx: Context, a: np.ndarray, **meta) -> dict:
+    """``a`` stored as a blob; how to read it back."""
+    return store(ctx, encode(a), **meta)
 
 
 def xor_blob(ctx: Context, a: np.ndarray, ref: np.ndarray, ref_spec, **meta) -> dict:
     """``a`` stored as the exclusive or of its bits with ``ref`` (same type and shape)."""
-    code = dtype_code(a)
-    bits = BITS[code]
-    a = np.asarray(a, dtype=DTYPES[code])
-    r = np.asarray(ref, dtype=DTYPES[code])
-    x = a.view(bits) ^ r.view(bits)
-    data = zlib.compress(_shuffled(x), 9)
-    return {
-        "blob": put(ctx, data, "bin"),
-        "dtype": code,
-        "bytes": len(data),
-        "xor": ref_spec,
-        "zero": not bool(x.any()),
-        **meta,
-    }
+    return store(ctx, encode(a, ref, ref_spec), **meta)
 
 
 def write_tool(ctx: Context, tool: str, doc: dict) -> Path:
@@ -286,12 +288,12 @@ class Grid:
 # ------------------------------------------------------------------------------- metrics
 
 
-def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0) -> dict:
+def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0, inter: float = 0.0) -> dict:
     """``a`` against ``b`` (values as stored, the same shape), over every voxel, in float64.
 
-    ``identical`` compares the stored bytes. ``scale`` multiplies stored differences into the
-    image's units (an integer output's scale factor); ``max_abs_stored`` keeps them as stored.
-    """
+    ``identical`` compares the stored bytes. ``scale`` and ``inter`` turn stored values into
+    the image's units (an integer output's scale factor and intercept, the same for both);
+    ``max_abs_stored`` keeps the largest difference as stored."""
     identical = a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
     x = np.asarray(a, dtype=np.float64)
     y = np.asarray(b, dtype=np.float64)
@@ -301,23 +303,24 @@ def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0) -> dict:
     ad = np.abs(d)
     k = int(np.argmax(ad)) if nd else 0
     at = [int(v) for v in np.unravel_index(k, d.shape)]
-    rng = float(y.max() - y.min()) * scale
+    s = abs(scale)
+    rng = float(y.max() - y.min()) * s
     out = {
         "identical": bool(identical),
         "voxels": n,
         "differ": nd,
         "share": nd / n if n else 0.0,
-        "max_abs": float(ad[np.unravel_index(k, d.shape)]) * scale,
+        "max_abs": float(ad.flat[k]) * s,
         "at": at,
-        "a_at": float(x[tuple(at)]) * scale,
-        "b_at": float(y[tuple(at)]) * scale,
-        "rms": math.sqrt(float(np.mean(d * d))) * scale,
+        "a_at": float(x[tuple(at)]) * scale + inter,
+        "b_at": float(y[tuple(at)]) * scale + inter,
+        "rms": math.sqrt(float(np.mean(d * d))) * s,
         "range": rng,
-        "max_rel_range": (float(ad.max()) * scale / rng) if rng else 0.0,
+        "max_rel_range": (float(ad.flat[k]) * s / rng) if rng else 0.0,
         "one_minus_ncc": 0.0 if identical else one_minus_ncc(x, y),
     }
     if scale != 1.0:
-        out["max_abs_stored"] = float(ad.max())
+        out["max_abs_stored"] = float(ad.flat[k])
     return out
 
 

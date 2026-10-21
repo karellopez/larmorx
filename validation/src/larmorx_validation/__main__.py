@@ -86,10 +86,13 @@ def _redacted(result):
 
 
 def _summary(result) -> dict:
-    """What the JSON record keeps of a case: its status, anything that did not pass, and the
-    values a suite reports without a threshold (``threshold="reported"``, e.g. the number of
-    values that differ from the original's where a case passes within tolerances), which the
-    documentation site's case explorer reads (``python -m larmorx_validation evidence``)."""
+    """What the JSON record keeps of a case: its status, anything that did not pass, the
+    values a suite reports without a threshold (``threshold="reported"`` or ``"reported (...)"``,
+    e.g. the number of values that differ from the original's where a case passes within
+    tolerances, or a comparison that glibc's maths decided), and the measured value of every
+    other check that has one (``measured``, e.g. a run's 95th-percentile deviation). The
+    documentation site's case explorer reads them to decide each case's verdict
+    (``python -m larmorx_validation evidence``)."""
     out = {
         "case": result.case,
         "category": result.category,
@@ -100,9 +103,17 @@ def _summary(result) -> dict:
         "failed_checks": [c.__dict__ for c in result.failed_checks],
         "seconds": round(result.seconds, 3),
     }
-    reported = {c.name: c.value for c in result.checks if c.threshold == "reported"}
+    def is_reported(c) -> bool:
+        return isinstance(c.threshold, str) and c.threshold.startswith("reported")
+
+    reported = {c.name: c.value for c in result.checks if is_reported(c)}
     if reported:
         out["reported"] = reported
+    measured = {
+        c.name: c.value for c in result.checks if c.value is not None and not is_reported(c)
+    }
+    if measured:
+        out["measured"] = measured
     return out
 
 

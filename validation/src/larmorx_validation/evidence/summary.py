@@ -20,40 +20,127 @@ from larmorx_validation.evidence import TOOLS, core
 #: Every tool page of the site, in the status table's order: page, title, ecosystem, and its
 #: implementations (label, record, status, the part-1 figures module and agreement figure).
 PAGES = [
-    ("/tools/ants-registration/", "antsRegistration", "ants",
-     [("port", "ants-registration", "validated", "ants_registration", "agreement")]),
-    ("/tools/ants-n4/", "N4BiasFieldCorrection", "ants", [("port", "ants-n4", "validated", None, None)]),
-    ("/tools/ants-denoise/", "DenoiseImage", "ants",
-     [("port", "ants-denoise", "validated", "ants_denoise", "agreement")]),
-    ("/tools/ants-apply-transforms/", "antsApplyTransforms", "ants",
-     [("port", "ants-apply-transforms", "validated", "ants_apply_transforms", "agreement")]),
-    ("/tools/ants-programs/", "ImageMath and the filters", "ants",
-     [("ImageMath (port)", "ants-image-math", "validated", "ants_programs", "overview#ImageMath"),
-      ("ThresholdImage (port)", "ants-threshold-image", "validated", "ants_programs",
-       "overview#ThresholdImage"),
-      ("MultiplyImages (port)", "ants-multiply-images", "validated", "ants_programs",
-       "overview#MultiplyImages"),
-      ("SmoothImage (port)", "ants-smooth-image", "validated", "ants_programs",
-       "overview#SmoothImage"),
-      ("ResampleImage (port)", "ants-resample-image", "validated", "ants_programs",
-       "overview#ResampleImage"),
-      ("ResampleImageBySpacing (port)", "ants-resample-image-by-spacing", "validated",
-       "ants_programs", "overview#ResampleImageBySpacing")]),
-    ("/tools/ants-ai/", "antsAI, antsAffineInitializer", "ants",
-     [("antsAI (port)", "ants-ai", "validated", "ants_ai", "agreement-ai"),
-      ("antsAffineInitializer (port)", "ants-affine-initializer", "validated", "ants_ai",
-       "agreement-initializer")]),
-    ("/tools/itk-hdf5/", "ITK transform files", "ants",
-     [("port", "itk-hdf5", "validated", "itk_hdf5", "agreement")]),
-    ("/tools/afni-tshift/", "3dTshift", "afni",
-     [("clean-room original", "afni-tshift", "validated", None, None),
-      ("larmorx-gpl replica", "afni-tshift-replica", "validated", None, None)]),
-    ("/tools/mri-hmc/", "Head-motion correction", "fsl",
-     [("clean-room original", "mri-hmc", "experimental", "mri_hmc", "agreement")]),
-    ("/tools/resample-series/", "One-shot BOLD resampler", "larmorx",
-     [("port", "resample-series", "validated", "resample_series", "agreement")]),
-    ("/tools/nifti-io/", "NIfTI I/O", "larmorx",
-     [("own implementation", "nifti-io", "validated", "nifti_io", "agreement")]),
+    (
+        "/tools/ants-registration/",
+        "antsRegistration",
+        "ants",
+        [("port", "ants-registration", "validated", "ants_registration", "agreement")],
+    ),
+    (
+        "/tools/ants-n4/",
+        "N4BiasFieldCorrection",
+        "ants",
+        [("port", "ants-n4", "validated", None, None)],
+    ),
+    (
+        "/tools/ants-denoise/",
+        "DenoiseImage",
+        "ants",
+        [("port", "ants-denoise", "validated", "ants_denoise", "agreement")],
+    ),
+    (
+        "/tools/ants-apply-transforms/",
+        "antsApplyTransforms",
+        "ants",
+        [("port", "ants-apply-transforms", "validated", "ants_apply_transforms", "agreement")],
+    ),
+    (
+        "/tools/ants-programs/",
+        "ImageMath and the filters",
+        "ants",
+        [
+            (
+                "ImageMath (port)",
+                "ants-image-math",
+                "validated",
+                "ants_programs",
+                "overview#ImageMath",
+            ),
+            (
+                "ThresholdImage (port)",
+                "ants-threshold-image",
+                "validated",
+                "ants_programs",
+                "overview#ThresholdImage",
+            ),
+            (
+                "MultiplyImages (port)",
+                "ants-multiply-images",
+                "validated",
+                "ants_programs",
+                "overview#MultiplyImages",
+            ),
+            (
+                "SmoothImage (port)",
+                "ants-smooth-image",
+                "validated",
+                "ants_programs",
+                "overview#SmoothImage",
+            ),
+            (
+                "ResampleImage (port)",
+                "ants-resample-image",
+                "validated",
+                "ants_programs",
+                "overview#ResampleImage",
+            ),
+            (
+                "ResampleImageBySpacing (port)",
+                "ants-resample-image-by-spacing",
+                "validated",
+                "ants_programs",
+                "overview#ResampleImageBySpacing",
+            ),
+        ],
+    ),
+    (
+        "/tools/ants-ai/",
+        "antsAI, antsAffineInitializer",
+        "ants",
+        [
+            ("antsAI (port)", "ants-ai", "validated", "ants_ai", "agreement-ai"),
+            (
+                "antsAffineInitializer (port)",
+                "ants-affine-initializer",
+                "validated",
+                "ants_ai",
+                "agreement-initializer",
+            ),
+        ],
+    ),
+    (
+        "/tools/itk-hdf5/",
+        "ITK transform files",
+        "ants",
+        [("port", "itk-hdf5", "validated", "itk_hdf5", "agreement")],
+    ),
+    (
+        "/tools/afni-tshift/",
+        "3dTshift",
+        "afni",
+        [
+            ("clean-room original", "afni-tshift", "validated", None, None),
+            ("larmorx-gpl replica", "afni-tshift-replica", "validated", None, None),
+        ],
+    ),
+    (
+        "/tools/mri-hmc/",
+        "Head-motion correction",
+        "fsl",
+        [("clean-room original", "mri-hmc", "experimental", "mri_hmc", "agreement")],
+    ),
+    (
+        "/tools/resample-series/",
+        "One-shot BOLD resampler",
+        "larmorx",
+        [("port", "resample-series", "validated", "resample_series", "agreement")],
+    ),
+    (
+        "/tools/nifti-io/",
+        "NIfTI I/O",
+        "larmorx",
+        [("own implementation", "nifti-io", "validated", "nifti_io", "agreement")],
+    ),
 ]
 STATE = {
     "identical": "bit-identical",
@@ -116,7 +203,8 @@ def export(ctx: core.Context) -> dict:
                 tool = page.strip("/").split("/")[-1]
                 doc = json.loads((ctx.out / f"{tool}.json").read_text(encoding="utf-8"))
                 im = next(
-                    i for i in doc["implementations"]
+                    i
+                    for i in doc["implementations"]
                     if record in (i.get("name"), None) or i["record"].endswith(f"/{record}.md")
                 )
                 counts = dict(im["summary"]["verdicts"])
@@ -127,14 +215,18 @@ def export(ctx: core.Context) -> dict:
                 for k, v in states.items():
                     key = STATE.get(k, "unclassified")
                     counts[key] = counts.get(key, 0) + v
-            entries.append({
-                "label": label,
-                "record": f"docs/validation/{record}.md" if record else "docs/validation/",
-                "status": status,
-                "cases": sum(counts.values()),
-                "verdicts": {k: counts[k] for k in [*core.VERDICTS, "unclassified"] if counts.get(k)},
-                "source": source,
-            })
+            entries.append(
+                {
+                    "label": label,
+                    "record": f"docs/validation/{record}.md" if record else "docs/validation/",
+                    "status": status,
+                    "cases": sum(counts.values()),
+                    "verdicts": {
+                        k: counts[k] for k in [*core.VERDICTS, "unclassified"] if counts.get(k)
+                    },
+                    "source": source,
+                }
+            )
         tools.append({"page": page, "title": title, "eco": eco, "implementations": entries})
     return {
         "schema": 1,

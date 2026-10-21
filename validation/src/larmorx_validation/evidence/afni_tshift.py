@@ -162,6 +162,7 @@ def entry(ctx: core.Context) -> fcache.Entry:
         _compute,
     )
 
+
 # ----------------------------------------------------------------------------------- export
 
 DATA = {
@@ -170,10 +171,20 @@ DATA = {
     "licence": "CC0-1.0",
 }
 IMPLS = [
-    {"id": "replica", "label": "larmorx-gpl replica", "short": "replica",
-     "record": "docs/validation/afni-tshift-replica.md", "name": "afni-tshift-replica"},
-    {"id": "original", "label": "larmorx clean-room original", "short": "original",
-     "record": "docs/validation/afni-tshift.md", "name": "afni-tshift"},
+    {
+        "id": "replica",
+        "label": "larmorx-gpl replica",
+        "short": "replica",
+        "record": "docs/validation/afni-tshift-replica.md",
+        "name": "afni-tshift-replica",
+    },
+    {
+        "id": "original",
+        "label": "larmorx clean-room original",
+        "short": "original",
+        "record": "docs/validation/afni-tshift.md",
+        "name": "afni-tshift",
+    },
 ]
 FOURIER_WHY = (
     "AFNI computes the Fourier shift in float32 with its own FFT, the clean-room original in "
@@ -188,27 +199,67 @@ RUNS = [
     ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran", "AFNI 25.2.09 in its image"),
     ("replica", "replica", "larmorx", "larmorx-gpl replica", "default mode, 12 threads"),
     ("replica-1", "replica-1", "larmorx", "larmorx-gpl replica", "default mode, 1 thread"),
-    ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica",
-     "reproduce mode, 12 threads"),
+    (
+        "replica-reproduce",
+        "replica-reproduce",
+        "larmorx",
+        "larmorx-gpl replica",
+        "reproduce mode, 12 threads",
+    ),
     ("original", "original", "larmorx", "larmorx clean-room original", "default mode, 12 threads"),
-    ("original-1", "original-1", "larmorx", "larmorx clean-room original",
-     "default mode, 1 thread"),
-    ("original-reproduce", "original-reproduce", "larmorx", "larmorx clean-room original",
-     "reproduce mode, 12 threads"),
+    (
+        "original-1",
+        "original-1",
+        "larmorx",
+        "larmorx clean-room original",
+        "default mode, 1 thread",
+    ),
+    (
+        "original-reproduce",
+        "original-reproduce",
+        "larmorx",
+        "larmorx clean-room original",
+        "reproduce mode, 12 threads",
+    ),
 ]
 NEG_RUNS = [
-    ("afni", "afni", "original", "AFNI 25.2.09, on the usual encoding",
-     "the result the data call for"),
+    (
+        "afni",
+        "afni",
+        "original",
+        "AFNI 25.2.09, on the usual encoding",
+        "the result the data call for",
+    ),
     ("afni-neg", "neg-afni", "original", "AFNI 25.2.09", "on the negative scale factor"),
     ("replica-neg", "neg-replica", "larmorx", "larmorx-gpl replica", "default mode: corrected"),
-    ("replica-neg-reproduce", "neg-replica-reproduce", "larmorx", "larmorx-gpl replica",
-     "reproduce mode"),
-    ("original", "original", "larmorx", "larmorx clean-room original",
-     "default mode, on the usual encoding"),
-    ("original-neg", "neg-original", "larmorx", "larmorx clean-room original",
-     "default mode: corrected"),
-    ("original-neg-reproduce", "neg-original-reproduce", "larmorx", "larmorx clean-room original",
-     "reproduce mode"),
+    (
+        "replica-neg-reproduce",
+        "neg-replica-reproduce",
+        "larmorx",
+        "larmorx-gpl replica",
+        "reproduce mode",
+    ),
+    (
+        "original",
+        "original",
+        "larmorx",
+        "larmorx clean-room original",
+        "default mode, on the usual encoding",
+    ),
+    (
+        "original-neg",
+        "neg-original",
+        "larmorx",
+        "larmorx clean-room original",
+        "default mode: corrected",
+    ),
+    (
+        "original-neg-reproduce",
+        "neg-original-reproduce",
+        "larmorx",
+        "larmorx clean-room original",
+        "reproduce mode",
+    ),
 ]
 
 
@@ -260,11 +311,13 @@ def _case_verdict(r: dict) -> tuple[str, str]:
     if n == 0:
         return "bit-identical", ""
     method = rep.get("method", "")
-    why = FOURIER_WHY if method == "Fourier" else (
-        f"{method} interpolation: the last float32 bit; its cause is not reproduced yet (the "
-        "record's notes)"
+    why = (
+        "AFNI's Fourier shift is float32, the original's double precision"
+        if method == "Fourier"
+        else f"{method} interpolation, in the last float32 bit; the cause is not reproduced yet "
+        "(the record's notes)"
     )
-    return "open", f"{n:,} values differ from AFNI's, within the record's thresholds. {why}."
+    return "open", f"{n:,} values differ from AFNI's, within the record's thresholds: {why}."
 
 
 def _cases(ctx: core.Context) -> list[dict]:
@@ -280,15 +333,20 @@ def _cases(ctx: core.Context) -> list[dict]:
                 order.append(r["case"])
                 desc, s = defs.get(r["case"], ("", None))
                 by[r["case"]] = {
-                    "id": r["case"], "category": r["category"], "description": desc,
-                    "command": _case_command(s) if s else "", "results": {},
+                    "id": r["case"],
+                    "category": r["category"],
+                    "description": desc,
+                    "command": _case_command(s) if s else "",
+                    "results": {},
                 }
                 if r["case"].startswith("real/ds005040"):
                     by[r["case"]]["example"] = "fmriprep-stc"
             v, why = _case_verdict(r)
             by[r["case"]]["results"][impl["id"]] = {
-                "outcome": r["status"], "verdict": v,
-                "checks": f"{r['checks_passed']}/{r['checks_total']}", "reason": why,
+                "outcome": r["status"],
+                "verdict": v,
+                "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                "reason": why,
             }
     return [by[c] for c in order]
 
@@ -360,11 +418,15 @@ def _finish(ctx, ex, exm, diffs, verdict, default, extra) -> dict:
         verdict(d, same)
         d.setdefault("links", [])
     m4 = np.broadcast_to(ex.m[..., None], ex.shown[ex.key("afni", "series")].shape)
-    outputs = [{
-        "id": "series", "label": "Slice-time corrected series", "unit": "",
-        "stored_unit": "stored unit",
-        "windows": exm.windows(ex.values(ex.key("afni", "series"))[m4]),
-    }]
+    outputs = [
+        {
+            "id": "series",
+            "label": "Slice-time corrected series",
+            "unit": "",
+            "stored_unit": "stored unit",
+            "windows": exm.windows(ex.values(ex.key("afni", "series"))[m4]),
+        }
+    ]
     panels = ex.describe_panels()
     for p in panels:
         if p["role"] == "input":
@@ -398,8 +460,12 @@ def _finish(ctx, ex, exm, diffs, verdict, default, extra) -> dict:
         "diffs": diffs,
         "default": default,
         "poster": {
-            "plane": plane, "slice": z, "aspect": exm.aspect(ex.grid, plane),
-            "panels": post_p, "diffs": post_d, "ranges": ranges,
+            "plane": plane,
+            "slice": z,
+            "aspect": exm.aspect(ex.grid, plane),
+            "panels": post_p,
+            "diffs": post_d,
+            "ranges": ranges,
             "caption": f"Axial slice {z + 1} of {ex.grid.shape[2]}, volume {t + 1} of {n_vol}, "
             "in the window of the brain's 0.5–99.5 %.",
         },
@@ -419,31 +485,92 @@ def _note(n_vox: int, shape) -> str:
 def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     info = e.info()
     run, img, ex, exm = _setup(ctx, e)
-    raw, slope, inter = _load_raw(e.dir / "afni.nii.gz")
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
-    ex.add(exm.Panel("bold", "input", "ds005040 sub-002 BOLD, task clip run 1",
-                     "int16 × scale factor; 40 ascending slices over 1.95 s, TR 2 s",
-                     {"all": braw}, scale=bslope, inter=binter))
+    ex.add(
+        exm.Panel(
+            "bold",
+            "input",
+            "ds005040 sub-002 BOLD, task clip run 1",
+            "int16 × scale factor; 40 ascending slices over 1.95 s, TR 2 s",
+            {"all": braw},
+            scale=bslope,
+            inter=binter,
+        )
+    )
     _add_runs(ex, exm, e, run, RUNS)
     diffs = [
-        _d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09",
-           "larmorx against the original"),
-        _d("original-afni", "original", "afni", "main", "clean-room original − AFNI 25.2.09",
-           "larmorx against the original"),
-        _d("fmriprep-afni", "fmriprep", "afni", "variability",
-           "fMRIPrep's own AFNI − the repository's AFNI build", "the original against itself"),
-        _d("replica-fmriprep", "replica", "fmriprep", "fmriprep", "replica − fMRIPrep's own output",
-           "larmorx against fMRIPrep"),
-        _d("original-fmriprep", "original", "fmriprep", "fmriprep",
-           "clean-room original − fMRIPrep's own output", "larmorx against fMRIPrep"),
-        _d("replica-threads", "replica", "replica-1", "check", "replica, 12 threads − 1 thread",
-           "larmorx against itself"),
-        _d("original-threads", "original", "original-1", "check",
-           "clean-room original, 12 threads − 1 thread", "larmorx against itself"),
-        _d("replica-repro", "replica", "replica-reproduce", "check",
-           "replica, default − reproduce mode", "larmorx against itself"),
-        _d("original-repro", "original", "original-reproduce", "check",
-           "clean-room original, default − reproduce mode", "larmorx against itself"),
+        _d(
+            "replica-afni",
+            "replica",
+            "afni",
+            "main",
+            "replica − AFNI 25.2.09",
+            "larmorx against the original",
+        ),
+        _d(
+            "original-afni",
+            "original",
+            "afni",
+            "main",
+            "clean-room original − AFNI 25.2.09",
+            "larmorx against the original",
+        ),
+        _d(
+            "fmriprep-afni",
+            "fmriprep",
+            "afni",
+            "variability",
+            "fMRIPrep's own AFNI − the repository's AFNI build",
+            "the original against itself",
+        ),
+        _d(
+            "replica-fmriprep",
+            "replica",
+            "fmriprep",
+            "fmriprep",
+            "replica − fMRIPrep's own output",
+            "larmorx against fMRIPrep",
+        ),
+        _d(
+            "original-fmriprep",
+            "original",
+            "fmriprep",
+            "fmriprep",
+            "clean-room original − fMRIPrep's own output",
+            "larmorx against fMRIPrep",
+        ),
+        _d(
+            "replica-threads",
+            "replica",
+            "replica-1",
+            "check",
+            "replica, 12 threads − 1 thread",
+            "larmorx against itself",
+        ),
+        _d(
+            "original-threads",
+            "original",
+            "original-1",
+            "check",
+            "clean-room original, 12 threads − 1 thread",
+            "larmorx against itself",
+        ),
+        _d(
+            "replica-repro",
+            "replica",
+            "replica-reproduce",
+            "check",
+            "replica, default − reproduce mode",
+            "larmorx against itself",
+        ),
+        _d(
+            "original-repro",
+            "original",
+            "original-reproduce",
+            "check",
+            "clean-room original, default − reproduce mode",
+            "larmorx against itself",
+        ),
     ]
 
     def verdict(d: dict, same: dict[str, bool]) -> None:
@@ -453,7 +580,8 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             d["reason"] = (
                 "Two builds of AFNI 25.2.09 (fMRIPrep's image and the repository's) give the "
                 "same values: AFNI's own variability on this run is zero."
-                if same[i] else "AFNI's two builds differ on this run."
+                if same[i]
+                else "AFNI's two builds differ on this run."
             )
         elif same[i]:
             d["verdict"] = "bit-identical"
@@ -486,7 +614,10 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
 
     x, y, z, t = _where_to_look(ex, info)
     default = {
-        "output": "series", "plane": "axial", "voxel": [x, y, z], "t": t,
+        "output": "series",
+        "plane": "axial",
+        "voxel": [x, y, z],
+        "t": t,
         "panels": ["bold", "afni", "replica", "original"],
         "diffs": ["replica-afni", "original-afni", "fmriprep-afni"],
         "compare": {"a": "afni", "b": "original"},
@@ -495,7 +626,9 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     vers = info.get("versions", {})
     command = " ".join(info["command"].split()).replace(
         "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/"
-        "slice_timing_correction/", "…/")
+        "slice_timing_correction/",
+        "…/",
+    )
     extra = {
         "id": "fmriprep-stc",
         "title": "fMRIPrep's slice-timing correction of a real BOLD run",
@@ -506,44 +639,92 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "12 threads. fMRIPrep's own output is the column it produced in its run."
         ),
         "facts": [
-            {"label": "Data", "text": f"{DATA['dataset']}, {DATA['subject']} ({DATA['licence']}): "
-             f"{' × '.join(map(str, img.shape))} int16 values, {img.shape[3]} volumes; shown "
-             "inside fMRIPrep's BOLD brain mask, dilated by one voxel"},
+            {
+                "label": "Data",
+                "text": f"{DATA['dataset']}, {DATA['subject']} ({DATA['licence']}): "
+                f"{' × '.join(map(str, img.shape))} int16 values, {img.shape[3]} volumes; shown "
+                "inside fMRIPrep's BOLD brain mask, dilated by one voxel",
+            },
             {"label": "Node", "text": "fMRIPrep 25.2.6, `bold_stc_wf/slice_timing_correction`"},
             {"label": "Command", "text": f"`{command}`"},
-            {"label": "Slice times", "text": f"{len(info['slice_timing'])} slices, ascending, "
-             f"{min(info['slice_timing']):g} to {max(info['slice_timing']):g} s into each TR "
-             f"of {info['tr']:g} s, shifted to {timing['tzero']:g} s"},
-            {"label": "Programs", "text": f"AFNI {vers.get('afni', '?')} (the repository's oracle "
-             f"build); {vers.get('larmorx-gpl', '?')} (the replica); larmorx's clean-room original "
-             f"at commit `{info['larmorx_commit'][:12]}`"},
+            {
+                "label": "Slice times",
+                "text": f"{len(info['slice_timing'])} slices, ascending, "
+                f"{min(info['slice_timing']):g} to {max(info['slice_timing']):g} s into each TR "
+                f"of {info['tr']:g} s, shifted to {timing['tzero']:g} s",
+            },
+            {
+                "label": "Programs",
+                "text": f"AFNI {vers.get('afni', '?')} (the repository's oracle "
+                f"build); {vers.get('larmorx-gpl', '?')} (the replica); larmorx's clean-room original "
+                f"at commit `{info['larmorx_commit'][:12]}`",
+            },
         ],
         "chain": {
             "title": "Who gives which bytes on this run",
             "steps": [
-                {"nodes": [
-                    {"label": "fMRIPrep 25.2.6, as it ran", "sub": "AFNI 25.2.09 in its image",
-                     "role": "fmriprep"},
-                    {"label": "AFNI 25.2.09", "sub": "the repository's oracle build",
-                     "role": "original"},
-                    {"label": "larmorx-gpl replica", "sub": "1 and 12 threads, both modes",
-                     "role": "larmorx"},
-                ]},
-                {"nodes": [{"label": "larmorx clean-room original",
-                            "sub": "1 and 12 threads, both modes", "role": "larmorx"}]},
+                {
+                    "nodes": [
+                        {
+                            "label": "fMRIPrep 25.2.6, as it ran",
+                            "sub": "AFNI 25.2.09 in its image",
+                            "role": "fmriprep",
+                        },
+                        {
+                            "label": "AFNI 25.2.09",
+                            "sub": "the repository's oracle build",
+                            "role": "original",
+                        },
+                        {
+                            "label": "larmorx-gpl replica",
+                            "sub": "1 and 12 threads, both modes",
+                            "role": "larmorx",
+                        },
+                    ]
+                },
+                {
+                    "nodes": [
+                        {
+                            "label": "larmorx clean-room original",
+                            "sub": "1 and 12 threads, both modes",
+                            "role": "larmorx",
+                        }
+                    ]
+                },
             ],
             "links": [],  # from the metrics, below
             "note": "",
         },
         "series": [
-            {"panel": "bold", "label": "input, at its acquisition times", "color": "input",
-             "marker": "dot", "acquired": True, "width": 1},
-            {"panel": "afni", "label": "AFNI 25.2.09", "color": "original", "marker": "dot",
-             "reference": True},
-            {"panel": "replica", "label": "larmorx-gpl replica", "color": "replica",
-             "marker": "x", "compare": True},
-            {"panel": "original", "label": "clean-room original", "color": "larmorx",
-             "marker": "ring", "compare": True},
+            {
+                "panel": "bold",
+                "label": "input, at its acquisition times",
+                "color": "input",
+                "marker": "dot",
+                "acquired": True,
+                "width": 1,
+            },
+            {
+                "panel": "afni",
+                "label": "AFNI 25.2.09",
+                "color": "original",
+                "marker": "dot",
+                "reference": True,
+            },
+            {
+                "panel": "replica",
+                "label": "larmorx-gpl replica",
+                "color": "replica",
+                "marker": "x",
+                "compare": True,
+            },
+            {
+                "panel": "original",
+                "label": "clean-room original",
+                "color": "larmorx",
+                "marker": "ring",
+                "compare": True,
+            },
         ],
         "timing": timing,
         "metrics_note": _note(int(np.prod(img.shape)), img.shape),
@@ -551,12 +732,22 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     }
     out = _finish(ctx, ex, exm, diffs, verdict, default, extra)
     by = {d["id"]: d for d in out["diffs"]}
-    for i in ("fmriprep-afni", "replica-afni", "replica-threads", "replica-repro",
-              "original-threads", "original-repro"):
+    for i in (
+        "fmriprep-afni",
+        "replica-afni",
+        "replica-threads",
+        "replica-repro",
+        "original-threads",
+        "original-repro",
+    ):
         if not by[i]["metrics"]["series"]["identical"]:
             raise AssertionError(f"{TOOL}: the chain assumes {i} is identical")
-    out["chain"]["links"] = [{"cause": "Fourier shift in double precision",
-                              "max_abs": by["original-afni"]["metrics"]["series"]["max_abs"]}]
+    out["chain"]["links"] = [
+        {
+            "cause": "Fourier shift in double precision",
+            "max_abs": by["original-afni"]["metrics"]["series"]["max_abs"],
+        }
+    ]
     m = by["original-afni"]["metrics"]["series"]
     out["chain"]["note"] = (
         f"Each box holds runs that give the same values. The clean-room original differs from "
@@ -570,32 +761,96 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     run, img, ex, exm = _setup(ctx, e)
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
     nraw, nslope, ninter = _load_raw(e.dir / NEG)
-    ex.add(exm.Panel("bold", "input", "The run, as stored", "int16 × scale factor 47.67",
-                     {"all": braw}, scale=bslope, inter=binter))
-    ex.add(exm.Panel("bold-neg", "input", "The same run, negative scale factor",
-                     "stored integers negated, scale factor −47.67: the same values",
-                     {"all": nraw}, scale=nslope, inter=ninter))
+    ex.add(
+        exm.Panel(
+            "bold",
+            "input",
+            "The run, as stored",
+            "int16 × scale factor 47.67",
+            {"all": braw},
+            scale=bslope,
+            inter=binter,
+        )
+    )
+    ex.add(
+        exm.Panel(
+            "bold-neg",
+            "input",
+            "The same run, negative scale factor",
+            "stored integers negated, scale factor −47.67: the same values",
+            {"all": nraw},
+            scale=nslope,
+            inter=ninter,
+        )
+    )
     _add_runs(ex, exm, e, run, NEG_RUNS)
     afni01 = reg["AFNI-01"]
     link = [{"label": "AFNI-01", "href": afni01["link"]}]
     diffs = [
-        _d("replica-neg-afni-neg", "replica-neg", "afni-neg", "main",
-           "replica (default) − AFNI, same input", "larmorx against the original"),
-        _d("original-neg-afni-neg", "original-neg", "afni-neg", "main",
-           "clean-room original (default) − AFNI, same input", "larmorx against the original"),
-        _d("replica-neg-afni", "replica-neg", "afni", "check",
-           "replica (default) − AFNI on the usual encoding", "the corrected result"),
-        _d("original-neg-original", "original-neg", "original", "check",
-           "clean-room original (default) − itself on the usual encoding", "the corrected result"),
-        _d("replica-repro-afni-neg", "replica-neg-reproduce", "afni-neg", "main",
-           "replica (reproduce) − AFNI, same input", "larmorx against the original"),
-        _d("original-repro-afni-neg", "original-neg-reproduce", "afni-neg", "main",
-           "clean-room original (reproduce) − AFNI, same input", "larmorx against the original"),
-        _d("inputs", "bold-neg", "bold", "variability", "the two inputs' values",
-           "the same data, two encodings"),
-        _d("afni-neg-afni", "afni-neg", "afni", "variability",
-           "AFNI on the negative scale factor − AFNI on the usual encoding",
-           "the defect, in AFNI"),
+        _d(
+            "replica-neg-afni-neg",
+            "replica-neg",
+            "afni-neg",
+            "main",
+            "replica (default) − AFNI, same input",
+            "larmorx against the original",
+        ),
+        _d(
+            "original-neg-afni-neg",
+            "original-neg",
+            "afni-neg",
+            "main",
+            "clean-room original (default) − AFNI, same input",
+            "larmorx against the original",
+        ),
+        _d(
+            "replica-neg-afni",
+            "replica-neg",
+            "afni",
+            "check",
+            "replica (default) − AFNI on the usual encoding",
+            "the corrected result",
+        ),
+        _d(
+            "original-neg-original",
+            "original-neg",
+            "original",
+            "check",
+            "clean-room original (default) − itself on the usual encoding",
+            "the corrected result",
+        ),
+        _d(
+            "replica-repro-afni-neg",
+            "replica-neg-reproduce",
+            "afni-neg",
+            "main",
+            "replica (reproduce) − AFNI, same input",
+            "larmorx against the original",
+        ),
+        _d(
+            "original-repro-afni-neg",
+            "original-neg-reproduce",
+            "afni-neg",
+            "main",
+            "clean-room original (reproduce) − AFNI, same input",
+            "larmorx against the original",
+        ),
+        _d(
+            "inputs",
+            "bold-neg",
+            "bold",
+            "variability",
+            "the two inputs' values",
+            "the same data, two encodings",
+        ),
+        _d(
+            "afni-neg-afni",
+            "afni-neg",
+            "afni",
+            "variability",
+            "AFNI on the negative scale factor − AFNI on the usual encoding",
+            "the defect, in AFNI",
+        ),
     ]
 
     def verdict(d: dict, same: dict[str, bool]) -> None:
@@ -609,7 +864,8 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                 else "AFNI's result changes with the encoding of the same data: AFNI applies the "
                 "negative scale factor on output only, so the shifted slices come out "
                 "sign-flipped and scaled (AFNI-01)."
-                if not same[i] else "The same values."
+                if not same[i]
+                else "The same values."
             )
         elif i in ("replica-neg-afni-neg", "original-neg-afni-neg"):
             ok = same["replica-neg-afni" if i.startswith("replica") else "original-neg-original"]
@@ -641,7 +897,10 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
 
     x, y, z, t = _where_to_look(ex, info)
     default = {
-        "output": "series", "plane": "axial", "voxel": [x, y, z], "t": t,
+        "output": "series",
+        "plane": "axial",
+        "voxel": [x, y, z],
+        "t": t,
         "panels": ["bold-neg", "afni-neg", "replica-neg", "replica-neg-reproduce"],
         "diffs": ["replica-neg-afni-neg", "replica-neg-afni", "replica-repro-afni-neg"],
         "compare": {"a": "afni-neg", "b": "replica-neg"},
@@ -656,23 +915,50 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "their default and reproduce modes."
         ),
         "facts": [
-            {"label": "Input", "text": "the run above, re-stored by "
-             "`larmorx_validation.evidence.afni_tshift.negative_slope`: only `scl_slope` and the "
-             "data bytes change"},
-            {"label": "Defect", "text": f"[AFNI-01](repo:{afni01['link']}): {afni01['title']}; "
-             "corrected by default in both implementations, with a warning"},
+            {
+                "label": "Input",
+                "text": "the run above, re-stored by "
+                "`larmorx_validation.evidence.afni_tshift.negative_slope`: only `scl_slope` and the "
+                "data bytes change",
+            },
+            {
+                "label": "Defect",
+                "text": f"[AFNI-01](repo:{afni01['link']}): {afni01['title']}; "
+                "corrected by default in both implementations, with a warning",
+            },
             {"label": "Command", "text": "fMRIPrep's, as in the example above"},
         ],
         "chain": None,
         "series": [
-            {"panel": "bold-neg", "label": "input, at its acquisition times", "color": "input",
-             "marker": "dot", "acquired": True, "width": 1},
-            {"panel": "afni-neg", "label": "AFNI 25.2.09", "color": "original", "marker": "dot",
-             "reference": True},
-            {"panel": "replica-neg", "label": "replica, default", "color": "replica",
-             "marker": "x", "compare": True},
-            {"panel": "replica-neg-reproduce", "label": "replica, reproduce", "color": "larmorx",
-             "marker": "ring", "compare": True},
+            {
+                "panel": "bold-neg",
+                "label": "input, at its acquisition times",
+                "color": "input",
+                "marker": "dot",
+                "acquired": True,
+                "width": 1,
+            },
+            {
+                "panel": "afni-neg",
+                "label": "AFNI 25.2.09",
+                "color": "original",
+                "marker": "dot",
+                "reference": True,
+            },
+            {
+                "panel": "replica-neg",
+                "label": "replica, default",
+                "color": "replica",
+                "marker": "x",
+                "compare": True,
+            },
+            {
+                "panel": "replica-neg-reproduce",
+                "label": "replica, reproduce",
+                "color": "larmorx",
+                "marker": "ring",
+                "compare": True,
+            },
         ],
         "timing": _timing(info, ex.grid),
         "metrics_note": _note(int(np.prod(img.shape)), img.shape),
@@ -702,13 +988,18 @@ def _speed(bench) -> dict | None:
 
     series = [
         {"id": "AFNI 25.2.09|1 thread", "label": "AFNI (single-threaded)", "mark": "original"},
-        {"id": "larmorx-gpl (replica, CLI)|1 thread", "label": "replica, 1 thread",
-         "mark": "replica"},
-        {"id": "larmorx-gpl (replica, CLI)|12 threads", "label": "replica, 12 threads",
-         "mark": "replica-open"},
+        {
+            "id": "larmorx-gpl (replica, CLI)|1 thread",
+            "label": "replica, 1 thread",
+            "mark": "replica",
+        },
+        {
+            "id": "larmorx-gpl (replica, CLI)|12 threads",
+            "label": "replica, 12 threads",
+            "mark": "replica-open",
+        },
         {"id": "larmorx (CLI)|1 thread", "label": "original, 1 thread", "mark": "larmorx"},
-        {"id": "larmorx (CLI)|12 threads", "label": "original, 12 threads",
-         "mark": "larmorx-open"},
+        {"id": "larmorx (CLI)|12 threads", "label": "original, 12 threads", "mark": "larmorx-open"},
     ]
     ids = {s["id"] for s in series}
     rows: dict[str, dict] = {}
@@ -716,8 +1007,10 @@ def _speed(bench) -> dict | None:
         sid = f"{r['tool']}|{r['operation']}"
         if sid not in ids:
             continue
-        row = rows.setdefault(r["input"], {"label": SPEED_LABELS.get(r["input"], r["input"]),
-                                           "input": r["input"], "seconds": {}})
+        row = rows.setdefault(
+            r["input"],
+            {"label": SPEED_LABELS.get(r["input"], r["input"]), "input": r["input"], "seconds": {}},
+        )
         row["seconds"][sid] = r["median"]
     out = list(rows.values())
     for row in out:
@@ -733,7 +1026,10 @@ def _speed(bench) -> dict | None:
     return {
         "title": "Seconds for the whole command (read, shift, write), median of repeated runs, "
         "log scale; the factor is the clean-room original's speed-up over AFNI at one thread",
-        "axis": [float(lo), float(hi)], "ticks": ticks, "series": series, "rows": out,
+        "axis": [float(lo), float(hi)],
+        "ticks": ticks,
+        "series": series,
+        "rows": out,
         "note": f"From the benchmark report `docs/benchmarks/afni-tshift.json` "
         f"({env.get('cpu', '?')}, {env.get('logical_cpus', '?')} logical CPUs).",
     }
@@ -746,17 +1042,27 @@ def export(ctx: core.Context) -> dict:
     impls = []
     for impl in IMPLS:
         rec = records.load(ctx.repo, impl["name"])
-        flat = [{"category": c["category"], "verdict": c["results"][impl["id"]]["verdict"]}
-                for c in cases if impl["id"] in c["results"]]
+        flat = [
+            {"category": c["category"], "verdict": c["results"][impl["id"]]["verdict"]}
+            for c in cases
+            if impl["id"] in c["results"]
+        ]
         totals: dict[str, int] = {}
         for c in flat:
             totals[c["verdict"]] = totals.get(c["verdict"], 0) + 1
-        impls.append({
-            "id": impl["id"], "label": impl["label"], "short": impl["short"],
-            "name": impl["name"], "record": impl["record"], "status": "validated",
-            "summary": {"cases": len(flat), "verdicts": totals},
-            "agreement": core.agreement(flat), "source": rec.source(),
-        })
+        impls.append(
+            {
+                "id": impl["id"],
+                "label": impl["label"],
+                "short": impl["short"],
+                "name": impl["name"],
+                "record": impl["record"],
+                "status": "validated",
+                "summary": {"cases": len(flat), "verdicts": totals},
+                "agreement": core.agreement(flat),
+                "source": rec.source(),
+            }
+        )
     bench = records.load_bench(ctx.repo, TOOL)
     return {
         "schema": 1,

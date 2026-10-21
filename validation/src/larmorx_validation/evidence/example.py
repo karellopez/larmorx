@@ -93,7 +93,9 @@ class Example:
                     (
                         k
                         for k, b in self.shown.items()
-                        if k != key and b.shape == a.shape and b.dtype == a.dtype
+                        if k != key
+                        and b.shape == a.shape
+                        and b.dtype == a.dtype
                         and np.array_equal(-b, a)
                     ),
                     None,
@@ -217,7 +219,9 @@ def poster_gray(ctx: Context, a: np.ndarray, mask: np.ndarray, lo: float, hi: fl
     return _webp(np.dstack([g, g, g, np.where(mask, 255, 0).astype(np.uint8)]), ctx)
 
 
-def poster_diff(ctx: Context, d: np.ndarray, mask: np.ndarray, rng: float, log: bool = False) -> str:
+def poster_diff(
+    ctx: Context, d: np.ndarray, mask: np.ndarray, rng: float, log: bool = False
+) -> str:
     """A still difference: blue below zero, apricot above, opaque in proportion to |Δ| / rng
     (or, on a log scale, to its place in the six decades below rng), any non-zero difference
     visible, a faint grey brain; the page's paper shows through. As the viewer draws it."""

@@ -33,7 +33,10 @@ NODE = f"{WF}/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0
 INPUT = f"{WF}/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz"
 WEIGHT = f"{WF}/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz"
 MASK = "out/sub-01/anat/sub-01_desc-brain_mask.nii.gz"
-OUT_C, OUT_B = "sub-01_T1w_noise_corrected_corrected.nii.gz", "sub-01_T1w_noise_corrected_bias.nii.gz"
+OUT_C, OUT_B = (
+    "sub-01_T1w_noise_corrected_corrected.nii.gz",
+    "sub-01_T1w_noise_corrected_bias.nii.gz",
+)
 IMAGE = "images/fmriprep-25.2.6.sif"
 #: ANTs' thread band, as the record measures it (parity/ants_n4.py's BAND_THREADS)
 BAND = (2, 3, 4, 8, 12)
@@ -89,7 +92,10 @@ def _compute(e: fcache.Entry) -> None:
             env["LD_PRELOAD"] = str(lib)
         e.run(
             label,
-            [str(b / "N4BiasFieldCorrection"), *_argv(command, str(inp), str(weight), *outs(label))],
+            [
+                str(b / "N4BiasFieldCorrection"),
+                *_argv(command, str(inp), str(weight), *outs(label)),
+            ],
             env=env,
             unset=clean,
         )
@@ -168,6 +174,7 @@ def _load(path: str) -> np.ndarray:
 
     return np.asanyarray(nib.load(path).dataobj)
 
+
 # ----------------------------------------------------------------------------------- export
 
 #: The worked example's runs: panel id, cache label (None: fMRIPrep's own), role, label, sub.
@@ -176,22 +183,62 @@ def _load(path: str) -> np.ndarray:
 RUNS = [
     ("larmorx", "larmorx-1", "larmorx", "larmorx (port), 1 thread", "default mode"),
     ("larmorx-12", "larmorx-12", "larmorx", "larmorx (port), 12 threads", "default mode"),
-    ("larmorx-reproduce", "larmorx-1-reproduce", "larmorx", "larmorx (port), 1 thread",
-     "reproduce mode"),
-    ("larmorx-12-reproduce", "larmorx-12-reproduce", "larmorx", "larmorx (port), 12 threads",
-     "reproduce mode"),
-    ("ants-1-cr", "ants-1-cr", "reference", "ANTs 2.6.5, 1 thread, correctly rounded maths",
-     "the same binary, CORE-MATH preloaded"),
-    ("image-1-cr", "fmriprep-image-1-cr", "reference",
-     "ANTs 2.6.2 (fMRIPrep's image), 1 thread, correctly rounded maths", "CORE-MATH preloaded"),
-    ("ants-1", "ants-1", "original", "ANTs 2.6.5, 1 thread, as built",
-     "the repository's oracle build (GCC 14.3), glibc's maths"),
-    ("image-1", "fmriprep-image-1", "original", "ANTs 2.6.2 (fMRIPrep's image), 1 thread",
-     "conda-forge's build, glibc's maths"),
-    ("ants-8", "ants-8", "original", "ANTs 2.6.5, 8 threads",
-     "the repository's oracle build, glibc's maths"),
-    ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran",
-     "ANTs 2.6.2 in its image, 8 threads (NSLOTS=8), glibc's maths"),
+    (
+        "larmorx-reproduce",
+        "larmorx-1-reproduce",
+        "larmorx",
+        "larmorx (port), 1 thread",
+        "reproduce mode",
+    ),
+    (
+        "larmorx-12-reproduce",
+        "larmorx-12-reproduce",
+        "larmorx",
+        "larmorx (port), 12 threads",
+        "reproduce mode",
+    ),
+    (
+        "ants-1-cr",
+        "ants-1-cr",
+        "reference",
+        "ANTs 2.6.5, 1 thread, correctly rounded maths",
+        "the same binary, CORE-MATH preloaded",
+    ),
+    (
+        "image-1-cr",
+        "fmriprep-image-1-cr",
+        "reference",
+        "ANTs 2.6.2 (fMRIPrep's image), 1 thread, correctly rounded maths",
+        "CORE-MATH preloaded",
+    ),
+    (
+        "ants-1",
+        "ants-1",
+        "original",
+        "ANTs 2.6.5, 1 thread, as built",
+        "the repository's oracle build (GCC 14.3), glibc's maths",
+    ),
+    (
+        "image-1",
+        "fmriprep-image-1",
+        "original",
+        "ANTs 2.6.2 (fMRIPrep's image), 1 thread",
+        "conda-forge's build, glibc's maths",
+    ),
+    (
+        "ants-8",
+        "ants-8",
+        "original",
+        "ANTs 2.6.5, 8 threads",
+        "the repository's oracle build, glibc's maths",
+    ),
+    (
+        "fmriprep",
+        None,
+        "fmriprep",
+        "fMRIPrep 25.2.6, as it ran",
+        "ANTs 2.6.2 in its image, 8 threads (NSLOTS=8), glibc's maths",
+    ),
 ]
 OUTPUTS = [
     {"id": "corrected", "label": "Corrected image", "unit": ""},
@@ -213,27 +260,75 @@ def _diffs() -> list[dict]:
     lx, ants, itself = "larmorx against the original", "the original against itself", None
     out = [
         d("lx-ants1", "larmorx", "ants-1", "main", "larmorx − ANTs 2.6.5, 1 thread, as built", lx),
-        d("lx-cr", "larmorx", "ants-1-cr", "main",
-          "larmorx − ANTs 2.6.5, 1 thread, correctly rounded maths", lx),
-        d("lx-fmriprep", "larmorx", "fmriprep", "fmriprep", "larmorx − fMRIPrep's own output",
-          "larmorx against fMRIPrep"),
-        d("lx12-lx1", "larmorx-12", "larmorx", "check", "larmorx, 12 threads − 1 thread",
-          "larmorx against itself"),
-        d("lx-repro", "larmorx", "larmorx-reproduce", "check",
-          "larmorx, default − reproduce mode", "larmorx against itself"),
+        d(
+            "lx-cr",
+            "larmorx",
+            "ants-1-cr",
+            "main",
+            "larmorx − ANTs 2.6.5, 1 thread, correctly rounded maths",
+            lx,
+        ),
+        d(
+            "lx-fmriprep",
+            "larmorx",
+            "fmriprep",
+            "fmriprep",
+            "larmorx − fMRIPrep's own output",
+            "larmorx against fMRIPrep",
+        ),
+        d(
+            "lx12-lx1",
+            "larmorx-12",
+            "larmorx",
+            "check",
+            "larmorx, 12 threads − 1 thread",
+            "larmorx against itself",
+        ),
+        d(
+            "lx-repro",
+            "larmorx",
+            "larmorx-reproduce",
+            "check",
+            "larmorx, default − reproduce mode",
+            "larmorx against itself",
+        ),
     ]
     out += [
-        d(f"ants{t}-ants1", f"ants-{t}", "ants-1", "variability",
-          f"ANTs 2.6.5, {t} threads − 1 thread", ants)
+        d(
+            f"ants{t}-ants1",
+            f"ants-{t}",
+            "ants-1",
+            "variability",
+            f"ANTs 2.6.5, {t} threads − 1 thread",
+            ants,
+        )
         for t in BAND
     ]
     out += [
-        d("fmriprep-ants8", "fmriprep", "ants-8", "variability",
-          "fMRIPrep's own output − ANTs 2.6.5, 8 threads", ants),
-        d("image1-ants1", "image-1", "ants-1", "variability",
-          "ANTs 2.6.2 − ANTs 2.6.5, 1 thread each, as built", ants),
-        d("image1cr-ants1cr", "image-1-cr", "ants-1-cr", "variability",
-          "ANTs 2.6.2 − ANTs 2.6.5, 1 thread each, correctly rounded", ants),
+        d(
+            "fmriprep-ants8",
+            "fmriprep",
+            "ants-8",
+            "variability",
+            "fMRIPrep's own output − ANTs 2.6.5, 8 threads",
+            ants,
+        ),
+        d(
+            "image1-ants1",
+            "image-1",
+            "ants-1",
+            "variability",
+            "ANTs 2.6.2 − ANTs 2.6.5, 1 thread each, as built",
+            ants,
+        ),
+        d(
+            "image1cr-ants1cr",
+            "image-1-cr",
+            "ants-1-cr",
+            "variability",
+            "ANTs 2.6.2 − ANTs 2.6.5, 1 thread each, correctly rounded",
+            ants,
+        ),
     ]
     del itself
     return out
@@ -317,11 +412,24 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         return ref, {"div": ["t1w:all", f"{pid}:bias"]}
 
     ex.predict["corrected"] = quotient
-    ex.add(exm.Panel("t1w", "input", "ds000005 sub-01 T1w",
-                     "as fMRIPrep passed it, after its DenoiseImage",
-                     {"all": _load(str(run / INPUT))}))
-    ex.add(exm.Panel("weight", "input", "Weight image (-w)",
-                     "fMRIPrep's white-matter posterior × prior", {"all": _load(str(run / WEIGHT))}))
+    ex.add(
+        exm.Panel(
+            "t1w",
+            "input",
+            "ds000005 sub-01 T1w",
+            "as fMRIPrep passed it, after its DenoiseImage",
+            {"all": _load(str(run / INPUT))},
+        )
+    )
+    ex.add(
+        exm.Panel(
+            "weight",
+            "input",
+            "Weight image (-w)",
+            "fMRIPrep's white-matter posterior × prior",
+            {"all": _load(str(run / WEIGHT))},
+        )
+    )
     for pid, label, role, text, sub in RUNS:
         c, b = (
             (run / NODE / OUT_C, run / NODE / OUT_B)
@@ -330,8 +438,10 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         )
         ex.add(exm.Panel(pid, role, text, sub, {"bias": _load(str(b)), "corrected": _load(str(c))}))
     band = {
-        f"ants-{t}": {o: _load(str(e.dir / f"ants-{t}{s}.nii.gz")) for o, s in
-                      (("corrected", ""), ("bias", "-bias"))}
+        f"ants-{t}": {
+            o: _load(str(e.dir / f"ants-{t}{s}.nii.gz"))
+            for o, s in (("corrected", ""), ("bias", "-bias"))
+        }
         for t in BAND
     }
     shown_ids = {p.id for p in ex.panels}
@@ -353,7 +463,14 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
     by = {d["id"]: d for d in diffs}
 
     # the chain from fMRIPrep's output to larmorx's: every identity asserted from the metrics
-    for i in ("fmriprep-ants8", "image1-ants1", "image1cr-ants1cr", "lx-cr", "lx12-lx1", "lx-repro"):
+    for i in (
+        "fmriprep-ants8",
+        "image1-ants1",
+        "image1cr-ants1cr",
+        "lx-cr",
+        "lx12-lx1",
+        "lx-repro",
+    ):
         if not same[i]:
             raise AssertionError(f"{TOOL}: the chain assumes {i} is bit-identical")
     labels = {p.id: (p.label, p.sub, p.role) for p in ex.panels}
@@ -367,14 +484,23 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "steps": [
             {"nodes": [node("fmriprep"), node("ants-8")]},
             {"nodes": [node("ants-1"), node("image-1")]},
-            {"nodes": [node("ants-1-cr"), node("image-1-cr"),
-                       node("larmorx", "larmorx (port)", "1 and 12 threads, default and reproduce")]},
+            {
+                "nodes": [
+                    node("ants-1-cr"),
+                    node("image-1-cr"),
+                    node("larmorx", "larmorx (port)", "1 and 12 threads, default and reproduce"),
+                ]
+            },
         ],
         "links": [
-            {"cause": "1 thread instead of 8",
-             "max_abs": by["ants8-ants1"]["metrics"]["corrected"]["max_abs"]},
-            {"cause": "correctly rounded maths instead of glibc's",
-             "max_abs": by["lx-ants1"]["metrics"]["corrected"]["max_abs"]},
+            {
+                "cause": "1 thread instead of 8",
+                "max_abs": by["ants8-ants1"]["metrics"]["corrected"]["max_abs"],
+            },
+            {
+                "cause": "correctly rounded maths instead of glibc's",
+                "max_abs": by["lx-ants1"]["metrics"]["corrected"]["max_abs"],
+            },
         ],
         "note": "Each box holds runs that give the same bytes, both outputs. fMRIPrep's ANTs "
         "2.6.2 and the repository's ANTs 2.6.5 agree bit for bit at equal thread counts and "
@@ -408,16 +534,18 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
     for pid in default_panels:
         lo, hi = win[pid] if win.get(pid) else (ow["lo"], ow["hi"])
         a = ex.values(ex.key(pid, "corrected"))
-        post_p[pid] = exm.poster_gray(ctx, exm.plane_slice(a, plane, k),
-                                      exm.plane_slice(ex.m, plane, k), lo, hi)
+        post_p[pid] = exm.poster_gray(
+            ctx, exm.plane_slice(a, plane, k), exm.plane_slice(ex.m, plane, k), lo, hi
+        )
     shared = [i for i in default_diffs if not by[i]["metrics"]["corrected"]["identical"]]
     rng = max(by[i]["display"]["corrected"]["max_abs"] for i in shared)
     post_d, ranges = {}, {}
     for i in shared:
         x = by[i]
         dv = ex.values(ex.key(x["a"], "corrected")) - ex.values(ex.key(x["b"], "corrected"))
-        post_d[i] = exm.poster_diff(ctx, exm.plane_slice(dv, plane, k),
-                                    exm.plane_slice(ex.m, plane, k), rng, log=True)
+        post_d[i] = exm.poster_diff(
+            ctx, exm.plane_slice(dv, plane, k), exm.plane_slice(ex.m, plane, k), rng, log=True
+        )
         ranges[i] = rng
     shape = grid.describe()["shape"]
     n_vox = int(np.prod(t1_img.shape))
@@ -435,18 +563,30 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
             "given to fMRIPrep's own ANTs, to the repository's ANTs 2.6.5 and to larmorx."
         ),
         "facts": [
-            {"label": "Data", "text": f"{DATA['dataset']}, {DATA['subject']}'s T1w "
-             f"({DATA['licence']}); shown inside fMRIPrep's brain mask, dilated by 2 voxels"},
-            {"label": "Node", "text": "fMRIPrep 25.2.6, `anat_fit_wf/brain_extraction_wf/"
-             "atropos_wf/inu_n4_final` (sMRIPrep's final N4), run with `NSLOTS=8`"},
+            {
+                "label": "Data",
+                "text": f"{DATA['dataset']}, {DATA['subject']}'s T1w "
+                f"({DATA['licence']}); shown inside fMRIPrep's brain mask, dilated by 2 voxels",
+            },
+            {
+                "label": "Node",
+                "text": "fMRIPrep 25.2.6, `anat_fit_wf/brain_extraction_wf/"
+                "atropos_wf/inu_n4_final` (sMRIPrep's final N4), run with `NSLOTS=8`",
+            },
             {"label": "Command", "text": "`" + _short_command(info["command"]) + "`"},
-            {"label": "Programs", "text": f"{vers.get('ants', '?')}; "
-             f"{_image_ants(vers)} in fMRIPrep's image; CORE-MATH's "
-             "correctly rounded functions preloaded where stated; larmorx at commit "
-             f"`{info['larmorx_commit'][:12]}`"},
-            {"label": "Grid", "text": f"{' × '.join(map(str, t1_img.shape))} voxels of "
-             f"{' × '.join(f'{z:.3g}' for z in t1_img.header.get_zooms())} mm; shown: "
-             f"{' × '.join(map(str, shape))} around the brain"},
+            {
+                "label": "Programs",
+                "text": f"{vers.get('ants', '?')}; "
+                f"{_image_ants(vers)} in fMRIPrep's image; CORE-MATH's "
+                "correctly rounded functions preloaded where stated; larmorx at commit "
+                f"`{info['larmorx_commit'][:12]}`",
+            },
+            {
+                "label": "Grid",
+                "text": f"{' × '.join(map(str, t1_img.shape))} voxels of "
+                f"{' × '.join(f'{z:.3g}' for z in t1_img.header.get_zooms())} mm; shown: "
+                f"{' × '.join(map(str, shape))} around the brain",
+            },
         ],
         "grid": grid.describe(),
         "mask": core.blob(ctx, ex.mask),
@@ -454,13 +594,21 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "panels": panels,
         "diffs": diffs,
         "default": {
-            "output": "corrected", "plane": plane, "voxel": at[:3],
-            "panels": default_panels, "diffs": default_diffs,
-            "compare": {"a": "ants-1", "b": "larmorx"}, "scale": "log",
+            "output": "corrected",
+            "plane": plane,
+            "voxel": at[:3],
+            "panels": default_panels,
+            "diffs": default_diffs,
+            "compare": {"a": "ants-1", "b": "larmorx"},
+            "scale": "log",
         },
         "poster": {
-            "plane": plane, "slice": k, "aspect": exm.aspect(grid, plane),
-            "panels": post_p, "diffs": post_d, "ranges": ranges,
+            "plane": plane,
+            "slice": k,
+            "aspect": exm.aspect(grid, plane),
+            "panels": post_p,
+            "diffs": post_d,
+            "ranges": ranges,
             "caption": f"Axial slice {k + 1} of {shape[2]} of the shown grid (the one with the most "
             "brain), the crosshair where larmorx and ANTs as built differ most in it; the "
             "corrected image, in the brain's "
@@ -477,7 +625,8 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         ),
         "provenance": [
             f"Inputs: fMRIPrep 25.2.6's oracle run `{RUN}` (image sha256 "
-            f"`{vers.get('fmriprep_image', '?')[:16]}…`): " + "; ".join(
+            f"`{vers.get('fmriprep_image', '?')[:16]}…`): "
+            + "; ".join(
                 f"{k} ({v.split('sha256 ')[-1].rstrip(')')[:16]}…)" for k, v in sha.items()
             ),
             f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with "
@@ -512,25 +661,40 @@ def _cases(ctx: core.Context, rec, reg: dict) -> tuple[list[dict], dict]:
             verdict, reason = "open", _clip(r["reason"])
         elif r["case"] in rows:
             verdict = "identical-cr"
-            reason = "; ".join(
-                f"{x['Output']}: as built, {x['Difference from ANTs as built']} "
-                f"(÷ ANTs' thread band: {x['max |diff| / band']} max |Δ|, "
-                f"{x['(1 - NCC) / band']} 1 − NCC)"
-                for x in rows[r["case"]]
-            ) + "; bit-identical with correctly rounded maths"
+            reason = (
+                "; ".join(
+                    f"{x['Output']}: as built, {x['Difference from ANTs as built']} "
+                    f"(÷ ANTs' thread band: {x['max |diff| / band']} max |Δ|, "
+                    f"{x['(1 - NCC) / band']} 1 − NCC)"
+                    for x in rows[r["case"]]
+                )
+                + "; bit-identical with correctly rounded maths"
+            )
         else:
             verdict = "bit-identical"
             if c is not None and not c.outputs:
                 reason = "exit status compared (both 0); the usage text is not compared"
-        out.append({
-            "id": r["case"], "category": r["category"],
-            "description": c.description if c else "",
-            "command": _command(c) if c else "",
-            "results": {"port": {"outcome": status, "verdict": verdict,
-                                 "checks": f"{r['checks_passed']}/{r['checks_total']}",
-                                 "reason": reason}},
-            **({"example": "final-n4"} if r["case"] == "fmriprep/brain-extraction-final" else {}),
-        })
+        out.append(
+            {
+                "id": r["case"],
+                "category": r["category"],
+                "description": c.description if c else "",
+                "command": _command(c) if c else "",
+                "results": {
+                    "port": {
+                        "outcome": status,
+                        "verdict": verdict,
+                        "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                        "reason": reason,
+                    }
+                },
+                **(
+                    {"example": "final-n4"}
+                    if r["case"] == "fmriprep/brain-extraction-final"
+                    else {}
+                ),
+            }
+        )
     return out, {}
 
 
@@ -549,7 +713,9 @@ def _command(c) -> str:
         a = a.replace("{out}", "out.nii.gz").replace("{out2}", "bias.nii.gz").replace("{tmp}/", "")
         return a
 
-    return " ".join([c.program, *(shlex.quote(arg(a)) if " " in arg(a) else arg(a) for a in c.args)])
+    return " ".join(
+        [c.program, *(shlex.quote(arg(a)) if " " in arg(a) else arg(a) for a in c.args)]
+    )
 
 
 def _band(rec) -> dict:
@@ -600,8 +766,10 @@ def _speed(bench) -> dict | None:
         sid = f"{r['tool']}|{r['operation']}"
         if sid not in {s["id"] for s in series}:
             continue
-        row = rows.setdefault(r["input"], {"label": SPEED_LABELS.get(r["input"], r["input"]),
-                                           "input": r["input"], "seconds": {}})
+        row = rows.setdefault(
+            r["input"],
+            {"label": SPEED_LABELS.get(r["input"], r["input"]), "input": r["input"], "seconds": {}},
+        )
         row["seconds"][sid] = r["median"]
     out = list(rows.values())
     for row in out:
@@ -652,8 +820,11 @@ def export(ctx: core.Context) -> dict:
         },
         "implementations": [
             {
-                "id": "port", "label": "larmorx (port)", "short": "port",
-                "record": "docs/validation/ants-n4.md", "status": "validated",
+                "id": "port",
+                "label": "larmorx (port)",
+                "short": "port",
+                "record": "docs/validation/ants-n4.md",
+                "status": "validated",
                 "summary": {"cases": len(cases), "verdicts": totals},
                 "agreement": agreement,
             }

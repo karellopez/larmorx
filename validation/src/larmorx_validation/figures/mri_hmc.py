@@ -207,15 +207,32 @@ def motion_figure(ctx: Context) -> tuple[Figure, Figure]:
 
     def draw_band(theme: style.Theme, width: int):
         t = state["t"]
-        h = 300
+        h = 318
         c = Canvas(theme, width, h)
+        fx = t["fix-rms"]
+        changed = np.flatnonzero(fx != t["reproduce-rms"])
         items = [
             ("larmorx, as compared (reproduce)", theme.larmorx, "-"),
             ("larmorx's default (D13 corrections)", theme.larmorx, ":"),
             ("mcflirt on slightly perturbed input (its own band)", theme.both, "-"),
         ]
         y = legend(c, theme, width, items)
-        ax = c.axes(52, y + 14, width - 60, h - y - 60)
+        if changed.size:
+            note = (
+                f"the default differs in {changed.size} volume{'s' if changed.size > 1 else ''}"
+                f" (volume {int(changed[-1])}: {fx[changed[-1]]:.2g} mm)"
+            )
+            c.text(0, y + 12, note, family=style.MONO, size=10, color=theme.ink3)
+            y += 18
+        c.text(
+            52,
+            y + 18,
+            "RMS deviation from mcflirt (mm, 80 mm sphere)",
+            family=style.MONO,
+            size=10.5,
+            color=theme.ink2,
+        )
+        ax = c.axes(52, y + 30, width - 60, h - y - 76)
         vols = np.arange(t["n"])
         for kind, v in t["band"].items():
             ax.plot(vols, v, color=theme.both, lw=0.9, alpha=0.9, zorder=1)
@@ -229,23 +246,6 @@ def motion_figure(ctx: Context) -> tuple[Figure, Figure]:
             tl.set_fontfamily(style.MONO)
         ax.set_xlim(0, t["n"] - 1)
         ax.set_xlabel("volume", fontsize=style.pt(11))
-        ax.set_ylabel("RMS deviation from mcflirt (mm)", fontsize=style.pt(11))
-        fx = t["fix-rms"]
-        changed = np.flatnonzero(fx != t["reproduce-rms"])
-        if changed.size:
-            k = int(changed[np.argmax(np.abs(fx - t["reproduce-rms"])[changed])])
-            shown = min(fx[k], top * 1.12)
-            ax.annotate(
-                f"default: {fx[k]:.2g} mm at volume {k}, where the D13 corrections change it",
-                (k, shown),
-                xytext=(-10, -2),
-                textcoords="offset points",
-                ha="right",
-                va="top",
-                fontfamily=style.MONO,
-                fontsize=style.pt(10),
-                color=theme.ink2,
-            )
         return c.fig
 
     data = [

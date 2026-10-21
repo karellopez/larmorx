@@ -238,6 +238,9 @@ def series_figure(ctx: Context) -> Figure:
             t.set_fontfamily(style.MONO)
         ax2.set_xlim(-1, n)
         ax2.set_ylim(0, max(1, d_o.max()) * 1.25)
+        from matplotlib.ticker import MaxNLocator
+
+        ax2.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax2.set_xlabel("volume", fontsize=style.pt(11.5))
         c.text(
             64,

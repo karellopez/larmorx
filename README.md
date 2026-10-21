@@ -110,7 +110,7 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 
 | Tool | Command / Python | How | Validation (standard tier) |
 |---|---|---|---|
-| NIfTI-1/2 I/O | `lx.load`, `lx.save`, `lx.Image` | own implementation | [252 files](docs/validation/nifti-io.md), data bit-identical to nibabel; [4–8× faster](docs/benchmarks/nifti-io.md) on compressed writes with threads |
+| NIfTI-1/2 I/O | `lx.load`, `lx.save`, `lx.Image` | own implementation | [254 files](docs/validation/nifti-io.md), data bit-identical to nibabel; [4–8× faster](docs/benchmarks/nifti-io.md) on compressed writes with threads |
 | antsApplyTransforms | `larmorx ants antsApplyTransforms`, `lx.ants.apply_transforms` | port (ANTs/ITK) | [220 cases](docs/validation/ants-apply-transforms.md): 160 of 174 compared bit-identical to ANTs, the rest differ only through glibc's maths |
 | ITK transform files (`.mat`, `.txt`, `.h5`) | `lx.transforms` | port (ITK, HDF5) | [149 cases](docs/validation/itk-hdf5.md), 0 failures; HDF5 read and written in pure Rust |
 | N4BiasFieldCorrection | `larmorx ants N4BiasFieldCorrection`, `lx.ants.n4_bias_field_correction` | port | [29 of 45](docs/validation/ants-n4.md) bit-identical to ANTs, 45 of 45 with correctly rounded maths |

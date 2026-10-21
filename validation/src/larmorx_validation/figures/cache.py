@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -152,7 +153,7 @@ def provenance(e: Entry) -> dict:
             {
                 "label": r["label"],
                 "argv": [_short(a) for a in r["argv"]],
-                "env": r["env"],
+                "env": {k: _short(str(v)) for k, v in r["env"].items()},
                 "exit": r["exit"],
                 "seconds": r["seconds"],
             }
@@ -162,17 +163,34 @@ def provenance(e: Entry) -> dict:
     }
 
 
+#: A larmorx checkout inside a path: a clone named ``larmorx`` or a worktree
+#: (``.claude/worktrees/<name>``), followed by one of the repository's own directories.
+_CHECKOUT = re.compile(
+    r"(?<![\w.~<>-])/(?:[^\s,\[\]\"'=@:;]+/)*?(?:larmorx|\.claude/worktrees/[^/\s,\[\]\"'=@:;]+)"
+    r"(?=/(?:crates-gpl|crates|target|python|validation|scripts|tests)/)"
+)
+
+
+def checkout_paths(text: str) -> str:
+    """``text`` with any larmorx checkout's path replaced by ``<larmorx>``: a program built in
+    a checkout (the replica, ``crates-gpl/target/release/larmorx-gpl``) or a file of one is
+    named alike whichever checkout or worktree ran it, so a re-export from another checkout
+    gives the same bytes."""
+    return _CHECKOUT.sub("<larmorx>", text)
+
+
 def _short(arg: str) -> str:
     """A path with the machine-specific part replaced (provenance is published)."""
     from larmorx_validation.report import redact
 
     home = str(Path.home())
-    out = redact(arg)
+    out = checkout_paths(arg)
+    # the workspace before the home directory (``redact`` replaces that by ``~``)
     for parent in Path(__file__).resolve().parents:
         if (parent / "oracles").is_dir():
-            out = out.replace(str(parent), "<workspace>")
+            out = out.replace(str(parent) + "/", "<workspace>/")
             break
-    return out.replace(home, "~")
+    return redact(out).replace(home, "~")
 
 
 def larmorx_cli(*args: str) -> list[str]:

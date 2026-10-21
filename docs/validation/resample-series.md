@@ -5,12 +5,13 @@
 - **Validated:** `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` (crates larmorx-transform, -interp)
 - **Reference:** fMRIPrep 26.0.0.dev1+g21a490fb8 `ResampleSeries` (run through nipype), nitransforms 25.1.0, SciPy 1.15.3, in-process
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard`
+- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard`
 
 **Bit-identical: 136 of 136 passing cases** produce exactly the values of the reference (SciPy, nitransforms or fMRIPrep's ResampleSeries), with `upstream_defects="reproduce"`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - PIPE-03: 9 case(s) named it, 9 with changed values (largest difference 871): `pe/las-i`, `pe/las-i-`, `anat/las-hmc-coreg-sdc`, `std/on-grid-warp`, `std/off-grid-warp`, `threads/1`, `threads/3`, `threads/12` …
-  - SCI-03: 15 case(s) named it, 10 with changed values (largest difference 5): `ndimage/nearest-order5`, `ndimage/reflect-order2`, `ndimage/reflect-order3`, `ndimage/reflect-order4`, `ndimage/reflect-order5`, `ndimage/grid-mirror-order2`, `ndimage/grid-mirror-order3`, `ndimage/grid-mirror-order4` …
+  - SCI-02: 10 case(s) named it, 10 with changed values (largest difference 2.15e+09): `ndimage/grid-constant-order1`, `ndimage/grid-constant-order2`, `ndimage/grid-constant-order3`, `ndimage/grid-constant-order4`, `ndimage/grid-constant-order5`, `ndimage/nearest-order1`, `ndimage/nearest-order2`, `ndimage/nearest-order3` …
+  - SCI-03: 15 case(s) named it, 11 with changed values (largest difference 2.15e+09): `ndimage/nearest-order5`, `ndimage/reflect-order2`, `ndimage/reflect-order3`, `ndimage/reflect-order4`, `ndimage/reflect-order5`, `ndimage/grid-mirror-order2`, `ndimage/grid-mirror-order3`, `ndimage/grid-mirror-order4` …
 
 ## Thresholds
 
@@ -54,7 +55,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4a087a77882b-dirty) |
+| larmorx | 0.0.1 (1dfe56c0dc60) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

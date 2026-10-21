@@ -51,6 +51,13 @@ from ANTs 2.6.5 at one thread in 4,900,198 of 5,898,240 voxels (max |diff| 271, 
 1.1e-4), and from larmorx by the same amount (4,900,422 voxels, 1 − NCC 1.1e-4); from ANTs
 2.6.5 at 8 threads in 163,367 voxels (max |diff| 73, 1 − NCC 1.1e-6), about three times as
 much as two 8-thread runs of ANTs 2.6.5 differ from each other.
+*Measured again 2026-10-21* (the evidence page's cache entries `ants-denoise/fmriprep-ds000005-denoise`
+and `-repeats`, on a loaded machine): ANTs 2.6.5 ran sMRIPrep's command six times at 8 threads and
+three times at 12, one run after another, and gave the same bytes each time at each thread count;
+fMRIPrep's run (ANTs 2.6.2 at 8 threads, in its image) differed from them in the same 163,367
+voxels, while the two builds agree bit for bit at one thread. So the race of ANTS-42 does not
+change every run: whether two runs differ depends on how the work units are scheduled, which
+these runs did not vary. larmorx gives the one-thread result either way.
 
 ## The program: DenoiseImage.cxx
 

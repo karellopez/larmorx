@@ -8,8 +8,8 @@ program's outputs, larmorx's outputs, the differences, each panel labelled with 
 program, version, build, thread count and mode), the metrics of every comparison computed
 offline in float64, a verdict per comparison and per parity case from one taxonomy with its
 reason, and every parity case in a searchable table. N4BiasFieldCorrection and 3dTshift were the
-pilot (part 2a); the other tools still show the static figures of part 1 until their pages are
-redone (part 2b, below).
+pilot (part 2a); part 2b brought every other tool into the same form (2026-10-21), and the static
+figures of part 1 left the site.
 
 The code that computes everything lives here, in `larmorx_validation`, so the evidence can be
 exported again from a commit of larmorx; the site's repository (`larmorx_documentation`) holds
@@ -22,7 +22,7 @@ runs in CI (rule 10).
 pip install -e "validation[figures]"   # matplotlib, fonttools, nibabel, scipy (and Pillow)
 # larmorx itself: a release build of this checkout; the oracles named in CLAUDE.md
 python -m larmorx_validation evidence ants-n4 --site ../larmorx_documentation
-python -m larmorx_validation evidence all --site ../larmorx_documentation   # every pilot tool + summary
+python -m larmorx_validation evidence all --site ../larmorx_documentation   # every tool + summary
 ```
 
 | Argument | Effect |
@@ -65,12 +65,26 @@ evidence").
   25 MB per page of examples in the site's repository (the pilot: 18 MB for both tools).
 - **The cases** (`evidence/<tool>.py`, `_cases`): every case of the tool's records with its
   description and command line (from the parity suite's own definitions), outcome, checks and a
-  verdict: the records' JSON keeps each case's *reported* values (`__main__._summary`, e.g. how
-  many values differ from the original's where a case passes within tolerances), so a case's
-  verdict is read, not inferred from totals.
+  verdict: the records' JSON keeps each case's *reported* values (`__main__._summary`: checks
+  whose threshold is `reported` or `reported (...)`, e.g. how many values differ from the
+  original's, or the comparisons glibc's maths decided) and the *measured* value of every other
+  check (e.g. a run's 95th-percentile deviation), so a case's verdict is read, not inferred from
+  totals. Where a record cannot settle a verdict (ImageMath's cases within a tolerance), the
+  cases are run again into a cache entry (ANTs at several thread counts and with CORE-MATH) and
+  classified from those runs.
 - **Charts' data**: the agreement overview (cases by category and verdict), the differences
   against the original's thread band (from the record's table), speed (from the benchmark
-  report, never from informal timings).
+  report, never from informal timings), dots on a log axis (`dots`, e.g. antsRegistration's
+  thread band beside larmorx's distance), line charts (an example's `lines`, e.g. a run's motion
+  parameters over its volumes with the original's perturbation band) and tables (`tables`:
+  numbers with their formats, text, verdicts; e.g. a transform's parameters, every dataset of
+  an `.h5` file, every NIfTI header field).
+- **Shared pieces** (`evidence/common.py`): the oracles, ITK fields and linear transforms read
+  as stored, the comparisons of an example with their metrics, the default view (the slice with
+  the most brain, the crosshair inside it where two outputs differ most), windows and posters,
+  tables, the speed chart from a benchmark report, a record case's outcome verdict. An example
+  may show a subset of a 4D series' volumes (`grid.t_index` names the file's volumes) and
+  float64 outputs (stored as their bits, as float32).
 - **Provenance** inside each tool's JSON: the records (path, SHA-256, commit), the benchmark
   reports, the cache entries (commands, versions, threads), the data (dataset, subject, licence)
   and the exporter's git tree hash.
@@ -84,11 +98,15 @@ divergence; rejected by both; open difference (not accounted for by the others, 
 thresholds: it can still be improved, and what is known is stated). Rows comparing the original
 with itself (thread counts, builds, versions) carry no verdict: they are the yardstick.
 
-## Add a tool (part 2b and later)
+## Add a tool
 
 1. Create `validation/src/larmorx_validation/evidence/<tool>.py` with `export(ctx) -> dict`, and
    add it to `TOOLS` in `evidence/__init__.py`; take `ants_n4.py` (a port, one output pair, a
-   thread band) or `afni_tshift.py` (two implementations, 4D, a D13 correction) as the model.
+   thread band), `afni_tshift.py` (two implementations, 4D, a D13 correction),
+   `ants_registration.py` (several outputs: an image and a displacement field's components;
+   tables), `mri_hmc.py` (a clean-room original against a perturbation band; a subset of
+   volumes; line charts), `ants_programs.py` (six programs on one page, one case explorer each)
+   or `itk_hdf5.py` (no images: tables) as the model, and `common.py`'s pieces.
 2. The cache entry: the pipeline's real call on real data where there is one (an fMRIPrep
    oracle run's node), the original as built, with CORE-MATH, at the thread counts its record's
    band uses, fMRIPrep's own build if it differs; larmorx in both modes and at 1 and 12 threads.
@@ -107,7 +125,7 @@ with itself (thread counts, builds, versions) carry no verdict: they are the yar
    figures from `static/figures/<tool>/`. Export, build (0 problems), run the number check, and
    look at every component: desktop and phone, light and dark, several slices and compare modes.
 
-## The part-1 figures (the tools not redone yet)
+## The part-1 figures (no page uses them since part 2b)
 
 `python -m larmorx_validation figures <tool>|all --out <site>/static/figures` draws a tool's
 static figures from its records, benchmark reports and cache entries
@@ -122,5 +140,8 @@ differences blue–paper–apricot on a stated symmetric scale. They are replace
 Only shareable data: OpenNeuro datasets whose `dataset_description.json` gives a public-domain
 dedication (CC0-1.0, PDDL-1.0) or CC-BY (credited), and templates with their notices (the MNI
 ICBM 152 notice). Brain slices only, masked, never a face. The cases used so far: ds000005 sub-01
-(PDDL-1.0; T1w, fMRIPrep 25.2.6's oracle run, its final N4), ds005040 sub-002 (CC0-1.0; BOLD with
-slice timing, fMRIPrep's 3dTshift node), MNI152NLin2009cAsym (part-1 figures).
+(PDDL-1.0; T1w and BOLD, fMRIPrep 25.2.6's oracle run: denoising, N4, the brain extraction's
+calls, the template registration, the T1w in MNI space, head-motion estimation; its `.h5`
+composite; the NIfTI files of its run), ds005040 sub-002 (CC0-1.0; BOLD: slice timing, the
+one-shot resampling with its field map), MNI152NLin2009cAsym (the MNI notice) and OASIS30ANTs
+(CC-BY 4.0) from TemplateFlow.

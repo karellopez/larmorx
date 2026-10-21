@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "4fe591cf4057",
-  "larmorx_testdata_commit": "db846de5f34a",
+  "larmorx_commit": "1dfe56c0dc60",
+  "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -21,8 +21,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.32,
+   "seconds": 0.496,
    "status": "pass"
   },
   {
@@ -31,8 +45,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.012,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -41,8 +69,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 3.469446951953614e-18,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -51,8 +93,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -61,8 +117,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -71,8 +141,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -81,8 +165,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 3.469446951953614e-18,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 3.469446951953614e-18,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 3.469446951953614e-18,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.038,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -91,8 +189,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -101,8 +213,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.011,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -111,8 +237,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.604228440844963e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.049,
+   "seconds": 2.801,
    "status": "pass"
   },
   {
@@ -121,8 +261,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.951,
+   "seconds": 2.656,
    "status": "pass"
   },
   {
@@ -131,8 +285,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 8.604228440844963e-16,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.604228440844963e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 8.604228440844963e-16,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.948,
+   "seconds": 2.795,
    "status": "pass"
   },
   {
@@ -141,8 +309,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.96,
+   "seconds": 2.969,
    "status": "pass"
   },
   {
@@ -151,8 +333,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 4.196937936074008e-13,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.402,
+   "seconds": 0.705,
    "status": "pass"
   },
   {
@@ -161,8 +357,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -171,8 +381,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.028,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -181,8 +405,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -191,8 +429,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 2.0887449873950468e-15,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -201,8 +453,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -211,8 +477,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 2.985680501825466e-26,
+    "qform matrix": 4.440892098500626e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.107,
+   "seconds": 0.224,
    "status": "pass"
   },
   {
@@ -221,8 +501,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.014,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -231,8 +524,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -242,7 +549,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: FileNotFoundError(2, 'No such file or directory'); larmorx: FileNotFoundError('<testdata-cache>/nibabel/tests/data/nifti1.img: No such file or directory (os error 2)')",
-   "seconds": 0.001,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -252,7 +559,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: FileNotFoundError(2, 'No such file or directory'); larmorx: FileNotFoundError('<testdata-cache>/nibabel/tests/data/nifti2.img: No such file or directory (os error 2)')",
-   "seconds": 0.001,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -261,8 +568,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -271,8 +592,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -281,8 +616,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -291,8 +640,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.485,
+   "seconds": 0.831,
    "status": "pass"
   },
   {
@@ -301,8 +664,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.489,
+   "seconds": 0.831,
    "status": "pass"
   },
   {
@@ -311,8 +688,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.377,
+   "seconds": 0.639,
    "status": "pass"
   },
   {
@@ -321,8 +712,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.051,
+   "seconds": 3.555,
    "status": "pass"
   },
   {
@@ -331,8 +736,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.477,
+   "seconds": 0.822,
    "status": "pass"
   },
   {
@@ -341,8 +760,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.013,
+   "seconds": 1.825,
    "status": "pass"
   },
   {
@@ -351,8 +784,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.05,
+   "seconds": 1.875,
    "status": "pass"
   },
   {
@@ -361,8 +808,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.071,
+   "seconds": 1.835,
    "status": "pass"
   },
   {
@@ -371,8 +832,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.088,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -381,8 +856,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.274,
+   "seconds": 0.556,
    "status": "pass"
   },
   {
@@ -391,8 +880,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -401,8 +904,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -411,8 +928,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 12.405,
+   "seconds": 18.307,
    "status": "pass"
   },
   {
@@ -421,8 +952,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.296,
+   "seconds": 0.438,
    "status": "pass"
   },
   {
@@ -431,8 +976,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -441,8 +1000,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.013,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -451,8 +1024,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 8.871,
+   "seconds": 14.224,
    "status": "pass"
   },
   {
@@ -461,8 +1048,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.131,
+   "seconds": 0.29,
    "status": "pass"
   },
   {
@@ -471,8 +1072,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.122,
+   "seconds": 2.432,
    "status": "pass"
   },
   {
@@ -481,8 +1096,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.154,
+   "seconds": 0.383,
    "status": "pass"
   },
   {
@@ -491,8 +1120,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 5.596,
+   "seconds": 8.884,
    "status": "pass"
   },
   {
@@ -501,8 +1144,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 8.001,
+   "seconds": 14.177,
    "status": "pass"
   },
   {
@@ -511,8 +1168,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 4.440892098500626e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 7.032,
+   "seconds": 12.882,
    "status": "pass"
   },
   {
@@ -521,8 +1192,21 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 6.773,
+   "seconds": 12.103,
    "status": "pass"
   },
   {
@@ -531,8 +1215,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 5.5,
+   "seconds": 8.245,
    "status": "pass"
   },
   {
@@ -541,8 +1239,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.551115123125783e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 7.919,
+   "seconds": 13.012,
    "status": "pass"
   },
   {
@@ -551,8 +1263,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.551115123125783e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 7.653,
+   "seconds": 13.085,
    "status": "pass"
   },
   {
@@ -561,8 +1287,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.551115123125783e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 7.757,
+   "seconds": 12.375,
    "status": "pass"
   },
   {
@@ -571,8 +1311,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.535,
+   "seconds": 5.424,
    "status": "pass"
   },
   {
@@ -581,8 +1335,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 7.720603670269277e-16,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 7.720603670269277e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 7.720603670269277e-16,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.161,
+   "seconds": 0.306,
    "status": "pass"
   },
   {
@@ -591,8 +1359,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 2.7755575615628914e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.081,
+   "seconds": 4.894,
    "status": "pass"
   },
   {
@@ -601,8 +1383,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.764,
+   "seconds": 1.42,
    "status": "pass"
   },
   {
@@ -611,8 +1407,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 4.187,
+   "seconds": 7.12,
    "status": "pass"
   },
   {
@@ -621,8 +1431,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 4.037,
+   "seconds": 6.929,
    "status": "pass"
   },
   {
@@ -631,8 +1455,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.625,
+   "seconds": 2.978,
    "status": "pass"
   },
   {
@@ -641,8 +1479,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.313,
+   "seconds": 4.099,
    "status": "pass"
   },
   {
@@ -651,8 +1503,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.193,
+   "seconds": 5.313,
    "status": "pass"
   },
   {
@@ -661,8 +1527,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 1.570092485579527e-16,
+    "qform matrix": 8.673617379884035e-19,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 4.218,
+   "seconds": 7.067,
    "status": "pass"
   },
   {
@@ -671,8 +1551,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.893,
+   "seconds": 5.484,
    "status": "pass"
   },
   {
@@ -681,8 +1575,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1466522176206695e-14,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 6.722,
+   "seconds": 11.072,
    "status": "pass"
   },
   {
@@ -691,8 +1599,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -701,8 +1623,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.062,
+   "seconds": 5.211,
    "status": "pass"
   },
   {
@@ -711,8 +1647,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -721,8 +1671,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -731,8 +1695,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "seconds": 0.128,
    "status": "pass"
   },
   {
@@ -741,8 +1719,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.2,
    "status": "pass"
   },
   {
@@ -751,8 +1743,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.05,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -761,8 +1767,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -771,8 +1791,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.067,
+   "seconds": 0.128,
    "status": "pass"
   },
   {
@@ -781,8 +1815,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -791,8 +1839,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -801,8 +1863,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -811,8 +1887,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "seconds": 0.134,
    "status": "pass"
   },
   {
@@ -821,8 +1911,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.426,
+   "seconds": 0.807,
    "status": "pass"
   },
   {
@@ -831,8 +1935,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.191,
+   "seconds": 0.461,
    "status": "pass"
   },
   {
@@ -841,8 +1959,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.42,
+   "seconds": 0.898,
    "status": "pass"
   },
   {
@@ -851,8 +1983,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.209,
+   "seconds": 0.392,
    "status": "pass"
   },
   {
@@ -861,8 +2007,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.193,
+   "seconds": 0.477,
    "status": "pass"
   },
   {
@@ -871,8 +2031,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.193,
+   "seconds": 0.404,
    "status": "pass"
   },
   {
@@ -881,8 +2055,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.457,
+   "seconds": 0.82,
    "status": "pass"
   },
   {
@@ -891,8 +2079,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.024,
+   "seconds": 5.088,
    "status": "pass"
   },
   {
@@ -901,8 +2103,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.481,
+   "seconds": 4.484,
    "status": "pass"
   },
   {
@@ -911,8 +2127,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.3877787807814457e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.53,
+   "seconds": 4.528,
    "status": "pass"
   },
   {
@@ -921,8 +2151,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.604228440844963e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.007,
+   "seconds": 5.262,
    "status": "pass"
   },
   {
@@ -931,8 +2175,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 1.5931700403370996e-14,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.5931700403370996e-14,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 1.5931700403370996e-14,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.635,
+   "seconds": 1.117,
    "status": "pass"
   },
   {
@@ -941,8 +2199,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.881784197001252e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.489,
+   "seconds": 0.773,
    "status": "pass"
   },
   {
@@ -951,8 +2223,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.753,
+   "seconds": 1.26,
    "status": "pass"
   },
   {
@@ -961,8 +2247,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 4.440892098500626e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -972,7 +2272,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: OSError('Expected 236996928 bytes, got 9554 bytes from <testdata-cache>/openneuro/ds003020/sub-UTS10/ses-5/func/sub-UTS10_ses-5_task-wheretheressmoke_run-4_bold.nii\\n - could the file be damaged?'); larmorx: NiftiError('<testdata-cache>/openneuro/ds003020/sub-UTS10/ses-5/func/sub-UTS10_ses-5_task-wheretheressmoke_run-4_bold.nii: expected 236996928 bytes of voxel data, found 9554')",
-   "seconds": 0.115,
+   "seconds": 0.174,
    "status": "both-error"
   },
   {
@@ -981,8 +2281,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 4.440892098500626e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 7.735,
+   "seconds": 12.88,
    "status": "pass"
   },
   {
@@ -991,8 +2305,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.653944922922455e-20,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.201,
+   "seconds": 3.879,
    "status": "pass"
   },
   {
@@ -1002,7 +2330,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: OSError('Expected 152764416 bytes, got 164400 bytes from object\\n - could the file be damaged?'); larmorx: OSError('<testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream')",
-   "seconds": 0.078,
+   "seconds": 0.133,
    "status": "both-error"
   },
   {
@@ -1011,8 +2339,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.62,
+   "seconds": 1.108,
    "status": "pass"
   },
   {
@@ -1021,8 +2363,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.881784197001252e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.235,
+   "seconds": 0.374,
    "status": "pass"
   },
   {
@@ -1031,8 +2387,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.0408340855860843e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.995,
+   "seconds": 4.692,
    "status": "pass"
   },
   {
@@ -1041,8 +2411,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.952,
+   "seconds": 6.89,
    "status": "pass"
   },
   {
@@ -1051,8 +2435,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.257,
+   "seconds": 0.538,
    "status": "pass"
   },
   {
@@ -1061,8 +2459,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.259,
+   "seconds": 0.448,
    "status": "pass"
   },
   {
@@ -1071,8 +2483,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 3.598,
+   "seconds": 5.931,
    "status": "pass"
   },
   {
@@ -1081,8 +2507,21 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1091,8 +2530,19 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 4.2299497238218464e-14,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.648,
+   "seconds": 1.365,
    "status": "pass"
   },
   {
@@ -1101,8 +2551,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 6.938893903907228e-18,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 5.7,
+   "seconds": 9.734,
    "status": "pass"
   },
   {
@@ -1111,8 +2575,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.3877787807814457e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.2,
+   "seconds": 0.361,
    "status": "pass"
   },
   {
@@ -1121,8 +2599,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.3877787807814457e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.204,
+   "seconds": 0.458,
    "status": "pass"
   },
   {
@@ -1131,8 +2623,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.3877787807814457e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.254,
+   "seconds": 0.627,
    "status": "pass"
   },
   {
@@ -1141,8 +2647,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.664,
+   "seconds": 3.258,
    "status": "pass"
   },
   {
@@ -1151,8 +2671,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.066,
+   "seconds": 0.18,
    "status": "pass"
   },
   {
@@ -1161,8 +2695,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -1171,8 +2719,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 9.691,
+   "seconds": 16.646,
    "status": "pass"
   },
   {
@@ -1181,8 +2743,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.527,
+   "seconds": 0.972,
    "status": "pass"
   },
   {
@@ -1191,8 +2767,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.817,
+   "seconds": 4.779,
    "status": "pass"
   },
   {
@@ -1201,8 +2791,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 2.220446049250313e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 18.291,
+   "seconds": 32.264,
    "status": "pass"
   },
   {
@@ -1211,8 +2815,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 2.220446049250313e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.181,
+   "seconds": 0.33,
    "status": "pass"
   },
   {
@@ -1221,8 +2839,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 8.20350731789432e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.214,
+   "seconds": 0.391,
    "status": "pass"
   },
   {
@@ -1231,8 +2863,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 5.966,
+   "seconds": 10.017,
    "status": "pass"
   },
   {
@@ -1241,8 +2887,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 8.9052831931207e-16,
+    "qform matrix": 1.3322676295501878e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.069,
+   "seconds": 0.137,
    "status": "pass"
   },
   {
@@ -1251,8 +2911,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 8.9052831931207e-16,
+    "qform matrix": 1.3322676295501878e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.068,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -1261,8 +2935,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 8.9052831931207e-16,
+    "qform matrix": 1.3322676295501878e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 4.188,
+   "seconds": 7.022,
    "status": "pass"
   },
   {
@@ -1271,8 +2959,19 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 3.552713678800501e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1281,8 +2980,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.264,
+   "seconds": 2.078,
    "status": "pass"
   },
   {
@@ -1291,8 +3004,20 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1301,8 +3026,20 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1311,8 +3048,20 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1321,8 +3070,20 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1331,8 +3092,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1341,8 +3116,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1351,8 +3140,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1361,8 +3164,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1371,8 +3188,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1381,8 +3212,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1391,8 +3236,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1401,8 +3260,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1411,8 +3284,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1421,8 +3308,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -1431,8 +3332,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1441,8 +3356,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1471,8 +3400,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1481,8 +3424,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1491,8 +3448,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1501,8 +3472,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1511,8 +3496,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1521,8 +3520,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1531,8 +3544,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1541,8 +3568,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1551,8 +3592,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1561,8 +3616,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1571,8 +3640,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1581,8 +3664,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1591,8 +3688,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 1.1102230246251565e-16,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 1.1102230246251565e-16,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1601,8 +3712,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1611,8 +3736,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1621,8 +3760,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.016,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1631,8 +3784,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.017,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1641,8 +3808,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1661,8 +3841,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1671,8 +3865,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1681,8 +3889,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1691,8 +3913,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1701,8 +3937,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1711,8 +3960,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1721,8 +3983,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1731,8 +4006,21 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1742,7 +4030,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "larmorx detects gzip from the file content; nibabel from the file name (and fails) (larmorx: reads it; nibabel: ImageFileError('File <larmorx-testdata>/data/synthetic/nifti/layouts/plain-content-named-gz.nii.gz is not a gzip file'))",
-   "seconds": 0.001,
+   "seconds": 0.005,
    "status": "expected-divergence"
   },
   {
@@ -1751,8 +4039,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.01,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1762,7 +4064,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/bad-magic.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/bad-magic.nii: invalid magic string \"xyz\\\\0\"')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1772,7 +4074,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "nibabel: ValueError('read length must be non-negative or -1'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/extension-bad-size.nii: bad header extension: extension size 4 is smaller than its 8-byte header')",
-   "seconds": 0.0,
+   "seconds": 0.001,
    "status": "both-error"
   },
   {
@@ -1782,7 +4084,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: HeaderDataError('data code 1536 not supported'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/float128-datatype.nii: data type code 1536 is not supported')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1792,7 +4094,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: HeaderDataError('vox offset 0 too low for single file nifti1'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/ndim-8.nii: vox_offset 0.00000000000000000000000000000000000000006323079060572872 is below the minimum 352 for a single-file image')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1802,7 +4104,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: OverflowError('memory mapped length must be positive'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/negative-dim.nii: dim[2] = -6 is negative')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1812,7 +4114,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/not-nifti.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/not-nifti.nii: not a NIfTI-1 or NIfTI-2 header (sizeof_hdr is neither 348 nor 540)')",
-   "seconds": 0.0,
+   "seconds": 0.001,
    "status": "both-error"
   },
   {
@@ -1822,7 +4124,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: OSError('Expected 420 bytes, got 410 bytes from <larmorx-testdata>/data/synthetic/nifti/malformed/truncated-data.nii\\n - could the file be damaged?'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-data.nii: expected 420 bytes of voxel data, found 410')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1832,7 +4134,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: OSError('Expected 32000 bytes, got 15945 bytes from object\\n - could the file be damaged?'); larmorx: OSError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-gzip.nii.gz: incomplete deflate stream')",
-   "seconds": 0.003,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -1842,7 +4144,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "nibabel: ImageFileError('Cannot work out file type of \"<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-header.nii\"'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/truncated-header.nii: file ends inside the header')",
-   "seconds": 0.0,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1852,7 +4154,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: HeaderDataError('data code 999 not recognized'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/unknown-datatype.nii: data type code 999 is not supported')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1872,7 +4174,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "larmorx rejects a single file with vox_offset 0; nibabel reads the header bytes as voxel data (larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/malformed/vox-offset-zero.nii: vox_offset is 0 in a single-file image'); nibabel: reads it)",
-   "seconds": 0.001,
+   "seconds": 0.004,
    "status": "expected-divergence"
   },
   {
@@ -1881,8 +4183,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1891,8 +4207,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1901,8 +4231,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1911,8 +4255,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1921,8 +4279,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1931,8 +4303,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1941,8 +4327,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1951,8 +4351,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1961,8 +4375,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1971,8 +4399,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1981,8 +4423,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 5.551115123125783e-17,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.551115123125783e-17,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 5.551115123125783e-17,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1991,8 +4447,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -2001,8 +4471,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 1.1102230246251565e-16,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 1.1102230246251565e-16,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2012,7 +4496,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: ValueError('w2 should be positive, but is -1.400000e-01'); larmorx: NiftiError('qform quaternion is not unit: 1 - (b\u00b2 + c\u00b2 + d\u00b2) = -1.4000000268220925e-1')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -2021,8 +4505,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 8.673617379884035e-19,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 1.734723475976807e-18,
+    "qform matrix": 8.673617379884035e-19,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 8.673617379884035e-19,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2031,8 +4529,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 1.1102230246251565e-16,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 1.1102230246251565e-16,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2041,8 +4553,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2051,8 +4577,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2061,8 +4601,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2071,8 +4625,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2081,8 +4649,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2091,8 +4673,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2101,8 +4697,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.1102230246251565e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2111,8 +4721,20 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -2121,8 +4743,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -2131,8 +4767,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -2141,8 +4791,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -2151,8 +4815,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2161,8 +4839,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2171,8 +4863,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -2181,8 +4887,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2191,8 +4911,21 @@
    "checks_passed": 18,
    "checks_total": 18,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.004,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2201,8 +4934,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2211,8 +4958,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2222,7 +4983,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "nibabel: HeaderDataError('Valid slope but invalid intercept nan'); larmorx: NiftiError('<larmorx-testdata>/data/synthetic/nifti/scaling/slope-one-inter-nan.nii: scl_slope is valid but scl_inter = NaN is not finite')",
-   "seconds": 0.001,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -2231,8 +4992,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2241,8 +5016,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -2251,8 +5040,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2261,8 +5064,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2271,8 +5088,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2281,8 +5112,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2291,8 +5136,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.01,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2301,8 +5160,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -2311,8 +5184,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -2321,8 +5208,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.009,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2331,8 +5232,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2341,8 +5256,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2351,8 +5280,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2361,8 +5304,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.013,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -2371,8 +5328,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.008,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -2381,8 +5352,69 @@
    "checks_passed": 19,
    "checks_total": 19,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.02,
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/resampling/transforms/warp-lps-vector.nii.gz",
+   "category": "synthetic/transforms",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 5.273559366969494e-16,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
+   "reason": "",
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "synthetic/resampling/transforms/warp-ras-dispvect.nii.gz",
+   "category": "synthetic/transforms",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 1.0547118733938987e-15,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
+   "reason": "",
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -2391,8 +5423,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.263,
+   "seconds": 0.618,
    "status": "pass"
   },
   {
@@ -2401,8 +5447,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -2411,8 +5471,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.052,
+   "seconds": 3.989,
    "status": "pass"
   },
   {
@@ -2421,8 +5495,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.42,
+   "seconds": 0.767,
    "status": "pass"
   },
   {
@@ -2431,8 +5519,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 1.54,
+   "seconds": 2.895,
    "status": "pass"
   },
   {
@@ -2441,8 +5543,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.312,
+   "seconds": 0.496,
    "status": "pass"
   },
   {
@@ -2451,8 +5567,22 @@
    "checks_passed": 21,
    "checks_total": 21,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.141,
+   "seconds": 0.234,
    "status": "pass"
   },
   {
@@ -2461,8 +5591,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.36,
+   "seconds": 0.616,
    "status": "pass"
   },
   {
@@ -2471,8 +5615,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.26,
+   "seconds": 0.44,
    "status": "pass"
   },
   {
@@ -2481,8 +5639,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.267,
+   "seconds": 0.442,
    "status": "pass"
   },
   {
@@ -2491,8 +5663,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.253,
+   "seconds": 0.448,
    "status": "pass"
   },
   {
@@ -2501,8 +5687,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 5.601,
+   "seconds": 10.086,
    "status": "pass"
   },
   {
@@ -2511,8 +5711,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.846,
+   "seconds": 1.541,
    "status": "pass"
   },
   {
@@ -2521,8 +5735,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 0.824,
+   "seconds": 1.568,
    "status": "pass"
   },
   {
@@ -2531,8 +5759,22 @@
    "checks_passed": 22,
    "checks_total": 22,
    "failed_checks": [],
+   "measured": {
+    "affine": 0.0,
+    "data as float32 (get_fdata(float32))": 0,
+    "data as float64 (get_fdata)": 0,
+    "data, default (nibabel img.dataobj)": 0,
+    "data, memory-mapped (mmap=True)": 0,
+    "fresh image: same qform as nibabel's": 0.0,
+    "qform matrix": 0.0,
+    "round trip: larmorx reads the same data": 0,
+    "round trip: nibabel reads the same affine": 0.0,
+    "round trip: nibabel reads the same data": 0,
+    "sform matrix": 0.0,
+    "stored values (unscaled)": 0
+   },
    "reason": "",
-   "seconds": 2.701,
+   "seconds": 5.163,
    "status": "pass"
   }
  ],
@@ -2541,7 +5783,7 @@
   "both-error": 17,
   "expected-divergence": 5,
   "fail": 0,
-  "pass": 230,
+  "pass": 232,
   "skipped": 0
  },
  "tier": "standard"

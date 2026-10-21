@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "50509e30b3e8",
+  "larmorx_commit": "1dfe56c0dc60",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,7 +22,10 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.038,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -32,7 +35,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: Usage        : KinematicTensor displacementField whichTensor ['d'=DeformationFieldGradient, 'l'=Lagrangian, 'e'=Eulerian, 'rc'=RightCauchyGreen, 'lc'=LeftCauchyGreen, 'rs'=RightStretch, 'ls'=LeftStretch]; larmorx exit 1: ExtractContours inputImage {fullyConnected=1} : the voxels of each label (the value truncated to an integer) that touch another label",
-   "seconds": 0.017,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -42,7 +48,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation Bogus not found or not supported for dimension 3; larmorx exit 1: Operation Bogus not found or not supported for dimension 3",
-   "seconds": 0.076,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.173,
    "status": "both-error"
   },
   {
@@ -52,7 +61,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation neg not found or not supported for dimension 3; larmorx exit 1: Operation neg not found or not supported for dimension 3",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -62,6 +74,9 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: Dimension 5 is not supported; larmorx exit 1: Dimension 5 is not supported",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.015,
    "status": "both-error"
   },
@@ -72,7 +87,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ImageMath: the dimension 'three' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.013,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -82,7 +100,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: Operation TileImages not found or not supported for dimension 3; larmorx exit 1: Operation TileImages not found or not supported for dimension 3",
-   "seconds": 0.016,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -92,7 +113,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here: it uses the null image)",
-   "seconds": 0.014,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -102,7 +126,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: '<tmp>/none.nii.gz' is neither a number nor a readable image (ANTs crashes here: it uses the null image)",
-   "seconds": 0.023,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -111,8 +138,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.063,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -121,8 +159,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.066,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -131,8 +180,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -141,8 +201,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -151,8 +222,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 23278,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -161,8 +243,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -171,8 +264,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -181,8 +285,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -191,8 +306,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.069,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -201,8 +327,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.056,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -211,8 +348,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (within tolerance)": 1
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 12,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -221,8 +369,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -231,8 +390,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (within tolerance)": 1
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 27,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -241,8 +411,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -251,8 +432,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -261,8 +453,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -271,8 +474,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -281,8 +495,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.037,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -291,8 +516,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -301,8 +537,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -311,8 +558,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -321,8 +579,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.044,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -331,8 +600,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -341,8 +621,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -351,8 +642,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -361,8 +663,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -371,8 +684,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (within tolerance)": 1
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 35,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -381,8 +705,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.063,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -391,8 +726,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -401,8 +747,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -411,8 +768,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -421,8 +789,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -431,8 +810,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -441,8 +831,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -451,8 +852,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -461,8 +873,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -471,8 +894,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -481,8 +915,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.031,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -491,8 +936,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -501,8 +957,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 35839,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -511,8 +978,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 35837,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -521,8 +999,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -531,8 +1020,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -541,8 +1041,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.031,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -551,8 +1062,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.069,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -561,8 +1083,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -571,8 +1104,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -581,8 +1125,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.065,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -591,8 +1146,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.068,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -601,8 +1167,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -611,8 +1188,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -621,8 +1209,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -631,8 +1230,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -641,8 +1251,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.898,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.994,
    "status": "pass"
   },
   {
@@ -651,8 +1272,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.74,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.774,
    "status": "pass"
   },
   {
@@ -661,8 +1293,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.077,
+   "reported": {
+    "D13 fix pass": 137757,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -671,8 +1314,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.082,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -681,8 +1335,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 5.344,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 5.705,
    "status": "pass"
   },
   {
@@ -691,8 +1356,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.836,
+   "reported": {
+    "D13 fix pass": 4308769,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.898,
    "status": "pass"
   },
   {
@@ -701,8 +1377,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.068,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -711,8 +1398,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -721,8 +1419,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -731,8 +1440,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -741,8 +1461,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -751,8 +1482,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -761,8 +1503,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -771,8 +1524,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "reported": {
+    "D13 fix pass": 385,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -781,8 +1545,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -791,8 +1566,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -801,8 +1587,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -811,8 +1608,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -821,8 +1629,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -832,7 +1651,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: TruncateImageIntensity: the number of bins 'many' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.014,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -841,8 +1663,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -851,8 +1684,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -861,8 +1705,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -871,8 +1726,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.86,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.95,
    "status": "pass"
   },
   {
@@ -881,8 +1747,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.089,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.11,
    "status": "pass"
   },
   {
@@ -891,8 +1768,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.965,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.884,
    "status": "pass"
   },
   {
@@ -901,8 +1789,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.08,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -911,8 +1810,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -921,8 +1831,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -931,8 +1852,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -941,8 +1873,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -951,8 +1894,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -961,8 +1915,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -971,7 +1936,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.032,
    "status": "pass"
   },
@@ -981,8 +1957,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -991,7 +1978,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.049,
    "status": "pass"
   },
@@ -1001,8 +1999,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.098,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -1011,8 +2020,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.778,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.828,
    "status": "pass"
   },
   {
@@ -1021,8 +2041,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.067,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -1031,7 +2062,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.061,
    "status": "pass"
   },
@@ -1041,8 +2083,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1051,8 +2104,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1061,8 +2125,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1071,8 +2146,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -1081,8 +2167,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x5d6ab94332f0): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
-   "seconds": 0.023,
+   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x56fb3a42d2f0): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1092,7 +2181,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  std::exception; larmorx exit 1: larmorx: RescaleImage needs an input image, a minimum and a maximum (ANTs aborts: it throws std::exception)",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -1101,8 +2193,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.554,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.527,
    "status": "pass"
   },
   {
@@ -1111,8 +2214,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.199,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.198,
    "status": "pass"
   },
   {
@@ -1121,8 +2235,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.071,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -1131,8 +2256,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -1141,8 +2277,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -1151,8 +2298,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1161,8 +2319,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1171,8 +2340,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1181,8 +2361,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.11,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -1191,8 +2382,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.066,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1201,8 +2403,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -1211,8 +2424,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -1221,7 +2445,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.037,
    "status": "pass"
   },
@@ -1231,8 +2466,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -1241,7 +2487,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.029,
    "status": "pass"
   },
@@ -1251,8 +2508,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -1261,8 +2529,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.13,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.084,
    "status": "pass"
   },
   {
@@ -1271,8 +2550,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.767,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.602,
    "status": "pass"
   },
   {
@@ -1281,8 +2571,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.14,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -1291,8 +2592,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.558,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.595,
    "status": "pass"
   },
   {
@@ -1301,8 +2613,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.737,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.701,
    "status": "pass"
   },
   {
@@ -1311,8 +2634,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.073,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -1321,8 +2655,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1331,7 +2676,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.061,
    "status": "pass"
   },
@@ -1341,8 +2697,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -1351,7 +2718,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.06,
    "status": "pass"
   },
@@ -1361,8 +2739,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1372,6 +2761,9 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: Laplacian: '.5' is not a number (ANTs aborts: std::stoi throws)",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.02,
    "status": "both-error"
   },
@@ -1381,8 +2773,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 64,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1391,8 +2794,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x60bb6b27b440): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
-   "seconds": 0.018,
+   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5add7f6b9440): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -1401,8 +2807,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1411,8 +2828,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -1421,8 +2849,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -1431,8 +2870,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1441,8 +2891,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 1280,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1451,8 +2912,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 22400,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -1461,8 +2933,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 10.452,
+   "reported": {
+    "D13 fix pass": 22626239,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 10.59,
    "status": "pass"
   },
   {
@@ -1471,8 +2954,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.07,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -1481,8 +2975,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.064,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -1491,8 +2996,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1501,8 +3017,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.078,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1512,7 +3039,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: Grad: 'yes' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -1521,8 +3051,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.131,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -1531,8 +3072,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.706,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.535,
    "status": "pass"
   },
   {
@@ -1541,8 +3093,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1551,8 +3114,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1561,8 +3135,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.088,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -1571,8 +3156,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1581,8 +3177,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -1591,8 +3198,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x55fbcf133280): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
-   "seconds": 0.026,
+   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x55fda71cf280): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -1602,7 +3212,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stof; larmorx exit 1: larmorx: UnsharpMask: 'abc' is not a number (ANTs aborts: std::stof throws)",
-   "seconds": 0.026,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -1611,8 +3224,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1621,8 +3245,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -1631,8 +3266,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.144,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.108,
    "status": "pass"
   },
   {
@@ -1641,8 +3287,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1651,7 +3308,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.038,
    "status": "pass"
   },
@@ -1661,8 +3329,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1671,8 +3350,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.036,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1681,8 +3371,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1692,7 +3393,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  std::bad_alloc; larmorx exit 1: larmorx: MD: a radius of -1 is not supported (ANTs converts it to a radius near 2^64 and cannot allocate its structuring element)",
-   "seconds": 0.017,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -1701,8 +3405,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1711,8 +3426,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1721,8 +3447,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.038,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1731,8 +3468,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.759,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.762,
    "status": "pass"
   },
   {
@@ -1741,8 +3489,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.796,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.774,
    "status": "pass"
   },
   {
@@ -1751,8 +3510,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.074,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1761,8 +3531,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1771,8 +3552,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1781,8 +3573,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1791,8 +3594,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1801,8 +3615,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1811,8 +3636,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1821,8 +3657,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1831,8 +3678,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -1841,8 +3699,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.567,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.501,
    "status": "pass"
   },
   {
@@ -1851,8 +3720,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.295,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.256,
    "status": "pass"
   },
   {
@@ -1861,8 +3741,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.353,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.341,
    "status": "pass"
   },
   {
@@ -1871,8 +3762,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.037,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1881,8 +3783,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1891,8 +3804,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1901,8 +3825,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1911,8 +3846,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1921,8 +3867,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1931,8 +3888,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1941,8 +3909,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -1951,8 +3930,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -1961,8 +3951,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1971,8 +3972,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.056,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -1981,8 +3993,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -1991,8 +4014,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.982,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.827,
    "status": "pass"
   },
   {
@@ -2001,8 +4035,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -2011,8 +4056,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.07,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -2021,8 +4077,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2031,8 +4098,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -2041,8 +4119,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -2051,8 +4140,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.029,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2061,8 +4161,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -2071,8 +4182,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.919,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.95,
    "status": "pass"
   },
   {
@@ -2081,8 +4203,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.063,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -2091,8 +4224,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -2101,8 +4245,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -2111,8 +4266,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.029,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2121,8 +4287,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.072,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -2131,8 +4308,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.696,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.726,
    "status": "pass"
   },
   {
@@ -2141,8 +4329,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.065,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -2151,8 +4350,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.067,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -2161,8 +4371,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.056,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -2171,8 +4392,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.029,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2181,8 +4413,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.073,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -2191,8 +4434,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.119,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.155,
    "status": "pass"
   },
   {
@@ -2201,8 +4455,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.07,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -2211,8 +4476,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.069,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -2221,8 +4497,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -2231,8 +4518,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.031,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2241,8 +4539,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.056,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -2251,8 +4560,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 2.522,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.235,
    "status": "pass"
   },
   {
@@ -2261,8 +4581,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.078,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -2271,8 +4602,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.057,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2281,8 +4623,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.242,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.192,
    "status": "pass"
   },
   {
@@ -2291,8 +4644,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2301,8 +4665,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (within tolerance)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 832,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -2311,8 +4686,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (within tolerance)": 0
+   },
    "reason": "",
-   "seconds": 0.034,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 763,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2321,8 +4707,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -2331,8 +4728,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.05,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2341,8 +4749,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2351,7 +4770,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.048,
    "status": "pass"
   },
@@ -2361,8 +4791,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -2371,8 +4812,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -2381,8 +4833,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.053,
+   "reported": {
+    "D13 fix pass": 4,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -2391,8 +4854,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -2401,8 +4875,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.057,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2411,8 +4896,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.054,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -2421,8 +4917,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.081,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -2431,8 +4938,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 3.685,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.383,
    "status": "pass"
   },
   {
@@ -2441,8 +4959,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.797,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.672,
    "status": "pass"
   },
   {
@@ -2451,8 +4980,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2461,8 +5001,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -2471,8 +5022,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2481,8 +5043,18 @@
    "checks_passed": 8,
    "checks_total": 8,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0
+   },
    "reason": "",
-   "seconds": 0.031,
+   "reported": {
+    "D13 fix pass": 0,
+    "header bytes identical": "True",
+    "values not compared": 0
+   },
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2491,8 +5063,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.069,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -2501,8 +5084,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2511,8 +5105,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.059,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -2521,8 +5126,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.06,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -2531,8 +5147,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -2541,8 +5168,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -2551,8 +5189,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -2562,7 +5211,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: malloc_consolidate(): invalid chunk size; larmorx exit 1: larmorx: PadImage: padding by -14 gives an axis of 0 voxels (ANTs cannot allocate or write such an image)",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -2572,7 +5224,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: PadImage: padding by -20 gives an axis of 4294967288 voxels (ANTs cannot allocate or write such an image)",
-   "seconds": 0.026,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -2582,7 +5237,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath PadImage needs at least 2 operand(s) (ANTs reads past the arguments here)",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -2591,8 +5249,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.062,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -2601,8 +5270,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.063,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -2611,8 +5291,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -2621,8 +5312,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.93,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.812,
    "status": "pass"
   },
   {
@@ -2631,8 +5333,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.494,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.419,
    "status": "pass"
   },
   {
@@ -2641,7 +5354,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.026,
    "status": "pass"
   },
@@ -2651,8 +5375,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -2661,8 +5396,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2671,7 +5417,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.032,
    "status": "pass"
   },
@@ -2681,7 +5438,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 35840,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.031,
    "status": "pass"
   },
@@ -2691,8 +5459,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 4320,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2701,8 +5480,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2711,7 +5501,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 2240,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.026,
    "status": "pass"
   },
@@ -2722,6 +5523,9 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: GetLargestComponent: the minimum size 'big' is not a number (ANTs aborts: std::stoi throws)",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.014,
    "status": "both-error"
   },
@@ -2731,8 +5535,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -2741,7 +5556,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.037,
    "status": "pass"
   },
@@ -2751,8 +5577,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.034,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2761,8 +5598,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.038,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2771,8 +5619,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.562,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.609,
    "status": "pass"
   },
   {
@@ -2781,8 +5640,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.669,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.666,
    "status": "pass"
   },
   {
@@ -2791,8 +5661,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -2801,7 +5682,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.029,
    "status": "pass"
   },
@@ -2811,7 +5703,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.03,
    "status": "pass"
   },
@@ -2821,8 +5724,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.063,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -2831,8 +5745,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.052,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -2841,8 +5766,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.058,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -2851,8 +5787,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -2861,8 +5808,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.055,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -2871,7 +5829,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.03,
    "status": "pass"
   },
@@ -2881,7 +5850,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.036,
    "status": "pass"
   },
@@ -2891,7 +5871,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.042,
    "status": "pass"
   },
@@ -2901,7 +5892,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.039,
    "status": "pass"
   },
@@ -2911,8 +5913,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.146,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -2921,8 +5934,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 5.211,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 5.316,
    "status": "pass"
   },
   {
@@ -2931,8 +5955,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.036,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -2941,8 +5976,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.037,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2951,8 +5997,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -2961,8 +6018,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -2971,8 +6039,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -2981,8 +6060,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.044,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -2991,8 +6081,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -3001,8 +6102,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.026,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -3011,7 +6123,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.03,
    "status": "pass"
   },
@@ -3021,7 +6144,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.048,
    "status": "pass"
   },
@@ -3031,8 +6165,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3041,8 +6186,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.527,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.598,
    "status": "pass"
   },
   {
@@ -3051,8 +6207,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.413,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.404,
    "status": "pass"
   },
   {
@@ -3061,8 +6228,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3071,8 +6249,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.028,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -3081,7 +6270,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.033,
    "status": "pass"
   },
@@ -3091,8 +6291,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -3101,8 +6312,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.034,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3111,8 +6333,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.047,
+   "reported": {
+    "D13 fix pass": 11473,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -3121,8 +6354,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 17871,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -3131,8 +6375,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -3142,7 +6397,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  stoi; larmorx exit 1: larmorx: ExtractContours: 'yes' is not a number (ANTs aborts: std::stoi throws)",
-   "seconds": 0.014,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -3151,8 +6409,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.493,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.5,
    "status": "pass"
   },
   {
@@ -3161,7 +6430,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.036,
    "status": "pass"
   },
@@ -3171,8 +6451,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.031,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -3181,8 +6472,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -3191,8 +6493,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -3201,7 +6514,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.035,
    "status": "pass"
   },
@@ -3211,7 +6535,10 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x62f8bf4604e0): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
+   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x5b2275e644e0): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.021,
    "status": "both-error"
   },
@@ -3221,8 +6548,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.589,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.62,
    "status": "pass"
   },
   {
@@ -3231,8 +6569,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.035,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3241,8 +6590,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.033,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -3251,8 +6611,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -3261,7 +6632,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
    "seconds": 0.053,
    "status": "pass"
   },
@@ -3272,6 +6654,9 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: ; larmorx exit 1: larmorx: ImageMath ReplaceVoxelValue needs at least 4 operand(s) (ANTs reads past the arguments here)",
+   "reported": {
+    "D13 fix pass": 0
+   },
    "seconds": 0.014,
    "status": "both-error"
   },
@@ -3281,8 +6666,19 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.027,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.028,
    "status": "pass"
   }
  ],

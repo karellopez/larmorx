@@ -34,8 +34,9 @@ starts no other agent.
    N4BiasFieldCorrection and 3dTshift. Part 2b: every other tool, and the cases the summary
    counts "within thresholds, not yet classified" (antsApplyTransforms 28, ImageMath 5, ITK
    transform files 1, head-motion correction 121) given their verdicts; N4's benchmark re-run
-   against the current oracle (on a quiet machine). **Part 2b running.** Each later part brings
-   its tool's evidence in the same form.
+   against the current oracle (on a quiet machine). **Part 2b merged 2026-10-21:** every tool's
+   page in this form, every case classified. Each later part brings its tool's evidence in the
+   same form.
 2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
    corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
@@ -80,6 +81,9 @@ starts no other agent.
   for antsRegistration, antsAI and the HDF5 files say their benchmark is pending until the
   reports above exist. The figures take about 12 MB of the site's repository (four SVGs each,
   text as outlines); embedded font subsets per SVG would make them smaller.
+- **Head-motion correction's open cases** (91 of the record's 134, shown as "open" on its
+  evidence page): mcflirt's own variability is measured for the real-data cases only; measuring
+  its band per option and synthetic case would classify them.
 - **`antsApplyTransforms` with `BSplineTransform` files** (the `BSpline` stage's output; refused
   with a message today, `warped=True` gives the warped image), with parity cases.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,

@@ -103,6 +103,7 @@ def _summary(result) -> dict:
         "failed_checks": [c.__dict__ for c in result.failed_checks],
         "seconds": round(result.seconds, 3),
     }
+
     def is_reported(c) -> bool:
         return isinstance(c.threshold, str) and c.threshold.startswith("reported")
 

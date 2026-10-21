@@ -12,15 +12,20 @@
 //! - [`transform`], the transforms a linear stage optimises (`TranslationTransform`,
 //!   `Euler2DTransform`, `Euler3DTransform`, `Similarity2DTransform`,
 //!   `Similarity3DTransform`, `AffineTransform`, `ANTSAffine3DTransform`,
-//!   `ANTSCenteredAffine2DTransform`), the transforms they compose with, and
-//!   `CompositeTransform` with its Jacobian.
+//!   `ANTSCenteredAffine2DTransform`), displacement fields ([`field`]), the cubic
+//!   `BSplineTransform` ([`transform::bspline`]), and `CompositeTransform` with its Jacobian
+//!   (sparse for a B-spline transform).
+//! - [`field`], [`syn`], [`bspline_field`]: displacement fields (composition, inversion,
+//!   Gaussian and B-spline smoothing on update), SyN and B-spline SyN, the B-spline
+//!   approximation of fields and scattered points.
 //! - [`metric`], the image metrics (`MattesMutualInformationImageToImageMetricv4`,
 //!   `MeanSquares`, `Correlation`, `JointHistogramMutualInformation`, `Demons`,
 //!   `ANTSNeighborhoodCorrelation`) and the virtual-domain sampling.
 //! - [`optimizer`], `ConjugateGradientLineSearchOptimizerv4` with the scales of
 //!   `RegistrationParameterScalesFromPhysicalShift` and `WindowConvergenceMonitoringFunction`.
 //! - [`method`], `ImageRegistrationMethodv4`: the levels, their shrunk virtual domains and
-//!   smoothed images, the metric's sample points.
+//!   smoothed images, the metric's sample points, the level adaptors of displacement fields and
+//!   B-spline transforms.
 //!
 //! # Precision and order
 //!
@@ -36,6 +41,7 @@
 // ITK's loops index several arrays at once; they are kept as written.
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
 
+pub mod bspline_field;
 pub mod convergence;
 pub mod field;
 pub mod format;
@@ -301,6 +307,19 @@ impl CompensatedSum {
         self.sum = temp;
     }
 
+    /// `AddElement(0)` `k` times. Adding zero is a function of the state that reaches a fixed
+    /// point at once in practice (the compensation is below half an ulp of the sum), so the
+    /// loop stops there: the state is exactly the one of `k` additions.
+    pub fn add_zeros(&mut self, k: u64) {
+        for _ in 0..k {
+            let before = (self.sum.to_bits(), self.compensation.to_bits());
+            self.add(0.0);
+            if (self.sum.to_bits(), self.compensation.to_bits()) == before {
+                break;
+            }
+        }
+    }
+
     /// `GetSum()`.
     #[inline]
     pub fn sum(&self) -> f64 {
@@ -311,6 +330,65 @@ impl CompensatedSum {
     #[inline]
     pub fn compensation(&self) -> f64 {
         self.compensation
+    }
+}
+
+/// One compensated sum per parameter, each point adding its local derivative to every one
+/// (`StorePointDerivativeResult` of a transform of global support). A B-spline transform's
+/// derivative at a point is zero but for the parameters of the control points around it: those
+/// are added ([`CompensatedSums::add_sparse`]), and the zeros the other parameters receive are
+/// added when the parameter is next touched, or at [`CompensatedSums::flush`], with the same
+/// result as adding them in order.
+#[derive(Clone, Debug, Default)]
+pub struct CompensatedSums {
+    pub sums: Vec<CompensatedSum>,
+    /// The points added so far, and for each parameter the last one that added to it (sparse
+    /// additions only).
+    points: u64,
+    last: Vec<u64>,
+}
+
+impl CompensatedSums {
+    pub fn new(n: usize) -> Self {
+        CompensatedSums {
+            sums: vec![CompensatedSum::default(); n],
+            points: 0,
+            last: Vec::new(),
+        }
+    }
+
+    /// One point's derivative for every parameter.
+    #[inline]
+    pub fn add_dense<R: Real>(&mut self, local: &[R]) {
+        self.points += 1;
+        for (s, &d) in self.sums.iter_mut().zip(local) {
+            s.add(d.to_f64());
+        }
+    }
+
+    /// One point's derivative, zero but for the parameters `cols` (`local` their values).
+    pub fn add_sparse<R: Real>(&mut self, cols: &[usize], local: &[R]) {
+        if self.last.is_empty() {
+            self.last = vec![self.points; self.sums.len()];
+        }
+        self.points += 1;
+        for (&c, &d) in cols.iter().zip(local) {
+            let s = &mut self.sums[c];
+            s.add_zeros(self.points - 1 - self.last[c]);
+            s.add(d.to_f64());
+            self.last[c] = self.points;
+        }
+    }
+
+    /// The zeros not yet added (after sparse additions).
+    pub fn flush(&mut self) {
+        if self.last.is_empty() {
+            return;
+        }
+        for (s, &l) in self.sums.iter_mut().zip(&self.last) {
+            s.add_zeros(self.points - l);
+        }
+        self.last = vec![self.points; self.sums.len()];
     }
 }
 

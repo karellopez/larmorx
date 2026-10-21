@@ -341,7 +341,8 @@ impl<R: Real> JointHistogramMi<R> {
             moving: true,
         };
         let eps = R::from_f64(1.0e-16);
-        let process = |i: usize| -> Option<(Vec<R>, Option<usize>)> {
+        type Point<R> = (Vec<R>, Option<usize>, Option<Vec<usize>>);
+        let process = |i: usize| -> Option<Point<R>> {
             let s = m.sample(i, transform, gradients, true, floor)?;
             if s.moving_value < self.moving_min || s.moving_value > self.moving_max {
                 return None;
@@ -363,30 +364,30 @@ impl<R: Real> JointHistogramMi<R> {
             } else {
                 R::ZERO
             };
-            let mut jac = vec![R::ZERO; D * np];
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(s.virtual_point[k]));
-            m.moving_jacobian(transform, &vp, &mut jac);
+            let jac = m.jacobian_columns(transform, &vp);
             let voxel = if m.local_support {
                 m.voxel_of(&s.virtual_index)
             } else {
                 None
             };
             Some((
-                (0..np)
+                (0..jac.n)
                     .map(|par| {
                         let mut sum = R::ZERO;
                         for dim in 0..D {
-                            sum = sum + scaling * jac[dim * np + par] * s.moving_gradient[dim];
+                            sum = sum + scaling * jac.at(dim, par) * s.moving_gradient[dim];
                         }
                         sum
                     })
                     .collect(),
                 voxel,
+                jac.cols,
             ))
         };
         let mut reduction = BaseReduction::for_metric(m, transform, true);
-        m.for_each_sample(process, |(local, voxel)| {
-            reduction.add_point(R::ZERO, &local, voxel);
+        m.for_each_sample(process, |(local, voxel, cols)| {
+            reduction.add_point_cols(R::ZERO, &local, cols.as_deref(), voxel);
             Ok(())
         })?;
         let reduced = reduction.finish(true, np);

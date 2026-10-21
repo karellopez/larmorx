@@ -140,7 +140,48 @@ pub struct Stage<R, const D: usize> {
     /// Whether the output transform's centre starts at the initial transforms' (on in
     /// ANTs).
     pub initialize_center: bool,
+    /// A B-spline displacement field's meshes per level (`BSplineDisplacementField`); `None`
+    /// for other transforms.
+    pub field_meshes: Option<FieldMeshes>,
+    /// A B-spline transform's mesh at the base level and physical dimensions
+    /// (`BSplineTransformParametersAdaptor` per level); `None` for other transforms.
+    pub bspline_mesh: Option<BSplineMesh<D>>,
+    /// ITK-30 corrected: GC's derivative for a displacement field is each voxel's own.
+    pub correct_gc_derivative: bool,
     pub n_threads: usize,
+}
+
+/// The adaptors of a B-spline displacement field stage
+/// (`BSplineSmoothingOnUpdateDisplacementFieldTransformParametersAdaptor`): at level `l` the
+/// meshes are `mesh << (l + shift)` (ANTs: `shift` 1), the numbers of control points the mesh
+/// plus the order where the mesh is positive, else 0.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldMeshes {
+    pub order: u32,
+    pub update_mesh: Vec<u32>,
+    pub total_mesh: Vec<u32>,
+    pub shift: u32,
+}
+
+impl FieldMeshes {
+    /// The control points of `mesh` at `level`.
+    pub fn control_points(&self, mesh: &[u32], level: usize) -> Vec<u32> {
+        mesh.iter()
+            .map(|&m| {
+                let m = m.wrapping_shl(level as u32 + self.shift);
+                if m > 0 { m + self.order } else { 0 }
+            })
+            .collect()
+    }
+}
+
+/// The adaptors of a `BSpline` stage (`BSplineTransformParametersAdaptor`): at level `l` the
+/// mesh `mesh << l`, on the level's virtual domain (its origin and direction) with the stage's
+/// physical dimensions.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BSplineMesh<const D: usize> {
+    pub mesh: [usize; D],
+    pub physical: [f64; D],
 }
 
 /// A metric, initialised for a level.
@@ -148,8 +189,13 @@ pub enum LevelMetric<R> {
     Mattes(Mattes<R>),
     MeanSquares,
     Mi(Box<JointHistogramMi<R>>),
-    Gc,
+    /// GC; with a transform of local support, ITK-30 corrected or not.
+    Gc {
+        correct_local: bool,
+    },
     Cc(NeighborhoodCorrelation),
+    /// Demons (a displacement field only).
+    Demons,
 }
 
 const VERIFY_FILE: &str = "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx";
@@ -171,15 +217,13 @@ impl<R: Real> LevelMetric<R> {
                 metric,
                 correct_marginals,
             )?)),
-            MetricKind::Gc => LevelMetric::Gc,
+            MetricKind::Gc => LevelMetric::Gc {
+                correct_local: true,
+            },
             MetricKind::Cc { radius } => LevelMetric::Cc(NeighborhoodCorrelation { radius }),
             MetricKind::Demons => {
-                return Err(ItkException::new(
-                    "Modules/Registration/Metricsv4/include/itkDemonsImageToImageMetricv4.hxx",
-                    68,
-                    "DemonsImageToImageMetricv4",
-                    "The moving transform must be a displacement field transform",
-                ));
+                crate::metric::demons::normalizer(metric)?;
+                LevelMetric::Demons
             }
         })
     }
@@ -206,7 +250,16 @@ impl<R: Real> LevelMetric<R> {
                 Ok(reduced(r, "MeanSquaresImageToImageMetricv4", warnings))
             }
             LevelMetric::Mi(m) => m.evaluate(metric, moving, derivative, floor, warnings),
-            LevelMetric::Gc => correlation::evaluate(metric, moving, derivative, floor, warnings),
+            LevelMetric::Gc { correct_local } if metric.local_support && derivative => {
+                correlation::local_derivative(metric, moving, *correct_local, floor, warnings)
+            }
+            LevelMetric::Gc { .. } => {
+                correlation::evaluate(metric, moving, derivative, floor, warnings)
+            }
+            LevelMetric::Demons => {
+                let r = crate::metric::demons::evaluate(metric, moving, derivative, floor)?;
+                Ok(reduced(r, "DemonsImageToImageMetricv4", warnings))
+            }
             LevelMetric::Cc(m) => {
                 let r = m.evaluate(metric, moving, derivative, floor)?;
                 Ok(reduced(
@@ -305,17 +358,58 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         floor: &IndexFloor,
         warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
-        match entry {
+        // A B-spline transform after the active one throws at the first point whose
+        // derivative is computed (any valid point).
+        let jacobian_error = if derivative {
+            moving.position_jacobian_error()
+        } else {
+            None
+        };
+        let before = warnings.len();
+        let result = match entry {
             LevelEntry::Image(m, state) => state.evaluate(m, moving, derivative, floor, warnings),
             LevelEntry::PointSet(p) => {
                 if derivative {
-                    let v = p.value_and_derivative(moving, warnings)?;
-                    Ok((v.value, v.derivative))
+                    p.value_and_derivative(moving, warnings)
+                        .map(|v| (v.value, v.derivative))
                 } else {
                     Ok((p.value(moving, warnings)?, Vec::new()))
                 }
             }
+        };
+        let Some(e) = jacobian_error else {
+            return result;
+        };
+        let no_valid = warnings[before..]
+            .iter()
+            .any(|w| w.contains("No valid points were found"));
+        if let (LevelEntry::Image(_, LevelMetric::Mattes(_)), Err(m)) = (&*entry, &result)
+            && m.description.starts_with("All samples map outside")
+        {
+            return result;
         }
+        if no_valid {
+            return result;
+        }
+        warnings.truncate(before);
+        const BASE: &str = "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4GetValueAndDerivativeThreaderBase.hxx";
+        const PROCESS: &str = "Exception in GetValueAndDerivativeProcessPoint:\n";
+        Err(match entry {
+            LevelEntry::Image(m, state) => match state {
+                LevelMetric::Gc { .. } => e.wrapped(
+                    "Modules/Registration/Metricsv4/include/itkCorrelationImageToImageMetricv4GetValueAndDerivativeThreader.hxx",
+                    250,
+                    PROCESS,
+                ),
+                LevelMetric::Cc(_) => e.wrapped(
+                    "Modules/Registration/Metricsv4/include/itkANTSNeighborhoodCorrelationImageToImageMetricv4GetValueAndDerivativeThreader.hxx",
+                    if m.samples.is_some() { 628 } else { 82 },
+                    "Caught exception: \n",
+                ),
+                _ => e.wrapped(BASE, 259, PROCESS),
+            },
+            LevelEntry::PointSet(_) => e,
+        })
     }
 
     /// `GetValue`/`GetValueAndDerivative`; with several metrics
@@ -401,17 +495,63 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
         self.moving.active_mut().set_parameters(p)
     }
 
-    fn update(&mut self, update: &[R]) -> Result<(), ItkException> {
-        self.moving.active_mut().update(update, R::ONE)
+    fn update(&mut self, update: &mut [R]) -> Result<(), ItkException> {
+        self.moving.active_mut().update_in_place(update, R::ONE)
+    }
+
+    fn number_of_local_parameters(&self) -> usize {
+        self.moving.number_of_local_parameters()
     }
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
         self.check_samples()?;
+        if self.moving.active().is_bspline() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first); every parameter.
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::central_region(&self.virtual_space)
+            };
+            return scales::estimate_bspline_scales(&mut self.moving, &samples);
+        }
+        if self.moving.active().has_local_support() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first), the parameters of the central voxel (the first point's).
+            let (samples, index) = if self.point_set_samples {
+                let p = self.samples[0];
+                (self.samples.clone(), self.virtual_space.point_to_index(&p))
+            } else {
+                (
+                    scales::central_region(&self.virtual_space),
+                    scales::central_index(&self.virtual_space),
+                )
+            };
+            if !self.virtual_space.contains(&index) {
+                return Err(ItkException::new(
+                    "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
+                    330,
+                    "ObjectToObjectMetric",
+                    " point is not inside virtual domain. Cannot compute offset. ",
+                ));
+            }
+            let offset = self.virtual_space.offset(&index) * D;
+            return scales::estimate_local_scales(&mut self.moving, &samples, offset);
+        }
         scales::estimate_scales(&mut self.moving, &self.samples)
     }
 
-    fn estimate_step_scale(&mut self, step: &[R]) -> Result<R, ItkException> {
+    fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException> {
         self.check_samples()?;
+        if self.moving.active().has_local_support() || self.moving.active().is_bspline() {
+            // FullDomainSampling (the point set with a point-set metric first).
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::full_domain(&self.virtual_space)
+            };
+            return scales::estimate_local_step_scale(&mut self.moving, &samples, step);
+        }
         scales::estimate_step_scale(&mut self.moving, &self.samples, step)
     }
 
@@ -731,6 +871,36 @@ where
     let mut outcomes = Vec::new();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
+        // The level's adaptor: a displacement field resampled onto the level's virtual domain
+        // (DisplacementFieldTransformParametersAdaptor), a B-spline field given the level's
+        // numbers of control points.
+        if let Xfm::Field(f) = &mut output {
+            *f = crate::field::adapt(f, &virtual_space, floor);
+            if let (
+                Some(meshes),
+                Some(crate::field::FieldSmoothing::BSpline {
+                    update_control_points,
+                    total_control_points,
+                    ..
+                }),
+            ) = (&stage.field_meshes, &mut f.smoothing)
+            {
+                *update_control_points = meshes.control_points(&meshes.update_mesh, level);
+                *total_control_points = meshes.control_points(&meshes.total_mesh, level);
+            }
+        }
+        // A B-spline transform's adaptor: the level's mesh on the level's virtual domain.
+        if let (Xfm::BSpline(b), Some(m)) = (&mut output, &stage.bspline_mesh) {
+            let mesh: [usize; D] = std::array::from_fn(|d| m.mesh[d] << level);
+            let required = crate::transform::bspline::required_fixed(
+                &mesh,
+                &virtual_space.origin,
+                &m.physical,
+                &virtual_space.direction,
+            );
+            crate::transform::bspline::adapt(b, &required, floor)?;
+        }
+        let local_support = output.has_local_support();
         let sigma = stage.smoothing_sigmas[level];
         let smooth = |image: &Arc<Image<R, D>>| -> Result<Arc<Image<R, D>>, ItkException> {
             smooth_for_level(
@@ -754,7 +924,7 @@ where
                     fixed_gradient_image: None,
                     moving_gradient_image: None,
                     pixel_f32: false,
-                    local_support: false,
+                    local_support,
                 }),
                 StageMetric::PointSet(_) => None,
             });
@@ -828,8 +998,14 @@ where
                             "VirtualSampledPointSet must have 1 or more points.",
                         ));
                     }
-                    // Demons checks its transform before ImageToImageMetricv4::Initialize.
+                    // Demons checks its transform before ImageToImageMetricv4::Initialize, and
+                    // takes its gradient from the fixed image.
                     if sm.kind == MetricKind::Demons {
+                        crate::metric::demons::normalizer(&m)?;
+                        if sm.use_gradient_filter {
+                            m.fixed_gradient_image =
+                                Some(Arc::new(gradient_image(&m.fixed, stage.n_threads)?));
+                        }
                         return LevelMetric::initialize(sm.kind, &m)
                             .map(|s| LevelEntry::Image(m, s));
                     }
@@ -837,7 +1013,10 @@ where
                         m.moving_gradient_image =
                             Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
                     }
-                    let state = LevelMetric::initialize(sm.kind, &m)?;
+                    let mut state = LevelMetric::initialize(sm.kind, &m)?;
+                    if let LevelMetric::Gc { correct_local } = &mut state {
+                        *correct_local = stage.correct_gc_derivative;
+                    }
                     Ok(LevelEntry::Image(m, state))
                 })(),
                 (_, StageMetric::PointSet(_)) => {

@@ -34,15 +34,15 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 | Family | Tools | Records |
 |---|---|---|
 | I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`) | `nifti-io`, `itk-hdf5`, `resample-series` |
-| ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (linear and SyN stages, image and point-set metrics), antsAI (all but `-b`), antsAffineInitializer | `ants-*` |
+| ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (linear, SyN, BSplineSyN, BSpline and displacement-field stages, image and point-set metrics), antsAI (all but `-b`), antsAffineInitializer | `ants-*` |
 | AFNI | 3dTshift, complete: clean-room original (`crates/larmorx-afni`) and GPL replica (`crates-gpl/`) | `afni-tshift`, `afni-tshift-replica` |
 | FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`) not started | `mri-hmc` |
 
 Golden tests cover every tool on all six platforms (`docs/validation/golden.md`); CI has been green at every merge. Stage-by-stage comparisons with fMRIPrep 25.2.6 were run on four oracle runs (`docs/validation/fmriprep-stages*.md`); further fMRIPrep comparisons wait until every tool is ported (user, 2026-10-16).
 
-**Running:** A5 part 2 (BSplineSyN, BSpline, Gaussian and B-spline displacement fields). Launched by mistake from the documentation repository, its worktree is `larmorx_documentation/.claude/worktrees/agent-a8e1b12f07e8dd9e9/`, holding a clone of larmorx at `.../larmorx` on branch `a5-part2-bspline`: fetch that branch into this repository for the merge (`git fetch <clone> a5-part2-bspline:a5-part2-bspline`).
+**Running:** nothing. A5 part 2 (BSplineSyN, BSpline, Gaussian and B-spline displacement fields) was merged on 2026-10-21 (branch `a5-part2-bspline`, fetched from a clone of larmorx inside `larmorx_documentation/.claude/worktrees/agent-a8e1b12f07e8dd9e9/larmorx`, where the agent had to work after being launched from the documentation repository).
 **Next** (order decided 2026-10-20): the visual reports (figure framework, figures for every ported tool, per-tool pages on the documentation site), then A5 part 3 (velocity fields, exponential), then A6 (Atropos); each a bounded agent run with a stop after it.
-**Build-cache seed** for the next agent: the newest merged worktree's `target/` (now `.claude/worktrees/agent-aca867b0b4aec5f3f/`; after A5 part 2, its clone's).
+**Build-cache seed** for the next agent: the newest merged worktree's `target/` (now A5 part 2's clone, `larmorx_documentation/.claude/worktrees/agent-a8e1b12f07e8dd9e9/larmorx/target/`).
 
 **fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`).
 

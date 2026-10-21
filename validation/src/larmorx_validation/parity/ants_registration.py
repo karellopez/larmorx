@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (linear
-and SyN stages; the SyN cases are in :mod:`ants_registration_syn`).
+"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (linear,
+SyN, B-spline and displacement-field stages; the SyN cases are in :mod:`ants_registration_syn`,
+the BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline cases in
+:mod:`ants_registration_bspline`).
 
 ANTs runs as its own binary with one thread and a fixed sampling seed
 (``ANTS_RANDOM_SEED``; without one ANTs seeds from the clock and is not repeatable); larmorx
@@ -33,7 +35,11 @@ Real cases repeat the ``antsRegistration`` command lines fMRIPrep 25.2.6 ran in 
 (``oracles/fmriprep-25.2.6``), on the inputs it ran them on; they are skipped where those runs
 are missing. sMRIPrep's brain extraction and template registration run whole (Rigid, Affine,
 SyN) at full size in the full tier, and on every third voxel of their images (``real-syn-small``)
-in the standard tier (its first run) and the full tier (the others).
+in the standard tier (its first run) and the full tier (the others). The template registration
+runs again with its SyN stage replaced by antsRegistrationSyN.sh's ``BSplineSyN[0.1,26,0,3]``,
+as that script's ``-t b`` would run it: on every third voxel (``real-bsplinesyn-small``: the
+first run in the standard tier, the others in the full tier) and, for the first run, full size
+(``real-bsplinesyn``, full tier).
 """
 
 from __future__ import annotations
@@ -49,6 +55,10 @@ import numpy as np
 
 from larmorx_validation.parity import ants_inputs, ants_point_sets, defects
 from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
+from larmorx_validation.parity.ants_registration_bspline import bspline_cases
+from larmorx_validation.parity.ants_registration_bspline import (
+    transform_file as bspline_transform_file,
+)
 from larmorx_validation.parity.ants_registration_syn import syn_cases
 from larmorx_validation.parity.ants_registration_syn import transform_file as syn_transform_file
 from larmorx_validation.parity.harness import (
@@ -859,6 +869,7 @@ def all_cases() -> list[RegCase]:
     cases += _message_cases()
     cases += _point_set_cases()
     cases += syn_cases(_syn_case)
+    cases += bspline_cases(_syn_case)
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -944,6 +955,32 @@ def all_cases() -> list[RegCase]:
                     tier="full",
                 )
             )
+            if short == "template":
+                # antsRegistrationSyN.sh -t b: its SyN stage as BSplineSyN[0.1,26,0,3].
+                cases.append(
+                    RegCase(
+                        f"real-bsplinesyn-small/{name}/{short}",
+                        "real-bsplinesyn-small",
+                        f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
+                        "BSplineSyN[0.1,26,0,3] (antsRegistrationSyN.sh's) for its SyN stage, on "
+                        f"one voxel in {SMALL} along each axis of its images",
+                        (f"{{fmriprep-small-bsplinesyn:{run}/{subject}/{node}}}",),
+                        tier="standard" if run.startswith("ds000005") else "full",
+                        band=run.startswith("ds000005"),
+                    )
+                )
+                # Full size: the first run only (hours per run in ANTs at one thread).
+                if run.startswith("ds000005"):
+                    cases.append(
+                        RegCase(
+                            f"real-bsplinesyn/{name}/{short}",
+                            "real-bsplinesyn",
+                            f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
+                            "BSplineSyN[0.1,26,0,3] for its SyN stage, full size",
+                            (f"{{fmriprep-whole-bsplinesyn:{run}/{subject}/{node}}}",),
+                            tier="full",
+                        )
+                    )
     return cases
 
 
@@ -1615,6 +1652,12 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
         return _fmriprep_args(c.args[0][16:-1], out, tmp=tmp, stand_ins=True)
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep-small:"):
         return _fmriprep_args(c.args[0][16:-1], out, tmp=tmp, stand_ins=True, small=SMALL)
+    if len(c.args) == 1 and c.args[0].startswith("{fmriprep-whole-bsplinesyn:"):
+        args = _fmriprep_args(c.args[0][27:-1], out, tmp=tmp, stand_ins=True)
+        return _bsplinesyn(args)
+    if len(c.args) == 1 and c.args[0].startswith("{fmriprep-small-bsplinesyn:"):
+        args = _fmriprep_args(c.args[0][27:-1], out, tmp=tmp, stand_ins=True, small=SMALL)
+        return _bsplinesyn(args)
 
     def sub(m: re.Match[str]) -> str:
         key = m.group(1)
@@ -1636,9 +1679,21 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
             return str(ants_point_sets.write_points(key[11:], tmp))
         if key.startswith("gen-syn:"):
             return str(syn_transform_file(tmp, key[8:]))
+        if key.startswith("gen-bsp:"):
+            return str(bspline_transform_file(tmp, key[8:]))
         raise KeyError(f"unknown placeholder {{{key}}}")
 
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args]
+
+
+def _bsplinesyn(args: list[str]) -> list[str]:
+    """The arguments with their SyN stage replaced by antsRegistrationSyN.sh's
+    ``BSplineSyN[0.1,26,0,3]`` (the script's ``-t b``)."""
+    out = list(args)
+    for i, a in enumerate(out[:-1]):
+        if a in ("--transform", "-t") and out[i + 1].startswith("SyN["):
+            out[i + 1] = "BSplineSyN[0.1,26,0,3]"
+    return out
 
 
 def _run_ants(
@@ -1723,6 +1778,8 @@ def _normalise(text: str, out: Path) -> list[str]:
             r"WARNING: In \1/",
             line,
         )
+        # An exception's what() inside another's description: the thrower's file and line.
+        line = re.sub(r"^\S*?/(Modules|Utilities|Examples)/(\S+:\d+:)$", r"\1/\2", line)
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
         if "DIAGNOSTIC," in line and not line.startswith("DIAGNOSTIC"):
             fields = line.split(", ")
@@ -2013,7 +2070,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
 def suite() -> Suite:
     return Suite(
         name="ants-registration",
-        title="antsRegistration (linear and SyN stages)",
+        title="antsRegistration (linear, SyN, B-spline and displacement-field stages)",
         tool="`larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, "
         "larmorx-ants)",
         reference=f"antsRegistration from {ants_version()}, the binary built by "

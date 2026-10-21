@@ -116,10 +116,10 @@ pub fn estimate_scales<R: Real, const D: usize>(
 pub fn estimate_step_scale<R: Real, const D: usize>(
     transform: &mut Composite<R, D>,
     samples: &[[f64; D]],
-    step: &[R],
+    step: &mut [R],
 ) -> Result<R, ItkException> {
     let mut max_step = R::ZERO;
-    for &s in step {
+    for &s in step.iter() {
         let a = s.abs();
         if max_step < a {
             max_step = a;
@@ -131,6 +131,212 @@ pub fn estimate_step_scale<R: Real, const D: usize>(
     let factor = R::from_f64(SMALL) / max_step;
     let small: Vec<R> = step.iter().map(|&s| s * factor).collect();
     Ok(maximum_shift(transform, samples, &small)? / factor)
+}
+
+/// `GetVirtualDomainCentralIndex`: per axis `(IndexValueType)((lower + upper) / 2.0)`.
+pub fn central_index<const D: usize>(space: &Space<D>) -> [i64; D] {
+    std::array::from_fn(|d| {
+        let lower = space.start[d];
+        let upper = space.start[d] + space.size[d] as i64 - 1;
+        ((lower + upper) as f64 / 2.0) as i64
+    })
+}
+
+/// `SampleVirtualDomainWithCentralRegion`: the physical points of the voxels within 5 of the
+/// central index (`m_CentralRegionRadius`), x fastest.
+pub fn central_region<const D: usize>(space: &Space<D>) -> Vec<[f64; D]> {
+    let central = central_index(space);
+    let mut lower = [0i64; D];
+    let mut upper = [0i64; D];
+    for d in 0..D {
+        lower[d] = space.start[d];
+        upper[d] = space.start[d] + space.size[d] as i64 - 1;
+        if lower[d] < central[d] - 5 {
+            lower[d] = central[d] - 5;
+        }
+        if upper[d] > central[d] + 5 {
+            upper[d] = central[d] + 5;
+        }
+    }
+    let mut points = Vec::new();
+    let size: [usize; D] = std::array::from_fn(|d| (upper[d] - lower[d] + 1).max(0) as usize);
+    let total: usize = size.iter().product();
+    for o in 0..total {
+        let mut rest = o;
+        let idx: [i64; D] = std::array::from_fn(|d| {
+            let i = (rest % size[d]) as i64;
+            rest /= size[d];
+            lower[d] + i
+        });
+        points.push(space.index_to_point(&idx));
+    }
+    points
+}
+
+/// `SampleVirtualDomainFully`: every voxel's physical point, x fastest.
+pub fn full_domain<const D: usize>(space: &Space<D>) -> Vec<[f64; D]> {
+    (0..space.len())
+        .map(|o| space.index_to_point(&space.index_of(o)))
+        .collect()
+}
+
+/// `ComputeSampleShifts` for a transform with local support: the samples mapped before and
+/// after `UpdateTransformParameters(delta)` (which may smooth `delta` in place, as ITK's
+/// Gaussian-smoothing field does to the caller's array), then the parameters restored.
+fn local_shifts<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+    delta: &mut [R],
+) -> Result<R, ItkException> {
+    let old_parameters = transform.active().parameters();
+    let to_r = |p: &[f64; D]| -> [R; D] { std::array::from_fn(|k| R::from_f64(p[k])) };
+    let old: Vec<[R; D]> = samples
+        .iter()
+        .map(|p| transform.transform_point(&to_r(p)))
+        .collect();
+    transform.active_mut().update_in_place(delta, R::ONE)?;
+    let mut max = R::ZERO;
+    for (p, o) in samples.iter().zip(&old) {
+        let n = transform.transform_point(&to_r(p));
+        let mut sum = 0.0f64;
+        for k in 0..D {
+            let d = n[k].to_f64() - o[k].to_f64();
+            sum += d * d;
+        }
+        let s = R::from_f64(sum.sqrt());
+        if max < s {
+            max = s;
+        }
+    }
+    transform.active_mut().set_parameters(&old_parameters)?;
+    Ok(max)
+}
+
+/// `EstimateScales` for a displacement field (`IsDisplacementFieldTransform`): for each of the
+/// `D` local parameters, the largest shift of the `samples` when the parameter at `offset` (the
+/// central voxel's, or the first point's) changes by 0.01 through
+/// `UpdateTransformParameters`, squared and divided by 0.01²; zero shifts get the smallest
+/// non-zero shift squared; all 1 when every shift is zero.
+pub fn estimate_local_scales<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+    offset: usize,
+) -> Result<Vec<R>, ItkException> {
+    let n_all = transform.number_of_parameters();
+    let small = R::from_f64(SMALL);
+    let mut scales = vec![R::ZERO; D];
+    let mut min_nonzero = R::MAX;
+    for i in 0..D {
+        let mut delta = vec![R::ZERO; n_all];
+        delta[offset + i] = small;
+        let shift = local_shifts(transform, samples, &mut delta)?;
+        scales[i] = shift;
+        if shift > R::EPSILON && shift < min_nonzero {
+            min_nonzero = shift;
+        }
+    }
+    if min_nonzero == R::MAX {
+        return Ok(vec![R::ONE; D]);
+    }
+    let factor = R::ONE / (small * small);
+    for s in scales.iter_mut() {
+        if *s <= R::EPSILON {
+            *s = min_nonzero * min_nonzero;
+        } else {
+            *s = *s * *s;
+        }
+        *s = *s * factor;
+    }
+    Ok(scales)
+}
+
+/// `EstimateScales` for a B-spline transform (`IsBSplineTransform`): for every parameter, the
+/// largest shift of the `samples` when that parameter alone changes by 0.01; every scale is
+/// then the smallest of those shifts above epsilon (`Fill(minNonZeroShift)`, neither squared
+/// nor normalised), or 1 when every shift is zero.
+///
+/// A parameter moves only the samples whose support holds its control point; those are mapped
+/// again (the whole composite, as ITK maps every sample), the others do not move.
+pub fn estimate_bspline_scales<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+) -> Result<Vec<R>, ItkException> {
+    let n = transform.number_of_parameters();
+    let small = R::from_f64(SMALL);
+    let points: Vec<[R; D]> = samples
+        .iter()
+        .map(|p| std::array::from_fn(|k| R::from_f64(p[k])))
+        .collect();
+    let old: Vec<[R; D]> = points
+        .iter()
+        .map(|p| transform.transform_point(p))
+        .collect();
+    let (per, affected) = {
+        let crate::transform::Xfm::BSpline(b) = transform.active() else {
+            return estimate_scales(transform, samples);
+        };
+        let per = b.parameters_per_dimension();
+        let mut affected: Vec<Vec<usize>> = vec![Vec::new(); per];
+        for (s, p) in points.iter().enumerate() {
+            if let Some(support) = b.support(p) {
+                for o in b.support_offsets(&support) {
+                    affected[o].push(s);
+                }
+            }
+        }
+        (per, affected)
+    };
+    let shift = |a: &[R; D], b: &[R; D]| -> R {
+        let mut sum = 0.0f64;
+        for k in 0..D {
+            let d = a[k].to_f64() - b[k].to_f64();
+            sum += d * d;
+        }
+        R::from_f64(sum.sqrt())
+    };
+    let mut min_nonzero = R::MAX;
+    for i in 0..n {
+        let o = i % per;
+        if affected[o].is_empty() {
+            continue;
+        }
+        let saved = match transform.active_mut() {
+            crate::transform::Xfm::BSpline(b) => {
+                let saved = b.coefficients[i];
+                b.coefficients[i] = saved + small;
+                saved
+            }
+            _ => unreachable!("a B-spline transform"),
+        };
+        let mut max = R::ZERO;
+        for &s in &affected[o] {
+            let moved = transform.transform_point(&points[s]);
+            let d = shift(&moved, &old[s]);
+            if max < d {
+                max = d;
+            }
+        }
+        if let crate::transform::Xfm::BSpline(b) = transform.active_mut() {
+            b.coefficients[i] = saved;
+        }
+        if max > R::EPSILON && max < min_nonzero {
+            min_nonzero = max;
+        }
+    }
+    if min_nonzero == R::MAX {
+        return Ok(vec![R::ONE; n]);
+    }
+    Ok(vec![min_nonzero; n])
+}
+
+/// `EstimateStepScale(step)` for a transform with local support: the largest shift of every
+/// sample (no scaling of the step), `step` possibly smoothed in place.
+pub fn estimate_local_step_scale<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+    step: &mut [R],
+) -> Result<R, ItkException> {
+    local_shifts(transform, samples, step)
 }
 
 /// `EstimateMaximumStepSize`: the smallest virtual spacing.

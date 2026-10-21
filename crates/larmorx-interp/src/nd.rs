@@ -38,6 +38,9 @@ impl<const D: usize> GaussianWeightsNd<D> {
 pub enum InterpolationNd<const D: usize> {
     /// Order 0 to 5.
     BSpline { order: u32 },
+    /// `BSplineResampleImageFunction`: the B-spline of order 0 to 5 whose coefficients are the
+    /// image's voxels (no decomposition).
+    BSplineCoefficients { order: u32 },
     /// `sigma` in physical units, `alpha` the cut-off in sigmas.
     Gaussian { sigma: [f64; D], alpha: f64 },
     /// Label-wise Gaussian voting.
@@ -92,6 +95,15 @@ impl<'a, T: RealElement, const D: usize> InterpolatorNd<'a, T, D> {
                 Kind::BSpline {
                     order: *order,
                     coefficients: coefficients(data, size, strides, *order),
+                }
+            }
+            InterpolationNd::BSplineCoefficients { order } => {
+                if *order > 5 {
+                    return Err(super::InterpError::BSplineOrder(*order));
+                }
+                Kind::BSpline {
+                    order: *order,
+                    coefficients: data.iter().map(|x| x.to_f64()).collect(),
                 }
             }
             InterpolationNd::Gaussian { sigma, alpha } => {

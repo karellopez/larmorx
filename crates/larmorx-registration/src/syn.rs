@@ -39,7 +39,7 @@ use larmorx_core::IndexFloor;
 
 use crate::convergence::WindowConvergence;
 use crate::field::{
-    Field, FieldXfm, InvertSettings, compose, gaussian_smooth, invert, resample_to, scale_update,
+    Field, FieldXfm, InvertSettings, adapt, compose, gaussian_smooth, invert, scale_update,
     zero_field,
 };
 use crate::mask::Mask;
@@ -97,7 +97,71 @@ pub struct SynStage<R, const D: usize> {
     /// ITK-33: a point-set metric among several metrics is evaluated through the fixed and
     /// moving composites (corrected) or, as ITK, through identity displacement fields.
     pub correct_point_set_transforms: bool,
+    /// `BSplineSyNImageRegistrationMethod`: the update and total fields smoothed by B-spline
+    /// approximations instead of Gaussians (the variances are then not used).
+    pub bspline: Option<BSplineSynSmoothing<D>>,
     pub n_threads: usize,
+}
+
+/// The B-spline smoothing of a B-spline SyN stage (`BSplineSyN[step,update,total,order]`): the
+/// mesh sizes at the base level, doubled at each level (`meshSize << level`), and the spline
+/// order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BSplineSynSmoothing<const D: usize> {
+    pub order: u32,
+    pub update_mesh: [u32; D],
+    pub total_mesh: [u32; D],
+}
+
+impl<const D: usize> BSplineSynSmoothing<D> {
+    /// `BSplineSmoothingOnUpdateDisplacementFieldTransformParametersAdaptor::SetMeshSize...`
+    /// of a level: `mesh << level` plus the order where it is positive, else 0.
+    pub fn control_points(mesh: &[u32; D], level: usize, order: u32) -> [u32; D] {
+        std::array::from_fn(|d| {
+            let m = mesh[d].wrapping_shl(level as u32);
+            if m > 0 { m + order } else { 0 }
+        })
+    }
+}
+
+/// `BSplineSyNImageRegistrationMethod::BSplineSmoothDisplacementField`: a copy when a number
+/// of control points is 0, else the field's B-spline approximation (one fitting level, the
+/// boundary stationary) weighted by `mask`.
+pub fn bspline_smooth<R: Real, const D: usize>(
+    field: &Field<R, D>,
+    control_points: &[u32; D],
+    order: u32,
+    mask: Option<&Image<f64, D>>,
+) -> Result<Field<R, D>, ItkException> {
+    if control_points.contains(&0) {
+        return Ok(field.clone());
+    }
+    crate::bspline_field::field_to_bspline(field, mask, control_points, order, true)
+}
+
+/// The weighted mask of `BSplineSyNImageRegistrationMethod::ComputeUpdateField`: the first
+/// metric's mask resampled onto the virtual domain through `transform`
+/// (`ResampleImageFilter<Image<uchar>, Image<double>, R>`, its default linear interpolator,
+/// default 0).
+fn weighted_mask<R: Real, const D: usize>(
+    mask: &Mask<D>,
+    output: &Space<D>,
+    transform: &Composite<R, D>,
+    floor: &IndexFloor,
+) -> Image<f64, D> {
+    let image = &mask.image;
+    let data = resample_nonlinear_with(&image.space, output, transform, 0.0f64, |c| {
+        crate::interp::at_cindex_with(&image.space, c, floor, |o| f64::from(image.data[o]))
+    });
+    let space = Space::new(
+        output.size,
+        [0; D],
+        output.spacing,
+        output.origin,
+        output.direction,
+    )
+    .expect("the virtual domain's geometry");
+    Image::new(space, data)
 }
 
 /// What the iteration observer sees after each iteration (`IterationEvent`).
@@ -269,7 +333,13 @@ fn metric_derivative<R: Real, const D: usize>(
     let identity = Composite::new(Vec::new());
     match (&m.state, m.kind) {
         (Some(state), _) => state.evaluate(&m.metric, &identity, true, floor, warnings),
-        (None, MetricKind::Gc) => gc_derivative(&m.metric, correct_gc, floor, warnings),
+        (None, MetricKind::Gc) => crate::metric::correlation::local_derivative(
+            &m.metric,
+            &Composite::new(Vec::new()),
+            correct_gc,
+            floor,
+            warnings,
+        ),
         (None, _) => {
             let r = demons::evaluate(&m.metric, &identity, true, floor)?;
             if r.no_valid_points {
@@ -282,122 +352,6 @@ fn metric_derivative<R: Real, const D: usize>(
             Ok((r.value, r.derivative))
         }
     }
-}
-
-/// `CorrelationImageToImageMetricv4::GetValueAndDerivative` with a transform of local
-/// support. ITK accumulates every point's `f·g` and `m·g` into the derivative's first `D`
-/// entries (its per-thread sums are sized for all the parameters but indexed by the local
-/// parameter) and scales the whole vector, so only the first voxel gets a derivative
-/// (ITK-30, reproduced with `correct` false); corrected, each voxel gets its own point's terms.
-fn gc_derivative<R: Real, const D: usize>(
-    metric: &ImageMetricv4<R, D>,
-    correct: bool,
-    floor: &IndexFloor,
-    warnings: &mut Vec<String>,
-) -> Result<(R, Vec<R>), ItkException> {
-    use crate::metric::GradientSource;
-    let identity = Composite::new(Vec::new());
-    let total = D * metric.virtual_space.len();
-    // The first pass: the averages.
-    let none = GradientSource {
-        fixed: false,
-        moving: false,
-    };
-    let (mut fix_sum, mut mov_sum, mut valid) = (R::ZERO, R::ZERO, 0usize);
-    metric.for_each_sample(
-        |i| {
-            metric
-                .sample(i, &identity, none, false, floor)
-                .map(|s| (s.fixed_value, s.moving_value))
-        },
-        |(f, m)| {
-            fix_sum = fix_sum + f;
-            mov_sum = mov_sum + m;
-            valid += 1;
-            Ok(())
-        },
-    )?;
-    let (average_fix, average_mov) = if valid == 0 {
-        warnings.push(
-            "WARNING: In Modules/Registration/Metricsv4/include/itkCorrelationImageToImageMetricv4HelperThreader.hxx, line 77\n\
-             CorrelationImageToImageMetricv4HelperThreader (0x0): collected only zero points\n\n"
-                .to_string(),
-        );
-        (R::ZERO, R::ZERO)
-    } else {
-        let n = R::from_i64(valid as i64);
-        ((R::ZERO + fix_sum) / n, (R::ZERO + mov_sum) / n)
-    };
-    let gradients = GradientSource {
-        fixed: false,
-        moving: true,
-    };
-    let (mut f2, mut m2, mut fm) = (R::ZERO, R::ZERO, R::ZERO);
-    let mut fdm = vec![R::ZERO; total];
-    let mut mdm = vec![R::ZERO; total];
-    let mut count = 0usize;
-    metric.for_each_sample(
-        |i| {
-            let s = metric.sample(i, &identity, gradients, true, floor)?;
-            let f1 = s.fixed_value - average_fix;
-            let m1 = s.moving_value - average_mov;
-            // Σ_dim ∇m[dim]·J[dim][par] with the identity Jacobian.
-            let projected: [R; D] = std::array::from_fn(|par| {
-                let mut sum = R::ZERO;
-                for dim in 0..D {
-                    let j = if dim == par { R::ONE } else { R::ZERO };
-                    sum = sum + s.moving_gradient[dim] * j;
-                }
-                sum
-            });
-            Some((f1, m1, projected, metric.voxel_of(&s.virtual_index)))
-        },
-        |(f1, m1, projected, voxel)| {
-            f2 = f2 + f1 * f1;
-            m2 = m2 + m1 * m1;
-            fm = fm + f1 * m1;
-            let base = if correct {
-                match voxel {
-                    Some(v) => v * D,
-                    None => return Ok(()),
-                }
-            } else {
-                0
-            };
-            for par in 0..D {
-                fdm[base + par] = fdm[base + par] + f1 * projected[par];
-                mdm[base + par] = mdm[base + par] + m1 * projected[par];
-            }
-            count += 1;
-            Ok(())
-        },
-    )?;
-    let mut derivative = vec![R::ZERO; total];
-    if count == 0 {
-        warnings.push(no_valid_points_warning(
-            VERIFY_FILE,
-            544,
-            "CorrelationImageToImageMetricv4",
-        ));
-        return Ok((R::MAX, derivative));
-    }
-    let (fm, f2, m2) = (R::ZERO + fm, R::ZERO + f2, R::ZERO + m2);
-    let m2f2 = m2 * f2;
-    if m2f2 <= R::EPSILON {
-        // m_Value keeps its previous value; ANTs' SyN reads it as the value of this call.
-        return Ok((R::ZERO, derivative));
-    }
-    let value = R::from_f64(-fm.to_f64() * fm.to_f64() / m2f2.to_f64());
-    // m_DerivativeResult += fc * fm / (f2 * m2) * (fdm - fm / m2 * mdm), element by element.
-    let fc = R::from_f64(2.0);
-    let a = fc * fm / (f2 * m2);
-    let b = fm / m2;
-    for i in 0..total {
-        let fd = R::ZERO + fdm[i];
-        let md = R::ZERO + mdm[i];
-        derivative[i] = derivative[i] + a * (fd - b * md);
-    }
-    Ok((value, derivative))
 }
 
 /// The multi-metric's weights, normalised at each `Initialize` (`m_MetricWeights / sum`).
@@ -478,6 +432,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                     fixed_transform: ft,
                     moving_transform: mt,
                     virtual_space: self.virtual_space,
+                    sparse: true,
                 };
                 let p = self.point_sets[j].as_mut().expect("a point-set metric");
                 match p.tangent_initialize(&call, warnings) {
@@ -620,44 +575,67 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
     }
 }
 
+impl<R: Real, const D: usize> GradientCall<'_, R, D> {
+    /// `BSplineSyNImageRegistrationMethod::ComputeUpdateField` for a stage whose only metric is
+    /// a point-set metric: the metric in tangent space with each fixed point's derivative kept
+    /// at the point (`SetStoreDerivativeAsSparseFieldForLocalSupportTransforms(false)`), times
+    /// the optimizer weights, and the B-spline fitted to the fixed points' virtual positions
+    /// (`SetBSplineDomainFromImage` of the virtual domain); a zero field without fixed points
+    /// or with 0 control points.
+    fn bspline_point_update(
+        &mut self,
+        swapped: bool,
+        control_points: &[u32; D],
+        order: u32,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Field<R, D>), ItkException> {
+        let (ft, mt) = if swapped {
+            (self.moving_composite, self.fixed_composite)
+        } else {
+            (self.fixed_composite, self.moving_composite)
+        };
+        let call = TangentCall {
+            swapped,
+            fixed_transform: ft,
+            moving_transform: mt,
+            virtual_space: self.virtual_space,
+            sparse: false,
+        };
+        let p = self.point_sets[0].as_mut().expect("a point-set metric");
+        p.tangent_initialize(&call, warnings)?;
+        let (value, mut derivative) = p.tangent_evaluate(warnings)?;
+        if let Some(w) = &self.stage.optimizer_weights
+            && w.len() == D
+            && !weights_are_identity(w)
+        {
+            for chunk in derivative.as_chunks_mut::<D>().0 {
+                for d in 0..D {
+                    chunk[d] = chunk[d] * w[d];
+                }
+            }
+        }
+        let points = p.tangent_fixed_points();
+        let zero = zero_field(self.virtual_space);
+        if points.is_empty() || control_points.contains(&0) {
+            return Ok((value, zero));
+        }
+        let data: Vec<[R; D]> = derivative.as_chunks::<D>().0.to_vec();
+        let field = crate::bspline_field::points_to_bspline(
+            self.virtual_space,
+            &points,
+            &data,
+            control_points,
+            order,
+            true,
+        )?;
+        Ok((value, field))
+    }
+}
+
 /// `m_OptimizerWeightsAreIdentity`: every weight within 1e-4 of 1.
 pub fn weights_are_identity<R: Real>(w: &[R]) -> bool {
     let tolerance = R::from_f64(1e-4);
     w.iter().all(|&x| (R::ONE - x).abs() <= tolerance)
-}
-
-/// The adaptor of a level (`DisplacementFieldTransformParametersAdaptor`): the transform's
-/// fields (and inverse) resampled onto `space` unless their fixed parameters already equal it.
-fn adapt<R: Real, const D: usize>(
-    t: &FieldXfm<R, D>,
-    space: &Space<D>,
-    floor: &IndexFloor,
-) -> FieldXfm<R, D> {
-    let s = &t.field.space;
-    let same = s.size == space.size
-        && s.origin == space.origin
-        && s.spacing == space.spacing
-        && s.direction == space.direction;
-    if same {
-        return t.clone();
-    }
-    // The resampled fields start at index 0 (`SetSize`).
-    let target = Space::new(
-        space.size,
-        [0; D],
-        space.spacing,
-        space.origin,
-        space.direction,
-    )
-    .expect("the virtual domain's geometry");
-    FieldXfm {
-        field: Arc::new(resample_to(&t.field, &target, floor)),
-        inverse: t
-            .inverse
-            .as_ref()
-            .map(|i| Arc::new(resample_to(i, &target, floor))),
-        exact_floor: t.exact_floor,
-    }
 }
 
 /// Runs a SyN stage: the output transform and the state, or ITK's exception.
@@ -698,6 +676,8 @@ fn run_syn_levels<R: Real, const D: usize>(
     };
     let multi = stage.metrics.len() > 1;
     let has_point_sets = point_sets.iter().any(Option::is_some);
+    // A single point-set metric (`POINT_SET_METRIC`): B-spline SyN's own path.
+    let point_set_only = !multi && has_point_sets;
     let mut identity_point_sets = false;
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
@@ -833,6 +813,39 @@ fn run_syn_levels<R: Real, const D: usize>(
         let mut converged = false;
         while iteration < n_iterations && !converged {
             iteration += 1;
+            // Each total field inverted from the previous inverse, and that inverse inverted
+            // again from the total field.
+            let finish = |fixed_total: Field<R, D>,
+                          moving_total: Field<R, D>,
+                          moving_value: R,
+                          fixed_value: R| {
+                let fixed_inverse = invert(
+                    &fixed_total,
+                    f2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let fixed_field =
+                    invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
+                let moving_inverse = invert(
+                    &moving_total,
+                    m2m.inverse.as_deref(),
+                    &invert_settings,
+                    floor,
+                );
+                let moving_field = invert(
+                    &moving_inverse,
+                    Some(&moving_total),
+                    &invert_settings,
+                    floor,
+                );
+                (
+                    FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
+                    FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
+                    moving_value,
+                    fixed_value,
+                )
+            };
             let step = || -> Result<_, ItkException> {
                 let mut fixed_composite: Vec<Xfm<R, D>> = stage
                     .fixed_initial
@@ -898,52 +911,86 @@ fn run_syn_levels<R: Real, const D: usize>(
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
                 };
+                // B-spline SyN with a single point-set metric: the B-spline fitted to the
+                // points' derivatives.
+                if let Some(b) = &stage.bspline
+                    && point_set_only
+                {
+                    let cps = BSplineSynSmoothing::control_points(&b.update_mesh, level, b.order);
+                    let (moving_value, update) =
+                        call.bspline_point_update(false, &cps, b.order, warnings)?;
+                    let fixed_update = scale_update(&update, stage.learning_rate);
+                    let (fixed_value, update) =
+                        call.bspline_point_update(true, &cps, b.order, warnings)?;
+                    let moving_update = scale_update(&update, stage.learning_rate);
+                    let tcp = BSplineSynSmoothing::control_points(&b.total_mesh, level, b.order);
+                    let fixed_total = bspline_smooth(
+                        &compose(&fixed_update, &f2m.field, floor),
+                        &tcp,
+                        b.order,
+                        None,
+                    )?;
+                    let moving_total = bspline_smooth(
+                        &compose(&moving_update, &m2m.field, floor),
+                        &tcp,
+                        b.order,
+                        None,
+                    )?;
+                    return Ok(finish(fixed_total, moving_total, moving_value, fixed_value));
+                }
                 // The fixed-to-middle update (the metric value is the "moving" one), then the
                 // moving-to-middle update.
                 let (moving_value, fixed_gradient) = call.gradient_field(false, warnings)?;
+                let smooth_update = |gradient: &Field<R, D>,
+                                     mask: Option<&Mask<D>>,
+                                     composite: &Composite<R, D>|
+                 -> Result<Field<R, D>, ItkException> {
+                    Ok(match &stage.bspline {
+                        None => gaussian_smooth(gradient, stage.update_variance),
+                        Some(b) => {
+                            let weighted =
+                                mask.map(|m| weighted_mask(m, &virtual_space, composite, floor));
+                            bspline_smooth(
+                                gradient,
+                                &BSplineSynSmoothing::control_points(
+                                    &b.update_mesh,
+                                    level,
+                                    b.order,
+                                ),
+                                b.order,
+                                weighted.as_ref(),
+                            )?
+                        }
+                    })
+                };
+                let smooth_total = |total: &Field<R, D>| -> Result<Field<R, D>, ItkException> {
+                    Ok(match &stage.bspline {
+                        None => gaussian_smooth(total, stage.total_variance),
+                        Some(b) => bspline_smooth(
+                            total,
+                            &BSplineSynSmoothing::control_points(&b.total_mesh, level, b.order),
+                            b.order,
+                            None,
+                        )?,
+                    })
+                };
+                // The first metric's masks (BSplineSyN's weighted masks).
+                let (first_fixed_mask, first_moving_mask) = match &level_metrics[0] {
+                    Some(lm) => (lm.fixed_mask.as_ref(), lm.moving_mask.as_ref()),
+                    None => (None, None),
+                };
                 let fixed_update = scale_update(
-                    &gaussian_smooth(&fixed_gradient, stage.update_variance),
+                    &smooth_update(&fixed_gradient, first_fixed_mask, &fixed_composite)?,
                     stage.learning_rate,
                 );
                 let (fixed_value, moving_gradient) = call.gradient_field(true, warnings)?;
                 let moving_update = scale_update(
-                    &gaussian_smooth(&moving_gradient, stage.update_variance),
+                    &smooth_update(&moving_gradient, first_moving_mask, &moving_composite)?,
                     stage.learning_rate,
                 );
-                let fixed_total = gaussian_smooth(
-                    &compose(&fixed_update, &f2m.field, floor),
-                    stage.total_variance,
-                );
-                let moving_total = gaussian_smooth(
-                    &compose(&moving_update, &m2m.field, floor),
-                    stage.total_variance,
-                );
-                let fixed_inverse = invert(
-                    &fixed_total,
-                    f2m.inverse.as_deref(),
-                    &invert_settings,
-                    floor,
-                );
-                let fixed_field =
-                    invert(&fixed_inverse, Some(&fixed_total), &invert_settings, floor);
-                let moving_inverse = invert(
-                    &moving_total,
-                    m2m.inverse.as_deref(),
-                    &invert_settings,
-                    floor,
-                );
-                let moving_field = invert(
-                    &moving_inverse,
-                    Some(&moving_total),
-                    &invert_settings,
-                    floor,
-                );
-                Ok((
-                    FieldXfm::new(fixed_field, Some(fixed_inverse), stage.exact_floor),
-                    FieldXfm::new(moving_field, Some(moving_inverse), stage.exact_floor),
-                    moving_value,
-                    fixed_value,
-                ))
+                let fixed_total = smooth_total(&compose(&fixed_update, &f2m.field, floor))?;
+                let moving_total = smooth_total(&compose(&moving_update, &m2m.field, floor))?;
+                Ok(finish(fixed_total, moving_total, moving_value, fixed_value))
             };
             // The iteration's work runs in a pool of the stage's thread count.
             let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;

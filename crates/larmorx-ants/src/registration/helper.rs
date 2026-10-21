@@ -14,6 +14,7 @@ use std::time::Instant;
 
 use larmorx_core::IndexFloor;
 use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects, push_once};
+use larmorx_registration::field::{FieldSmoothing, FieldXfm};
 use larmorx_registration::format::OStream;
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{
@@ -25,7 +26,7 @@ use larmorx_registration::pointset::{
     IntensityPointSet, PointSetCorrections, PointSetEvents, PointSetInputs, PointSetMetric,
     PointSetMetricKind,
 };
-use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
+use larmorx_registration::transform::{BSplineXfm, Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Real};
 
 use super::pointsets::{LabeledRead, OutputState};
@@ -152,6 +153,15 @@ pub struct TransformMethod<R> {
     pub update_field_time_sigma: R,
     pub total_field_time_sigma: R,
     pub number_of_time_indices: u32,
+    /// `BSplineSyN`, `BSplineDisplacementField`: `m_SplineOrder` (default 3).
+    pub spline_order: u32,
+    /// `BSplineSyN`, `BSplineDisplacementField`: `m_UpdateFieldMeshSizeAtBaseLevel` and
+    /// `m_TotalFieldMeshSizeAtBaseLevel` (any length; ANTs checks it against the dimension
+    /// when the stage runs).
+    pub update_field_mesh: Vec<u32>,
+    pub total_field_mesh: Vec<u32>,
+    /// `BSpline`: `m_MeshSizeAtBaseLevel`.
+    pub mesh_size: Vec<u32>,
 }
 
 impl<R: Real> TransformMethod<R> {
@@ -165,6 +175,10 @@ impl<R: Real> TransformMethod<R> {
             update_field_time_sigma: R::ZERO,
             total_field_time_sigma: R::ZERO,
             number_of_time_indices: 0,
+            spline_order: 3,
+            update_field_mesh: Vec::new(),
+            total_field_mesh: Vec::new(),
+            mesh_size: Vec::new(),
         }
     }
 }
@@ -253,7 +267,7 @@ impl<R: Compute, const D: usize> Default for RegistrationHelper<R, D> {
 /// `Transform`: `name`) set from the composite's last transform where ANTs knows how
 /// (translation to translation, rigid or affine; rigid to rigid or affine; affine to affine);
 /// `false`, after ANTs' messages, otherwise.
-fn initialize_with_previous<R: Compute, const D: usize>(
+pub(crate) fn initialize_with_previous<R: Compute, const D: usize>(
     log: &mut Log<'_>,
     previous: Option<&Xfm<R, D>>,
     name: &str,
@@ -498,6 +512,36 @@ struct FullScale<R, const D: usize> {
     moving: Arc<Image<R, D>>,
 }
 
+/// The observer's copy of a composite's transforms (`CreateAnother()`, `SetParameters`, then
+/// `SetFixedParameters`): a new displacement field transform has no field when its
+/// parameters are set, and `SetParameters` throws (ANTS-75). The exception of the first field,
+/// if any.
+fn field_copy_error<R: Real, const D: usize>(transforms: &[Xfm<R, D>]) -> Option<ItkException> {
+    // A new BSplineTransform has a mesh of 1: D·4^D parameters.
+    let default_bspline = D * 4usize.pow(D as u32);
+    transforms.iter().find_map(|t| match t {
+        Xfm::BSpline(b) if b.number_of_parameters() != default_bspline => Some(ItkException::new(
+            "Modules/Core/Transform/include/itkBSplineBaseTransform.hxx",
+            50,
+            "BSplineTransform",
+            format!(
+                "Mismatch between parameters size {} and expected number of parameters {default_bspline}",
+                b.number_of_parameters()
+            ),
+        )),
+        Xfm::Field(f) => Some(ItkException::new(
+            "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.h",
+            281,
+            f.class(),
+            format!(
+                "Input parameters size ({}) does not match internal size (0).",
+                t.number_of_parameters()
+            ),
+        )),
+        _ => None,
+    })
+}
+
 /// ANTs' iteration observer of a linear stage (`antsRegistrationOptimizerCommandIterationUpdate`).
 struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     log: &'l mut Log<'a>,
@@ -519,6 +563,24 @@ struct IterationObserver<'l, 'a, 's, 'k, R, const D: usize> {
     fixed_initial: Option<Composite<R, D>>,
     floor: &'s IndexFloor,
     warnings: Vec<String>,
+    /// ANTS-75 reproduced: the transform copies throw on a displacement field.
+    reproduce_copies: bool,
+    /// ANTS-75's condition met.
+    ants_75: bool,
+}
+
+impl<R: Compute, const D: usize> IterationObserver<'_, '_, '_, '_, R, D> {
+    /// The observer's copies of `transforms` (ANTS-75): ITK's exception when reproduced,
+    /// else the transforms used as they are.
+    fn copy(&mut self, transforms: &[Xfm<R, D>]) -> Result<(), ItkException> {
+        if let Some(e) = field_copy_error(transforms) {
+            self.ants_75 = true;
+            if self.reproduce_copies {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
@@ -572,6 +634,15 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
                 },
             ));
         }
+        if self.full_scale.as_ref().is_some_and(|f| due(f.interval)) {
+            // UpdateFullScaleMetricValue copies the fixed composite's and the moving
+            // composite's transforms (CreateAnother, SetParameters, SetFixedParameters): a
+            // displacement field has no field yet when its parameters are set, and throws.
+            if let Some(fixed) = self.fixed_initial.clone() {
+                self.copy(&fixed.transforms)?;
+            }
+            self.copy(&_problem.moving.transforms)?;
+        }
         if let Some(f) = &self.full_scale
             && due(f.interval)
         {
@@ -590,6 +661,8 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
             }
         }
         if due(self.write_interval) {
+            // WriteIntervalVolumes copies the moving composite's transforms first.
+            self.copy(&_problem.moving.transforms)?;
             let name = format!(
                 "{}Stage{}_level{}_Iter{:04}.nii.gz",
                 self.prefix,
@@ -1074,7 +1147,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             };
             let learning_rate = self.transforms[stage].gradient_step;
             let method = self.transforms[stage].method;
-            if method == XfrmMethod::SyN {
+            if matches!(method, XfrmMethod::SyN | XfrmMethod::BSplineSyN) {
                 let inputs = super::syn::SynInputs {
                     stage,
                     iterations: iterations.clone(),
@@ -1088,7 +1161,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     sampling,
                     percentage: R::r(f64::from(percentage)),
                 };
-                self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                if method == XfrmMethod::SyN {
+                    self.syn_stage(log, floor, sink.as_deref_mut(), inputs)?;
+                } else {
+                    self.bspline_syn_stage(log, floor, inputs)?;
+                }
                 let elapsed = timer.elapsed().as_secs_f64();
                 log.logger(&format!(
                     "  Elapsed time (stage {stage}): {}\n\n",
@@ -1096,12 +1173,49 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
                 continue;
             }
-            let mut output = match self.new_transform(method) {
-                Some(t) => t,
-                None => return self.unsupported(log, &format!("{} stages", method.as_str())),
+            // GaussianDisplacementField, BSplineDisplacementField: ImageRegistrationMethodv4
+            // optimising a displacement field with smoothing on update.
+            let field_stage = matches!(
+                method,
+                XfrmMethod::GaussianDisplacementField | XfrmMethod::BSplineDisplacementField
+            );
+            if field_stage && stage_metrics[0].kind == Some(MetricKind::Igdm) {
+                log.logger(
+                    "Intensity point set metric is not implemented yet for the specified transform.\n",
+                );
+                return Err(RegistrationFailed(
+                    "Intensity point set metric is not implemented yet for the specified transform."
+                        .into(),
+                ));
+            }
+            let bspline_stage = method == XfrmMethod::BSpline;
+            let mut output = if field_stage || bspline_stage {
+                // A placeholder until the field is allocated or the B-spline's domain set
+                // (after PrepareRegistrationMethod).
+                Xfm::Identity
+            } else {
+                match self.new_transform(method) {
+                    Some(t) => t,
+                    None => return self.unsupported(log, &format!("{} stages", method.as_str())),
+                }
             };
-            let class = output.class();
-            let n_parameters = output.number_of_parameters();
+            let class = match method {
+                XfrmMethod::GaussianDisplacementField => {
+                    "GaussianSmoothingOnUpdateDisplacementFieldTransform"
+                }
+                XfrmMethod::BSplineDisplacementField => {
+                    "BSplineSmoothingOnUpdateDisplacementFieldTransform"
+                }
+                XfrmMethod::BSpline => "BSplineTransform",
+                _ => output.class(),
+            };
+            // PrepareRegistrationMethod's parametersDimensionSize: the dimension for the
+            // displacement fields and the B-spline transform.
+            let n_parameters = if field_stage || bspline_stage {
+                D
+            } else {
+                output.number_of_parameters()
+            };
             let percentage_r = R::r(f64::from(percentage));
             if let Err(e) = method::check_sampling_percentage_levels(percentage_r.to_f64(), levels)
             {
@@ -1147,6 +1261,131 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     }
                 }
             }
+            // The displacement field: zero vectors on the stage's first fixed image (a
+            // point-set metric first has none: ANTs allocates on a null image).
+            let mut field_meshes = None;
+            if field_stage {
+                let Some(space) = prepared.first().and_then(|m| match m {
+                    StageMetric::Image(i) => Some(i.fixed.space.clone()),
+                    StageMetric::PointSet(_) => None,
+                }) else {
+                    return Err(self.crash(
+                        log,
+                        "a displacement field stage whose first metric is a point-set metric: ANTs allocates the field on the null image of its first metric",
+                    ));
+                };
+                let t = &self.transforms[stage];
+                let smoothing = if method == XfrmMethod::GaussianDisplacementField {
+                    FieldSmoothing::Gaussian {
+                        update_variance: t.update_field_variance,
+                        total_variance: t.total_field_variance,
+                    }
+                } else {
+                    if t.update_field_mesh.len() != D || t.total_field_mesh.len() != D {
+                        log.logger("ERROR:  The mesh size(s) don't match the ImageDimension.\n");
+                        return Err(RegistrationFailed(
+                            "The mesh size(s) don't match the ImageDimension.".into(),
+                        ));
+                    }
+                    field_meshes = Some(method::FieldMeshes {
+                        order: t.spline_order,
+                        update_mesh: t.update_field_mesh.clone(),
+                        total_mesh: t.total_field_mesh.clone(),
+                        shift: 1,
+                    });
+                    FieldSmoothing::BSpline {
+                        order: t.spline_order,
+                        update_control_points: vec![4; D],
+                        total_control_points: vec![0; D],
+                    }
+                };
+                let mut f = FieldXfm::new(
+                    larmorx_registration::field::zero_field(&space),
+                    None,
+                    self.upstream_defects.fix(),
+                );
+                f.smoothing = Some(smoothing);
+                output = Xfm::Field(f);
+            }
+            // ITK-30: GC's derivative with a displacement field being optimised.
+            if field_stage
+                && prepared
+                    .iter()
+                    .any(|m| matches!(m, StageMetric::Image(i) if i.kind == MethodMetric::Gc))
+            {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_30,
+                        self.upstream_defects,
+                        if self.upstream_defects.fix() {
+                            format!(
+                                "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                            )
+                        },
+                    ),
+                );
+            }
+            // The B-spline transform: its domain is the stage's first fixed image (origin,
+            // direction, and physical dimensions `spacing·(size − 1)` in R), its mesh the
+            // stage's; then the identity. ANTs reads as many mesh sizes as dimensions.
+            let mut bspline_mesh = None;
+            let mut bspline_failure = None;
+            if bspline_stage {
+                let Some(space) = prepared.first().and_then(|m| match m {
+                    StageMetric::Image(i) => Some(i.fixed.space.clone()),
+                    StageMetric::PointSet(_) => None,
+                }) else {
+                    return Err(self.crash(
+                        log,
+                        "a BSpline stage whose first metric is a point-set metric: ANTs reads the spacing and size of the null image of its first metric",
+                    ));
+                };
+                let sizes = &self.transforms[stage].mesh_size;
+                let mesh: [usize; D] =
+                    std::array::from_fn(|d| sizes.get(d).copied().unwrap_or(0) as usize);
+                let physical: [f64; D] = std::array::from_fn(|d| {
+                    (R::r(space.spacing[d]) * R::r((space.size[d] - 1) as f64)).to_f64()
+                });
+                if sizes.len() < D || mesh.contains(&0) {
+                    bspline_failure = Some(if sizes.len() < D {
+                        format!(
+                            "{} mesh sizes for {D} dimensions: ANTs reads past the end of its list (a mesh size of 0 when that memory is 0), divides by zero and fails with garbage (ANTS-77)",
+                            sizes.len()
+                        )
+                    } else {
+                        "a mesh size of 0: ANTs divides by zero, prints vnl's SVD warnings and fails with an exception on garbage indices (ANTS-77)".to_owned()
+                    });
+                } else if physical.contains(&0.0) {
+                    return Err(self.crash(
+                        log,
+                        "a BSpline stage on a fixed image of one voxel along an axis: the B-spline grid's spacing is 0, ITK's Matrix::GetInverse throws outside ANTs' try blocks",
+                    ));
+                } else {
+                    let identity = |log: &mut Log<'_>, e: ItkException| -> RegistrationFailed {
+                        log.logger(&format!("Exception caught: {}\n", e.print()));
+                        RegistrationFailed(e.description)
+                    };
+                    let mut b = BSplineXfm::<R, D>::new_default();
+                    let set = (|| {
+                        b.set_domain_origin(space.origin)?;
+                        b.set_domain_physical(physical)?;
+                        b.set_domain_mesh(mesh)?;
+                        b.set_domain_direction(space.direction)?;
+                        b.set_identity();
+                        Ok::<(), ItkException>(())
+                    })();
+                    if let Err(e) = set {
+                        return Err(identity(log, e));
+                    }
+                    output = Xfm::BSpline(b);
+                }
+                bspline_mesh = Some(method::BSplineMesh { mesh, physical });
+            }
             let composite = self.composite.as_ref().expect("set above").clone();
             let fixed_initial = self.fixed_initial.as_ref().expect("set above").clone();
             let seed = if self.random_seed != 0 {
@@ -1165,9 +1404,40 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 fixed_initial: (!fixed_initial.is_empty()).then(|| Composite::new(fixed_initial)),
                 moving_initial: composite.clone(),
                 initialize_center: true,
+                field_meshes,
+                bspline_mesh,
+                correct_gc_derivative: self.upstream_defects.fix(),
                 n_threads: self.n_threads,
             };
-            log.logger(&format!("\n*** Running {class} registration ***\n\n"));
+            let t = &self.transforms[stage];
+            match method {
+                XfrmMethod::BSpline => {
+                    let shown: Vec<u32> = std::array::from_fn::<u32, D, _>(|d| {
+                        t.mesh_size.get(d).copied().unwrap_or(0)
+                    })
+                    .to_vec();
+                    log.logger(&format!(
+                        "\n*** Running bspline registration (meshSizeAtBaseLevel = {}) ***\n\n",
+                        super::bspline_syn::print_array(&shown)
+                    ));
+                    if let Some(why) = bspline_failure {
+                        let msg = format!("larmorx: antsRegistration: stage {stage}: {why}; larmorx stops\n");
+                        log.cerr(&msg);
+                        return Err(RegistrationFailed(msg));
+                    }
+                }
+                XfrmMethod::GaussianDisplacementField => log.logger(&format!(
+                    "\n*** Running gaussian displacement field registration (varianceForUpdateField = {}, varianceForTotalField = {}) ***\n\n",
+                    log.f(t.update_field_variance.to_f64()),
+                    log.f(t.total_field_variance.to_f64())
+                )),
+                XfrmMethod::BSplineDisplacementField => log.logger(&format!(
+                    "\n*** Running bspline displacement field registration (updateMeshSizeAtBaseLevel = {}, totalMeshSizeAtBaseLevel = {}) ***\n\n",
+                    super::bspline_syn::print_array(&t.update_field_mesh),
+                    super::bspline_syn::print_array(&t.total_field_mesh)
+                )),
+                _ => log.logger(&format!("\n*** Running {class} registration ***\n\n")),
+            }
             // SetOrigFixedImage/SetOrigMovingImage: the first metric's images, as read.
             let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
                 (Some(f), Some(m)) => Some((Arc::clone(f), Arc::clone(m))),
@@ -1197,6 +1467,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 fixed_initial: stage_spec.fixed_initial.clone(),
                 floor,
                 warnings: Vec::new(),
+                reproduce_copies: !self.upstream_defects.fix(),
+                ants_75: false,
             };
             let mut warnings = Vec::new();
             let mut events = PointSetEvents::default();
@@ -1269,6 +1541,25 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ),
             };
             self.point_set_notices(&events);
+            if observer.ants_75 {
+                let mode = self.upstream_defects;
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_75,
+                        mode,
+                        if mode.fix() {
+                            format!(
+                                "stage {stage}: the full-scale similarity or the interval volumes use the displacement field as it is; ANTs fails copying it and the stage fails"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: copying the displacement field for the full-scale similarity or the interval volumes fails, as in ANTs"
+                            )
+                        },
+                    ),
+                );
+            }
             let observed = std::mem::take(&mut observer.warnings);
             for w in &warnings {
                 log.cerr(w);
@@ -1282,6 +1573,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 }
                 Err(e) if e.file == method::CRASH_FILE => {
                     return Err(self.crash(log, &e.description));
+                }
+                Err(e) if field_stage || bspline_stage => {
+                    // The displacement field stages return EXIT_FAILURE themselves.
+                    log.logger(&format!("Exception caught: {}\n", e.print()));
+                    return Err(RegistrationFailed(e.description));
                 }
                 Err(e) => {
                     // AddLinearTransformToCompositeTransform logs the exception and returns

@@ -1095,7 +1095,7 @@ pub fn collapse_linear<R: Real, const D: usize>(
                 nth.set_matrix(l.matrix);
                 nth.set_translation(l.translation);
             }
-            Xfm::Identity | Xfm::Field(_) => return None,
+            Xfm::Identity | Xfm::Field(_) | Xfm::BSpline(_) => return None,
         }
         total.compose_pre(&nth);
     }

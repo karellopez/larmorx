@@ -56,12 +56,13 @@ pub struct ImageMetricv4<R, const D: usize> {
     /// `FixedImagePixelType` / `MovingImagePixelType` (`TransformAndEvaluateFixedPoint`), so
     /// they are rounded to float. In `antsRegistration` the pixel type is `R`.
     pub pixel_f32: bool,
-    /// The moving transform is a displacement field transform on the virtual domain (SyN's
-    /// identity field, `DownsampleImagesForMetricDerivatives`): it maps every point to itself
-    /// (pass an empty composite), has `D` local parameters with the identity as their Jacobian,
-    /// and each point's derivative is added to its voxel's `D` entries of a derivative over the
-    /// whole virtual domain, which is not averaged (`StorePointDerivativeResult` for a
-    /// transform of local support).
+    /// The moving transform being optimised is a displacement field on the virtual domain
+    /// (`HasLocalSupport()`): SyN's identity field (`DownsampleImagesForMetricDerivatives`; pass
+    /// an empty composite, which maps every point to itself with the identity as its Jacobian),
+    /// or the field of a `GaussianDisplacementField` or `BSplineDisplacementField` stage (the
+    /// composite's Jacobian, `D` local parameters). Each point's derivative is added to its
+    /// voxel's `D` entries of a derivative over the whole virtual domain, which is not averaged
+    /// (`StorePointDerivativeResult` for a transform of local support).
     pub local_support: bool,
 }
 
@@ -76,6 +77,29 @@ pub struct Sample<R, const D: usize> {
     pub moving_point: [f64; D],
     pub moving_value: R,
     pub moving_gradient: [R; D],
+}
+
+/// A point's Jacobian with respect to the parameters, `D` rows of `n` columns: every local
+/// parameter (`cols` `None`), or the parameters `cols` (every other column is zero).
+#[derive(Clone, Debug)]
+pub struct JacobianColumns<R> {
+    pub n: usize,
+    pub cols: Option<Vec<usize>>,
+    pub values: Vec<R>,
+}
+
+impl<R: Copy> JacobianColumns<R> {
+    /// The entry of row `dim`, column `c`.
+    #[inline]
+    pub fn at(&self, dim: usize, c: usize) -> R {
+        self.values[dim * self.n + c]
+    }
+
+    /// The parameter of column `c`.
+    #[inline]
+    pub fn parameter(&self, c: usize) -> usize {
+        self.cols.as_ref().map_or(c, |cols| cols[c])
+    }
 }
 
 /// Which gradients a metric uses (`GetGradientSourceIncludesFixed/Moving`).
@@ -111,13 +135,36 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     /// [`ImageMetricv4::local_parameters`] values (the identity with local support).
     #[inline]
     pub fn moving_jacobian(&self, transform: &Composite<R, D>, vp: &[R; D], out: &mut [R]) {
-        if self.local_support {
+        if self.local_support && transform.transforms.is_empty() {
             out.fill(R::ZERO);
             for i in 0..D {
                 out[i * D + i] = R::ONE;
             }
         } else {
             transform.jacobian(vp, out);
+        }
+    }
+
+    /// The Jacobian's columns at `vp` ([`ImageMetricv4::moving_jacobian`]): every local
+    /// parameter's, or for a B-spline transform being optimised only those of the parameters
+    /// around the point ([`Composite::sparse_jacobian`]; the others are zero).
+    pub fn jacobian_columns(&self, transform: &Composite<R, D>, vp: &[R; D]) -> JacobianColumns<R> {
+        if !self.local_support
+            && let Some((cols, values)) = transform.sparse_jacobian(vp)
+        {
+            return JacobianColumns {
+                n: cols.len(),
+                cols: Some(cols),
+                values,
+            };
+        }
+        let n = self.local_parameters(transform);
+        let mut values = vec![R::ZERO; D * n];
+        self.moving_jacobian(transform, vp, &mut values);
+        JacobianColumns {
+            n,
+            cols: None,
+            values,
         }
     }
 

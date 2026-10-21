@@ -738,15 +738,6 @@ def syn_cases(make) -> list:
             expect="error",
         ),
         make(
-            f"{SYN}/bsplinesyn",
-            SYN,
-            "BSplineSyN: A5 part 2",
-            *_stage("BSplineSyN[0.1,26,0,3]", [cc]),
-            out=PRE,
-            expect="divergence",
-            reason="B-spline SyN is milestone A5 part 2; larmorx refuses with a message",
-        ),
-        make(
             f"{SYN}/exponential",
             SYN,
             "Exponential: A5 part 3",

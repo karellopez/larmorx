@@ -15,11 +15,12 @@
 //! - the option values are read newest first (`GetFunction(0)` is the last one given), the
 //!   stages are numbered from the last on the command line (`AssignStages`).
 //!
-//! **Scope (A4 part 2).** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
-//! `CompositeAffine`) with the image metrics (`MI`/`Mattes`, `MI2`, `MeanSquares`, `GC`, `CC`;
-//! `Demons` fails in a linear stage as in ANTs), in 2, 3 and 4 dimensions, float and double.
-//! The deformable transforms are parsed as ANTs parses them and refused before the
-//! registration runs (A5). What is not ported yet is refused with a message naming it.
+//! **Scope.** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
+//! `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
+//! `BSplineDisplacementField` and `BSpline`, with every image metric and point-set metric, in 2,
+//! 3 and 4 dimensions, float and double. The velocity-field transforms are parsed as ANTs
+//! parses them and refused before the registration runs (A5 part 3). What is not ported yet is
+//! refused with a message naming it.
 
 use std::io::Write;
 use std::path::Path;
@@ -29,7 +30,7 @@ use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
 use larmorx_registration::initializer::{Feature, initialize};
 use larmorx_registration::mask::Mask;
-use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
+use larmorx_registration::transform::{BSplineXfm, Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Space};
 
 use super::TransformLoader;
@@ -50,7 +51,7 @@ use larmorx_io::itk_transform::{
     ItkTransformParts, Parameters, transform_from_parts, write_itk_transform_parts,
 };
 use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry};
-use larmorx_registration::transform::collapse_composite;
+use larmorx_registration::transform::{collapse_composite, collapse_composite_ants};
 
 /// What ends a run early: the exit status (the messages are already printed).
 type Exit = u8;
@@ -484,6 +485,72 @@ fn read_image<R: Compute, const D: usize>(
     }
 }
 
+/// `CalculateMeshSizeForSpecifiedKnotSpacing(fixedImage, knotSpacing, splineOrder)`: per axis
+/// `ceil((size − 1)·spacing / knotSpacing)` in the computation type (0 for a spacing almost 0),
+/// of the stage's first fixed image, read again as ANTs reads it. Where that image cannot be
+/// read ANTs dereferences the null image and crashes. A quotient that is negative, not a
+/// number or out of `unsigned int`'s range is clamped (ANTS-06; `reproduce` converts it as
+/// x86-64 does).
+fn knot_spacing_mesh<R: Compute, const D: usize>(
+    ctx: &mut Context<'_, '_>,
+    log: &mut Log<'_>,
+    fixed_name: &str,
+    knot_spacing: R,
+    _order: u32,
+) -> Result<Vec<u32>, Exit> {
+    let Some(image) = read_image::<R, D>(ctx, log, fixed_name) else {
+        return Err(refuse(
+            log,
+            "a mesh size given as a knot spacing needs the stage's fixed image, which could not be read (ANTs crashes: it uses the missing image)",
+        ));
+    };
+    let zero = match R::PRECISION {
+        larmorx_core::Precision::Double => {
+            larmorx_image::itk_math::almost_equal_f64(knot_spacing.to_f64(), 0.0)
+        }
+        larmorx_core::Precision::Float => {
+            larmorx_image::itk_math::almost_equal_f32(knot_spacing.to_f64() as f32, 0.0)
+        }
+    };
+    let mut out = Vec::with_capacity(D);
+    let mut wrapped = 0;
+    for d in 0..D {
+        if zero {
+            out.push(0);
+            continue;
+        }
+        let domain = R::r((image.space.size[d] - 1) as f64) * R::r(image.space.spacing[d]);
+        let q = (domain / knot_spacing).to_f64().ceil();
+        let q = R::r(q).to_f64();
+        if q.is_nan() || !(0.0..=f64::from(u32::MAX)).contains(&q) {
+            wrapped += 1;
+            out.push(if ctx.notices.fix() {
+                if q.is_nan() || q < 0.0 { 0 } else { u32::MAX }
+            } else {
+                crate::image::x86_to_i64(q) as u32
+            });
+        } else {
+            out.push(q as u32);
+        }
+    }
+    if wrapped > 0 {
+        let fix = ctx.notices.fix();
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_06,
+            if fix {
+                format!(
+                    "{wrapped} mesh size(s) from a knot spacing outside unsigned int's range are clamped; ANTs on x86-64 wraps them around"
+                )
+            } else {
+                format!(
+                    "{wrapped} mesh size(s) from a knot spacing outside unsigned int's range wrap around as ANTs on x86-64 converts them"
+                )
+            },
+        );
+    }
+    Ok(out)
+}
+
 /// An image as the registration holds it.
 pub fn to_image<T: Copy, const D: usize>(img: AntsImage<T>) -> Result<Image<T, D>, ItkException> {
     let g = &img.geometry;
@@ -778,16 +845,17 @@ fn load_transform<R: Compute, const D: usize>(
             .map(|p| {
                 if p.name.starts_with("DisplacementFieldTransform") {
                     field_from_part::<R, D>(name, p, exact_floor)
+                } else if p.name.starts_with("BSplineTransform") {
+                    bspline_from_part::<R, D>(name, p)
                 } else {
                     xfm_from_part::<R, D>(name, p)
                 }
             })
             .collect();
     }
-    if !parts
-        .iter()
-        .any(|p| p.name.starts_with("DisplacementFieldTransform"))
-    {
+    if !parts.iter().any(|p| {
+        p.name.starts_with("DisplacementFieldTransform") || p.name.starts_with("BSplineTransform")
+    }) {
         let t = transform_from_parts(&parts).map_err(|e| LoadError::Report(format!("{e}\n")))?;
         let mut flat = Vec::new();
         flatten::<R, D>(&t, ctx.notices.mode(), &mut flat)?;
@@ -800,6 +868,10 @@ fn load_transform<R: Compute, const D: usize>(
     {
         if p.name.starts_with("DisplacementFieldTransform") {
             flat.push(field_from_part::<R, D>(name, p, exact_floor)?);
+            continue;
+        }
+        if p.name.starts_with("BSplineTransform") {
+            flat.push(bspline_from_part::<R, D>(name, p)?);
             continue;
         }
         let t = transform_from_parts(std::slice::from_ref(p))
@@ -1018,6 +1090,29 @@ fn field_from_part<R: Compute, const D: usize>(
     )))
 }
 
+/// A `BSplineTransform` (of order 3) read from a transform file as ITK's readers build it:
+/// `SetFixedParameters` (the grid), then `SetParametersByValue` (the coefficients).
+fn bspline_from_part<R: Compute, const D: usize>(
+    file: &str,
+    part: &ItkTransformParts,
+) -> Result<Xfm<R, D>, LoadError> {
+    let report = |e: ItkException| {
+        LoadError::Report(format!(
+            "Transform reader for {file} caught an ITK exception:\n{}",
+            e.print()
+        ))
+    };
+    let p: Vec<R> = match &part.parameters {
+        Parameters::F64(v) => v.iter().map(|&x| R::r(x)).collect(),
+        Parameters::F32(v) => v.iter().map(|&x| R::r(f64::from(x))).collect(),
+    };
+    let mut b = BSplineXfm::<R, D>::new_default();
+    b.set_fixed_parameters(&part.fixed_parameters)
+        .map_err(report)?;
+    b.set_parameters_by_value(&p).map_err(report)?;
+    Ok(Xfm::BSpline(b))
+}
+
 /// One stored transform in 2 or 4 dimensions, as ITK's reader builds it (`SetParameters`,
 /// `SetFixedParameters`): the classes ITK's transform factory knows there and larmorx has
 /// (identity, translation, affine, matrix-offset; in 2D Euler, rigid and similarity).
@@ -1145,6 +1240,8 @@ fn invert_xfm<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Option<Xfm<R, D>> {
         }),
         Xfm::Linear(l) => l.inverse().map(Xfm::Linear),
         Xfm::Field(f) => f.inverse_transform().map(Xfm::Field),
+        // BSplineBaseTransform::GetInverse returns false: no inverse.
+        Xfm::BSpline(_) => None,
     }
 }
 
@@ -1322,11 +1419,13 @@ fn do_registration<R: Compute, const D: usize>(
                 field: field(&queue[n - 4]),
                 inverse: Some(field(&queue[n - 3])),
                 exact_floor: exact,
+                smoothing: None,
             };
             let m2m = larmorx_registration::field::FieldXfm {
                 field: field(&queue[n - 2]),
                 inverse: Some(field(&queue[n - 1])),
                 exact_floor: exact,
+                smoothing: None,
             };
             log.logger(
                 "Initial FixedToMiddle and MovingToMiddle transforms are restored from the registration state file.\n",
@@ -1487,15 +1586,95 @@ fn do_registration<R: Compute, const D: usize>(
         };
         let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
         if !method.is_linear() {
-            let variances = parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
-            if method == XfrmMethod::SyN {
-                // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
-                // floats read by the parser, held as RealType.
-                let (update, total) = variances.unwrap_or((3.0, 0.0));
-                transform_method.update_field_variance = R::r(f64::from(update));
-                transform_method.total_field_variance = R::r(f64::from(total));
-            } else {
-                deformable.get_or_insert(method);
+            // The stage's first metric's fixed image (`fixedImageFileName`), read where a mesh
+            // is given as a knot spacing.
+            let fixed_name = (0..metrics.len())
+                .rev()
+                .find(|&k| metric_stages[k] == current)
+                .map(|k| param(&metrics[k], 0).to_owned())
+                .unwrap_or_default();
+            let mut knots = |log: &mut Log<'_>, spacing: R, order: u32| {
+                knot_spacing_mesh::<R, D>(&mut ctx, log, &fixed_name, spacing, order)
+            };
+            match method {
+                XfrmMethod::SyN => {
+                    let variances =
+                        parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+                    // AddSyNTransform(learningRate, varianceForUpdateField, varianceForTotalField):
+                    // floats read by the parser, held as RealType.
+                    let (update, total) = variances.unwrap_or((3.0, 0.0));
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.total_field_variance = R::r(f64::from(total));
+                }
+                XfrmMethod::GaussianDisplacementField => {
+                    let update = Conv::f32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    let total = Conv::f32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.total_field_variance = R::r(f64::from(total));
+                }
+                XfrmMethod::BSplineSyN => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as float) is a knot spacing in millimetres.
+                    type Knots<'k, R> =
+                        dyn FnMut(&mut Log<'_>, R, u32) -> Result<Vec<u32>, Exit> + 'k;
+                    let read_mesh = |log: &mut Log<'_>,
+                                     i: usize,
+                                     knots: &mut Knots<'_, R>|
+                     -> Result<Vec<u32>, Exit> {
+                        let v = Conv::vec_f32(param(t, i)).map_err(|e| throw(log, e))?;
+                        if v.len() == 1 {
+                            knots(log, R::r(f64::from(v[0])), order)
+                        } else {
+                            Conv::vec_u32(param(t, i)).map_err(|e| throw(log, e))
+                        }
+                    };
+                    transform_method.update_field_mesh = read_mesh(log, 1, &mut knots)?;
+                    transform_method.total_field_mesh = if n > 2 {
+                        read_mesh(log, 2, &mut knots)?
+                    } else {
+                        vec![0; D]
+                    };
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::BSplineDisplacementField => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as unsigned int) is a knot spacing.
+                    let mut update = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if update.len() == 1 {
+                        update = knots(log, R::r(f64::from(update[0])), order)?;
+                    }
+                    let total = if n > 2 {
+                        let mut total = Conv::vec_u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                        if total.len() == 1 {
+                            total = knots(log, R::r(f64::from(total[0])), order)?;
+                        }
+                        total
+                    } else {
+                        vec![0; D]
+                    };
+                    transform_method.update_field_mesh = update;
+                    transform_method.total_field_mesh = total;
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::BSpline => {
+                    let mut mesh = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if mesh.len() == 1 {
+                        mesh = knots(log, R::r(f64::from(mesh[0])), 3)?;
+                    }
+                    transform_method.mesh_size = mesh;
+                }
+                _ => {
+                    parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
+                    deformable.get_or_insert(method);
+                }
             }
         }
         helper.transforms.push(transform_method);
@@ -1598,17 +1777,10 @@ fn do_registration<R: Compute, const D: usize>(
         helper.metrics.push(metric);
     }
     if let Some(method) = deformable {
-        let part = match method {
-            XfrmMethod::BSplineSyN
-            | XfrmMethod::BSpline
-            | XfrmMethod::GaussianDisplacementField
-            | XfrmMethod::BSplineDisplacementField => "A5 part 2",
-            _ => "A5 part 3",
-        };
         return Err(refuse(
             log,
             &format!(
-                "{} stages are deformable registration that larmorx ports in milestone {part}; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine) and SyN",
+                "{} stages are deformable registration that larmorx ports in milestone A5 part 3; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine), SyN, BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline",
                 method.as_str()
             ),
         ));
@@ -2079,8 +2251,8 @@ fn chain_of<R: Compute, const D: usize>(
     for t in queue.iter().rev() {
         let (name, parameters, fixed) = match t {
             Xfm::Identity => continue,
-            Xfm::Field(_) => {
-                return Err("a displacement field goes through the per-voxel resampler".into());
+            Xfm::Field(_) | Xfm::BSpline(_) => {
+                return Err("a displacement field or a B-spline transform goes through the per-voxel resampler".into());
             }
             Xfm::Translation { offset } => (
                 "TranslationTransform_double_3_3".to_owned(),
@@ -2370,6 +2542,7 @@ fn forward_only<R: Compute, const D: usize>(t: &Xfm<R, D>) -> Xfm<R, D> {
             field: Arc::clone(&f.field),
             inverse: None,
             exact_floor: f.exact_floor,
+            smoothing: None,
         }),
         other => other.clone(),
     }
@@ -2409,6 +2582,7 @@ fn write_inverse_field<R: Compute, const D: usize>(
         field: Arc::clone(inverse),
         inverse: None,
         exact_floor: f.exact_floor,
+        smoothing: None,
     });
     write_transform_file(log, ctx.notices, name, &[xfm_parts(&t)]);
 }
@@ -2646,16 +2820,34 @@ fn write_transforms<R: Compute, const D: usize>(
     }
     let (to_write, names): (Vec<Xfm<R, D>>, Vec<String>) = if collapse {
         let floor = IndexFloor::new(ctx.notices.mode());
-        match collapse_composite(queue, &floor) {
+        let ants = collapse_composite_ants(queue, &floor);
+        let collapsed = if queue.iter().any(Xfm::is_bspline) {
+            let fixed = collapse_composite(queue, &floor);
+            if fixed != ants {
+                ctx.notices.add(
+                    &larmorx_core::defects::ANTS_76,
+                    if ctx.notices.fix() {
+                        "every transform is kept in the collapsed composite; ANTs' collapse loses or mixes some of them around B-spline transforms"
+                    } else {
+                        "the transforms are collapsed as ANTs collapses them around B-spline transforms"
+                    },
+                );
+            }
+            if ctx.notices.fix() { fixed } else { ants }
+        } else {
+            ants
+        };
+        match collapsed {
             Some(ts) => {
                 // The names by category: linear transforms are generic affine ones, fields
                 // with an inverse are named as SyN's, without one as a Gaussian
-                // displacement field's.
+                // displacement field's, B-spline transforms as B-spline ones.
                 let names = ts
                     .iter()
                     .map(|t| match t {
                         Xfm::Field(f) if f.inverse.is_some() => "syn".to_owned(),
                         Xfm::Field(_) => "gdf".to_owned(),
+                        Xfm::BSpline(_) => "bspline".to_owned(),
                         _ => "genericaffine".to_owned(),
                     })
                     .collect();
@@ -2664,7 +2856,11 @@ fn write_transforms<R: Compute, const D: usize>(
             None => {
                 return Err(refuse(
                     log,
-                    "an IdentityTransform cannot be collapsed (ANTs crashes here)",
+                    if queue.iter().any(Xfm::is_bspline) {
+                        "these transforms cannot be collapsed as ANTs collapses them: a B-spline transform joins a run of linear transforms or fields, and ANTs' collapse throws outside a try block (ANTS-76; ANTs crashes here)"
+                    } else {
+                        "an IdentityTransform cannot be collapsed (ANTs crashes here)"
+                    },
                 ));
             }
         }

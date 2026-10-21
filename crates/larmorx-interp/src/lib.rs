@@ -755,6 +755,15 @@ fn windowed_sinc<T: RealElement, R: ItkReal>(
 // ------------------------------------------------------------------------------------------------
 // B-spline
 
+/// ITK's `BSplineDecompositionImageFilter::DataToCoefficients1D` of one line (in place, in
+/// double) for a spline order (0 and 1: unchanged).
+pub fn bspline_line_to_coefficients(line: &mut [f64], order: u32) {
+    let poles = bspline::poles(order);
+    if !poles.is_empty() {
+        bspline::line_to_coefficients(line, &poles);
+    }
+}
+
 // The arithmetic follows ITK's expression for expression (e.g. `z2n *= z2n * iz`), so the
 // result rounds the same way.
 #[allow(clippy::misrefactored_assign_op)]

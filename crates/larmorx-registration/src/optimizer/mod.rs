@@ -26,12 +26,16 @@ pub trait Problem<R: Real> {
     fn parameters(&self) -> Vec<R>;
     /// `SetParameters`.
     fn set_parameters(&mut self, p: &[R]) -> Result<(), ItkException>;
-    /// `UpdateTransformParameters(update, 1)`.
-    fn update(&mut self, update: &[R]) -> Result<(), ItkException>;
+    /// `UpdateTransformParameters(update, 1)`. A transform that smooths its update in place
+    /// (`GaussianSmoothingOnUpdateDisplacementFieldTransform`) leaves the smoothed update in
+    /// `update`, as ITK does with the optimizer's array.
+    fn update(&mut self, update: &mut [R]) -> Result<(), ItkException>;
+    /// `GetNumberOfLocalParameters()` of the metric (the size of the scales and weights).
+    fn number_of_local_parameters(&self) -> usize;
     /// `RegistrationParameterScalesFromPhysicalShift::EstimateScales`.
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException>;
-    /// `EstimateStepScale(step)`.
-    fn estimate_step_scale(&mut self, step: &[R]) -> Result<R, ItkException>;
+    /// `EstimateStepScale(step)`; like [`Problem::update`], it may smooth `step` in place.
+    fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException>;
     /// `EstimateMaximumStepSize()`: the smallest virtual spacing.
     fn estimate_maximum_step(&self) -> R;
 }
@@ -128,6 +132,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         observer: &mut O,
     ) -> Result<Outcome<R>, ItkException> {
         let np = problem.parameters().len();
+        let nl = problem.number_of_local_parameters();
         if self.scales.is_none()
             && self.estimate_learning_rate_once
             && self.estimate_learning_rate_at_each_iteration
@@ -152,13 +157,13 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
                 problem.estimate_scales()?
             }
         };
-        if scales.len() != np {
+        if scales.len() != nl {
             return Err(ItkException::new(
                 "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                100,
+                118,
                 "ConjugateGradientLineSearchOptimizerv4Template",
                 format!(
-                    "Size of scales ({}) must equal number of local parameters ({np}).",
+                    "Size of scales ({}) must equal number of local parameters ({nl}).",
                     scales.len()
                 ),
             ));
@@ -168,7 +173,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             if s <= R::EPSILON {
                 return Err(ItkException::new(
                     "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                    114,
+                    130,
                     "ConjugateGradientLineSearchOptimizerv4Template",
                     format!(
                         "m_Scales values must be > epsilon.{}",
@@ -185,13 +190,13 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         }
         let mut weights_identity = true;
         if !self.weights.is_empty() {
-            if self.weights.len() != np {
+            if self.weights.len() != nl {
                 return Err(ItkException::new(
                     "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
-                    137,
+                    158,
                     "ConjugateGradientLineSearchOptimizerv4Template",
                     format!(
-                        "Size of weights ({}) must equal number of local parameters ({np}).",
+                        "Size of weights ({}) must equal number of local parameters ({nl}).",
                         self.weights.len()
                     ),
                 ));
@@ -297,13 +302,17 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
     fn estimate_learning_rate<P: Problem<R> + ?Sized>(
         &mut self,
         problem: &mut P,
-        run: &Run<R>,
+        run: &mut Run<R>,
     ) -> Result<(), ItkException> {
         if self.scales.is_none()
             && (self.estimate_learning_rate_at_each_iteration
                 || (self.estimate_learning_rate_once && run.current_iteration == 0))
         {
-            let step_scale = problem.estimate_step_scale(&run.gradient)?;
+            // EstimateStepScale(const ParametersType &) given the DerivativeType m_Gradient
+            // converts it into a temporary OptimizerParameters: a transform that smooths its
+            // update in place smooths that copy, not the gradient.
+            let mut copy = run.gradient.clone();
+            let step_scale = problem.estimate_step_scale(&mut copy)?;
             self.learning_rate = if step_scale <= R::EPSILON {
                 R::ONE
             } else {
@@ -369,7 +378,7 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             .map(|g| *g * self.learning_rate)
             .collect();
         run.gradient = step;
-        problem.update(&run.gradient)?;
+        problem.update(&mut run.gradient)?;
         let state = IterationState {
             iteration: run.current_iteration,
             value: run.value,
@@ -413,23 +422,23 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
             let base_gradient = run.gradient.clone();
             let base_parameters = problem.parameters();
             self.learning_rate = x;
-            let step: Vec<R> = run
+            let mut step: Vec<R> = run
                 .gradient
                 .iter()
                 .map(|g| *g * self.learning_rate)
                 .collect();
-            problem.update(&step)?;
+            problem.update(&mut step)?;
             let mx = problem.value()?;
             problem.set_parameters(&base_parameters)?;
             run.gradient = base_gradient.clone();
             if metricb == R::MAX {
                 self.learning_rate = b;
-                let step: Vec<R> = run
+                let mut step: Vec<R> = run
                     .gradient
                     .iter()
                     .map(|g| *g * self.learning_rate)
                     .collect();
-                problem.update(&step)?;
+                problem.update(&mut step)?;
                 metricb = problem.value()?;
                 problem.set_parameters(&base_parameters)?;
                 run.gradient = base_gradient;

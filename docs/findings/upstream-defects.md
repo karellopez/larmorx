@@ -120,6 +120,10 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-72 | antsRegistration | a linear stage after a displacement field (a SyN stage, `-r field`) estimates its parameter scales and learning rate from 1000 voxels drawn with a generator ITK seeds from the clock: not repeatable, whatever the seed | b | none (fMRIPrep's linear stages come first) | draws them with the stage's seed | – |
 | ANTS-73 | antsRegistration | an initial transform image that is not a field of the registration's dimension (a scalar image, a 2D field in 3D) is read as one: ITK converts the pixels as gray, complex, RGB or RGBA values | e | none | corrected by default: refused; `reproduce` converts as ITK (A5 part 1) | – |
 | ANTS-74 | antsRegistration | `--save-state` after linear stages that follow a SyN stage (or a restored state) saves that SyN state, without the later stages | c | none (fMRIPrep does not save states) | corrected by default: every transform, as after linear stages (ANTS-50); `reproduce` as ANTs (A5 part 1) | – |
+| ANTS-75 | antsRegistration | `--print-similarity-measure-interval` and `--write-interval-volumes` copy the stage's transforms by setting each copy's parameters before its fixed parameters: a displacement field, or a B-spline transform of another mesh than 1, refuses, and the stage fails at its first iteration | c | none (fMRIPrep sets neither option) | corrected by default: the transforms are used as they are, a notice; `reproduce` fails as ANTs (A5 part 2) | – |
+| ANTS-76 | antsRegistration | collapsing the output transforms (`-z 1`, the default) around B-spline transforms loses transforms: one that follows only B-spline transforms, a B-spline transform after another at the end of the queue; before more linear transforms or fields that B-spline transform joins their run and ANTs crashes | c | none (fMRIPrep uses no B-spline transform) | corrected by default: every transform kept, linear and field runs collapsed around them, a notice; `reproduce` collapses as ANTs, stops where it crashes (A5 part 2) | – |
+| ANTS-77 | antsRegistration `BSpline` | a mesh size of 0, or fewer mesh sizes than dimensions (read past the end of the list), divides by zero: a grid of NaN and infinite geometry, vnl's SVD warnings, an exception on garbage indices | a | none | refused with a message (A5 part 2) | – |
+| ANTS-78 | antsRegistration `BSplineDisplacementField` | the meshes "at the base level" are doubled already at the base level (`mesh << (level + 1)`; B-spline SyN uses `mesh << level`) | c? | none | reproduces | decide |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -154,6 +158,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-32 | ITK `LabeledPointSetToPointSetMetricv4` | appends per-label metrics at every `Initialize` and uses the first: in SyN every evaluation compares with the moving points as the first one mapped them | c | none | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
 | ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
+| ITK-35 | ITK `BSplineBaseTransform` | no Jacobian with respect to position (`ComputeJacobianWithRespectToPosition` throws "not yet implemented"): a stage after a B-spline transform whose metric needs the composite's Jacobian (linear, displacement-field and `BSpline` stages) fails at its first derivative | c? | none | fails as ITK (the linear stage dropped, ANTS-49) | decide |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -277,8 +282,11 @@ a switch (2026-10-17). A4 part 4 (antsRegistration's point-set metrics, 2026-10-
 ANTS-61 to ANTS-70 and ITK-22 to ITK-29: ANTS-61, -65, ITK-22, -23, -26 and -28 corrected by
 default with a switch; ANTS-62, -63 and -66 (class (a)) corrected by default, their defined
 parts reproduced on request; ANTS-64, -69 and ITK-25 not reproduced; ITK-27 an imprecision;
-ANTS-67, -68, -70, ITK-24 and ITK-29 to decide. The gap column now has 24 **decide** (recounted
-2026-10-18), 1 rule 8 and 1 open.
+ANTS-67, -68, -70, ITK-24 and ITK-29 to decide. A5 part 1 (SyN, 2026-10-19) added ANTS-71 to
+ANTS-74 and ITK-30 to ITK-34; A5 part 2 (the B-spline and displacement-field stages,
+2026-10-20) added ANTS-75 to ANTS-78 and ITK-35: ANTS-75 and ANTS-76 corrected by default with
+a switch, ANTS-77 refused (class (a)), ANTS-78 and ITK-35 to decide. The gap column now has 26
+**decide** (recounted 2026-10-20), 1 rule 8 and 1 open.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -1422,6 +1430,69 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   correction does after linear stages; `reproduce` writes ANTs' stale state.
 - **D13 / gap:** done. No gap.
 
+### ANTS-75 The observer's transform copies refuse fields and B-spline transforms — (c)
+- **What:** `antsRegistrationOptimizerCommandIterationUpdate` copies the fixed and moving
+  composites for the full-scale similarity (`--print-similarity-measure-interval`) and for the
+  interval volumes (`--write-interval-volumes`) with `CreateAnother()`, `SetParameters`, then
+  `SetFixedParameters`. A new displacement field transform has no field when its parameters are
+  set, and throws (`Input parameters size (..) does not match internal size (0).`); a new
+  B-spline transform has a mesh of 1 (`D·4^D` parameters) and throws for any other mesh
+  (`Mismatch between parameters size .. and expected number of parameters ..`). The exception
+  ends the stage at its first iteration: with an initial field, or in a
+  `GaussianDisplacementField`, `BSplineDisplacementField` or `BSpline` stage, the options cannot
+  be used.
+- **Evidence:** read: `antsRegistrationOptimizerCommandIterationUpdate.h:256-302, 370`,
+  `itkDisplacementFieldTransform.h:281`, `itkBSplineBaseTransform.hxx:50`; validated
+  (`displacement-field/gaussian-print-similarity`, `-interval-volumes`,
+  `bspline/print-similarity`, and `bspline/print-similarity-mesh-1`, where the copy works).
+- **fMRIPrep:** none (fMRIPrep sets neither option).
+- **larmorx:** corrected by default (A5 part 2): the similarity and the volumes use the
+  transforms as they are, with a notice; `reproduce` fails as ANTs.
+- **D13 / gap:** done. No gap.
+
+### ANTS-76 The collapse loses transforms around B-spline transforms — (c)
+- **What:** `CollapseCompositeTransform` (`-z 1`, the default) handles linear and
+  displacement-field runs. A transform of another category (a `BSplineTransform`) is kept as it
+  is but upsets the run logic: the transforms before the first linear transform or field are
+  added as they are, and a first linear transform or field that is the queue's last is never
+  added (`-r bspline.txt` then a SyN stage: the SyN fields are lost, only `0BSpline.txt` is
+  written); after a linear or field run, a B-spline transform following another is never added
+  at the end of the queue, and before more linear transforms or fields it joins their run, whose
+  collapse throws outside a try block (a crash).
+- **Evidence:** read: `itkantsRegistrationHelper.hxx:3896-3992`; validated
+  (`bspline-syn/initial-bspline`, `bspline/initial-bspline-syn`,
+  `bspline/initial-bspline-syn-composite`: reproduced; corrected, the fields are written).
+- **fMRIPrep:** none (fMRIPrep uses no B-spline transform).
+- **larmorx:** corrected by default (A5 part 2): every B-spline transform is kept and ends the
+  run before it, the linear and field runs around them collapsed as ANTs collapses runs, a
+  notice where the result differs; `reproduce` collapses as ANTs and stops where it crashes.
+- **D13 / gap:** done. No gap.
+
+### ANTS-77 A B-spline mesh size of 0 — (a)
+- **What:** a `BSpline` stage whose mesh has a size of 0, or fewer sizes than dimensions (the
+  missing ones read past the end of the vector, `itkantsRegistrationHelper.hxx:3474`), divides
+  the physical dimensions by 0: the coefficient grid's spacing is infinite and its geometry NaN,
+  vnl prints its SVD warnings ("suspicious return value (3) from SVDC") for every inversion, and
+  the registration throws on an image region with garbage indices (`-4611686018427387904`).
+- **Evidence:** verified (`BSpline[0.2,0x2x2]`, `BSpline[0.2,2x2]` in 3D: exit 1 after the
+  warnings).
+- **fMRIPrep:** none.
+- **larmorx:** refused with a message (exit 1), after the stage's messages (A5 part 2);
+  `bspline/mesh-0` and `bspline/mesh-short` are expected divergences.
+- **D13 / gap:** none (class (a): never reproduced).
+
+### ANTS-78 BSplineDisplacementField doubles its base-level mesh — (c?)
+- **What:** `-t BSplineDisplacementField[step,updateMesh,totalMesh,order]` takes the meshes "at
+  the base level" (the option's help and the log's `updateMeshSizeAtBaseLevel`), but the level
+  adaptors set `mesh << (level + 1)`: the base level already uses twice the mesh asked for.
+  B-spline SyN and the `BSpline` transform use `mesh << level`.
+- **Evidence:** read: `itkantsRegistrationHelper.hxx:1933-1934` (against `:2302-2303` for
+  B-spline SyN and `:3493` for `BSpline`); validated (every `displacement-field/bspline-*` case reproduces it).
+- **fMRIPrep:** none (fMRIPrep uses no B-spline displacement field).
+- **larmorx:** reproduces.
+- **D13 / gap:** decide (possibly intended: the comment says "double the b-spline mesh
+  resolution at each level").
+
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
   the joint density along its first index (the fixed image's bin) into what it calls the
@@ -1871,6 +1942,22 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   differs; `reproduce` carries the state as HDF5 does (`larmorx_hdf5::datatype::conv_f_f`).
 - **D13 / gap:** done. No gap.
 
+
+### ITK-35 B-spline transforms have no Jacobian with respect to position — (c?)
+- **What:** `BSplineBaseTransform::ComputeJacobianWithRespectToPosition` throws ("not yet
+  implemented for BSplineTransform"). `CompositeTransform`'s Jacobian with respect to the active
+  transform's parameters needs it for every transform applied after the active one, so a stage
+  after a `BSpline` stage, or with a B-spline initial transform, fails at its first derivative
+  unless its metric works on identity fields (SyN, B-spline SyN): a linear stage is then dropped
+  (ANTS-49), a displacement-field or `BSpline` stage ends the run with exit 1. The Jacobian is
+  well defined (the derivative of the cubic B-spline sum) and cheap.
+- **Evidence:** read: `itkBSplineBaseTransform.h:301`, `itkCompositeTransform.hxx`
+  (`ComputeJacobianWithRespectToParametersCachedTemporaries`); validated (`bspline/then-affine`,
+  `bspline/then-bspline`, `bspline/initial-bspline-affine`: identical messages).
+- **fMRIPrep:** none.
+- **larmorx:** fails as ITK.
+- **D13 / gap:** decide (implementing the Jacobian would let such stages run: a new behaviour,
+  not a correction of a result).
 ## fMRIPrep and its libraries
 
 fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.2, sdcflows

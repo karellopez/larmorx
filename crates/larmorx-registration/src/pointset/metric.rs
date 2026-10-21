@@ -515,6 +515,7 @@ impl<R: Real, const D: usize> FixedInverse<R, D> {
                 },
                 Xfm::Linear(l) => Xfm::Linear(l.inverse()?),
                 Xfm::Field(f) => Xfm::Field(f.inverse_transform()?),
+                Xfm::BSpline(_) => return None,
             });
         }
         Some(FixedInverse(Some(Composite::new(out))))
@@ -563,6 +564,8 @@ pub struct PointSetMetric<R, const D: usize> {
     syn_current: Option<Vec<LabelMetric<R, D>>>,
     /// The state SyN's `Initialize()` leaves for the evaluation.
     tangent: Option<TangentState<R, D>>,
+    /// The tangent-space derivative's layout (`TangentCall::sparse`).
+    sparse: bool,
     /// Where the originals' defects met this metric.
     pub events: PointSetEvents,
 }
@@ -584,6 +587,10 @@ pub struct TangentCall<'a, R, const D: usize> {
     pub moving_transform: &'a Composite<R, D>,
     /// The level's virtual domain.
     pub virtual_space: &'a Space<D>,
+    /// `SetStoreDerivativeAsSparseFieldForLocalSupportTransforms`: each point's derivative
+    /// added at its nearest virtual voxel (SyN), or stored at the point's index, `D` values per
+    /// fixed point (the B-spline SyN method, which fits a B-spline to the points).
+    pub sparse: bool,
 }
 
 /// What one evaluation gives.
@@ -615,6 +622,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             syn_clones: None,
             syn_current: None,
             tangent: None,
+            sparse: true,
             events: PointSetEvents::default(),
         }
     }
@@ -922,11 +930,15 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         warnings: &mut Vec<String>,
     ) -> Result<PointSetValue<R>, ItkException> {
         let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, warnings)?;
+        if moving.active().has_local_support() {
+            return self.local_value_and_derivative(moving, &virt, &fixed_t, valid, warnings);
+        }
         let np = moving.number_of_parameters();
         let mut thread = CompensatedSum::default();
-        let mut sums = vec![CompensatedSum::default(); np];
-        let mut jac = vec![R::ZERO; D * np];
-        let mut local_transform = vec![R::ZERO; np];
+        let mut sums = crate::CompensatedSums::new(np);
+        let sparse = moving.active().is_bspline();
+        let mut jac = vec![R::ZERO; if sparse { 0 } else { D * np }];
+        let mut local_transform = vec![R::ZERO; if sparse { 0 } else { np }];
         for index in 0..fixed_t.len() {
             if !self.takes_part(index, &virt) {
                 continue;
@@ -944,16 +956,30 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 *x = R::ZERO;
             }
             let vp: [R; D] = std::array::from_fn(|k| R::from_f64(f64::from(virt[index][k])));
+            if let Some((cols, columns)) = moving.sparse_jacobian(&vp) {
+                // A B-spline transform: zero but for the parameters around the point.
+                let k = cols.len();
+                let values: Vec<R> = (0..k)
+                    .map(|par| {
+                        let mut v = R::ZERO;
+                        for d in 0..D {
+                            v = v + columns[d * k + par] * local[d];
+                        }
+                        v
+                    })
+                    .collect();
+                sums.add_sparse(&cols, &values);
+                continue;
+            }
             moving.jacobian(&vp, &mut jac);
             for par in 0..np {
                 for d in 0..D {
                     local_transform[par] = local_transform[par] + jac[d * np + par] * local[d];
                 }
             }
-            for par in 0..np {
-                sums[par].add(local_transform[par].to_f64());
-            }
+            sums.add_dense(&local_transform);
         }
+        sums.flush();
         let total = add_thread(&thread);
         let mut value = R::from_f64(total.sum());
         if valid == 0 {
@@ -965,10 +991,71 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         }
         let n = R::from_i64(valid as i64);
         let derivative = sums
+            .sums
             .iter()
             .map(|s| R::from_f64(add_thread(s).sum() / n.to_f64()))
             .collect();
         value = value / n;
+        Ok(PointSetValue { value, derivative })
+    }
+
+    /// `GetValueAndDerivative()` with a moving transform of local support (a displacement
+    /// field a stage optimises): each point's derivative turned by the composite's Jacobian
+    /// (`D` local parameters) and added at the virtual voxel nearest its virtual position
+    /// (`StorePointDerivative`), not averaged.
+    fn local_value_and_derivative(
+        &mut self,
+        moving: &Composite<R, D>,
+        virt: &[[f32; D]],
+        fixed_t: &[[f32; D]],
+        valid: usize,
+        warnings: &mut Vec<String>,
+    ) -> Result<PointSetValue<R>, ItkException> {
+        let n_all = moving.number_of_parameters();
+        let mut derivative = vec![R::ZERO; n_all];
+        let mut thread = CompensatedSum::default();
+        let mut jac = [R::ZERO; 16];
+        let space = self
+            .virtual_space
+            .clone()
+            .expect("a point-set metric has a virtual domain");
+        for index in 0..fixed_t.len() {
+            if !self.takes_part(index, virt) {
+                continue;
+            }
+            let (v, local) = match &self.inputs {
+                PointSetInputs::Labeled { .. } => self
+                    .label_metric(index, 116)?
+                    .value_and_derivative(&fixed_t[index], warnings),
+                PointSetInputs::Intensity { fixed, moving: m } => {
+                    self.igdm_value_and_derivative(&fixed_t[index], &fixed.data[index], m)?
+                }
+            };
+            thread.add(v.to_f64());
+            let vp: [R; D] = std::array::from_fn(|k| R::from_f64(f64::from(virt[index][k])));
+            moving.jacobian(&vp, &mut jac[..D * D]);
+            let transformed: [R; D] = std::array::from_fn(|par| {
+                let mut s = R::ZERO;
+                for d in 0..D {
+                    s = s + jac[d * D + par] * local[d];
+                }
+                s
+            });
+            let q: [f64; D] = std::array::from_fn(|k| f64::from(virt[index][k]));
+            let o = space.offset(&space.point_to_index(&q)) * D;
+            for d in 0..D {
+                derivative[o + d] = derivative[o + d] + transformed[d];
+            }
+        }
+        let total = add_thread(&thread);
+        if valid == 0 {
+            warnings.push(self.no_valid_points());
+            return Ok(PointSetValue {
+                value: R::MAX,
+                derivative: vec![R::ZERO; n_all],
+            });
+        }
+        let value = R::from_f64(total.sum()) / R::from_i64(valid as i64);
         Ok(PointSetValue { value, derivative })
     }
 
@@ -1148,6 +1235,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 Some(self.igdm_initialize(&wf, &wm, &fixed_inverse, &moving_inverse)?)
             }
         };
+        self.sparse = call.sparse;
         self.tangent = Some(TangentState {
             swapped,
             fixed_inverse,
@@ -1224,8 +1312,52 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         Ok(valid)
     }
 
-    /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`.
-    fn store(&self, derivative: &mut [R], p: &[f32; D], local: &[R; D]) {
+    /// The size of a tangent-space derivative: `D` per virtual voxel (sparse) or per fixed
+    /// point.
+    fn tangent_len(&self, points: usize) -> usize {
+        if self.sparse {
+            D * self.virtual_space.as_ref().map_or(0, Space::len)
+        } else {
+            D * points
+        }
+    }
+
+    /// The fixed points' virtual positions of the latest tangent-space call
+    /// (`GetModifiableFixedTransformedPointSet`, in tangent space).
+    pub fn tangent_fixed_points(&self) -> Vec<[f32; D]> {
+        let Some(state) = &self.tangent else {
+            return Vec::new();
+        };
+        let points: &[[f32; D]] = match &self.inputs {
+            PointSetInputs::Labeled { fixed, moving } => {
+                if state.swapped {
+                    &moving.points
+                } else {
+                    &fixed.points
+                }
+            }
+            PointSetInputs::Intensity { fixed, moving } => {
+                if state.swapped {
+                    &moving.points
+                } else {
+                    &fixed.points
+                }
+            }
+        };
+        points
+            .iter()
+            .map(|p| state.fixed_inverse.apply(p))
+            .collect()
+    }
+
+    /// `StorePointDerivative`: `local` added at the virtual voxel nearest `p`; without the
+    /// sparse field (`StoreDerivativeAsSparseFieldForLocalSupportTransforms` off), `local`
+    /// stored at the point's index.
+    fn store(&self, derivative: &mut [R], index: usize, p: &[f32; D], local: &[R; D]) {
+        if !self.sparse {
+            derivative[index * D..(index + 1) * D].copy_from_slice(local);
+            return;
+        }
         let space = self.virtual_space.as_ref().expect("set by the call");
         let q: [f64; D] = std::array::from_fn(|k| f64::from(p[k]));
         let o = space.offset(&space.point_to_index(&q)) * D;
@@ -1315,8 +1447,8 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let fl = wf.labels.as_ref().expect("checked at Initialize");
         let labels = self.labels.clone();
         let valid = self.tangent_valid(&virt, |i| labels.contains(&fl[i]), warnings)?;
-        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
-        let mut derivative = vec![R::ZERO; D * space_len];
+        let total_len = self.tangent_len(virt.len());
+        let mut derivative = vec![R::ZERO; total_len];
         let mut thread = CompensatedSum::default();
         let clones = match &self.syn_current {
             Some(c) if self.corrections.current_clones => c,
@@ -1339,12 +1471,12 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             };
             let (v, local) = clones[position].value_and_derivative(p, warnings);
             thread.add(v.to_f64());
-            self.store(&mut derivative, p, &local);
+            self.store(&mut derivative, index, p, &local);
         }
         let total = add_thread(&thread);
         if valid == 0 {
             warnings.push(self.no_valid_points());
-            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+            return Ok((R::MAX, vec![R::ZERO; total_len]));
         }
         Ok((
             R::from_f64(total.sum()) / R::from_i64(valid as i64),
@@ -1434,8 +1566,8 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             return Err(no_points());
         }
         let valid = self.tangent_valid(&virt, |_| true, warnings)?;
-        let space_len = self.virtual_space.as_ref().map_or(0, Space::len);
-        let mut derivative = vec![R::ZERO; D * space_len];
+        let total_len = self.tangent_len(virt.len());
+        let mut derivative = vec![R::ZERO; total_len];
         let mut thread = CompensatedSum::default();
         for (index, p) in virt.iter().enumerate() {
             if !self.inside(p) {
@@ -1446,12 +1578,12 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             }
             let (v, local) = self.igdm_value_and_derivative(p, &wf.data[index], moved)?;
             thread.add(v.to_f64());
-            self.store(&mut derivative, p, &local);
+            self.store(&mut derivative, index, p, &local);
         }
         let total = add_thread(&thread);
         if valid == 0 {
             warnings.push(self.no_valid_points());
-            return Ok((R::MAX, vec![R::ZERO; D * space_len]));
+            return Ok((R::MAX, vec![R::ZERO; total_len]));
         }
         Ok((
             R::from_f64(total.sum()) / R::from_i64(valid as i64),

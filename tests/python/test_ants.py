@@ -252,3 +252,42 @@ def test_registration_syn_stage_does_not_depend_on_threads(tmp_path):
     assert np.array_equal(one.warped.data, many.warped.data)
     warped = lx.ants.apply_transforms(m, f, one.transforms)
     assert warped.shape == f.shape
+
+
+@pytest.mark.parametrize(
+    ("transform", "extra", "files", "name"),
+    [
+        ("BSplineSyN", {"mesh_size": (2, 2, 2)}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
+        ("GaussianDisplacementField", {"update_field_variance": 2.0}, ["0Warp.nii.gz"], "Displacement"),
+        ("BSplineDisplacementField", {"mesh_size": 12.0, "total_mesh_size": 0}, ["0Warp.nii.gz"], "Displacement"),
+        ("BSpline", {"mesh_size": (2, 2, 1)}, ["0BSpline.txt"], "BSplineTransform"),
+    ],
+)  # fmt: skip
+def test_registration_deformable_stages_do_not_depend_on_threads(transform, extra, files, name):
+    """The B-spline and displacement-field stages: their files, and the same transform at any
+    thread count."""
+    rng = np.random.default_rng(6)
+    fixed = 100.0 + 20.0 * rng.random((14, 12, 10))
+    fixed[4:10, 3:9, 3:7] += 200.0
+    moving = np.roll(fixed, 1, axis=0)
+    affine = np.diag([2.0, 2.0, 2.5, 1.0])
+    f = lx.Image(fixed.astype(np.float32), affine)
+    m = lx.Image(moving.astype(np.float32), affine)
+    stage = lx.ants.RegistrationStage(
+        transform, 0.3, lx.ants.RegistrationMetric("MeanSquares", f, m),
+        iterations=[3, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+        convergence_window=3, **extra,
+    )  # fmt: skip
+    one = lx.ants.registration([stage], warped=True, n_threads=1)
+    many = lx.ants.registration([stage], warped=True, n_threads=3)
+    assert sorted(one.files) == files
+    assert one.files[files[-1]][0].name.startswith(name)
+    for f_name in one.files:
+        a = np.asarray(one.files[f_name][0].parameters)
+        b = np.asarray(many.files[f_name][0].parameters)
+        assert np.array_equal(a, b)
+    assert np.array_equal(one.warped.data, many.warped.data)
+    with pytest.raises(ValueError, match="mesh_size"):
+        lx.ants.registration(
+            [lx.ants.RegistrationStage("BSpline", 0.3, stage.metrics, [1], [1], [0])]
+        )

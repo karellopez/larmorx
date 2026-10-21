@@ -10,15 +10,16 @@
 //! from its command line ([`RegistrationConfig`]), the stages ANTs runs, and the outputs it
 //! writes.
 //!
-//! **Scope (A4 part 2).** The linear stages (`Rigid`, `Affine`, `CompositeAffine`,
-//! `Similarity`, `Translation`) are ported. The deformable ones (`BSpline`,
-//! `GaussianDisplacementField`, `BSplineDisplacementField`, `TimeVaryingVelocityField`,
-//! `TimeVaryingBSplineVelocityField`, `SyN`, `BSplineSyN`, `Exponential`,
+//! **Scope.** The linear stages (`Rigid`, `Affine`, `CompositeAffine`, `Similarity`,
+//! `Translation`; A4 part 2), `SyN` (A5 part 1), `BSplineSyN`, `GaussianDisplacementField`,
+//! `BSplineDisplacementField` and `BSpline` (A5 part 2) are ported. The velocity-field ones
+//! (`TimeVaryingVelocityField`, `TimeVaryingBSplineVelocityField`, `Exponential`,
 //! `BSplineExponential`) are parsed and checked as ANTs parses them, and refused when a stage
-//! would run them: they are A5's.
+//! would run them: they are A5 part 3's.
 
 use larmorx_core::Precision;
 
+pub mod bspline_syn;
 pub mod config;
 pub mod helper;
 pub mod pointsets;

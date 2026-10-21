@@ -1051,6 +1051,9 @@ difference that can still be improved), each with its reason; every parity case 
 static figures of part 1 are replaced. **How:** a pilot first (the validation guide page, the
 shared components, N4BiasFieldCorrection and 3dTshift), reviewed by the user, then the other
 tools.
+**Pilot approved by the user** the same day ("Yes, I like that, please proceed"), as published:
+the clean-room 3dTshift's last-unit differences from its double-precision Fourier shift stay an
+"open difference"; part 2b brings every other tool into the same form.
 
 ## Open decisions (PLAN.md §16)
 

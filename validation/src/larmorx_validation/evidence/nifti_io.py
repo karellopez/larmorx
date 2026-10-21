@@ -191,6 +191,34 @@ def _group(category: str) -> str:
     return category
 
 
+def _double_qform_same(case: str) -> bool | None:
+    """Whether larmorx's matrices equal nibabel's when nibabel computes the qform in double
+    precision, as it does where ``numpy.longdouble`` is 64 bits (arm64, Windows): nibabel's
+    ``quaternions.MAX_FLOAT`` set to float64 for the call. None when the file is not at hand."""
+    import larmorx_testdata as td
+    import nibabel as nib
+    from nibabel import quaternions
+
+    import larmorx as lx
+
+    try:
+        path = Path(td.get(case))
+    except Exception:  # not a catalog path
+        return None
+    saved = quaternions.MAX_FLOAT
+    quaternions.MAX_FLOAT = np.float64
+    try:
+        ref = nib.load(str(path))
+        hdr = ref.header
+        ours = lx.load(str(path)).header
+        same = np.array_equal(np.asarray(lx.load(str(path)).affine), ref.affine)
+        if ours.qform is not None and int(hdr["qform_code"]):
+            same &= np.array_equal(np.asarray(ours.qform), hdr.get_qform())
+        return bool(same)
+    finally:
+        quaternions.MAX_FLOAT = saved
+
+
 def _cases(ctx: core.Context, rec) -> list[dict]:
     descs = {}
     for t in rec.tables:
@@ -214,12 +242,19 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
                     "voxel data in every read mode, every header field, the "
                     "extensions and the matrices equal; the written file read back alike",
                 )
-            else:
+            elif _double_qform_same(r["case"]):
                 v = (
                     "within-variability",
-                    f"data and every header field equal; the matrices "
-                    f"within {worst:.2g} mm: nibabel computes the qform in numpy's long double "
-                    "(80-bit on Linux x86-64, 64-bit on arm64 and Windows), larmorx in double",
+                    f"data and every header field equal; the matrices within {worst:.2g} mm: "
+                    "nibabel computes the qform in numpy's long double, 80-bit on Linux x86-64; "
+                    "computed in double, as nibabel does where long double is 64 bits (arm64, "
+                    "Windows), its matrices are larmorx's, bit for bit (NIB-04)",
+                )
+            else:
+                v = (
+                    "open",
+                    f"data and every header field equal; the matrices within {worst:.2g} mm, "
+                    "not accounted for by nibabel's long double",
                 )
         out.append(
             {

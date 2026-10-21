@@ -23,27 +23,21 @@ starts no other agent.
 | A4.4 | `f19ffb7` (10-18) | `antsRegistration`'s point-set metrics; ANTS-54 and ITK-21 corrected by default; correctly rounded `pow` | five decisions (below) |
 | A5.1 | `7f2a61e` (10-20) | `antsRegistration`'s SyN stages; displacement fields as initial transforms; parity `--jobs` | the other deformable stages (A5.2, A5.3) |
 | A5.2 | `a5-part2-bspline` (10-21) | `antsRegistration`'s BSplineSyN, BSpline, GaussianDisplacementField and BSplineDisplacementField stages; the Python API's `mesh_size`, `total_mesh_size`, `spline_order` | `antsApplyTransforms` with `BSplineTransform` files; ANTS-78 and ITK-35 (below); A5.3 |
+| Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
 
 ## The order from here
 
-1. **The visual reports** (user, 2026-10-20), before the next program: the shared figure code in
-   `larmorx_validation` (one style, every figure drawn from the validation records, reproducible
-   from a commit); figures for every tool already ported (agreement overviews, difference
-   distributions, image comparisons such as N4 bias fields, registration overlays, warp-field
-   differences and 3dTshift time series, the originals' own variability, speed); per-tool pages on
-   the documentation site (`larmorx_documentation`), with the landing page's two fixes (the hero
-   on phones mid-scroll, a font with Greek letters).
-2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
+1. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
    corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
    point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
    ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
-3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
+2. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
    extraction and MNI normalisation run in larmorx.
-4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
+3. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
    (`docs/findings/ants-ai.md`, "Blobs").
-5. **AFNI:** 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
+4. **AFNI:** 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
    current fMRIPrep, niworkflows and sdcflows do not call 3dvolreg (to drop unless wanted);
    optional paths of its libraries use 3dQwarp (sdcflows' alternative PEPOLAR estimator) and
    3dSkullStrip with 3dcalc (niworkflows' legacy AFNI skull-stripping): **planned for later**
@@ -54,17 +48,17 @@ starts no other agent.
    3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority). Check each source file's licence:
    NIH public-domain files get one Apache replica; MCW (GPL) files a replica in `larmorx-gpl`
    and a clean-room original from a spec.
-6. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
+5. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each.
-7. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
+6. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
    as a clean-room original with its atlas fetched on first use, its data packaged apart from the
    wheels; `docs/licensing.md`); pretrained models as Rust inference with the original weights
    (decision log 2026-10-19); Connectome Workbench- and MSM-compatible surface tools; the
    confounds (CompCor, DVARS, framewise displacement, ...).
-8. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
-9. **Releases on PyPI** (below).
+7. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
+8. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
 
@@ -73,6 +67,10 @@ starts no other agent.
   thread, larmorx 24 to 41 s, bit-identical); the B-spline and displacement-field stages (4D
   `BSpline` on a small phantom: ANTs 461 s, larmorx 23 s at one thread, identical); HDF5 reading
   against h5py and ANTs.
+- **Figures:** every new part brings its tool's figures (`docs/figures.md`); the site's pages
+  for antsRegistration, antsAI and the HDF5 files say their benchmark is pending until the
+  reports above exist. The figures take about 12 MB of the site's repository (four SVGs each,
+  text as outlines); embedded font subsets per SVG would make them smaller.
 - **`antsApplyTransforms` with `BSplineTransform` files** (the `BSpline` stage's output; refused
   with a message today, `warped=True` gives the warped image), with parity cases.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,

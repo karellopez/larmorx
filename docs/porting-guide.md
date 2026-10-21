@@ -597,6 +597,7 @@ Mandatory for every tool (PLAN.md §4, rule 7). Copy the models.
 | 10 | Golden cases for every CLI tool, ImageMath operation and public function | `tests/golden/registry.py` (replicas: `crates-gpl/.../tests/golden.rs`) | [validation/golden.md](validation/golden.md), "Adding a golden case" |
 | 11 | The stage comparison, if fMRIPrep runs the tool | `validation/.../stages/catalogue.py` | [validation/fmriprep-stages.md](validation/fmriprep-stages.md) |
 | 12 | A status line in CLAUDE.md and the record's row in the validation index | `CLAUDE.md`, `docs/validation/README.md` | |
+| 13 | Figures and the tool's page on the documentation site | `validation/.../figures/<tool>.py`; the site's `static/figures/<tool>/`, `content/tools/<tool>.md` | [figures.md](figures.md); `figures/ants_n4.py` |
 
 How the code is laid out, and how to add an ImageMath group or a replica:
 [architecture.md](architecture.md).

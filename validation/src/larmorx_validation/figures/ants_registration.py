@@ -81,18 +81,19 @@ def band(rec: records.Record, program: str) -> Figure:
 
 
 def _band_chart(theme: style.Theme, width: int, pts: list[tuple[str, float]], program: str):
+    """A lollipop per case: the original's largest parameter change across thread counts."""
     from larmorx_validation.figures.canvas import Canvas
 
     narrow = width < 500
     zero = [c for c, v in pts if v == 0]
     vals = sorted([(v, c) for c, v in pts if v > 0])
-    row_h = 15
+    row_h = 28 if narrow else 15
     top = 30
     h = top + row_h * len(vals) + 56
     c = Canvas(theme, width, h)
     label_w = 0 if narrow else 300
     ax = c.axes(label_w, top, width - label_w - 8, row_h * len(vals))
-    ys = np.arange(len(vals))
+    ys = np.arange(len(vals)) + (0.22 if narrow else 0)
     xs = [v for v, _ in vals]
     ax.hlines(ys, 1e-23, xs, color=theme.line, lw=0.9)
     ax.scatter(xs, ys, s=26, color=theme.original, edgecolors=theme.paper, linewidths=1, zorder=3)
@@ -100,16 +101,8 @@ def _band_chart(theme: style.Theme, width: int, pts: list[tuple[str, float]], pr
     ax.set_xlim(1e-23, 30)
     ax.set_ylim(len(vals) - 0.5, -0.5)
     for i, (_v, case) in enumerate(vals):
-        if narrow:
-            ax.text(
-                1.5e-23,
-                i - 0.05,
-                case,
-                fontfamily=style.MONO,
-                fontsize=style.pt(9),
-                color=theme.ink2,
-                va="center",
-            )
+        if narrow:  # the case's name above its line
+            c.text(4, top + row_h * i + 10, case, family=style.MONO, size=9.5, color=theme.ink2)
         else:
             c.text(
                 label_w - 10,
@@ -128,15 +121,18 @@ def _band_chart(theme: style.Theme, width: int, pts: list[tuple[str, float]], pr
     for t in ax.get_xticklabels():
         t.set_fontfamily(style.MONO)
     ax.set_xlabel(
-        f"largest change in a transform parameter, {program} at 2, 4, 8 threads vs 1 (log)",
+        f"largest change in a transform parameter, {program} at 2, 4, 8 threads vs 1 (log)"
+        if not narrow
+        else f"largest parameter change, {program} at 2-8 threads vs 1",
         fontsize=style.pt(11.5),
     )
+    cases = "case" if len(zero) == 1 else "cases"
     c.text(
         0,
         14,
-        f"{len(zero)} cases unchanged by the thread count: " + ", ".join(zero)
+        f"{len(zero)} {cases} unchanged by the thread count: " + ", ".join(zero)
         if not narrow
-        else f"{len(zero)} more cases unchanged by the thread count",
+        else f"and {len(zero)} {cases} unchanged by the thread count",
         family=style.MONO,
         size=10,
         color=theme.ink3,

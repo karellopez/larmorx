@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.figures import style
-from larmorx_validation.figures.canvas import Canvas
+from larmorx_validation.figures.canvas import Canvas, wrap
 
 
 @dataclass
@@ -154,10 +154,12 @@ def draw_grid(theme: style.Theme, width: int, grid: Grid) -> object:
     heads = [36 if any(p.subtitle for p in row) else 22 for row in rows]
     row_heights = [max(sizes[i * cols : i * cols + cols]) for i in range(len(rows))]
     bars = list(grid.bars.items())
-    bar_h = 50
     per_line = 1 if narrow else 2
-    bar_rows = -(-len(bars) // per_line) if bars else 0
-    height = sum(row_heights) + sum(heads) + len(rows) * gap + bar_rows * bar_h + 4
+    bw = width if per_line == 1 else (width - 3 * gap) / 2
+    # a bar's label wraps to its width: 50 px for one line, 14 more for each other
+    bar_h = [50 + 14 * (len(wrap(b.label, bw, style.SANS, 11)) - 1) for _, b in bars]
+    bar_rows = [max(bar_h[i : i + per_line]) for i in range(0, len(bars), per_line)]
+    height = sum(row_heights) + sum(heads) + len(rows) * gap + sum(bar_rows) + 4
     c = Canvas(theme, width, height)
     y = 0.0
     k = 0
@@ -171,10 +173,9 @@ def draw_grid(theme: style.Theme, width: int, grid: Grid) -> object:
             _show(ax, p, theme)
             k += 1
         y += row_heights[r] + heads[r] + gap
-    bw = width if per_line == 1 else (width - 3 * gap) / 2
     for i, (_key, bar) in enumerate(bars):
         bx = 0 if per_line == 1 else (i % 2) * (bw + 3 * gap)
-        by = y + (i // per_line) * bar_h
+        by = y + sum(bar_rows[: i // per_line])
         colorbar(c, bx, by + 6, bw, bar, theme)
     return c.fig
 
@@ -222,6 +223,10 @@ def colorbar(c: Canvas, x: float, y: float, w: float, bar: Bar, theme: style.The
     import matplotlib as mpl
 
     cmap = mpl.colormaps[bar.cmap] if isinstance(bar.cmap, str) else bar.cmap
+    lines = wrap(bar.label, w, style.SANS, 11)
+    for k, line in enumerate(lines):
+        c.text(x, y + 11 + 14 * k, line, size=11, color=theme.ink2)
+    y += 14 * (len(lines) - 1)
     ax = c.axes(x, y + 16, w, 7)
     grad = np.linspace(0, 1, 256)[None, :]
     ax.imshow(grad, aspect="auto", cmap=cmap, extent=(bar.vmin, bar.vmax, 0, 1))
@@ -242,7 +247,6 @@ def colorbar(c: Canvas, x: float, y: float, w: float, bar: Bar, theme: style.The
             color=theme.ink2,
             ha=ha,
         )
-    c.text(x, y + 11, bar.label, size=11, color=theme.ink2)
 
 
 def largest(diff: np.ndarray, mask: np.ndarray | None = None) -> str:

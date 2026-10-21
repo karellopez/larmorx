@@ -5,7 +5,7 @@
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
+- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
 
 **Bit-identical: 176 of 279 passing cases** produce exactly the bytes of AFNI's output data.
 - Lagrange and weighted-sinc methods and copies: 129 of 132 bit-identical.
@@ -118,7 +118,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (64ecce8ac8ae) |
+| larmorx | 0.0.1 (a58978f4dfd1) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -203,7 +203,7 @@ RUNS = [
         "ANTs 2.6.2 (fMRIPrep's image), 1 thread",
         "conda-forge's build, glibc's maths",
     ),
-    ("ants-8", "ants-8", "original", "ANTs 2.6.5, 8 threads", "a first run"),
+    ("ants-8", "ants-8", "original", "ANTs 2.6.5, 8 threads", "as built (fMRIPrep ran 8)"),
     ("ants-8b", "ants-8b", "original", "ANTs 2.6.5, 8 threads", "a second run, same command"),
     ("ants-12", "ants-12", "original", "ANTs 2.6.5, 12 threads", "as built"),
     (

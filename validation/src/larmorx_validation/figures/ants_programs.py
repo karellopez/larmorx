@@ -99,12 +99,18 @@ def image_math(ctx: Context) -> Figure:
     rec = records.load(ctx.repo, "ants-image-math")
     t = rec.table("Category", "Bit-identical", "Pass")
     same = {r["Category"]: int(records.number(r["Bit-identical"])) for r in t.rows}
-    not_cmp = set(_cases_after(rec, "Values not compared"))
+    # the cases the record names as within their tolerance; the other passing cases that are
+    # not bit-identical had no values to compare
+    within = set(_cases_after(rec, "Not bit-identical"))
 
     def split(cat: str, passing: list[dict]) -> dict[str, int]:
-        n_agree = sum(1 for r in passing if r["case"] in not_cmp)
-        n_same = min(same.get(cat, 0), len(passing) - n_agree)
-        return {"identical": n_same, "within": len(passing) - n_agree - n_same, "agree": n_agree}
+        n_within = sum(1 for r in passing if r["case"] in within)
+        n_same = same.get(cat, 0)
+        return {
+            "identical": n_same,
+            "within": n_within,
+            "agree": len(passing) - n_same - n_within,
+        }
 
     return common.agreement_figure(
         rec,

@@ -112,10 +112,10 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-64 | antsRegistration point sets | a sampling percentage below 1 keeps a random fraction drawn with a generator seeded from the clock: no two runs agree | b | none | seeded from the registration's seed (121212 without one): repeatable | – |
 | ANTS-65 | antsRegistration IGDM | the estimated intensity sigma ignores both point sets' minima (never updated: `else if`) and subtracts the moving maximum (`std::min(minMoving, maxMoving)`): the difference of the maxima, or the larger maximum | c | none | corrected by default: the range of both sets' intensities, a notice with both values; `reproduce` as ANTs (A4 part 4) | – |
 | ANTS-66 | antsRegistration IGDM | the value (the line search's) computes the neighbourhood's centre from `-0.5` times its voxel count: for a radius of 1 or more, a negative index and a read before the intensity arrays | a | none | corrected by default: the centre as the derivative reads it; `reproduce` takes the two intensities as equal, with a notice (A4 part 4) | – |
-| ANTS-67 | antsRegistration IGDM | the `kNeighborhood` and `gradientSigma` arguments are parsed and never used (central differences, one neighbour) | c? | none | reproduces (both ignored) | decide |
-| ANTS-68 | antsRegistration IGDM | the derivative lacks the Gaussians' `1/σ²` factors, so it is not the value's gradient and its two terms are weighed by `σ²` | c? | none | reproduces | decide |
+| ANTS-67 | antsRegistration IGDM | the `kNeighborhood` and `gradientSigma` arguments are parsed and never used (central differences, one neighbour) | c? | none | reproduces (both ignored) | yes (decided 2026-10-21: corrected by default with A5 part 3) |
+| ANTS-68 | antsRegistration IGDM | the derivative lacks the Gaussians' `1/σ²` factors, so it is not the value's gradient and its two terms are weighed by `σ²` | c? | none | reproduces | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | ANTS-69 | antsRegistration point sets | crashes and a hang: no fixed mask, warped outputs, `--print-similarity-measure-interval` or `--write-interval-volumes` with a point-set metric first, an unreadable point set, image sampling in a stage with a point-set metric, NaN parameters; a text file with a word among its numbers loops forever | a | none | refuses with a message where ANTs crashes (its output up to there); refuses a hanging read | – |
-| ANTS-70 | antsRegistration IGDM | the estimated distance sigma is the standard deviation of the nearest distances: 0 when they are all equal (identical point sets), and the registration's parameters become NaN | c? | none | reproduces the estimate; stops where the parameters become NaN (ANTS-69) | decide |
+| ANTS-70 | antsRegistration IGDM | the estimated distance sigma is the standard deviation of the nearest distances: 0 when they are all equal (identical point sets), and the registration's parameters become NaN | c? | none | reproduces the estimate; stops where the parameters become NaN (ANTS-69) | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | ANTS-71 | antsRegistration SyN | `--print-similarity-measure-interval` crashes without an initial fixed transform (`-q`), without a moving transform before the stage, or with several metrics (null pointers in the observer) | a | none | stops with a message where ANTs crashes; corrected, the missing transforms are the identity and the first metric's images are used (A5 part 1) | – |
 | ANTS-72 | antsRegistration | a linear stage after a displacement field (a SyN stage, `-r field`) estimates its parameter scales and learning rate from 1000 voxels drawn with a generator ITK seeds from the clock: not repeatable, whatever the seed | b | none (fMRIPrep's linear stages come first) | draws them with the stage's seed | – |
 | ANTS-73 | antsRegistration | an initial transform image that is not a field of the registration's dimension (a scalar image, a 2D field in 3D) is read as one: ITK converts the pixels as gray, complex, RGB or RGBA values | e | none | corrected by default: refused; `reproduce` converts as ITK (A5 part 1) | – |
@@ -123,7 +123,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-75 | antsRegistration | `--print-similarity-measure-interval` and `--write-interval-volumes` copy the stage's transforms by setting each copy's parameters before its fixed parameters: a displacement field, or a B-spline transform of another mesh than 1, refuses, and the stage fails at its first iteration | c | none (fMRIPrep sets neither option) | corrected by default: the transforms are used as they are, a notice; `reproduce` fails as ANTs (A5 part 2) | – |
 | ANTS-76 | antsRegistration | collapsing the output transforms (`-z 1`, the default) around B-spline transforms loses transforms: one that follows only B-spline transforms, a B-spline transform after another at the end of the queue; before more linear transforms or fields that B-spline transform joins their run and ANTs crashes | c | none (fMRIPrep uses no B-spline transform) | corrected by default: every transform kept, linear and field runs collapsed around them, a notice; `reproduce` collapses as ANTs, stops where it crashes (A5 part 2) | – |
 | ANTS-77 | antsRegistration `BSpline` | a mesh size of 0, or fewer mesh sizes than dimensions (read past the end of the list), divides by zero: a grid of NaN and infinite geometry, vnl's SVD warnings, an exception on garbage indices | a | none | refused with a message (A5 part 2) | – |
-| ANTS-78 | antsRegistration `BSplineDisplacementField` | the meshes "at the base level" are doubled already at the base level (`mesh << (level + 1)`; B-spline SyN uses `mesh << level`) | c? | none | reproduces | decide |
+| ANTS-78 | antsRegistration `BSplineDisplacementField` | the meshes "at the base level" are doubled already at the base level (`mesh << (level + 1)`; B-spline SyN uses `mesh << level`) | c? | none | reproduces | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -147,18 +147,18 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-21 | ITK `ConjugateGradientLineSearchOptimizerv4` in `antsAffineInitializer` | without a scales estimator the learning rate the line search leaves in one start point starts the next | c (c? until 2026-10-17) | every niworkflows initialization | corrected by default: each start point at the configured rate (0.1), a notice where the result changes (2026-10-17) | – |
 | ITK-22 | ITK `LabeledPointSetToPointSetMetricv4` | label sets that differ: a warning, then "Label not found in common label set" for the first fixed point whose label the moving set lacks (the stage dropped, ANTS-49) | c | none | corrected by default: those points take no part (an error when no label is common), a notice; `reproduce` throws ITK's exception (A4 part 4) | – |
 | ITK-23 | ITK `GaussianMembershipFunction` | a covariance equal to the identity (JHCT with a point-set sigma of 1, isotropic) keeps the univariate prefactor `1/√(2π)` in any dimension | c | none | corrected by default: the `D`-dimensional prefactor, a notice; `reproduce` as ITK (A4 part 4) | – |
-| ITK-24 | ITK JHCT metric | the total number of points leaves out the fixed ones (`m_NumberOfValidPoints` is still 0 in `Initialize`) | c? | none | reproduces | decide |
+| ITK-24 | ITK JHCT metric | the total number of points leaves out the fixed ones (`m_NumberOfValidPoints` is still 0 in `Initialize`) | c? | none | reproduces | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | ITK-25 | ITK `ManifoldParzenWindowsPointSetFunction` | fewer points than the covariance neighbourhood (5): the loop reads past the end of the list of neighbours | a | none | uses the neighbours there are, in both modes, with a notice (A4 part 4) | – |
 | ITK-26 | ITK `ManifoldParzenWindowsPointSetFunction` | anisotropic covariances add each diagonal product twice (`Cout(m, n)` and `Cout(n, m)` with `n = m`) | c | none | corrected by default: once, a notice; `reproduce` as ITK (A4 part 4) | – |
 | ITK-27 | ITK `CompensatedSummation` | adding one compensated sum to another adds its compensation first, then its sum | d | none | reproduces (one work unit) | – (D11) |
 | ITK-28 | ITK JHCT metric | `alpha` is tested with `!= 1` for the prefactor and with `AlmostEquals` for the value: an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | c | none | corrected by default: both test `AlmostEquals`, a notice; `reproduce` as ITK (A4 part 4) | – |
-| ITK-29 | ITK `ManifoldParzenWindowsPointSetFunction` | the kernel sigma multiplies the covariance unsquared (a variance of 10), where the regularisation sigma is squared | c? | none | reproduces | decide |
+| ITK-29 | ITK `ManifoldParzenWindowsPointSetFunction` | the kernel sigma multiplies the covariance unsquared (a variance of 10), where the regularisation sigma is squared | c? | none | reproduces | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | ITK-30 | ITK `CorrelationImageToImageMetricv4` (ANTs' `GC`) | with a displacement field (SyN) every point's derivative is added to the first voxel's entries: only that voxel moves | c | none (fMRIPrep's SyN uses CC) | corrected by default: each voxel its own derivative; `reproduce` as ITK (A5 part 1) | – |
 | ITK-31 | ITK `SyNImageRegistrationMethod` | a stage with only one of its two masks: the role without one keeps the previous evaluation's resampled mask | c | every run: sMRIPrep's brain extraction's SyN stage has a fixed mask only (corrected: the field moves by at most 0.18 mm, median 0.0004 mm, on ds000005) | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-32 | ITK `LabeledPointSetToPointSetMetricv4` | appends per-label metrics at every `Initialize` and uses the first: in SyN every evaluation compares with the moving points as the first one mapped them | c | none | corrected by default; `reproduce` as ITK (A5 part 1) | – |
 | ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
 | ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
-| ITK-35 | ITK `BSplineBaseTransform` | no Jacobian with respect to position (`ComputeJacobianWithRespectToPosition` throws "not yet implemented"): a stage after a B-spline transform whose metric needs the composite's Jacobian (linear, displacement-field and `BSpline` stages) fails at its first derivative | c? | none | fails as ITK (the linear stage dropped, ANTS-49) | decide |
+| ITK-35 | ITK `BSplineBaseTransform` | no Jacobian with respect to position (`ComputeJacobianWithRespectToPosition` throws "not yet implemented"): a stage after a B-spline transform whose metric needs the composite's Jacobian (linear, displacement-field and `BSpline` stages) fails at its first derivative | c? | none | fails as ITK (the linear stage dropped, ANTS-49) | yes (decided 2026-10-21: corrected by default with A5 part 3) |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -1321,7 +1321,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** none.
 - **larmorx:** reproduces (both arguments accepted and ignored; documented in
   `docs/api/ants-registration.md`).
-- **D13 / gap:** decide: whether to honour them (the k nearest points; the Gaussian gradient
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide: whether to honour them (the k nearest points; the Gaussian gradient
   with that sigma) or keep ANTs' behaviour.
 
 ### ANTS-68 IGDM's derivative lacks the Gaussians' 1/σ² — (c?)
@@ -1332,7 +1332,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `Temporary/itkMeanSquaresPointSetToPointSetIntensityMetricv4.hxx:396-417`.
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** decide (possibly intended: a step direction rather than a gradient).
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (possibly intended: a step direction rather than a gradient).
 
 ### ANTS-69 Crashes and a hang with point-set metrics — (a)
 - **What:** ANTs crashes (a) in a stage of point-set metrics without a fixed mask (the spacing
@@ -1366,7 +1366,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** none.
 - **larmorx:** reproduces the estimate; where the parameters become NaN it stops as ANTs would
   crash (ANTS-69).
-- **D13 / gap:** decide: a defect (a typical distance, e.g. the mean, or a floor) or the
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide: a defect (a typical distance, e.g. the mean, or a floor) or the
   heuristic as intended.
 
 
@@ -1490,7 +1490,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   B-spline SyN and `:3493` for `BSpline`); validated (every `displacement-field/bspline-*` case reproduces it).
 - **fMRIPrep:** none (fMRIPrep uses no B-spline displacement field).
 - **larmorx:** reproduces.
-- **D13 / gap:** decide (possibly intended: the comment says "double the b-spline mesh
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (possibly intended: the comment says "double the b-spline mesh
   resolution at each level").
 
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
@@ -1597,7 +1597,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   case reproduces it).
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** decide (the total is a normalisation constant: it scales the value and the
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (the total is a normalisation constant: it scales the value and the
   derivative alike).
 
 ### ITK-25 The Parzen covariances read past their neighbours — (a)
@@ -1651,7 +1651,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `itkantsRegistrationHelper.hxx:1058`.
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** decide (a width of √10 instead of 10; it weighs the neighbours of the local
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (a width of √10 instead of 10; it weighs the neighbours of the local
   covariances).
 
 
@@ -1956,7 +1956,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `bspline/then-bspline`, `bspline/initial-bspline-affine`: identical messages).
 - **fMRIPrep:** none.
 - **larmorx:** fails as ITK.
-- **D13 / gap:** decide (implementing the Jacobian would let such stages run: a new behaviour,
+- **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (implementing the Jacobian would let such stages run: a new behaviour,
   not a correction of a result).
 ## fMRIPrep and its libraries
 

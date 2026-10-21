@@ -33,7 +33,11 @@ starts no other agent.
    differences and 3dTshift time series, the originals' own variability, speed); per-tool pages on
    the documentation site (`larmorx_documentation`), with the landing page's two fixes (the hero
    on phones mid-scroll, a font with Greek letters).
-2. **A5 part 3:** the time-varying velocity fields and the exponential transforms.
+2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
+   corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
+   ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
+   point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
+   ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
 3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
    extraction and MNI normalisation run in larmorx.
 4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
@@ -73,6 +77,12 @@ starts no other agent.
   with a message today, `warped=True` gives the warped image), with parity cases.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
+- **In-place writing in 3dTshift** (decided 2026-10-21): an existing writable output in a
+  directory that cannot be written is replaced in place, as AFNI does. The replica directly;
+  the clean-room original from a spec amendment written from black-box runs (the implementer
+  reads only the spec).
+- **PIPE-16** (larmorprepx, decided 2026-10-21): the corrected field-map reference keeps N4's
+  float32 result; `reproduce` gives fMRIPrep's int16 re-quantisation.
 - `larmorx-interp`'s B-spline prefilter still calls the `libm` crate's `pow`: switch to
   `larmorx_core::math::pow` and re-run `antsApplyTransforms`' B-spline cases.
 - A4's linear stages run in the global thread pool instead of `n_threads` (results unaffected).
@@ -115,20 +125,11 @@ Still to do:
 
 ## Waiting for the user
 
-- **PIPE-16** (for larmorprepx): nipype's N4 interface writes the corrected field-map
-  reference in the input's int16 type (re-quantized, up to 0.3 % at the dimmest voxels). Keep
-  fMRIPrep's behaviour, or keep N4's float32 result.
-- **In-place writing:** an existing writable output in a directory that cannot be written is
-  replaced in place by AFNI but is an error in larmorx (it writes a temporary file and renames
-  it). Proposed: fall back to writing in place there, in both 3dTshift implementations.
-- **ANTS-30:** review ResampleImage's corrected command line (`docs/api/ants-resample-image.md`).
+- **ANTS-30:** review ResampleImage's corrected command line (`docs/api/ants-resample-image.md`,
+  "The seventh argument").
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
-  PIPE-03's real-data numbers, ready to file.
-- **`LARMORX_GPL_BIN`:** Python still reads it, only to find the replica program.
-- **The point-set metrics' defects** (A4.4; fMRIPrep does not use these metrics): ANTS-67,
-  ANTS-68, ANTS-70, ITK-24, ITK-29, each kept faithful until decided (the register says what each
-  is).
-- **Two questionable behaviours of the B-spline stages** (A5.2), reproduced until decided:
-  **ANTS-78**, BSplineDisplacementField's base-level mesh is already doubled at the base level;
-  **ITK-35**, B-spline transforms have no Jacobian with respect to position in ITK, so a later
-  linear, field or BSpline stage fails (implementing it would let those stages run).
+  PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
+
+Decided 2026-10-21 (decision log): ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29
+corrected by default (with A5 part 3); in-place writing as AFNI does; `LARMORX_GPL_BIN` kept;
+PIPE-16 keeps N4's float32 result.

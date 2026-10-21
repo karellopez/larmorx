@@ -1006,6 +1006,31 @@ paper, light and dark themes, serif titles, a particle hero). Its first version,
 whose hero shows spins of the different toolkits coming into resonance and forming a brain, was
 started the same day.
 
+## 2026-10-21: The pending defect decisions, as recommended
+
+**Decided by the user** ("Follow your recommendations"), applying D13 (correct by default, a
+switch to reproduce the original exactly) as for ANTS-54:
+- **ANTS-78:** BSplineDisplacementField uses the mesh given "at the base level" at the base
+  level (as B-spline SyN and `BSpline` do); `reproduce` keeps ANTs' doubled mesh.
+- **ITK-35:** B-spline transforms get their Jacobian with respect to position (the derivative of
+  the cubic B-spline sum), so stages after a `BSpline` stage or a B-spline initial transform run;
+  `reproduce` keeps ITK's failure.
+- **The point-set metrics** (fMRIPrep uses none): **ANTS-67** IGDM honours `kNeighborhood` and
+  `gradientSigma`; **ANTS-68** IGDM's derivative is the value's true gradient (with the
+  Gaussians' 1/σ²); **ANTS-70** IGDM's estimated distance sigma gets a floor, with a warning,
+  instead of NaN parameters; **ITK-24** JHCT counts the fixed points in its total; **ITK-29** the
+  Parzen kernel sigma is used as a sigma (squared for the covariance). Each with `reproduce`.
+- **In-place writing:** where an existing writable output lies in a directory that cannot be
+  written, larmorx replaces it in place, as AFNI does, in both 3dTshift implementations (the
+  replica directly; the clean-room original through its spec).
+- **`LARMORX_GPL_BIN`** stays: it only locates the installed replica program and changes no
+  result.
+- **PIPE-16** (larmorprepx): the corrected field-map reference keeps N4's float32 result by
+  default; `reproduce` gives fMRIPrep's int16 re-quantisation.
+**When:** the registration items with A5 part 3; the in-place writing and PIPE-16 as follow-ups
+(`docs/next-steps.md`). Still the user's: the review of ANTS-30's command line and filing the
+PIPE-02 and PIPE-03 reports.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

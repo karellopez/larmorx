@@ -52,7 +52,10 @@ def _oracles() -> Path:
 
 def negative_slope(src: Path, dst: Path) -> None:
     """The same values stored with a negative scale factor: the stored integers negated and
-    ``scl_slope`` negated (a legal NIfTI encoding of the same data; AFNI-01's condition)."""
+    ``scl_slope`` negated (a legal NIfTI encoding of the same data; AFNI-01's condition). The
+    rest of the file (header, extensions) is the input's, byte for byte."""
+    import gzip
+
     import nibabel as nib
 
     img = nib.load(str(src))
@@ -60,18 +63,18 @@ def negative_slope(src: Path, dst: Path) -> None:
     if raw.min() <= np.iinfo(raw.dtype).min:
         raise ValueError("the input's most negative value cannot be negated")
     hdr = img.header.copy()
-    slope, inter = img.dataobj.slope, img.dataobj.inter
-    out = nib.Nifti1Image((-raw).astype(raw.dtype), img.affine, hdr)
-    out.header.set_data_dtype(raw.dtype)
-    out.header["scl_slope"] = -slope
-    out.header["scl_inter"] = inter
-    out.update_header()
-    out.header["scl_slope"] = -slope
-    out.header["scl_inter"] = inter
-    nib.save(out, str(dst))
+    hdr["scl_slope"] = -float(img.dataobj.slope)
+    offset = int(hdr["vox_offset"])
+    with gzip.open(src, "rb") as f:
+        head = bytearray(f.read(offset))
+    head[:348] = hdr.binaryblock
+    data = (-raw).astype(raw.dtype.newbyteorder(hdr.endianness)).tobytes(order="F")
+    with open(dst, "wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0) as g:
+        g.write(bytes(head) + data)
     back = nib.load(str(dst))
     assert np.array_equal(np.asanyarray(back.dataobj.get_unscaled()), -raw)
-    assert float(back.header["scl_slope"]) == -float(slope)
+    assert float(back.dataobj.slope) == -float(img.dataobj.slope)
+    assert np.array_equal(np.asanyarray(back.dataobj), np.asanyarray(img.dataobj))
 
 
 def _compute(e: fcache.Entry) -> None:

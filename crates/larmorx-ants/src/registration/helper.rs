@@ -1758,7 +1758,31 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             self.warnings.extend(observed);
             self.warnings.extend(warnings);
             match result {
-                Ok((t, _)) => {
+                Ok((mut t, _)) => {
+                    // An exponential transform that never integrated (no iteration, no
+                    // resampling) keeps its velocity image as its field and has no inverse
+                    // field: ITK's inverse then has no field and throws when it maps a point
+                    // (ITK-41). Corrected: integrated, exp(v) and exp(-v).
+                    if let Xfm::Field(f) = &mut t
+                        && let Some(FieldSmoothing::Exponential(e)) = f.smoothing.clone()
+                        && f.inverse.is_none()
+                    {
+                        push_once(
+                            &mut self.notices,
+                            Notice::new(
+                                &defects::ITK_41,
+                                self.upstream_defects,
+                                if self.upstream_defects.fix() {
+                                    format!("stage {stage}: the exponential transform never integrated its velocity field; integrated now, so it has an inverse; ITK's inverse has no field and fails when it maps a point")
+                                } else {
+                                    format!("stage {stage}: the exponential transform never integrated its velocity field and has no inverse field, as in ITK")
+                                },
+                            ),
+                        );
+                        if self.upstream_defects.fix() {
+                            f.integrate_exponential(&e);
+                        }
+                    }
                     self.composite.as_mut().expect("set above").push(t);
                     self.origins.push(Some(stage));
                 }

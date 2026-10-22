@@ -2611,6 +2611,25 @@ fn write_velocity_field<R: Compute, const D: usize>(
         }
         _ => return,
     };
+    if ndim > 4 {
+        // NiftiImageIO::WriteImageInformation refuses vector images of more than four
+        // dimensions.
+        if log.verbose {
+            let e = ItkException::new(
+                "Modules/IO/NIFTI/src/itkNiftiImageIO.cxx",
+                1576,
+                "NiftiImageIO",
+                format!(
+                    "Can not store a vector image of more than 4 dimensions in a Nifti file. Dimension={ndim}"
+                ),
+            );
+            log.cerr(&format!(
+                "Can't write velocity field transform file {name}\nException Object caught: \n{}\n",
+                e.print()
+            ));
+        }
+        return;
+    }
     let geometry = ItkGeometry {
         ndim,
         size,
@@ -2860,6 +2879,22 @@ fn write_outputs<R: Compute, const D: usize>(
             &queue,
         );
     };
+    // ITK-41 reproduced: a time-varying velocity field transform that never integrated maps
+    // points through an interpolator without input (a crash); an exponential one without an
+    // inverse field gives an inverse without a field (an exception in main).
+    let never_integrated = queue.iter().any(|t| {
+        matches!(t, Xfm::Field(f) if matches!(
+            &f.smoothing,
+            Some(larmorx_registration::field::FieldSmoothing::TimeVarying(v)) if !v.integrated
+        ))
+    });
+    if ctx.notices.reproduce()
+        && never_integrated
+        && (!warped_name.is_empty() || !inverse_warped_name.is_empty())
+    {
+        log.cerr("larmorx: antsRegistration: a TimeVaryingVelocityField transform that never integrated its velocity field maps a point: ANTs's displacement field interpolator has no input (ITK-41); ANTs crashes here, larmorx stops\n");
+        return Err(1);
+    }
     if !warped_name.is_empty() {
         let data =
             resample(moving, fixed, &queue, &interpolation, ctx).map_err(|e| refuse(log, &e))?;
@@ -2874,6 +2909,21 @@ fn write_outputs<R: Compute, const D: usize>(
         .map_err(|e| refuse(log, &e))?;
     }
     if !inverse_warped_name.is_empty() {
+        if queue.iter().any(|t| {
+            matches!(t, Xfm::Field(f) if f.inverse.is_none() && matches!(
+                &f.smoothing,
+                Some(larmorx_registration::field::FieldSmoothing::Exponential(_))
+            ))
+        }) {
+            let e = ItkException::new(
+                "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.hxx",
+                73,
+                "ConstantVelocityFieldTransform",
+                "No displacement field is specified.",
+            );
+            log.cerr(&format!("Exception Object caught: \n{}\n", e.print()));
+            return Err(1);
+        }
         let inverse: Option<Vec<Xfm<R, D>>> = queue.iter().rev().map(invert_xfm).collect();
         if let Some(inverse) = inverse {
             let data = resample(fixed, moving, &inverse, &interpolation, ctx)

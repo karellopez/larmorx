@@ -58,6 +58,10 @@ pub struct VelocityOutput<R> {
     pub direction: Vec<f64>,
     /// The vectors, `size.len() − 1` components each, interleaved, voxel `x` fastest.
     pub data: Vec<R>,
+    /// Whether the transform ever integrated its velocity field: ITK sets the displacement
+    /// field's interpolator only there, so a transform that never did (no iteration, no
+    /// resampling) crashes when it maps a point.
+    pub integrated: bool,
 }
 
 impl<R: Real> VelocityOutput<R> {
@@ -85,6 +89,7 @@ impl<R: Real> VelocityOutput<R> {
             origin: s.origin.to_vec(),
             direction: s.direction.iter().flatten().copied().collect(),
             data: v.data.iter().flatten().copied().collect(),
+            integrated: true,
         }
     }
 }
@@ -504,6 +509,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
     let fixed_initial_ignored = stage.fixed_initial.is_some();
+    let mut integrated = false;
     let mut masks_not_moved = false;
     let settings = CallSettings {
         n_threads: stage.n_threads,
@@ -529,6 +535,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                 transform.upper = R::ONE;
                 let t = &mut transform;
                 pooled(stage.n_threads, || t.integrate(floor, true))?;
+                integrated = true;
             }
         }
         // The level's images, masks and sample points.
@@ -719,6 +726,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                 transform.steps = steps;
                 let t = &mut transform;
                 pooled(stage.n_threads, || t.integrate(floor, true))?;
+                integrated = true;
             } else {
                 // The method's last integration of the iteration (the flow from the last time
                 // point back to 0) leaves these bounds.
@@ -736,7 +744,8 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
             })?;
         }
     }
-    let output = VelocityOutput::of(false, &transform.velocity);
+    let mut output = VelocityOutput::of(false, &transform.velocity);
+    output.integrated = integrated;
     let mut out = FieldXfm::new(transform.field, transform.inverse, stage.exact_floor);
     out.smoothing = Some(FieldSmoothing::TimeVarying(Arc::new(output)));
     Ok(TvvfOutput {

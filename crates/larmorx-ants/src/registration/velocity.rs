@@ -160,6 +160,24 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     );
                 }
                 self.mask_notice(stage, out.masks_not_moved);
+                let never = matches!(
+                    &out.output.smoothing,
+                    Some(larmorx_registration::field::FieldSmoothing::TimeVarying(v)) if !v.integrated
+                );
+                if never {
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ITK_41,
+                            self.upstream_defects,
+                            if fix {
+                                format!("stage {stage}: the time-varying velocity field transform never integrated its velocity field (no iteration, no resampling); its zero fields are used; ITK's displacement field has no interpolator input and the next use of the transform crashes")
+                            } else {
+                                format!("stage {stage}: the time-varying velocity field transform never integrated its velocity field: ITK crashes at the next use of the transform")
+                            },
+                        ),
+                    );
+                }
                 let composite = self.composite.as_mut().expect("set by DoRegistration");
                 composite.push(Xfm::Field(out.output));
                 self.origins.push(Some(stage));
@@ -282,6 +300,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             "\n*** Running time-varying b-spline velocity field registration (initial mesh size = {}) ***\n\n",
             super::bspline_syn::print_array(&mesh)
         ));
+        if mesh.contains(&0) {
+            let msg = format!(
+                "larmorx: antsRegistration: stage {stage}: a mesh size of 0: ANTs divides by zero (an infinite control-point spacing, vnl's SVD warnings) and fails with an exception on a parametric domain of no span (ANTS-77); larmorx stops\n"
+            );
+            log.cerr(&msg);
+            return Err(RegistrationFailed(msg));
+        }
         let mut observer = MethodLog {
             log,
             clock: Instant::now(),

@@ -2,8 +2,11 @@
 """antsApplyTransforms's second worked example: a B-spline transform applied by ANTs 2.6.5 and
 by larmorx. The transforms come from ANTs itself: sMRIPrep's template registration of ds000005
 sub-01 (its own command, every third voxel of its images, as the antsRegistration record runs
-it) with a ``BSpline`` stage (a cubic B-spline transform, knot spacing 26 mm) in place of its SyN
-stage. fMRIPrep's masked T1w (1 mm) is then resampled onto the 2 mm template through
+it) with a ``BSpline`` stage (a cubic B-spline transform, knot spacing 104 mm) in place of its
+SyN stage. Not 26 mm (antsRegistrationSyN.sh's B-spline spacing): the mesh doubles at each level,
+to about a million parameters at the last one, and ANTs computes every parameter's Jacobian at
+every voxel; it had not finished after almost four hours (larmorx: 38 s), see
+``docs/findings/ants-bspline.md``. fMRIPrep's masked T1w (1 mm) is then resampled onto the 2 mm template through
 ``BSpline.txt`` and the collapsed affine, with Lanczos interpolation, as fMRIPrep resamples
 the T1w into MNI space, in single (``--float 1``) and double precision: ANTs as built (1 and 8
 threads) and with correctly rounded maths, larmorx at 1 and 12 threads in both modes."""
@@ -18,12 +21,12 @@ from larmorx_validation.evidence import common, core
 from larmorx_validation.figures import cache as fcache
 
 TOOL = "ants-apply-transforms"
-CASE = "bspline-ds000005-t1w"
+CASE = "bspline104-ds000005-t1w"
 RUN = "ds000005-sub-01-noreconall"
 WF = "work/fmriprep_25_2_wf/sub_01_wf/ds_std_volumes_wf"
 INPUT = f"{WF}/mask_anat/sub-01_desc-preproc_T1w_masked.nii.gz"
 TPL = "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_"
-STAGE = "BSpline[0.1,26]"
+STAGE = "BSpline[0.1,104]"
 LX_THREADS = (1, 12)
 
 
@@ -366,7 +369,9 @@ def example(ctx: core.Context) -> dict:
         "title": "A B-spline transform applied by ANTs and larmorx",
         "summary": (
             "The B-spline transform ANTs 2.6.5 found for ds000005 sub-01's T1w (sMRIPrep's "
-            f"template registration with {STAGE} for its SyN stage, on every third voxel), "
+            f"template registration with {STAGE} for its SyN stage, on every third voxel; "
+            "a knot spacing of 104 mm, because with antsRegistrationSyN.sh's 26 mm ANTs had not "
+            "finished after almost four hours), "
             "applied with the registration's affine to the 1 mm T1w onto the 2 mm template, "
             "Lanczos, as fMRIPrep resamples the T1w into MNI space; given to ANTs 2.6.5 and to "
             "larmorx, in single and double precision. Before A5 part 3 larmorx refused "

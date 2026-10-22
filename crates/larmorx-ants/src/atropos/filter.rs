@@ -83,6 +83,13 @@ fn itk(line: u32, description: impl Into<String>) -> AtroposError {
     }
 }
 
+/// ITK's text of the Gaussian model's warning `w` (`itkWarningMacro`).
+fn gaussian_warning(w: &str) -> String {
+    format!(
+        "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
+    )
+}
+
 /// One iteration as the verbose observer reports it: the elapsed iterations and the posterior
 /// probability at the start of the iteration (`IterationEvent` fires before the update).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -191,7 +198,8 @@ pub struct Atropos<'a> {
     neighborhood: Neighborhood,
     outlier_filter: Option<OutlierFilter>,
     pub notices: Notices,
-    /// ITK warnings (`itkWarningMacro`), in order.
+    /// What ITK prints on standard error, in order: its warnings (`itkWarningMacro`) and
+    /// SLATEC's messages, each a complete text.
     pub warnings: Vec<String>,
     pub iterations: Vec<IterationRecord>,
 }
@@ -429,6 +437,11 @@ impl<'a> Atropos<'a> {
         Ok(())
     }
 
+    /// The outlier filter, as the run left it (Grubbs-Rosner's last outliers).
+    pub fn outlier_filter(&self) -> Option<&OutlierFilter> {
+        self.outlier_filter.as_ref()
+    }
+
     /// The annealing temperature of the current iteration, as the verbose observer computes
     /// it: `T0 · rate^elapsed`, at least the minimum.
     pub fn annealing_temperature(&self) -> f32 {
@@ -611,7 +624,7 @@ impl<'a> Atropos<'a> {
                 let w = self.components[c].set_sample(&samples[c], m, &weights[c])?;
                 self.model_notices(c, &weights[c]);
                 if let Some(w) = w {
-                    self.warnings.push(w.to_string());
+                    self.warnings.push(gaussian_warning(w));
                 }
                 self.proportions[c] = if self.options.use_mixture_model_proportions {
                     sizes[c] as f32 / total_size as f32
@@ -625,7 +638,7 @@ impl<'a> Atropos<'a> {
                     let w =
                         self.components[c].set_indexed_sample(d, &samples[l], m, &weights[l])?;
                     if let Some(w) = w {
-                        self.warnings.push(w.to_string());
+                        self.warnings.push(gaussian_warning(w));
                     }
                 }
                 self.proportions[c] = 0.0;
@@ -977,12 +990,17 @@ impl<'a> Atropos<'a> {
         let mut out: Vec<f32> = Vec::new();
         let mut size = voxels.len();
         let mut changed = false;
+        let mut overflow_changed = false;
         for i in 0..m {
             let column: Vec<f32> = voxels.iter().map(|&v| self.intensities[i][v]).collect();
             let values: Vec<f32> = match self.outlier_filter.as_mut() {
                 Some(f) => {
-                    let (o, c) = f.apply(&column)?;
+                    let applied = f.apply(&column);
+                    self.warnings
+                        .extend(f.messages.drain(..).map(|m| format!("{m}\n")));
+                    let (o, c) = applied?;
                     changed |= c;
+                    overflow_changed |= f.overflow_changed;
                     o
                 }
                 None => column,
@@ -999,6 +1017,12 @@ impl<'a> Atropos<'a> {
             self.notices.add(
                 &defects::ANTS_94,
                 "the outlier filter's output, which ANTs does not clear between calls",
+            );
+        }
+        if overflow_changed {
+            self.notices.add(
+                &defects::ITK_51,
+                "the Grubbs-Rosner outliers, which ITK's Student quantiles (NaN) never find",
             );
         }
         Ok((out, size))
@@ -1088,7 +1112,7 @@ impl<'a> Atropos<'a> {
             if c < classes {
                 let w = self.components[c].set_sample(&sample, m, &weights)?;
                 if let Some(w) = w {
-                    self.warnings.push(w.to_string());
+                    self.warnings.push(gaussian_warning(w));
                 }
                 self.model_notices(c, &weights);
             } else {

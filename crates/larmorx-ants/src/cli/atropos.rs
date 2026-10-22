@@ -688,7 +688,9 @@ fn segmentation(
             let mut rate = 1.0f32;
             if post.parameters.len() > 2 {
                 rate = Conv::f32(param(post, 2)).map_err(|e| conv_err(log, e))?;
-                if !(0.0..=1.0).contains(&rate) {
+                // ANTs' two comparisons (a NaN passes them).
+                #[allow(clippy::manual_range_contains)]
+                if rate < 0.0 || rate > 1.0 {
                     log.silent(true, "Annealing rate must be in the range [0, 1].\n");
                     return Err(1);
                 }
@@ -1249,9 +1251,7 @@ fn segmentation(
     };
     let result = filter.run();
     for w in &filter.warnings {
-        log.cerr(&format!(
-            "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
-        ));
+        log.cerr(w);
     }
     filter.warnings.clear();
     if verbose {
@@ -1415,9 +1415,7 @@ fn segmentation(
         ));
     }
     for w in &filter.warnings {
-        log.cerr(&format!(
-            "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
-        ));
+        log.cerr(w);
     }
     ctx.notices
         .extend(filter.notices.as_slice().iter().cloned());
@@ -1557,10 +1555,10 @@ fn print_filter(f: &Atropos<'_>) -> String {
     } else {
         s += &format!("{i}Use synchronous updating of the labels.\n");
     }
-    match o.outliers {
+    match f.outlier_filter() {
         Some(h) => {
             s += &format!("{i}Outlier handling \n");
-            s += &crate::atropos::outliers::print(&h, "      ");
+            s += &crate::atropos::outliers::print_filter(h, "      ");
         }
         None => s += &format!("{i}No outlier handling.\n"),
     }

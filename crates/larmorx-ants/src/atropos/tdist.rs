@@ -11,10 +11,14 @@
 
 use larmorx_core::math::{exp, log, sin};
 
-/// The SLATEC messages a computation printed.
+/// The SLATEC routines' state: the messages a computation printed, and whether the Student
+/// density avoids Gamma's overflow (ITK-51).
 #[derive(Clone, Debug, Default)]
 pub struct Slatec {
     pub messages: Vec<String>,
+    /// `true`: [`Slatec::t_pdf`] takes the ratio of Gamma functions through their logarithms
+    /// when Gamma would overflow (more than 340 degrees of freedom), instead of ITK's inf/inf.
+    pub fix_overflow: bool,
 }
 
 fn d1mach(i: i32) -> f64 {
@@ -405,7 +409,9 @@ impl Slatec {
         let alneps = log(eps);
         let sml = d1mach(1);
         let alnsml = log(sml);
-        if !(0.0..=1.0).contains(&x) {
+        // Not `!(0.0..=1.0).contains(&x)`: a NaN passes SLATEC's test silently.
+        #[allow(clippy::manual_range_contains)]
+        if x < 0.0 || x > 1.0 {
             self.xermsg("DBETAI", "X IS NOT IN THE RANGE (0,1)");
         }
         if pin <= 0.0 || qin <= 0.0 {
@@ -486,11 +492,20 @@ impl Slatec {
     }
 
     /// `TDistribution::PDF(x, dof)`.
+    ///
+    /// ITK divides `Γ((ν+1)/2)` by `Γ(ν/2)`, both infinite above about 340 degrees of freedom:
+    /// the density is NaN (ITK-51). With `fix_overflow` such ratios are taken as
+    /// `exp(ln Γ((ν+1)/2) − ln Γ(ν/2))`; smaller ones as ITK takes them.
     fn t_pdf(&mut self, x: f64, dof: u64) -> f64 {
         let dof = dof as f64;
         let a = 0.5 * (dof + 1.0);
         let b = 0.5 * dof;
-        (self.dgamma(a) / self.dgamma(b))
+        let ratio = if self.fix_overflow && a > self.dgamlm().1 {
+            larmorx_core::math::exp(self.dlngam(a) - self.dlngam(b))
+        } else {
+            self.dgamma(a) / self.dgamma(b)
+        };
+        ratio
             / ((dof * std::f64::consts::PI).sqrt()
                 * larmorx_core::math::pow(1.0 + (x * x) / dof, a))
     }

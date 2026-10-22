@@ -36,6 +36,14 @@ pub struct OutlierFilter {
     pub handling: OutlierHandling,
     /// ANTs' output list after the previous call.
     ants_state: Vec<f32>,
+    /// Grubbs-Rosner's outliers (instance identifiers, in the order found) of the last call
+    /// that tested for them (a list of at most 6 values keeps the previous ones, as in ANTs).
+    pub outlier_ids: Vec<usize>,
+    /// SLATEC's messages (ITK prints them on standard error), until the caller takes them.
+    pub messages: Vec<String>,
+    /// The last call's Grubbs-Rosner result differed between ITK's Student quantiles and the
+    /// overflow-free ones (ITK-51).
+    pub overflow_changed: bool,
     /// Use the documented filter (larmorx's correction of ANTS-94); `false` reproduces ANTs.
     pub fix: bool,
 }
@@ -49,6 +57,9 @@ impl OutlierFilter {
         OutlierFilter {
             handling,
             ants_state: Vec::new(),
+            outlier_ids: Vec::new(),
+            messages: Vec::new(),
+            overflow_changed: false,
             fix,
         }
     }
@@ -70,7 +81,25 @@ impl OutlierFilter {
                 significance,
                 winsorizing,
             } => {
-                let clean = grubbs_rosner(input, significance, winsorizing)?;
+                // Both Student quantiles (ITK's, NaN above ~340 degrees of freedom, and the
+                // overflow-free ones): the mode's result, and whether ITK-51 changes it.
+                let mut quiet = Vec::new();
+                let (fixed, fixed_ids) =
+                    grubbs_rosner(input, significance, winsorizing, true, &mut quiet)?;
+                let mut messages = Vec::new();
+                let (itk, itk_ids) =
+                    grubbs_rosner(input, significance, winsorizing, false, &mut messages)?;
+                self.overflow_changed = fixed != itk;
+                let (clean, ids) = if self.fix {
+                    self.messages.extend(quiet);
+                    (fixed, fixed_ids)
+                } else {
+                    self.messages.extend(messages);
+                    (itk, itk_ids)
+                };
+                if let Some(ids) = ids {
+                    self.outlier_ids = ids;
+                }
                 let mut ants = self.ants_state.clone();
                 ants.extend_from_slice(&clean);
                 (clean, ants)
@@ -181,14 +210,20 @@ fn box_plot_ants(
 /// value (the mean and variance updated after each removal, as ANTs updates them), as long as
 /// more than 6 values remain; outliers become the mean ± the Student quantile of the
 /// winsorizing level times the standard deviation.
+///
+/// Returns the output list and the outliers' identifiers in the order found (`None` for a
+/// list of at most 6 values, which is not tested); SLATEC's messages go to `messages`.
+/// `fix_overflow` takes the Student quantiles without Gamma's overflow (ITK-51).
 fn grubbs_rosner(
     input: &[f32],
     significance: f64,
     winsorizing: f64,
-) -> Result<Vec<f32>, OutlierError> {
+    fix_overflow: bool,
+    messages: &mut Vec<String>,
+) -> Result<(Vec<f32>, Option<Vec<usize>>), OutlierError> {
     let n = input.len();
     if n <= 6 {
-        return Ok(input.to_vec());
+        return Ok((input.to_vec(), None));
     }
     let mut mean = 0.0f64;
     let mut variance = 0.0f64;
@@ -200,8 +235,12 @@ fn grubbs_rosner(
         mean += (x - mean) / count;
     }
     variance /= count - 1.0;
-    let mut slatec = super::tdist::Slatec::default();
+    let mut slatec = super::tdist::Slatec {
+        fix_overflow,
+        ..Default::default()
+    };
     let mut is_outlier = vec![false; n];
+    let mut ids = Vec::new();
     let mut outliers = 0usize;
     let mut found = true;
     while found && n - outliers > 6 {
@@ -234,14 +273,16 @@ fn grubbs_rosner(
                     (count2 - 1.0) * variance - (count2 - 1.0) * ((x - mean) * (x - mean)) / count2;
                 variance /= count2 - 2.0;
                 is_outlier[id] = true;
+                ids.push(id);
                 outliers += 1;
             }
         }
     }
     let t = slatec.t_inverse_cdf(1.0 - 0.5 * winsorizing, (n - outliers) as u64);
+    messages.append(&mut slatec.messages);
     let lower = mean - t * variance.sqrt();
     let upper = mean + t * variance.sqrt();
-    Ok(input
+    let values = input
         .iter()
         .enumerate()
         .map(|(id, &x)| {
@@ -253,10 +294,28 @@ fn grubbs_rosner(
                 upper as f32
             }
         })
-        .collect())
+        .collect();
+    Ok((values, Some(ids)))
 }
 
 /// `Print(os, indent)` of the outlier filter: the header and its `PrintSelf`.
+/// The filter's `PrintSelf` after the run: Grubbs-Rosner lists the outliers of its last call.
+pub fn print_filter(f: &OutlierFilter, indent: &str) -> String {
+    let mut s = print(&f.handling, indent);
+    if let OutlierHandling::GrubbsRosner { .. } = f.handling {
+        let next = format!("{indent}  ");
+        if f.outlier_ids.is_empty() {
+            s += &format!("{next}There are no outliers.\n");
+        } else {
+            s += &format!("{next}Outlier Identifiers: \n");
+            for id in &f.outlier_ids {
+                s += &format!("{next}   {id}\n");
+            }
+        }
+    }
+    s
+}
+
 pub fn print(h: &OutlierHandling, indent: &str) -> String {
     let next = format!("{indent}  ");
     let g = |v: f64| crate::cli::cstd::format_g(v);

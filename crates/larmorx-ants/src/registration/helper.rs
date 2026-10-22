@@ -1925,8 +1925,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         if e.stale_clones {
             add(
                 &defects::ITK_32,
-                "SyN's point-set evaluations use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
-                "SyN's point-set evaluations use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
+                "the point-set evaluations of SyN and the time-varying velocity field stages use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
+                "the point-set evaluations of SyN and the time-varying velocity field stages use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
             );
         }
         if e.igdm_centre {

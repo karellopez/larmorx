@@ -101,6 +101,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             sampling_percentage: x.percentage,
             seed,
             moving_initial: self.composite.clone().expect("set by DoRegistration"),
+            fixed_initial: self
+                .fixed_initial
+                .as_ref()
+                .filter(|f| !f.is_empty())
+                .map(|f| Composite::new(f.clone())),
+            correct_fixed_initial: self.upstream_defects.fix(),
+            correct_masks: self.upstream_defects.fix(),
             learning_rate: t.gradient_step,
             iterations: x.iterations.clone(),
             convergence_threshold: x.threshold,
@@ -136,9 +143,25 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         }
         self.warnings.extend(warnings);
         match result {
-            Ok(output) => {
+            Ok(out) => {
+                let fix = self.upstream_defects.fix();
+                if out.fixed_initial_ignored {
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ITK_39,
+                            self.upstream_defects,
+                            if fix {
+                                format!("stage {stage}: the fixed images are resampled through the fixed initial transforms (-q) and the flow; ITK's TimeVaryingVelocityField method ignores -q")
+                            } else {
+                                format!("stage {stage}: the fixed initial transforms (-q) are ignored, as in ITK")
+                            },
+                        ),
+                    );
+                }
+                self.mask_notice(stage, out.masks_not_moved);
                 let composite = self.composite.as_mut().expect("set by DoRegistration");
-                composite.push(Xfm::Field(output));
+                composite.push(Xfm::Field(out.output));
                 self.origins.push(Some(stage));
                 Ok(())
             }
@@ -252,6 +275,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             correct_multi_metric_transforms: fix,
             correct_stale_inverses: fix,
             correct_point_positions: fix,
+            correct_masks: fix,
             n_threads: self.n_threads,
         };
         log.logger(&format!(
@@ -295,6 +319,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                         ),
                     );
                 }
+                self.mask_notice(stage, out.masks_not_moved);
                 if out.physical_points {
                     push_once(
                         &mut self.notices,
@@ -342,5 +367,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 Err(RegistrationFailed(e.description))
             }
         }
+    }
+}
+
+impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
+    /// ITK-40's notice: the time-varying velocity field methods' metrics keep the stage's masks
+    /// while their images are resampled through the flows.
+    fn mask_notice(&mut self, stage: usize, met: bool) {
+        if !met {
+            return;
+        }
+        let fix = self.upstream_defects.fix();
+        push_once(
+            &mut self.notices,
+            Notice::new(
+                &defects::ITK_40,
+                self.upstream_defects,
+                if fix {
+                    format!("stage {stage}: the masks are resampled with their images through the flows (nearest neighbour), as SyN resamples them; ITK's time-varying velocity field methods keep them where they were")
+                } else {
+                    format!("stage {stage}: the masks stay where they were while the images are resampled through the flows, as in ITK")
+                },
+            ),
+        );
     }
 }

@@ -80,6 +80,8 @@ pub struct TvbStage<R, const D: usize> {
     pub correct_multi_metric_transforms: bool,
     /// ITK-37 corrected: the flows' inverses are zero where the flows are.
     pub correct_stale_inverses: bool,
+    /// ITK-40 corrected: the metric's masks resampled with their images.
+    pub correct_masks: bool,
     /// ITK-38 corrected: a single point-set metric's points (and the domain's boundary points)
     /// placed at their parametric positions (the virtual domain without its direction), as
     /// the image metrics' are; ITK places them at their physical positions.
@@ -98,6 +100,8 @@ pub struct TvbOutput<R, const D: usize> {
     /// ITK-38's condition met (a single point-set metric on a virtual domain whose direction is
     /// not the identity).
     pub physical_points: bool,
+    /// ITK-40's condition met (a mask evaluated after an iteration).
+    pub masks_not_moved: bool,
 }
 
 fn crash(description: impl Into<String>) -> ItkException {
@@ -363,6 +367,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
     let mut multi_metric_transforms = false;
     let mut stale_inverses = false;
     let mut physical_points = false;
+    let mut masks_not_moved = false;
     let need_inverses = has_point_sets;
     let mut mesh = mesh0;
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
@@ -492,6 +497,15 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                 identity,
             )?
         };
+        if n_iterations > 0
+            && !point_set_only
+            && level_metrics
+                .iter()
+                .flatten()
+                .any(|lm| lm.fixed_mask.is_some() || lm.moving_mask.is_some())
+        {
+            masks_not_moved = true;
+        }
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
@@ -639,13 +653,23 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                     let mut resampled: Vec<Option<Resampled<R, D>>> =
                         Vec::with_capacity(level_metrics.len());
                     for lm in &level_metrics {
-                        resampled.push(lm.as_ref().map(|lm| Resampled {
-                            fixed: Arc::new(resample_image(&lm.fixed, &virtual_space, &fixed_composite, floor)),
-                            moving: Arc::new(resample_image(&lm.moving, &virtual_space, &moving_composite, floor)),
-                            fixed_mask: lm.fixed_mask.clone(),
-                            moving_mask: lm.moving_mask.clone(),
-                            fixed_gradient: None,
-                            moving_gradient: None,
+                        resampled.push(lm.as_ref().map(|lm| {
+                            let (fixed_mask, moving_mask) = crate::time_varying::evaluation_masks(
+                                &lm.fixed_mask,
+                                &lm.moving_mask,
+                                stage.correct_masks,
+                                &virtual_space,
+                                &fixed_composite,
+                                &moving_composite,
+                            );
+                            Resampled {
+                                fixed: Arc::new(resample_image(&lm.fixed, &virtual_space, &fixed_composite, floor)),
+                                moving: Arc::new(resample_image(&lm.moving, &virtual_space, &moving_composite, floor)),
+                                fixed_mask,
+                                moving_mask,
+                                fixed_gradient: None,
+                                moving_gradient: None,
+                            }
                         }));
                     }
                     // ITK-36: the transforms the last metric set apply to every metric.
@@ -799,5 +823,6 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
         multi_metric_transforms,
         stale_inverses,
         physical_points,
+        masks_not_moved,
     })
 }

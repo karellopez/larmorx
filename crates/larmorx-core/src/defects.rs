@@ -278,6 +278,10 @@ defects! {
         "TimeVaryingBSplineVelocityFieldImageRegistrationMethod zeroes the flow's displacement field at the first time sample (and at the last) but keeps the previous integration's inverse field, which the point-set metrics use to map their points";
     ITK_38 = "ITK-38", "ITK", true,
         "TimeVaryingBSplineVelocityFieldImageRegistrationMethod with a single point-set metric fits the points (and the domain's boundary points) at their physical positions in the B-spline's parametric domain, which leaves out the domain's direction: with any direction but the identity (an image stored in RAS order, as NIfTI files are) the points fall outside it and the fit throws";
+    ITK_39 = "ITK-39", "ITK", true,
+        "TimeVaryingVelocityFieldImageRegistrationMethodv4 resamples the fixed images through the flow alone: the fixed initial transforms (antsRegistration's -q) are ignored";
+    ITK_40 = "ITK-40", "ITK", true,
+        "the time-varying velocity field registration methods resample the fixed and moving images through the flows but give the metric the stage's masks unchanged (with identity transforms), so the masks no longer cover the images they belong to";
     ITK_32 = "ITK-32", "ITK", true,
         "the labelled point-set metric (ANTs' ICP, PSE, JHCT) appends new per-label metrics at every Initialize and keeps using the first ones: in SyN, which initialises the metric twice per iteration, every evaluation compares with the moving points as the stage's first evaluation mapped them (in the moving-to-middle update, with the moving points themselves)";
     ITK_33 = "ITK-33", "ITK", true,

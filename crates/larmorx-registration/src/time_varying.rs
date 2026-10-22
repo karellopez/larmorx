@@ -355,10 +355,17 @@ pub struct TvvfStage<R, const D: usize> {
     pub seed: i32,
     /// The moving initial transforms (the registration's composite, flattened).
     pub moving_initial: Vec<Xfm<R, D>>,
+    /// The fixed initial transforms (`-q`), which ITK's method does not use (ITK-39).
+    pub fixed_initial: Option<Composite<R, D>>,
     pub learning_rate: R,
     pub iterations: Vec<u32>,
     pub convergence_threshold: R,
     pub convergence_window: usize,
+    /// ITK-39 corrected: the fixed images resampled through the fixed initial transforms too.
+    pub correct_fixed_initial: bool,
+    /// ITK-40 corrected: the metric's masks resampled with their images (nearest neighbour), as
+    /// SyN resamples them.
+    pub correct_masks: bool,
     /// `numberOfTimeIndices`: the velocity field's time points.
     pub time_indices: u32,
     pub update_variance: R,
@@ -374,6 +381,40 @@ pub struct TvvfStage<R, const D: usize> {
     /// ITK-30 corrected.
     pub correct_gc_derivative: bool,
     pub n_threads: usize,
+}
+
+/// What a time-varying velocity field stage ends with.
+#[derive(Clone, Debug)]
+pub struct TvvfOutput<R, const D: usize> {
+    pub output: FieldXfm<R, D>,
+    /// ITK-39's condition met: a fixed initial transform.
+    pub fixed_initial_ignored: bool,
+    /// ITK-40's condition met: a mask evaluated after an iteration.
+    pub masks_not_moved: bool,
+}
+
+/// The masks of one image metric as the metric holds them in an evaluation: the stage's
+/// masks as they are (ITK-40 reproduced), or resampled onto the virtual domain through the
+/// fixed and moving composites with the nearest neighbour (corrected).
+pub(crate) fn evaluation_masks<R: Real, const D: usize>(
+    fixed_mask: &Option<Mask<D>>,
+    moving_mask: &Option<Mask<D>>,
+    correct: bool,
+    virtual_space: &Space<D>,
+    fixed: &Composite<R, D>,
+    moving: &Composite<R, D>,
+) -> (Option<Mask<D>>, Option<Mask<D>>) {
+    if !correct {
+        return (fixed_mask.clone(), moving_mask.clone());
+    }
+    (
+        fixed_mask.as_ref().map(|m| {
+            Mask::new(crate::resample::resample_mask_nearest(&m.image, virtual_space, fixed))
+        }),
+        moving_mask.as_ref().map(|m| {
+            Mask::new(crate::resample::resample_mask_nearest(&m.image, virtual_space, moving))
+        }),
+    )
 }
 
 /// What the observer sees after each iteration (`IterationEvent` of the method).
@@ -412,7 +453,7 @@ pub fn run_tvvf<R: Real, const D: usize>(
     observer: &mut dyn TvObserver<R>,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
-) -> Result<FieldXfm<R, D>, ItkException> {
+) -> Result<TvvfOutput<R, D>, ItkException> {
     match D {
         2 => run_tvvf_e::<R, D, 3>(stage, observer, floor, warnings),
         3 => run_tvvf_e::<R, D, 4>(stage, observer, floor, warnings),
@@ -426,7 +467,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
     observer: &mut dyn TvObserver<R>,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
-) -> Result<FieldXfm<R, D>, ItkException> {
+) -> Result<TvvfOutput<R, D>, ItkException> {
     assert_eq!(E, D + 1);
     // The first metric must be an image metric (ANTs reads the first preprocessed fixed
     // image's geometry).
@@ -462,6 +503,8 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
     let multi = stage.metrics.len() > 1;
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
+    let fixed_initial_ignored = stage.fixed_initial.is_some();
+    let mut masks_not_moved = false;
     let settings = CallSettings {
         n_threads: stage.n_threads,
         correct_gc_derivative: stage.correct_gc_derivative,
@@ -543,6 +586,14 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                 None => (None, None),
             })
             .collect();
+        if n_iterations > 0
+            && level_metrics
+                .iter()
+                .flatten()
+                .any(|lm| lm.fixed_mask.is_some() || lm.moving_mask.is_some())
+        {
+            masks_not_moved = true;
+        }
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
@@ -568,11 +619,12 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                     } else {
                         integrate(&transform.velocity, t.to_f64(), 1.0, steps, floor)
                     };
-                    let fixed_composite = Composite::new(vec![Xfm::Field(FieldXfm::new(
-                        fixed_field,
-                        None,
-                        stage.exact_floor,
-                    ))]);
+                    let mut fixed: Vec<Xfm<R, D>> = match &stage.fixed_initial {
+                        Some(c) if stage.correct_fixed_initial => c.transforms.clone(),
+                        _ => Vec::new(),
+                    };
+                    fixed.push(Xfm::Field(FieldXfm::new(fixed_field, None, stage.exact_floor)));
+                    let fixed_composite = Composite::new(fixed);
                     let mut moving = stage.moving_initial.clone();
                     moving.push(Xfm::Field(FieldXfm::new(moving_field, None, stage.exact_floor)));
                     let moving_composite = Composite::new(moving);
@@ -582,11 +634,19 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         let Some(lm) = lm else {
                             return Err(no_input());
                         };
+                        let (fixed_mask, moving_mask) = evaluation_masks(
+                            &lm.fixed_mask,
+                            &lm.moving_mask,
+                            stage.correct_masks,
+                            &virtual_space,
+                            &fixed_composite,
+                            &moving_composite,
+                        );
                         resampled.push(Some(Resampled {
                             fixed: Arc::new(resample_image(&lm.fixed, &virtual_space, &fixed_composite, floor)),
                             moving: Arc::new(resample_image(&lm.moving, &virtual_space, &moving_composite, floor)),
-                            fixed_mask: lm.fixed_mask.clone(),
-                            moving_mask: lm.moving_mask.clone(),
+                            fixed_mask,
+                            moving_mask,
                             fixed_gradient: None,
                             moving_gradient: None,
                         }));
@@ -679,7 +739,11 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
     let output = VelocityOutput::of(false, &transform.velocity);
     let mut out = FieldXfm::new(transform.field, transform.inverse, stage.exact_floor);
     out.smoothing = Some(FieldSmoothing::TimeVarying(Arc::new(output)));
-    Ok(out)
+    Ok(TvvfOutput {
+        output: out,
+        fixed_initial_ignored,
+        masks_not_moved,
+    })
 }
 
 #[cfg(test)]

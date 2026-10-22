@@ -204,6 +204,7 @@ impl BSplineTransform {
     /// cubic kernel at `c − start`, `c − start − 1`, …, in double); each coordinate is the
     /// sum from 0 in `R` of the weighted coefficients (each product in double, stored in `R`)
     /// plus the point's coordinate, in `R`.
+    #[allow(clippy::needless_range_loop)] // per-axis loops, as ITK writes them
     pub fn transform_point_as<R: ItkReal>(&self, p: [R; 3]) -> [R; 3] {
         let c: [R; 3] = self
             .grid

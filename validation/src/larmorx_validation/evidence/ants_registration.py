@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """antsRegistration's evidence: sMRIPrep's T1w-to-MNI registration of a real T1w (the record's
-``real-syn-small`` case: Rigid, Affine and SyN on every third voxel of the images), and the
-same command with antsRegistrationSyN.sh's ``BSplineSyN[0.1,26,0,3]`` for its SyN stage
-(``real-bsplinesyn-small``), by ANTs 2.6.5 (as built, with correctly rounded maths, at 2, 4 and
-8 threads) and by larmorx (1 and 12 threads, default and ``reproduce`` modes); the record's
-cases; ANTs' own thread band.
+``real-syn-small`` case: Rigid, Affine and SyN on every third voxel of the images), the same
+command with antsRegistrationSyN.sh's ``BSplineSyN[0.1,26,0,3]`` for its SyN stage
+(``real-bsplinesyn-small``) and with a time-varying velocity field
+(``real-time-varying-small``), by ANTs 2.6.5 (as built, with correctly rounded maths, at 2, 4
+and 8 threads) and by larmorx (1 and 12 threads, default and ``reproduce`` modes); the record's
+cases; ANTs' own thread band; what the corrections decided on 2026-10-21 change (the
+``ants-registration-corrections`` record).
 
 The arguments are fMRIPrep 25.2.6's own (its ``command.txt`` in the oracle run's working
 directory), built by the parity suite (``parity.ants_registration._fmriprep_args``): the masked
@@ -35,18 +37,58 @@ EXAMPLES = {
     # id -> (cache case, record case, stage label, description)
     "syn": (
         "fmriprep-ds000005-template-syn-small",
-        "real-syn-small/ds000005/template",
+        "real-syn-small/ds000005-sub-01/template",
         "SyN[0.1,3,0]",
         "sMRIPrep's T1w-to-MNI registration (Rigid, Affine, SyN) of ds000005 sub-01 on every "
         "third voxel: ANTs 2.6.5 (1, 2, 4, 8 threads; CORE-MATH) and larmorx",
     ),
     "bsplinesyn": (
         "fmriprep-ds000005-template-bsplinesyn-small",
-        "real-bsplinesyn-small/ds000005/template",
+        "real-bsplinesyn-small/ds000005-sub-01/template",
         "BSplineSyN[0.1,26,0,3]",
         "sMRIPrep's T1w-to-MNI registration with BSplineSyN[0.1,26,0,3] for its SyN stage, "
         "ds000005 sub-01 on every third voxel: ANTs 2.6.5 (1, 2, 4, 8 threads; CORE-MATH) and "
         "larmorx",
+    ),
+    "tvf": (
+        "fmriprep-ds000005-template-tvf-small",
+        "real-time-varying-small/ds000005-sub-01/template",
+        "TimeVaryingVelocityField[0.5,4,3,0,0,0]",
+        "sMRIPrep's T1w-to-MNI registration with TimeVaryingVelocityField[0.5,4,3,0,0,0] for its "
+        "SyN stage, ds000005 sub-01 on every third voxel: ANTs 2.6.5 (1, 2, 4, 8 threads; "
+        "CORE-MATH) and larmorx",
+    ),
+}
+#: Each example's title, summary, stages line and the stage that replaces SyN in the command.
+TEXTS = {
+    "syn": (
+        "sMRIPrep's T1w-to-MNI registration, by ANTs and larmorx",
+        "fMRIPrep 25.2.6's template registration of OpenNeuro ds000005 sub-01 (its own "
+        "arguments, from the oracle run's command.txt) on every third voxel of its images, "
+        "as the record's standard tier runs it, given to ANTs 2.6.5 and to larmorx. Choose "
+        "the output (the warped T1w or a component of the displacement field), the plane "
+        "and the panels; Checkerboard and Swipe compare the template with the warped T1w.",
+        "Rigid, Affine and SyN, exactly fMRIPrep's",
+        None,
+    ),
+    "bsplinesyn": (
+        "The same registration with a B-spline SyN stage",
+        "The command above with its SyN stage replaced by BSplineSyN[0.1,26,0,3], as "
+        "antsRegistrationSyN.sh's `-t b` runs it (the record's real-bsplinesyn-small case): "
+        "the update field and the total field are B-spline smoothed.",
+        "Rigid and Affine as fMRIPrep's, then antsRegistrationSyN.sh's "
+        "BSplineSyN[0.1,26,0,3] (its `-t b`) in place of SyN[0.1,3,0]",
+        "BSplineSyN[0.1,26,0,3]",
+    ),
+    "tvf": (
+        "The same registration with a time-varying velocity field",
+        "The command above with its SyN stage replaced by TimeVaryingVelocityField[0.5,4,3,0,0,0] "
+        "(the record's real-time-varying-small case): a velocity field over space and four time "
+        "points, its displacement the flow from time 0 to 1 integrated by fourth-order "
+        "Runge–Kutta, the update smoothed in space with SyN's variance of 3 voxels².",
+        "Rigid and Affine as fMRIPrep's, then TimeVaryingVelocityField[0.5,4,3,0,0,0] in place "
+        "of SyN[0.1,3,0], with SyN's levels, iterations and CC metric",
+        "TimeVaryingVelocityField[0.5,4,3,0,0,0]",
     ),
 }
 
@@ -54,12 +96,13 @@ EXAMPLES = {
 def _args(example: str, out: Path, tmp: Path) -> list[str]:
     from larmorx_validation.parity.ants_registration import (
         SMALL,
-        _bsplinesyn,
         _fmriprep_args,
+        _replace_syn,
     )
 
     args = _fmriprep_args(SPEC, out, tmp=tmp, stand_ins=True, small=SMALL)
-    return _bsplinesyn(args) if example == "bsplinesyn" else args
+    stage = TEXTS[example][3]
+    return _replace_syn(args, stage) if stage else args
 
 
 def _compute(example: str):
@@ -573,31 +616,12 @@ def _example(ctx: core.Context, ex_id: str, reg: dict) -> dict:
     so_b, _ = _stdout_lines(e.dir, "larmorx-1-reproduce", "ants-1")
     vers = info.get("versions", {})
     command = info["command"]
-    stage_text = (
-        "Rigid, Affine and SyN, exactly fMRIPrep's"
-        if ex_id == "syn"
-        else "Rigid and Affine as fMRIPrep's, then antsRegistrationSyN.sh's "
-        "BSplineSyN[0.1,26,0,3] (its `-t b`) in place of SyN[0.1,3,0]"
-    )
+    title, summary, stage_text, _stage = TEXTS[ex_id]
     n_vox = int(np.prod(fimg.shape))
     return {
         "id": f"template-{ex_id}",
-        "title": (
-            "sMRIPrep's T1w-to-MNI registration, by ANTs and larmorx"
-            if ex_id == "syn"
-            else "The same registration with a B-spline SyN stage"
-        ),
-        "summary": (
-            "fMRIPrep 25.2.6's template registration of OpenNeuro ds000005 sub-01 (its own "
-            "arguments, from the oracle run's command.txt) on every third voxel of its images, "
-            "as the record's standard tier runs it, given to ANTs 2.6.5 and to larmorx. Choose "
-            "the output (the warped T1w or a component of the displacement field), the plane "
-            "and the panels; Checkerboard and Swipe compare the template with the warped T1w."
-            if ex_id == "syn"
-            else "The command above with its SyN stage replaced by BSplineSyN[0.1,26,0,3], as "
-            "antsRegistrationSyN.sh's `-t b` runs it (the record's real-bsplinesyn-small case): "
-            "the update field and the total field are B-spline smoothed."
-        ),
+        "title": title,
+        "summary": summary,
         "facts": [
             {
                 "label": "Data",
@@ -659,8 +683,9 @@ def _short(command: str, ex_id: str) -> str:
     c = re.sub(r"\s+", " ", command).strip()
     c = c.replace("[ ", "[").replace(" ]", "]").replace(", ", ",")
     c = re.sub(r"/work/\S*?/registration/", "", c)
-    if ex_id == "bsplinesyn":
-        c = c.replace("--transform SyN[0.1,3.0,0.0]", "--transform BSplineSyN[0.1,26,0,3]")
+    stage = TEXTS[ex_id][3]
+    if stage:
+        c = c.replace("--transform SyN[0.1,3.0,0.0]", f"--transform {stage}")
     return c
 
 
@@ -783,18 +808,150 @@ def _band(rec) -> dict | None:
     }
 
 
+#: The corrections record's tables: id, title, the cases (record id, label), the columns
+#: (check name in the record, column label, format).
+CORRECTION_TABLES = [
+    (
+        "corrections-igdm",
+        "IGDM (ANTS-67, ANTS-68, ANTS-70): a rigid registration of the point-set phantoms, whose "
+        "moving blocks are shifted by 3.77 mm; the translation error each mode leaves",
+        [
+            ("igdm/one-neighbour", "given sigmas, one neighbour, central differences"),
+            ("igdm/one-neighbour-gradient-sigma", "one neighbour, gradientSigma 1 mm"),
+            ("igdm/five-neighbours", "kNeighborhood 5"),
+            ("igdm/five-neighbours-gradient-sigma", "kNeighborhood 5, gradientSigma 1.5 mm"),
+            ("igdm/estimated-sigmas", "estimated sigmas (the floor applies)"),
+            ("igdm/same-sets-half-voxel", "an image with itself, half a voxel apart"),
+        ],
+        [
+            ("reproduce: translation error (mm)", "ANTs (reproduce): error (mm)", "num"),
+            ("fix: translation error (mm)", "corrected: error (mm)", "num"),
+            ("reproduce: iterations", "ANTs: iterations", "count"),
+            ("fix: iterations", "corrected: iterations", "count"),
+        ],
+    ),
+    (
+        "corrections-jhct",
+        "JHCT (ITK-24, ITK-29): the same registration with the labelled phantoms",
+        [
+            ("jhct/isotropic-sigma-2", "isotropic, sigma 2: the total alone (ITK-24)"),
+            ("jhct/isotropic-sigma-1", "isotropic, sigma 1 (ITK-24, ITK-23)"),
+            ("jhct/anisotropic-sigma-1", "anisotropic, sigma 1 (ITK-29, ITK-24, ITK-26)"),
+            ("jhct/anisotropic-sigma-2", "anisotropic, sigma 2, alpha 1.5"),
+        ],
+        [
+            ("reproduce: translation error (mm)", "ANTs (reproduce): error (mm)", "num"),
+            ("fix: translation error (mm)", "corrected: error (mm)", "num"),
+            ("parameters changed by the corrections", "largest parameter change", "num"),
+        ],
+    ),
+    (
+        "corrections-mesh",
+        "B-spline field meshes at the base level (ANTS-78; ITK-42): ANTs' stage is the corrected "
+        "one with twice the mesh, byte for byte; how far the corrected field moves from ANTs' "
+        "(mm, in the mask) and the fit each leaves",
+        [
+            ("mesh/bspline-field-3", "BSplineDisplacementField 3x3x3, two levels"),
+            ("mesh/bspline-field-5-total-4", "5x5x5, total mesh 4x4x4"),
+            ("mesh/bspline-field-knots", "a knot spacing of 12 mm"),
+            ("mesh/bspline-exponential-4", "BSplineExponential 4x4x4"),
+        ],
+        [
+            ("field moved by the correction: largest (mm)", "field moved: largest (mm)", "num"),
+            ("field moved by the correction: mean (mm)", "mean (mm)", "num"),
+            ("reproduce: mean squared difference in the mask", "ANTs' fit (MSE)", "num"),
+            ("default: mean squared difference in the mask", "corrected fit (MSE)", "num"),
+        ],
+    ),
+    (
+        "corrections-chain",
+        "Stages after a B-spline transform (ITK-35), which ANTs cannot run: the corrected stage "
+        "against ANTs' closest runs, how far their results map the fixed points apart (largest "
+        "and mean, mm, in the mask)",
+        [
+            ("chain/bspline-then-affine", "BSpline, then Affine"),
+            ("chain/bspline-then-rigid", "BSpline, then Rigid"),
+            ("chain/initial-bspline-then-rigid", "-r a B-spline transform, then Rigid"),
+            ("chain/initial-bspline-then-affine", "-r a B-spline transform, then Affine"),
+            ("chain/bspline-then-bspline", "two BSpline stages"),
+        ],
+        [
+            (
+                "ANTs on the moving image resampled through the B-spline transform: largest distance (mm)",
+                "vs ANTs on the resampled image: largest",
+                "num",
+            ),
+            (
+                "ANTs on the moving image resampled through the B-spline transform: mean distance (mm)",
+                "mean",
+                "num",
+            ),
+            (
+                "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)",
+                "vs ANTs with the field (half spacing): largest",
+                "num",
+            ),
+            (
+                "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)",
+                "mean",
+                "num",
+            ),
+        ],
+    ),
+]
+
+
+def _corrections_tables(ctx: core.Context) -> tuple[list[dict], list[dict]]:
+    """The corrections record's measurements as tables, and its source for the provenance
+    (none when the record is missing)."""
+    try:
+        rec = records.load(ctx.repo, "ants-registration-corrections")
+    except FileNotFoundError:
+        return [], []
+    by = {r["case"]: r for r in rec.results}
+    tables = []
+    for tid, title, rows, cols in CORRECTION_TABLES:
+        out_rows = []
+        for case, label in rows:
+            r = by.get(case)
+            if r is None:
+                continue
+            vals = {**r.get("measured", {}), **r.get("reported", {})}
+            cells = []
+            for name, _label, fmt in cols:
+                v = vals.get(name)
+                if v in (None, ""):
+                    cells.append(common.cell("–", "text"))
+                else:
+                    cells.append(common.cell(float(v), "sig" if fmt == "num" else fmt))
+            out_rows.append({"head": label, "cells": cells})
+        tables.append(
+            common.table(
+                tid,
+                title,
+                ["Case", *({"label": c[1], "num": True} for c in cols)],
+                out_rows,
+                note="From the ants-registration-corrections record (larmorx in its default "
+                "mode against `reproduce`, which the ants-registration record compares with "
+                "ANTs bit for bit; for the B-spline chains, against ANTs 2.6.5 itself).",
+            )
+        )
+    return tables, rec.source()
+
+
 def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx)
     examples = [_example(ctx, k, reg) for k in EXAMPLES]
+    corrections, corrections_source = _corrections_tables(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "antsRegistration",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": rec.source() + corrections_source,
             "benchmarks": [],
             "cache": [fcache.provenance(entry(ctx, k)) for k in EXAMPLES],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
@@ -807,6 +964,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cases,
         "cases_total": len(cases),
         "dots": {"band": _band(rec)},
+        "tables": corrections,
         "examples": examples,
     }
 

@@ -2625,6 +2625,10 @@ fn writes_velocity(kind: &str) -> bool {
     )
 }
 
+/// A velocity field as ITK's writer takes it: the dimension, size, spacing, origin, direction
+/// (row by row) and the vectors.
+type VelocityImage<R> = (usize, Vec<usize>, Vec<f64>, Vec<f64>, Vec<Vec<f64>>, Vec<R>);
+
 /// The velocity field of a transform (`VelocityField.nii.gz` without collapsing): a
 /// time-varying velocity field transform's (`D + 1` dimensions) or a Gaussian exponential
 /// transform's constant one, as ITK's `ImageFileWriter` writes vector images; other transforms
@@ -2639,14 +2643,7 @@ fn write_velocity_field<R: Compute, const D: usize>(
     use larmorx_registration::exponential::ExponentialSmoothing;
     use larmorx_registration::field::FieldSmoothing;
     let Xfm::Field(f) = t else { return };
-    let (ndim, size, spacing, origin, direction, data): (
-        usize,
-        Vec<usize>,
-        Vec<f64>,
-        Vec<f64>,
-        Vec<Vec<f64>>,
-        Vec<R>,
-    ) = match &f.smoothing {
+    let (ndim, size, spacing, origin, direction, data): VelocityImage<R> = match &f.smoothing {
         Some(FieldSmoothing::TimeVarying(v)) if !v.bspline => {
             let n = v.size.len();
             (

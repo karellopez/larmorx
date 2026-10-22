@@ -1269,7 +1269,8 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let floor = self.virtual_space.as_ref().map_or(1.0, |s| {
             s.spacing.iter().copied().fold(f64::INFINITY, f64::min)
         });
-        if !(estimate.to_f64() >= floor) {
+        let e = estimate.to_f64();
+        if e.is_nan() || e < floor {
             self.events.igdm_distance_floor = Some((estimate.to_f64(), floor));
             if self.corrections.igdm_distance_floor {
                 return R::from_f64(floor);

@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (linear,
-SyN, B-spline and displacement-field stages; the SyN cases are in :mod:`ants_registration_syn`,
-the BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline cases in
-:mod:`ants_registration_bspline`).
+"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (every
+stage; the SyN cases are in :mod:`ants_registration_syn`, the BSplineSyN,
+GaussianDisplacementField, BSplineDisplacementField and BSpline cases in
+:mod:`ants_registration_bspline`, the Exponential, BSplineExponential, TimeVaryingVelocityField
+and TimeVaryingBSplineVelocityField cases and the corrections' paths in
+:mod:`ants_registration_velocity`).
 
 ANTs runs as its own binary with one thread and a fixed sampling seed
 (``ANTS_RANDOM_SEED``; without one ANTs seeds from the clock and is not repeatable); larmorx
@@ -2137,7 +2139,8 @@ def highlights(results: list[CaseResult]) -> list[str]:
 def suite() -> Suite:
     return Suite(
         name="ants-registration",
-        title="antsRegistration (linear, SyN, B-spline and displacement-field stages)",
+        title="antsRegistration (every stage: linear, SyN, B-spline, displacement-field and "
+        "velocity-field)",
         tool="`larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, "
         "larmorx-ants)",
         reference=f"antsRegistration from {ants_version()}, the binary built by "

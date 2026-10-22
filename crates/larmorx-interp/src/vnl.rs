@@ -133,6 +133,89 @@ pub fn erf(x: f64) -> f64 {
     }
 }
 
+/// `vnl_erfc` (`core/vnl/vnl_erf.cxx`, W. J. Cody's rational approximations): `1 − vnl_erf`
+/// below 0.46875, Cody's fractions above, `2 − erfc(|x|)` for negative `x`.
+pub fn erfc(x: f64) -> f64 {
+    const THRESH: f64 = 0.46875;
+    const XBIG: f64 = 26.543;
+    const XHUGE: f64 = 6.71e7;
+    const XMAX: f64 = 2.53e307;
+    const C: [f64; 9] = [
+        0.564_188_496_988_670_089,
+        8.883_149_794_388_375_94,
+        66.119_190_637_141_629_5,
+        298.635_138_197_400_131,
+        881.952_221_241_769_09,
+        1_712.047_612_634_070_58,
+        2_051.078_377_826_071_47,
+        1_230.339_354_797_997_25,
+        2.153_115_354_744_038_46e-8,
+    ];
+    const D: [f64; 8] = [
+        15.744_926_110_709_834_7,
+        117.693_950_891_312_499,
+        537.181_101_862_009_858,
+        1_621.389_574_566_690_19,
+        3_290.799_235_733_459_63,
+        4_362.619_090_143_247_16,
+        3_439.367_674_143_721_64,
+        1_230.339_354_803_749_42,
+    ];
+    const P: [f64; 6] = [
+        0.305_326_634_961_232_344,
+        0.360_344_899_949_804_439,
+        0.125_781_726_111_229_246,
+        0.016_083_785_148_742_276_6,
+        6.587_491_615_298_378_03e-4,
+        0.016_315_387_137_302_097_8,
+    ];
+    const Q: [f64; 5] = [
+        2.568_520_192_289_822_42,
+        1.872_952_849_923_460_47,
+        0.527_905_102_951_428_412,
+        0.060_518_341_312_441_319_1,
+        0.002_335_204_976_268_691_85,
+    ];
+    const SQRPI: f64 = 0.564_189_583_547_756_286_95;
+    let y = x.abs();
+    let mut result;
+    if y <= THRESH {
+        return 1.0 - erf(x);
+    } else if y <= 4.0 {
+        let mut xnum = C[8] * y;
+        let mut xden = y;
+        for i in 0..7 {
+            xnum = (xnum + C[i]) * y;
+            xden = (xden + D[i]) * y;
+        }
+        result = (xnum + C[7]) / (xden + D[7]);
+        let ysq = (y * 16.0).floor() / 16.0;
+        let del = (y - ysq) * (y + ysq);
+        result = math::exp(-ysq * ysq) * math::exp(-del) * result;
+    } else if y >= XHUGE {
+        result = if y < XMAX { SQRPI / y } else { 0.0 };
+    } else if y >= XBIG {
+        result = 0.0;
+    } else {
+        let ysq = 1.0 / (y * y);
+        let mut xnum = P[5] * ysq;
+        let mut xden = ysq;
+        for i in 0..4 {
+            xnum = (xnum + P[i]) * ysq;
+            xden = (xden + Q[i]) * ysq;
+        }
+        result = ysq * (xnum + P[4]) / (xden + Q[4]);
+        result = (SQRPI - result) / y;
+        let ysq = (y * 16.0).floor() / 16.0;
+        let del = (y - ysq) * (y + ysq);
+        result = math::exp(-ysq * ysq) * math::exp(-del) * result;
+    }
+    if x < 0.0 {
+        result = 2.0 - result;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

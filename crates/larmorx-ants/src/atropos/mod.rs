@@ -23,6 +23,7 @@ pub mod gaussian;
 pub mod models;
 pub mod outliers;
 mod smoothing;
+pub mod tdist;
 
 use std::collections::BTreeMap;
 

@@ -167,9 +167,79 @@ fn box_plot_ants(
     Ok(winsorize(input, lb, ub, lb2b, ub2b))
 }
 
-/// `GrubbsRosnerListSampleFilter::GenerateData` (with winsorizing) on a cleared list.
-fn grubbs_rosner(_input: &[f32], _significance: f64, _winsorizing: f64) -> Result<Vec<f32>, OutlierError> {
-    Err(OutlierError("GrubbsRosner is not implemented yet".into()))
+/// `GrubbsRosnerListSampleFilter::GenerateData` (with winsorizing) on a cleared list: the
+/// value farthest from the mean is an outlier while Grubbs' statistic exceeds its critical
+/// value (the mean and variance updated after each removal, as ANTs updates them), as long as
+/// more than 6 values remain; outliers become the mean ± the Student quantile of the
+/// winsorizing level times the standard deviation.
+fn grubbs_rosner(input: &[f32], significance: f64, winsorizing: f64) -> Result<Vec<f32>, OutlierError> {
+    let n = input.len();
+    if n <= 6 {
+        return Ok(input.to_vec());
+    }
+    let mut mean = 0.0f64;
+    let mut variance = 0.0f64;
+    let mut count = 0.0f64;
+    for &x in input {
+        let x = f64::from(x);
+        count += 1.0;
+        variance += (count - 1.0) * ((x - mean) * (x - mean)) / count;
+        mean += (x - mean) / count;
+    }
+    variance /= count - 1.0;
+    let mut slatec = super::tdist::Slatec::default();
+    let mut is_outlier = vec![false; n];
+    let mut outliers = 0usize;
+    let mut found = true;
+    while found && n - outliers > 6 {
+        found = false;
+        // FindMaximumNonOutlierDeviationValue
+        let mut max_dev = 0.0f64;
+        let mut max_id: Option<usize> = None;
+        for (id, &x) in input.iter().enumerate() {
+            if !is_outlier[id] {
+                let dev = (f64::from(x) - mean).abs();
+                if dev > max_dev {
+                    max_dev = dev;
+                    max_id = Some(id);
+                }
+            }
+        }
+        if let Some(id) = max_id {
+            let x = f64::from(input[id]);
+            let remaining = (n - outliers) as u64;
+            // IsMeasurementAnOutlier
+            let sig = significance / (2.0 * remaining as f64);
+            let t = slatec.t_inverse_cdf(1.0 - sig, remaining - 2);
+            let nu = (remaining - 1) as f64;
+            let g = nu / (nu + 1.0).sqrt() * (t * t / (nu - 1.0 + t * t)).sqrt();
+            found = g < (x - mean).abs() / variance.sqrt();
+            if found {
+                let count2 = remaining as f64;
+                mean = (mean * count2 - x) / (count2 - 1.0);
+                variance = (count2 - 1.0) * variance - (count2 - 1.0) * ((x - mean) * (x - mean)) / count2;
+                variance /= count2 - 2.0;
+                is_outlier[id] = true;
+                outliers += 1;
+            }
+        }
+    }
+    let t = slatec.t_inverse_cdf(1.0 - 0.5 * winsorizing, (n - outliers) as u64);
+    let lower = mean - t * variance.sqrt();
+    let upper = mean + t * variance.sqrt();
+    Ok(input
+        .iter()
+        .enumerate()
+        .map(|(id, &x)| {
+            if !is_outlier[id] {
+                x
+            } else if f64::from(x) < lower {
+                lower as f32
+            } else {
+                upper as f32
+            }
+        })
+        .collect())
 }
 
 /// `Print(os, indent)` of the outlier filter: the header and its `PrintSelf`.

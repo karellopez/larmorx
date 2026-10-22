@@ -37,7 +37,7 @@
 
 pub mod nd;
 pub mod ndimage;
-mod vnl;
+pub mod vnl;
 
 use std::collections::BTreeMap;
 

@@ -1088,6 +1088,15 @@ impl<'a> Atropos<'a> {
         let (sample, sample_size) = self.scalar_samples()?;
         let m = self.intensities.len();
         let voxels: Vec<usize> = (0..self.n).filter(|&v| self.in_mask(v)).collect();
+        if sample_size > voxels.len() {
+            // ANTs sizes the weights for the grown sample (ANTS-94) and sets those of the
+            // masked voxels only: the rest is uninitialized memory (ANTS-107); 0 here, what a
+            // fresh allocation holds.
+            self.notices.add(
+                &defects::ANTS_107,
+                "the weights of the samples the outlier filter added, uninitialized in ANTs (0 here)",
+            );
+        }
         let reproduce_pv = self.options.upstream_defects.reproduce();
         let mut class_weights: Vec<Vec<f64>> = Vec::with_capacity(classes);
         for c in 0..total {

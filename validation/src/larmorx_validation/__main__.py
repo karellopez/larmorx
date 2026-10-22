@@ -42,6 +42,7 @@ PARITY_MODULES = {
     "ants-registration": "ants_registration",
     "ants-ai": "ants_ai",
     "ants-affine-initializer": "ants_affine_initializer",
+    "ants-atropos": "ants_atropos",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).

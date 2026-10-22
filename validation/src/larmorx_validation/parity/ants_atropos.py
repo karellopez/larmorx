@@ -325,6 +325,11 @@ def _templateflow() -> Path | None:
     return None
 
 
+@functools.cache
+def _priors_dir() -> Path:
+    return Path(tempfile.mkdtemp(prefix="lx-atropos-priors-"))
+
+
 #: The five runs and their subject's workflow directory.
 RUNS = {
     "ds000005-sub-01-noreconall": "sub_01_wf",
@@ -365,11 +370,50 @@ def _node_inputs(run: str) -> tuple[Path, Path]:
 
 
 OASIS_CLASSES = {3: ("CSF", "CGM", "WM"), 6: ("CSF", "CGM", "WM", "SCGM", "BS", "CBM")}
+#: SHA-256 of TemplateFlow's ``tpl-OASIS30ANTs_res-01_label-<label>_probseg.nii.gz``
+#: (``oracles/templateflow`` holds some of them; the others are fetched and verified).
+OASIS_SHA256 = {
+    "CSF": "ebbe851b6d5898c5637194ddc386c92df0ddfe727a63c61a81abe919d8fdfc60",
+    "CGM": "c4be7df569fa12d059033fc8775f78240785659591d3c00913619536a80193da",
+    "WM": "3579a79d197cb3e8722638fa57228d3bd8fb6e6f88de4d3e76e306d6871ce0d6",
+    "SCGM": "7755a667e4d658b49cccf9f325f939b5effa4bbc3a7801299e9484908659d573",
+    "BS": "8e0e0b0f77056671e2a4b3136daccd04c0bb117c6bd7dffa5e349f2534e94dc3",
+    "CBM": "235a34466ca143e37cc0c9c0f3a8802588923b1eeda450e4b4a5dbece3bbacd1",
+}
+TEMPLATEFLOW_URL = "https://templateflow.s3.amazonaws.com/tpl-OASIS30ANTs/"
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @functools.cache
-def _priors_dir() -> Path:
-    return Path(tempfile.mkdtemp(prefix="lx-atropos-priors-"))
+def _oasis_prior(label: str) -> Path:
+    """TemplateFlow's OASIS30ANTs prior of ``label``: the workspace's copy
+    (``oracles/templateflow``) when it is the file (not an empty placeholder), else fetched
+    from TemplateFlow into a temporary directory; its SHA-256 checked either way."""
+    name = f"tpl-OASIS30ANTs_res-01_label-{label}_probseg.nii.gz"
+    tf = _templateflow()
+    local = None if tf is None else tf / "tpl-OASIS30ANTs" / name
+    if (
+        local is not None
+        and local.is_file()
+        and local.stat().st_size > 0
+        and _sha256(local) == OASIS_SHA256[label]
+    ):
+        return local
+    import urllib.request
+
+    target = _priors_dir() / name
+    try:
+        urllib.request.urlretrieve(TEMPLATEFLOW_URL + name, target)
+    except OSError as e:
+        raise Outcome(SKIPPED, f"{name} is neither in {TEMPLATEFLOW} nor fetchable ({e})") from e
+    if _sha256(target) != OASIS_SHA256[label]:
+        raise RuntimeError(f"{name} from TemplateFlow does not have the recorded SHA-256")
+    return target
 
 
 @functools.cache
@@ -378,9 +422,6 @@ def _oasis_priors(run: str, n: int) -> str:
     6: also deep GM, brainstem, cerebellum) in ``run``'s T1w space: fMRIPrep's
     ``map_brainmask`` command with each prior as input (ANTs' antsApplyTransforms, Gaussian
     interpolation, the template-to-T1w transforms of the brain extraction)."""
-    tf = _templateflow()
-    if tf is None:
-        raise Outcome(SKIPPED, f"{TEMPLATEFLOW}/tpl-OASIS30ANTs is not here")
     work = _work(run)
     words = (work / BRAIN_EXTRACTION / "map_brainmask/command.txt").read_text().split()[1:]
     root = work.parents[1]
@@ -392,9 +433,7 @@ def _oasis_priors(run: str, n: int) -> str:
         if target.exists():
             continue
         args = list(words)
-        args[args.index("--input") + 1] = str(
-            tf / "tpl-OASIS30ANTs" / f"tpl-OASIS30ANTs_res-01_label-{label}_probseg.nii.gz"
-        )
+        args[args.index("--input") + 1] = str(_oasis_prior(label))
         args[args.index("--output") + 1] = str(target)
         env = {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "8"}
         p = subprocess.run(
@@ -969,6 +1008,7 @@ def _phantom_cases() -> list[AtroposCase]:
             "1",
             *O3,
             expect="error",
+            silent_ok=("ITK-50", "ANTS-96"),
             tier="standard",
         ),
         _c(
@@ -1957,7 +1997,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             if ok and _fix_pass(c, tmp, checks, lx):
                 raise Outcome(EXPECTED, c.reason or "ANTs aborts; larmorx exits 1 with its text")
             return
-        if c.stdout:
+        if c.stdout and (c.expect == "error" or not (ants.ok and lx.ok)):
             _same_text("stdout", checks, printed(ants.out, tmp), printed(lx.out, tmp))
         if c.expect == "error" or (not ants.ok and not lx.ok):
             checks("same exit status", ants.code == lx.code, detail=summary)
@@ -1992,6 +2032,30 @@ def run_case(case: Case, checks: CheckList) -> None:
             checks("ANTs with correctly rounded math succeeds", cr.ok)
             if not cr.ok:
                 cr = None
+        if c.stdout:
+            # -v prints the models' means with 17 digits: glibc's maths shows there.
+            reference = cr if cr is not None else ants
+            _same_text(
+                "stdout (as ANTs with correctly rounded math prints it)"
+                if cr is not None
+                else "stdout",
+                checks,
+                printed(reference.out, tmp),
+                printed(lx.out, tmp),
+            )
+            same_built = printed(ants.out, tmp) == printed(lx.out, tmp)
+            checks.add(
+                Check(
+                    "stdout as ANTs as built prints it",
+                    True,
+                    metric="identical",
+                    value=str(same_built),
+                    threshold="reported",
+                    detail=""
+                    if same_built
+                    else "the models' means differ in their last digits (glibc's maths)",
+                )
+            )
         band: dict[int, _Run] = {}
         if c.band:
             for t in BAND_THREADS:

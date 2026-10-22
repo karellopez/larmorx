@@ -156,6 +156,19 @@ stages), and `larmorx_ants::registration::{bspline_syn, helper}`.
   bit for bit (`CompensatedSum::add_zeros`: adding zero is a function of the sum's state, which
   reaches a fixed point after at most a step, so the deferred zeros give the state of the
   in-order ones). Demons refuses (it needs a displacement field).
+- **What this costs ANTs on real data** (A5 part 3, 2026-10-22; one informal measurement on a
+  loaded machine, not a benchmark). The mesh doubles at each level, and both the scales (each
+  parameter perturbed in turn, the parameter vector copied each time, the central samples mapped)
+  and every metric derivative (a `D × parameters` Jacobian row filled and summed at every voxel)
+  grow with the number of parameters. sMRIPrep's template registration of ds000005 sub-01, on
+  every third voxel, with `BSpline[0.1,26]` in place of its SyN stage (antsRegistrationSyN.sh's
+  B-spline spacing; a mesh of 8 × 9 × 8 at the base level and 64 × 72 × 64 at the last, about a
+  million parameters): ANTs 2.6.5 at 4 threads had not finished after 3 h 50 min, when it was
+  stopped; for its last 2 h 30 min only its main thread was busy (as in the single-threaded
+  scales). larmorx (`reproduce`, one thread), which computes each point's `4^D` non-zero columns
+  only and maps again only the samples a parameter's control point supports, ran the whole
+  registration in 38 s. The antsApplyTransforms evidence (its B-spline example) therefore takes
+  its transform from a 104 mm spacing (a mesh of 2 × 3 × 2 at the base level).
 - **Messages:** `*** Running bspline registration (meshSizeAtBaseLevel = [2, 2, 2]) ***`; a mesh
   size of 0, or fewer mesh sizes than dimensions (ANTs reads past its vector), is ANTS-77.
 - **Outputs:** `BSpline.txt` (ITK's text format, the `BSplineTransform_double_3_3` parameters

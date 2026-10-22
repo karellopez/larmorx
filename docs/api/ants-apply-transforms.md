@@ -5,7 +5,7 @@ and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crate
 `larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
 
 **Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 220 cases:
+[validation record](../validation/ants-apply-transforms.md)). The record covers 258 cases:
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
@@ -16,13 +16,16 @@ and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crate
 - all of them again with `--float 1`, ANTs' single-precision pipeline;
 - the transform outputs, every form and format, and the errors around them.
 
-All 220 agree (14 of them errors both programs report; 4 expected divergences, where ANTs
-crashes and larmorx refuses, ANTS-48). Of the 174 resampling cases compared, 160 are
-byte-identical to the unmodified ANTs program, among them all 89 `--float 1` cases; the other
-14 (two of them through fMRIPrep's `.h5` composite) differ only where ITK calls the platform's
-`exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc in double), by at most about 1e-15
-relative ([why](../findings/platform-math.md)). With correctly rounded maths preloaded into
-ANTs, all 174 are byte-identical. The 28 transform-output cases (`-o Linear[...]`,
+All 258 agree (20 of them errors both programs report; 4 expected divergences, where ANTs
+crashes and larmorx refuses, ANTS-48). Of the 200 resampling cases compared, 185 are
+byte-identical to the unmodified ANTs program, among them all 102 `--float 1` cases; the other
+15 (two of them through fMRIPrep's `.h5` composite, one through a B-spline transform with
+Lanczos) differ only where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and
+windowed sinc in double), by at most about 1e-15 relative ([why](../findings/platform-math.md)).
+With correctly rounded maths preloaded into ANTs, all 200 are byte-identical. The 40 cases of
+B-spline transforms (A5 part 3: text, MATLAB and HDF5 files, float coefficients, composites,
+chains, interpolators, time series, `--float 1`, the transform outputs, and the inverses both
+programs refuse) all agree. The 46 transform-output cases (`-o Linear[...]`,
 `-o CompositeTransform[...]`, `-o DisplacementField[...]`) write ANTs's files: text and MATLAB
 byte for byte, NIfTI fields bit for bit, HDF5 dataset for dataset. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own

@@ -15,12 +15,12 @@
 //! - the option values are read newest first (`GetFunction(0)` is the last one given), the
 //!   stages are numbered from the last on the command line (`AssignStages`).
 //!
-//! **Scope.** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
-//! `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
-//! `BSplineDisplacementField` and `BSpline`, with every image metric and point-set metric, in 2,
-//! 3 and 4 dimensions, float and double. The velocity-field transforms are parsed as ANTs
-//! parses them and refused before the registration runs (A5 part 3). What is not ported yet is
-//! refused with a message naming it.
+//! **Scope.** Every stage ANTs has: the linear ones (`Translation`, `Rigid`, `Similarity`,
+//! `Affine`, `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
+//! `BSplineDisplacementField`, `BSpline`, `Exponential`, `BSplineExponential`,
+//! `TimeVaryingVelocityField` and `TimeVaryingBSplineVelocityField`, with every image metric and
+//! point-set metric, in 2, 3 and 4 dimensions, float and double. What is not ported (`--minc`)
+//! is refused with a message naming it.
 
 use std::io::Write;
 use std::path::Path;
@@ -1529,7 +1529,6 @@ fn do_registration<R: Compute, const D: usize>(
         let ids = p.stage_ids("metric");
         ids.into_iter().rev().collect()
     };
-    let mut deformable: Option<XfrmMethod> = None;
     for current in (0..n_transforms).rev() {
         let c = &convergence[current];
         let iterations = if c.parameters.is_empty() {
@@ -1771,10 +1770,8 @@ fn do_registration<R: Compute, const D: usize>(
                     transform_method.number_of_time_indices = steps;
                     transform_method.spline_order = order;
                 }
-                _ => {
-                    parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
-                    deformable.get_or_insert(method);
-                }
+                // The linear methods: no deformable parameters.
+                _ => {}
             }
         }
         helper.transforms.push(transform_method);
@@ -1875,15 +1872,6 @@ fn do_registration<R: Compute, const D: usize>(
             _ => {}
         }
         helper.metrics.push(metric);
-    }
-    if let Some(method) = deformable {
-        return Err(refuse(
-            log,
-            &format!(
-                "{} stages are deformable registration that larmorx ports in milestone A5 part 3; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine), SyN, BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline",
-                method.as_str()
-            ),
-        ));
     }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());

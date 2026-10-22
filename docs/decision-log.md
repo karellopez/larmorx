@@ -1055,6 +1055,24 @@ tools.
 the clean-room 3dTshift's last-unit differences from its double-precision Fourier shift stay an
 "open difference"; part 2b brings every other tool into the same form.
 
+## 2026-10-22: ANTS-106 and ANTS-30, as recommended; the defect policy restated
+
+**Decided by the user** ("Follow your recommendation, they should be compliant with your other
+recommendations regarding originals bugs"):
+- **ANTS-106** (Atropos): partial-volume classes with an MRF are made to work. In the MRF a
+  partial-volume label counts as a member of its own set (−1 with its tissues, −2 with itself,
+  +1 with any other label); `reproduce` keeps ANTs' stop; validated on phantoms with known
+  mixtures. A follow-up after A5 part 3.
+- **ANTS-30** (ResampleImage): the corrected command line is approved as designed
+  (`docs/api/ants-resample-image.md`, "The seventh argument").
+**The policy, as the user summarised it and confirmed:** defects of the originals are recorded
+(the register), fixed by default (with a warning where the fix changes a result), and a switch
+reproduces the original exactly (`upstream_defects="reproduce"`, used by the parity tests);
+where a defect affects a project's users and the evidence is solid, a report is drafted for its
+developers and filed by the user. Crashes, races and nondeterminism are never the default but
+get a switch where they are reproducible; where it is unclear whether a behaviour is a defect,
+the user decides (D13, 2026-10-11).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

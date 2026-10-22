@@ -90,6 +90,10 @@ starts no other agent.
   with a message today, `warped=True` gives the warped image), with parity cases.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
+- **ANTS-106 in Atropos** (decided 2026-10-22): partial-volume classes with an MRF, a
+  partial-volume label counting as a member of its own set; `reproduce` keeps ANTs' stop; parity
+  in `reproduce` plus a fix pass, phantoms with known mixtures, golden case, the site's Atropos
+  page. A small part after A5 part 3.
 - **In-place writing in 3dTshift** (decided 2026-10-21): an existing writable output in a
   directory that cannot be written is replaced in place, as AFNI does. The replica directly;
   the clean-room original from a spec amendment written from black-box runs (the implementer
@@ -138,15 +142,10 @@ Still to do:
 
 ## Waiting for the user
 
-- **ANTS-106** (A6): Atropos' partial-volume classes combined with an MRF never win a voxel, and
-  both ANTs and larmorx stop with an error. No correction is defined yet; one option is to count
-  a partial-volume label as a member of its own set. sMRIPrep does not use partial volumes.
-
-- **ANTS-30:** review ResampleImage's corrected command line (`docs/api/ants-resample-image.md`,
-  "The seventh argument").
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
 
-Decided 2026-10-21 (decision log): ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29
+Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's
+command line approved. Decided 2026-10-21: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29
 corrected by default (with A5 part 3); in-place writing as AFNI does; `LARMORX_GPL_BIN` kept;
 PIPE-16 keeps N4's float32 result.

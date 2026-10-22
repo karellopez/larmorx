@@ -75,7 +75,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-27 | MultiplyImages | unreadable second file multiplies by 0, silently | e | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-28 | ResampleImageBySpacing, ResampleImage, SmoothImage | uninitialised values reach the output | a | none | refuses; `reproduce` fills the unwritten buffer with zeros and warns (2026-10-12) | – |
 | ANTS-29 | ResampleImage | size 1: infinite spacing, a zero image, exit 0 | c | none | refuses; `reproduce` writes ANTs' image byte for byte (2026-10-12) | – |
-| ANTS-30 | ResampleImage | seventh argument read twice | e | none | corrected by default (`upstream_defects`, 2026-10-12); the command-line design awaits review | – |
+| ANTS-30 | ResampleImage | seventh argument read twice | e | none | corrected by default (`upstream_defects`, 2026-10-12); the command-line design approved by the user (2026-10-22) | – |
 | ANTS-31 | ResampleImageBySpacing | `nn` read from the wrong argument; dimension 5 does nothing | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-32 | ResampleImageBySpacing | sigma `out/in − 1` taken in mm; outside points get the value at index 1 | c? | none | reproduces | decide |
 | ANTS-33 | antsApplyTransforms | unknown `-u` ignored; interpolator parameters ignored | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -140,7 +140,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-103 | Atropos | `JointShapeAndOrientationProbability` evaluates its histograms at the raw components and an unset coordinate | a | none | corrected by default: at the tensor's eigenvalues and direction; `reproduce` takes the unset coordinate as 0, with a notice (A6) | – |
 | ANTS-104 | Atropos | `ManifoldParzenWindows`' local covariances double their running sums | c | none | corrected by default (A6) | – |
 | ANTS-105 | Atropos | `-u 1` with prior probability images and a mask crashes | a | none | runs; `reproduce` stops where ANTs crashes (A6) | – |
-| ANTS-106 | Atropos | partial-volume classes with their likelihoods and an MRF never win a voxel: Atropos stops | c? | none | as ANTs in both modes (no correction defined); documented | decide |
+| ANTS-106 | Atropos | partial-volume classes with their likelihoods and an MRF never win a voxel: Atropos stops | c? | none | as ANTs in both modes today; decided 2026-10-22: a partial-volume label counts as a member of its own set in the MRF, `reproduce` keeps ANTs' stop | yes (to implement) |
 | ANTS-107 | Atropos | with Grubbs-Rosner (ANTS-94) the grown sample is weighed with uninitialized memory: the result depends on the heap | a | none | not met by default (ANTS-94 corrected); `reproduce` weighs those samples 0, with a notice (A6) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -857,7 +857,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   after them (argument 7 for linear and nearest neighbour, as in ANTs; 8 for windowed sinc and
   B-spline; 9 for Gaussian). The window `b` is Blackman, as the usage says (ANTs' code builds
   a second Lanczos). The warning comes when the two readings differ.
-- **D13 / gap:** done; the design awaits the user's review. No gap.
+- **D13 / gap:** done; the design approved by the user on 2026-10-22 (decision log). No gap.
 
 ### ANTS-31 ResampleImageBySpacing's arguments — (e)
 - **What:** in 2D the `nn` flag is read from the `addvox` argument whenever an eighth argument
@@ -1705,8 +1705,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `partial-volume-likelihoods` without the MRF: identical with CORE-MATH).
 - **fMRIPrep:** none.
 - **larmorx:** as ANTs in both modes, documented ([api/ants-atropos.md](../api/ants-atropos.md)).
-- **D13 / gap:** decide: the intended energy of a partial-volume label is not stated (counting
-  its own label as a member of its set would give it −1 with its tissues).
+- **D13 / gap:** decided by the user on 2026-10-22 (decision log): corrected by default, a
+  partial-volume label counting as a member of its own set (−1 with its tissues, −2 with
+  itself, +1 with any other label); `reproduce` keeps ANTs' stop; validated on phantoms with
+  known mixtures. To implement (follow-up). Was: the intended energy of a partial-volume label
+  is not stated.
 
 ### ANTS-107 Grubbs-Rosner's grown sample is weighed with uninitialized memory — (a)
 - **What:** with Grubbs-Rosner the samples grow by the masked voxels at every update

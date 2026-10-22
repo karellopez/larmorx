@@ -61,6 +61,7 @@ pub mod rng;
 pub mod space;
 pub mod syn;
 pub mod time_varying;
+pub mod tv_bspline;
 pub mod transform;
 
 use larmorx_core::ItkReal;

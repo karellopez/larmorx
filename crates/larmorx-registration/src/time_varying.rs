@@ -605,6 +605,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         floor,
                         masks: &mut masks,
                         stale_masks: false,
+                        through: None,
                     };
                     let (value, derivative) = call.gradient_field(false, warnings)?;
                     value_sum = value_sum + value;

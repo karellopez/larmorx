@@ -283,13 +283,14 @@ fn initialize_metric<R: Real, const D: usize>(
     moving_gradient: Option<Arc<Image<[f64; D], D>>>,
     virtual_space: &Space<D>,
     samples: &Option<Arc<Vec<[f64; D]>>>,
+    fixed_transform: Option<Composite<R, D>>,
 ) -> Result<Initialized<R, D>, ItkException> {
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
         moving: Arc::clone(moving),
         fixed_mask: fixed_mask.clone(),
         moving_mask: moving_mask.clone(),
-        fixed_transform: None,
+        fixed_transform,
         virtual_space: virtual_space.clone(),
         samples: samples.clone(),
         fixed_gradient_image: fixed_gradient,
@@ -317,6 +318,7 @@ fn initialize_metric<R: Real, const D: usize>(
 fn metric_derivative<R: Real, const D: usize>(
     m: &Initialized<R, D>,
     correct_gc: bool,
+    moving: &Composite<R, D>,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
 ) -> Result<(R, Vec<R>), ItkException> {
@@ -330,18 +332,17 @@ fn metric_derivative<R: Real, const D: usize>(
             "VirtualSampledPointSet must have 1 or more points.",
         ));
     }
-    let identity = Composite::new(Vec::new());
     match (&m.state, m.kind) {
-        (Some(state), _) => state.evaluate(&m.metric, &identity, true, floor, warnings),
+        (Some(state), _) => state.evaluate(&m.metric, moving, true, floor, warnings),
         (None, MetricKind::Gc) => crate::metric::correlation::local_derivative(
             &m.metric,
-            &Composite::new(Vec::new()),
+            moving,
             correct_gc,
             floor,
             warnings,
         ),
         (None, _) => {
-            let r = demons::evaluate(&m.metric, &identity, true, floor)?;
+            let r = demons::evaluate(&m.metric, moving, true, floor)?;
             if r.no_valid_points {
                 warnings.push(no_valid_points_warning(
                     VERIFY_FILE,
@@ -422,6 +423,10 @@ pub(crate) struct GradientCall<'a, R, const D: usize> {
     /// the mask the previous call set (ITK-31, reproduced when `stale_masks`).
     pub(crate) masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
     pub(crate) stale_masks: bool,
+    /// The fixed and moving transforms the image metrics are evaluated through, on top of
+    /// their resampled images (ITK-36 reproduced: a time-varying B-spline velocity field's
+    /// multi-metric whose last metric is a point-set metric); `None`: the identity.
+    pub(crate) through: Option<(&'a Composite<R, D>, &'a Composite<R, D>)>,
 }
 
 impl<R: Real, const D: usize> GradientCall<'_, R, D> {
@@ -527,6 +532,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 mg,
                 self.virtual_space,
                 &lm.samples,
+                self.through.map(|(f, _)| f.clone()),
             );
             match result {
                 Ok(m) => initialized.push(Some(m)),
@@ -545,7 +551,15 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         for (j, m) in initialized.iter().enumerate() {
             let (v, d) = match m {
                 Some(m) => {
-                    metric_derivative(m, self.settings.correct_gc_derivative, self.floor, warnings)?
+                    let identity = Composite::new(Vec::new());
+                    let moving = self.through.map_or(&identity, |(_, m)| m);
+                    metric_derivative(
+                        m,
+                        self.settings.correct_gc_derivative,
+                        moving,
+                        self.floor,
+                        warnings,
+                    )?
                 }
                 None => self.point_sets[j]
                     .as_mut()
@@ -930,6 +944,7 @@ fn run_syn_levels<R: Real, const D: usize>(
                     floor,
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
+                    through: None,
                 };
                 // B-spline SyN with a single point-set metric: the B-spline fitted to the
                 // points' derivatives.

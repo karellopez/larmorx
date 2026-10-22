@@ -1209,6 +1209,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
                 continue;
             }
+            if method == XfrmMethod::TimeVaryingBSplineVelocityField {
+                let inputs = super::syn::SynInputs {
+                    stage,
+                    iterations: iterations.clone(),
+                    threshold,
+                    window,
+                    levels,
+                    kinds: stage_metrics.iter().map(|m| m.kind).collect(),
+                    prepared,
+                    shrink_factors: per_level,
+                    sigmas: sigmas_r,
+                    sampling,
+                    percentage: R::r(f64::from(percentage)),
+                };
+                self.tvbsvf_stage(log, floor, inputs)?;
+                let elapsed = timer.elapsed().as_secs_f64();
+                log.logger(&format!(
+                    "  Elapsed time (stage {stage}): {}\n\n",
+                    log.f(elapsed)
+                ));
+                continue;
+            }
             // GaussianDisplacementField, BSplineDisplacementField: ImageRegistrationMethodv4
             // optimising a displacement field with smoothing on update.
             let field_stage = matches!(

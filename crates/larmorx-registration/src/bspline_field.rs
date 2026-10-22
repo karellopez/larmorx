@@ -51,20 +51,32 @@ const BSPLINE_EPSILON: f32 = 1e-3;
 /// The weight of a boundary point (`boundaryWeight = 1.0e10`, a float).
 const BOUNDARY_WEIGHT: f32 = 1.0e10;
 
-/// A control-point lattice of displacement vectors (`PointDataImageType`), x fastest.
+/// A control-point lattice of `K`-component vectors (`PointDataImageType`) in `D` dimensions
+/// (`K = D` for a displacement field, `D + 1` dimensions for a time-varying velocity field),
+/// x fastest.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Lattice<R, const D: usize> {
+pub struct Lattice<R, const D: usize, const K: usize> {
     pub size: [usize; D],
-    pub data: Vec<[R; D]>,
+    pub data: Vec<[R; K]>,
 }
 
 /// The scattered data of a fit: points (`Point<float, D>`, the B-spline domain's parametric
-/// positions), their displacements and weights (float).
-#[derive(Clone, Debug, Default)]
-pub struct Scattered<R, const D: usize> {
+/// positions), their `K`-component values and weights (float).
+#[derive(Clone, Debug)]
+pub struct Scattered<R, const D: usize, const K: usize> {
     pub points: Vec<[f32; D]>,
-    pub data: Vec<[R; D]>,
+    pub data: Vec<[R; K]>,
     pub weights: Vec<f32>,
+}
+
+impl<R, const D: usize, const K: usize> Default for Scattered<R, D, K> {
+    fn default() -> Self {
+        Scattered {
+            points: Vec::new(),
+            data: Vec::new(),
+            weights: Vec::new(),
+        }
+    }
 }
 
 /// The fit's domain: `m_Origin`, `m_Spacing`, `m_Size` of the filter (its direction only
@@ -203,12 +215,12 @@ fn digits_of<const D: usize>(m: usize, n: usize) -> [usize; D] {
 
 /// `ThreadedGenerateDataForFitting` and `AfterThreadedGenerateData` for one level: the
 /// control-point lattice `φ` of `control_points` per axis.
-pub fn fit<R: Real, const D: usize>(
+pub fn fit<R: Real, const D: usize, const K: usize>(
     domain: &FitDomain<D>,
     control_points: &[u32; D],
     order: u32,
-    input: &Scattered<R, D>,
-) -> Result<Lattice<R, D>, ItkException> {
+    input: &Scattered<R, D, K>,
+) -> Result<Lattice<R, D, K>, ItkException> {
     check(domain, control_points, order)?;
     let ord = order as usize;
     let n = ord + 1;
@@ -263,11 +275,11 @@ pub fn fit<R: Real, const D: usize>(
     // One task per control-point index along the last axis: the points that reach it, in point
     // order (a merge of the buckets c − order ..= c), each adding its contributions to the
     // control points of that index.
-    let slabs: Vec<(Vec<f32>, Vec<[R; D]>)> = (0..cps[last])
+    let slabs: Vec<(Vec<f32>, Vec<[R; K]>)> = (0..cps[last])
         .into_par_iter()
         .map(|c| {
             let mut omega = vec![0f32; slab];
-            let mut delta = vec![[R::ZERO; D]; slab];
+            let mut delta = vec![[R::ZERO; K]; slab];
             let lo = c.saturating_sub(ord);
             let mut heads: Vec<(usize, usize)> = (lo..=c).map(|b| (b, 0usize)).collect();
             loop {
@@ -301,7 +313,7 @@ pub fn fit<R: Real, const D: usize>(
                     let factor = t * t * t * wc / pw.w2;
                     let f = R::from_f64(f64::from(factor));
                     let d = &mut delta[cell];
-                    for k in 0..D {
+                    for k in 0..K {
                         d[k] = d[k] + scale(v[k], f);
                     }
                 }
@@ -312,9 +324,9 @@ pub fn fit<R: Real, const D: usize>(
     let mut data = Vec::with_capacity(slab * cps[last]);
     for (omega, delta) in slabs {
         for (o, dl) in omega.iter().zip(&delta) {
-            let mut p = [R::ZERO; D];
+            let mut p = [R::ZERO; K];
             if !almost_equal_f32(*o, 0.0) {
-                for k in 0..D {
+                for k in 0..K {
                     let q = divide(dl[k], *o);
                     p[k] = if q.to_f64().is_finite() { q } else { R::ZERO };
                 }
@@ -355,11 +367,11 @@ fn collapse_weights(kernel: &Kernel, order: usize, half: f64, u: f32) -> (usize,
 /// `ThreadedGenerateDataForReconstruction`: the B-spline of `lattice` evaluated on `space`'s
 /// grid (output index `i` at `U = spans·i/(size − 1)` in float, pulled inside `[0, spans)`),
 /// each voxel collapsing the lattice along the last axis first; sums in `R` from 0.
-pub fn reconstruct<R: Real, const D: usize>(
-    lattice: &Lattice<R, D>,
+pub fn reconstruct<R: Real, const D: usize, const K: usize>(
+    lattice: &Lattice<R, D, K>,
     order: u32,
     space: &Space<D>,
-) -> Result<Field<R, D>, ItkException> {
+) -> Result<Image<[R; K], D>, ItkException> {
     let ord = order as usize;
     let kernel = Kernel::new(ord);
     let half = 0.5 * f64::from(order.wrapping_sub(1) as f32);
@@ -379,7 +391,10 @@ pub fn reconstruct<R: Real, const D: usize>(
             if u < 0.0 && u.abs() <= eps {
                 u = 0.0;
             }
-            if u < 0.0 || u >= s || u.is_nan() {
+            // NaN (an axis of one voxel: 0/0) passes ITK's test; its control point is then
+            // x86-64's conversion of NaN, 0 (as Rust's), and the kernel of NaN is 0 up to order
+            // 3 (NaN above).
+            if u < 0.0 || u >= s {
                 return Err(scattered_error(
                     630,
                     format!(
@@ -394,14 +409,14 @@ pub fn reconstruct<R: Real, const D: usize>(
     }
     let lsize = lattice.size;
     // Collapse `src` (axes after `axis` already of size 1) along `axis`.
-    let collapse = |src: &[[R; D]], axis: usize, first: usize, w: &[f32]| -> Vec<[R; D]> {
+    let collapse = |src: &[[R; K]], axis: usize, first: usize, w: &[f32]| -> Vec<[R; K]> {
         let inner: usize = lsize[..axis].iter().product();
-        let mut out = vec![[R::ZERO; D]; inner];
+        let mut out = vec![[R::ZERO; K]; inner];
         for (k, &wk) in w.iter().enumerate() {
             let base = (first + k) * inner;
             let b = R::from_f64(f64::from(wk));
             for (o, v) in out.iter_mut().zip(&src[base..base + inner]) {
-                for c in 0..D {
+                for c in 0..K {
                     o[c] = o[c] + v[c] * b;
                 }
             }
@@ -411,11 +426,11 @@ pub fn reconstruct<R: Real, const D: usize>(
     let n0 = space.size[0];
     let n_voxels = space.len();
     let lines = n_voxels / n0.max(1);
-    let rows: Vec<Vec<[R; D]>> = (0..lines)
+    let rows: Vec<Vec<[R; K]>> = (0..lines)
         .into_par_iter()
         .map(|line| {
             let idx = space.index_of(line * n0);
-            let mut current: Option<Vec<[R; D]>> = None;
+            let mut current: Option<Vec<[R; K]>> = None;
             for a in (1..D).rev() {
                 let i = (idx[a] - space.start[a]) as usize;
                 let (first, w) = &tables[a][i];
@@ -426,11 +441,11 @@ pub fn reconstruct<R: Real, const D: usize>(
             (0..n0)
                 .map(|x| {
                     let (first, w) = &tables[0][x];
-                    let mut sum = [R::ZERO; D];
+                    let mut sum = [R::ZERO; K];
                     for (k, &wk) in w.iter().enumerate() {
                         let b = R::from_f64(f64::from(wk));
                         let v = &row[first + k];
-                        for c in 0..D {
+                        for c in 0..K {
                             sum[c] = sum[c] + v[c] * b;
                         }
                     }
@@ -439,7 +454,7 @@ pub fn reconstruct<R: Real, const D: usize>(
                 .collect()
         })
         .collect();
-    let data: Vec<[R; D]> = rows.into_iter().flatten().collect();
+    let data: Vec<[R; K]> = rows.into_iter().flatten().collect();
     let out_space = Space::new(
         space.size,
         [0; D],
@@ -508,7 +523,7 @@ pub fn field_scattered<R: Real, const D: usize>(
     field: &Field<R, D>,
     confidence: Option<&Image<f64, D>>,
     stationary_boundary: bool,
-) -> Result<(Space<D>, Scattered<R, D>), ItkException> {
+) -> Result<(Space<D>, Scattered<R, D, D>), ItkException> {
     let space = &field.space;
     let start = [0i64; D];
     // The B-spline domain: the field's geometry (bsplinePhysicalDomainField) with region
@@ -641,7 +656,7 @@ fn run<R: Real, const D: usize>(
     domain: &Space<D>,
     control_points: &[u32; D],
     order: u32,
-    input: &Scattered<R, D>,
+    input: &Scattered<R, D, D>,
 ) -> Result<Field<R, D>, ItkException> {
     if input.points.is_empty() {
         return Err(ItkException::new(
@@ -664,7 +679,7 @@ mod tests {
         domain: &FitDomain<3>,
         cps: &[u32; 3],
         order: u32,
-        input: &Scattered<f64, 3>,
+        input: &Scattered<f64, 3, 3>,
     ) -> Vec<[f64; 3]> {
         let ord = order as usize;
         let n = ord + 1;

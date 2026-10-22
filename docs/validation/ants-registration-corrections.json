@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "393b190e4ce6",
+  "larmorx_commit": "88bb1fffccbf",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -32,7 +32,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "3.775"
    },
-   "seconds": 0.505,
+   "seconds": 0.515,
    "status": "pass"
   },
   {
@@ -52,7 +52,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "3.775"
    },
-   "seconds": 0.476,
+   "seconds": 0.479,
    "status": "pass"
   },
   {
@@ -72,7 +72,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "3.775"
    },
-   "seconds": 0.634,
+   "seconds": 0.61,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "3.775"
    },
-   "seconds": 0.323,
+   "seconds": 0.288,
    "status": "pass"
   },
   {
@@ -112,7 +112,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "3.775"
    },
-   "seconds": 0.256,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
     "reproduce: iterations": 9,
     "reproduce: translation error (mm)": "1"
    },
-   "seconds": 0.065,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -152,7 +152,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "0.03453"
    },
-   "seconds": 2.468,
+   "seconds": 1.905,
    "status": "pass"
   },
   {
@@ -172,7 +172,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "5.59e-06"
    },
-   "seconds": 2.797,
+   "seconds": 1.918,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "0.02731"
    },
-   "seconds": 2.473,
+   "seconds": 1.791,
    "status": "pass"
   },
   {
@@ -212,7 +212,7 @@
     "reproduce: iterations": 40,
     "reproduce: translation error (mm)": "0.1042"
    },
-   "seconds": 3.124,
+   "seconds": 2.916,
    "status": "pass"
   },
   {
@@ -234,7 +234,7 @@
     "reproduce field: largest vector (mm)": "5.07",
     "reproduce: mean squared difference in the mask": "3.014e+04"
    },
-   "seconds": 27.919,
+   "seconds": 21.067,
    "status": "pass"
   },
   {
@@ -256,7 +256,7 @@
     "reproduce field: largest vector (mm)": "6.915",
     "reproduce: mean squared difference in the mask": "3.114e+04"
    },
-   "seconds": 23.758,
+   "seconds": 17.789,
    "status": "pass"
   },
   {
@@ -277,7 +277,7 @@
     "reproduce field: largest vector (mm)": "5.64",
     "reproduce: mean squared difference in the mask": "2.922e+04"
    },
-   "seconds": 20.624,
+   "seconds": 15.562,
    "status": "pass"
   },
   {
@@ -299,7 +299,7 @@
     "reproduce field: largest vector (mm)": "0.1649",
     "reproduce: mean squared difference in the mask": "3.75e+04"
    },
-   "seconds": 4.216,
+   "seconds": 3.375,
    "status": "pass"
   },
   {
@@ -317,15 +317,15 @@
     "ANTs on the moving image resampled through the B-spline transform: largest distance (mm)": "0.3663",
     "ANTs on the moving image resampled through the B-spline transform: mean distance (mm)": "0.1855",
     "ANTs on the moving image resampled through the B-spline transform: mean squared difference left": "2.875e+04",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "4.655",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "2.336",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): mean squared difference left": "3.407e+04",
-    "ANTs with the B-spline transform as a displacement field (moving grid): largest distance (mm)": "4.662",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "2.346",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.407e+04",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "3.75",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "1.635",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): mean squared difference left": "3.246e+04",
+    "ANTs with the B-spline transform as a displacement field (moving grid): largest distance (mm)": "4.718",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "2.177",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.294e+04",
     "default: mean squared difference left (exact composite)": "2.962e+04"
    },
-   "seconds": 13.183,
+   "seconds": 16.79,
    "status": "pass"
   },
   {
@@ -343,15 +343,15 @@
     "ANTs on the moving image resampled through the B-spline transform: largest distance (mm)": "0.2916",
     "ANTs on the moving image resampled through the B-spline transform: mean distance (mm)": "0.143",
     "ANTs on the moving image resampled through the B-spline transform: mean squared difference left": "2.957e+04",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "2.728",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "1.695",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): mean squared difference left": "3.257e+04",
-    "ANTs with the B-spline transform as a displacement field (moving grid): largest distance (mm)": "0.7089",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "0.5473",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "2.995e+04",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "2.063",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "1.404",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): mean squared difference left": "3.196e+04",
+    "ANTs with the B-spline transform as a displacement field (moving grid): largest distance (mm)": "3.356",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "1.947",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.299e+04",
     "default: mean squared difference left (exact composite)": "2.95e+04"
    },
-   "seconds": 17.611,
+   "seconds": 14.832,
    "status": "pass"
   },
   {
@@ -377,7 +377,7 @@
     "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.127e+04",
     "default: mean squared difference left (exact composite)": "2.704e+04"
    },
-   "seconds": 10.287,
+   "seconds": 8.552,
    "status": "pass"
   },
   {
@@ -395,15 +395,15 @@
     "ANTs on the moving image resampled through the B-spline transform: largest distance (mm)": "7.543",
     "ANTs on the moving image resampled through the B-spline transform: mean distance (mm)": "3.956",
     "ANTs on the moving image resampled through the B-spline transform: mean squared difference left": "2.912e+04",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "9.408",
-    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "4.305",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): largest distance (mm)": "9.435",
+    "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)": "4.331",
     "ANTs with the B-spline transform as a displacement field (half its spacing): mean squared difference left": "3.439e+04",
     "ANTs with the B-spline transform as a displacement field (moving grid): largest distance (mm)": "9.584",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "4.38",
-    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.45e+04",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean distance (mm)": "4.378",
+    "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.446e+04",
     "default: mean squared difference left (exact composite)": "3.095e+04"
    },
-   "seconds": 11.237,
+   "seconds": 9.322,
    "status": "pass"
   },
   {
@@ -429,7 +429,7 @@
     "ANTs with the B-spline transform as a displacement field (moving grid): mean squared difference left": "3.007e+04",
     "default: mean squared difference left (exact composite)": "3.004e+04"
    },
-   "seconds": 26.94,
+   "seconds": 21.266,
    "status": "pass"
   }
  ],

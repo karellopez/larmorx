@@ -59,19 +59,19 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
 | `errors/invert-bspline` | inverting a B-spline transform: it has no inverse | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
 | `errors/invert-bspline-composite` | inverting a composite that holds a B-spline transform | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-pe465e0z/missing.mat |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-70o4607h/missing.mat |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `float/errors/4d-as-scalar` | --float 1: a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `float/errors/invert-field` | --float 1: inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
 | `float/errors/invert-bspline` | --float 1: inverting a B-spline transform: it has no inverse | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
 | `float/errors/invert-bspline-composite` | --float 1: inverting a composite that holds a B-spline transform | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
-| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-7s7jlghd/missing.mat |
+| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-603ac3bl/missing.mat |
 | `float/errors/unknown-interpolator` | --float 1: -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `transform-output/errors/linear-no-parameter` | -o Linear without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
 | `transform-output/errors/composite-no-parameter` | -o CompositeTransform without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
 | `transform-output/errors/linear-with-field` | -o Linear[...] of a chain with a displacement field: not linear | ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear. |
 | `transform-output/errors/linear-with-bspline` | -o Linear[...] of a chain with a B-spline transform: not linear | ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear. |
-| `transform-output/errors/inverted-bspline` | -o CompositeTransform[...] -t [bspline,1]: a B-spline transform has no inverse | ANTs: Inverse does not exist for /tmp/lx-aat-d6tsxzpd/gen-bspline.txt; larmorx: Inverse does not exist: a B-spline transform has no inverse |
+| `transform-output/errors/inverted-bspline` | -o CompositeTransform[...] -t [bspline,1]: a B-spline transform has no inverse | ANTs: Inverse does not exist for /tmp/lx-aat-2vvu341w/gen-bspline.txt; larmorx: Inverse does not exist: a B-spline transform has no inverse |
 | `transform-output/errors/field-no-reference` | -o DisplacementField[...] without -r | ANTs: A reference image is required.; larmorx: A reference image is required. |
 | `transform-output/errors/image-no-input` | -o [x.nii.gz,0] without -i: an image output needs an input | ANTs: An input image is required.; larmorx: An input image is required. |
 | `transform-output/errors/inverted-field` | -o CompositeTransform[...] -t [field,1]: a displacement field has no inverse | ANTs: Inverse does not exist for <larmorx-testdata>/data/synthetic/resampling/transforms/warp-lps-vector.nii.gz; larmorx: Inverse does not exist: a displacemen… |
@@ -80,7 +80,7 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (393b190e4ce6) |
+| larmorx | 0.0.1 (88bb1fffccbf) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -106,6 +106,33 @@ def _(t):
     _save(_intensity(_blobs((1, -1, 1)), 8), _affine(), t)
 
 
+def _affine_lpsid() -> np.ndarray:
+    """The 3D grid stored with RAS axes reversed in x and y: ITK reads it with the identity
+    direction (the same LPS coordinates the RAS file has)."""
+    a = np.diag([-2.0, -2.0, 2.5, 1.0])
+    a[:3, 3] = [20.0, 18.0, -15.0]
+    return a
+
+
+for _name, _make in {
+    "ps-labels-fixed-lpsid": lambda: _blobs(),
+    "ps-labels-moving-lpsid": lambda: _blobs((1, -1, 1)),
+    "ps-mask-lpsid": lambda: (_blobs() > 0).astype(np.uint8),
+    "ps-mask-moving-lpsid": lambda: (_blobs((1, -1, 1)) > 0).astype(np.uint8),
+    "ps-intensity-fixed-lpsid": lambda: _intensity(_blobs(), 7),
+    "ps-intensity-moving-lpsid": lambda: _intensity(_blobs((1, -1, 1)), 8),
+}.items():
+
+    def _build(t, make=_make):
+        _save(make(), _affine_lpsid(), t)
+
+    _build.__doc__ = (
+        f"``{_name.removesuffix('-lpsid')}`` on a grid ITK reads with the identity direction "
+        "(the time-varying B-spline stage's point-set path needs one, ITK-38)."
+    )
+    ants_inputs.builder(_name)(_build)
+
+
 def _affine2() -> np.ndarray:
     a = np.diag([1.5, 2.0, 1.0, 1.0])
     a[:2, 3] = [-10.0, -12.0]

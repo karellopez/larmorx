@@ -3214,9 +3214,7 @@ fn write_transforms<R: Compute, const D: usize>(
             .origins
             .iter()
             .enumerate()
-            .filter_map(|(i, o)| {
-                o.map(|s| (i, helper.transforms[s].method.as_str().to_lowercase()))
-            })
+            .filter_map(|(i, o)| o.map(|s| (i, helper.transforms[s].name.clone())))
             .collect();
         let differs = runs_out || ants_files != fixed_files;
         let files = if ctx.notices.reproduce() {

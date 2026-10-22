@@ -40,6 +40,7 @@ PARITY_MODULES = {
     "ants-n4": "ants_n4",
     "ants-denoise": "ants_denoise",
     "ants-registration": "ants_registration",
+    "ants-registration-corrections": "ants_registration_corrections",
     "ants-ai": "ants_ai",
     "ants-affine-initializer": "ants_affine_initializer",
 }

@@ -434,6 +434,27 @@ pub(crate) fn evaluation_masks<R: Real, const D: usize>(
     )
 }
 
+/// Whether moving the masks with the images (ITK-40 corrected) changes which virtual voxels
+/// they hold: the stage's masks as the metric tests them at each voxel of the virtual domain,
+/// against their nearest-neighbour resamplings through the fixed and moving composites.
+pub(crate) fn masks_move<R: Real, const D: usize>(
+    fixed_mask: &Option<Mask<D>>,
+    moving_mask: &Option<Mask<D>>,
+    virtual_space: &Space<D>,
+    fixed: &Composite<R, D>,
+    moving: &Composite<R, D>,
+) -> bool {
+    let differs = |m: &Mask<D>, t: &Composite<R, D>| {
+        let moved = crate::resample::resample_mask_nearest(&m.image, virtual_space, t);
+        (0..virtual_space.len()).any(|o| {
+            let p = virtual_space.index_to_point(&virtual_space.index_of(o));
+            m.is_inside(&p) != (moved.data[o] != 0)
+        })
+    };
+    fixed_mask.as_ref().is_some_and(|m| differs(m, fixed))
+        || moving_mask.as_ref().is_some_and(|m| differs(m, moving))
+}
+
 /// What the observer sees after each iteration (`IterationEvent` of the method).
 pub struct TvIteration<R> {
     /// The level (0-based).
@@ -617,21 +638,16 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                 None => (None, None),
             })
             .collect();
-        if n_iterations > 0
-            && level_metrics
-                .iter()
-                .flatten()
-                .any(|lm| lm.fixed_mask.is_some() || lm.moving_mask.is_some())
-        {
-            masks_not_moved = true;
-        }
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
             iteration += 1;
-            let step = || -> Result<(Vec<R>, R), ItkException> {
+            // ITK-40's notice: whether moving the masks changes them (checked until it does).
+            let check_masks = !masks_not_moved;
+            let step = || -> Result<(Vec<R>, R, bool), ItkException> {
                 let mut update = vec![R::ZERO; total];
                 let mut value_sum = R::ZERO;
+                let mut masks_differ = false;
                 for tp in 0..n_time {
                     let t = if n_time > 1 {
                         R::from_i64(tp as i64) / R::from_i64(n_time as i64 - 1)
@@ -673,6 +689,15 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         let Some(lm) = lm else {
                             return Err(no_input());
                         };
+                        if check_masks && !masks_differ {
+                            masks_differ = masks_move(
+                                &lm.fixed_mask,
+                                &lm.moving_mask,
+                                &virtual_space,
+                                &fixed_composite,
+                                &moving_composite,
+                            );
+                        }
                         let (fixed_mask, moving_mask) = evaluation_masks(
                             &lm.fixed_mask,
                             &lm.moving_mask,
@@ -742,9 +767,10 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         }
                     }
                 }
-                Ok((update, value_sum))
+                Ok((update, value_sum, masks_differ))
             };
-            let (mut update, value_sum) = pooled(stage.n_threads, step)??;
+            let (mut update, value_sum, masks_differ) = pooled(stage.n_threads, step)??;
+            masks_not_moved |= masks_differ;
             // Averaging with the last update reduces oscillations.
             let half = R::from_f64(0.5);
             for (u, l) in update.iter_mut().zip(&last_update) {

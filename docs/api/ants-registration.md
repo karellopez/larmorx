@@ -1,4 +1,4 @@
-# antsRegistration (linear, SyN, B-spline and displacement-field stages, point-set metrics)
+# antsRegistration (every stage, image and point-set metrics)
 
 `lx.ants.registration` (command line `larmorx ants antsRegistration`; Rust
 `larmorx_ants::registration::helper::RegistrationHelper` and the crate `larmorx-registration`).
@@ -7,7 +7,10 @@ A replica of ANTs 2.6.5's `antsRegistration` on ITK 5.4.5's v4 registration fram
 `CompositeAffine`), **SyN stages** (`SyN[gradientStep,updateFieldVariance,totalFieldVariance]`,
 milestone A5 part 1; see [SyN stages](#syn-stages)) and the **B-spline and displacement-field
 stages** (`BSplineSyN`, `GaussianDisplacementField`, `BSplineDisplacementField`, `BSpline`,
-milestone A5 part 2; see [B-spline and displacement-field stages](#b-spline-and-displacement-field-stages)),
+milestone A5 part 2; see [B-spline and displacement-field stages](#b-spline-and-displacement-field-stages))
+and the **velocity-field stages** (`Exponential`, `BSplineExponential`,
+`TimeVaryingVelocityField`, `TimeVaryingBSplineVelocityField`, milestone A5 part 3; see
+[Velocity-field stages](#velocity-field-stages)): every transform `antsRegistration` has,
 in 2, 3 and 4 dimensions, double and float
 (`--float 1`), with every image metric (`Mattes`/`MI`, `MI2`, `MeanSquares`, `CC`, `GC`, and
 `Demons`, which needs a displacement field: it fails in a linear stage as in ANTs) and every
@@ -16,8 +19,8 @@ several metrics per stage, sampling, masks, multi-resolution shrinking and smoot
 gradient filter, winsorizing and histogram matching, initial transforms (files, displacement
 fields and composites holding them, `[fixed,moving,feature]`), `--initialize-transforms-per-stage`,
 `--restore-state` and `--save-state`, `--print-similarity-measure-interval` and
-`--write-interval-volumes`. The time-varying and exponential transforms come later (A5 part
-3) and are refused with a message.
+`--write-interval-volumes`. larmorx refuses nothing ANTs accepts, except MINC transform files
+and the crashes and hangs listed in the [register](upstream-defects.md).
 
 **Status: `validated`** against antsRegistration itself (the
 [validation record](../validation/ants-registration.md), standard tier, and the
@@ -133,12 +136,16 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 | `-t SyN[step,update,total]` | `RegistrationStage(transform="SyN", gradient_step=step, update_field_variance=update, total_field_variance=total)` | variances in voxels², default 3 and 0 |
 | `-t BSplineSyN[step,updateMesh,totalMesh,order]` | `RegistrationStage(transform="BSplineSyN", gradient_step=step, mesh_size=updateMesh, total_mesh_size=totalMesh, spline_order=order)` | meshes per axis at the base level (`(2, 2, 2)`, `2x2x2`), or one knot spacing in mm (`26`); total mesh default 0 (no smoothing), order 3 |
 | `-t GaussianDisplacementField[step,update,total]` | `RegistrationStage(transform="GaussianDisplacementField", gradient_step=step, update_field_variance=update, total_field_variance=total)` | both variances required on the command line |
-| `-t BSplineDisplacementField[step,updateMesh,totalMesh,order]` | `RegistrationStage(transform="BSplineDisplacementField", gradient_step=step, mesh_size=, total_mesh_size=, spline_order=)` | the meshes are doubled already at the base level (ANTS-78) |
+| `-t BSplineDisplacementField[step,updateMesh,totalMesh,order]` | `RegistrationStage(transform="BSplineDisplacementField", gradient_step=step, mesh_size=, total_mesh_size=, spline_order=)` | the meshes at the base level, doubled at each level (ANTs doubles them already at the base level, ANTS-78: give twice the mesh, or `reproduce`, for its result) |
 | `-t BSpline[step,mesh]` | `RegistrationStage(transform="BSpline", gradient_step=step, mesh_size=mesh)` | a cubic B-spline transform; the mesh (or knot spacing) at the base level, doubled at each level |
+| `-t Exponential[step,update,velocity,steps]` | `RegistrationStage(transform="Exponential", gradient_step=step, update_field_variance=update, velocity_field_variance=velocity, integration_steps=steps)` | `Exp` is the short name; `steps` 0 or left out (`None`): automatic; the sigmas `-s` in the units given (ANTs: mm, ANTS-80) |
+| `-t BSplineExponential[step,updateMesh,velocityMesh,steps,order]` | `RegistrationStage(transform="BSplineExponential", gradient_step=step, mesh_size=updateMesh, total_mesh_size=velocityMesh, integration_steps=steps, spline_order=order)` | meshes or knot spacings, at the base level (ANTS-78) |
+| `-t TimeVaryingVelocityField[step,timeIndices,update,updateTime,total,totalTime]` | `RegistrationStage(transform="TimeVaryingVelocityField", gradient_step=step, number_of_time_indices=, update_field_variance=, update_field_time_variance=, total_field_variance=, total_field_time_variance=)` | `tvf` is the short name; all six parameters required |
+| `-t TimeVaryingBSplineVelocityField[step,mesh,samples,order]` | `RegistrationStage(transform="TimeVaryingBSplineVelocityField", gradient_step=step, mesh_size=mesh, number_of_time_point_samples=samples, spline_order=order)` | the mesh has one size per axis and one for time (`4x4x4x2`) |
 | `-m ICP[f,m,w,p,boundary]` | `PointSetMetric("ICP", f, m, weight=w, sampling_percentage=p, boundary_points_only=boundary)` | `f`, `m`: a label image, a `.txt` or `.vtk` point set, or `(points, labels)` arrays |
 | `-m PSE[f,m,w,p,boundary,sigma,k]` | `PointSetMetric("PSE", ..., sigma=sigma, k_neighborhood=k)` | |
 | `-m JHCT[f,m,w,p,boundary,sigma,k,alpha,aniso]` | `PointSetMetric("JHCT", ..., sigma=, k_neighborhood=, alpha=, anisotropic_covariances=)` | |
-| `-m IGDM[f,m,w,fmask,mmask,radius,isigma,dsigma,k,gsigma]` | `IntensityPointSetMetric(f, m, fmask, mmask, weight=, neighborhood_radius=, intensity_sigma=, distance_sigma=, k_neighborhood=, gradient_sigma=)` | sigmas of 0 are estimated; `k` and `gsigma` are not used by ANTs (ANTS-67) |
+| `-m IGDM[f,m,w,fmask,mmask,radius,isigma,dsigma,k,gsigma]` | `IntensityPointSetMetric(f, m, fmask, mmask, weight=, neighborhood_radius=, intensity_sigma=, distance_sigma=, k_neighborhood=, gradient_sigma=)` | sigmas of 0 are estimated (the distance sigma at least one voxel, ANTS-70); the `k` nearest points and Gaussian gradients of `gsigma` mm (ANTs uses neither, ANTS-67) |
 | `-m Mattes[f,m,w,bins,sampling,p,gf]` | `RegistrationMetric("Mattes", f, m, weight=w, bins=bins, sampling=..., sampling_percentage=p, use_gradient_filter=gf)` | `MI` is ANTs' other name for Mattes; `MI2` the joint-histogram MI; `CC[f,m,w,radius,...]`: `radius=`; `MeanSquares`, `GC`, `Demons` have no parameter |
 | several `-m` in a stage | `metrics=[...]` | the first metric's value; derivatives weighed by `weight` (normalised) |
 | `-c [10x5,1e-6,10]` | `iterations=[10, 5]`, `convergence_threshold=1e-6`, `convergence_window=10` | a level stops when the window's convergence value is ≤ the threshold (negative when the metric rises: [findings](../findings/ants-registration.md)) |
@@ -163,7 +170,7 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] \
 | `-v 1` | `RegistrationResult.log`, `.iterations` | Python always runs verbose and parses the `DIAGNOSTIC` lines |
 | `--minc 1` | – | MINC transforms: not supported yet |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | the result does not depend on it |
-| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | ANTS-49, -50, -51, ITK-18; the point-set metrics' ANTS-61 to -63, -65, -66, ITK-22, -23, -26, -28; SyN's ANTS-71, -73, -74, ITK-30 to -33; the B-spline and field stages' ANTS-75, -76 ([upstream defects](upstream-defects.md)) |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | ANTS-49, -50, -51, ITK-18; the point-set metrics' ANTS-61 to -63, -65 to -68, -70, ITK-22 to -24, -26, -28, -29; SyN's ANTS-71, -73, -74, ITK-30 to -33; the B-spline and field stages' ANTS-75, -76, -78, ITK-35, -42; the velocity-field stages' ANTS-79 to -81, ITK-36 to -41 ([upstream defects](upstream-defects.md)) |
 
 ## SyN stages
 
@@ -257,20 +264,89 @@ res.files["2Warp.nii.gz"]
   `BSpline` stage with it fails), masks, sampling, several metrics, 2D, 3D and 4D, double and
   float, `-g` (the dimension's weights for the fields; with `BSpline` they do not match its
   parameters and ITK throws, as in ANTs).
-- **A B-spline transform has no Jacobian with respect to position in ITK** (ITK-35): a linear,
-  displacement-field or `BSpline` stage after a `BSpline` stage (or with a B-spline initial
-  transform) fails at its first derivative, as in ANTs (a linear stage is dropped, ANTS-49);
-  SyN and B-spline SyN stages work after it.
+- **Stages after a B-spline transform** (a `BSpline` stage, or a B-spline initial transform)
+  run: larmorx computes the B-spline transform's Jacobian with respect to position (ITK-35,
+  corrected by default: ITK has none, so in ANTs a linear, displacement-field or `BSpline` stage
+  after it fails at its first derivative, a linear one dropped, ANTS-49; `reproduce` does the
+  same). Validated against finite differences and against the closest runs ANTs can do
+  ([findings](../findings/ants-velocity.md)). Give such a stage a mask: the B-spline transform is
+  the identity outside its valid region, so the composite jumps at that border where its
+  coefficients are not 0.
 - **Results do not depend on threads** in larmorx (ANTs' B-spline fits and the B-spline
   transform's metric sums depend on its thread count).
 - **Fast:** larmorx computes a B-spline transform's derivative only at each point's control
   points (ITK computes and sums every parameter at every point), with the same sums bit for bit.
 - **Defaults that differ from ANTs** (D13; `upstream_defects="reproduce"` gives ANTs' result):
   ANTS-75 (the full-scale similarity and interval volumes with a field or a B-spline transform),
-  ANTS-76 (the collapse loses transforms around B-spline transforms). A mesh size of 0, or
-  fewer mesh sizes than dimensions, is refused (ANTS-77: ANTs divides by zero).
-- **Not supported yet:** `antsApplyTransforms` does not read `BSpline.txt` (use the stage's
-  warped image, `warped=True`).
+  ANTS-76 (the collapse loses transforms around B-spline transforms), ANTS-78 (the
+  `BSplineDisplacementField` mesh at the base level: ANTs doubles it there; twice the mesh gives
+  ANTs' result byte for byte), ITK-35 (above), ITK-42 (a coarse B-spline mesh at a shrunken
+  level: ITK refuses the equal, vanishing scales). A mesh size of 0, or fewer mesh sizes than
+  dimensions, is refused (ANTS-77: ANTs divides by zero).
+- **`antsApplyTransforms` applies `BSpline.txt`** (and B-spline transforms in `.mat`, `.h5` and
+  composites), bit for bit as ANTs ([antsApplyTransforms](ants-apply-transforms.md)).
+
+## Velocity-field stages
+
+Four more deformable stages (milestone A5 part 3), what they compute and the defects found:
+[findings](../findings/ants-velocity.md).
+
+- **`Exponential`** optimises a stationary velocity field `v` whose displacement is `exp(v)`
+  (scaling and squaring), and its inverse `exp(−v)`: each update and the velocity field smoothed
+  by Gaussians, plain gradient descent at the gradient step (no scales estimator).
+  **`BSplineExponential`** smooths them by B-spline approximations instead. Outputs: `Warp.nii.gz`,
+  `InverseWarp.nii.gz`; with `-z 0`, `Exponential` also writes `VelocityField.nii.gz`.
+- **`TimeVaryingVelocityField`** optimises a velocity field over space and time (`timeIndices`
+  time points), its displacement the flow from time 0 to 1 integrated by fourth-order
+  Runge–Kutta, its inverse the flow back; each iteration evaluates the metric at every time
+  point. **`TimeVaryingBSplineVelocityField`** holds the velocity as a B-spline over space and
+  time (the mesh has a size for time too) and fits each iteration's derivatives by a B-spline.
+  Outputs: `Warp.nii.gz`, `InverseWarp.nii.gz`; with `-z 0` the time-varying field writes
+  `VelocityField.nii.gz` (a `D + 1`-dimensional vector image; not in 4D, which NIfTI cannot hold).
+
+```python
+import larmorx as lx
+
+cc = lx.ants.RegistrationMetric("CC", "fixed.nii.gz", "moving.nii.gz", radius=4)
+levels = dict(iterations=[100, 70, 50, 20], shrink_factors=[8, 4, 2, 1], smoothing_sigmas=[3, 2, 1, 0])
+exp = lx.ants.RegistrationStage("Exponential", 0.25, cc, **levels,
+                                update_field_variance=3.0, velocity_field_variance=0.5)
+tvf = lx.ants.RegistrationStage("TimeVaryingVelocityField", 0.5, cc, **levels,
+                                number_of_time_indices=4, update_field_variance=3.0)
+tvb = lx.ants.RegistrationStage("TimeVaryingBSplineVelocityField", 0.5, cc, **levels,
+                                mesh_size=(4, 4, 4, 2), number_of_time_point_samples=4)
+res = lx.ants.registration([stage1, stage2, exp], random_seed=42)
+res.files["2Warp.nii.gz"], res.files["2InverseWarp.nii.gz"]
+```
+
+```bash
+larmorx ants antsRegistration -d 3 -o out_ ... \
+    -t Exponential[0.25,3,0.5] -m CC[fixed.nii.gz,moving.nii.gz,1,4] \
+    -c [100x70x50x20,1e-6,10] -f 8x4x2x1 -s 3x2x1x0vox
+larmorx ants antsRegistration -d 3 -o out_ -z 0 \
+    -t TimeVaryingVelocityField[0.5,4,3,0,0,0] -m CC[fixed.nii.gz,moving.nii.gz,1,4] \
+    -c [100x70x50x20,1e-6,10] -f 8x4x2x1 -s 3x2x1x0vox
+# out_0Warp.nii.gz, out_0InverseWarp.nii.gz, out_0VelocityField.nii.gz
+```
+
+- **Every image metric and the point-set metrics** (a point-set metric cannot come first: ANTs
+  allocates the field on its null image and crashes), masks, sampling, several metrics, 2D, 3D
+  and 4D, double and float, `-g`, initial transforms, collapse and composites,
+  `--initialize-transforms-per-stage`.
+- **Results do not depend on threads**, and larmorx's time-varying stages run several times faster
+  than ANTs' (each voxel's integration on its own thread).
+- **Not repeatable in ANTs with sampling:** the `Exponential`, `BSplineExponential` and
+  `TimeVaryingVelocityField` stages never seed their sampling (ANTS-82): ANTs samples from the
+  clock; larmorx with the registration's seed.
+- **Defaults that differ from ANTs** (D13; `upstream_defects="reproduce"` gives ANTs' result):
+  ANTS-79 (the number of time indices and the time-varying B-spline mesh: each stage's own;
+  ANTs reads the last `-t`'s), ANTS-80 (the exponential stages' sigmas in the units given; ANTs:
+  mm), ANTS-81 (`Exp` writes its `InverseWarp`), ITK-36 to ITK-38 (the time-varying B-spline
+  method's metric transforms, stale inverse fields, its point-set fit on oblique grids), ITK-39
+  (`-q` applied by the time-varying method), ITK-40 (the masks moved with the images), ITK-41
+  (a stage that never iterates is still integrated). ANTS-75 (`--print-similarity-measure-interval`
+  and `--write-interval-volumes` in the exponential stages) and ANTS-77 (a time-varying B-spline
+  mesh size of 0, refused) as for the B-spline stages.
 
 ## Point-set metrics
 
@@ -313,19 +389,21 @@ igdm = lx.ants.IntensityPointSetMetric("fixed.nii.gz", "moving.nii.gz",
 - **Defaults that differ from ANTs** (D13; `upstream_defects="reproduce"` gives ANTs' result):
   ANTS-61 (IGDM with other kinds of metrics), ANTS-62 (a text file's final newline), ANTS-63
   (binary VTK labels), ANTS-65 (IGDM's intensity sigma), ANTS-66 (IGDM's value with a
-  neighbourhood), ITK-22 (labels the moving set lacks), ITK-23 (an identity covariance's
-  prefactor), ITK-26 (JHCT's covariance diagonal), ITK-28 (JHCT's `alpha` near 1). Each is
-  named in a notice where it changes the result.
+  neighbourhood), ANTS-67 (IGDM's `kNeighborhood` and `gradientSigma` used), ANTS-68 (IGDM's
+  derivative the value's gradient), ANTS-70 (IGDM's estimated distance sigma at least one voxel),
+  ITK-22 (labels the moving set lacks), ITK-23 (an identity covariance's prefactor), ITK-24
+  (JHCT's total number of points with the fixed points), ITK-26 (JHCT's covariance diagonal),
+  ITK-28 (JHCT's `alpha` near 1), ITK-29 (the Parzen kernel sigma as a sigma). Each is named in a
+  notice where it changes the result; their measured effects are in the
+  [findings](../findings/ants-velocity.md#the-corrections-decided-on-2026-10-21-and-what-they-change).
 - **Correctly rounded powers:** JHCT calls `pow`; larmorx's is CORE-MATH's (glibc's differs by
   an ulp in about 0.1 % of calls).
 
 ## Not supported yet
 
-- `TimeVaryingVelocityField`, `TimeVaryingBSplineVelocityField`, `Exponential`,
-  `BSplineExponential` (A5 part 3), MINC transform files: refused with a message.
+- MINC transform files: refused with a message.
 - Transform files of classes larmorx does not build in 2D and 4D (ITK's `CenteredRigid2D`,
   `CenteredSimilarity2D`, `CenteredAffine`, `Scale`): refused. Files of the classes
   antsRegistration writes (`AffineTransform`, `MatrixOffsetTransformBase`, `Euler2DTransform`,
   `Rigid2DTransform`, `Similarity2DTransform`, `TranslationTransform`, `IdentityTransform`,
   `DisplacementFieldTransform`, `BSplineTransform`) are read in every dimension.
-- `antsApplyTransforms` with `BSplineTransform` files.

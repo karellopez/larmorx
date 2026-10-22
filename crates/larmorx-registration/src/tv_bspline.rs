@@ -547,15 +547,6 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                 identity,
             )?
         };
-        if n_iterations > 0
-            && !point_set_only
-            && level_metrics
-                .iter()
-                .flatten()
-                .any(|lm| lm.fixed_mask.is_some() || lm.moving_mask.is_some())
-        {
-            masks_not_moved = true;
-        }
         let mut iteration = 0usize;
         let mut converged = false;
         while iteration < n_iterations && !converged {
@@ -701,6 +692,18 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                     }
                 } else {
                     // AttachMetricGradientPointSetAtSpecificTimePoint.
+                    // ITK-40's notice: whether moving the masks changes them.
+                    if !masks_not_moved {
+                        masks_not_moved = level_metrics.iter().flatten().any(|lm| {
+                            crate::time_varying::masks_move(
+                                &lm.fixed_mask,
+                                &lm.moving_mask,
+                                &virtual_space,
+                                &fixed_composite,
+                                &moving_composite,
+                            )
+                        });
+                    }
                     let mut resampled: Vec<Option<Resampled<R, D>>> =
                         Vec::with_capacity(level_metrics.len());
                     for lm in &level_metrics {

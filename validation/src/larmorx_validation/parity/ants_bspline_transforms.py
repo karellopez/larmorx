@@ -24,8 +24,9 @@ NAMES = ("bspline.txt", "bspline.mat", "bspline.h5", "bspline-float.txt", "affin
 
 
 def _bspline(dtype: str):
-    import larmorx as lx
     import larmorx_testdata as td
+
+    import larmorx as lx
     from larmorx import _core
 
     g = _core.itk_grid(str(td.get(IMAGE)))

@@ -39,14 +39,10 @@ OASIS = {
     "licence": "CC-BY 4.0",
 }
 OUTPUTS = [
-    {
-        "id": "labels",
-        "label": "Classified image (1 CSF, 2 grey matter, 3 white matter)",
-        "unit": "",
-    },
-    {"id": "post1", "label": "Posterior of class 1 (CSF)", "unit": ""},
-    {"id": "post2", "label": "Posterior of class 2 (grey matter)", "unit": ""},
-    {"id": "post3", "label": "Posterior of class 3 (white matter)", "unit": ""},
+    {"id": "labels", "label": "Classes (1 CSF, 2 GM, 3 WM)", "unit": ""},
+    {"id": "post1", "label": "Posterior: CSF", "unit": ""},
+    {"id": "post2", "label": "Posterior: grey matter", "unit": ""},
+    {"id": "post3", "label": "Posterior: white matter", "unit": ""},
 ]
 FILES = {"labels": "{}.nii.gz", "post1": "{}-post01.nii.gz", "post2": "{}-post02.nii.gz",
          "post3": "{}-post03.nii.gz"}  # fmt: skip
@@ -118,7 +114,8 @@ def _compute(e: fcache.Entry) -> None:
         unset=common.CLEAN_ENV,
     )
     image_version = subprocess.run(
-        ["apptainer", "exec", "--cleanenv", str(sif), "Atropos", "--version"],
+        # Atropos has no --version; the image's antsRegistration is the same ANTs build
+        ["apptainer", "exec", "--cleanenv", str(sif), "antsRegistration", "--version"],
         capture_output=True,
         text=True,
         encoding="utf-8",

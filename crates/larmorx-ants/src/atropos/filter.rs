@@ -596,6 +596,7 @@ impl<'a> Atropos<'a> {
         for c in 0..total {
             if c < classes {
                 let w = self.components[c].set_sample(&samples[c], m, &weights[c])?;
+                self.model_notices(c, &weights[c]);
                 if let Some(w) = w {
                     self.warnings.push(w.to_string());
                 }
@@ -1071,6 +1072,7 @@ impl<'a> Atropos<'a> {
                 if let Some(w) = w {
                     self.warnings.push(w.to_string());
                 }
+                self.model_notices(c, &weights);
             } else {
                 // ANTs' test `n == labelSet[d] - 1` never holds for a partial-volume class, so
                 // the model is never re-estimated (ANTS-96); larmorx re-estimates it from the
@@ -1148,6 +1150,33 @@ impl<'a> Atropos<'a> {
             }
         }
         Ok((max_posterior_sum / sample_size as f64) as f32)
+    }
+
+    /// The likelihood models' defects met by class `c`'s estimate from `weights`.
+    fn model_notices(&mut self, c: usize, weights: &[f64]) {
+        match &self.components[c] {
+            Likelihood::ManifoldParzen(model) => {
+                if weights.windows(2).any(|w| w[0] != w[1]) {
+                    self.notices.add(
+                        &defects::ANTS_95,
+                        "the manifold Parzen likelihoods, evaluated with the posterior weights",
+                    );
+                }
+                if model.met_covariance_defect {
+                    self.notices.add(
+                        &defects::ANTS_104,
+                        "the manifold Parzen windows' local covariances",
+                    );
+                }
+            }
+            Likelihood::JointShape(_) => {
+                self.notices.add(
+                    &defects::ANTS_103,
+                    "the joint shape and orientation likelihood reads an unset coordinate (0 here)",
+                );
+            }
+            _ => {}
+        }
     }
 
     /// The masked voxels of each ICM code, in raster order.

@@ -367,7 +367,7 @@ defects! {
     ANTS_103 = "ANTS-103", "Atropos", true,
         "JointShapeAndOrientationProbability evaluates its histograms at the raw tensor components, at a point whose second coordinate is never set (uninitialized memory)";
     ANTS_104 = "ANTS-104", "Atropos", true,
-        "ManifoldParzenWindows' local covariances (a covariance neighbourhood above 0) add each product to the diagonal twice and the running upper value to the lower triangle";
+        "ManifoldParzenWindows' local covariances (a covariance neighbourhood above 0) double the running diagonal sums at every neighbour and add the running upper values to the lower triangle";
     ANTS_105 = "ANTS-105", "Atropos", true,
         "--minimize-memory-usage with prior probability images and a mask crashes: the check of the priors against the mask rebuilds a prior on the first intensity image before any is read";
 }

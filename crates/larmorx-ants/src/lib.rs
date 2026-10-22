@@ -22,6 +22,7 @@
 pub mod affine_initializer;
 pub mod ai;
 pub mod apply_transforms;
+pub mod atropos;
 pub mod cli;
 pub mod denoise_image;
 pub mod image;

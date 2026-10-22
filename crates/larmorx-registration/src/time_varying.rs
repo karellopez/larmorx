@@ -399,7 +399,7 @@ fn crash(description: impl Into<String>) -> ItkException {
 fn no_input() -> ItkException {
     ItkException::new(
         "Modules/Core/Common/src/itkProcessObject.cxx",
-        1474,
+        1339,
         "ResampleImageFilter",
         "Input Primary is required but not set.",
     )

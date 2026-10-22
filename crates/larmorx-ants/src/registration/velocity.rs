@@ -251,6 +251,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             correct_gc_derivative: fix,
             correct_multi_metric_transforms: fix,
             correct_stale_inverses: fix,
+            correct_point_positions: fix,
             n_threads: self.n_threads,
         };
         log.logger(&format!(
@@ -289,6 +290,24 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             } else {
                                 format!(
                                     "stage {stage}: every metric of the multi-metric is evaluated through the transforms the last one set, as in ITK"
+                                )
+                            },
+                        ),
+                    );
+                }
+                if out.physical_points {
+                    push_once(
+                        &mut self.notices,
+                        Notice::new(
+                            &defects::ITK_38,
+                            self.upstream_defects,
+                            if fix {
+                                format!(
+                                    "stage {stage}: the point-set metric's points are fitted at their positions in the B-spline's parametric domain; ITK fits them at their physical positions, outside that domain when the virtual domain's direction is not the identity (and throws when one falls outside it)"
+                                )
+                            } else {
+                                format!(
+                                    "stage {stage}: the point-set metric's points are fitted at their physical positions in the B-spline's parametric domain, as in ITK"
                                 )
                             },
                         ),

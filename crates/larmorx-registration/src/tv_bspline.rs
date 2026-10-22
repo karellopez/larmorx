@@ -80,6 +80,10 @@ pub struct TvbStage<R, const D: usize> {
     pub correct_multi_metric_transforms: bool,
     /// ITK-37 corrected: the flows' inverses are zero where the flows are.
     pub correct_stale_inverses: bool,
+    /// ITK-38 corrected: a single point-set metric's points (and the domain's boundary points)
+    /// placed at their parametric positions (the virtual domain without its direction), as
+    /// the image metrics' are; ITK places them at their physical positions.
+    pub correct_point_positions: bool,
     pub n_threads: usize,
 }
 
@@ -91,6 +95,9 @@ pub struct TvbOutput<R, const D: usize> {
     pub multi_metric_transforms: bool,
     /// ITK-37's condition met (a point-set metric evaluated at the first or last time sample).
     pub stale_inverses: bool,
+    /// ITK-38's condition met (a single point-set metric on a virtual domain whose direction is
+    /// not the identity).
+    pub physical_points: bool,
 }
 
 fn crash(description: impl Into<String>) -> ItkException {
@@ -355,6 +362,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
     };
     let mut multi_metric_transforms = false;
     let mut stale_inverses = false;
+    let mut physical_points = false;
     let need_inverses = has_point_sets;
     let mut mesh = mesh0;
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
@@ -429,7 +437,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
         if multi && level_metrics[0].is_none() {
             return Err(ItkException::new(
                 METHOD_FILE,
-                108,
+                113,
                 METHOD_CLASS,
                 "ERROR: Invalid conversion from the multi metric queue.",
             ));
@@ -579,9 +587,23 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                         }
                     }
                     let points = p.tangent_fixed_points();
+                    let oblique = virtual_space.direction != parametric.direction;
+                    if oblique {
+                        physical_points = true;
+                    }
+                    let correct = stage.correct_point_positions && oblique;
                     for (k, q) in points.iter().enumerate() {
                         let mut st = [0f32; E];
-                        st[..D].copy_from_slice(q);
+                        if correct {
+                            let qd: [f64; D] = std::array::from_fn(|d| f64::from(q[d]));
+                            let c: [f64; D] = virtual_space.point_to_cindex(&qd);
+                            let r = parametric.cindex_to_point(&c);
+                            for d in 0..D {
+                                st[d] = r[d] as f32;
+                            }
+                        } else {
+                            st[..D].copy_from_slice(q);
+                        }
                         st[D] = time;
                         scattered.points.push(st);
                         scattered
@@ -596,7 +618,12 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                             idx[d] == fs.start[d] || idx[d] == fs.start[d] + fs.size[d] as i64 - 1
                         });
                         if boundary {
-                            let q = fs.index_to_point(&idx);
+                            let q = if correct {
+                                let c: [f64; D] = std::array::from_fn(|d| idx[d] as f64);
+                                parametric.cindex_to_point(&c)
+                            } else {
+                                fs.index_to_point(&idx)
+                            };
                             let mut st = [0f32; E];
                             for d in 0..D {
                                 st[d] = q[d] as f32;
@@ -710,7 +737,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                     if prev.len() != scattered.data.len() {
                         return Err(ItkException::new(
                             METHOD_FILE,
-                            200,
+                            177,
                             METHOD_CLASS,
                             "The number of points is not the same between iterations.",
                         ));
@@ -771,5 +798,6 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
         output: out,
         multi_metric_transforms,
         stale_inverses,
+        physical_points,
     })
 }

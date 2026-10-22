@@ -340,3 +340,101 @@ pub fn print(h: &OutlierHandling, indent: &str) -> String {
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 400 values in [0, 19.5] and one far value at the end.
+    fn with_outlier(n: usize, far: f32) -> Vec<f32> {
+        let mut v: Vec<f32> = (0..n).map(|i| (i % 40) as f32 * 0.5).collect();
+        v.push(far);
+        v
+    }
+
+    #[test]
+    fn box_plot_winsorizes_beyond_the_whiskers() {
+        let input = with_outlier(400, 1000.0);
+        let out = box_plot_documented(&input, 0.25, 0.75, 1.5).unwrap();
+        assert_eq!(&out[..400], &input[..400]);
+        assert!(out[400] < 100.0 && out[400] > 19.5);
+    }
+
+    #[test]
+    fn grubbs_rosner_finds_outliers_only_without_itk_51() {
+        // 401 values: more than ITK's Student quantiles survive (ITK-51).
+        let input = with_outlier(400, 1000.0);
+        let mut messages = Vec::new();
+        let (fixed, ids) = grubbs_rosner(&input, 0.05, 0.10, true, &mut messages).unwrap();
+        assert_eq!(ids, Some(vec![400]));
+        assert!(fixed[400] < 1000.0);
+        assert_eq!(&fixed[..400], &input[..400]);
+        assert!(messages.is_empty());
+        let (itk, ids) = grubbs_rosner(&input, 0.05, 0.10, false, &mut messages).unwrap();
+        assert_eq!(ids, Some(vec![]));
+        assert_eq!(itk, input);
+        assert!(
+            messages
+                .iter()
+                .all(|m| m == "SLATEC/DGAMMA: X SO BIG GAMMA OVERFLOWS")
+        );
+        assert!(!messages.is_empty());
+        // 61 values: both quantiles exist and agree.
+        let small = with_outlier(60, 1000.0);
+        let (a, ia) = grubbs_rosner(&small, 0.05, 0.10, true, &mut Vec::new()).unwrap();
+        let (b, ib) = grubbs_rosner(&small, 0.05, 0.10, false, &mut Vec::new()).unwrap();
+        assert_eq!((a, ia.clone()), (b, ib));
+        assert_eq!(ia, Some(vec![60]));
+    }
+
+    #[test]
+    fn grubbs_rosner_leaves_six_values_alone() {
+        let input = [1.0f32, 2.0, 3.0, 4.0, 5.0, 500.0];
+        let (out, ids) = grubbs_rosner(&input, 0.05, 0.10, true, &mut Vec::new()).unwrap();
+        assert_eq!((out.as_slice(), ids), (&input[..], None));
+    }
+
+    #[test]
+    fn ants_lists_keep_growing_between_calls() {
+        let input = with_outlier(60, 1000.0);
+        let handling = OutlierHandling::GrubbsRosner {
+            significance: 0.05,
+            winsorizing: 0.10,
+        };
+        let mut ants = OutlierFilter::new(handling, false);
+        let (first, changed) = ants.apply(&input).unwrap();
+        assert_eq!((first.len(), changed), (61, false));
+        let (second, changed) = ants.apply(&input).unwrap();
+        assert_eq!((second.len(), changed), (122, true));
+        let mut fixed = OutlierFilter::new(handling, true);
+        fixed.apply(&input).unwrap();
+        let (second, changed) = fixed.apply(&input).unwrap();
+        assert_eq!((second.len(), changed), (61, true));
+        assert_eq!(fixed.outlier_ids, vec![60]);
+        let text = print_filter(&fixed, "  ");
+        assert!(text.contains("Outlier Identifiers: \n       60\n"));
+    }
+
+    #[test]
+    fn print_follows_ants_print_self() {
+        let b = OutlierHandling::BoxPlot {
+            lower: 0.25,
+            upper: 0.75,
+            whisker: 1.5,
+        };
+        assert_eq!(
+            print(&b, ""),
+            "BoxPlotQuantileListSampleFilter (0x0)\n  Percentile Bounds: [0.25, 0.75]\n  Whisker scaling factor: 1.5\n  Outlier handling: Winsorize\n"
+        );
+        let f = OutlierFilter::new(
+            OutlierHandling::GrubbsRosner {
+                significance: 0.05,
+                winsorizing: 0.1,
+            },
+            true,
+        );
+        assert!(
+            print_filter(&f, "").ends_with("Winsorize (level = 0.1)\n  There are no outliers.\n")
+        );
+    }
+}

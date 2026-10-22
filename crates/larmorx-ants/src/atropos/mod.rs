@@ -17,6 +17,16 @@
 //! in ANTs' order) and keeps every sum in ANTs' order, so its result does not depend on the
 //! number of threads.
 
+// Index loops, `-1.0 * x` and the SLATEC tables' literals mirror the C++ and Fortran sources
+// (`-1.0 * x` and `-x` are the same bits; the literals round to the same doubles); the
+// likelihood models are one per class, so their sizes do not matter.
+#![allow(
+    clippy::needless_range_loop,
+    clippy::neg_multiply,
+    clippy::excessive_precision,
+    clippy::large_enum_variant
+)]
+
 mod fast_marching;
 mod filter;
 pub mod gaussian;

@@ -339,3 +339,88 @@ impl PartialVolumeModel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kahan_keeps_what_naive_summation_loses() {
+        let mut k = Kahan::default();
+        let mut naive = 0.0f64;
+        k.add(1.0);
+        naive += 1.0;
+        for _ in 0..10 {
+            k.add(1e-16);
+            naive += 1e-16;
+        }
+        assert_eq!(naive, 1.0);
+        assert!((k.sum() - (1.0 + 1e-15)).abs() < 2e-16);
+    }
+
+    #[test]
+    fn univariate_gaussian_is_its_formula() {
+        let mut g = GaussianMembership::default();
+        g.set(vec![2.0], vec![4.0]).unwrap();
+        for &x in &[0.0f32, 2.0, 3.5] {
+            let d = f64::from(x) - 2.0;
+            let expect = (-0.5 * d * d / 4.0).exp() / (2.0 * (2.0 * std::f64::consts::PI).sqrt());
+            assert!((g.evaluate(&[x]) - expect).abs() <= 1e-15 * expect.max(1.0));
+        }
+    }
+
+    #[test]
+    fn bivariate_gaussian_uses_the_inverse_covariance() {
+        let mut g = GaussianMembership::default();
+        g.set(vec![0.0, 0.0], vec![2.0, 0.5, 0.5, 1.0]).unwrap();
+        let det: f64 = 2.0 - 0.25;
+        let inv = [1.0 / det, -0.5 / det, -0.5 / det, 2.0 / det];
+        let q = inv[0] - 2.0 * inv[1] + inv[3];
+        let expect = (-0.5 * q).exp() / (2.0 * std::f64::consts::PI * det.sqrt());
+        assert!((g.evaluate(&[1.0, -1.0]) - expect).abs() < 1e-12 * expect);
+    }
+
+    #[test]
+    fn a_singular_covariance_stops_the_model_with_ants_message() {
+        let mut m = GaussianModel::default();
+        let e = m.set_sample(&[3.0; 4], 1, &[1.0; 4]).unwrap_err();
+        assert_eq!(
+            (e.file, e.line),
+            ("ImageSegmentation/antsGaussianListSampleFunction.hxx", 100)
+        );
+        assert_eq!(
+            e.description,
+            "Covariance is singular (determinant = 0 < 1.0e-6)"
+        );
+        assert_eq!(m.set_sample(&[3.0], 1, &[1.0]).unwrap(), Some(SMALL_SAMPLE));
+    }
+
+    #[test]
+    fn weighted_mean_and_covariance() {
+        let samples = [1.0f32, 3.0, 5.0, 7.0];
+        let weights = [1.0, 1.0, 0.0, 2.0];
+        let mean = weighted_mean(&samples, 1, &weights).unwrap();
+        assert!((mean[0] - 4.5).abs() < 1e-12);
+        let mut m = GaussianModel::default();
+        m.set_sample(&samples, 1, &weights).unwrap();
+        assert!((m.gaussian.mean[0] - 4.5).abs() < 1e-12);
+        assert!(m.gaussian.covariance[0] > 0.0);
+        let e = weighted_mean(&samples, 1, &[0.0; 4]).unwrap_err();
+        assert_eq!(
+            e.description,
+            "Total weight was too close to zero. Value = 0"
+        );
+    }
+
+    #[test]
+    fn partial_volume_class_lies_between_its_two_classes() {
+        let mut pv = PartialVolumeModel::default();
+        assert_eq!(pv.evaluate(&[1.0]), 0.0);
+        pv.set_sample(0, &[10.0, 10.0], 1, &[1.0, 1.0]).unwrap();
+        assert_eq!(pv.evaluate(&[1.0]), 0.0);
+        pv.set_sample(1, &[20.0, 20.0], 1, &[1.0, 1.0]).unwrap();
+        assert_eq!(pv.gaussian.mean, vec![15.0]);
+        assert!((pv.gaussian.covariance[0] - 100.0 / 12.0).abs() < 1e-12);
+        assert!(pv.evaluate(&[15.0]) > pv.evaluate(&[10.0]));
+    }
+}

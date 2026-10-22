@@ -134,7 +134,9 @@ pub fn erf(x: f64) -> f64 {
 }
 
 /// `vnl_erfc` (`core/vnl/vnl_erf.cxx`, W. J. Cody's rational approximations): `1 − vnl_erf`
-/// below 0.46875, Cody's fractions above, `2 − erfc(|x|)` for negative `x`.
+/// below 0.46875, Cody's fractions above, `2 − erfc(|x|)` for negative `x`. The coefficients
+/// are vnl's literals, rounded to `f64` as the C++ compiler rounds them.
+#[allow(clippy::excessive_precision)]
 pub fn erfc(x: f64) -> f64 {
     const THRESH: f64 = 0.46875;
     const XBIG: f64 = 26.543;
@@ -191,7 +193,7 @@ pub fn erfc(x: f64) -> f64 {
         result = (xnum + C[7]) / (xden + D[7]);
         let ysq = (y * 16.0).floor() / 16.0;
         let del = (y - ysq) * (y + ysq);
-        result = math::exp(-ysq * ysq) * math::exp(-del) * result;
+        result *= math::exp(-ysq * ysq) * math::exp(-del);
     } else if y >= XHUGE {
         result = if y < XMAX { SQRPI / y } else { 0.0 };
     } else if y >= XBIG {
@@ -208,7 +210,7 @@ pub fn erfc(x: f64) -> f64 {
         result = (SQRPI - result) / y;
         let ysq = (y * 16.0).floor() / 16.0;
         let del = (y - ysq) * (y + ysq);
-        result = math::exp(-ysq * ysq) * math::exp(-del) * result;
+        result *= math::exp(-ysq * ysq) * math::exp(-del);
     }
     if x < 0.0 {
         result = 2.0 - result;

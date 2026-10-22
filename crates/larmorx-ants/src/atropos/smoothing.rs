@@ -284,7 +284,7 @@ pub fn fit(
                 residuals[p] -= collapse_at(&phi, &kernel, &u);
             }
             for (s, &p) in psi.data.iter_mut().zip(&phi.data) {
-                *s = p + *s;
+                *s += p;
             }
             psi = refine(&psi, order, level, settings.levels)?;
             for a in 0..d {
@@ -295,7 +295,7 @@ pub fn fit(
             phi = fit_level(&current, &residuals)?;
         }
         for (s, &p) in psi.data.iter_mut().zip(&phi.data) {
-            *s = p + *s;
+            *s += p;
         }
         phi = psi;
     }
@@ -313,4 +313,73 @@ pub fn reconstruct(
 ) -> Result<Vec<f32>, SmoothingError> {
     larmorx_image::bspline::evaluate(lattice, order, size, spacing, n_threads)
         .map_err(|e| SmoothingError(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings<'a>(size: &'a [usize], spacing: &'a [f64], origin: &'a [f64]) -> FitSettings<'a> {
+        FitSettings {
+            origin,
+            spacing,
+            size,
+            order: 3,
+            levels: &[3, 3],
+            control_points: &[4, 4],
+        }
+    }
+
+    #[test]
+    fn a_constant_is_approximated_and_threads_do_not_matter() {
+        let size = [12usize, 9];
+        let spacing = [1.5, 2.0];
+        let origin = [-3.0, 4.0];
+        let s = settings(&size, &spacing, &origin);
+        let voxels: Vec<usize> = (0..size[0] * size[1]).filter(|v| v % 3 != 0).collect();
+        let values = vec![5.0f32; voxels.len()];
+        let weights = vec![1.0f32; voxels.len()];
+        let one = fit(&s, &voxels, &values, &weights, 1).unwrap();
+        let four = fit(&s, &voxels, &values, &weights, 4).unwrap();
+        let a = reconstruct(&one, 3, &size, &spacing, 1).unwrap();
+        let b = reconstruct(&four, 3, &size, &spacing, 4).unwrap();
+        assert_eq!(a, b);
+        // Lee's multilevel approximation, not an interpolation: close, not exact.
+        assert!(a.iter().all(|&x| (x - 5.0).abs() < 0.3), "{a:?}");
+    }
+
+    #[test]
+    fn the_fit_follows_a_smooth_field() {
+        let size = [16usize, 12];
+        let spacing = [1.0, 1.0];
+        let origin = [0.0, 0.0];
+        let s = settings(&size, &spacing, &origin);
+        let voxels: Vec<usize> = (0..size[0] * size[1]).collect();
+        let values: Vec<f32> = voxels
+            .iter()
+            .map(|&v| (v % size[0]) as f32 * 0.5 + (v / size[0]) as f32 * 0.25)
+            .collect();
+        let weights = vec![1.0f32; voxels.len()];
+        let lattice = fit(&s, &voxels, &values, &weights, 2).unwrap();
+        let out = reconstruct(&lattice, 3, &size, &spacing, 2).unwrap();
+        let mean_error: f32 = out
+            .iter()
+            .zip(&values)
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / out.len() as f32;
+        assert!(mean_error < 0.25, "{mean_error}");
+        // Increasing along both axes, as the field does, in the middle row and column.
+        let row = size[1] / 2;
+        assert!((2..size[0] - 2).all(|i| out[row * size[0] + i + 1] > out[row * size[0] + i]));
+    }
+
+    #[test]
+    fn order_zero_is_refused_as_itk_refuses_it() {
+        let size = [4usize, 4];
+        let mut s = settings(&size, &[1.0, 1.0], &[0.0, 0.0]);
+        s.order = 0;
+        let e = fit(&s, &[0], &[1.0], &[1.0], 1).unwrap_err();
+        assert!(e.0.contains("greater than 0"));
+    }
 }

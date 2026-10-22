@@ -18,6 +18,9 @@
 //! `-v` prints ANTs' progress lines and the filter's own settings and models (`Print`), without
 //! the ITK base classes' lines (addresses, times, thread settings); addresses print as `0x0`.
 
+// The outputs are written class by class, as `Atropos.cxx` loops over them.
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 use std::time::Instant;
 
@@ -99,7 +102,7 @@ fn itk_exception(e: &AtroposError) -> ItkException {
 }
 
 /// `GetFunction(i)`: the `i`-th value counted from the last one given.
-fn function<'p>(values: &'p [OptionValue], i: usize) -> Option<&'p OptionValue> {
+fn function(values: &[OptionValue], i: usize) -> Option<&OptionValue> {
     values.len().checked_sub(i + 1).map(|k| &values[k])
 }
 
@@ -774,16 +777,16 @@ fn segmentation(
         }
     }
     // The checks of the priors against the mask (warnings only with -v).
-    if let Some(label) = &prior_label {
-        if same_grid(&mask, label) {
-            let uncovered = mask
-                .data
-                .iter()
-                .zip(&label.data)
-                .any(|(&m, &l)| m != 0 && l == 0);
-            if uncovered && verbose {
-                log.cout("\nWarning: the labels in the the prior label image do not encompass the entire mask region.  As a result each unlabeled voxel will be initially assigned a random label.  The user might want to consider various alternative strategies like assigning an additional \"background\" label to the unlabeled voxels or propagating the labels within the mask region.\n\n");
-            }
+    if let Some(label) = &prior_label
+        && same_grid(&mask, label)
+    {
+        let uncovered = mask
+            .data
+            .iter()
+            .zip(&label.data)
+            .any(|(&m, &l)| m != 0 && l == 0);
+        if uncovered && verbose {
+            log.cout("\nWarning: the labels in the the prior label image do not encompass the entire mask region.  As a result each unlabeled voxel will be initially assigned a random label.  The user might want to consider various alternative strategies like assigning an additional \"background\" label to the unlabeled voxels or propagating the labels within the mask region.\n\n");
         }
     }
     if let Some(priors) = &prior_images
@@ -853,12 +856,7 @@ fn segmentation(
             let mut boundary = 1.0f32;
             if v.parameters.len() > 1 {
                 boundary = Conv::f32(param(v, 1)).map_err(|e| uncaught(log, &e))?;
-                if boundary < 0.0 {
-                    boundary = 0.0;
-                }
-                if boundary > 1.0 {
-                    boundary = 1.0;
-                }
+                boundary = boundary.clamp(0.0, 1.0);
             }
             Ok((lambda, boundary))
         };
@@ -1425,13 +1423,7 @@ fn segmentation(
 
 /// `SetProbabilityThreshold`'s clamp to `[0, 1]`.
 fn clamp01(v: f32) -> f32 {
-    if v < 0.0 {
-        0.0
-    } else if v > 1.0 {
-        1.0
-    } else {
-        v
-    }
+    v.clamp(0.0, 1.0)
 }
 
 /// Whether `s` reads entirely as a number (then ANTs' attempt to read it as an image fails).
@@ -1587,8 +1579,7 @@ fn print_filter(f: &Atropos<'_>) -> String {
         s += &f.components()[n].print("      ");
     }
     if o.use_partial_volume_likelihoods {
-        let mut n = classes;
-        for set in &o.partial_volume_sets {
+        for (n, set) in (classes..).zip(&o.partial_volume_sets) {
             let labels: Vec<String> = set.iter().map(|l| l.to_string()).collect();
             s += &format!(
                 "{i}Partial volume class {} [labels: {}]: proportion = {}\n",
@@ -1599,7 +1590,6 @@ fn print_filter(f: &Atropos<'_>) -> String {
             if let Some(c) = f.components().get(n) {
                 s += &c.print("      ");
             }
-            n += 1;
         }
     }
     s
@@ -1842,5 +1832,148 @@ mod tests {
         assert!(function(&v, 2).is_none());
         assert_eq!(param(&v[1], 0), "1");
         assert_eq!(param(&v[1], 1), "");
+    }
+
+    use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
+    use larmorx_core::{Affine, DataType};
+    use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+
+    const SHAPE: [usize; 3] = [12, 10, 8];
+
+    fn write(path: &std::path::Path, data: Vec<f32>) {
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &SHAPE, DataType::F32).unwrap();
+        let affine = Affine::from_zooms([1.5, 1.5, 2.0], [-9.0, 4.0, 1.0]);
+        h.set_qform(&affine, 1).unwrap();
+        h.set_sform(&affine, 1);
+        let a = ArrayD::from_shape_vec(IxDyn(&SHAPE).f(), data).unwrap();
+        nifti::write(path, &h, a.view(), &WriteOptions::default()).unwrap();
+    }
+
+    /// A two-tissue phantom (dark shell, bright core) with deterministic noise, and its mask.
+    fn phantom(dir: &std::path::Path) -> (String, String) {
+        let n: usize = SHAPE.iter().product();
+        let mut image = vec![0.0f32; n];
+        let mut mask = vec![0.0f32; n];
+        for v in 0..n {
+            let (i, j, k) = (
+                v % SHAPE[0],
+                (v / SHAPE[0]) % SHAPE[1],
+                v / (SHAPE[0] * SHAPE[1]),
+            );
+            let depth = [
+                i,
+                SHAPE[0] - 1 - i,
+                j,
+                SHAPE[1] - 1 - j,
+                k,
+                SHAPE[2] - 1 - k,
+            ]
+            .into_iter()
+            .min()
+            .unwrap();
+            if depth > 0 {
+                mask[v] = 1.0;
+                image[v] = if depth > 2 { 120.0 } else { 40.0 } + ((v * 7919) % 17) as f32;
+            }
+        }
+        let (a, m) = (dir.join("t1.nii.gz"), dir.join("mask.nii.gz"));
+        write(&a, image);
+        write(&m, mask);
+        (a.to_str().unwrap().into(), m.to_str().unwrap().into())
+    }
+
+    fn run_capture(args: &[&str], threads: usize) -> (u8, String, String) {
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run(
+            &args,
+            &mut FileStore,
+            threads,
+            UpstreamDefects::Reproduce,
+            &mut out,
+            &mut err,
+        );
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    #[test]
+    fn usage_help_and_argument_errors() {
+        let (code, out, _) = run_capture(&[], 1);
+        assert_eq!(code, 1);
+        assert!(out.contains("--initialization"));
+        let (code, out, _) = run_capture(&["--help"], 1);
+        assert_eq!(code, 0);
+        assert!(out.contains("PriorProbabilityImages"));
+        let (code, out, _) = run_capture(&["-h"], 1);
+        assert_eq!((code, out.contains("--likelihood-model")), (0, true));
+    }
+
+    #[test]
+    fn a_segmentation_on_files_and_its_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let (t1, mask) = phantom(dir.path());
+        let seg = dir.path().join("seg.nii.gz");
+        let post = dir.path().join("post%02d.nii.gz");
+        let out_spec = format!("[{},{}]", seg.display(), post.display());
+        let base = [
+            "-d",
+            "3",
+            "-a",
+            &t1,
+            "-x",
+            &mask,
+            "-i",
+            "KMeans[2]",
+            "-c",
+            "[2,0]",
+            "-r",
+            "0",
+        ];
+        let mut args = base.to_vec();
+        args.extend_from_slice(&["-o", &out_spec, "-v", "1"]);
+        let (code, out, _) = run_capture(&args, 2);
+        assert_eq!(code, 0, "{out}");
+        assert!(out.contains("Iteration 0 (of 2)"));
+        assert!(out.contains("Writing output:"));
+        let mut notices = Notices::new(UpstreamDefects::Reproduce);
+        let labels = FileStore
+            .load(seg.to_str().unwrap(), 1, &mut notices)
+            .unwrap();
+        assert_eq!(labels.geometry.size, SHAPE.to_vec());
+        assert!(dir.path().join("post01.nii.gz").exists());
+        assert!(dir.path().join("post02.nii.gz").exists());
+        // The same files whatever the threads.
+        let first = std::fs::read(&seg).unwrap();
+        let (code, _, _) = run_capture(&args, 5);
+        assert_eq!(code, 0);
+        assert_eq!(std::fs::read(&seg).unwrap(), first);
+
+        // A missing mask, a wrong MRF radius, an unknown likelihood: ANTs' messages.
+        let (code, o, e) = run_capture(&["-d", "3", "-a", &t1, "-i", "KMeans[2]", "-v", "1"], 1);
+        let err = o + &e;
+        assert_eq!(code, 1);
+        assert!(err.contains("mask"), "{err}");
+        let mut bad = base.to_vec();
+        bad.extend_from_slice(&["-m", "[0.1,1x1]", "-v", "1"]);
+        let (code, o, e) = run_capture(&bad, 1);
+        let err = o + &e;
+        assert_eq!(code, 1);
+        assert!(
+            err.contains("MRF radius size needs to be equal to the image dimension."),
+            "{err}"
+        );
+        let mut bad = base.to_vec();
+        bad.extend_from_slice(&["-k", "Foo", "-v", "1"]);
+        let (code, o, e) = run_capture(&bad, 1);
+        let err = o + &e;
+        assert_eq!(code, 1);
+        assert!(
+            err.contains("Unrecognized likelihood model request."),
+            "{err}"
+        );
     }
 }

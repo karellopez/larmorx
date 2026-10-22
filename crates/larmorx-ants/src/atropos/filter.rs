@@ -1325,10 +1325,7 @@ impl<'a> Atropos<'a> {
                     mrf = numerator / denominator;
                 }
             }
-            let prior = match self.prior_value(k, v) {
-                Some(p) => p,
-                None => 1.0,
-            };
+            let prior = self.prior_value(k, v).unwrap_or(1.0);
             let mut p = self.local_posterior(
                 self.proportions[k],
                 prior,
@@ -1938,5 +1935,332 @@ impl<'a> Atropos<'a> {
     /// initial labelling made from prior probability images.
     pub fn has_prior_label(&self) -> bool {
         self.prior_label.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::atropos::{AtroposOptions, Formulation, Initialization};
+    use larmorx_core::defects::UpstreamDefects;
+
+    const SIZE: [usize; 3] = [14, 12, 10];
+
+    /// Three tissues in nested boxes (1 dark, 2 middle, 3 bright) with deterministic noise
+    /// (a linear congruential sequence), a mask leaving a border out: (image, mask, truth).
+    fn phantom() -> (Vec<f32>, Vec<u32>, Vec<u32>) {
+        let n: usize = SIZE.iter().product();
+        let mut state = 12345u32;
+        let mut noise = || {
+            state = state.wrapping_mul(1_103_515_245).wrapping_add(12345);
+            ((state >> 16) % 1000) as f32 / 1000.0 - 0.5
+        };
+        let mut truth = vec![0u32; n];
+        for (v, t) in truth.iter_mut().enumerate() {
+            let (i, j, k) = (
+                v % SIZE[0],
+                (v / SIZE[0]) % SIZE[1],
+                v / (SIZE[0] * SIZE[1]),
+            );
+            let depth = [i, SIZE[0] - 1 - i, j, SIZE[1] - 1 - j, k, SIZE[2] - 1 - k]
+                .into_iter()
+                .min()
+                .unwrap();
+            *t = match depth {
+                0 => 0,
+                1 | 2 => 1,
+                3 => 2,
+                _ => 3,
+            };
+        }
+        let means = [0.0f32, 40.0, 100.0, 160.0];
+        let image = truth
+            .iter()
+            .map(|&t| means[t as usize] + 20.0 * noise())
+            .collect();
+        let mask = truth.iter().map(|&t| u32::from(t > 0)).collect();
+        (image, mask, truth)
+    }
+
+    fn run(
+        options: &AtroposOptions,
+        images: &[Vec<f32>],
+        mask: &[u32],
+        threads: usize,
+    ) -> (Vec<u32>, Vec<Vec<f32>>, Atropos<'static>) {
+        let options: &'static AtroposOptions = Box::leak(Box::new(options.clone()));
+        let images: &'static [Vec<f32>] = Box::leak(images.to_vec().into_boxed_slice());
+        let mask: &'static [u32] = Box::leak(mask.to_vec().into_boxed_slice());
+        let refs = images.iter().map(|i| i.as_slice()).collect();
+        let mut f = Atropos::new(
+            options,
+            &SIZE,
+            &[1.0, 1.0, 1.5],
+            &[0.0; 3],
+            refs,
+            Some(mask),
+            threads,
+        )
+        .unwrap();
+        f.run().unwrap();
+        let posteriors = (0..options.classes as usize)
+            .map(|c| f.posterior(c).unwrap())
+            .collect();
+        (f.labels.clone(), posteriors, f)
+    }
+
+    fn agreement(labels: &[u32], truth: &[u32]) -> f64 {
+        let inside: Vec<_> = truth.iter().zip(labels).filter(|(t, _)| **t > 0).collect();
+        inside.iter().filter(|(t, l)| t == l).count() as f64 / inside.len() as f64
+    }
+
+    #[test]
+    fn kmeans_segments_the_phantom_in_both_modes() {
+        let (image, mask, truth) = phantom();
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut o = AtroposOptions::new(3);
+            o.upstream_defects = mode;
+            let (labels, posteriors, f) = run(&o, std::slice::from_ref(&image), &mask, 1);
+            assert!(agreement(&labels, &truth) > 0.97);
+            assert!(
+                labels
+                    .iter()
+                    .zip(&truth)
+                    .all(|(l, t)| (*t == 0) == (*l == 0))
+            );
+            for v in 0..labels.len() {
+                let total: f64 = posteriors.iter().map(|p| f64::from(p[v])).sum();
+                if truth[v] > 0 {
+                    assert!((total - 1.0).abs() < 1e-5, "{total}");
+                }
+            }
+            assert_eq!(f.iterations[0].elapsed, 0);
+            assert!(f.current_posterior_probability > 0.9);
+        }
+    }
+
+    #[test]
+    fn threads_do_not_change_anything() {
+        let (image, mask, truth) = phantom();
+        // A second contrast with its own noise.
+        let second: Vec<f32> = truth
+            .iter()
+            .zip(&image)
+            .enumerate()
+            .map(|(v, (&t, &x))| {
+                [0.0f32, 150.0, 90.0, 30.0][t as usize] + ((v * 7919) % 23) as f32 - (x % 3.0)
+            })
+            .collect();
+        for asynchronous in [true, false] {
+            for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+                let mut o = AtroposOptions::new(3);
+                o.asynchronous = asynchronous;
+                o.upstream_defects = mode;
+                o.mrf_radius = vec![2, 1, 1];
+                let images = [image.clone(), second.clone()];
+                let (l1, p1, _) = run(&o, &images, &mask, 1);
+                let (l4, p4, _) = run(&o, &images, &mask, 4);
+                assert_eq!(l1, l4);
+                assert_eq!(p1, p4);
+            }
+        }
+    }
+
+    #[test]
+    fn icm_codes_colour_the_mrf_neighbourhood() {
+        let (image, mask, _) = phantom();
+        let o = AtroposOptions::new(3);
+        let (_, _, f) = run(&o, &[image], &mask, 2);
+        let codes = f.icm_codes().unwrap();
+        assert!(f.maximum_icm_code >= 2);
+        let (nx, ny) = (SIZE[0], SIZE[1]);
+        for v in 0..codes.len() {
+            if mask[v] == 0 {
+                assert_eq!(codes[v], 0);
+                continue;
+            }
+            assert!(codes[v] >= 1 && codes[v] <= f.maximum_icm_code);
+            // The 26 neighbours (radius 1) inside the mask have other codes.
+            let (i, j, k) = (
+                (v % nx) as i64,
+                ((v / nx) % ny) as i64,
+                (v / (nx * ny)) as i64,
+            );
+            for dk in -1..=1i64 {
+                for dj in -1..=1i64 {
+                    for di in -1..=1i64 {
+                        let (a, b, c) = (i + di, j + dj, k + dk);
+                        if (di, dj, dk) == (0, 0, 0)
+                            || a < 0
+                            || b < 0
+                            || c < 0
+                            || a >= nx as i64
+                            || b >= ny as i64
+                            || c >= SIZE[2] as i64
+                        {
+                            continue;
+                        }
+                        let w = (a + b * nx as i64 + c * (nx * ny) as i64) as usize;
+                        if mask[w] > 0 {
+                            assert_ne!(codes[w], codes[v]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn otsu_random_and_given_centres() {
+        let (image, mask, truth) = phantom();
+        let mut o = AtroposOptions::new(3);
+        o.initialization = Initialization::Otsu;
+        assert!(agreement(&run(&o, std::slice::from_ref(&image), &mask, 1).0, &truth) > 0.95);
+        o.initialization = Initialization::KMeans {
+            centers: Some(vec![30.0, 90.0, 170.0]),
+        };
+        assert!(agreement(&run(&o, std::slice::from_ref(&image), &mask, 1).0, &truth) > 0.95);
+        // Random labels: a result or a lost class, the same whatever the threads.
+        o.initialization = Initialization::Random;
+        o.mrf_smoothing = 0.0;
+        let attempt = |threads: usize| {
+            let options: &'static AtroposOptions = Box::leak(Box::new(o.clone()));
+            let image: &'static [f32] = Box::leak(image.clone().into_boxed_slice());
+            let mask: &'static [u32] = Box::leak(mask.clone().into_boxed_slice());
+            let mut f = Atropos::new(
+                options,
+                &SIZE,
+                &[1.0; 3],
+                &[0.0; 3],
+                vec![image],
+                Some(mask),
+                threads,
+            )
+            .unwrap();
+            f.run().map(|_| f.labels.clone()).map_err(|e| e.to_string())
+        };
+        assert_eq!(attempt(1), attempt(3));
+    }
+
+    #[test]
+    fn priors_and_prior_labels() {
+        let (image, mask, truth) = phantom();
+        let priors: Vec<Vec<f32>> = (1..=3u32)
+            .map(|c| {
+                truth
+                    .iter()
+                    .map(|&t| if t == c { 0.8 } else { 0.1 })
+                    .collect()
+            })
+            .collect();
+        for (formulation, weight) in [
+            (Formulation::Socrates, 0.0f32),
+            (Formulation::Plato, 0.5),
+            (Formulation::Aristotle, 0.5),
+            (Formulation::Sigmoid, 0.5),
+        ] {
+            let mut o = AtroposOptions::new(3);
+            o.initialization = Initialization::PriorProbabilityImages {
+                images: priors.clone(),
+            };
+            o.formulation = formulation;
+            o.prior_weight = weight;
+            let (labels, _, f) = run(&o, std::slice::from_ref(&image), &mask, 2);
+            assert!(agreement(&labels, &truth) > 0.95, "{formulation:?}");
+            assert!(f.has_prior(0));
+        }
+        let mut o = AtroposOptions::new(3);
+        o.initialization = Initialization::PriorLabelImage {
+            image: truth.clone(),
+        };
+        o.prior_weight = 0.5;
+        o.label_parameters.insert(2, (1.0, 0.5));
+        let (labels, _, mut f) = run(&o, std::slice::from_ref(&image), &mask, 2);
+        assert!(f.has_prior_label());
+        assert!(agreement(&labels, &truth) > 0.95);
+        let distance = f.distance_prior(1).unwrap().expect("label 2 propagates");
+        assert_eq!(distance.len(), image.len());
+        o.euclidean_distance = true;
+        let (euclid, _, _) = run(&o, std::slice::from_ref(&image), &mask, 2);
+        assert!(agreement(&euclid, &truth) > 0.95);
+    }
+
+    #[test]
+    fn annealing_temperature_follows_the_schedule() {
+        let (image, mask, _) = phantom();
+        let mut o = AtroposOptions::new(3);
+        o.initial_annealing_temperature = 2.0;
+        o.annealing_rate = 0.5;
+        o.minimum_annealing_temperature = 0.6;
+        o.max_iterations = 3;
+        o.convergence_threshold = 0.0;
+        let (_, _, f) = run(&o, &[image], &mask, 1);
+        let temps: Vec<f32> = f
+            .iterations
+            .iter()
+            .map(|r| r.annealing_temperature)
+            .collect();
+        assert_eq!(&temps[..2], &[2.0, 1.0]);
+        if temps.len() > 2 {
+            assert_eq!(temps[2], 0.6);
+        }
+    }
+
+    #[test]
+    fn a_class_lost_stops_atropos_with_ants_message() {
+        // Two intensities and three classes: one class empties.
+        let (_, mask, truth) = phantom();
+        let image: Vec<f32> = truth
+            .iter()
+            .map(|&t| if t < 2 { 10.0 } else { 90.0 })
+            .collect();
+        let mut o = AtroposOptions::new(3);
+        o.initialization = Initialization::KMeans {
+            centers: Some(vec![10.0, 50.0, 90.0]),
+        };
+        let options: &'static AtroposOptions = Box::leak(Box::new(o));
+        let image: &'static [f32] = Box::leak(image.into_boxed_slice());
+        let mask: &'static [u32] = Box::leak(mask.into_boxed_slice());
+        let mut f = Atropos::new(
+            options,
+            &SIZE,
+            &[1.0; 3],
+            &[0.0; 3],
+            vec![image],
+            Some(mask),
+            1,
+        )
+        .unwrap();
+        let e = f.run().unwrap_err();
+        assert!(matches!(e, AtroposError::Itk { .. }), "{e}");
+    }
+
+    #[test]
+    fn outliers_and_their_notices() {
+        let (mut image, mask, truth) = phantom();
+        // A few far values in the brightest tissue.
+        let bright: Vec<usize> = (0..image.len())
+            .filter(|&v| truth[v] == 3)
+            .take(4)
+            .collect();
+        for &v in &bright {
+            image[v] += 2000.0;
+        }
+        let mut o = AtroposOptions::new(3);
+        o.initialization = Initialization::PriorLabelImage {
+            image: truth.clone(),
+        };
+        o.outliers = Some(crate::atropos::outliers::OutlierHandling::GrubbsRosner {
+            significance: 0.05,
+            winsorizing: 0.1,
+        });
+        let (_, _, f) = run(&o, std::slice::from_ref(&image), &mask, 1);
+        assert!(f.notices.contains(&defects::ITK_51));
+        assert_eq!(f.outlier_filter().unwrap().outlier_ids.len(), 4);
+        o.upstream_defects = UpstreamDefects::Reproduce;
+        let (_, _, f) = run(&o, &[image], &mask, 1);
+        assert!(f.notices.contains(&defects::ITK_51));
+        assert!(f.outlier_filter().unwrap().outlier_ids.is_empty());
+        assert!(f.warnings.iter().any(|w| w.starts_with("SLATEC/DGAMMA")));
     }
 }

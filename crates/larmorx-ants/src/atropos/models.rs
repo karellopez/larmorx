@@ -1154,4 +1154,90 @@ mod tests {
         assert!(inside > 0.0);
         assert_eq!(outside, 0.0);
     }
+
+    fn two_clusters() -> Vec<f32> {
+        (0..120)
+            .map(|i| if i % 2 == 0 { 10.0 } else { 30.0 } + (i % 7) as f32 * 0.3)
+            .collect()
+    }
+
+    #[test]
+    fn manifold_parzen_follows_the_clusters_and_the_weights_when_fixed() {
+        let samples = two_clusters();
+        let weights: Vec<f64> = (0..samples.len())
+            .map(|i| if i % 2 == 0 { 1.0 } else { 0.05 })
+            .collect();
+        let model = LikelihoodModel::ManifoldParzenWindows {
+            regularization_sigma: 1.0,
+            evaluation_k: 10,
+            covariance_k: 0,
+            kernel_sigma: 1.0,
+        };
+        let mut fixed = Likelihood::new(&model, UpstreamDefects::Fix);
+        let mut ants = Likelihood::new(&model, UpstreamDefects::Reproduce);
+        fixed.set_sample(&samples, 1, &weights).unwrap();
+        ants.set_sample(&samples, 1, &weights).unwrap();
+        assert!(ants.evaluate(&[11.0]) > ants.evaluate(&[20.0]));
+        assert!(ants.evaluate(&[31.0]) > ants.evaluate(&[20.0]));
+        // ANTs ignores the weights (ANTS-95): both clusters count alike.
+        let ratio_ants = ants.evaluate(&[11.0]) / ants.evaluate(&[31.0]);
+        let ratio_fixed = fixed.evaluate(&[11.0]) / fixed.evaluate(&[31.0]);
+        assert!(ratio_fixed > 2.0 * ratio_ants, "{ratio_fixed} {ratio_ants}");
+    }
+
+    #[test]
+    fn log_euclidean_tensors_prefer_their_class_mean() {
+        // 2-D tensors (xx, xy, yy): an isotropic class.
+        let mut samples = Vec::new();
+        for i in 0..40 {
+            let e = 1.0 + (i % 5) as f32 * 0.01;
+            samples.extend_from_slice(&[e, 0.0, e]);
+        }
+        let weights = vec![1.0f64; 40];
+        let mut m = Likelihood::new(&LikelihoodModel::LogEuclideanGaussian, UpstreamDefects::Fix);
+        m.set_sample(&samples, 3, &weights).unwrap();
+        assert!(m.evaluate(&[1.02, 0.0, 1.02]) > m.evaluate(&[3.0, 0.5, 0.4]));
+    }
+
+    #[test]
+    fn joint_shape_is_evaluated_where_its_histograms_were_filled_when_fixed() {
+        // 3-D tensors with a principal direction along x.
+        let mut samples = Vec::new();
+        for i in 0..60 {
+            let a = 2.0 + (i % 6) as f32 * 0.05;
+            samples.extend_from_slice(&[a, 0.0, 0.0, 1.0, 0.0, 0.5]);
+        }
+        let weights = vec![1.0f64; 60];
+        let model = LikelihoodModel::JointShapeAndOrientationProbability {
+            shape_sigma: 1.0,
+            shape_bins: 16,
+            orientation_sigma: 1.0,
+            orientation_bins: 8,
+        };
+        let mut fixed = Likelihood::new(&model, UpstreamDefects::Fix);
+        let mut ants = Likelihood::new(&model, UpstreamDefects::Reproduce);
+        fixed.set_sample(&samples, 6, &weights).unwrap();
+        ants.set_sample(&samples, 6, &weights).unwrap();
+        let x = [2.1f32, 0.0, 0.0, 1.0, 0.0, 0.5];
+        assert!(fixed.evaluate(&x) > 0.0);
+        assert_ne!(fixed.evaluate(&x), ants.evaluate(&x));
+        // A tensor along y has another orientation: less likely when fixed.
+        let y = [1.0f32, 0.0, 0.0, 2.1, 0.0, 0.5];
+        assert!(fixed.evaluate(&y) < fixed.evaluate(&x));
+    }
+
+    #[test]
+    fn print_follows_ants_print_self() {
+        let mut g = Likelihood::new(&LikelihoodModel::Gaussian, UpstreamDefects::Fix);
+        g.set_sample(&[1.0, 2.0, 3.0, 4.0], 1, &[1.0; 4]).unwrap();
+        let text = print(&g, "  ");
+        assert!(
+            text.starts_with("  GaussianListSampleFunction (0x0)\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("mean = [2.5], covariance = [1.66667]"),
+            "{text}"
+        );
+    }
 }

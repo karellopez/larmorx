@@ -547,7 +547,9 @@ mod tests {
         for (i, d) in DEFECTS.iter().enumerate() {
             let (family, number) = d.id.split_once('-').unwrap();
             assert!(family.chars().all(|c| c.is_ascii_uppercase()), "{}", d.id);
-            assert_eq!(number.len(), 2, "{}", d.id);
+            // Two digits, three once a family passes 99 (ANTs, with Atropos).
+            assert!((2..=3).contains(&number.len()), "{}", d.id);
+            assert!(number.chars().all(|c| c.is_ascii_digit()), "{}", d.id);
             assert!(DEFECTS[..i].iter().all(|e| e.id != d.id), "{}", d.id);
             assert!(!d.what.ends_with('.'), "{}", d.id);
             assert_eq!(lookup(d.id), Some(*d));

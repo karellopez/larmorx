@@ -61,7 +61,7 @@ impl KdTree {
     /// `WeightedCentroidKdTreeGenerator` with bucket size `bucket` (Atropos uses 16) on the
     /// sample `samples` (`n × m`, row-major).
     pub fn new(samples: &[f32], m: usize, bucket: usize) -> Result<Self, FilterError> {
-        if m == 0 || samples.len() % m != 0 {
+        if m == 0 || !samples.len().is_multiple_of(m) {
             return Err(FilterError::invalid(
                 "Length of a sample's measurement vector hasn't been set.",
             ));
@@ -132,8 +132,8 @@ impl KdTree {
     ) -> usize {
         let m = self.m;
         let mut weighted = vec![0.0f64; m];
-        for i in begin..end {
-            let v = self.vector(ids[i]);
+        for &id in &ids[begin..end] {
+            let v = self.vector(id);
             for (w, &x) in weighted.iter_mut().zip(v) {
                 *w += f64::from(x);
             }
@@ -142,8 +142,8 @@ impl KdTree {
         let first = self.vector(ids[begin]).to_vec();
         let mut min = first.clone();
         let mut max = first;
-        for i in begin + 1..end {
-            let v = self.vector(ids[i]);
+        for &id in &ids[begin + 1..end] {
+            let v = self.vector(id);
             for d in 0..m {
                 if v[d] < min[d] {
                     min[d] = v[d];
@@ -631,15 +631,14 @@ impl FilterState<'_, '_> {
     }
 
     fn add_point(&mut self, id: u32, valid: &[usize]) {
-        let m = self.point.len();
         let v = self.tree.vector(id);
-        for j in 0..m {
-            self.point[j] = f64::from(v[j]);
+        for (p, &x) in self.point.iter_mut().zip(v) {
+            *p = f64::from(x);
         }
         let point = std::mem::take(&mut self.point);
         let c = self.closest(&point, valid);
-        for j in 0..m {
-            self.candidates[c].weighted[j] += point[j];
+        for (w, &x) in self.candidates[c].weighted.iter_mut().zip(&point) {
+            *w += x;
         }
         self.candidates[c].size += 1;
         self.point = point;

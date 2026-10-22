@@ -147,7 +147,7 @@ const ALNRCS: [f64; 43] = [
 
 const SQ2PIL: f64 = 0.91893853320467274178032973640562;
 const SQPI2L: f64 = 0.225791352644727432363097614947441;
-const PI: f64 = 3.1415926535897932384626433832795;
+const PI: f64 = std::f64::consts::PI;
 
 impl Slatec {
     fn xermsg(&mut self, subrou: &str, messg: &str) {
@@ -596,5 +596,50 @@ mod tests {
         // t_{0.975, 10} = 2.228138851986...
         assert!((s.t_inverse_cdf(0.975, 10) - 2.228138851986).abs() < 1e-9);
         assert!((gaussian_inverse_cdf(0.975) - 1.959963984540054).abs() < 1e-9);
+    }
+
+    #[test]
+    fn student_quantiles_and_itk_51() {
+        let mut s = Slatec::default();
+        let t = s.t_inverse_cdf(0.975, 10);
+        assert!((t - 2.228_138_851_964_938_5).abs() < 1e-9, "{t}");
+        assert!(s.messages.is_empty());
+        // ITK's density is inf/inf above about 340 degrees of freedom.
+        assert!(s.t_inverse_cdf(0.975, 1000).is_nan());
+        assert!(
+            s.messages
+                .iter()
+                .any(|m| m == "SLATEC/DGAMMA: X SO BIG GAMMA OVERFLOWS")
+        );
+        let mut f = Slatec {
+            fix_overflow: true,
+            ..Default::default()
+        };
+        let t = f.t_inverse_cdf(0.975, 1000);
+        assert!((t - 1.962_339_081_026_242).abs() < 1e-9, "{t}");
+        assert!(f.messages.is_empty());
+        // Below the overflow, both take ITK's path, bit for bit.
+        assert_eq!(
+            f.t_inverse_cdf(0.9, 300).to_bits(),
+            s.t_inverse_cdf(0.9, 300).to_bits()
+        );
+        assert_eq!(s.t_inverse_cdf(0.0, 5), -f64::MAX);
+        assert_eq!(s.t_inverse_cdf(1.0, 5), f64::MAX);
+    }
+
+    #[test]
+    fn gaussian_quantiles() {
+        assert!((gaussian_inverse_cdf(0.975) - 1.959_963_984_540_054).abs() < 1e-12);
+        assert!((gaussian_inverse_cdf(0.5)).abs() < 1e-15);
+        assert!((gaussian_inverse_cdf(0.025) + 1.959_963_984_540_054).abs() < 1e-12);
+    }
+
+    #[test]
+    fn slatec_range_test_lets_nan_through_as_c_does() {
+        let mut s = Slatec::default();
+        let _ = s.dbetai(f64::NAN, 2.0, 0.5);
+        assert!(s.messages.is_empty());
+        let _ = s.dbetai(1.5, 2.0, 0.5);
+        assert_eq!(s.messages, ["SLATEC/DBETAI: X IS NOT IN THE RANGE (0,1)"]);
     }
 }

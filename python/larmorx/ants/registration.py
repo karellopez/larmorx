@@ -52,6 +52,10 @@ TransformType = Literal[
     "GaussianDisplacementField",
     "BSplineDisplacementField",
     "BSpline",
+    "TimeVaryingVelocityField",
+    "TimeVaryingBSplineVelocityField",
+    "Exponential",
+    "BSplineExponential",
 ]
 Sampling = Literal["None", "Regular", "Random"]
 Precision = Literal["float64", "float32"]
@@ -187,6 +191,29 @@ class RegistrationStage:
     - ``BSpline`` (a cubic B-spline transform, ``-t BSpline[gradientStep,meshSize]``) takes
       ``mesh_size``, its control-point mesh at the base level over the fixed image (sizes or a
       knot spacing); the mesh doubles at each level.
+    - ``Exponential`` (a stationary velocity field, its displacement the exponential by
+      scaling and squaring, ``-t Exponential[gradientStep,updateFieldVariance,
+      velocityFieldVariance,numberOfIntegrationSteps]``) takes ``update_field_variance`` and
+      ``velocity_field_variance`` (the Gaussian smoothing of each update and of the velocity
+      field; ANTs takes them in millimetres², ANTS-80) and ``integration_steps`` (``None``:
+      chosen from the field's largest vector).
+    - ``BSplineExponential`` (``-t BSplineExponential[gradientStep,updateFieldMesh,
+      velocityFieldMesh,numberOfIntegrationSteps,splineOrder]``) smooths them by B-splines
+      instead: ``mesh_size`` (the update field's mesh at the base level), ``total_mesh_size``
+      (the velocity field's; ``None`` or 0: not smoothed), ``integration_steps``,
+      ``spline_order``.
+    - ``TimeVaryingVelocityField`` (a velocity field over space and time, integrated by
+      fourth-order Runge-Kutta, ``-t TimeVaryingVelocityField[gradientStep,
+      numberOfTimeIndices,updateFieldVariance,updateFieldTimeVariance,totalFieldVariance,
+      totalFieldTimeVariance]``) takes ``number_of_time_indices``, ``update_field_variance``,
+      ``update_field_time_variance``, ``total_field_variance`` and
+      ``total_field_time_variance`` (variances in voxels² of the space-time Gaussian
+      smoothing).
+    - ``TimeVaryingBSplineVelocityField`` (the velocity field a B-spline over space and time,
+      ``-t TimeVaryingBSplineVelocityField[gradientStep,velocityFieldMesh,
+      numberOfTimePointSamples,splineOrder]``) takes ``mesh_size`` (one size per axis and one
+      for time, e.g. ``(4, 4, 4, 2)``), ``number_of_time_point_samples`` and
+      ``spline_order``.
     """
 
     transform: TransformType
@@ -205,6 +232,12 @@ class RegistrationStage:
     mesh_size: Sequence[int] | float | None = None
     total_mesh_size: Sequence[int] | float | None = None
     spline_order: int = 3
+    velocity_field_variance: float = 0.0
+    integration_steps: int | None = None
+    number_of_time_indices: int = 4
+    update_field_time_variance: float = 0.0
+    total_field_time_variance: float = 0.0
+    number_of_time_point_samples: int = 4
 
 
 @dataclass(frozen=True)
@@ -452,11 +485,11 @@ def registration(
     ``Similarity``, ``Affine``, ``CompositeAffine``; ``SyN``'s or ``BSplineSyN``'s symmetric
     displacement fields; a displacement field smoothed by a Gaussian or a B-spline,
     ``GaussianDisplacementField``, ``BSplineDisplacementField``; a cubic B-spline transform,
-    ``BSpline``) against its metrics (image metrics, :class:`RegistrationMetric`; point-set
-    metrics, :class:`PointSetMetric` and :class:`IntensityPointSetMetric`), level by level
-    (shrunk and smoothed images); the stages chain, each starting where the previous left.
-    The velocity-field stages (``TimeVaryingVelocityField``, ``Exponential`` and their B-spline
-    forms) come in milestone A5's third part.
+    ``BSpline``; velocity fields, stationary (``Exponential``, ``BSplineExponential``) or
+    over time (``TimeVaryingVelocityField``, ``TimeVaryingBSplineVelocityField``)) against
+    its metrics (image metrics, :class:`RegistrationMetric`; point-set metrics,
+    :class:`PointSetMetric` and :class:`IntensityPointSetMetric`), level by level (shrunk and
+    smoothed images); the stages chain, each starting where the previous left.
 
     - ``initial_moving_transforms`` (``-r``): transform files, transform lists,
       ``(transform, invert)`` pairs or :class:`AlignCenters`; ``initial_fixed_transforms``
@@ -548,6 +581,44 @@ def registration(
                 if s.transform != "BSpline":
                     total = 0 if s.total_mesh_size is None else s.total_mesh_size
                     parameters += [_mesh(total), str(int(s.spline_order))]
+            elif s.transform == "Exponential":
+                parameters = [
+                    _num(s.gradient_step),
+                    _num(s.update_field_variance),
+                    _num(s.velocity_field_variance),
+                ]
+                if s.integration_steps is not None:
+                    parameters.append(str(int(s.integration_steps)))
+            elif s.transform == "BSplineExponential":
+                if s.mesh_size is None:
+                    raise ValueError("a BSplineExponential stage needs mesh_size")
+                total = 0 if s.total_mesh_size is None else s.total_mesh_size
+                steps = 0 if s.integration_steps is None else int(s.integration_steps)
+                parameters = [
+                    _num(s.gradient_step),
+                    _mesh(s.mesh_size),
+                    _mesh(total),
+                    str(steps),
+                    str(int(s.spline_order)),
+                ]
+            elif s.transform == "TimeVaryingVelocityField":
+                parameters = [
+                    _num(s.gradient_step),
+                    str(int(s.number_of_time_indices)),
+                    _num(s.update_field_variance),
+                    _num(s.update_field_time_variance),
+                    _num(s.total_field_variance),
+                    _num(s.total_field_time_variance),
+                ]
+            elif s.transform == "TimeVaryingBSplineVelocityField":
+                if s.mesh_size is None:
+                    raise ValueError("a TimeVaryingBSplineVelocityField stage needs mesh_size")
+                parameters = [
+                    _num(s.gradient_step),
+                    _mesh(s.mesh_size),
+                    str(int(s.number_of_time_point_samples)),
+                    str(int(s.spline_order)),
+                ]
             else:
                 parameters = [_num(s.gradient_step)]
             argv += ["-t", f"{s.transform}[{','.join(parameters)}]"]

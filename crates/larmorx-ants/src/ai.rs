@@ -1021,6 +1021,8 @@ pub fn search<const D: usize>(
         estimate_learning_rate_at_each_iteration: false,
         estimate_learning_rate_once: true,
         scales: None,
+        unit_equal_scales: false,
+        replaced_scales: None,
     };
     let skip_failed = notices.fix();
     let outcome = if log.verbose {

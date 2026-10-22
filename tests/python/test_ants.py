@@ -261,6 +261,11 @@ def test_registration_syn_stage_does_not_depend_on_threads(tmp_path):
         ("GaussianDisplacementField", {"update_field_variance": 2.0}, ["0Warp.nii.gz"], "Displacement"),
         ("BSplineDisplacementField", {"mesh_size": 12.0, "total_mesh_size": 0}, ["0Warp.nii.gz"], "Displacement"),
         ("BSpline", {"mesh_size": (2, 2, 1)}, ["0BSpline.txt"], "BSplineTransform"),
+        ("Exponential", {"update_field_variance": 2.0, "velocity_field_variance": 0.5}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
+        ("Exponential", {"integration_steps": 4}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
+        ("BSplineExponential", {"mesh_size": (2, 2, 2), "integration_steps": 0}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
+        ("TimeVaryingVelocityField", {"number_of_time_indices": 3, "total_field_variance": 0.5}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
+        ("TimeVaryingBSplineVelocityField", {"mesh_size": (2, 2, 2, 2), "number_of_time_point_samples": 3}, ["0InverseWarp.nii.gz", "0Warp.nii.gz"], "Displacement"),
     ],
 )  # fmt: skip
 def test_registration_deformable_stages_do_not_depend_on_threads(transform, extra, files, name):
@@ -291,3 +296,65 @@ def test_registration_deformable_stages_do_not_depend_on_threads(transform, extr
         lx.ants.registration(
             [lx.ants.RegistrationStage("BSpline", 0.3, stage.metrics, [1], [1], [0])]
         )
+
+
+def _blocks() -> tuple[lx.Image, lx.Image]:
+    rng = np.random.default_rng(7)
+    fixed = 100.0 + 20.0 * rng.random((14, 12, 10))
+    fixed[4:10, 3:9, 3:7] += 200.0
+    moving = np.roll(fixed, 1, axis=0)
+    affine = np.diag([2.0, 2.0, 2.5, 1.0])
+    return lx.Image(fixed.astype(np.float32), affine), lx.Image(moving.astype(np.float32), affine)
+
+
+def test_bspline_transforms_apply_and_have_no_inverse(tmp_path):
+    """A BSpline stage's transform, applied by apply_transforms in both precisions (as written
+    and read back from text, MATLAB and HDF5 files), and refused inverted as ANTs refuses it."""
+    f, m = _blocks()
+    stage = lx.ants.RegistrationStage(
+        "BSpline", 0.3, lx.ants.RegistrationMetric("MeanSquares", f, m),
+        iterations=[3], shrink_factors=[1], smoothing_sigmas=[0], mesh_size=(2, 2, 1),
+    )  # fmt: skip
+    r = lx.ants.registration([stage], warped=True)
+    (bspline,) = r.files["0BSpline.txt"]
+    assert bspline.name == "BSplineTransform_double_3_3"
+    warped = lx.ants.apply_transforms(m, f, r.transforms)
+    np.testing.assert_array_equal(warped.data, r.warped.data)
+    for suffix in (".txt", ".mat", ".h5"):
+        path = tmp_path / f"b{suffix}"
+        lx.transforms.write(path, [bspline])
+        again = lx.ants.apply_transforms(m, f, [path])
+        np.testing.assert_array_equal(again.data, warped.data)
+    single = lx.ants.apply_transforms(m, f, r.transforms, precision="float32")
+    assert single.data.dtype == np.float32
+    np.testing.assert_allclose(single.data, warped.data, rtol=1e-4, atol=1e-2)
+    with pytest.raises(ValueError, match="no inverse"):
+        lx.ants.apply_transforms(m, f, r.transforms, invert=[True])
+    with pytest.raises(ValueError, match="not linear"):
+        lx.ants.combine_transforms(r.transforms, output="linear")
+
+
+def test_a_stage_after_a_bspline_transform_runs_corrected(recwarn):
+    """ITK-35: an affine stage after a BSpline stage runs by default (the B-spline transform's
+    Jacobian with respect to position); with ANTs' defects reproduced it fails and is dropped
+    (ANTS-49), as in ANTs."""
+    f, m = _blocks()
+    metric = lx.ants.RegistrationMetric("MeanSquares", f, m)
+    stages = [
+        lx.ants.RegistrationStage(
+            "BSpline", 0.3, metric, iterations=[2], shrink_factors=[1], smoothing_sigmas=[0],
+            mesh_size=(1, 1, 1),
+        ),
+        lx.ants.RegistrationStage(
+            "Affine", 0.1, metric, iterations=[3], shrink_factors=[1], smoothing_sigmas=[0]
+        ),
+    ]  # fmt: skip
+    fixed = lx.ants.registration(stages)
+    assert sorted(fixed.files) == ["0BSpline.txt", "1GenericAffine.mat"]
+    assert [i.stage for i in fixed.iterations].count(1) == 3
+    affine = fixed.files["1GenericAffine.mat"][0].parameters
+    assert not np.array_equal(affine[:9], np.eye(3).ravel())
+    named = {str(w.message).split()[2] for w in recwarn if "ITK-35" in str(w.message)}
+    assert named
+    reproduced = lx.ants.registration(stages, upstream_defects="reproduce")
+    assert [i.stage for i in reproduced.iterations].count(1) == 0

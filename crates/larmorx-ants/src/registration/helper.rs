@@ -1306,6 +1306,8 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 estimate_learning_rate_at_each_iteration: true,
                 estimate_learning_rate_once: false,
                 scales: None,
+                unit_equal_scales: self.upstream_defects.fix(),
+                replaced_scales: None,
             };
             // PrepareRegistrationMethod: with --initialize-transforms-per-stage, the stage starts
             // from the last transform of the composite when it can, and that transform leaves
@@ -1750,6 +1752,19 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ),
             };
             self.point_set_notices(&events);
+            if let Some(s) = optimizer.replaced_scales {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_42,
+                        self.upstream_defects,
+                        format!(
+                            "stage {stage}: the estimated scales are equal and not above epsilon ({}): ones are used, which give the same steps (equal scales cancel in the learning rate); ITK throws 'm_Scales values must be > epsilon' and the stage fails",
+                            larmorx_registration::format::OStream::default().float(s)
+                        ),
+                    ),
+                );
+            }
             if observer.ants_75 {
                 let mode = self.upstream_defects;
                 push_once(

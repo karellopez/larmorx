@@ -270,7 +270,9 @@ mod tests {
         fixed.extend(spacing);
         fixed.extend([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
         let per = n * n * n;
-        let c: Vec<f64> = (0..3 * per).map(|i| coefficient(i / per, i % per)).collect();
+        let c: Vec<f64> = (0..3 * per)
+            .map(|i| coefficient(i / per, i % per))
+            .collect();
         BSplineTransform::from_itk("BSplineTransform_double_3_3", FieldData::F64(c), &fixed)
             .unwrap()
     }
@@ -306,12 +308,20 @@ mod tests {
     fn wrong_counts_are_refused() {
         let fixed = vec![5.0; 18];
         assert!(
-            BSplineTransform::from_itk("BSplineTransform_double_3_3", FieldData::F64(vec![0.0; 3]), &fixed)
-                .is_err()
+            BSplineTransform::from_itk(
+                "BSplineTransform_double_3_3",
+                FieldData::F64(vec![0.0; 3]),
+                &fixed
+            )
+            .is_err()
         );
         assert!(
-            BSplineTransform::from_itk("BSplineTransform_double_2_2", FieldData::F64(vec![]), &fixed)
-                .is_err()
+            BSplineTransform::from_itk(
+                "BSplineTransform_double_2_2",
+                FieldData::F64(vec![]),
+                &fixed
+            )
+            .is_err()
         );
     }
 }

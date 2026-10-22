@@ -24,6 +24,7 @@ starts no other agent.
 | A5.1 | `7f2a61e` (10-20) | `antsRegistration`'s SyN stages; displacement fields as initial transforms; parity `--jobs` | the other deformable stages (A5.2, A5.3) |
 | A5.2 | `a5-part2-bspline` (10-21) | `antsRegistration`'s BSplineSyN, BSpline, GaussianDisplacementField and BSplineDisplacementField stages; the Python API's `mesh_size`, `total_mesh_size`, `spline_order` | `antsApplyTransforms` with `BSplineTransform` files; ANTS-78 and ITK-35 (below); A5.3 |
 | Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
+| A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | ANTS-106 (below) |
 
 ## The order from here
 
@@ -42,8 +43,9 @@ starts no other agent.
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
    point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
    ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
-3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding; running since 2026-10-22, in parallel with A5 part 3 at the user's request). With A4 to A6, sMRIPrep's brain
-   extraction and MNI normalisation run in larmorx.
+3. **A6, Atropos: done** (merged 2026-10-22, run in parallel with A5 part 3 at the user's
+   request). With A4 to A6, sMRIPrep's brain extraction and MNI normalisation run in larmorx
+   once A5 part 3 is merged.
 4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
    (`docs/findings/ants-ai.md`, "Blobs").
@@ -135,6 +137,10 @@ Still to do:
   deflate (one to two days) would make them match the oracle's build only. Skipped for now.
 
 ## Waiting for the user
+
+- **ANTS-106** (A6): Atropos' partial-volume classes combined with an MRF never win a voxel, and
+  both ANTs and larmorx stop with an error. No correction is defined yet; one option is to count
+  a partial-volume label as a member of its own set. sMRIPrep does not use partial volumes.
 
 - **ANTS-30:** review ResampleImage's corrected command line (`docs/api/ants-resample-image.md`,
   "The seventh argument").

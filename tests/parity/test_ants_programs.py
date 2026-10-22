@@ -28,6 +28,7 @@ SUITES = (
     "ants_registration",
     "ants_ai",
     "ants_affine_initializer",
+    "ants_atropos",
 )
 TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
 

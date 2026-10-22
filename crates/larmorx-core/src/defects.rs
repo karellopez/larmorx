@@ -336,6 +336,44 @@ defects! {
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,
         "one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN";
+    ITK_50 = "ITK-50", "ITK", true,
+        "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
+    ITK_51 = "ITK-51", "ITK", true,
+        "TDistribution's density divides Gamma((n+1)/2) by Gamma(n/2), both infinite above about 340 degrees of freedom: the density and InverseCDF are NaN, so GrubbsRosnerListSampleFilter finds no outlier in a sample of more than about 342 values";
+    ANTS_90 = "ANTS-90", "Atropos", true,
+        "KMeans with several intensity images starts its second k-means (on every image) from the mask's mean instead of the first k-means' class means, and then keeps the first k-means' labels: only the first image decides the initial labelling";
+    ANTS_91 = "ANTS-91", "Atropos", true,
+        "Otsu finds the first image's range from FLT_MIN with else-if, so the histogram can miss the brightest voxel and, for negative images, extends to 0";
+    ANTS_92 = "ANTS-92", "Atropos", true,
+        "Random labels every voxel, outside the mask too, and those voxels enter the first estimates of the classes";
+    ANTS_93 = "ANTS-93", "Atropos", true,
+        "the adaptive smoothing weights of several -a options are applied in reverse order (the first image gets the last option's weight)";
+    ANTS_94 = "ANTS-94", "Atropos", true,
+        "the outlier filters keep their previous output: BoxPlot computes its replacement values from a histogram that also holds the previous call's values, and GrubbsRosner gives the second and later images the first image's values";
+    ANTS_95 = "ANTS-95", "Atropos", true,
+        "ManifoldParzenWindows evaluates every class without its posterior weights, so all classes have the same likelihood up to a constant";
+    ANTS_96 = "ANTS-96", "Atropos", true,
+        "partial-volume classes are never re-estimated: their Gaussians keep the initial labelling's means";
+    ANTS_97 = "ANTS-97", "Atropos", true,
+        "with --minimize-memory-usage the prior probability images are stored with their voxel numbers in float, so in images of more than 2^24 voxels prior values land on rounded voxel numbers";
+    ANTS_98 = "ANTS-98", "Atropos", true,
+        "KMeans takes the first image's range from the voxels labelled 1 in the mask only: a mask with other values gives infinite initial centres";
+    ANTS_99 = "ANTS-99", "Atropos", true,
+        "without -d every image is segmented in 3D: Atropos asks the image reader for the dimension before the reader has read the header, and NIfTI's reader answers 3";
+    ANTS_100 = "ANTS-100", "Atropos", true,
+        "prior probability images given as one vector image (without --minimize-memory-usage) all hold the last component: every class gets the last class's prior";
+    ANTS_101 = "ANTS-101", "Atropos", true,
+        "-p with a name other than Socrates, Plato, Aristotle or Sigmoid silently keeps Socrates";
+    ANTS_102 = "ANTS-102", "Atropos", true,
+        "--icm in its documented bracketed form ([async,iterations,codeImage]) aborts: the option's empty name is converted to a bool";
+    ANTS_103 = "ANTS-103", "Atropos", true,
+        "JointShapeAndOrientationProbability evaluates its histograms at the raw tensor components, at a point whose second coordinate is never set (uninitialized memory)";
+    ANTS_104 = "ANTS-104", "Atropos", true,
+        "ManifoldParzenWindows' local covariances (a covariance neighbourhood above 0) double the running diagonal sums at every neighbour and add the running upper values to the lower triangle";
+    ANTS_105 = "ANTS-105", "Atropos", true,
+        "--minimize-memory-usage with prior probability images and a mask crashes: the check of the priors against the mask rebuilds a prior on the first intensity image before any is read";
+    ANTS_107 = "ANTS-107", "Atropos", true,
+        "with GrubbsRosner, whose output keeps growing (ANTS-94), Atropos weighs the samples beyond the masked voxels with weights it never sets (uninitialized memory): the class parameters depend on what the memory held";
 }
 
 /// The register entry with ID `id`.
@@ -511,7 +549,9 @@ mod tests {
         for (i, d) in DEFECTS.iter().enumerate() {
             let (family, number) = d.id.split_once('-').unwrap();
             assert!(family.chars().all(|c| c.is_ascii_uppercase()), "{}", d.id);
-            assert_eq!(number.len(), 2, "{}", d.id);
+            // Two digits, three once a family passes 99 (ANTs, with Atropos).
+            assert!((2..=3).contains(&number.len()), "{}", d.id);
+            assert!(number.chars().all(|c| c.is_ascii_digit()), "{}", d.id);
             assert!(DEFECTS[..i].iter().all(|e| e.id != d.id), "{}", d.id);
             assert!(!d.what.ends_with('.'), "{}", d.id);
             assert_eq!(lookup(d.id), Some(*d));

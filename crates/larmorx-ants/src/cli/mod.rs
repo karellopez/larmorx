@@ -11,6 +11,7 @@
 pub mod affine_initializer;
 pub mod ai;
 pub mod apply_transforms;
+pub mod atropos;
 pub mod cstd;
 pub mod denoise_image;
 pub mod image_math;
@@ -73,6 +74,7 @@ pub const TOOLS: &[&str] = &[
     "antsAI",
     "antsApplyTransforms",
     "antsRegistration",
+    "Atropos",
     "DenoiseImage",
     "ImageMath",
     "MultiplyImages",
@@ -97,6 +99,7 @@ pub fn run(
         "antsAI" => Some(ai::main(args, out, err)),
         "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
         "antsRegistration" => Some(registration::main(args, loader, out, err)),
+        "Atropos" => Some(atropos::main(args, out, err)),
         "DenoiseImage" => Some(denoise_image::main(args, out, err)),
         "ImageMath" => Some(image_math::main(args, out, err)),
         "MultiplyImages" => Some(multiply_images::main(args, out, err)),

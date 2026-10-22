@@ -162,6 +162,23 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-63 | antsRegistration | a binary VTK point set's labels read only as far as one point's components | every label read (`reproduce`: ANTs' bytes, the unread labels 0) |
 | ANTS-65 | antsRegistration | IGDM's estimated intensity sigma: the minima never updated, the moving maximum subtracted | the range of both point sets' intensities |
 | ANTS-66 | antsRegistration | IGDM's value reads before its intensity arrays for neighbourhoods of more than one voxel | the centre intensity, as the derivative reads it (`reproduce`: the two intensities taken as equal) |
+| ANTS-90 | Atropos | `KMeans` with several images: the second k-means seeded from the mask's statistics, its labels never read | the second k-means from each class's means, its labels kept |
+| ANTS-91 | Atropos | `Otsu`'s range from `FLT_MIN` with `else if` | the image's range in the mask |
+| ANTS-92 | Atropos | `Random` labels voxels outside the mask, which enter the first estimates | only the mask's voxels labelled |
+| ANTS-93 | Atropos | several `-a` options: the adaptive smoothing weights in reverse order | each image its own weight |
+| ANTS-94 | Atropos | the outlier filters keep their previous output | each call filters its own input |
+| ANTS-95 | Atropos | `ManifoldParzenWindows` ignores the posterior weights | weighted |
+| ANTS-96 | Atropos | partial-volume classes never re-estimated | re-estimated from their two classes |
+| ANTS-97 | Atropos | `-u 1`: the priors' voxel numbers stored in `float` | exact |
+| ANTS-98 | Atropos | `KMeans`' range from the mask's label 1 only | the mask's non-zero voxels |
+| ANTS-99 | Atropos | without `-d`, every image in 3D | the first image's dimension |
+| ANTS-100 | Atropos | vector priors: every class the last component | each class its component |
+| ANTS-101 | Atropos | an unknown `-p` runs Socrates silently | an error |
+| ANTS-102 | Atropos | `--icm [1,2]` (the documented form) aborts | read as documented (`reproduce`: ANTs' message, exit 1) |
+| ANTS-103 | Atropos | the joint shape and orientation model at the raw components and an unset coordinate | at the tensor's eigenvalues and direction (`reproduce`: the unset coordinate 0) |
+| ANTS-104 | Atropos | `ManifoldParzenWindows`' local covariances double their running sums | the local covariance |
+| ANTS-105 | Atropos | `-u 1` with priors and a mask crashes | runs (`reproduce`: exit 1 where ANTs crashes) |
+| ANTS-107 | Atropos | Grubbs-Rosner's grown sample weighed with uninitialized memory | not met (ANTS-94 corrected; `reproduce`: those weights 0) |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -179,6 +196,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-25 | ITK manifold Parzen windows (`JHCT`) | fewer points than the covariance neighbourhood: a read past the list of neighbours | the neighbours there are (in both modes) |
 | ITK-26 | ITK manifold Parzen windows (`JHCT`) | anisotropic covariances count each diagonal product twice | once |
 | ITK-28 | ITK `JHCT` | an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | both tests treat it as 1 |
+| ITK-50 | ITK `KdTreeBasedKmeansEstimator` (Atropos `KMeans`) | the point each divided k-d tree node is split at is left out of the new centres | every point counted |
+| ITK-51 | ITK `TDistribution` (Atropos' Grubbs-Rosner) | NaN above about 340 degrees of freedom: no outlier is ever found in an image | the Gamma ratio through its logarithm where it would overflow |
 
 **Not the default yet:**
 

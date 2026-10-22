@@ -124,6 +124,24 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-76 | antsRegistration | collapsing the output transforms (`-z 1`, the default) around B-spline transforms loses transforms: one that follows only B-spline transforms, a B-spline transform after another at the end of the queue; before more linear transforms or fields that B-spline transform joins their run and ANTs crashes | c | none (fMRIPrep uses no B-spline transform) | corrected by default: every transform kept, linear and field runs collapsed around them, a notice; `reproduce` collapses as ANTs, stops where it crashes (A5 part 2) | – |
 | ANTS-77 | antsRegistration `BSpline` | a mesh size of 0, or fewer mesh sizes than dimensions (read past the end of the list), divides by zero: a grid of NaN and infinite geometry, vnl's SVD warnings, an exception on garbage indices | a | none | refused with a message (A5 part 2) | – |
 | ANTS-78 | antsRegistration `BSplineDisplacementField` | the meshes "at the base level" are doubled already at the base level (`mesh << (level + 1)`; B-spline SyN uses `mesh << level`) | c? | none | reproduces | yes (decided 2026-10-21: corrected by default with A5 part 3) |
+| ANTS-90 | Atropos | `KMeans` with several images: the second k-means starts from the mask's statistics and its labels are never read, so only the first image decides the initial labelling | c | none (sMRIPrep segments one image) | corrected by default (A6) | – |
+| ANTS-91 | Atropos | `Otsu`'s range starts at `FLT_MIN` and uses `else if`: a decreasing or negative image gets a wrong range | c | none | corrected by default (A6) | – |
+| ANTS-92 | Atropos | `Random` labels voxels outside the mask too, and they enter the first estimates | c | none | corrected by default (A6) | – |
+| ANTS-93 | Atropos | the adaptive smoothing weights of several `-a` apply in reverse order | c | none | corrected by default (A6) | – |
+| ANTS-94 | Atropos | the outlier filters keep their previous output: box-plot bounds from earlier values too, Grubbs-Rosner's later images get the first image's values and its sample grows | c | none (sMRIPrep uses no outlier handling) | corrected by default (A6) | – |
+| ANTS-95 | Atropos | `ManifoldParzenWindows` ignores the posterior weights: every class has the same density | c | none | corrected by default (A6) | – |
+| ANTS-96 | Atropos | partial-volume classes are never re-estimated | c | none | corrected by default (A6) | – |
+| ANTS-97 | Atropos | `-u 1` stores the priors' voxel numbers in `float` (rounded above 2^24 voxels) | c | none | corrected by default (A6) | – |
+| ANTS-98 | Atropos | `KMeans` takes the first image's range from the mask's label 1 only: a mask of 255s gives infinite centres and an error | c | none (fMRIPrep's masks are 0 and 1) | corrected by default (A6) | – |
+| ANTS-99 | Atropos | without `-d` every image is segmented in 3D | e | none (nipype passes `-d`) | corrected by default (A6) | – |
+| ANTS-100 | Atropos | priors given as one vector image: every class gets the last component | c | none | corrected by default (A6) | – |
+| ANTS-101 | Atropos | an unknown `-p` formulation silently runs Socrates | e | none | corrected by default: an error (A6) | – |
+| ANTS-102 | Atropos | `--icm [async,iterations]`, the documented form (and what nipype's `icm_use_synchronous_update` writes), aborts | a | none (sMRIPrep does not set it) | read as documented; `reproduce` stops with ANTs' message (A6) | – |
+| ANTS-103 | Atropos | `JointShapeAndOrientationProbability` evaluates its histograms at the raw components and an unset coordinate | a | none | corrected by default: at the tensor's eigenvalues and direction; `reproduce` takes the unset coordinate as 0, with a notice (A6) | – |
+| ANTS-104 | Atropos | `ManifoldParzenWindows`' local covariances double their running sums | c | none | corrected by default (A6) | – |
+| ANTS-105 | Atropos | `-u 1` with prior probability images and a mask crashes | a | none | runs; `reproduce` stops where ANTs crashes (A6) | – |
+| ANTS-106 | Atropos | partial-volume classes with their likelihoods and an MRF never win a voxel: Atropos stops | c? | none | as ANTs in both modes (no correction defined); documented | decide |
+| ANTS-107 | Atropos | with Grubbs-Rosner (ANTS-94) the grown sample is weighed with uninitialized memory: the result depends on the heap | a | none | not met by default (ANTS-94 corrected); `reproduce` weighs those samples 0, with a notice (A6) | – |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -159,6 +177,8 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-33 | ITK `SyNImageRegistrationMethod` | with several metrics, the point-set metrics get identity transforms: they never see the initial transforms or the deformation | c | none | corrected by default (the composites); `reproduce` as ITK (A5 part 1) | – |
 | ITK-34 | ITK `PointSetToPointSetMetricWithIndexv4` | with a displacement field the points' derivatives are added into the shared field from several threads without synchronisation: SyN with a point-set metric changes from run to run at more than one thread | b | none | the one-thread order at any thread count | – |
 | ITK-35 | ITK `BSplineBaseTransform` | no Jacobian with respect to position (`ComputeJacobianWithRespectToPosition` throws "not yet implemented"): a stage after a B-spline transform whose metric needs the composite's Jacobian (linear, displacement-field and `BSpline` stages) fails at its first derivative | c? | none | fails as ITK (the linear stage dropped, ANTS-49) | yes (decided 2026-10-21: corrected by default with A5 part 3) |
+| ITK-50 | ITK `KdTreeBasedKmeansEstimator` | the point a k-d tree node is split at is left out of the new centres when the node is divided between candidates | c | every run: sMRIPrep's Atropos call (corrected: 1 to 25 of 0.8 to 2.5 million voxels change label on the five oracle runs) | corrected by default (A6) | – |
+| ITK-51 | ITK `TDistribution` | density and `InverseCDF` NaN above about 340 degrees of freedom (Gamma overflows): Grubbs-Rosner never finds an outlier in an image | c | none | corrected by default (A6) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -1494,6 +1514,217 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (possibly intended: the comment says "double the b-spline mesh
   resolution at each level").
 
+
+### ANTS-90 Atropos' second k-means changes nothing — (c)
+- **What:** with several intensity images, `KMeans` labels the voxels by a k-means of the first
+  image, then runs a second k-means on all images. It seeds that one with
+  `stats->GetMean(j + 1)` (`Atropos.hxx:1163`): the statistics of the *mask* on the first image,
+  so class 1 starts at the mask's mean and the others at 0 (ITK's value for a missing label);
+  and it then relabels the voxels from the first classifier's output (`classifier`, not
+  `classifier2`, `:1260`). The second k-means is computed and thrown away.
+- **Evidence:** read; validated (`kmeans-multivariate`, `log-euclidean`: larmorx reproduces
+  ANTs bit for bit with CORE-MATH; corrected, the initial labelling changes).
+- **fMRIPrep:** none (sMRIPrep segments one image).
+- **larmorx:** corrected by default: the second k-means starts from each class's means in every
+  image and its labels are kept, with a notice where they differ; `reproduce` keeps the first
+  k-means' labels (A6).
+- **D13 / gap:** none.
+
+### ANTS-91 Atropos' Otsu range — (c)
+- **What:** `GenerateInitialClassLabelingWithOtsuThresholding` starts the maximum at
+  `NumericTraits<float>::min()` (the smallest positive float, not the lowest) and updates it in
+  an `else if` after the minimum (`Atropos.hxx:907-922`): a voxel that lowers the minimum never
+  raises the maximum, and an image of negative values keeps a maximum of 1.2e-38. The 200-bin
+  histogram then misses values or spans an empty range.
+- **Evidence:** read; validated (the parity suite's Otsu cases).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: the image's range in the mask, with a notice where it
+  differs (A6).
+- **D13 / gap:** none.
+
+### ANTS-92 Atropos' random labels outside the mask — (c)
+- **What:** `Random` draws a label for every voxel of the image (`Atropos.hxx:622-629`); the
+  voxels outside the mask keep theirs until the first update, and enter the classes' first
+  estimates.
+- **Evidence:** read; validated (`random`, `real/ds000005/random`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: the voxels outside the mask stay unlabelled (the draws
+  keep ANTs' order, so the voxels inside get ANTs' labels), with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-93 Atropos' adaptive smoothing weights in reverse order — (c)
+- **What:** `Atropos.cxx:612-637` loops over the `-a` options from the first given to the last
+  (the parser stores them in reverse), sets image `count`, but reads its weight from
+  `GetFunction(count)`, counted from the last option: with several images, the first gets the
+  last option's weight.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: each image its own weight, with a notice where they differ
+  (A6).
+- **D13 / gap:** none.
+
+### ANTS-94 Atropos' outlier filters keep their previous output — (c)
+- **What:** the outlier filter is created once and its output list is never cleared.
+  `BoxPlotQuantileListSampleFilter::GenerateData` re-runs itself on its own output (an
+  `Update` inside `GenerateData`, verified with ITK's code instrumented), so the whiskers come
+  from a histogram of the input winsorized at bounds computed from the previous call's values
+  plus the kept ones; `GrubbsRosnerListSampleFilter` appends to its output, so Atropos'
+  samples of the second and later images are the first image's values, and the sample grows by
+  the number of masked voxels at every call (then ANTS-107).
+- **Evidence:** read (`antsBoxPlotQuantileListSampleFilter.hxx:46-140`,
+  `antsGrubbsRosnerListSampleFilter.hxx`, `Atropos.hxx:1760-1800`); validated (`box-plot`,
+  `grubbs-rosner`: identical with CORE-MATH; the multivariate Grubbs case stops identically).
+- **fMRIPrep:** none (sMRIPrep uses no outlier handling).
+- **larmorx:** corrected by default: each call filters its own input, with a notice where the
+  result differs (A6).
+- **D13 / gap:** none.
+
+### ANTS-95 ManifoldParzenWindows ignores the posterior weights — (c)
+- **What:** `ManifoldParzenWindowsListSampleFunction` builds its Parzen windows from the whole
+  sample and `Evaluate` weighs every sample alike: the posterior weights Atropos sets are never
+  used, so every class has the same density up to a constant.
+- **Evidence:** read (`antsManifoldParzenWindowsListSampleFunction.hxx:175`); validated
+  (`manifold-parzen`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: the windows weighed by the posteriors, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-96 Partial-volume classes are never re-estimated — (c)
+- **What:** `UpdateClassLabeling` re-estimates a partial-volume class only when
+  `n == labelSet[d] − 1` (`Atropos.hxx:1413-1421`), `n` the partial-volume class's own index:
+  never true. Its Gaussian keeps the means of the initial labelling.
+- **Evidence:** read; validated (`partial-volume-likelihoods`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: re-estimated at every iteration from its two classes'
+  posteriors, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-97 Sparse priors store voxel numbers in float — (c)
+- **What:** with `--minimize-memory-usage` the prior probability images are kept as point sets
+  whose points are the voxel numbers stored as `float` coordinates: above 2^24 voxels the
+  numbers round, and priors land on neighbouring voxels.
+- **Evidence:** read (`Atropos.hxx:190-230`, `:279-300`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: exact voxel numbers, with a notice where rounding would
+  have moved a prior (A6).
+- **D13 / gap:** none.
+
+### ANTS-98 Atropos' K-means range from the mask's label 1 — (c)
+- **What:** `KMeans` spreads its initial centres over the first image's range among the
+  voxels whose mask value is 1 (`LabelStatisticsImageFilter::GetMinimum(1)`,
+  `Atropos.hxx:1011-1012`), although every non-zero voxel is segmented. A mask without 1s (a
+  mask of 255s) gives ITK's defaults for a missing label, `FLT_MAX` and `−FLT_MAX`: infinite
+  centres in `float`, every voxel in one class, and ITK's LabelMap error.
+- **Evidence:** read; validated (`mask-255`: both stop with the same message).
+- **fMRIPrep:** none (fMRIPrep's masks hold 0 and 1).
+- **larmorx:** corrected by default: the range of the mask's non-zero voxels, with a notice
+  where it differs (A6).
+- **D13 / gap:** none.
+
+### ANTS-99 Atropos without -d is always 3D — (e)
+- **What:** without `-d`, `Atropos.cxx:1710-1712` asks a new image IO for the number of
+  dimensions before it has read the file's header; NIfTI's IO answers its default, 3. A 2D or
+  4D image is then read as 3D.
+- **Evidence:** read; validated (`no-dimension`).
+- **fMRIPrep:** none (nipype passes `--image-dimensionality`).
+- **larmorx:** corrected by default: the first image's dimension, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-100 Vector priors all hold the last component — (c)
+- **What:** prior probability images given as one vector image are extracted with one
+  `VectorIndexSelectionCastImageFilter`, its index set and `Update`d for each class, and its
+  output pointer handed to the filter each time (`Atropos.cxx:242-249`): every class keeps the
+  same image, the last component, which each class's normalization then rescales in place.
+- **Evidence:** read; validated (`priors-vector`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: each class its component, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-101 An unknown posterior formulation runs Socrates — (e)
+- **What:** `-p Zeno` matches none of the four names (`Atropos.cxx:344-360`) and Atropos runs
+  its default formulation, silently.
+- **Evidence:** validated (`unknown-formulation`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: an error naming the four; `reproduce` runs Socrates, with
+  a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-102 `--icm [1,2]` aborts — (a)
+- **What:** `Atropos.cxx:711` converts the `--icm` option's name to a bool; in the documented
+  form `--icm [async,iterations,codes]` the name is empty, the parser throws, and ANTs aborts
+  ("Unable to convert '' to type 'b'"). `--icm 1[1,2]` works. nipype's `Atropos` interface
+  writes the bracketed form whenever `icm_use_synchronous_update` is set
+  (`nipype/interfaces/ants/segmentation.py:219-223`), so such nipype calls abort with ANTs 2.6.5.
+- **Evidence:** validated (`icm-brackets`).
+- **fMRIPrep:** none (sMRIPrep does not set the ICM options).
+- **larmorx:** read as documented; `reproduce` stops with ANTs' message (exit 1) (A6).
+- **D13 / gap:** none.
+
+### ANTS-103 The joint shape and orientation model reads an unset coordinate — (a)
+- **What:** `JointHistogramParzenShapeAndOrientationListSampleFunction::Evaluate` looks its
+  shape and first orientation histograms up at the measurement's first two components (raw
+  tensor values, not the eigenvalues and angles the histograms were filled with), at a point
+  whose second coordinate it never sets
+  (`antsJointHistogramParzenShapeAndOrientationListSampleFunction.hxx:581-608`).
+- **Evidence:** read; validated (`joint-shape-orientation`: with the unset coordinate 0, larmorx
+  reproduces the oracle's result).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: evaluated at the tensor's normalized eigenvalues and its
+  principal direction's angles, where the histograms were filled; `reproduce` takes the unset
+  coordinate as 0, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-104 ManifoldParzenWindows' local covariances — (c)
+- **What:** with a covariance neighbourhood (`ManifoldParzenWindows[s,k,c>0,σ]`) each sample's
+  covariance accumulates its neighbours' products into a running matrix whose diagonal is
+  doubled at every neighbour and whose lower triangle receives the running upper values.
+- **Evidence:** read (`antsManifoldParzenWindowsListSampleFunction.hxx`); validated
+  (`manifold-parzen-covariance`).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default: the weighted local covariance, with a notice (A6).
+- **D13 / gap:** none.
+
+### ANTS-105 Minimized memory with priors and a mask crashes — (a)
+- **What:** `Atropos.cxx:440` checks the priors against the mask through
+  `GetPriorProbabilityImage`, which with `--minimize-memory-usage` rebuilds the prior on the
+  first intensity image's grid, before any intensity image is set: a segmentation fault.
+- **Evidence:** validated (`priors-minimize-memory`: ANTs killed by SIGSEGV).
+- **fMRIPrep:** none.
+- **larmorx:** runs; `reproduce` stops where ANTs crashes, with a message (A6).
+- **D13 / gap:** none.
+
+### ANTS-106 Partial-volume classes with an MRF never win a voxel — (c?)
+- **What:** with `--use-partial-volume-likelihoods 1`, `ComputeMRFDeltaMatrix`
+  (`Atropos.hxx:546-606`) gives two labels of one partial-volume set −1, the same label −2 and
+  any other pair +1; it compares the *tissue* labels of each set, never the partial-volume
+  class's own label, so a partial-volume label is +1 against every neighbour. No voxel starts
+  with a partial-volume label, the MRF makes them improbable everywhere, and the first update
+  stops: "Updating the class labeling resulted in 3 non-zero label sets but 5 is requested".
+  Without the MRF (`-m [0,...]`) partial-volume classes work.
+- **Evidence:** read; validated (`partial-volume-with-mrf`: both stop identically;
+  `partial-volume-likelihoods` without the MRF: identical with CORE-MATH).
+- **fMRIPrep:** none.
+- **larmorx:** as ANTs in both modes, documented ([api/ants-atropos.md](../api/ants-atropos.md)).
+- **D13 / gap:** decide: the intended energy of a partial-volume label is not stated (counting
+  its own label as a member of its set would give it −1 with its tissues).
+
+### ANTS-107 Grubbs-Rosner's grown sample is weighed with uninitialized memory — (a)
+- **What:** with Grubbs-Rosner the samples grow by the masked voxels at every update
+  (ANTS-94). `UpdateClassLabeling` allocates the weights for the grown sample
+  (`WeightArrayType weights(totalSampleSize)`, a `vnl_vector` left uninitialized) and sets those
+  of the masked voxels only (`Atropos.hxx:1361-1372`): from the second update on, the weighted
+  means and covariances include whatever the heap held. The same command line gives different
+  posteriors when only the length of the output paths changes (18,700 of 35,551 posterior
+  values between output directories of 139 and 145 characters; with fresh memory the extra
+  weights are 0).
+- **Evidence:** verified (`grubbs-rosner` and `grubbs-rosner-outliers` at several output
+  paths).
+- **fMRIPrep:** none.
+- **larmorx:** not met by default (ANTS-94 corrected: the sample does not grow); `reproduce`
+  weighs the extra samples 0, what a fresh allocation holds, with a notice (A6). The parity
+  cases report ANTs' values without requiring them.
+- **D13 / gap:** none.
+
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
   the joint density along its first index (the fixed image's bin) into what it calls the
@@ -1959,6 +2190,42 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** fails as ITK.
 - **D13 / gap:** decided 2026-10-21 (decision log): corrected by default, `reproduce` keeps the original; to implement with A5 part 3. Was: decide (implementing the Jacobian would let such stages run: a new behaviour,
   not a correction of a result).
+
+### ITK-50 K-means leaves out the k-d tree's split points — (c)
+- **What:** `KdTreeBasedKmeansEstimator::Filter` adds a whole node to its closest candidate
+  when one candidate remains, and otherwise recurses into the node's two halves
+  (`itkKdTreeBasedKmeansEstimator.hxx:198-227`). A non-terminal node of
+  `WeightedCentroidKdTreeGenerator`'s tree holds one point itself, the one it is split at (the
+  median of its partition dimension); the recursion visits only the halves, so that point is
+  left out of the new centres whenever its node is divided between candidates. Each k-means
+  pass misses up to one point per divided node.
+- **Evidence:** read; validated (every K-means case of the Atropos suite reproduces it with
+  `reproduce`, bit for bit with CORE-MATH).
+- **fMRIPrep:** every run: sMRIPrep's Atropos call initializes with `KMeans[3]`. Corrected, on
+  the five oracle runs 1 to 25 of 0.8 to 2.5 million brain voxels change label (Dice ≥ 0.99999
+  for every class) and the posteriors move by at most 0.14; ANTs' own runs with the clock's seed
+  differ in 287 labels on ds000005 ([ants-atropos.md](ants-atropos.md)).
+- **larmorx:** corrected by default: every point counted, with a notice where the centres
+  change (`larmorx_image::kdtree::Kmeans::fix_split_points`); `reproduce` as ITK (A6).
+- **D13 / gap:** none.
+
+### ITK-51 Student's distribution is NaN above about 340 degrees of freedom — (c)
+- **What:** `TDistribution::PDF` divides `dgamma((n+1)/2)` by `dgamma(n/2)`
+  (`itkTDistribution.cxx:84-85`); SLATEC's `dgamma` overflows above 171.6 (it prints "X SO BIG
+  GAMMA OVERFLOWS" and returns infinity), so for more than about 340 degrees of freedom the
+  density is ∞/∞ = NaN, and `InverseCDF`'s Newton steps (`:215-219`) make the quantile NaN.
+  `GrubbsRosnerListSampleFilter` compares its statistic with a NaN critical value: false, so it
+  never finds an outlier in a sample of more than about 342 values (any image), and its
+  winsorizing bounds are NaN.
+- **Evidence:** read; verified (`grubbs-rosner-outliers`: six outliers 1,800 to 3,800 above a
+  phantom's brightest tissue are kept; SLATEC's messages on standard error, as ANTs prints
+  them).
+- **fMRIPrep:** none (sMRIPrep uses no outlier handling).
+- **larmorx:** corrected by default: where the Gamma functions would overflow, their ratio is
+  taken through `dlngam` (smaller arguments as ITK computes them, bit for bit), with a notice
+  where Grubbs-Rosner's result changes; `reproduce` as ITK, its SLATEC messages included (A6).
+- **D13 / gap:** none.
+
 ## fMRIPrep and its libraries
 
 fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.2, sdcflows

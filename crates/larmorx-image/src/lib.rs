@@ -35,6 +35,7 @@ pub mod gaussian;
 pub mod grid;
 pub mod intensity;
 pub mod itk_math;
+pub mod kdtree;
 mod lines;
 pub mod median;
 pub mod morphology;

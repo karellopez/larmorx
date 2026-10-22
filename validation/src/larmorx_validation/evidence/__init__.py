@@ -21,6 +21,7 @@ TOOLS: dict[str, str] = {
     "ants-apply-transforms": "ants_apply_transforms",
     "ants-programs": "ants_programs",
     "ants-ai": "ants_ai",
+    "ants-atropos": "ants_atropos",
     "itk-hdf5": "itk_hdf5",
     "afni-tshift": "afni_tshift",
     "mri-hmc": "mri_hmc",

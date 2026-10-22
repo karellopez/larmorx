@@ -525,6 +525,47 @@ pub fn read_with<T: Pixel, S: ImageStore + ?Sized>(
     from_itk(image, name, dim, n_threads, notices)
 }
 
+/// `ReadImage<itk::VectorImage<float, D>>`: the components of a vector image (a NIfTI file
+/// whose intent is a vector, `dim[5]` components; any other file has one component), each as
+/// a `D`-dimensional float image read as [`read_with`] reads a scalar image.
+pub fn read_vector_components<S: ImageStore + ?Sized>(
+    store: &mut S,
+    name: &str,
+    dim: usize,
+    n_threads: usize,
+    notices: &mut Notices,
+) -> Result<Vec<AntsImage<f32>>, ReadError> {
+    if name.len() < 3 && notices.reproduce() {
+        return Err(ReadError::TooShort);
+    }
+    let image = store.load(name, n_threads, notices)?;
+    let file_voxels: usize = image.geometry.size.iter().product();
+    let total = image.voxels.len();
+    if file_voxels == 0 || total % file_voxels != 0 {
+        return Err(ReadError::Unsupported {
+            name: name.to_owned(),
+            message: "the voxel count is not a multiple of the grid's".into(),
+        });
+    }
+    let components = total / file_voxels;
+    let mut out = Vec::with_capacity(components);
+    for c in 0..components {
+        let range = c * file_voxels..(c + 1) * file_voxels;
+        let voxels = match &image.voxels {
+            ItkVoxels::F32(v) => ItkVoxels::F32(v[range].to_vec()),
+            ItkVoxels::F64(v) => ItkVoxels::F64(v[range].to_vec()),
+        };
+        let scalar = ItkImage {
+            geometry: image.geometry.clone(),
+            voxels,
+            intent_code: 0,
+            meta: image.meta.clone(),
+        };
+        out.push(from_itk::<f32>(scalar, name, dim, n_threads, notices)?);
+    }
+    Ok(out)
+}
+
 /// `ANTs::WriteImage(image, name)` to `store`: whether it wrote.
 ///
 /// ANTs writes nothing, silently, for a name of fewer than 3 characters (ANTS-03): with

@@ -315,14 +315,15 @@ ImageTuple = (
 def ants_program(
     program: str,
     args: list[str],
-    inputs: dict[str, ImageTuple],
+    inputs: dict[str, ImageTuple | str],
     outputs: list[str],
     n_threads: int = 1,
     upstream_defects: str = "fix",
 ) -> tuple[int, str, str, dict[str, tuple[np.ndarray, np.ndarray, bytes]]]:
     """Run ``ImageMath``, ``ThresholdImage``, ``MultiplyImages``, ``SmoothImage``, ``N4BiasFieldCorrection``,
-    ``DenoiseImage``, ``ResampleImageBySpacing``, ``ResampleImage`` or ``antsRegistration`` with
-    ``args`` on in-memory ``inputs`` (by placeholder name; other names are files);
+    ``DenoiseImage``, ``ResampleImageBySpacing``, ``ResampleImage``, ``antsRegistration``,
+    ``antsAI``, ``antsAffineInitializer`` or ``Atropos`` with ``args`` on in-memory ``inputs``
+    (by placeholder name; a string value is a file the name stands for; other names are files);
     writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``. The program runs in
     the D13 mode ``upstream_defects``; its notices are lines of ``stderr``."""

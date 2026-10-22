@@ -30,7 +30,7 @@ use larmorx_core::{Grid3, IndexFloor, ItkReal, Precision, same_value};
 use rayon::prelude::*;
 
 use crate::linear::versor;
-use crate::{DisplacementField, LinearKind, LinearTransform, Transform};
+use crate::{BSplineTransform, DisplacementField, LinearKind, LinearTransform, Transform};
 use crate::{TransformChain, TransformError};
 
 /// The class name a stored transform has in precision `precision`: `<base>_<double|float>_3_3`.
@@ -365,6 +365,7 @@ impl<R: ItkReal> LinearObject<R> {
 pub enum ChainObject<'a, R> {
     Linear(LinearObject<R>),
     Field(&'a DisplacementField),
+    BSpline(&'a BSplineTransform),
 }
 
 impl TransformChain {
@@ -391,6 +392,7 @@ impl TransformChain {
                         ChainObject::Linear(LinearObject::<R>::read(l, mode)?)
                     }
                     (Transform::DisplacementField(f), _) => ChainObject::Field(f),
+                    (Transform::BSpline(b), _) => ChainObject::BSpline(b),
                     (Transform::Composite(_), _) => unreachable!("composites are expanded"),
                 })
             })
@@ -420,6 +422,12 @@ impl TransformChain {
                         parameters: ObjectParameters::Field(f),
                         fixed_parameters: f.fixed_parameters(),
                     },
+                    // `BSplineTransform<R>` holds its coefficients as `R`.
+                    ChainObject::BSpline(b) => ItkObject {
+                        name: class_name("BSplineTransform", precision),
+                        parameters: ObjectParameters::Values(b.parameters_as::<R>()),
+                        fixed_parameters: b.fixed_parameters(),
+                    },
                 })
                 .collect()
         }
@@ -444,7 +452,7 @@ impl TransformChain {
         for o in &objects {
             match o {
                 ChainObject::Linear(l) => linear.push(l),
-                ChainObject::Field(_) => {
+                ChainObject::Field(_) | ChainObject::BSpline(_) => {
                     return Err(TransformError::Invalid(
                         "The transform or set of transforms is not linear.".into(),
                     ));

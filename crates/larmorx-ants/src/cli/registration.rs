@@ -1189,6 +1189,12 @@ fn flatten<R: Compute, const D: usize>(
         larmorx_transform::Transform::DisplacementField(_) => Err(LoadError::Unsupported(
             "displacement fields among the initial transforms are not supported yet".into(),
         )),
+        larmorx_transform::Transform::BSpline(_) => {
+            for part in larmorx_io::itk_transform::transform_to_parts(t) {
+                out.push(bspline_from_part::<R, D>("", &part)?);
+            }
+            Ok(())
+        }
         larmorx_transform::Transform::Linear(l) => {
             let o = LinearObject::<R>::read(l, mode)
                 .map_err(|e| LoadError::Report(format!("{e}\n")))?;

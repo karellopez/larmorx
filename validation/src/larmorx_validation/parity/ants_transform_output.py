@@ -290,6 +290,32 @@ def scenarios() -> list[tuple[str, str, str, OutputScenario]]:
     )
     comp("no-transforms", "-o CompositeTransform[x.txt] without -t", "compe.txt", ())
     comp(
+        "bspline-text",
+        "-o CompositeTransform[x.txt]: a B-spline transform after a centred affine",
+        "compb.txt",
+        ("-t", "{gen-bspline:bspline.txt}", "-t", "{t:affine-centered.mat}"),
+    )
+    comp(
+        "bspline-matlab",
+        "-o CompositeTransform[x.mat]: a B-spline transform read from MATLAB",
+        "compb.mat",
+        ("-t", "{gen-bspline:bspline.mat}"),
+    )
+    comp(
+        "bspline-hdf5",
+        "-o CompositeTransform[x.h5]: an affine and B-spline composite and an inverted Euler",
+        "compb.h5",
+        ("-t", "{gen-bspline:affine-bspline.h5}", "-t", "[{t:euler-centered.mat},1]"),
+    )
+    comp(
+        "bspline-float",
+        "--float 1 -o CompositeTransform[x.h5]: a double B-spline transform read in float and a "
+        "float one",
+        "compbf.h5",
+        ("-t", "{gen-bspline:bspline.txt}", "-t", "{gen-bspline:bspline-float.txt}"),
+        ("--float", "1"),
+    )
+    comp(
         "fmriprep",
         "-o CompositeTransform[x.h5]: fMRIPrep's T1w-to-MNI composite (ds000005) after its "
         "BOLD-to-T1w affine",
@@ -355,6 +381,21 @@ def scenarios() -> list[tuple[str, str, str, OutputScenario]]:
         reference=R_TIES,
     )
     field(
+        "bspline",
+        "-o DisplacementField[x.nii.gz]: an affine and B-spline composite (pointwise)",
+        "DisplacementField[{out}/dfb.nii.gz]",
+        "dfb.nii.gz",
+        ("-t", "{gen-bspline:affine-bspline.h5}"),
+    )
+    field(
+        "bspline-float",
+        "--float 1 -o DisplacementField[x.nii.gz]: a B-spline transform in float",
+        "DisplacementField[{out}/dfbf.nii.gz]",
+        "dfbf.nii.gz",
+        ("-t", "{gen-bspline:bspline.txt}"),
+        ("--float", "1"),
+    )
+    field(
         "no-transforms",
         "-o DisplacementField[x.nii.gz] without -t: zero vectors",
         "DisplacementField[{out}/dfid.nii.gz]",
@@ -390,6 +431,16 @@ def scenarios() -> list[tuple[str, str, str, OutputScenario]]:
         "linear-with-field",
         "-o Linear[...] of a chain with a displacement field: not linear",
         ("-o", "Linear[{out}/x.txt]", "-t", "{t:warp-lps-vector.nii.gz}"),
+    )
+    err(
+        "linear-with-bspline",
+        "-o Linear[...] of a chain with a B-spline transform: not linear",
+        ("-o", "Linear[{out}/x.txt]", "-t", "{gen-bspline:bspline.txt}"),
+    )
+    err(
+        "inverted-bspline",
+        "-o CompositeTransform[...] -t [bspline,1]: a B-spline transform has no inverse",
+        ("-o", "CompositeTransform[{out}/x.txt]", "-t", "[{gen-bspline:bspline.txt},1]"),
     )
     err(
         "field-no-reference",
@@ -440,6 +491,10 @@ def _expand(arg: str, out: Path, tmp: Path) -> str:
             return str(td.get(T[value]))
         if key == "in":
             return str(td.get(value))
+        if key == "gen-bspline":
+            from larmorx_validation.parity import ants_bspline_transforms
+
+            return str(ants_bspline_transforms.bspline_file(value, tmp))
         if key == "gen":
             path = tmp / value
             if not path.exists():

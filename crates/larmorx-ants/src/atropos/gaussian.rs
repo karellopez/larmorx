@@ -30,6 +30,10 @@ impl Kahan {
     pub(crate) fn sum(&self) -> f64 {
         self.sum
     }
+
+    pub(crate) fn compensation(&self) -> f64 {
+        self.compensation
+    }
 }
 
 /// Why an estimate failed (an ITK exception: Atropos stops).

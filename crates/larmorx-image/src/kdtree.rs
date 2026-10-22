@@ -48,19 +48,19 @@ enum Node {
     },
 }
 
-/// A k-d tree over `n` measurement vectors of length `m` (row-major `samples`).
+/// A k-d tree over `n` measurement vectors of length `m` (row-major `samples`, copied).
 #[derive(Clone, Debug)]
-pub struct KdTree<'a> {
-    samples: &'a [f32],
+pub struct KdTree {
+    samples: Vec<f32>,
     m: usize,
     nodes: Vec<Node>,
     root: usize,
 }
 
-impl<'a> KdTree<'a> {
+impl KdTree {
     /// `WeightedCentroidKdTreeGenerator` with bucket size `bucket` (Atropos uses 16) on the
     /// sample `samples` (`n × m`, row-major).
-    pub fn new(samples: &'a [f32], m: usize, bucket: usize) -> Result<Self, FilterError> {
+    pub fn new(samples: &[f32], m: usize, bucket: usize) -> Result<Self, FilterError> {
         if m == 0 || samples.len() % m != 0 {
             return Err(FilterError::invalid(
                 "Length of a sample's measurement vector hasn't been set.",
@@ -72,7 +72,7 @@ impl<'a> KdTree<'a> {
         }
         let mut ids: Vec<u32> = (0..n as u32).collect();
         let mut tree = KdTree {
-            samples,
+            samples: samples.to_vec(),
             m,
             nodes: vec![Node::Empty],
             root: 0,
@@ -162,7 +162,7 @@ impl<'a> KdTree<'a> {
             }
         }
         let median = (end - begin) / 2;
-        let value = nth_element(self.samples, m, ids, dim, begin, end, median);
+        let value = nth_element(&self.samples, m, ids, dim, begin, end, median);
         let median = median + begin;
         let saved_lower = lower[dim];
         let saved_upper = upper[dim];
@@ -505,7 +505,7 @@ struct Candidate {
 
 impl Kmeans {
     /// `StartOptimization` from the initial centres `initial` (`K × m`, row-major).
-    pub fn estimate(&self, tree: &KdTree<'_>, initial: &[f64]) -> KmeansResult {
+    pub fn estimate(&self, tree: &KdTree, initial: &[f64]) -> KmeansResult {
         let m = tree.m;
         let k = initial.len() / m;
         // FindSampleBound over the sample in its own order.
@@ -580,7 +580,7 @@ impl Kmeans {
 }
 
 struct FilterState<'t, 'c> {
-    tree: &'t KdTree<'t>,
+    tree: &'t KdTree,
     candidates: &'c mut Vec<Candidate>,
     vertex: Vec<f64>,
     point: Vec<f64>,

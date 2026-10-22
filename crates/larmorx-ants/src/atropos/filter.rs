@@ -161,6 +161,7 @@ pub struct Atropos<'a> {
     pub options: &'a AtroposOptions,
     size: Vec<usize>,
     spacing: Vec<f64>,
+    origin: Vec<f64>,
     strides: Vec<usize>,
     n: usize,
     intensities: Vec<&'a [f32]>,
@@ -202,6 +203,7 @@ impl<'a> Atropos<'a> {
         options: &'a AtroposOptions,
         size: &[usize],
         spacing: &[f64],
+        origin: &[f64],
         intensities: Vec<&'a [f32]>,
         mask: Option<&'a [u32]>,
         n_threads: usize,
@@ -221,7 +223,7 @@ impl<'a> Atropos<'a> {
         let total = classes + options.partial_volume_classes();
         let mut components = Vec::with_capacity(total);
         for _ in 0..classes {
-            components.push(Likelihood::new(&options.likelihood));
+            components.push(Likelihood::new(&options.likelihood, options.upstream_defects));
         }
         for _ in classes..total {
             components.push(Likelihood::PartialVolume(Default::default()));
@@ -234,6 +236,7 @@ impl<'a> Atropos<'a> {
             options,
             size: size.to_vec(),
             spacing: spacing.to_vec(),
+            origin: origin.to_vec(),
             strides,
             n,
             intensities,
@@ -328,7 +331,13 @@ impl<'a> Atropos<'a> {
     /// `SetPriorProbabilityImage(k + 1, image)`: dense, or sparse with `--minimize-memory-usage`
     /// (the values above the probability threshold, at their voxel numbers; ANTs stores the
     /// numbers in a float point set, ANTS-97).
+    /// Where class `k`'s prior is stored (one slot for all with aliased priors).
+    fn slot(&self, k: usize) -> usize {
+        if self.options.aliased_priors { 0 } else { k }
+    }
+
     fn set_prior(&mut self, k: usize, image: Vec<f32>) {
+        let k = self.slot(k);
         if self.options.minimize_memory {
             let threshold = self.options.probability_threshold;
             let reproduce = self.options.upstream_defects.reproduce();
@@ -374,14 +383,14 @@ impl<'a> Atropos<'a> {
         }
         if self.options.minimize_memory {
             let mut out = vec![0.0f32; self.n];
-            for &(number, p) in &self.sparse_priors[c] {
+            for &(number, p) in &self.sparse_priors[self.slot(c)] {
                 if let Some(slot) = out.get_mut(number as usize) {
                     *slot = p;
                 }
             }
             Some(std::borrow::Cow::Owned(out))
         } else {
-            Some(std::borrow::Cow::Borrowed(&self.priors[c]))
+            Some(std::borrow::Cow::Borrowed(&self.priors[self.slot(c)]))
         }
     }
 
@@ -916,6 +925,8 @@ impl<'a> Atropos<'a> {
         }
         let threshold = self.options.probability_threshold;
         for c in 0..classes {
+            // Each class's image as it is now (with aliased priors, the one image as the
+            // previous classes' normalization left it).
             let mut prior = self.prior(c).expect("prior").into_owned();
             for v in 0..self.n {
                 if self.in_mask(v) {
@@ -938,25 +949,41 @@ impl<'a> Atropos<'a> {
 
     /// `GetScalarSamples`: the masked voxels' intensities, each image's column through the
     /// outlier filter.
+    ///
+    /// The first image's column takes every value of the filter's output list: when the list
+    /// keeps earlier calls' values (GrubbsRosner, ANTS-94), the sample grows by them and the
+    /// later columns copy the list's first values.
     fn scalar_samples(&mut self) -> Result<(Vec<f32>, usize), AtroposError> {
         let m = self.intensities.len();
         let voxels: Vec<usize> = (0..self.n).filter(|&v| self.in_mask(v)).collect();
-        let count = voxels.len();
-        let mut out = vec![0.0f32; count * m];
+        let mut out: Vec<f32> = Vec::new();
+        let mut size = voxels.len();
+        let mut changed = false;
         for i in 0..m {
             let column: Vec<f32> = voxels.iter().map(|&v| self.intensities[i][v]).collect();
             let values: Vec<f32> = match self.outlier_filter.as_mut() {
                 Some(f) => {
-                    let o = f.apply(&column)?;
-                    o.iter().take(count).copied().collect()
+                    let (o, c) = f.apply(&column)?;
+                    changed |= c;
+                    o
                 }
                 None => column,
             };
-            for (j, &x) in values.iter().enumerate().take(count) {
+            if i == 0 {
+                size = values.len();
+                out = vec![0.0f32; size * m];
+            }
+            for (j, &x) in values.iter().enumerate().take(size) {
                 out[j * m + i] = x;
             }
         }
-        Ok((out, count))
+        if changed {
+            self.notices.add(
+                &defects::ANTS_94,
+                "the outlier filter's output, which ANTs does not clear between calls",
+            );
+        }
+        Ok((out, size))
     }
 
     /// `UpdateClassLabeling`: the ICM pass (asynchronous updating), the posteriors, the new
@@ -1099,12 +1126,12 @@ impl<'a> Atropos<'a> {
                 Some(&size) => self.label_volumes[c] = size,
                 None => {
                     return Err(AtroposError::Itk {
-                        file: "Modules/Core/Common/include/itkLabelMap.hxx",
-                        line: 288,
+                        file: "Modules/Filtering/LabelMap/include/itkLabelMap.hxx",
+                        line: 180,
                         class: "LabelMap",
                         description: format!(
-                            "Can't access to label object number {c}. There is only {} label \
-                             objects.",
+                            "Can't access label object at position {c}. The label map has only \
+                             {} label objects registered.",
                             objects.len()
                         ),
                     });
@@ -1264,7 +1291,7 @@ impl<'a> Atropos<'a> {
         }
         if self.options.minimize_memory {
             // The sparse list, as reconstructed: the last entry at `v` wins.
-            let list = &self.sparse_priors[k];
+            let list = &self.sparse_priors[self.slot(k)];
             let mut value = 0.0f32;
             if let Ok(i) = list.binary_search_by(|&(n, _)| n.cmp(&(v as u64))) {
                 // Entries may repeat a rounded number (ANTS-97): take the last one.
@@ -1276,7 +1303,7 @@ impl<'a> Atropos<'a> {
             }
             Some(value)
         } else {
-            Some(self.priors[k][v])
+            Some(self.priors[self.slot(k)][v])
         }
     }
 
@@ -1710,10 +1737,71 @@ impl<'a> Atropos<'a> {
     // Adaptive smoothing and likelihood images
 
     /// `GetSmoothIntensityImageFromPriorImage(i, c + 1)`.
-    pub fn smooth_intensity(&mut self, _i: usize, _c: usize) -> Result<Vec<f32>, AtroposError> {
-        Err(AtroposError::Refused(
-            "adaptive smoothing is not implemented yet".into(),
-        ))
+    pub fn smooth_intensity(&mut self, i: usize, c: usize) -> Result<Vec<f32>, AtroposError> {
+        let order = self.options.spline_order as usize;
+        let smoothing_error = |e: super::smoothing::SmoothingError| AtroposError::Itk {
+            file: "Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.hxx",
+            line: 0,
+            class: "BSplineScatteredDataPointSetToImageFilter",
+            description: e.0,
+        };
+        if c >= self.classes() || i >= self.lattices.len() {
+            return Err(AtroposError::Refused(format!(
+                "no control-point lattice for image {i} and class {} (ANTs reads past its list)",
+                c + 1
+            )));
+        }
+        if let Some(lattice) = &self.lattices[i][c] {
+            return super::smoothing::reconstruct(
+                lattice,
+                order,
+                &self.size,
+                &self.spacing,
+                self.n_threads,
+            )
+            .map_err(smoothing_error);
+        }
+        let probability: Vec<f32> = if self.uses_prior_probabilities() {
+            self.prior(c).expect("prior").into_owned()
+        } else {
+            let label = c as u32 + 1;
+            self.prior_label
+                .as_ref()
+                .expect("prior label")
+                .iter()
+                .map(|&l| if l == label { 1.0 } else { 0.0 })
+                .collect()
+        };
+        let mut voxels = Vec::new();
+        let mut values = Vec::new();
+        let mut weights = Vec::new();
+        for v in 0..self.n {
+            if self.in_mask(v) && probability[v] >= 0.5 {
+                voxels.push(v);
+                values.push(self.intensities[i][v]);
+                weights.push(probability[v]);
+            }
+        }
+        let settings = super::smoothing::FitSettings {
+            origin: &self.origin,
+            spacing: &self.spacing,
+            size: &self.size,
+            order,
+            levels: &self.options.levels,
+            control_points: &self.options.control_points,
+        };
+        let lattice = super::smoothing::fit(&settings, &voxels, &values, &weights, self.n_threads)
+            .map_err(smoothing_error)?;
+        let out = super::smoothing::reconstruct(
+            &lattice,
+            order,
+            &self.size,
+            &self.spacing,
+            self.n_threads,
+        )
+        .map_err(smoothing_error)?;
+        self.lattices[i][c] = Some(lattice);
+        Ok(out)
     }
 
     /// `GetLikelihoodImage(c + 1)`.

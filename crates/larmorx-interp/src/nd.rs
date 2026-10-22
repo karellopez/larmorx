@@ -377,6 +377,36 @@ fn bspline_evaluate<const D: usize>(
     sum
 }
 
+/// `BSplineDecompositionImageFilter`: the B-spline coefficients of order `order` of an image of
+/// `size` (x fastest), as [`InterpolationNd::BSpline`] computes them, for callers that keep
+/// the coefficients and evaluate them with [`bspline_at`].
+pub fn bspline_coefficients<T: RealElement, const D: usize>(
+    data: &[T],
+    size: [usize; D],
+    order: u32,
+) -> Vec<f64> {
+    let mut strides = [1usize; D];
+    for d in 1..D {
+        strides[d] = strides[d - 1] * size[d - 1];
+    }
+    coefficients(data, size, strides, order)
+}
+
+/// `BSplineInterpolateImageFunction::EvaluateAtContinuousIndex` on coefficients from
+/// [`bspline_coefficients`].
+pub fn bspline_at<const D: usize>(
+    coefficients: &[f64],
+    size: [usize; D],
+    order: u32,
+    cidx: [f64; D],
+) -> f64 {
+    let mut strides = [1usize; D];
+    for d in 1..D {
+        strides[d] = strides[d - 1] * size[d - 1];
+    }
+    bspline_evaluate(coefficients, size, strides, order, cidx)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

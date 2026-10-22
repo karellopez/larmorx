@@ -121,6 +121,10 @@ pub struct AtroposOptions {
     pub prior_weight: f32,
     /// The prior probability threshold.
     pub probability_threshold: f32,
+    /// Every class's prior probability image is one image (ANTS-100: ANTs' classes all hold the
+    /// caster's output, a vector image's last component, and its in-place normalization applies
+    /// to that one image once per class). Only for reproducing ANTs.
+    pub aliased_priors: bool,
     pub upstream_defects: UpstreamDefects,
 }
 
@@ -157,6 +161,7 @@ impl AtroposOptions {
             adaptive_smoothing: Vec::new(),
             prior_weight: 0.0,
             probability_threshold: 0.0,
+            aliased_priors: false,
             upstream_defects: UpstreamDefects::Fix,
         }
     }

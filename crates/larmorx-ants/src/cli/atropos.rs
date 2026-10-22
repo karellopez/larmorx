@@ -579,15 +579,15 @@ fn segmentation(
                                 &defects::ANTS_100,
                                 "the prior probability images of a vector image",
                             );
+                            o.aliased_priors = !fix;
                         }
-                        for (c, comp) in components.iter().enumerate() {
+                        for comp in components.iter() {
                             let src = if aliased && !fix { &components[n - 1] } else { comp };
                             images.push(AntsImage {
                                 data: src.data.clone(),
                                 geometry: comp.geometry.clone(),
                                 meta: ItkMeta::default(),
                             });
-                            let _ = c;
                         }
                     }
                     Err(e) => {
@@ -718,6 +718,20 @@ fn segmentation(
         );
         return Err(1);
     };
+    // ANTS-105: with --minimize-memory-usage, the check below rebuilds each prior on the first
+    // intensity image, which is not read yet: ANTs crashes.
+    if o.minimize_memory && prior_images.is_some() {
+        ctx.notices.add(
+            &defects::ANTS_105,
+            "the prior probability images are checked against the mask; ANTs crashes here",
+        );
+        if !fix {
+            return Err(refuse(
+                log,
+                "--minimize-memory-usage with prior probability images and a mask: ANTs reads a                  null intensity image here and crashes (ANTS-105)",
+            ));
+        }
+    }
     // The checks of the priors against the mask (warnings only with -v).
     if let Some(label) = &prior_label {
         if same_grid(&mask, label) {
@@ -1169,7 +1183,16 @@ fn segmentation(
     let sizes = first_grid.size.clone();
     let spacing = first_grid.spacing.clone();
     let image_refs: Vec<&[f32]> = intensities.iter().map(|i| i.data.as_slice()).collect();
-    let mut filter = match Atropos::new(&o, &sizes, &spacing, image_refs, Some(&mask.data), n_threads)
+    let origin = first_grid.origin.clone();
+    let mut filter = match Atropos::new(
+        &o,
+        &sizes,
+        &spacing,
+        &origin,
+        image_refs,
+        Some(&mask.data),
+        n_threads,
+    )
     {
         Ok(f) => f,
         Err(e) => return Err(refuse(log, &e.to_string())),

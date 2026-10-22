@@ -108,6 +108,12 @@ PAGES = [
         ],
     ),
     (
+        "/tools/ants-atropos/",
+        "Atropos",
+        "ants",
+        [("port", "ants-atropos", "validated", None, None)],
+    ),
+    (
         "/tools/itk-hdf5/",
         "ITK transform files",
         "ants",

@@ -261,6 +261,59 @@ def bold() -> lx.Image:
     return _frozen(lx.Image(np.asfortranarray(data), aff, hdr))
 
 
+# --- Atropos' inputs ---------------------------------------------------------------------------
+
+
+@functools.cache
+def tissues() -> lx.Image:
+    """Atropos' input: three tissues in nested ellipsoids (40, 100 and 160) with integer noise
+    (0-39) and a background of noise, on ``anat``'s grid."""
+    level = (
+        40 * ellipsoid(SHAPE3, 9, 10).astype(np.int64)
+        + 60 * ellipsoid(SHAPE3, 6, 10).astype(np.int64)
+        + 60 * ellipsoid(SHAPE3, 3, 10).astype(np.int64)
+    )
+    v = level + ints(31, SHAPE3, 0, 40)
+    return _frozen(anat().with_data(v.astype(np.float32)))
+
+
+@functools.cache
+def tissues2() -> lx.Image:
+    """A second contrast of ``tissues`` (bright, middle, dark) with its own noise."""
+    level = (
+        150 * ellipsoid(SHAPE3, 9, 10).astype(np.int64)
+        - 50 * ellipsoid(SHAPE3, 6, 10).astype(np.int64)
+        - 50 * ellipsoid(SHAPE3, 3, 10).astype(np.int64)
+    )
+    v = level + ints(32, SHAPE3, 0, 30)
+    return _frozen(anat().with_data(v.astype(np.float32)))
+
+
+@functools.cache
+def tissue_mask() -> lx.Image:
+    """The outer ellipsoid of ``tissues`` (uint8)."""
+    return _frozen(anat().with_data(ellipsoid(SHAPE3, 9, 10).astype(np.uint8)))
+
+
+@functools.cache
+def tissue_labels() -> lx.Image:
+    """The tissues' labels (1 outer, 2 middle, 3 inner; 0 outside), int16."""
+    lab = (
+        ellipsoid(SHAPE3, 9, 10).astype(np.int64)
+        + ellipsoid(SHAPE3, 6, 10).astype(np.int64)
+        + ellipsoid(SHAPE3, 3, 10).astype(np.int64)
+    )
+    return _frozen(anat().with_data(lab.astype(np.int16)))
+
+
+def tissue_prior(c: int) -> lx.Image:
+    """Class ``c``'s prior probability: 0.75 on its tissue, 0.125 elsewhere, plus multiples of
+    1/200 of noise."""
+    lab = tissue_labels().data
+    v = np.where(lab == c, 0.75, 0.125) + ints(33 + c, SHAPE3, 0, 10) / 200
+    return _frozen(anat().with_data(v.astype(np.float32)))
+
+
 def _series_values() -> np.ndarray:
     """Integer time series with a trend and a slice- and voxel-dependent oscillation."""
     shape = SHAPE_TSHIFT
@@ -439,6 +492,13 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
         plane().with_data(ellipsoid(SHAPE2, 3, 5).astype(np.uint8)), p
     ),
     "bold.nii": lambda p: lx.save(bold(), p),
+    "tissues.nii": lambda p: lx.save(tissues(), p),
+    "tissues2.nii": lambda p: lx.save(tissues2(), p),
+    "tissue_mask.nii": lambda p: lx.save(tissue_mask(), p),
+    "tissue_labels.nii": lambda p: lx.save(tissue_labels(), p),
+    "tissue_prior01.nii": lambda p: lx.save(tissue_prior(1), p),
+    "tissue_prior02.nii": lambda p: lx.save(tissue_prior(2), p),
+    "tissue_prior03.nii": lambda p: lx.save(tissue_prior(3), p),
     "series.nii": _write_scaled_series,
     "series_negative.nii": _write_negative_series,
     "series_slope_inter.nii": _write_slope_inter_series,
@@ -1982,6 +2042,177 @@ def _(ctx: Context) -> dict[str, Any]:
         ):
             out[f"{name}.denoised"] = r.denoised.data
             out[f"{name}.noise"] = r.noise.data
+    return out
+
+
+def _atropos_cli(
+    ctx: Context,
+    name: str,
+    args: list[str],
+    classes: int,
+    extra: tuple[str, ...] = (),
+    upstream_defects: str = "fix",
+) -> dict[str, Any]:
+    """``Atropos <args> -o [<name>.nii,<name>_post%02d.nii(,...extra series)]``: the classified
+    image and the series written."""
+    seg = ctx.out(f"{name}.nii")
+    series = [f"{name}_{s}%02d.nii" for s in ("post", *extra)]
+    spec = ",".join([seg, *(ctx.out(s) for s in series)])
+    cli("ants", "Atropos", *args, "-o", f"[{spec}]", upstream_defects=upstream_defects)
+    out: dict[str, Any] = {name: Nifti(seg)}
+    for s in series:
+        for c in range(1, classes + 1):
+            path = ctx.out(s.replace("%02d", f"{c:02d}"))
+            out[os.path.basename(path)] = Nifti(path)
+    return out
+
+
+@case("cli.ants.Atropos", covers=("cli:ants Atropos",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sMRIPrep's call (k-means, Gaussian, MRF 0.1); prior probability images (a ``%02d``
+    series) with the Aristotle formulation, a label's Euclidean propagation, the likelihood and
+    distance images; Otsu on two images with histogram Parzen windows, box-plot winsorizing and
+    synchronous updates; 2D."""
+    t, m = ctx.file("tissues.nii"), ctx.file("tissue_mask.nii")
+    ctx.file("tissue_prior01.nii"), ctx.file("tissue_prior02.nii"), ctx.file("tissue_prior03.nii")
+    priors = ctx.file("tissue_prior01.nii").replace("01.nii", "%02d.nii")
+    out = _atropos_cli(ctx, "smriprep", [
+        "-d", "3", "-a", t, "-x", m, "-i", "KMeans[3]", "-k", "Gaussian", "-m", "[0.1,1x1x1]",
+        "-c", "[3,0]", "-r", "0",
+    ], 3)  # fmt: skip
+    out |= _atropos_cli(ctx, "priors", [
+        "-d", "3", "-a", t, "-x", m, "-i", f"PriorProbabilityImages[3,{priors},0.5]",
+        "-p", "Aristotle[1]", "-l", "1[1,0.5]", "-e", "1", "-r", "0",
+    ], 3, ("lik", "dist"))  # fmt: skip
+    out |= _atropos_cli(ctx, "otsu", [
+        "-d", "3", "-a", t, "-a", ctx.file("tissues2.nii"), "-x", m, "-i", "Otsu[3]",
+        "-k", "HistogramParzenWindows[1,16]", "-w", "BoxPlot[0.25,0.75,1.5]", "-g", "0",
+        "-r", "0",
+    ], 3)  # fmt: skip
+    out |= _atropos_cli(ctx, "plane", [
+        "-d", "2", "-a", ctx.file("plane.nii"), "-x", ctx.file("plane_mask.nii"),
+        "-i", "KMeans[2]", "-r", "0",
+    ], 2)  # fmt: skip
+    return out
+
+
+@case("cli.ants.Atropos.reproduce", covers=("cli:ants Atropos",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defects reproduced: sMRIPrep's call (ITK-50: the k-means centres); Grubbs-Rosner
+    winsorizing, whose outputs ANTs keeps between calls (ANTS-94) and whose Student quantiles
+    are NaN (ITK-51)."""
+    t, m = ctx.file("tissues.nii"), ctx.file("tissue_mask.nii")
+    out = _atropos_cli(ctx, "smriprep", [
+        "-d", "3", "-a", t, "-x", m, "-i", "KMeans[3]", "-k", "Gaussian", "-m", "[0.1,1x1x1]",
+        "-c", "[3,0]", "-r", "0",
+    ], 3, upstream_defects=REPRODUCE)  # fmt: skip
+    out |= _atropos_cli(ctx, "grubbs", [
+        "-d", "3", "-a", t, "-x", m, "-i", "KMeans[3,50x110x170]",
+        "-w", "GrubbsRosner[0.05,0.1]", "-r", "0",
+    ], 3, upstream_defects=REPRODUCE)  # fmt: skip
+    return out
+
+
+def _atropos_tensors() -> list[lx.Image]:
+    """Six tensor components (xx xy xz yy yz zz) per tissue of ``tissue_labels``, with integer
+    noise, in tenths."""
+    lab = tissue_labels().data.astype(np.int64)
+    diag = [
+        np.select([lab == 1, lab == 2, lab == 3], [a, b, c], 10)
+        for a, b, c in ((20, 10, 15), (10, 10, 30), (10, 10, 5))
+    ]
+    out = []
+    for q in range(6):
+        base = {0: diag[0], 3: diag[1], 5: diag[2]}.get(q, 0)
+        v = (base + ints(40 + q, SHAPE3, 0, 5)) / 10
+        out.append(tissues().with_data(v.astype(np.float32)))
+    return out
+
+
+def _atropos_outputs(name: str, r: Any) -> dict[str, Any]:
+    out: dict[str, Any] = {f"{name}.labels": r.labels.data}
+    for kind in ("posteriors", "likelihoods", "distances", "smoothed"):
+        for c, img in enumerate(getattr(r, kind), 1):
+            out[f"{name}.{kind}{c}"] = img.data
+    if r.icm_codes is not None:
+        out[f"{name}.icm"] = r.icm_codes.data
+    return out
+
+
+@case("py.ants.atropos", covers=("lx.ants.atropos",))
+def _(ctx: Context) -> dict[str, Any]:
+    """In-memory images: given k-means centres with Grubbs-Rosner winsorizing (outliers found,
+    ITK-51 corrected); prior probabilities with adaptive B-spline smoothing and the sigmoid
+    formulation; a prior label image with the Plato formulation, annealing and the ICM codes;
+    random labels; manifold Parzen windows with local covariances; the log-Euclidean and the
+    joint shape and orientation models on tensors; partial-volume classes; minimized memory; a
+    4D series."""
+    a = lx.ants
+    t, m, lab = tissues(), tissue_mask(), tissue_labels()
+    priors = [tissue_prior(c) for c in (1, 2, 3)]
+    tens = _atropos_tensors()
+    b = bold()
+    bmask = b.with_data(np.repeat(ellipsoid(SHAPE4[:3], 9, 10)[..., None], 4, 3).astype(np.uint8))
+    calls = {
+        "centres": lambda: a.atropos(t, m, kmeans_centers=[50, 110, 170],
+                                     outliers=a.GrubbsRosner(), use_random_seed=False),
+        "smooth": lambda: a.atropos(t, m, initialization="prior-probabilities", priors=priors,
+                                    prior_weight=0.25, prior_threshold=0.2,
+                                    posterior_formulation="sigmoid", adaptive_smoothing=0.5,
+                                    bspline=(2, 2, 3), smoothed_images=True, iterations=2,
+                                    use_random_seed=False),
+        "label": lambda: a.atropos(t, m, initialization="prior-label", prior_label=lab,
+                                   prior_weight=0.5, posterior_formulation="plato",
+                                   label_propagation=(1.0, 0.75), icm_code_image=True,
+                                   annealing=(2.0, 0.5, 0.6), use_random_seed=False),
+        "random": lambda: a.atropos(t, m, classes=2, initialization="random",
+                                    mrf_smoothing=0.0, iterations=2),
+        "mpw": lambda: a.atropos(t, m, likelihood=a.ManifoldParzenWindows(1.0, 10, 5, 1.0),
+                                 iterations=2, use_random_seed=False),
+        "logeuc": lambda: a.atropos(tens, m, likelihood=a.LogEuclideanGaussian(), iterations=2,
+                                    use_random_seed=False),
+        "joint": lambda: a.atropos(tens, m, iterations=1, use_random_seed=False,
+                                   likelihood=a.JointShapeAndOrientationProbability(2.0, 16, 1.0, 8)),
+        "pv": lambda: a.atropos(t, m, partial_volume=[(1, 2), (2, 3)],
+                                partial_volume_likelihoods=True, mrf_smoothing=0.0, iterations=2,
+                                use_random_seed=False),
+        "minmem": lambda: a.atropos(t, m, minimize_memory=True, use_random_seed=False),
+        "bold": lambda: a.atropos(b, bmask, mrf_radius=(1, 1, 1, 0), iterations=2,
+                                  use_random_seed=False),
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, call in calls.items():
+            out |= _atropos_outputs(name, call())
+    return out
+
+
+@case("py.ants.atropos.reproduce", covers=("lx.ants.atropos",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' defects reproduced: partial-volume classes that keep their first means (ANTS-96),
+    the joint shape and orientation model at the raw components (ANTS-103), prior label
+    propagation, and several images' k-means (ANTS-90)."""
+    a = lx.ants
+    t, m, lab = tissues(), tissue_mask(), tissue_labels()
+    calls = {
+        "pv": lambda: a.atropos(t, m, partial_volume=[(1, 2), (2, 3)],
+                                partial_volume_likelihoods=True, mrf_smoothing=0.0, iterations=2,
+                                use_random_seed=False, upstream_defects=REPRODUCE),
+        "joint": lambda: a.atropos(_atropos_tensors(), m, iterations=1, use_random_seed=False,
+                                   likelihood=a.JointShapeAndOrientationProbability(2.0, 16, 1.0, 8),
+                                   upstream_defects=REPRODUCE),
+        "label": lambda: a.atropos(t, m, initialization="prior-label", prior_label=lab,
+                                   prior_weight=0.5, label_propagation=(1.0, 0.75),
+                                   use_random_seed=False, upstream_defects=REPRODUCE),
+        "multi": lambda: a.atropos([t, tissues2()], m, use_random_seed=False,
+                                   upstream_defects=REPRODUCE),
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, call in calls.items():
+            out |= _atropos_outputs(name, call())
     return out
 
 

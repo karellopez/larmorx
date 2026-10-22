@@ -42,7 +42,7 @@ starts no other agent.
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
    point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
    ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
-3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding). With A4 to A6, sMRIPrep's brain
+3. **A6, Atropos** (k-means, EM, MRF; ANTs' random seeding; running since 2026-10-22, in parallel with A5 part 3 at the user's request). With A4 to A6, sMRIPrep's brain
    extraction and MNI normalisation run in larmorx.
 4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`

@@ -11,13 +11,20 @@ the fixed seed.
 **Status: `validated`** against Atropos itself (see the
 [validation record](../validation/ants-atropos.md)), on every option and failure case on
 phantoms, and on sMRIPrep's call and antsCorticalThickness-style prior-based segmentations of
-the five fMRIPrep oracle runs' T1w images:
-- against the **unmodified ANTs 2.6.5 binary** (one thread): RECORD-BUILT;
+the five fMRIPrep oracle runs' T1w images (standard tier: 93 cases, 56 compared):
+- against the **unmodified ANTs 2.6.5 binary** (one thread): 25 of 56 compared cases
+  bit-identical, the classified image identical in all 56. The others' posteriors differ in
+  their last bits where glibc's functions are not correctly rounded for a value the run
+  meets: on sMRIPrep's call, in 11 to 4,175 of 5.9 to 17.5 million values of a posterior
+  image (none on ds001600), by at most 1.2e-7;
 - against the **same binary with glibc's `expf`, `logf`, `exp`, `log`, `pow` (and the others)
   replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
-  `scripts/build_crmath_preload.sh`), the arithmetic larmorx uses: RECORD-CR;
+  `scripts/build_crmath_preload.sh`), the arithmetic larmorx uses: **56 of 56 bit-identical**, sMRIPrep's call on the five oracle
+  runs and two prior-based segmentations included;
 - **ANTs' Atropos does not depend on its thread count**, and neither does larmorx's; with the
-  clock's seed (`-r 1`, Atropos' default) two ANTs runs differ: RECORD-SEED.
+  clock's seed (`-r 1`, Atropos' default) two ANTs runs of sMRIPrep's options on ds000005 disagree on 343 labels
+  (smallest Dice 0.99942) and on posteriors by up to 0.28; larmorx, with its fixed seed,
+  is as far from them (294 and 327 labels).
 
 ## Quick start
 
@@ -118,7 +125,10 @@ line a line on standard error) names the entry wherever it changed the result
 ANTS-106 (partial-volume classes with an MRF never win a voxel, so Atropos stops) has no
 switch: no correction is defined; both modes behave as ANTs.
 
-On sMRIPrep's call RECORD-FIX.
+On sMRIPrep's call ITK-50 is met (its K-means): on the five oracle runs the correction
+changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels (Dice at least 0.99999 for every
+class) and the posteriors by at most 0.14, less than ANTs' own spread when it seeds from
+the clock (343 labels, 0.28 on ds000005).
 
 ## Deliberate differences
 

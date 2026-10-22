@@ -35,8 +35,9 @@ parser in [ants-cli.md](ants-cli.md). The defects have their entries in the
   (k-means skips the split points), ITK-51 (Student quantiles NaN beyond 340 degrees of
   freedom, so Grubbs-Rosner never finds an outlier in an image), ANTS-90 to ANTS-107. Each is
   corrected by default and reproduced on request (D13), except ANTS-106, a modelling limit with
-  no defined correction. On sMRIPrep's call only ITK-50 is met, and on the five runs the
-  correction changes [the numbers in the record].
+  no defined correction. On sMRIPrep's call only ITK-50 is met: on the five runs the
+  correction changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels and the posteriors by
+  at most 0.14, less than ANTs' own spread with the clock's seed.
 
 ## How sMRIPrep calls it
 
@@ -112,7 +113,9 @@ what larmorx's real cases repeat on each oracle run.
 (`MersenneTwisterRandomVariateGenerator::SetSeed()`, a hash of `time` and `clock`); every
 draw (the random initial labels, the ICM shuffle, the random tie-breaks of the local update)
 then differs from run to run. The [record](../validation/ants-atropos.md) measures it: two ANTs
-runs of sMRIPrep's options with the clock's seed on ds000005's T1w disagree on [N] voxels.
+runs of sMRIPrep's options with the clock's seed on ds000005's T1w disagree on 343 voxels'
+labels (smallest Dice 0.99942) and on posteriors by up to 0.28; at 2, 4 and 8 threads, with
+the fixed seed, ANTs gives its one-thread result bit for bit.
 larmorx replaces the clock by a fixed seed (121212, as for antsRegistration and antsAI), so its
 runs are repeatable; `--use-random-seed 0` gives ANTs' fixed seed 19650218 in both.
 
@@ -147,7 +150,8 @@ Each is an entry of the [register](upstream-defects.md), with its evidence; the 
 - **ITK-50** `KdTreeBasedKmeansEstimator` never counts the point a non-terminal k-d tree node is
   split at when the node is divided between candidate centres (`itkKdTreeBasedKmeansEstimator.hxx:209-227`
   recurses into both halves; the node's own point is in neither). The new centres miss those
-  points; on sMRIPrep's call the centres move by [N] and the labels of [N] voxels change.
+  points; on sMRIPrep's call, corrected, 1 to 25 voxels change label on each of the five
+  oracle runs (Dice at least 0.99999 for every class).
 - **ITK-51** `TDistribution::PDF` divides `dgamma((n+1)/2)` by `dgamma(n/2)`
   (`itkTDistribution.cxx:84-85`); both overflow above about 340 degrees of freedom (SLATEC
   prints "X SO BIG GAMMA OVERFLOWS"), the density is NaN, and so is the `InverseCDF` after its
@@ -234,3 +238,7 @@ exception's text; larmorx prints the same text, adds one line and exits 1.
   `-c [n,0]` Atropos stops early only if the value decreases.
 - With `-v 0` (the default) most errors are not explained (exit 1 only, ANTS-45); larmorx
   always explains them, on ANTs' stream.
+- nipype's `Atropos` interface writes `--icm [%d,%g]` from `icm_use_synchronous_update` and
+  `maximum_number_of_icm_terations` (`nipype/interfaces/ants/segmentation.py:219-223`): the
+  bracketed form ANTs 2.6.5 aborts on (ANTS-102), and `True` writes 1, which Atropos reads as
+  *asynchronous* updating (ICM), the opposite of the trait's name. sMRIPrep sets neither.

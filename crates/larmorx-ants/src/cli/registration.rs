@@ -1585,6 +1585,7 @@ fn do_registration<R: Compute, const D: usize>(
             return Err(1);
         };
         let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
+        transform_method.name = method_name.clone();
         if !method.is_linear() {
             // The stage's first metric's fixed image (`fixedImageFileName`), read where a mesh
             // is given as a knot spacing.
@@ -2554,6 +2555,95 @@ fn writes_inverse(kind: &str) -> bool {
     )
 }
 
+/// `RegTypeToFileName`'s `writeVelocityField`.
+fn writes_velocity(kind: &str) -> bool {
+    matches!(
+        kind,
+        "timevaryingvelocityfield" | "tvf" | "exp" | "exponential" | "bsplineexponential"
+    )
+}
+
+/// The velocity field of a transform (`VelocityField.nii.gz` without collapsing): a
+/// time-varying velocity field transform's (`D + 1` dimensions) or a Gaussian exponential
+/// transform's constant one, as ITK's `ImageFileWriter` writes vector images; other transforms
+/// (a B-spline exponential or time-varying B-spline transform, which ANTs' casts do not
+/// recognise) write nothing. A failure is reported only with `--verbose`, as ANTs does.
+fn write_velocity_field<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+    t: &Xfm<R, D>,
+) {
+    use larmorx_registration::exponential::ExponentialSmoothing;
+    use larmorx_registration::field::FieldSmoothing;
+    let Xfm::Field(f) = t else { return };
+    let (ndim, size, spacing, origin, direction, data): (
+        usize,
+        Vec<usize>,
+        Vec<f64>,
+        Vec<f64>,
+        Vec<Vec<f64>>,
+        Vec<R>,
+    ) = match &f.smoothing {
+        Some(FieldSmoothing::TimeVarying(v)) if !v.bspline => {
+            let n = v.size.len();
+            (
+                n,
+                v.size.clone(),
+                v.spacing.clone(),
+                v.origin.clone(),
+                v.direction.chunks(n).map(<[f64]>::to_vec).collect(),
+                v.data.clone(),
+            )
+        }
+        Some(FieldSmoothing::Exponential(e))
+            if matches!(e.smoothing, ExponentialSmoothing::Gaussian { .. }) =>
+        {
+            let s = &e.velocity.space;
+            (
+                D,
+                s.size.to_vec(),
+                s.spacing.to_vec(),
+                s.origin.to_vec(),
+                s.direction.iter().map(|r| r.to_vec()).collect(),
+                e.velocity.data.iter().flatten().copied().collect(),
+            )
+        }
+        _ => return,
+    };
+    let geometry = ItkGeometry {
+        ndim,
+        size,
+        spacing,
+        origin,
+        direction,
+        source: GeometrySource::Sform,
+        flipped: vec![false; ndim],
+    };
+    let options = larmorx_io::nifti::WriteOptions {
+        n_threads: ctx.n_threads,
+        ..Default::default()
+    };
+    let meta = larmorx_io::nifti::itk::ItkMeta::default();
+    let written = match R::PRECISION {
+        Precision::Double => {
+            let d: Vec<f64> = data.iter().map(|v| v.to_f64()).collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &d, &options)
+        }
+        Precision::Float => {
+            let d: Vec<f32> = data.iter().map(|v| v.to_f64() as f32).collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &d, &options)
+        }
+    };
+    if let Err(e) = written
+        && log.verbose
+    {
+        log.cerr(&format!(
+            "Can't write velocity field transform file {name}\nException Object caught: \n{e}\n"
+        ));
+    }
+}
+
 /// A displacement field as ITK's `ImageFileWriter<Image<Vector<R, D>, D>>` writes it (a NIfTI
 /// vector image); on failure ANTs' "Can't write transform file" report.
 fn write_field_image<R: Compute, const D: usize>(
@@ -2958,11 +3048,7 @@ fn write_transforms<R: Compute, const D: usize>(
             }
         }
     } else {
-        let names = helper
-            .transforms
-            .iter()
-            .map(|t| t.method.as_str().to_lowercase())
-            .collect();
+        let names = helper.transforms.iter().map(|t| t.name.clone()).collect();
         (queue.to_vec(), names)
     };
     if write_composite {
@@ -3038,6 +3124,18 @@ fn write_transforms<R: Compute, const D: usize>(
             }
             fixed_files
         };
+        // ANTS-81: ANTs names a stage's files after the name it was given, and the short
+        // name Exp is missing from its list of transforms with an inverse.
+        if helper.transforms.iter().any(|t| t.name == "exp") {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_81,
+                if ctx.notices.fix() {
+                    "an Exponential stage named Exp writes its InverseWarp file, as one named Exponential does; ANTs writes none"
+                } else {
+                    "an Exponential stage named Exp writes no InverseWarp file, as in ANTs"
+                },
+            );
+        }
         for (i, kind) in &files {
             let name = format!("{prefix}{i}{}", file_suffix(kind));
             write_one_transform(log, ctx, &name, &to_write[*i]);
@@ -3046,6 +3144,10 @@ fn write_transforms<R: Compute, const D: usize>(
             {
                 let name = format!("{prefix}{i}Inverse{}", file_suffix(kind));
                 write_inverse_field(log, ctx, &name, f);
+            }
+            if writes_velocity(kind) {
+                let name = format!("{prefix}{i}VelocityField.nii.gz");
+                write_velocity_field(log, ctx, &name, &to_write[*i]);
             }
         }
         if runs_out && ctx.notices.reproduce() {

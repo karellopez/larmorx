@@ -147,6 +147,9 @@ pub type FixedMoving<T> = (Arc<T>, Arc<T>);
 #[derive(Clone, Debug)]
 pub struct TransformMethod<R> {
     pub method: XfrmMethod,
+    /// The name the stage was given, in lower case (`TransformTypeNames`: it names the stage's
+    /// files when the output transforms are not collapsed).
+    pub name: String,
     pub gradient_step: R,
     pub update_field_variance: R,
     pub total_field_variance: R,
@@ -176,6 +179,7 @@ impl<R: Real> TransformMethod<R> {
     pub fn linear(method: XfrmMethod, gradient_step: R) -> Self {
         TransformMethod {
             method,
+            name: method.as_str().to_lowercase(),
             gradient_step,
             update_field_variance: R::ZERO,
             total_field_variance: R::ZERO,
@@ -1494,11 +1498,40 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             } else {
                 self.default_seed
             };
+            // ANTS-80: the exponential stages never tell their registration method the sigmas'
+            // units, so ITK's default, millimetres, applies to sigmas given in voxels.
+            let mut sigmas_in_physical_units = self.sigmas_in_physical_units[stage];
+            if exponential
+                && !sigmas_in_physical_units
+                && sigmas_r.iter().any(|&s| s > R::ZERO)
+            {
+                let fix = self.upstream_defects.fix();
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_80,
+                        self.upstream_defects,
+                        if fix {
+                            format!(
+                                "stage {stage}: the smoothing sigmas are in voxels, as given; ANTs's {} stage takes them as millimetres",
+                                method.as_str()
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: the smoothing sigmas given in voxels are taken as millimetres, as in ANTs"
+                            )
+                        },
+                    ),
+                );
+                if !fix {
+                    sigmas_in_physical_units = true;
+                }
+            }
             let stage_spec = Stage {
                 metrics: prepared,
                 shrink_factors: per_level,
                 smoothing_sigmas: sigmas_r,
-                sigmas_in_physical_units: self.sigmas_in_physical_units[stage],
+                sigmas_in_physical_units,
                 sampling,
                 sampling_percentage: percentage_r,
                 seed,

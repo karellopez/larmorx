@@ -160,7 +160,10 @@ pub fn integrate<R: Real, const D: usize, const E: usize>(
     let delta_time_in_image = time_scale * delta_time;
     let first_time = time_origin + lower * time_scale;
     let evaluate = |x: &[f64; E]| -> [R; D] {
-        let c: [R; E] = vs.point_to_cindex(x);
+        // The interpolator's `PointType` is `Point<R>`: the space-time point is converted
+        // before its continuous index is computed.
+        let xr: [f64; E] = std::array::from_fn(|k| R::from_f64(x[k]).to_f64());
+        let c: [R; E] = vs.point_to_cindex(&xr);
         if !vs.is_inside_buffer(&c) {
             return [R::ZERO; D];
         }

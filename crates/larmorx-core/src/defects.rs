@@ -262,6 +262,10 @@ defects! {
         "BSplineDisplacementField and BSplineExponential take their meshes 'at the base level' but double them already at the base level (mesh << (level + 1))";
     ANTS_79 = "ANTS-79", "antsRegistration", true,
         "TimeVaryingVelocityField's number of time indices and TimeVaryingBSplineVelocityField's mesh are read from the last -t option on the command line, not the stage's own";
+    ANTS_80 = "ANTS-80", "antsRegistration", true,
+        "Exponential and BSplineExponential stages take their smoothing sigmas as millimetres even when they are given in voxels (the stage never passes the sigmas' units to its registration method, whose default is millimetres)";
+    ANTS_81 = "ANTS-81", "antsRegistration", true,
+        "without collapsing, an Exponential stage given the short name Exp writes no InverseWarp file: the list of transforms with an inverse has only the long name";
     ITK_24 = "ITK-24", "ITK", true,
         "JHCT's total number of points leaves out the fixed points (counted only after it is used): the prefactors use the moving points alone";
     ITK_29 = "ITK-29", "ITK", true,

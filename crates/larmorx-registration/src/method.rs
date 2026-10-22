@@ -21,7 +21,7 @@ use crate::metric::joint_histogram::JointHistogramMi;
 use crate::metric::mattes::Mattes;
 use crate::metric::neighborhood_correlation::NeighborhoodCorrelation;
 use crate::metric::{ImageMetricv4, correlation, mean_squares, no_valid_points_warning};
-use crate::optimizer::{ConjugateGradientLineSearch, Observer, Outcome, Problem, scales};
+use crate::optimizer::{LevelOptimizer, Observer, Outcome, Problem, scales};
 use crate::pointset::{PointSetEvents, PointSetMetric};
 use crate::rng::{MersenneTwister, RandomIterator};
 use crate::transform::{Composite, Xfm};
@@ -775,10 +775,10 @@ fn crash(description: impl Into<String>) -> ItkException {
 }
 
 /// Runs a stage: returns the optimised transform and each level's outcome.
-pub fn run_stage<R: Real, const D: usize, O>(
+pub fn run_stage<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -802,10 +802,10 @@ type StageRun<R, const D: usize> = (
 );
 
 /// The levels of [`run_stage`]; also the stage's point-set metrics as they end.
-fn run_levels<R: Real, const D: usize, O>(
+fn run_levels<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -835,10 +835,10 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn levels<R: Real, const D: usize, O>(
+fn levels<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -887,6 +887,19 @@ where
             {
                 *update_control_points = meshes.control_points(&meshes.update_mesh, level);
                 *total_control_points = meshes.control_points(&meshes.total_mesh, level);
+            }
+            // BSplineExponentialDiffeomorphicTransformParametersAdaptor: the level's numbers of
+            // control points for the update and the velocity fields.
+            if let (Some(meshes), Some(crate::field::FieldSmoothing::Exponential(e))) =
+                (&stage.field_meshes, &mut f.smoothing)
+                && let crate::exponential::ExponentialSmoothing::BSpline {
+                    update_control_points,
+                    velocity_control_points,
+                    ..
+                } = &mut e.smoothing
+            {
+                *update_control_points = meshes.control_points(&meshes.update_mesh, level);
+                *velocity_control_points = meshes.control_points(&meshes.total_mesh, level);
             }
         }
         // A B-spline transform's adaptor: the level's mesh on the level's virtual domain.
@@ -1090,7 +1103,7 @@ where
             floor,
             warnings: level_warnings,
         };
-        let outcome = optimizer.start(&mut problem, observer);
+        let outcome = optimizer.start_level(&mut problem, observer);
         warnings.append(&mut problem.warnings);
         output = problem.moving.active().clone();
         for (j, entry) in problem.metrics.into_iter().enumerate() {

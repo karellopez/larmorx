@@ -24,6 +24,7 @@ pub mod config;
 pub mod helper;
 pub mod pointsets;
 pub mod syn;
+pub mod velocity;
 
 pub use config::*;
 

@@ -1671,6 +1671,99 @@ fn do_registration<R: Compute, const D: usize>(
                     }
                     transform_method.mesh_size = mesh;
                 }
+                XfrmMethod::TimeVaryingVelocityField => {
+                    // ANTs reads the number of time indices from the newest transform option
+                    // (GetFunction(0)), not the stage's own (ANTS-79).
+                    let source = if ctx.notices.fix() { t } else { &transforms[0] };
+                    let own = Conv::u32(param(source, 1)).map_err(|e| throw(log, e))?;
+                    if param(&transforms[0], 1) != param(t, 1) {
+                        ctx.notices.add(
+                            &larmorx_core::defects::ANTS_79,
+                            if ctx.notices.fix() {
+                                format!("stage {current}: TimeVaryingVelocityField's number of time indices is the stage's own, {own}; ANTs reads '{}' from the last -t option", param(&transforms[0], 1))
+                            } else {
+                                format!("stage {current}: TimeVaryingVelocityField's number of time indices read from the last -t option ({own}), as in ANTs")
+                            },
+                        );
+                    }
+                    let mut v = [0f32; 4];
+                    for (i, x) in v.iter_mut().enumerate() {
+                        *x = Conv::f32(param(t, i + 2)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.number_of_time_indices = own;
+                    transform_method.update_field_variance = R::r(f64::from(v[0]));
+                    transform_method.update_field_time_sigma = R::r(f64::from(v[1]));
+                    transform_method.total_field_variance = R::r(f64::from(v[2]));
+                    transform_method.total_field_time_sigma = R::r(f64::from(v[3]));
+                }
+                XfrmMethod::TimeVaryingBSplineVelocityField => {
+                    // The mesh, like the number of time indices, from the newest transform
+                    // option (ANTS-79).
+                    let source = if ctx.notices.fix() { t } else { &transforms[0] };
+                    let mesh = Conv::vec_u32(param(source, 1)).map_err(|e| throw(log, e))?;
+                    if param(&transforms[0], 1) != param(t, 1) {
+                        ctx.notices.add(
+                            &larmorx_core::defects::ANTS_79,
+                            if ctx.notices.fix() {
+                                format!("stage {current}: TimeVaryingBSplineVelocityField's mesh is the stage's own, {}; ANTs reads '{}' from the last -t option", param(t, 1), param(&transforms[0], 1))
+                            } else {
+                                format!("stage {current}: TimeVaryingBSplineVelocityField's mesh read from the last -t option ({}), as in ANTs", param(&transforms[0], 1))
+                            },
+                        );
+                    }
+                    let n = t.parameters.len();
+                    let mut samples = 4u32;
+                    if n > 2 {
+                        samples = Conv::u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    }
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.velocity_field_mesh = mesh;
+                    transform_method.number_of_time_point_samples = samples;
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::Exponential => {
+                    let update = Conv::f32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    let velocity = Conv::f32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    let mut steps = 0u32;
+                    if t.parameters.len() > 3 {
+                        steps = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.velocity_field_variance = R::r(f64::from(velocity));
+                    transform_method.number_of_time_indices = steps;
+                }
+                XfrmMethod::BSplineExponential => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 4 {
+                        order = Conv::u32(param(t, 4)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as unsigned int) is a knot spacing.
+                    let mut update = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if update.len() == 1 {
+                        update = knots(log, R::r(f64::from(update[0])), order)?;
+                    }
+                    let velocity = if n > 2 {
+                        let mut v = Conv::vec_u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                        if v.len() == 1 {
+                            v = knots(log, R::r(f64::from(v[0])), order)?;
+                        }
+                        v
+                    } else {
+                        vec![0; D]
+                    };
+                    let mut steps = 0u32;
+                    if n > 3 {
+                        steps = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.update_field_mesh = update;
+                    transform_method.velocity_field_mesh = velocity;
+                    transform_method.number_of_time_indices = steps;
+                    transform_method.spline_order = order;
+                }
                 _ => {
                     parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
                     deformable.get_or_insert(method);

@@ -252,6 +252,22 @@ defects! {
         "a BSpline stage with a mesh size of 0, or fewer mesh sizes than dimensions (read past the end of the list), divides by zero: NaN grid geometry, vnl SVD warnings and an exception on garbage indices";
     ANTS_75 = "ANTS-75", "ANTs", true,
         "--print-similarity-measure-interval and --write-interval-volumes copy the stage's transforms by setting each copy's parameters before its fixed parameters, which a displacement field refuses, and a B-spline transform whose number of parameters is not a new one's (a mesh of 1): with such a transform among the stage's (an initial transform, or a GaussianDisplacementField, BSplineDisplacementField or BSpline stage) the stage fails at its first iteration";
+    ANTS_67 = "ANTS-67", "antsRegistration", true,
+        "IGDM's kNeighborhood and gradientSigma are read and never used: one nearest point, central-difference gradients";
+    ANTS_68 = "ANTS-68", "antsRegistration", true,
+        "IGDM's derivative lacks the Gaussians' 1/sigma^2 factors, so it is not the gradient of IGDM's value";
+    ANTS_70 = "ANTS-70", "antsRegistration", true,
+        "IGDM's estimated distance sigma is the standard deviation of the nearest distances, 0 when they are all equal (an image registered to itself), and the parameters become NaN";
+    ANTS_78 = "ANTS-78", "antsRegistration", true,
+        "BSplineDisplacementField and BSplineExponential take their meshes 'at the base level' but double them already at the base level (mesh << (level + 1))";
+    ANTS_79 = "ANTS-79", "antsRegistration", true,
+        "TimeVaryingVelocityField's number of time indices and TimeVaryingBSplineVelocityField's mesh are read from the last -t option on the command line, not the stage's own";
+    ITK_24 = "ITK-24", "ITK", true,
+        "JHCT's total number of points leaves out the fixed points (counted only after it is used): the prefactors use the moving points alone";
+    ITK_29 = "ITK-29", "ITK", true,
+        "ManifoldParzenWindowsPointSetFunction uses its kernel sigma as a variance (identity times sigma), where the regularisation sigma is squared";
+    ITK_35 = "ITK-35", "ITK", true,
+        "BSplineTransform has no Jacobian with respect to position: a stage after a BSpline stage, or with a B-spline initial transform, fails at its first derivative unless its metric works on identity fields";
     ITK_32 = "ITK-32", "ITK", true,
         "the labelled point-set metric (ANTs' ICP, PSE, JHCT) appends new per-label metrics at every Initialize and keeps using the first ones: in SyN, which initialises the metric twice per iteration, every evaluation compares with the moving points as the stage's first evaluation mapped them (in the moving-to-middle update, with the moving points themselves)";
     ITK_33 = "ITK-33", "ITK", true,

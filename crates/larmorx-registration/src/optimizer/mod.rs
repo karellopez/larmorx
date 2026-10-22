@@ -461,3 +461,126 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         }
     }
 }
+
+/// An optimizer `ImageRegistrationMethodv4` runs at each level.
+pub trait LevelOptimizer<R: Real> {
+    /// `StartOptimization()` for one level.
+    fn start_level<P: Problem<R> + ?Sized, O: Observer<R, P> + ?Sized>(
+        &mut self,
+        problem: &mut P,
+        observer: &mut O,
+    ) -> Result<Outcome<R>, ItkException>;
+}
+
+impl<R: Real> LevelOptimizer<R> for ConjugateGradientLineSearch<R> {
+    fn start_level<P: Problem<R> + ?Sized, O: Observer<R, P> + ?Sized>(
+        &mut self,
+        problem: &mut P,
+        observer: &mut O,
+    ) -> Result<Outcome<R>, ItkException> {
+        self.start(problem, observer)
+    }
+}
+
+/// `GradientDescentOptimizerv4` as ANTs configures it for its exponential stages
+/// (`optimizer2` in `itkantsRegistrationHelper.hxx`): no scales estimator (so neither the
+/// scales nor the learning rate are estimated: the scales are ones and the learning rate is
+/// the gradient step), the convergence window, `ReturnBestParametersAndValue` off. Each
+/// iteration takes the metric's value and derivative, stops when the window's convergence
+/// value is at most the threshold, divides the derivative by the scales (times the weights),
+/// multiplies it by the learning rate and updates the transform with it.
+#[derive(Clone, Debug)]
+pub struct GradientDescent<R> {
+    pub learning_rate: R,
+    pub number_of_iterations: usize,
+    pub minimum_convergence_value: R,
+    pub convergence_window_size: usize,
+    /// `SetWeights` (`--restrict-deformation`), empty for none.
+    pub weights: Vec<R>,
+}
+
+impl<R: Real> LevelOptimizer<R> for GradientDescent<R> {
+    fn start_level<P: Problem<R> + ?Sized, O: Observer<R, P> + ?Sized>(
+        &mut self,
+        problem: &mut P,
+        observer: &mut O,
+    ) -> Result<Outcome<R>, ItkException> {
+        let nl = problem.number_of_local_parameters();
+        // ObjectToObjectOptimizerBase::StartOptimization: scales never set are ones; the
+        // weights are checked against the local parameters.
+        let mut weights_identity = true;
+        if !self.weights.is_empty() {
+            if self.weights.len() != nl {
+                return Err(ItkException::new(
+                    "Modules/Numerics/Optimizersv4/src/itkObjectToObjectOptimizerBase.cxx",
+                    158,
+                    "GradientDescentOptimizerv4Template",
+                    format!(
+                        "Size of weights ({}) must equal number of local parameters ({nl}).",
+                        self.weights.len()
+                    ),
+                ));
+            }
+            for &w in &self.weights {
+                if (R::ONE - w).abs() > R::from_f64(1e-4) {
+                    weights_identity = false;
+                    break;
+                }
+            }
+        }
+        // ModifyGradientByScalesOverSubRange's factors: weights[i] / scales[i], the scales 1.
+        let factor: Vec<R> = if weights_identity {
+            Vec::new()
+        } else {
+            self.weights.iter().map(|&w| w / R::ONE).collect()
+        };
+        let mut monitor = WindowConvergence::new(self.convergence_window_size);
+        let mut current_iteration = 0usize;
+        let mut value = R::ZERO;
+        let mut convergence = R::MAX;
+        loop {
+            if current_iteration >= self.number_of_iterations {
+                return Ok(Outcome {
+                    stop: StopCondition::MaximumNumberOfIterations,
+                    iterations: current_iteration,
+                    value,
+                    convergence,
+                });
+            }
+            let (v, mut gradient) = problem.value_and_derivative()?;
+            value = v;
+            monitor.add(value.to_f64());
+            convergence = R::from_f64(monitor.value());
+            if convergence <= self.minimum_convergence_value {
+                return Ok(Outcome {
+                    stop: StopCondition::ConvergenceCheckerPassed,
+                    iterations: current_iteration,
+                    value,
+                    convergence,
+                });
+            }
+            // AdvanceOneStep: ModifyGradientByScales (skipped when the scales and the weights
+            // are the identity), EstimateLearningRate (no estimator: nothing),
+            // ModifyGradientByLearningRate, then the transform's update.
+            if !factor.is_empty() {
+                let n = factor.len();
+                for (j, g) in gradient.iter_mut().enumerate() {
+                    *g = *g * factor[j % n];
+                }
+            }
+            for g in gradient.iter_mut() {
+                *g = *g * self.learning_rate;
+            }
+            problem.update(&mut gradient)?;
+            let state = IterationState {
+                iteration: current_iteration,
+                value,
+                convergence,
+                learning_rate: self.learning_rate,
+                step: gradient,
+            };
+            observer.iteration(&state, &mut self.number_of_iterations, problem)?;
+            current_iteration += 1;
+        }
+    }
+}

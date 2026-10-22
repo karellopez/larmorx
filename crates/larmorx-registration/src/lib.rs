@@ -43,6 +43,7 @@
 
 pub mod bspline_field;
 pub mod convergence;
+pub mod exponential;
 pub mod field;
 pub mod format;
 pub mod image;
@@ -59,6 +60,7 @@ pub mod resample;
 pub mod rng;
 pub mod space;
 pub mod syn;
+pub mod time_varying;
 pub mod transform;
 
 use larmorx_core::ItkReal;

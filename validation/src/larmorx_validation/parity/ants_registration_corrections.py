@@ -363,19 +363,19 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
         chain[mode] = (code, d, err)
     code_r, d_r, _ = chain[defects.REPRODUCE]
     code_f, d_f, err_f = chain[defects.FIX]
-    fails_r = code_r != 0 or not (d_r / sc.second_file).exists()
+    fails_r = code_r != 0 or not (d_r / f"r{sc.second_file}").exists()
     checks(
         "reproduce: the stage after the B-spline transform fails, as in ANTs",
         fails_r,
         metric="exit status and output",
-        value=f"exit {code_r}, {sc.second_file} {'missing' if not (d_r / sc.second_file).exists() else 'written'}",
+        value=f"exit {code_r}, {sc.second_file} {'missing' if not (d_r / f'r{sc.second_file}').exists() else 'written'}",
         threshold="a failure (an exception; a linear stage dropped)",
     )
     if code_f != 0:
         raise AssertionError(f"default: exit {code_f}: {err_f.strip()[-300:]}")
     _named_check(checks, err_f, sc.named)
     bsp = bsp_in if initial else d_f / "r0BSpline.txt"
-    second = d_f / sc.second_file
+    second = d_f / f"r{sc.second_file}"
     # ANTs: its stage on the moving image resampled through the B-spline transform, and with
     # the B-spline transform as a displacement field (the moving grid, and half its spacing).
     m = ants_inputs.path("reg-moving")
@@ -395,7 +395,7 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
     code, _o, err = _ants(["-d", "3", "-v", "1", "-o", str(d / "r"), *resampled])
     constructions["ANTs on the moving image resampled through the B-spline transform"] = (
         code,
-        d / sc.second_file.replace("1", "0", 1),
+        d / f"r{sc.second_file}".replace("r1", "r0", 1),
     )
     for tag, ref in (("moving grid", m), ("half its spacing", fine)):
         fld = tmp / f"bspline-field-{'fine' if ref == fine else 'grid'}.nii.gz"
@@ -407,7 +407,7 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
         )
         constructions[f"ANTs with the B-spline transform as a displacement field ({tag})"] = (
             code,
-            d / sc.second_file,
+            d / f"r{sc.second_file}",
         )
     checks(
         "default: mean squared difference left (exact composite)",

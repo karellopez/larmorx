@@ -137,11 +137,13 @@ def cmd_parity(args: argparse.Namespace) -> int:
         print(mark, end="", flush=True, file=sys.stderr)
 
     import functools
+    import re
 
+    pattern = re.compile(args.case) if args.case else None
     results = run(
         suite,
         args.tier,
-        select=(lambda c: args.case in c.id) if args.case else None,
+        select=(lambda c: pattern.search(c.id) is not None) if pattern else None,
         progress=progress,
         jobs=args.jobs,
         factory=functools.partial(suite_by_name, args.suite, args.implementation),
@@ -164,6 +166,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
         results = [_redacted(r) for r in results]
         env = environment.describe(suite.packages)
         command = f"python -m larmorx_validation parity {args.suite} --tier {args.tier}"
+        if args.case:
+            command += f" --case '{args.case}'"
         if args.implementation != "original":
             command += f" --implementation {args.implementation}"
         out = Path(args.out)
@@ -219,7 +223,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = sub.add_parser("parity", help="compare larmorx with a reference implementation")
     p.add_argument("suite", choices=PARITY_SUITES)
     p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
-    p.add_argument("--case", help="only cases whose id contains this text")
+    p.add_argument(
+        "--case",
+        help="only cases whose id this regular expression matches (a plain text: the ids that "
+        "contain it)",
+    )
     p.add_argument("--out", help="write <suite>.md and <suite>.json to this directory")
     p.add_argument(
         "--jobs",

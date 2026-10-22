@@ -6,10 +6,13 @@ it) with a ``BSpline`` stage (a cubic B-spline transform, knot spacing 104 mm) i
 SyN stage. Not 26 mm (antsRegistrationSyN.sh's B-spline spacing): the mesh doubles at each level,
 to about a million parameters at the last one, and ANTs computes every parameter's Jacobian at
 every voxel; it had not finished after almost four hours (larmorx: 38 s), see
-``docs/findings/ants-bspline.md``. fMRIPrep's masked T1w (1 mm) is then resampled onto the 2 mm template through
-``BSpline.txt`` and the collapsed affine, with Lanczos interpolation, as fMRIPrep resamples
-the T1w into MNI space, in single (``--float 1``) and double precision: ANTs as built (1 and 8
-threads) and with correctly rounded maths, larmorx at 1 and 12 threads in both modes."""
+``docs/findings/ants-bspline.md``. fMRIPrep's masked T1w (1 mm) is then resampled onto the 2 mm
+template through the registration's own composite (``transformComposite.h5``, as sMRIPrep's
+options write it: the collapsed affine, then the B-spline transform, both in float), with
+Lanczos interpolation, as fMRIPrep resamples the T1w into MNI space, in single (``--float 1``)
+and double precision: ANTs as built (1 and 8 threads) and with correctly rounded maths, larmorx
+at 1 and 12 threads in both modes. The affine alone (for the panel that shows what the B-spline
+transform adds) is taken out of the composite by ANTs' ``CompositeTransformUtil``."""
 
 from __future__ import annotations
 
@@ -38,25 +41,34 @@ def _registration_args(out: Path, tmp: Path) -> list[str]:
     return _replace_syn(args, STAGE)
 
 
-def _apply_args(inp: str, ref: str, bspline: str, affine: str, out: str, float_: bool):
-    return [
-        "-d",
-        "3",
-        "--float",
-        "1" if float_ else "0",
-        "-i",
-        inp,
-        "-r",
-        ref,
-        "-n",
-        "LanczosWindowedSinc",
-        "-t",
-        bspline,
-        "-t",
-        affine,
-        "-o",
-        out,
-    ]
+def _apply_args(inp: str, ref: str, transforms: list[str], out: str, float_: bool):
+    args = ["-d", "3", "--float", "1" if float_ else "0", "-i", inp, "-r", ref]
+    args += ["-n", "LanczosWindowedSinc"]
+    for t in transforms:
+        args += ["-t", t]
+    return [*args, "-o", out]
+
+
+def _logged_run(e: fcache.Entry, label: str, argv: list[str]) -> bool:
+    """Take the run ``label`` from its log when it already ran with these arguments and
+    succeeded (an interrupted computation of this entry resumed: the registration takes ANTs
+    over an hour); ``False`` when it has to run."""
+    import ast
+    import shlex
+
+    log = e.dir / f"{label}.log"
+    if not log.is_file():
+        return False
+    head = log.read_text(encoding="utf-8").split("\n", 3)
+    if len(head) < 3 or not head[0].startswith("$ ") or shlex.split(head[0][2:]) != argv:
+        return False
+    env = ast.literal_eval(head[1].removeprefix("# env: "))
+    status, _, secs = head[2].removeprefix("# exit ").partition(", ")
+    if status != "0":
+        return False
+    e.runs.append(fcache.Run(label, argv, env, 0, float(secs.removesuffix(" s"))))
+    e.ctx.log(f"  {e.tool}/{e.case}: {label} (taken from its log)")
+    return True
 
 
 def _compute(e: fcache.Entry) -> None:
@@ -75,18 +87,23 @@ def _compute(e: fcache.Entry) -> None:
     reg.mkdir(exist_ok=True)
     tmp = d / "inputs"
     tmp.mkdir(exist_ok=True)
+    argv = [str(b / "antsRegistration"), *_registration_args(reg, tmp)]
+    composite = reg / "transformComposite.h5"
+    if not (composite.is_file() and _logged_run(e, "registration", argv)):
+        e.run(
+            "registration",
+            argv,
+            env={"ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "4", "ANTS_RANDOM_SEED": SEED},
+            unset=common.CLEAN_ENV,
+        )
+    comp = e.input("the registration's composite (affine, then B-spline; float)", composite)
+    # The affine alone, out of the composite by ANTs' own tool (00_..._AffineTransform.mat).
     e.run(
-        "registration",
-        [str(b / "antsRegistration"), *_registration_args(reg, tmp)],
-        env={"ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "4", "ANTS_RANDOM_SEED": SEED},
+        "disassemble",
+        [str(b / "CompositeTransformUtil"), "--disassemble", str(composite), str(reg / "part")],
         unset=common.CLEAN_ENV,
     )
-    prefix = sorted(reg.glob("*BSpline.txt"))
-    affine = sorted(reg.glob("*GenericAffine.mat"))
-    if not prefix or not affine:
-        raise FileNotFoundError(f"{reg}: the registration's BSpline.txt and GenericAffine.mat")
-    bsp = e.input("B-spline transform (ANTs' BSpline stage, BSpline.txt)", prefix[0])
-    aff = e.input("affine (ANTs' Rigid and Affine stages, collapsed)", affine[0])
+    aff = e.input("affine (the composite's first transform)", reg / "part_00_AffineTransform.mat")
     inp = e.input("input (fMRIPrep's T1w × brain mask)", run / INPUT)
     ref = e.input("reference (MNI152NLin2009cAsym, 2 mm)", Path(td.get(TPL + "T1w.nii.gz")))
     for prec, float_ in (("float", True), ("double", False)):
@@ -103,7 +120,7 @@ def _compute(e: fcache.Entry) -> None:
                 label,
                 [
                     str(b / "antsApplyTransforms"),
-                    *_apply_args(str(inp), str(ref), str(bsp), str(aff), out, float_),
+                    *_apply_args(str(inp), str(ref), [str(comp)], out, float_),
                 ],
                 env=env,
                 unset=common.CLEAN_ENV,
@@ -117,7 +134,7 @@ def _compute(e: fcache.Entry) -> None:
                     fcache.larmorx_cli(
                         "ants",
                         "antsApplyTransforms",
-                        *_apply_args(str(inp), str(ref), str(bsp), str(aff), out, float_),
+                        *_apply_args(str(inp), str(ref), [str(comp)], out, float_),
                     ),
                     env={
                         "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads),
@@ -151,12 +168,12 @@ def _compute(e: fcache.Entry) -> None:
     e.finish(
         versions={"ants": ants_version()},
         command="antsApplyTransforms -d 3 --float 1 -i <T1w> -r <MNI 2 mm> -n LanczosWindowedSinc "
-        "-t BSpline.txt -t GenericAffine.mat -o <out>",
+        "-t transformComposite.h5 -o <out>",
         threads={"ants": [1, 8], "larmorx": list(LX_THREADS), "registration": 4},
         seed=f"ANTS_RANDOM_SEED={SEED}",
-        settings=f"the B-spline transform of sMRIPrep's template registration of {RUN} with "
-        f"{STAGE} for its SyN stage (ANTs 2.6.5, every third voxel), applied to the 1 mm T1w "
-        "onto the 2 mm template, --float 1 and --float 0",
+        settings=f"the composite transform (affine, then B-spline) of sMRIPrep's template "
+        f"registration of {RUN} with {STAGE} for its SyN stage (ANTs 2.6.5, every third voxel), "
+        "applied to the 1 mm T1w onto the 2 mm template, --float 1 and --float 0",
     )
 
 
@@ -356,12 +373,8 @@ def example(ctx: core.Context) -> dict:
     img = nib.load(str(run / INPUT))
     n_vox = int(np.prod(ref.shape))
     vers = info.get("versions", {})
-    parts = common.itk_parts(
-        e.dir
-        / "registration"
-        / sorted(p.name for p in (e.dir / "registration").glob("*BSpline.txt"))[0]
-    )
-    b = parts[0]
+    parts = common.itk_parts(e.dir / "registration" / "transformComposite.h5")
+    a, b = (next(t for t in parts if t.name.startswith(k)) for k in ("Affine", "BSpline"))
     mesh = " × ".join(str(int(v) - 3) for v in b.fixed_parameters[:3])
     coef = np.abs(np.asarray(b.parameters, float))
     return {
@@ -372,7 +385,8 @@ def example(ctx: core.Context) -> dict:
             f"template registration with {STAGE} for its SyN stage, on every third voxel; "
             "a knot spacing of 104 mm, because with antsRegistrationSyN.sh's 26 mm ANTs had not "
             "finished after almost four hours), "
-            "applied with the registration's affine to the 1 mm T1w onto the 2 mm template, "
+            "applied with the registration's affine (its composite, as antsRegistration writes "
+            "it with sMRIPrep's options) to the 1 mm T1w onto the 2 mm template, "
             "Lanczos, as fMRIPrep resamples the T1w into MNI space; given to ANTs 2.6.5 and to "
             "larmorx, in single and double precision. Before A5 part 3 larmorx refused "
             "B-spline transform files."
@@ -385,10 +399,10 @@ def example(ctx: core.Context) -> dict:
             },
             {
                 "label": "Transforms",
-                "text": f"`BSpline.txt`: a `{b.name}` of mesh {mesh} (control points every "
-                f"{', '.join(f'{v:.4g}' for v in b.fixed_parameters[6:9])} mm), coefficients up "
-                f"to {coef.max():.3g} mm; `GenericAffine.mat`: the Rigid and Affine stages, "
-                "collapsed",
+                "text": f"`transformComposite.h5` (ANTs' HDF5 file): an `{a.name}` (the Rigid "
+                f"and Affine stages, collapsed), then a `{b.name}` of mesh {mesh} (control "
+                f"points every {', '.join(f'{v:.4g}' for v in b.fixed_parameters[6:9])} mm, "
+                f"{b.parameters.size} coefficients up to {coef.max():.3g} mm)",
             },
             {"label": "Command", "text": f"`{info['command']}`"},
             {

@@ -204,7 +204,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-39 | ITK time-varying method | `-q` ignored | applied |
 | ITK-40 | ITK time-varying methods | masks not moved with the resampled images | moved |
 | ITK-41 | ITK velocity-field transforms | a transform that never integrated crashes or has no inverse | integrated |
-| ITK-42 | ITK scales estimator | equal scales below epsilon refused | ones (equal scales cancel) |
+| ITK-42 | ITK scales estimator | scales all below epsilon (a vanished probe) refused | ones (equal scales cancel) |
 
 **Not the default yet:**
 

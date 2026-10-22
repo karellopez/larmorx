@@ -169,7 +169,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-39 | ITK `TimeVaryingVelocityFieldImageRegistrationMethodv4` | the fixed images are resampled through the flow alone: the fixed initial transforms (`-q`) are ignored | c | none | corrected by default: applied, a notice; `reproduce` as ITK (A5 part 3) | – |
 | ITK-40 | ITK time-varying registration methods | the images are resampled through the flows but the metric gets the stage's masks unchanged, with identity transforms: the masks no longer cover their images | c | none | corrected by default: the masks resampled with their images, a notice where that changes them; `reproduce` as ITK (A5 part 3) | – |
 | ITK-41 | ITK velocity-field transforms | a transform that never integrated its velocity field (no iteration, no resampling) is incomplete: a time-varying one crashes at the next point it maps, an exponential one has no inverse field ("No displacement field is specified.") | a | none | corrected by default: integrated (zero fields where nothing was optimised), a notice; `reproduce` refuses where ANTs crashes and throws ITK's exception (A5 part 3) | – |
-| ITK-42 | ITK scales estimator and optimizer | equal scales below epsilon (a B-spline-smoothed update whose control points all touch its pinned boundary: the probe vanishes) are refused ("m_Scales values must be > epsilon"), although equal scales cancel in the estimated learning rate | c | none | corrected by default: ones, a notice; `reproduce` throws as ITK (A5 part 3) | – |
+| ITK-42 | ITK scales estimator and optimizer | scales all below epsilon (a B-spline-smoothed update whose control points all touch its pinned boundary: the probe vanishes, the scales equal but for rounding) are refused ("m_Scales values must be > epsilon"), although equal scales cancel in the estimated learning rate | c | none | corrected by default: ones, a notice; `reproduce` throws as ITK (A5 part 3) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -2126,12 +2126,13 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   notice; `reproduce` throws ITK's exception and refuses where ANTs crashes.
 - **D13 / gap:** class (a), the crash not reproduced. No gap.
 
-### ITK-42 Equal scales below epsilon — (c)
+### ITK-42 Scales all below epsilon — (c)
 - **What:** `RegistrationParameterScalesFromPhysicalShift` probes a transform of local support
   with a unit change of the central voxel's parameters. Where a B-spline-smoothed update field
   pins every control point to its stationary boundary (a coarse mesh at a shrunken level, e.g.
   `BSplineDisplacementField` 3x3x3 at shrink 2 with ANTS-78 corrected, or a total mesh of 1 in
-  ANTs), the probe vanishes and every scale is about 4e-24; `ObjectToObjectOptimizerBase`
+  ANTs), the probe vanishes and every scale is about 4e-24 to 5e-22 (equal, or equal but for
+  rounding on an oblique grid); `ObjectToObjectOptimizerBase`
   refuses scales ≤ ε ("m_Scales values must be > epsilon") and the stage fails, although equal
   scales cancel in the learning rate the optimizer estimates (the scaled gradient `g/s`, the rate
   proportional to `s`).
@@ -2139,7 +2140,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `itkRegistrationParameterScalesFromShiftBase.hxx`; validated
   (`displacement-field/bspline-coarse-total`, `corrections/bspline-field-coarse`).
 - **fMRIPrep:** none.
-- **larmorx:** corrected by default: equal scales not above ε replaced by ones, a notice;
+- **larmorx:** corrected by default: scales all not above ε replaced by ones, a notice;
   `reproduce` throws as ITK.
 - **D13 / gap:** class (c), corrected with a switch. No gap.
 

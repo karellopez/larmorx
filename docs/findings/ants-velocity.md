@@ -33,7 +33,7 @@ adaptors), `::optimizer::GradientDescent`, and `larmorx_ants::registration::{vel
   samples from the clock), ITK-36 to ITK-38 (the time-varying B-spline method's multi-metric
   transforms, stale inverse fields, physical points in a parametric domain), ITK-39 (`-q`
   ignored by the time-varying method), ITK-40 (masks not moved with the resampled images),
-  ITK-41 (a velocity transform that never integrated), ITK-42 (equal scales below epsilon);
+  ITK-41 (a velocity transform that never integrated), ITK-42 (scales all below epsilon);
   ANTS-75 and ANTS-77 extended to these stages.
 - **The corrections decided on 2026-10-21** are in place, each with `reproduce` giving ANTs'
   result: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29 (measured below).
@@ -46,9 +46,8 @@ adaptors), `::optimizer::GradientDescent`, and `larmorx_ants::registration::{vel
   `v / 2^n`, then `n` times `u ← u + u∘(x + u)`, each warp a `WarpVectorImageFilter` with
   `VectorLinearInterpolateNearestNeighborExtrapolateImageFunction` (linear inside, the nearest
   voxel outside), continuous indices in double. Its inverse is `exp(−v)` the same way.
-- **The number of squarings** is the stage's `numberOfIntegrationSteps` when given (ANTs sets
-  10 when it is not, `SetNumberOfIntegrationSteps` only above 0) or computed by the filter: the
-  largest squared norm of `v`'s vectors over the smallest spacing squared gives
+- **The number of squarings** is the stage's `numberOfIntegrationSteps` when it is above 0;
+  0 or none asks the filter for its automatic number: the largest squared norm of `v`'s vectors over the smallest spacing squared gives
   `⌊2 + ½·log₂(max)⌋ + 1`, at most 20. A field with an infinite vector makes the conversion to an
   integer undefined (x86-64 gives 0): larmorx clamps it to the maximum (`reproduce`: 0).
 - **The update** (`UpdateTransformParameters`): the metric's derivative over the virtual domain
@@ -126,7 +125,7 @@ adaptors), `::optimizer::GradientDescent`, and `larmorx_ants::registration::{vel
 - **Each iteration** evaluates the metric's derivative at every time sample (as above), scales
   each sample's derivatives to a largest norm of 1, averages them with the previous
   iteration's, fits one B-spline in space and time to all of them
-  (`BSplineScatteredDataPointSetToImageFilter`, one level, time spacing 1/(samples − 1), the
+  (`BSplineScatteredDataPointSetToImageFilter`, one level, the
   domain's boundary pinned with weight 10¹⁰, a fixed mask as the weights), and adds that
   lattice, times the learning rate, to the velocity's.
 - **Levels** (`TimeVaryingBSplineVelocityFieldTransformParametersAdaptor`): the lattice is
@@ -144,7 +143,7 @@ adaptors), `::optimizer::GradientDescent`, and `larmorx_ants::registration::{vel
 - **Other defects:** the mesh is read from the last `-t` option (ANTS-79); a mesh size of 0
   divides by zero and fails on a domain of no span (ANTS-77: refused).
 
-## Antsapplytransforms with B-spline transforms
+## antsApplyTransforms with B-spline transforms
 
 `antsApplyTransforms` applies `BSplineTransform` files (`antsRegistration`'s `BSpline` stage
 output; `.txt`, `.mat`, `.h5`, inside composites, double and float) as ITK's
@@ -171,11 +170,12 @@ phantoms; the parity suite's fix pass reports the same corrections case by case.
   mask) within 1 % to 14 % of ANTs' (the coarser corrected mesh is smoother). A coarse mesh at a
   shrunken level used to fail (every control point touches the pinned boundary, the scales
   estimator's probe vanishes: ITK-42); with ITK-42 corrected it runs.
-- **ITK-42** (equal scales below epsilon). The scales estimator probes a transform of local
+- **ITK-42** (scales all below epsilon). The scales estimator probes a transform of local
   support with a unit change of the central voxel's parameters; a B-spline-smoothed update pinned
-  to its boundary everywhere returns about 4e-24 for every scale, and ITK refuses scales ≤ ε.
-  Equal scales cancel in the learning rate the optimizer estimates (the scaled gradient is
-  `g/s`, the estimated rate proportional to `s`): larmorx uses ones. `BSplineDisplacementField
+  to its boundary everywhere returns about 4e-24 to 5e-22 for every scale (equal, or equal but
+  for rounding: 4.511e-22 and 4.506e-22 on an oblique grid), and ITK refuses scales ≤ ε. Equal
+  scales cancel in the learning rate the optimizer estimates (the scaled gradient is `g/s`, the
+  estimated rate proportional to `s`): larmorx uses ones. `BSplineDisplacementField
   [0.3,3x3x3,0,3]` over two levels then runs (mean squared difference 30082 against ANTs'
   30136 with its doubled mesh).
 - **ITK-35** (a B-spline transform's Jacobian with respect to position: the identity plus

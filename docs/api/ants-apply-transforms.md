@@ -9,7 +9,8 @@ and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crate
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
-  included;
+  included, and B-spline transforms (antsRegistration's `BSpline` stage output, A5 part 3: text,
+  MATLAB and HDF5 files, float coefficients, inside composites and chains, the inverse refused);
 - awkward geometries, output types and time series;
 - real fMRIPrep derivatives;
 - all of them again with `--float 1`, ANTs' single-precision pipeline;
@@ -91,7 +92,7 @@ are placed by their affine.
 | `-o Linear[file,<invert=0>]` | `combine_transforms(..., output="linear", invert_linear=)` | [below](#transform-outputs) |
 | `-o CompositeTransform[file]` | `combine_transforms(..., output="composite")` | [below](#transform-outputs) |
 | `-o DisplacementField[file]`, `-o [file,1]` | `combine_transforms(..., output="displacement_field", reference=)` | [below](#transform-outputs) |
-| `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists; linear transforms only can be inverted. **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
+| `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists: linear transforms, displacement fields, B-spline transforms (`BSplineTransform_double_3_3`, `_float_3_3`, as antsRegistration's `BSpline` stage writes them) and composites of them; linear transforms only can be inverted (a field or a B-spline transform has no inverse: `[file,1]` fails, as in ANTs). **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
 | `-t identity` | `transforms=()` | |
 | `-n Linear` | `interpolation="linear"` | default |
 | `-n NearestNeighbor` | `"nearest"` | |
@@ -132,8 +133,8 @@ the same transforms as `ItkTransform` objects, which `lx.transforms.write` write
   fixed parameters).
 - **`Linear[file,<invert>]`** collapses a chain of linear transforms into one `AffineTransform`
   (ANTs's `CollapseLinearTransforms`: centred on the last matrix-offset transform of the
-  queue); with `invert` 1, its inverse, centred at 0. A chain with a displacement field is
-  refused ("The transform or set of transforms is not linear.").
+  queue); with `invert` 1, its inverse, centred at 0. A chain with a displacement field or a
+  B-spline transform is refused ("The transform or set of transforms is not linear.").
 - **`DisplacementField[file]`** samples the chain on the reference grid (`-r`, required):
   `T(p) − p` for every voxel (ITK's `TransformToDisplacementFieldFilter`, with points in
   double; a linear chain maps each scan line's two ends and interpolates). `.h5` and `.hdf5`

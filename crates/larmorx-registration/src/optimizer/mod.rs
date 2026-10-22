@@ -96,13 +96,13 @@ pub struct ConjugateGradientLineSearch<R> {
     /// and `antsAI` set it). Without an estimator neither the scales nor the learning rate are
     /// estimated, so the learning rate a run ends with is the next run's first.
     pub scales: Option<Vec<R>>,
-    /// ITK-42 corrected: estimated scales that are all equal and not above ε (the
-    /// single-voxel probe of a B-spline-smoothed update vanishing where every control point
-    /// touches the pinned boundary) are replaced by ones, which give the same steps (equal
-    /// scales cancel in the estimated learning rate); ITK throws "m_Scales values must be >
-    /// epsilon". The replaced value is recorded in `replaced_scales`.
+    /// ITK-42 corrected: estimated scales that are all not above ε (the single-voxel probe of a
+    /// B-spline-smoothed update vanishing where every control point touches the pinned
+    /// boundary: equal, or equal but for rounding) are replaced by ones, which give the steps
+    /// equal scales give (they cancel in the estimated learning rate); ITK throws "m_Scales
+    /// values must be > epsilon". The largest replaced value is recorded in `replaced_scales`.
     pub unit_equal_scales: bool,
-    /// The equal scales ITK-42 replaced, if any.
+    /// The largest of the scales ITK-42 replaced, if any.
     pub replaced_scales: Option<f64>,
 }
 
@@ -179,10 +179,10 @@ impl<R: Real> ConjugateGradientLineSearch<R> {
         let mut scales = scales;
         if self.unit_equal_scales
             && !scales.is_empty()
-            && scales.iter().all(|&s| s == scales[0] && s <= R::EPSILON)
-            && scales[0] >= R::ZERO
+            && scales.iter().all(|&s| s <= R::EPSILON && s >= R::ZERO)
         {
-            self.replaced_scales = Some(scales[0].to_f64());
+            let largest = scales.iter().fold(0.0f64, |m, s| m.max(s.to_f64()));
+            self.replaced_scales = Some(largest);
             scales = vec![R::ONE; scales.len()];
         }
         let mut scales_identity = true;

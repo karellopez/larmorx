@@ -1759,7 +1759,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                         &defects::ITK_42,
                         self.upstream_defects,
                         format!(
-                            "stage {stage}: the estimated scales are equal and not above epsilon ({}): ones are used, which give the same steps (equal scales cancel in the learning rate); ITK throws 'm_Scales values must be > epsilon' and the stage fails",
+                            "stage {stage}: every estimated scale is below epsilon (at most {}: the scales estimator's probe vanished): ones are used, the steps equal scales give (they cancel in the learning rate); ITK throws 'm_Scales values must be > epsilon' and the stage fails",
                             larmorx_registration::format::OStream::default().float(s)
                         ),
                     ),

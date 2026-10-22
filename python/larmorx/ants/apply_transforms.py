@@ -131,7 +131,8 @@ def apply_transforms(
         which is what makes the result match ANTs bit for bit. In-memory images are placed by
         their affine.
     transforms
-        Transform files (``.mat``, ``.txt``, ``.h5``, warp ``.nii.gz``) or
+        Transform files (``.mat``, ``.txt``, ``.h5``, warp ``.nii.gz``; B-spline transforms included,
+        as antsRegistration's ``BSpline`` stage writes them) or
         :class:`~larmorx.transforms.ItkTransform` lists, in ``-t`` order: for each point of
         the output grid the first transform is applied first, so ``[warp, affine]`` moves the
         image by the affine, then the warp, as ``-t warp -t affine`` does.

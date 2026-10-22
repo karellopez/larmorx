@@ -163,7 +163,10 @@ impl Slatec {
             }
         }
         if i == nos {
-            self.xermsg("INITDS", "Chebyshev series too short for specified accuracy");
+            self.xermsg(
+                "INITDS",
+                "Chebyshev series too short for specified accuracy",
+            );
         }
         i
     }
@@ -379,7 +382,11 @@ impl Slatec {
         if p >= 10.0 {
             let corr = self.d9lgmc(p) + self.d9lgmc(q) - self.d9lgmc(p + q);
             let d1 = -p / (p + q);
-            return log(q) * -0.5 + SQ2PIL + corr + (p - 0.5) * log(p / (p + q)) + q * self.dlnrel(d1);
+            return log(q) * -0.5
+                + SQ2PIL
+                + corr
+                + (p - 0.5) * log(p / (p + q))
+                + q * self.dlnrel(d1);
         }
         if q >= 10.0 {
             let corr = self.d9lgmc(q) - self.d9lgmc(p + q);

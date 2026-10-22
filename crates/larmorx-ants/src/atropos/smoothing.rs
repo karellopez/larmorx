@@ -35,7 +35,13 @@ pub struct FitSettings<'a> {
 /// The parametric coordinate `ThreadedGenerateDataForUpdatingResidualValues` gives a point:
 /// `float(spans) · float(point − origin) / (float(size − 1) · spacing)`, the product in float,
 /// the quotient in double, stored as float, pulled inside `[0, spans)` at the ends.
-fn residual_u(spans: usize, point: f32, origin: f64, size: usize, spacing: f64) -> Result<f32, SmoothingError> {
+fn residual_u(
+    spans: usize,
+    point: f32,
+    origin: f64,
+    size: usize,
+    spacing: f64,
+) -> Result<f32, SmoothingError> {
     let s = spans as f32;
     let r = (f64::from(s) / (f64::from((size - 1) as f32) * spacing)) as f32;
     let eps = (f64::from(r) * spacing * f64::from(BSPLINE_EPSILON)) as f32;
@@ -86,7 +92,12 @@ fn collapse_at(lattice: &Lattice, kernel: &Kernel, u: &[f32]) -> f32 {
 /// `RefineControlPointLattice` of the scattered-data filter at `level`: axes whose number of
 /// levels exceeds `level` are doubled (`2n − order`), the others keep their control points
 /// (and ITK still uses the refinement coefficients on them).
-fn refine(psi: &Lattice, order: usize, level: u32, levels: &[u32]) -> Result<Lattice, SmoothingError> {
+fn refine(
+    psi: &Lattice,
+    order: usize,
+    level: u32,
+    levels: &[u32],
+) -> Result<Lattice, SmoothingError> {
     let d = psi.size.len();
     let coefficients = refined_lattice_coefficients(order)
         .ok_or_else(|| SmoothingError("the refinement SVD did not converge".into()))?;
@@ -204,7 +215,11 @@ pub fn fit(
             "The spline order in each dimension must be greater than 0".into(),
         ));
     }
-    let mut current: Vec<usize> = settings.control_points.iter().map(|&c| c as usize).collect();
+    let mut current: Vec<usize> = settings
+        .control_points
+        .iter()
+        .map(|&c| c as usize)
+        .collect();
     if current.iter().any(|&c| c < order + 1) {
         return Err(SmoothingError(
             "The number of control points must be greater than the spline order.".into(),
@@ -225,7 +240,11 @@ pub fn fit(
     }
     let coords: Vec<Vec<usize>> = voxels
         .iter()
-        .map(|&v| (0..d).map(|a| (v / strides_img[a]) % settings.size[a]).collect())
+        .map(|&v| {
+            (0..d)
+                .map(|a| (v / strides_img[a]) % settings.size[a])
+                .collect()
+        })
         .collect();
     let max_levels = settings.levels.iter().copied().max().unwrap_or(1).max(1);
     let kernel = Kernel::new(order);

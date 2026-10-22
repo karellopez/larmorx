@@ -123,7 +123,10 @@ pub fn fast_marching(
     for &i in trial {
         label[i] = Label::InitialTrial;
         output[i] = 0.0;
-        heap.push(Node { value: 0.0, index: i });
+        heap.push(Node {
+            value: 0.0,
+            index: i,
+        });
     }
     let coord = |i: usize, a: usize| (i / strides[a]) % size[a];
     let stopping = f64::from(f32::MAX);

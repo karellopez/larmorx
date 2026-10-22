@@ -22,7 +22,10 @@ use super::gaussian::{EstimateError, GaussianMembership, GaussianModel, PartialV
 pub enum LikelihoodModel {
     Gaussian,
     /// `HistogramParzenWindows[sigma, bins]` (1, 32).
-    HistogramParzenWindows { sigma: f32, bins: u32 },
+    HistogramParzenWindows {
+        sigma: f32,
+        bins: u32,
+    },
     /// `ManifoldParzenWindows[pointSetSigma, evaluationK, covarianceK, kernelSigma]`
     /// (1, 50, 0, 1).
     ManifoldParzenWindows {
@@ -86,6 +89,7 @@ impl Likelihood {
                 shape_bins,
                 orientation_sigma,
                 orientation_bins,
+                mode,
             )),
         }
     }
@@ -137,7 +141,8 @@ impl Likelihood {
     }
 }
 
-const SMALL: &str = "The input list sample has <= 1 element.Function evaluations will be equal to 0.";
+const SMALL: &str =
+    "The input list sample has <= 1 element.Function evaluations will be equal to 0.";
 
 // ------------------------------------------------------------------------------------------------
 // Histogram images shared by the Parzen-window models
@@ -159,7 +164,13 @@ impl<const D: usize> HistogramImage<D> {
     fn zeros(size: [usize; D], origin: [f64; D], spacing: [f64; D]) -> Self {
         let n: usize = size.iter().product();
         let flat: Vec<f64> = (0..D * D)
-            .map(|k| if k % (D + 1) == 0 { spacing[k / D] } else { 0.0 })
+            .map(|k| {
+                if k % (D + 1) == 0 {
+                    spacing[k / D]
+                } else {
+                    0.0
+                }
+            })
             .collect();
         let inv = vnl_inverse(&flat, D).unwrap_or_else(|| vec![f64::NAN; D * D]);
         HistogramImage {
@@ -457,14 +468,21 @@ impl ManifoldParzenModel {
                 let x = &self.samples[count * m..(count + 1) * m];
                 let mut g = GaussianMembership::default();
                 let mean: Vec<f64> = x.iter().map(|&v| f64::from(v)).collect();
-                g.set(mean.clone(), identity(1.0).iter().map(|v| v * f64::from(self.kernel_sigma)).collect())?;
+                g.set(
+                    mean.clone(),
+                    identity(1.0)
+                        .iter()
+                        .map(|v| v * f64::from(self.kernel_sigma))
+                        .collect(),
+                )?;
                 let mut cov = vec![0.0f64; m * m];
-                tree.search_into(x, k, &mut ids, &mut dist).map_err(|e| EstimateError {
-                    file: "Modules/Numerics/Statistics/include/itkKdTree.hxx",
-                    line: 167,
-                    class: "KdTree",
-                    description: e.to_string(),
-                })?;
+                tree.search_into(x, k, &mut ids, &mut dist)
+                    .map_err(|e| EstimateError {
+                        file: "Modules/Numerics/Statistics/include/itkKdTree.hxx",
+                        line: 167,
+                        class: "KdTree",
+                        description: e.to_string(),
+                    })?;
                 let mut denominator = 0.0f32;
                 for &id in ids.iter() {
                     let id = id as usize;
@@ -597,7 +615,10 @@ struct Mat {
 
 impl Mat {
     fn zeros(d: usize) -> Self {
-        Mat { d, v: vec![0.0; d * d] }
+        Mat {
+            d,
+            v: vec![0.0; d * d],
+        }
     }
     fn at(&self, r: usize, c: usize) -> f32 {
         self.v[r * self.d + c]
@@ -775,15 +796,18 @@ impl LogEuclideanModel {
 /// tensors' two largest eigenvalues (shape) and of the angles of their first and second
 /// eigenvectors (orientation), smoothed and normalized.
 ///
-/// Its evaluation reads the histograms of shape and first orientation at the measurement's
-/// first two components (raw tensor values, not eigenvalues or angles), each at a point whose
-/// second coordinate ANTs never sets (ANTS-103): larmorx sets it to 0, in both modes.
+/// ANTs evaluates the histograms of shape and first orientation at the measurement's first two
+/// components (raw tensor values, not eigenvalues or angles), each at a point whose second
+/// coordinate it never sets (ANTS-103). With `reproduce` larmorx evaluates them there, the
+/// unset coordinate 0; with `fix` it evaluates them where the histograms were filled: at the
+/// measurement's normalized two largest eigenvalues and its principal eigenvector's angles.
 #[derive(Clone, Debug)]
 pub struct JointShapeModel {
     pub shape_sigma: f32,
     pub shape_bins: u32,
     pub orientation_sigma: f32,
     pub orientation_bins: u32,
+    mode: UpstreamDefects,
     max_ev1: f32,
     max_ev2: f32,
     min_ev1: f32,
@@ -792,12 +816,19 @@ pub struct JointShapeModel {
 }
 
 impl JointShapeModel {
-    pub fn new(shape_sigma: f32, shape_bins: u32, orientation_sigma: f32, orientation_bins: u32) -> Self {
+    pub fn new(
+        shape_sigma: f32,
+        shape_bins: u32,
+        orientation_sigma: f32,
+        orientation_bins: u32,
+        mode: UpstreamDefects,
+    ) -> Self {
         JointShapeModel {
             shape_sigma,
             shape_bins,
             orientation_sigma,
             orientation_bins,
+            mode,
             max_ev1: 0.0,
             max_ev2: 0.0,
             min_ev1: 1.0,
@@ -818,10 +849,8 @@ impl JointShapeModel {
         }
     }
 
-    fn increment_shape(&mut self, mut ev1: f32, mut ev2: f32) {
-        let bins = self.shape_bins as usize;
-        let h = self.histograms[0]
-            .get_or_insert_with(|| HistogramImage::zeros([bins, bins], [0.0; 2], [1.0; 2]));
+    /// The shape histogram's point of the normalized eigenvalues `ev1`, `ev2`.
+    fn shape_point(&self, mut ev1: f32, mut ev2: f32) -> [f64; 2] {
         ev1 = ev1.clamp_upper(1.0);
         ev2 = ev2.clamp_upper(1.0);
         if ev1 < 0.0 {
@@ -831,14 +860,19 @@ impl JointShapeModel {
             ev2 = 0.0;
         }
         let scale = self.shape_bins.wrapping_sub(1) as f32;
-        let p = [f64::from(ev1 * scale), f64::from(ev2 * scale)];
+        [f64::from(ev1 * scale), f64::from(ev2 * scale)]
+    }
+
+    fn increment_shape(&mut self, ev1: f32, ev2: f32) {
+        let bins = self.shape_bins as usize;
+        let p = self.shape_point(ev1, ev2);
+        let h = self.histograms[0]
+            .get_or_insert_with(|| HistogramImage::zeros([bins, bins], [0.0; 2], [1.0; 2]));
         Self::increment(h, p);
     }
 
-    fn increment_orientation(&mut self, mut x: f32, mut y: f32, mut z: f32, which: usize) {
-        let bins = self.orientation_bins as usize;
-        let h = self.histograms[which]
-            .get_or_insert_with(|| HistogramImage::zeros([bins + 2, bins], [0.0; 2], [1.0; 2]));
+    /// The orientation histograms' point of the unit vector (`x`, `y`, `z`).
+    fn orientation_point(&self, mut x: f32, mut y: f32, mut z: f32) -> [f64; 2] {
         if x < 0.0 {
             x *= -1.0;
             y *= -1.0;
@@ -866,7 +900,15 @@ impl JointShapeModel {
         let nb = self.orientation_bins.wrapping_sub(1) as f32;
         let p0 = f64::from(psi / pi as f32 * nb + 1.0);
         let p1 = f64::from((theta + std::f64::consts::FRAC_PI_2 as f32) / pi as f32 * nb);
-        Self::increment(h, [p0, p1]);
+        [p0, p1]
+    }
+
+    fn increment_orientation(&mut self, x: f32, y: f32, z: f32, which: usize) {
+        let bins = self.orientation_bins as usize;
+        let p = self.orientation_point(x, y, z);
+        let h = self.histograms[which]
+            .get_or_insert_with(|| HistogramImage::zeros([bins + 2, bins], [0.0; 2], [1.0; 2]));
+        Self::increment(h, p);
         // Circular boundary: column 0 copies column `bins`, column `bins + 1` copies column 1.
         let (w, rows) = (bins + 2, bins);
         for r in 0..rows {
@@ -937,13 +979,29 @@ impl JointShapeModel {
     }
 
     fn evaluate(&self, x: &[f32]) -> f32 {
+        let points = if self.mode.fix() {
+            // Where the histograms were filled (ANTS-103 corrected).
+            let d = tensor_dimension(x.len());
+            if d < 3 {
+                return 0.0;
+            }
+            let (w, v) = Mat::tensor(x, d).eigen();
+            let ev1 = w.at(2, 2) / (self.max_ev1 - self.min_ev1);
+            let ev2 = w.at(1, 1) / (self.max_ev2 - self.min_ev2);
+            [
+                self.shape_point(ev1, ev2),
+                self.orientation_point(v.at(0, 2), v.at(1, 2), v.at(2, 2)),
+            ]
+        } else {
+            // ANTs: the raw components, point[1] never set (0 here).
+            [[f64::from(x[0]), 0.0], [f64::from(x[1]), 0.0]]
+        };
         let mut probability = 1.0f32;
-        for d in 0..2 {
-            let Some(h) = &self.histograms[d] else {
+        for (h, point) in self.histograms[..2].iter().zip(points) {
+            let Some(h) = h else {
                 return 0.0;
             };
-            // point[1] is never set by ANTs (ANTS-103): 0 here.
-            match h.evaluate([f64::from(x[d]), 0.0]) {
+            match h.evaluate(point) {
                 Some(v) => probability *= v as f32,
                 None => return 0.0,
             }
@@ -1012,7 +1070,9 @@ pub fn print(model: &Likelihood, indent: &str) -> String {
             s
         }
         Likelihood::LogEuclidean(h) => {
-            let mut s = format!("{indent}LogEuclideanGaussianListSampleFunction (0x0)\n{next}Mean tensor = [");
+            let mut s = format!(
+                "{indent}LogEuclideanGaussianListSampleFunction (0x0)\n{next}Mean tensor = ["
+            );
             if let Some(m) = &h.mean {
                 for r in 0..m.d {
                     for c in 0..m.d - 1 {

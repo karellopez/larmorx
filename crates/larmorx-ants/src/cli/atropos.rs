@@ -33,7 +33,9 @@ use crate::atropos::{
     Atropos, AtroposError, AtroposOptions, CLOCK_STAND_IN_SEED, FIXED_SEED, Formulation,
     Initialization, Likelihood, LikelihoodModel, OutlierHandling,
 };
-use crate::image::{AntsImage, FileStore, ImageStore, OutputImage, ReadError, read_with, write_with};
+use crate::image::{
+    AntsImage, FileStore, ImageStore, OutputImage, ReadError, read_with, write_with,
+};
 
 /// What ends a run early: the exit status (the messages are already printed).
 type Exit = u8;
@@ -61,7 +63,9 @@ impl Log<'_> {
             self.cout(s);
         }
         if !self.verbose {
-            self.cerr("larmorx: Atropos: ANTs prints the line above only with --verbose 1 (ANTS-45)\n");
+            self.cerr(
+                "larmorx: Atropos: ANTs prints the line above only with --verbose 1 (ANTS-45)\n",
+            );
         }
     }
 }
@@ -70,7 +74,9 @@ impl Log<'_> {
 /// exits 1.
 fn uncaught(log: &mut Log<'_>, e: &ItkException) -> Exit {
     log.cerr(&super::ai::terminate_text(e));
-    log.cerr("larmorx: Atropos: ANTs aborts here (an uncaught exception); larmorx stops with exit 1\n");
+    log.cerr(
+        "larmorx: Atropos: ANTs aborts here (an uncaught exception); larmorx stops with exit 1\n",
+    );
     1
 }
 
@@ -208,7 +214,9 @@ fn atropos(
         Conv::u32(&d.name).map_err(|e| uncaught(log, &e))? as usize
     } else {
         let Some(first) = p.all("intensity-image").last() else {
-            log.cerr("No input images were specified.  Specify an input image with the -a option\n");
+            log.cerr(
+                "No input images were specified.  Specify an input image with the -a option\n",
+            );
             return Err(1);
         };
         let name = if first.parameters.is_empty() {
@@ -234,7 +242,9 @@ fn atropos(
         if dims != 3 {
             notices.add(
                 &defects::ANTS_99,
-                format!("{name} is {dims}-dimensional and segmented as such; ANTs segments it in 3D"),
+                format!(
+                    "{name} is {dims}-dimensional and segmented as such; ANTs segments it in 3D"
+                ),
             );
         }
         if notices.fix() { dims } else { 3 }
@@ -262,7 +272,9 @@ fn iteration_line(elapsed: u32, max: u32, posterior: f32, temperature: f32) -> S
 /// width, precision and the `l`, `ll`, `h`, `hh`, `z`, `j`, `t` lengths, and `%%`); any other
 /// conversion, or a second one, reads arguments ANTs never passes (undefined behaviour).
 pub fn series_names(format: &str, count: u32) -> Result<Vec<String>, String> {
-    (1..=u64::from(count)).map(|i| c_format_one(format, i)).collect()
+    (1..=u64::from(count))
+        .map(|i| c_format_one(format, i))
+        .collect()
 }
 
 fn c_format_one(format: &str, value: u64) -> Result<String, String> {
@@ -306,14 +318,18 @@ fn c_format_one(format: &str, value: u64) -> Result<String, String> {
             i += 1;
         }
         if i < bytes.len() && bytes[i] == b'*' {
-            return Err(format!("'{format}': a '*' width reads an argument ANTs does not pass"));
+            return Err(format!(
+                "'{format}': a '*' width reads an argument ANTs does not pass"
+            ));
         }
         let mut precision: Option<usize> = None;
         if i < bytes.len() && bytes[i] == b'.' {
             i += 1;
             let mut p = 0usize;
             if i < bytes.len() && bytes[i] == b'*' {
-                return Err(format!("'{format}': a '*' precision reads an argument ANTs does not pass"));
+                return Err(format!(
+                    "'{format}': a '*' precision reads an argument ANTs does not pass"
+                ));
             }
             while i < bytes.len() && bytes[i].is_ascii_digit() {
                 p = p * 10 + usize::from(bytes[i] - b'0');
@@ -360,11 +376,27 @@ fn c_format_one(format: &str, value: u64) -> Result<String, String> {
         let (mut digits, negative, prefix) = match conv {
             b'd' | b'i' => (signed.unsigned_abs().to_string(), signed < 0, ""),
             b'u' => (masked.to_string(), false, ""),
-            b'x' => (format!("{masked:x}"), false, if alt && masked != 0 { "0x" } else { "" }),
-            b'X' => (format!("{masked:X}"), false, if alt && masked != 0 { "0X" } else { "" }),
+            b'x' => (
+                format!("{masked:x}"),
+                false,
+                if alt && masked != 0 { "0x" } else { "" },
+            ),
+            b'X' => (
+                format!("{masked:X}"),
+                false,
+                if alt && masked != 0 { "0X" } else { "" },
+            ),
             b'o' => {
                 let s = format!("{masked:o}");
-                (if alt && !s.starts_with('0') { format!("0{s}") } else { s }, false, "")
+                (
+                    if alt && !s.starts_with('0') {
+                        format!("0{s}")
+                    } else {
+                        s
+                    },
+                    false,
+                    "",
+                )
             }
             other => {
                 return Err(format!(
@@ -429,17 +461,11 @@ struct Ctx<'a, 'n> {
     dim: usize,
 }
 
-fn read_float(
-    ctx: &mut Ctx<'_, '_>,
-    name: &str,
-) -> Result<AntsImage<f32>, ReadError> {
+fn read_float(ctx: &mut Ctx<'_, '_>, name: &str) -> Result<AntsImage<f32>, ReadError> {
     read_with::<f32, _>(ctx.store, name, ctx.dim, ctx.n_threads, ctx.notices)
 }
 
-fn read_label(
-    ctx: &mut Ctx<'_, '_>,
-    name: &str,
-) -> Result<AntsImage<u32>, ReadError> {
+fn read_label(ctx: &mut Ctx<'_, '_>, name: &str) -> Result<AntsImage<u32>, ReadError> {
     read_with::<u32, _>(ctx.store, name, ctx.dim, ctx.n_threads, ctx.notices)
 }
 
@@ -466,7 +492,9 @@ fn segmentation(
     }
     log.verbose = verbose;
     if verbose {
-        log.cout(&format!("\nRunning Atropos for {dim}-dimensional images.\n"));
+        log.cout(&format!(
+            "\nRunning Atropos for {dim}-dimensional images.\n"
+        ));
     }
     let mut ctx = Ctx {
         store,
@@ -480,7 +508,9 @@ fn segmentation(
     o.upstream_defects = ctx.notices.mode();
 
     // --minimize-memory-usage (default "0").
-    let memory = p.last("minimize-memory-usage").map_or("0", |v| v.name.as_str());
+    let memory = p
+        .last("minimize-memory-usage")
+        .map_or("0", |v| v.name.as_str());
     o.minimize_memory = Conv::bool(memory).map_err(|e| conv_err(log, e))?;
 
     // --initialization
@@ -526,7 +556,9 @@ fn segmentation(
             if init.parameters.len() < 3 {
                 log.silent(
                     true,
-                    &format!("Incorrect initialization option specification.\n   {init_description}\n"),
+                    &format!(
+                        "Incorrect initialization option specification.\n   {init_description}\n"
+                    ),
                 );
                 return Err(1);
             }
@@ -534,9 +566,8 @@ fn segmentation(
                 .map_err(|e| conv_err(log, e))?
                 .clamp(0.0, 1.0e9);
             if init.parameters.len() > 3 {
-                o.probability_threshold = clamp01(
-                    Conv::f32(param(init, 3)).map_err(|e| conv_err(log, e))?,
-                );
+                o.probability_threshold =
+                    clamp01(Conv::f32(param(init, 3)).map_err(|e| conv_err(log, e))?);
             }
             let filename = param(init, 1).to_string();
             let mut images = Vec::with_capacity(k as usize);
@@ -582,7 +613,11 @@ fn segmentation(
                             o.aliased_priors = !fix;
                         }
                         for comp in components.iter() {
-                            let src = if aliased && !fix { &components[n - 1] } else { comp };
+                            let src = if aliased && !fix {
+                                &components[n - 1]
+                            } else {
+                                comp
+                            };
                             images.push(AntsImage {
                                 data: src.data.clone(),
                                 geometry: comp.geometry.clone(),
@@ -600,9 +635,8 @@ fn segmentation(
                 }
             }
             if init.parameters.len() > 3 {
-                o.probability_threshold = clamp01(
-                    Conv::f32(param(init, 3)).map_err(|e| conv_err(log, e))?,
-                );
+                o.probability_threshold =
+                    clamp01(Conv::f32(param(init, 3)).map_err(|e| conv_err(log, e))?);
             }
             prior_images = Some(images.into_iter().map(|i| i.data).collect());
         }
@@ -610,7 +644,9 @@ fn segmentation(
             if init.parameters.len() < 3 {
                 log.silent(
                     true,
-                    &format!("Incorrect initialization option specification.\n   {init_description}\n"),
+                    &format!(
+                        "Incorrect initialization option specification.\n   {init_description}\n"
+                    ),
                 );
                 return Err(1);
             }
@@ -672,7 +708,10 @@ fn segmentation(
                 // ANTs keeps Socrates for any other name (ANTS-101).
                 ctx.notices.add(
                     &defects::ANTS_101,
-                    format!("the posterior formulation '{}' is not one of Atropos' four", post.name),
+                    format!(
+                        "the posterior formulation '{}' is not one of Atropos' four",
+                        post.name
+                    ),
                 );
                 if fix {
                     log.cerr(&format!(
@@ -735,7 +774,11 @@ fn segmentation(
     // The checks of the priors against the mask (warnings only with -v).
     if let Some(label) = &prior_label {
         if same_grid(&mask, label) {
-            let uncovered = mask.data.iter().zip(&label.data).any(|(&m, &l)| m != 0 && l == 0);
+            let uncovered = mask
+                .data
+                .iter()
+                .zip(&label.data)
+                .any(|(&m, &l)| m != 0 && l == 0);
             if uncovered && verbose {
                 log.cout("\nWarning: the labels in the the prior label image do not encompass the entire mask region.  As a result each unlabeled voxel will be initially assigned a random label.  The user might want to consider various alternative strategies like assigning an additional \"background\" label to the unlabeled voxels or propagating the labels within the mask region.\n\n");
             }
@@ -751,7 +794,11 @@ fn segmentation(
                 let mut s = 0.0f32;
                 for p in priors {
                     let x = p[v];
-                    s += if o.minimize_memory && x <= threshold { 0.0 } else { x };
+                    s += if o.minimize_memory && x <= threshold {
+                        0.0
+                    } else {
+                        x
+                    };
                 }
                 if s < threshold {
                     below = true;
@@ -785,7 +832,10 @@ fn segmentation(
             if mesh.len() == 1 {
                 o.control_points = vec![mesh[0].wrapping_add(o.spline_order); dim];
             } else if mesh.len() == dim {
-                o.control_points = mesh.iter().map(|&m| m.wrapping_add(o.spline_order)).collect();
+                o.control_points = mesh
+                    .iter()
+                    .map(|&m| m.wrapping_add(o.spline_order))
+                    .collect();
             } else {
                 log.silent(true, "Incorrect mesh resolution\n");
                 return Err(1);
@@ -965,7 +1015,9 @@ fn segmentation(
     }
 
     // --use-euclidean-distance (default "0")
-    let euclid = p.last("use-euclidean-distance").map_or("0", |v| v.name.as_str());
+    let euclid = p
+        .last("use-euclidean-distance")
+        .map_or("0", |v| v.name.as_str());
     o.euclidean_distance = Conv::bool(euclid).map_err(|e| conv_err(log, e))?;
 
     // --likelihood-model
@@ -1092,8 +1144,7 @@ fn segmentation(
         let use_pv = p
             .last("use-partial-volume-likelihoods")
             .map(|v| v.name.to_lowercase());
-        o.use_partial_volume_likelihoods =
-            matches!(use_pv.as_deref(), Some("true") | Some("1"));
+        o.use_partial_volume_likelihoods = matches!(use_pv.as_deref(), Some("true") | Some("1"));
     }
 
     // --winsorize-outliers
@@ -1122,12 +1173,10 @@ fn segmentation(
                 let mut significance = 0.05f64;
                 let mut winsorizing = 0.10f64;
                 if !w.parameters.is_empty() {
-                    significance =
-                        f64::from(Conv::f32(param(w, 0)).map_err(|e| conv_err(log, e))?);
+                    significance = f64::from(Conv::f32(param(w, 0)).map_err(|e| conv_err(log, e))?);
                 }
                 if w.parameters.len() > 1 {
-                    winsorizing =
-                        f64::from(Conv::f32(param(w, 1)).map_err(|e| conv_err(log, e))?);
+                    winsorizing = f64::from(Conv::f32(param(w, 1)).map_err(|e| conv_err(log, e))?);
                 }
                 o.outliers = Some(OutlierHandling::GrubbsRosner {
                     significance,
@@ -1146,7 +1195,9 @@ fn segmentation(
     let n = intensities[0].data.len();
     let grid_ok = intensities.iter().all(|i| i.data.len() == n)
         && mask.data.len() == n
-        && prior_images.as_ref().is_none_or(|v| v.iter().all(|p| p.len() == n))
+        && prior_images
+            .as_ref()
+            .is_none_or(|v| v.iter().all(|p| p.len() == n))
         && prior_label.as_ref().is_none_or(|l| l.data.len() == n)
         && o.mrf_coefficients.as_ref().is_none_or(|c| c.len() == n);
     if !grid_ok {
@@ -1192,8 +1243,7 @@ fn segmentation(
         image_refs,
         Some(&mask.data),
         n_threads,
-    )
-    {
+    ) {
         Ok(f) => f,
         Err(e) => return Err(refuse(log, &e.to_string())),
     };
@@ -1215,7 +1265,8 @@ fn segmentation(
         }
     }
     if let Err(e) = result {
-        ctx.notices.extend(filter.notices.as_slice().iter().cloned());
+        ctx.notices
+            .extend(filter.notices.as_slice().iter().cloned());
         return Err(match e {
             AtroposError::Refused(m) => refuse(log, &m),
             e => {
@@ -1243,7 +1294,11 @@ fn segmentation(
         geometry: geometry.clone(),
         meta: ItkMeta::default(),
     };
-    let write_plain = |ctx: &mut Ctx<'_, '_>, log: &mut Log<'_>, name: &str, image: OutputImage| -> Result<(), Exit> {
+    let write_plain = |ctx: &mut Ctx<'_, '_>,
+                       log: &mut Log<'_>,
+                       name: &str,
+                       image: OutputImage|
+     -> Result<(), Exit> {
         ctx.store.save(name, &image, ctx.n_threads).map_err(|m| {
             let e = ItkException::new(
                 "Modules/IO/ImageBase/include/itkImageFileWriter.hxx",
@@ -1271,7 +1326,13 @@ fn segmentation(
         } else {
             param(out, 0).to_string()
         };
-        match write_with(ctx.store, &name, OutputImage::U32(classified), ctx.n_threads, ctx.notices) {
+        match write_with(
+            ctx.store,
+            &name,
+            OutputImage::U32(classified),
+            ctx.n_threads,
+            ctx.notices,
+        ) {
             Ok(_) => {}
             Err(m) => {
                 let e = ItkException::new(
@@ -1290,7 +1351,9 @@ fn segmentation(
                 if verbose {
                     log.cout(&format!("  Writing posterior image (class {})\n", i + 1));
                 }
-                let mut post = filter.posterior(i).map_err(|e| uncaught(log, &itk_exception(&e)))?;
+                let mut post = filter
+                    .posterior(i)
+                    .map_err(|e| uncaught(log, &itk_exception(&e)))?;
                 for (pv, &m) in post.iter_mut().zip(&mask.data) {
                     if m == 0 {
                         *pv = 0.0;
@@ -1305,7 +1368,9 @@ fn segmentation(
                 if verbose {
                     log.cout(&format!("  Writing likelihood image (class {})\n", i + 1));
                 }
-                let l = filter.likelihood(i).map_err(|e| uncaught(log, &itk_exception(&e)))?;
+                let l = filter
+                    .likelihood(i)
+                    .map_err(|e| uncaught(log, &itk_exception(&e)))?;
                 write_plain(&mut ctx, log, &names[i], OutputImage::F32(float_image(l)))?;
             }
         }
@@ -1354,7 +1419,8 @@ fn segmentation(
             "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
         ));
     }
-    ctx.notices.extend(filter.notices.as_slice().iter().cloned());
+    ctx.notices
+        .extend(filter.notices.as_slice().iter().cloned());
     drop(first_image);
     Ok(0)
 }
@@ -1398,7 +1464,10 @@ fn print_filter(f: &Atropos<'_>) -> String {
         o.partial_volume_classes()
     );
     s += &format!("{i}Minimize memory usage:");
-    let prior_probability = matches!(o.initialization, Initialization::PriorProbabilityImages { .. });
+    let prior_probability = matches!(
+        o.initialization,
+        Initialization::PriorProbabilityImages { .. }
+    );
     if o.minimize_memory {
         s += " true";
         if prior_probability {
@@ -1422,7 +1491,11 @@ fn print_filter(f: &Atropos<'_>) -> String {
             );
         }
     };
-    let euclid = if o.euclidean_distance { " true" } else { " false" };
+    let euclid = if o.euclidean_distance {
+        " true"
+    } else {
+        " false"
+    };
     match &o.initialization {
         Initialization::Random => s += "Random\n",
         Initialization::KMeans { .. } => s += "K means clustering\n",
@@ -1734,10 +1807,17 @@ mod tests {
     fn series_formats_like_snprintf() {
         assert_eq!(
             series_names("POSTERIOR_%02d.nii.gz", 3).unwrap(),
-            ["POSTERIOR_01.nii.gz", "POSTERIOR_02.nii.gz", "POSTERIOR_03.nii.gz"]
+            [
+                "POSTERIOR_01.nii.gz",
+                "POSTERIOR_02.nii.gz",
+                "POSTERIOR_03.nii.gz"
+            ]
         );
         assert_eq!(series_names("p%d.nii", 2).unwrap(), ["p1.nii", "p2.nii"]);
-        assert_eq!(series_names("same.nii", 2).unwrap(), ["same.nii", "same.nii"]);
+        assert_eq!(
+            series_names("same.nii", 2).unwrap(),
+            ["same.nii", "same.nii"]
+        );
         assert_eq!(series_names("a%%b%3d.nii", 1).unwrap(), ["a%b  1.nii"]);
         assert_eq!(series_names("x%-3dy", 1).unwrap(), ["x1  y"]);
         assert_eq!(series_names("x%#xy", 1).unwrap(), ["x0x1y"]);

@@ -21,7 +21,11 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OutlierHandling {
     /// `BoxPlot[lowerPercentile, upperPercentile, whiskerLength]` (0.25, 0.75, 1.5).
-    BoxPlot { lower: f64, upper: f64, whisker: f64 },
+    BoxPlot {
+        lower: f64,
+        upper: f64,
+        whisker: f64,
+    },
     /// `GrubbsRosner[significanceLevel, winsorizingLevel]` (0.05, 0.10).
     GrubbsRosner { significance: f64, winsorizing: f64 },
 }
@@ -87,7 +91,12 @@ fn quantiles(values: &[f32], lower: f64, upper: f64) -> Result<(f64, f64), Outli
 }
 
 /// The whisker bounds `(q_l − w·(q_u − q_l), q_u + w·(q_u − q_l))`.
-fn whiskers(values: &[f32], lower: f64, upper: f64, whisker: f64) -> Result<(f64, f64), OutlierError> {
+fn whiskers(
+    values: &[f32],
+    lower: f64,
+    upper: f64,
+    whisker: f64,
+) -> Result<(f64, f64), OutlierError> {
     let (lq, uq) = quantiles(values, lower, upper)?;
     Ok((lq - whisker * (uq - lq), uq + whisker * (uq - lq)))
 }
@@ -172,7 +181,11 @@ fn box_plot_ants(
 /// value (the mean and variance updated after each removal, as ANTs updates them), as long as
 /// more than 6 values remain; outliers become the mean ± the Student quantile of the
 /// winsorizing level times the standard deviation.
-fn grubbs_rosner(input: &[f32], significance: f64, winsorizing: f64) -> Result<Vec<f32>, OutlierError> {
+fn grubbs_rosner(
+    input: &[f32],
+    significance: f64,
+    winsorizing: f64,
+) -> Result<Vec<f32>, OutlierError> {
     let n = input.len();
     if n <= 6 {
         return Ok(input.to_vec());
@@ -217,7 +230,8 @@ fn grubbs_rosner(input: &[f32], significance: f64, winsorizing: f64) -> Result<V
             if found {
                 let count2 = remaining as f64;
                 mean = (mean * count2 - x) / (count2 - 1.0);
-                variance = (count2 - 1.0) * variance - (count2 - 1.0) * ((x - mean) * (x - mean)) / count2;
+                variance =
+                    (count2 - 1.0) * variance - (count2 - 1.0) * ((x - mean) * (x - mean)) / count2;
                 variance /= count2 - 2.0;
                 is_outlier[id] = true;
                 outliers += 1;

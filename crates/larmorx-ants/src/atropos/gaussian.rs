@@ -108,7 +108,8 @@ impl GaussianMembership {
         }
         self.nonsingular = det > 1.0e-6;
         if self.nonsingular {
-            self.inverse = vnl_inverse(&self.covariance, k).unwrap_or_else(|| vec![f64::NAN; k * k]);
+            self.inverse =
+                vnl_inverse(&self.covariance, k).unwrap_or_else(|| vec![f64::NAN; k * k]);
             let root = (2.0 * std::f64::consts::PI).sqrt();
             self.prefactor = 1.0 / (det.sqrt() * larmorx_core::math::pow(root, k as f64));
         } else {
@@ -225,7 +226,8 @@ pub struct GaussianModel {
 
 /// What `SetInputListSample` said besides its result: ITK's warning for a sample of at most one
 /// element (the model then keeps its previous parameters).
-pub const SMALL_SAMPLE: &str = "The input list sample has <= 1 element.  Function evaluations will be equal to 0.";
+pub const SMALL_SAMPLE: &str =
+    "The input list sample has <= 1 element.  Function evaluations will be equal to 0.";
 
 impl GaussianModel {
     /// `SetInputListSample` with the weights set before: the weighted estimate, then ANTs'

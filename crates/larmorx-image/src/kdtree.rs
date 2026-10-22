@@ -319,7 +319,13 @@ impl KdTree {
     }
 
     /// `BoundsOverlapBall`, with ITK's early return after each axis outside the box.
-    fn bounds_overlap_ball(&self, query: &[f32], lower: &[f32], upper: &[f32], radius: f64) -> bool {
+    fn bounds_overlap_ball(
+        &self,
+        query: &[f32],
+        lower: &[f32],
+        upper: &[f32],
+        radius: f64,
+    ) -> bool {
         let r2 = radius * radius;
         let mut sum = 0.0f64;
         for d in 0..self.m {
@@ -526,7 +532,9 @@ impl Kmeans {
                 }
             }
         }
-        let mut current: Vec<Vec<f64>> = (0..k).map(|i| initial[i * m..(i + 1) * m].to_vec()).collect();
+        let mut current: Vec<Vec<f64>> = (0..k)
+            .map(|i| initial[i * m..(i + 1) * m].to_vec())
+            .collect();
         let valid: Vec<usize> = (0..k).collect();
         let mut iteration = 0usize;
         let mut met = false;
@@ -548,7 +556,12 @@ impl Kmeans {
                 fix: self.fix_split_points,
                 met: false,
             };
-            state.filter(tree.root, valid.clone(), &mut lower.clone(), &mut upper.clone());
+            state.filter(
+                tree.root,
+                valid.clone(),
+                &mut lower.clone(),
+                &mut upper.clone(),
+            );
             met |= state.met;
             for c in candidates.iter_mut() {
                 if c.size > 0 {
@@ -656,7 +669,8 @@ impl FilterState<'_, '_> {
                 let closest_position = self.candidates[closest].centroid.clone();
                 let mut i = 0;
                 while i < valid.len() {
-                    if valid[i] != closest && self.is_farther(valid[i], &closest_position, lower, upper)
+                    if valid[i] != closest
+                        && self.is_farther(valid[i], &closest_position, lower, upper)
                     {
                         valid.remove(i);
                         continue;
@@ -695,7 +709,9 @@ mod tests {
     use super::*;
 
     fn lcg(seed: &mut u64) -> f32 {
-        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((*seed >> 40) as f32) / (1u64 << 24) as f32
     }
 

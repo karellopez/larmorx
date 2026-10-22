@@ -223,7 +223,10 @@ impl<'a> Atropos<'a> {
         let total = classes + options.partial_volume_classes();
         let mut components = Vec::with_capacity(total);
         for _ in 0..classes {
-            components.push(Likelihood::new(&options.likelihood, options.upstream_defects));
+            components.push(Likelihood::new(
+                &options.likelihood,
+                options.upstream_defects,
+            ));
         }
         for _ in classes..total {
             components.push(Likelihood::PartialVolume(Default::default()));
@@ -318,7 +321,10 @@ impl<'a> Atropos<'a> {
     }
 
     fn uses_prior_label(&self) -> bool {
-        matches!(self.options.initialization, Initialization::PriorLabelImage { .. })
+        matches!(
+            self.options.initialization,
+            Initialization::PriorLabelImage { .. }
+        )
     }
 
     fn uses_priors(&self) -> bool {
@@ -474,7 +480,14 @@ impl<'a> Atropos<'a> {
 
     /// `EvaluateMRFNeighborhoodWeights` at voxel `v` with `labels`.
     #[inline]
-    fn mrf_weights(&self, labels: &[u32], v: usize, coord: &[usize], out: &mut [f32], h: &mut [f32]) {
+    fn mrf_weights(
+        &self,
+        labels: &[u32],
+        v: usize,
+        coord: &[usize],
+        out: &mut [f32],
+        h: &mut [f32],
+    ) {
         let total = out.len();
         h.iter_mut().for_each(|x| *x = 0.0);
         let nb = &self.neighborhood;
@@ -609,7 +622,8 @@ impl<'a> Atropos<'a> {
                 let set = self.options.partial_volume_sets[c - classes].clone();
                 for (d, &l) in set.iter().enumerate() {
                     let l = l as usize - 1;
-                    let w = self.components[c].set_indexed_sample(d, &samples[l], m, &weights[l])?;
+                    let w =
+                        self.components[c].set_indexed_sample(d, &samples[l], m, &weights[l])?;
                     if let Some(w) = w {
                         self.warnings.push(w.to_string());
                     }
@@ -680,8 +694,7 @@ impl<'a> Atropos<'a> {
             _ => (0..classes)
                 .map(|k| {
                     f64::from(
-                        min_value
-                            + (max_value - min_value) * (k as f32 + 0.5) / classes as f32,
+                        min_value + (max_value - min_value) * (k as f32 + 0.5) / classes as f32,
                     )
                 })
                 .collect(),
@@ -781,7 +794,12 @@ impl<'a> Atropos<'a> {
     /// The k-means estimate of `samples` (`m` wide) from `initial`, as Atropos configures
     /// `KdTreeBasedKmeansEstimator` (bucket 16, 200 iterations, threshold 0), with ITK-50
     /// corrected unless reproduced.
-    fn kmeans(&mut self, samples: &[f32], m: usize, initial: &[f64]) -> Result<Vec<f64>, AtroposError> {
+    fn kmeans(
+        &mut self,
+        samples: &[f32],
+        m: usize,
+        initial: &[f64],
+    ) -> Result<Vec<f64>, AtroposError> {
         let tree = KdTree::new(samples, m, 16).map_err(|e| AtroposError::Refused(e.to_string()))?;
         let fix = self.options.upstream_defects.fix();
         let km = Kmeans {
@@ -870,8 +888,7 @@ impl<'a> Atropos<'a> {
                     .into(),
             ));
         }
-        let thresholds =
-            larmorx_image::threshold::otsu_thresholds(&h, thresholds_n, false, false);
+        let thresholds = larmorx_image::threshold::otsu_thresholds(&h, thresholds_n, false, false);
         let t: Vec<f32> = thresholds.iter().map(|&x| x as f32).collect();
         for v in 0..self.n {
             let mut label = 0u32;
@@ -1060,7 +1077,8 @@ impl<'a> Atropos<'a> {
                     max_labels[v] = c as u32 + 1;
                 } else if almost_equal_f32(p, max_posterior[v]) {
                     let current = max_labels[v];
-                    if current >= 1 && self.label_volumes[c] < self.label_volumes[current as usize - 1]
+                    if current >= 1
+                        && self.label_volumes[c] < self.label_volumes[current as usize - 1]
                     {
                         max_labels[v] = c as u32 + 1;
                     }
@@ -1172,7 +1190,7 @@ impl<'a> Atropos<'a> {
             Likelihood::JointShape(_) => {
                 self.notices.add(
                     &defects::ANTS_103,
-                    "the joint shape and orientation likelihood reads an unset coordinate (0 here)",
+                    "the joint shape and orientation likelihood, evaluated at the raw tensor components and an unset coordinate",
                 );
             }
             _ => {}
@@ -1372,9 +1390,7 @@ impl<'a> Atropos<'a> {
                 }
                 powf(spatial, w) * powf(likelihood * mrf, 1.0 - w)
             }
-            Formulation::Aristotle => {
-                powf(spatial * distance, w) * powf(likelihood * mrf, 1.0 - w)
-            }
+            Formulation::Aristotle => powf(spatial * distance, w) * powf(likelihood * mrf, 1.0 - w),
             Formulation::Sigmoid => {
                 let total = self.total_classes() as f32;
                 let offset = 1.0 / total;
@@ -1403,7 +1419,10 @@ impl<'a> Atropos<'a> {
     pub fn posterior(&mut self, c: usize) -> Result<Vec<f32>, AtroposError> {
         let total = self.total_classes();
         if c >= total {
-            return Err(itk(1996, "Requested class is greater than the number of classes."));
+            return Err(itk(
+                1996,
+                "Requested class is greater than the number of classes.",
+            ));
         }
         if c < self.posteriors.len() {
             return Ok(self.posteriors[c].clone());
@@ -1504,7 +1523,12 @@ impl<'a> Atropos<'a> {
         if self.uses_prior_probabilities() || (self.uses_prior_label() && c < self.classes()) {
             let mut out = Vec::with_capacity(m);
             for i in 0..m {
-                if self.options.adaptive_smoothing.get(i).is_some_and(|&w| w > 0.0) {
+                if self
+                    .options
+                    .adaptive_smoothing
+                    .get(i)
+                    .is_some_and(|&w| w > 0.0)
+                {
                     out.push(Some(self.smooth_intensity(i, c)?));
                 } else {
                     out.push(None);
@@ -1521,7 +1545,12 @@ impl<'a> Atropos<'a> {
         let m = self.intensities.len();
         let mut out = Vec::with_capacity(m);
         for i in 0..m {
-            if self.options.adaptive_smoothing.get(i).is_some_and(|&w| w > 0.0) {
+            if self
+                .options
+                .adaptive_smoothing
+                .get(i)
+                .is_some_and(|&w| w > 0.0)
+            {
                 out.push(Some(self.smooth_intensity(i, c)?));
             } else {
                 out.push(None);
@@ -1693,7 +1722,10 @@ impl<'a> Atropos<'a> {
             &self.labels
         };
         let label = c as u32 + 1;
-        let binary: Vec<f32> = source.iter().map(|&l| if l == label { 1.0 } else { 0.0 }).collect();
+        let binary: Vec<f32> = source
+            .iter()
+            .map(|&l| if l == label { 1.0 } else { 0.0 })
+            .collect();
         let mut distance = if self.options.euclidean_distance {
             let options = larmorx_image::distance::MaurerOptions {
                 background: 0.0,
@@ -1845,22 +1877,24 @@ impl<'a> Atropos<'a> {
         let mut out = vec![0.0f32; self.n];
         let this = &*self;
         larmorx_core::parallel::with_threads(this.n_threads, || {
-            out.par_chunks_mut(4096).enumerate().for_each(|(chunk, slice)| {
-                let mut x = vec![0.0f32; m];
-                for (j, slot) in slice.iter_mut().enumerate() {
-                    let v = chunk * 4096 + j;
-                    if !this.in_mask(v) {
-                        continue;
-                    }
-                    this.measurement(v, &mut x);
-                    for (i, sm) in smooth.iter().enumerate() {
-                        if let Some(sm) = sm {
-                            x[i] = (1.0 - weights[i]) * x[i] + weights[i] * sm[v];
+            out.par_chunks_mut(4096)
+                .enumerate()
+                .for_each(|(chunk, slice)| {
+                    let mut x = vec![0.0f32; m];
+                    for (j, slot) in slice.iter_mut().enumerate() {
+                        let v = chunk * 4096 + j;
+                        if !this.in_mask(v) {
+                            continue;
                         }
+                        this.measurement(v, &mut x);
+                        for (i, sm) in smooth.iter().enumerate() {
+                            if let Some(sm) = sm {
+                                x[i] = (1.0 - weights[i]) * x[i] + weights[i] * sm[v];
+                            }
+                        }
+                        *slot = this.components[c].evaluate(&x);
                     }
-                    *slot = this.components[c].evaluate(&x);
-                }
-            });
+                });
         })
         .map_err(|e| AtroposError::Refused(e.to_string()))?;
         Ok(out)

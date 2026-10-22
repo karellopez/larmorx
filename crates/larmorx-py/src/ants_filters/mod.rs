@@ -71,9 +71,12 @@ pub(crate) fn array_like<'py, T: numpy::Element>(
 // ------------------------------------------------------------------------------------------------
 // In-memory images for the command-line code
 
-/// Images held in memory under placeholder names; other names are files.
+/// Images held in memory under placeholder names, and placeholder names standing for files
+/// (`aliases`, for programs that read numbered series such as Atropos' priors); other names
+/// are files.
 struct MemoryStore {
     inputs: HashMap<String, ItkImage>,
+    aliases: HashMap<String, String>,
     outputs: HashMap<String, OutputImage>,
     capture: Vec<String>,
 }
@@ -85,9 +88,10 @@ impl ImageStore for MemoryStore {
         n_threads: usize,
         notices: &mut Notices,
     ) -> Result<ItkImage, ReadError> {
-        match self.inputs.get(name) {
-            Some(image) => Ok(image.clone()),
-            None => FileStore.load(name, n_threads, notices),
+        match (self.inputs.get(name), self.aliases.get(name)) {
+            (Some(image), _) => Ok(image.clone()),
+            (None, Some(path)) => FileStore.load(path, n_threads, notices),
+            (None, None) => FileStore.load(name, n_threads, notices),
         }
     }
 
@@ -226,7 +230,7 @@ pub(crate) fn output_to_py<'py>(
 /// `DenoiseImage`, `antsRegistration`) with `args` (after the program name). `inputs`
 /// maps placeholder names to `(data, ras_affine, descrip)` or
 /// `(data, ras_affine, descrip, extra_spacing)` (the spacing of the axes after the third,
-/// such as the repetition time); writes to the names in `outputs` are returned instead of
+/// such as the repetition time), or to a file path the name stands for; writes to the names in `outputs` are returned instead of
 /// written. Returns `(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})`. The
 /// program runs in the D13 mode `upstream_defects` (`"fix"` or `"reproduce"`); its notices
 /// are lines of `stderr` (`larmorx._defects.parse_line`).
@@ -244,12 +248,17 @@ fn ants_program<'py>(
     let mode = crate::defects::mode_from_py(upstream_defects)?;
     let mut store = MemoryStore {
         inputs: HashMap::new(),
+        aliases: HashMap::new(),
         outputs: HashMap::new(),
         capture: outputs,
     };
     for (name, value) in inputs.iter() {
         let name: String = name.extract()?;
-        store.inputs.insert(name, itk_image_from_tuple(&value)?);
+        if let Ok(path) = value.extract::<String>() {
+            store.aliases.insert(name, path);
+        } else {
+            store.inputs.insert(name, itk_image_from_tuple(&value)?);
+        }
     }
     type Run = fn(
         &[String],
@@ -271,6 +280,7 @@ fn ants_program<'py>(
         "antsRegistration" => larmorx_ants::cli::registration::run_store,
         "antsAI" => larmorx_ants::cli::ai::run_store,
         "antsAffineInitializer" => larmorx_ants::cli::affine_initializer::run,
+        "Atropos" => larmorx_ants::cli::atropos::run,
         other => {
             return Err(PyValueError::new_err(format!(
                 "unknown ANTs image program {other:?}"

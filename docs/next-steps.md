@@ -37,7 +37,7 @@ starts no other agent.
    against the current oracle (on a quiet machine). **Part 2b merged 2026-10-21:** every tool's
    page in this form, every case classified. Each later part brings its tool's evidence in the
    same form.
-2. **A5 part 3:** the time-varying velocity fields and the exponential transforms; with it the
+2. **A5 part 3** (running since 2026-10-22): the time-varying velocity fields and the exponential transforms; with it the
    corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
    ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
    point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving

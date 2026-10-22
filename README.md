@@ -127,7 +127,7 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 
 The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 
-1. **ANTs:** Atropos, then antsAI's `-b`.
+1. **ANTs:** antsAI's blob alignment (`-b`).
 2. **AFNI:** 3dUnifize and 3dAutomask (fMRIPrep's BOLD reference), then 3dQwarp, 3dSkullStrip,
    3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit,
    3dFWHMx/3dClustSim, ...).

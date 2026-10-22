@@ -38,11 +38,18 @@ use crate::bspline_field::{FitDomain, Lattice, Scattered, fit, reconstruct};
 use crate::convergence::WindowConvergence;
 use crate::field::{Field, FieldSmoothing, FieldXfm, zero_field};
 use crate::mask::Mask;
-use crate::method::{CRASH_FILE, SamplingStrategy, StageMetric, sample_points, shrink_space, smooth_for_level};
+use crate::method::{
+    CRASH_FILE, SamplingStrategy, StageMetric, sample_points, shrink_space, smooth_for_level,
+};
 use crate::pointset::metric::{PointSetEvents, PointSetMetric, TangentCall};
 use crate::resample::{Interpolator, resample_linear, resample_nonlinear_with};
-use crate::syn::{CallSettings, GradientCall, LevelImageMetric, Resampled, pooled, resample_image, weights_are_identity};
-use crate::time_varying::{TvField, TvIteration, TvObserver, VelocityOutput, integrate, spatial_space};
+use crate::syn::{
+    CallSettings, GradientCall, LevelImageMetric, Resampled, pooled, resample_image,
+    weights_are_identity,
+};
+use crate::time_varying::{
+    TvField, TvIteration, TvObserver, VelocityOutput, integrate, spatial_space,
+};
 use crate::transform::{Composite, Xfm};
 use crate::{Image, ItkException, Matrix, Real, Space};
 
@@ -142,7 +149,13 @@ pub fn lattice_space<const E: usize>(
         }
         lattice_origin[r] = sum + origin[r];
     }
-    Space::new(lattice_size, [0; E], lattice_spacing, lattice_origin, *direction)
+    Space::new(
+        lattice_size,
+        [0; E],
+        lattice_spacing,
+        lattice_origin,
+        *direction,
+    )
 }
 
 /// `TimeVaryingBSplineVelocityFieldTransform` as the stage drives it.
@@ -183,9 +196,21 @@ impl<R: Real, const D: usize, const E: usize> TvbTransform<R, D, E> {
     /// (`inverse` false skips the backward flow where nothing reads it).
     fn integrate(&mut self, floor: &IndexFloor, inverse: bool) -> Result<(), ItkException> {
         let v = self.sample()?;
-        self.field = integrate(&v, self.lower.to_f64(), self.upper.to_f64(), self.steps, floor);
+        self.field = integrate(
+            &v,
+            self.lower.to_f64(),
+            self.upper.to_f64(),
+            self.steps,
+            floor,
+        );
         self.inverse = if inverse {
-            Some(integrate(&v, self.upper.to_f64(), self.lower.to_f64(), self.steps, floor))
+            Some(integrate(
+                &v,
+                self.upper.to_f64(),
+                self.lower.to_f64(),
+                self.steps,
+                floor,
+            ))
         } else {
             None
         };
@@ -228,7 +253,11 @@ impl<R: Real, const D: usize, const E: usize> TvbTransform<R, D, E> {
                     e,
                 )
             })?;
-            components.push(crate::transform::bspline::decompose(&up, &required.size, self.order));
+            components.push(crate::transform::bspline::decompose(
+                &up,
+                &required.size,
+                self.order,
+            ));
         }
         let data: Vec<[R; D]> = (0..n)
             .map(|o| std::array::from_fn(|j| components[j][o]))
@@ -251,8 +280,14 @@ fn weighted_mask<R: Real, const D: usize>(
     floor: &IndexFloor,
 ) -> Vec<f32> {
     let image = &mask.image;
-    let target = Space::new(output.size, [0; D], output.spacing, output.origin, output.direction)
-        .expect("the virtual domain's geometry");
+    let target = Space::new(
+        output.size,
+        [0; D],
+        output.spacing,
+        output.origin,
+        output.direction,
+    )
+    .expect("the virtual domain's geometry");
     resample_nonlinear_with(&image.space, &target, transform, 0.0f64, |c| {
         crate::interp::at_cindex_with(&image.space, c, floor, |o| f64::from(image.data[o]))
     })
@@ -326,7 +361,10 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
     warnings: &mut Vec<String>,
     point_sets: &mut [Option<PointSetMetric<R, D>>],
 ) -> Result<TvbOutput<R, D>, ItkException> {
-    let Some(virtual_base) = stage.metrics.first().and_then(|m| m.virtual_domain().cloned())
+    let Some(virtual_base) = stage
+        .metrics
+        .first()
+        .and_then(|m| m.virtual_domain().cloned())
     else {
         return Err(crash(
             "a stage of point-set metrics without a fixed mask has no virtual domain (ANTs reads its spacing from a null image)",
@@ -385,7 +423,9 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
         )?;
         {
             let t = &mut transform;
-            pooled(stage.n_threads, || t.adapt(&required, &required_domain, floor))??;
+            pooled(stage.n_threads, || {
+                t.adapt(&required, &required_domain, floor)
+            })??;
         }
         for m in mesh.iter_mut() {
             *m = m.wrapping_shl(1);
@@ -401,8 +441,18 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
             };
             level_metrics.push(Some(LevelImageMetric {
                 kind: sm.kind,
-                fixed: smooth_for_level(&sm.fixed, sigma, stage.sigmas_in_physical_units, stage.n_threads)?,
-                moving: smooth_for_level(&sm.moving, sigma, stage.sigmas_in_physical_units, stage.n_threads)?,
+                fixed: smooth_for_level(
+                    &sm.fixed,
+                    sigma,
+                    stage.sigmas_in_physical_units,
+                    stage.n_threads,
+                )?,
+                moving: smooth_for_level(
+                    &sm.moving,
+                    sigma,
+                    stage.sigmas_in_physical_units,
+                    stage.n_threads,
+                )?,
                 fixed_mask: sm.fixed_mask.clone(),
                 moving_mask: sm.moving_mask.clone(),
                 use_gradient_filter: sm.use_gradient_filter,
@@ -585,10 +635,11 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                         virtual_space: &virtual_space,
                         sparse: false,
                     };
-                    let (value, mut derivative) = pooled(stage.n_threads, || -> Result<_, ItkException> {
-                        p.tangent_initialize(&call, warnings)?;
-                        p.tangent_evaluate(warnings)
-                    })??;
+                    let (value, mut derivative) =
+                        pooled(stage.n_threads, || -> Result<_, ItkException> {
+                            p.tangent_initialize(&call, warnings)?;
+                            p.tangent_evaluate(warnings)
+                        })??;
                     value_sum = value_sum + value;
                     if let Some(w) = settings.optimizer_weights
                         && w.len() == D
@@ -663,8 +714,18 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                                 &moving_composite,
                             );
                             Resampled {
-                                fixed: Arc::new(resample_image(&lm.fixed, &virtual_space, &fixed_composite, floor)),
-                                moving: Arc::new(resample_image(&lm.moving, &virtual_space, &moving_composite, floor)),
+                                fixed: Arc::new(resample_image(
+                                    &lm.fixed,
+                                    &virtual_space,
+                                    &fixed_composite,
+                                    floor,
+                                )),
+                                moving: Arc::new(resample_image(
+                                    &lm.moving,
+                                    &virtual_space,
+                                    &moving_composite,
+                                    floor,
+                                )),
                                 fixed_mask,
                                 moving_mask,
                                 fixed_gradient: None,
@@ -673,17 +734,20 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                         }));
                     }
                     // ITK-36: the transforms the last metric set apply to every metric.
-                    let last_is_point_set = matches!(stage.metrics.last(), Some(StageMetric::PointSet(_)));
+                    let last_is_point_set =
+                        matches!(stage.metrics.last(), Some(StageMetric::PointSet(_)));
                     let identity_field = Composite::new(vec![Xfm::Field(FieldXfm::new(
                         zero_field(&virtual_space),
                         Some(zero_field(&virtual_space)),
                         stage.exact_floor,
                     ))]);
-                    let reproduce_itk_36 = multi && has_point_sets && !stage.correct_multi_metric_transforms;
+                    let reproduce_itk_36 =
+                        multi && has_point_sets && !stage.correct_multi_metric_transforms;
                     if multi && has_point_sets {
                         multi_metric_transforms = true;
                     }
-                    let identity = (reproduce_itk_36 && !last_is_point_set).then_some(&identity_field);
+                    let identity =
+                        (reproduce_itk_36 && !last_is_point_set).then_some(&identity_field);
                     let images_through = (reproduce_itk_36 && last_is_point_set)
                         .then_some((&fixed_composite, &moving_composite));
                     let mut call = GradientCall {
@@ -776,7 +840,9 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                 None => previous = Some(scattered.data.clone()),
             }
             // The B-spline update lattice in space and time.
-            let update = pooled(stage.n_threads, || fit(&fit_domain, &cps, stage.order, &scattered))??;
+            let update = pooled(stage.n_threads, || {
+                fit(&fit_domain, &cps, stage.order, &scattered)
+            })??;
             // TimeVaryingBSplineVelocityFieldTransform::UpdateTransformParameters: the lattice
             // plus the update times the learning rate, then integrated.
             let lr = stage.learning_rate;

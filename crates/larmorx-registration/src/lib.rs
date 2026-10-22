@@ -61,8 +61,8 @@ pub mod rng;
 pub mod space;
 pub mod syn;
 pub mod time_varying;
-pub mod tv_bspline;
 pub mod transform;
+pub mod tv_bspline;
 
 use larmorx_core::ItkReal;
 
@@ -95,13 +95,15 @@ pub trait Real: ItkReal + Default + Send + Sync + 'static {
         n_threads: usize,
     ) -> Result<Vec<Self>, larmorx_image::FilterError>;
 
-    /// `GradientRecursiveGaussianImageFilter<Image<R>>` with one sigma, `NormalizeAcrossScale`
-    /// on: the component images (double) before the direction correction.
+    /// `GradientRecursiveGaussianImageFilter<Image<R>>` with one sigma and
+    /// `NormalizeAcrossScale` as given: the component images (double) before the direction
+    /// correction.
     fn gradient(
         data: &[Self],
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
+        normalize_across_scale: bool,
         n_threads: usize,
     ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError>;
 }
@@ -148,12 +150,13 @@ impl Real for f64 {
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
+        normalize_across_scale: bool,
         n_threads: usize,
     ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError> {
         larmorx_image::gaussian::gradient_recursive_gaussian_f64(
             larmorx_image::VolumeRef::new(data, size, spacing),
             sigma,
-            true,
+            normalize_across_scale,
             n_threads,
         )
     }
@@ -201,12 +204,13 @@ impl Real for f32 {
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
+        normalize_across_scale: bool,
         n_threads: usize,
     ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError> {
         larmorx_image::gaussian::gradient_recursive_gaussian(
             larmorx_image::VolumeRef::new(data, size, spacing),
             sigma,
-            true,
+            normalize_across_scale,
             n_threads,
         )
     }

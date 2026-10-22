@@ -77,6 +77,21 @@ fn cubic(u: f64) -> f64 {
     }
 }
 
+/// The cubic kernel's derivative: `−2u + 1.5·u·|u|` for `|u| < 1`,
+/// `sign(u)·(−2 + 2|u| − ½u²)` for `1 ≤ |u| < 2`, else 0.
+#[inline]
+fn cubic_derivative(u: f64) -> f64 {
+    let a = u.abs();
+    if a < 1.0 {
+        -2.0 * u + 1.5 * u * a
+    } else if a < 2.0 {
+        let d = -2.0 + 2.0 * a - 0.5 * a * a;
+        if u < 0.0 { -d } else { d }
+    } else {
+        0.0
+    }
+}
+
 /// A point's support: the first control point per axis and the `4^D` weights (x fastest).
 pub struct Support<const D: usize> {
     pub start: [usize; D],
@@ -450,6 +465,75 @@ impl<R: Real, const D: usize> BSplineXfm<R, D> {
         }
     }
 
+    /// The Jacobian with respect to position, `∂T(p)/∂p` (ITK-35 corrected: ITK's
+    /// `ComputeJacobianWithRespectToPosition` throws "not yet implemented"). Inside the valid
+    /// region it is the identity plus `Σ_k c_k ⊗ ∇w_k(p)`: each support weight's gradient is,
+    /// along continuous-index axis `i`, the cubic kernel's derivative on that axis times its
+    /// values on the others, turned into a physical gradient by the grid's point-to-index
+    /// matrix (`∂c/∂p`). Outside the valid region the transform is the identity, and so is its
+    /// Jacobian. In double, stored in `R`.
+    pub fn jacobian_position(&self, p: &[R; D]) -> crate::Matrix<R, D> {
+        let mut jac: [[f64; D]; D] =
+            std::array::from_fn(|i| std::array::from_fn(|j| if i == j { 1.0 } else { 0.0 }));
+        if let Some(c) = self.valid_index(p) {
+            let mut start = [0usize; D];
+            let mut w1 = [[0.0f64; ORDER + 1]; D];
+            let mut d1 = [[0.0f64; ORDER + 1]; D];
+            for j in 0..D {
+                let s = (c[j].to_f64() + 0.5 - ORDER as f64 / 2.0).floor();
+                start[j] = s as usize;
+                let mut x = c[j].to_f64() - s;
+                for k in 0..=ORDER {
+                    w1[j][k] = cubic(x);
+                    d1[j][k] = cubic_derivative(x);
+                    x -= 1.0;
+                }
+            }
+            let support = Support {
+                start,
+                weights: Vec::new(),
+            };
+            let offsets = self.support_offsets(&support);
+            let per = self.parameters_per_dimension();
+            let to_index = &self.grid.point_to_index;
+            for (k, &o) in offsets.iter().enumerate() {
+                let mut taps = [0usize; D];
+                let mut rest = k;
+                for t in taps.iter_mut() {
+                    *t = rest % (ORDER + 1);
+                    rest /= ORDER + 1;
+                }
+                // ∂w/∂c_i, then ∂w/∂p_m = Σ_i ∂w/∂c_i · ∂c_i/∂p_m.
+                let mut by_index = [0.0f64; D];
+                for (i, g) in by_index.iter_mut().enumerate() {
+                    let mut prod = 1.0f64;
+                    for l in 0..D {
+                        prod *= if l == i {
+                            d1[l][taps[l]]
+                        } else {
+                            w1[l][taps[l]]
+                        };
+                    }
+                    *g = prod;
+                }
+                let by_point: [f64; D] = std::array::from_fn(|m| {
+                    let mut s = 0.0f64;
+                    for i in 0..D {
+                        s += by_index[i] * to_index[i][m];
+                    }
+                    s
+                });
+                for (d, row) in jac.iter_mut().enumerate() {
+                    let coefficient = self.coefficients[d * per + o].to_f64();
+                    for m in 0..D {
+                        row[m] += coefficient * by_point[m];
+                    }
+                }
+            }
+        }
+        std::array::from_fn(|i| std::array::from_fn(|j| R::from_f64(jac[i][j])))
+    }
+
     /// ITK's exception of `ComputeJacobianWithRespectToPosition`, which B-spline transforms do
     /// not implement.
     pub fn no_position_jacobian() -> ItkException {
@@ -652,6 +736,148 @@ mod tests {
             assert_eq!(a.sum().to_bits(), b.sum().to_bits());
             assert_eq!(a.compensation().to_bits(), b.compensation().to_bits());
         }
+    }
+
+    /// ITK-35 corrected: the Jacobian with respect to position against central finite
+    /// differences of `TransformPoint`, at points inside and outside the valid region of an
+    /// oblique grid (2D and 3D).
+    #[test]
+    fn position_jacobian_matches_finite_differences() {
+        let mut rng = MersenneTwister::from_int(11);
+        let b = transform(&mut rng);
+        let mut inside = 0;
+        for _ in 0..300 {
+            let p = [
+                -42.0 + 40.0 * rng.closed(),
+                -6.0 + 40.0 * rng.closed(),
+                1.0 + 19.0 * rng.closed(),
+            ];
+            let jac = b.jacobian_position(&p);
+            if b.support(&p).is_some() {
+                inside += 1;
+            }
+            let h = 1e-5;
+            for m in 0..3 {
+                let mut plus = p;
+                let mut minus = p;
+                plus[m] += h;
+                minus[m] -= h;
+                // A step across the valid region's edge is not a derivative.
+                if b.support(&plus).is_some() != b.support(&minus).is_some() {
+                    continue;
+                }
+                let tp = b.transform_point(&plus);
+                let tm = b.transform_point(&minus);
+                for d in 0..3 {
+                    let fd = (tp[d] - tm[d]) / (2.0 * h);
+                    assert!(
+                        (fd - jac[d][m]).abs() < 1e-6 * (1.0 + jac[d][m].abs()),
+                        "p {p:?} d {d} m {m}: finite difference {fd}, Jacobian {}",
+                        jac[d][m]
+                    );
+                }
+            }
+        }
+        assert!(inside > 50, "{inside} points inside the grid");
+        // 2D, a grid with spacing and rotation, float coefficients evaluated in double.
+        let mut b2 = BSplineXfm::<f64, 2>::new_default();
+        b2.set_domain_origin([3.0, -7.0]).unwrap();
+        b2.set_domain_physical([25.0, 18.0]).unwrap();
+        b2.set_domain_mesh([4, 3]).unwrap();
+        let (s, c) = (0.6f64, 0.8f64);
+        b2.set_domain_direction([[c, -s], [s, c]]).unwrap();
+        for v in &mut b2.coefficients {
+            *v = 3.0 * (rng.closed() - 0.5);
+        }
+        let mut inside2 = 0;
+        for _ in 0..300 {
+            let p = [-15.0 + 40.0 * rng.closed(), -10.0 + 35.0 * rng.closed()];
+            if b2.support(&p).is_none() {
+                assert_eq!(b2.jacobian_position(&p), [[1.0, 0.0], [0.0, 1.0]]);
+                continue;
+            }
+            inside2 += 1;
+            let jac = b2.jacobian_position(&p);
+            let h = 1e-5;
+            for m in 0..2 {
+                let mut plus = p;
+                let mut minus = p;
+                plus[m] += h;
+                minus[m] -= h;
+                if b2.support(&plus).is_none() || b2.support(&minus).is_none() {
+                    continue;
+                }
+                let tp = b2.transform_point(&plus);
+                let tm = b2.transform_point(&minus);
+                for d in 0..2 {
+                    let fd = (tp[d] - tm[d]) / (2.0 * h);
+                    assert!((fd - jac[d][m]).abs() < 1e-6 * (1.0 + jac[d][m].abs()));
+                }
+            }
+        }
+        assert!(inside2 > 50, "{inside2} points inside the 2D grid");
+    }
+
+    /// The composite's Jacobian with respect to an affine transform's parameters, with a
+    /// B-spline transform applied after it (ITK-35 corrected), against finite differences of
+    /// the composite's `TransformPoint` in those parameters.
+    #[test]
+    fn composite_jacobian_through_a_bspline_matches_finite_differences() {
+        let mut rng = MersenneTwister::from_int(5);
+        let b = transform(&mut rng);
+        let mut affine = LinearXfm::<f64, 3>::new(Kind::Affine);
+        affine.set_matrix([[1.05, 0.02, 0.0], [-0.03, 0.97, 0.01], [0.0, 0.02, 1.01]]);
+        affine.set_offset([0.5, -1.0, 0.25]);
+        let c = Composite::new(vec![Xfm::BSpline(b), Xfm::Linear(affine.clone())]);
+        let np = c.number_of_parameters();
+        let params = Xfm::Linear(affine).parameters();
+        let mut tested = 0;
+        for _ in 0..100 {
+            let p = [
+                -42.0 + 40.0 * rng.closed(),
+                -6.0 + 40.0 * rng.closed(),
+                1.0 + 19.0 * rng.closed(),
+            ];
+            let mut jac = vec![0.0; 3 * np];
+            c.jacobian(&p, &mut jac);
+            let mut ok = true;
+            let mut fds = vec![0.0; 3 * np];
+            for k in 0..np {
+                let h = 1e-6;
+                let mut cp = c.clone();
+                let mut q = params.clone();
+                q[k] += h;
+                cp.active_mut().set_parameters(&q).unwrap();
+                let tp = cp.transform_point(&p);
+                let mut cm = c.clone();
+                let mut q = params.clone();
+                q[k] -= h;
+                cm.active_mut().set_parameters(&q).unwrap();
+                let tm = cm.transform_point(&p);
+                let support = |x: &[f64; 3]| {
+                    let Xfm::BSpline(b) = &c.transforms[0] else {
+                        unreachable!()
+                    };
+                    b.support(x).is_some()
+                };
+                let mp = cp.transforms[1].transform_point(&p);
+                let mm = cm.transforms[1].transform_point(&p);
+                if support(&mp) != support(&mm) {
+                    ok = false;
+                }
+                for d in 0..3 {
+                    fds[d * np + k] = (tp[d] - tm[d]) / (2.0 * h);
+                }
+            }
+            if !ok {
+                continue;
+            }
+            tested += 1;
+            for (a, f) in jac.iter().zip(&fds) {
+                assert!((a - f).abs() < 1e-5 * (1.0 + a.abs()), "{a} vs {f}");
+            }
+        }
+        assert!(tested > 50);
     }
 
     /// The decomposition of a constant is the constant (order 3), axis by axis.

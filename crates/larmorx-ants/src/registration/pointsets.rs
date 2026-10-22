@@ -489,6 +489,7 @@ pub fn read_intensity<R: Real + Pixel, const D: usize>(
     image_file: &str,
     mask_file: &str,
     radius: &[u32],
+    gradient_sigma: Option<f64>,
     n_threads: usize,
     notices: &mut Notices,
 ) -> Result<IntensityPointSet<R, D>, PointSetError> {
@@ -531,18 +532,28 @@ pub fn read_intensity<R: Real + Pixel, const D: usize>(
     let to = |e: larmorx_registration::ItkException| PointSetError::Refused(e.description);
     let image = crate::cli::registration::to_image::<R, D>(image).map_err(to)?;
     let mask = crate::cli::registration::to_image::<u8, D>(mask).map_err(to)?;
-    intensity_points(&image, &mask, radius)
+    let gradient = match gradient_sigma {
+        None => central_gradient(&image),
+        Some(sigma) => {
+            larmorx_registration::method::gradient_image_with(&image, sigma, false, n_threads)
+                .map_err(to)?
+                .data
+                .iter()
+                .map(|g| std::array::from_fn(|d| <R as larmorx_core::ItkReal>::from_f64(g[d])))
+                .collect()
+        }
+    };
+    intensity_points(&image, &mask, &gradient, radius)
 }
 
-/// `ImageIntensityAndGradientToPointSetFilter::GenerateData` with central differences.
-fn intensity_points<R: Real, const D: usize>(
-    image: &Image<R, D>,
-    mask: &Image<u8, D>,
-    radius: &[u32],
-) -> Result<IntensityPointSet<R, D>, PointSetError> {
+/// The gradient image `ImageIntensityAndGradientToPointSetFilter` computes by default
+/// (`m_UseCentralDifferenceFunction`): `CentralDifferenceImageFunction::EvaluateAtIndex` with
+/// the image's direction (0 along an axis at the image's border). With ANTS-67 corrected,
+/// IGDM's `gradientSigma` selects the filter's other branch instead,
+/// `GradientRecursiveGaussianImageFilter` of that sigma (`NormalizeAcrossScale` off, the
+/// image's direction used).
+fn central_gradient<R: Real, const D: usize>(image: &Image<R, D>) -> Vec<[R; D]> {
     let space = &image.space;
-    // The gradient image: CentralDifferenceImageFunction::EvaluateAtIndex with the image's
-    // direction (0 along an axis at the image's border).
     let n = space.len();
     let mut gradient: Vec<[R; D]> = Vec::with_capacity(n);
     let strides = space.strides();
@@ -566,6 +577,18 @@ fn intensity_points<R: Real, const D: usize>(
         let physical = space.local_to_physical_vector(&local);
         gradient.push(std::array::from_fn(|d| R::from_f64(physical[d])));
     }
+    gradient
+}
+
+/// `ImageIntensityAndGradientToPointSetFilter::GenerateData` from its gradient image.
+fn intensity_points<R: Real, const D: usize>(
+    image: &Image<R, D>,
+    mask: &Image<u8, D>,
+    gradient: &[[R; D]],
+    radius: &[u32],
+) -> Result<IntensityPointSet<R, D>, PointSetError> {
+    let space = &image.space;
+    let n = space.len();
     let r: Vec<i64> = radius.iter().map(|&v| i64::from(v)).collect();
     let mut voxels = 1usize;
     for &v in &r {

@@ -82,7 +82,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
                         )
                     } else {
-                        format!("stage {stage}: GC's derivative is all in the first voxel, as in ITK")
+                        format!(
+                            "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                        )
                     },
                 ),
             );
@@ -152,9 +154,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             &defects::ITK_39,
                             self.upstream_defects,
                             if fix {
-                                format!("stage {stage}: the fixed images are resampled through the fixed initial transforms (-q) and the flow; ITK's TimeVaryingVelocityField method ignores -q")
+                                format!(
+                                    "stage {stage}: the fixed images are resampled through the fixed initial transforms (-q) and the flow; ITK's TimeVaryingVelocityField method ignores -q"
+                                )
                             } else {
-                                format!("stage {stage}: the fixed initial transforms (-q) are ignored, as in ITK")
+                                format!(
+                                    "stage {stage}: the fixed initial transforms (-q) are ignored, as in ITK"
+                                )
                             },
                         ),
                     );
@@ -171,9 +177,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             &defects::ITK_41,
                             self.upstream_defects,
                             if fix {
-                                format!("stage {stage}: the time-varying velocity field transform never integrated its velocity field (no iteration, no resampling); its zero fields are used; ITK's displacement field has no interpolator input and the next use of the transform crashes")
+                                format!(
+                                    "stage {stage}: the time-varying velocity field transform never integrated its velocity field (no iteration, no resampling); its zero fields are used; ITK's displacement field has no interpolator input and the next use of the transform crashes"
+                                )
                             } else {
-                                format!("stage {stage}: the time-varying velocity field transform never integrated its velocity field: ITK crashes at the next use of the transform")
+                                format!(
+                                    "stage {stage}: the time-varying velocity field transform never integrated its velocity field: ITK crashes at the next use of the transform"
+                                )
                             },
                         ),
                     );
@@ -219,8 +229,11 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             ));
         };
         let t = &self.transforms[stage];
-        let (learning_rate, samples, order) =
-            (t.gradient_step, t.number_of_time_point_samples, t.spline_order);
+        let (learning_rate, samples, order) = (
+            t.gradient_step,
+            t.number_of_time_point_samples,
+            t.spline_order,
+        );
         let optimizer_weights = match self.restrict_deformation.get(stage) {
             Some(w) if w.len() == D => Some(w.clone()),
             _ => None,
@@ -264,7 +277,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "stage {stage}: GC's derivative is each voxel's own; ITK adds all of it to the first voxel"
                         )
                     } else {
-                        format!("stage {stage}: GC's derivative is all in the first voxel, as in ITK")
+                        format!(
+                            "stage {stage}: GC's derivative is all in the first voxel, as in ITK"
+                        )
                     },
                 ),
             );
@@ -409,9 +424,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 &defects::ITK_40,
                 self.upstream_defects,
                 if fix {
-                    format!("stage {stage}: the masks are resampled with their images through the flows (nearest neighbour), as SyN resamples them; ITK's time-varying velocity field methods keep them where they were")
+                    format!(
+                        "stage {stage}: the masks are resampled with their images through the flows (nearest neighbour), as SyN resamples them; ITK's time-varying velocity field methods keep them where they were"
+                    )
                 } else {
-                    format!("stage {stage}: the masks stay where they were while the images are resampled through the flows, as in ITK")
+                    format!(
+                        "stage {stage}: the masks stay where they were while the images are resampled through the flows, as in ITK"
+                    )
                 },
             ),
         );

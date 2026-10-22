@@ -1015,6 +1015,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             _ => PointSetMetricKind::Igdm {
                                 intensity_sigma: m.intensity_distance_sigma,
                                 euclidean_sigma: m.euclidean_distance_sigma,
+                                k: m.evaluation_k_neighborhood.to_f64() as u32 as usize,
                             },
                         };
                         let inputs = match (&m.labeled, &m.intensity) {
@@ -1523,10 +1524,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             // ANTS-80: the exponential stages never tell their registration method the sigmas'
             // units, so ITK's default, millimetres, applies to sigmas given in voxels.
             let mut sigmas_in_physical_units = self.sigmas_in_physical_units[stage];
-            if exponential
-                && !sigmas_in_physical_units
-                && sigmas_r.iter().any(|&s| s > R::ZERO)
-            {
+            if exponential && !sigmas_in_physical_units && sigmas_r.iter().any(|&s| s > R::ZERO) {
                 let fix = self.upstream_defects.fix();
                 push_once(
                     &mut self.notices,
@@ -1563,8 +1561,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 field_meshes,
                 bspline_mesh,
                 correct_gc_derivative: self.upstream_defects.fix(),
+                correct_bspline_jacobian: self.upstream_defects.fix(),
                 n_threads: self.n_threads,
             };
+            if composite.iter().any(Xfm::is_bspline) {
+                let fix = self.upstream_defects.fix();
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_35,
+                        self.upstream_defects,
+                        if fix {
+                            format!(
+                                "stage {stage}: the B-spline transform applied after this stage's transform has its Jacobian with respect to position (the derivative of its cubic B-spline sum); ITK throws 'ComputeJacobianWithRespectToPosition not yet implemented for BSplineTransform' at the first derivative and the stage fails"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: a B-spline transform applied after this stage's transform has no Jacobian with respect to position: the stage fails at its first derivative, as in ITK"
+                            )
+                        },
+                    ),
+                );
+            }
             let t = &self.transforms[stage];
             match method {
                 XfrmMethod::BSpline => {
@@ -1773,9 +1791,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                                 &defects::ITK_41,
                                 self.upstream_defects,
                                 if self.upstream_defects.fix() {
-                                    format!("stage {stage}: the exponential transform never integrated its velocity field; integrated now, so it has an inverse; ITK's inverse has no field and fails when it maps a point")
+                                    format!(
+                                        "stage {stage}: the exponential transform never integrated its velocity field; integrated now, so it has an inverse; ITK's inverse has no field and fails when it maps a point"
+                                    )
                                 } else {
-                                    format!("stage {stage}: the exponential transform never integrated its velocity field and has no inverse field, as in ITK")
+                                    format!(
+                                        "stage {stage}: the exponential transform never integrated its velocity field and has no inverse field, as in ITK"
+                                    )
                                 },
                             ),
                         );
@@ -1792,6 +1814,18 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 Err(e) if field_stage || bspline_stage || exponential => {
                     // The displacement field stages return EXIT_FAILURE themselves.
                     log.logger(&format!("Exception caught: {}\n", e.print()));
+                    if self.upstream_defects.fix()
+                        && matches!(
+                            method,
+                            XfrmMethod::BSplineDisplacementField | XfrmMethod::BSplineExponential
+                        )
+                        && e.description.contains("m_Scales values must be > epsilon")
+                    {
+                        log.cerr(&format!(
+                            "larmorx: antsRegistration: stage {stage}: the B-spline update mesh is too coarse for this level: every control point touches the stationary boundary, the update vanishes and the scales fall below epsilon; ANTs doubles base-level meshes (ANTS-78), so twice this mesh gives ANTs' result ({}=reproduce gives it as ANTs does)\n",
+                            defects::ENV
+                        ));
+                    }
                     return Err(RegistrationFailed(e.description));
                 }
                 Err(e) => {
@@ -1952,6 +1986,20 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 "the point-set evaluations of SyN and the time-varying velocity field stages use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
                 "the point-set evaluations of SyN and the time-varying velocity field stages use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
             );
+        }
+        if let Some((estimate, floor)) = e.igdm_distance_floor {
+            let f = OStream::default();
+            let fixed = format!(
+                "IGDM's estimated distance sigma, {} (the standard deviation of the nearest distances), is below one voxel; larmorx uses {}; ANTs uses the estimate (0 gives NaN parameters)",
+                f.float(estimate),
+                f.float(floor)
+            );
+            let reproduced = format!(
+                "IGDM's estimated distance sigma, {}, is below one voxel ({}): used as in ANTs",
+                f.float(estimate),
+                f.float(floor)
+            );
+            add(&defects::ANTS_70, &fixed, &reproduced);
         }
         if e.igdm_centre {
             add(

@@ -165,6 +165,9 @@ pub struct ParzenSettings<R> {
     pub normalise_identity: bool,
     /// ITK-26 corrected: each product enters the covariance's diagonal once.
     pub single_diagonal: bool,
+    /// ITK-29 corrected: the kernel sigma is a sigma, the kernel covariance `σ²·I` (ITK
+    /// multiplies the identity by `σ` itself).
+    pub kernel_as_sigma: bool,
 }
 
 /// What building the density met (for larmorx's notices).
@@ -215,8 +218,13 @@ impl<const D: usize> ParzenWindows<D> {
     ) -> Result<Self, ItkException> {
         let n = points.len();
         let mut kernel_cov = identity::<D>();
+        let kernel = if s.kernel_as_sigma {
+            (s.kernel_sigma * s.kernel_sigma).to_f64()
+        } else {
+            s.kernel_sigma.to_f64()
+        };
         for (r, row) in kernel_cov.iter_mut().enumerate() {
-            row[r] *= s.kernel_sigma.to_f64();
+            row[r] *= kernel;
         }
         let mut inputs = Vec::with_capacity(n);
         for p in points {

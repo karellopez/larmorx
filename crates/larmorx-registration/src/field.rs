@@ -279,7 +279,11 @@ pub fn invert<R: Real, const D: usize>(
 
 /// `GaussianOperator<R, D>` along an axis: [`larmorx_image::discrete_gaussian::gaussian_kernel`]
 /// (variance in voxels², maximum error, maximum width), stored in `R`.
-pub(crate) fn gaussian_operator<R: Real>(variance: R, maximum_error: f64, maximum_width: usize) -> Vec<R> {
+pub(crate) fn gaussian_operator<R: Real>(
+    variance: R,
+    maximum_error: f64,
+    maximum_width: usize,
+) -> Vec<R> {
     larmorx_image::discrete_gaussian::gaussian_kernel(
         variance.to_f64(),
         maximum_error,

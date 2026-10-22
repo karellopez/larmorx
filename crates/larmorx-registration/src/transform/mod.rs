@@ -101,21 +101,23 @@ impl<R: Real, const D: usize> Xfm<R, D> {
                 None => *v,
             },
             Xfm::Field(f) => transposed(&f.inverse_jacobian_position(p)),
-            // ITK throws (no Jacobian with respect to position). Covariant vectors are mapped
-            // only through inverted fixed transforms, and a B-spline transform has no inverse,
-            // so this is never reached.
+            // ITK throws (no Jacobian with respect to position, ITK-35). Covariant vectors are
+            // mapped only through inverted fixed transforms, and a B-spline transform has no
+            // inverse, so this is never reached.
             Xfm::BSpline(_) => *v,
         }
     }
 
     /// `ComputeJacobianWithRespectToPosition(p)`: the matrix (identity for a translation), a
-    /// field's local Jacobian at the voxel nearest `p`. A B-spline transform throws in ITK
-    /// ([`Composite::position_jacobian_error`]); the identity stands in here.
+    /// field's local Jacobian at the voxel nearest `p`, a B-spline transform's derivative of
+    /// its cubic sum (ITK throws there, [`Composite::position_jacobian_error`]; ITK-35
+    /// corrected).
     pub fn jacobian_position(&self, p: &[R; D]) -> Matrix<R, D> {
         match self {
-            Xfm::Identity | Xfm::Translation { .. } | Xfm::BSpline(_) => std::array::from_fn(|i| {
+            Xfm::Identity | Xfm::Translation { .. } => std::array::from_fn(|i| {
                 std::array::from_fn(|j| if i == j { R::ONE } else { R::ZERO })
             }),
+            Xfm::BSpline(b) => b.jacobian_position(p),
             Xfm::Linear(l) => l.matrix,
             Xfm::Field(f) => f.jacobian_position(p),
         }

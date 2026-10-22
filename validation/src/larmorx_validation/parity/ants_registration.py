@@ -13,7 +13,8 @@ ANTs' defects reproduced (``LARMORX_UPSTREAM_DEFECTS=reproduce``, D13). Compared
 - **standard output** (``-v 1``: the stage set-up, ITK's image dumps, every ``DIAGNOSTIC``
   line with the metric and convergence values to 12 digits), after masking what cannot be
   reproduced: object addresses, modification times and reference counts, timings, the build's
-  source paths in exception prints, and the two output directories;
+  source paths in exception prints, the signs of printed NaNs (unspecified by IEEE 754), and
+  the two output directories;
 - **standard error**, larmorx's notice lines removed;
 - **every file** each program writes: transform files byte for byte (``.mat``, ``.txt``),
   HDF5 transform files dataset by dataset (``/OSName`` and ``/OSVersion`` aside), images
@@ -1781,6 +1782,9 @@ def _normalise(text: str, out: Path) -> list[str]:
         # An exception's what() inside another's description: the thrower's file and line.
         line = re.sub(r"^\S*?/(Modules|Utilities|Examples)/(\S+:\d+:)$", r"\1/\2", line)
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
+        # The sign of a NaN result: IEEE 754 leaves it unspecified, the compiler's operand order
+        # decides it (docs/findings/ants-registration.md).
+        line = re.sub(r"-nan\b", "nan", line)
         if "DIAGNOSTIC," in line and not line.startswith("DIAGNOSTIC"):
             fields = line.split(", ")
             line = ", ".join(fields[:4] + fields[6:])

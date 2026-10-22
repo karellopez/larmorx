@@ -1975,11 +1975,44 @@ fn point_set_metric<R: Compute, const D: usize>(
             k = Conv::u32(param(m, 8)).map_err(|e| caught(log, &e))?;
         }
         metric.evaluation_k_neighborhood = R::r(f64::from(k));
-        // The gradient sigma (parameter 9) is read and then not used: the filter computes
-        // central differences.
+        // The gradient sigma (parameter 9, default 1): ANTs hands it to a filter that
+        // computes central differences and never uses it (ANTS-67).
+        let mut gradient_sigma = 1.0f64;
         if n > 9 {
-            let _ = Conv::real::<R>(param(m, 9)).map_err(|e| caught(log, &e))?;
+            gradient_sigma = Conv::real::<R>(param(m, 9))
+                .map_err(|e| caught(log, &e))?
+                .to_f64();
         }
+        let fix = ctx.notices.fix();
+        let gradient = (fix && gradient_sigma > 0.0).then_some(gradient_sigma);
+        let f = larmorx_registration::format::OStream::default();
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_67,
+            if fix {
+                format!(
+                    "IGDM uses its kNeighborhood ({k} nearest moving point(s), averaged) and its gradientSigma ({}: {}); ANTs uses the nearest point and central differences",
+                    f.float(gradient_sigma),
+                    if gradient.is_some() {
+                        "Gaussian derivatives of that sigma in mm"
+                    } else {
+                        "not above 0, so central differences"
+                    }
+                )
+            } else {
+                format!(
+                    "IGDM's kNeighborhood ({k}) and gradientSigma ({}) are ignored, as in ANTs: the nearest moving point, central differences",
+                    f.float(gradient_sigma)
+                )
+            },
+        );
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_68,
+            if fix {
+                "IGDM's derivative is the value's gradient (its distance term over the distance sigma squared, its intensity term over the intensity sigma squared); ANTs leaves both factors out"
+            } else {
+                "IGDM's derivative lacks the 1/sigma^2 factors of its two terms, as in ANTs"
+            },
+        );
         let radius = if n > 5 {
             Conv::vec_u32(param(m, 5)).map_err(|e| caught(log, &e))?
         } else {
@@ -1994,6 +2027,7 @@ fn point_set_metric<R: Compute, const D: usize>(
             &fixed_name,
             &fixed_mask,
             &radius,
+            gradient,
             ctx.n_threads,
             ctx.notices,
         );
@@ -2010,6 +2044,7 @@ fn point_set_metric<R: Compute, const D: usize>(
             &moving_name,
             &moving_mask,
             &radius,
+            gradient,
             ctx.n_threads,
             ctx.notices,
         );
@@ -2049,6 +2084,27 @@ fn point_set_metric<R: Compute, const D: usize>(
     if n > 8 {
         metric.use_anisotropic_covariances =
             Conv::bool(param(m, 8)).map_err(|e| caught(log, &e))?;
+    }
+    if name == "jhct" {
+        let fix = ctx.notices.fix();
+        ctx.notices.add(
+            &larmorx_core::defects::ITK_24,
+            if fix {
+                "JHCT's total number of points counts each label's fixed and moving points; ITK counts the moving points alone (its prefactors scale the value and the derivative)"
+            } else {
+                "JHCT's total number of points counts the moving points alone, as in ITK"
+            },
+        );
+        if metric.use_anisotropic_covariances {
+            ctx.notices.add(
+                &larmorx_core::defects::ITK_29,
+                if fix {
+                    "JHCT's Parzen kernel sigma (10) is used as a sigma, the kernel covariance 100 I; ITK uses it as a variance (10 I), which weighs the neighbours of the local covariances"
+                } else {
+                    "JHCT's Parzen kernel covariance is 10 I (the kernel sigma used as a variance), as in ITK"
+                },
+            );
+        }
     }
     let fixed_name = param(m, 0).to_owned();
     let moving_name = param(m, 1).to_owned();

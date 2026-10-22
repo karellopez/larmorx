@@ -34,7 +34,9 @@ use rayon::prelude::*;
 use crate::convergence::WindowConvergence;
 use crate::field::{Field, FieldSmoothing, FieldXfm, convolve_axis, gaussian_operator, zero_field};
 use crate::mask::Mask;
-use crate::method::{CRASH_FILE, SamplingStrategy, StageMetric, sample_points, shrink_space, smooth_for_level};
+use crate::method::{
+    CRASH_FILE, SamplingStrategy, StageMetric, sample_points, shrink_space, smooth_for_level,
+};
 use crate::pointset::metric::PointSetMetric;
 use crate::syn::{CallSettings, GradientCall, LevelImageMetric, Resampled, pooled, resample_image};
 use crate::transform::{Composite, Xfm};
@@ -97,7 +99,8 @@ impl<R: Real> VelocityOutput<R> {
 /// The spatial part of a velocity field's geometry: the first `D` axes (size, spacing, origin,
 /// direction), from index 0 (`TimeVaryingVelocityFieldIntegrationImageFilter`'s output).
 pub fn spatial_space<const D: usize, const E: usize>(s: &Space<E>) -> Space<D> {
-    let direction: Matrix<f64, D> = std::array::from_fn(|i| std::array::from_fn(|j| s.direction[i][j]));
+    let direction: Matrix<f64, D> =
+        std::array::from_fn(|i| std::array::from_fn(|j| s.direction[i][j]));
     Space::new(
         std::array::from_fn(|k| s.size[k]),
         [0; D],
@@ -325,7 +328,8 @@ impl<R: Real, const D: usize, const E: usize> TvTransform<R, D, E> {
             self.velocity.space.clone(),
             update.as_chunks::<D>().0.to_vec(),
         );
-        let update_field = gaussian_smooth(&update_field, self.update_spatial, self.update_temporal);
+        let update_field =
+            gaussian_smooth(&update_field, self.update_spatial, self.update_temporal);
         for (v, u) in self.velocity.data.iter_mut().zip(&update_field.data) {
             for d in 0..D {
                 v[d] = if factor == R::ONE {
@@ -414,10 +418,18 @@ pub(crate) fn evaluation_masks<R: Real, const D: usize>(
     }
     (
         fixed_mask.as_ref().map(|m| {
-            Mask::new(crate::resample::resample_mask_nearest(&m.image, virtual_space, fixed))
+            Mask::new(crate::resample::resample_mask_nearest(
+                &m.image,
+                virtual_space,
+                fixed,
+            ))
         }),
         moving_mask.as_ref().map(|m| {
-            Mask::new(crate::resample::resample_mask_nearest(&m.image, virtual_space, moving))
+            Mask::new(crate::resample::resample_mask_nearest(
+                &m.image,
+                virtual_space,
+                moving,
+            ))
         }),
     )
 }
@@ -490,11 +502,13 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
             "a TimeVaryingVelocityField stage with 0 time indices: ANTs divides the velocity field's voxels by 0",
         ));
     }
-    let velocity_space =
-        space_time::<D, E>(&stage.field_space, n_time, stage.field_space.start)?;
+    let velocity_space = space_time::<D, E>(&stage.field_space, n_time, stage.field_space.start)?;
     let field_space = stage.field_space.clone();
     let mut transform = TvTransform::<R, D, E> {
-        velocity: Image::new(velocity_space.clone(), vec![[R::ZERO; D]; velocity_space.len()]),
+        velocity: Image::new(
+            velocity_space.clone(),
+            vec![[R::ZERO; D]; velocity_space.len()],
+        ),
         lower: R::ZERO,
         upper: R::ONE,
         steps: 10,
@@ -549,8 +563,18 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
             };
             level_metrics.push(Some(LevelImageMetric {
                 kind: sm.kind,
-                fixed: smooth_for_level(&sm.fixed, sigma, stage.sigmas_in_physical_units, stage.n_threads)?,
-                moving: smooth_for_level(&sm.moving, sigma, stage.sigmas_in_physical_units, stage.n_threads)?,
+                fixed: smooth_for_level(
+                    &sm.fixed,
+                    sigma,
+                    stage.sigmas_in_physical_units,
+                    stage.n_threads,
+                )?,
+                moving: smooth_for_level(
+                    &sm.moving,
+                    sigma,
+                    stage.sigmas_in_physical_units,
+                    stage.n_threads,
+                )?,
                 fixed_mask: sm.fixed_mask.clone(),
                 moving_mask: sm.moving_mask.clone(),
                 use_gradient_filter: sm.use_gradient_filter,
@@ -630,10 +654,18 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         Some(c) if stage.correct_fixed_initial => c.transforms.clone(),
                         _ => Vec::new(),
                     };
-                    fixed.push(Xfm::Field(FieldXfm::new(fixed_field, None, stage.exact_floor)));
+                    fixed.push(Xfm::Field(FieldXfm::new(
+                        fixed_field,
+                        None,
+                        stage.exact_floor,
+                    )));
                     let fixed_composite = Composite::new(fixed);
                     let mut moving = stage.moving_initial.clone();
-                    moving.push(Xfm::Field(FieldXfm::new(moving_field, None, stage.exact_floor)));
+                    moving.push(Xfm::Field(FieldXfm::new(
+                        moving_field,
+                        None,
+                        stage.exact_floor,
+                    )));
                     let moving_composite = Composite::new(moving);
                     let mut resampled: Vec<Option<Resampled<R, D>>> =
                         Vec::with_capacity(level_metrics.len());
@@ -650,8 +682,18 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                             &moving_composite,
                         );
                         resampled.push(Some(Resampled {
-                            fixed: Arc::new(resample_image(&lm.fixed, &virtual_space, &fixed_composite, floor)),
-                            moving: Arc::new(resample_image(&lm.moving, &virtual_space, &moving_composite, floor)),
+                            fixed: Arc::new(resample_image(
+                                &lm.fixed,
+                                &virtual_space,
+                                &fixed_composite,
+                                floor,
+                            )),
+                            moving: Arc::new(resample_image(
+                                &lm.moving,
+                                &virtual_space,
+                                &moving_composite,
+                                floor,
+                            )),
                             fixed_mask,
                             moving_mask,
                             fixed_gradient: None,
@@ -779,12 +821,28 @@ mod tests {
         let f = integrate(&v, 0.0, 1.0, 6, &floor);
         let b = integrate(&v, 1.0, 0.0, 6, &floor);
         for (x, y) in f.data.iter().zip(&b.data) {
-            assert!((x[0] - 0.3).abs() < 1e-12 && (x[1] + 0.2).abs() < 1e-12, "{x:?}");
-            assert!((y[0] + 0.3).abs() < 1e-12 && (y[1] - 0.2).abs() < 1e-12, "{y:?}");
+            assert!(
+                (x[0] - 0.3).abs() < 1e-12 && (x[1] + 0.2).abs() < 1e-12,
+                "{x:?}"
+            );
+            assert!(
+                (y[0] + 0.3).abs() < 1e-12 && (y[1] - 0.2).abs() < 1e-12,
+                "{y:?}"
+            );
         }
         // Equal bounds or no step: a zero field.
-        assert!(integrate(&v, 0.5, 0.5, 6, &floor).data.iter().all(|x| *x == [0.0, 0.0]));
-        assert!(integrate(&v, 0.0, 1.0, 0, &floor).data.iter().all(|x| *x == [0.0, 0.0]));
+        assert!(
+            integrate(&v, 0.5, 0.5, 6, &floor)
+                .data
+                .iter()
+                .all(|x| *x == [0.0, 0.0])
+        );
+        assert!(
+            integrate(&v, 0.0, 1.0, 0, &floor)
+                .data
+                .iter()
+                .all(|x| *x == [0.0, 0.0])
+        );
     }
 
     #[test]

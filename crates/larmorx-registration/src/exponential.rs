@@ -310,7 +310,8 @@ impl<R: Real, const D: usize> Exponential<R, D> {
                 update_variance, ..
             } => {
                 if *update_variance > 0.0 {
-                    let smoothed = gaussian_smooth(&as_field(update), R::from_f64(*update_variance));
+                    let smoothed =
+                        gaussian_smooth(&as_field(update), R::from_f64(*update_variance));
                     for (u, v) in update.as_chunks_mut::<D>().0.iter_mut().zip(&smoothed.data) {
                         *u = *v;
                     }
@@ -417,7 +418,12 @@ mod tests {
         let v = crate::field::zero_field::<f64, 3>(&space);
         assert_eq!(automatic_iterations(&v, 20, false), 1);
         let (f, i) = integrate(&v, Integration::for_stage(0), &IndexFloor::itk(), false);
-        assert!(f.data.iter().chain(&i.data).all(|x| x.iter().all(|&c| c == 0.0)));
+        assert!(
+            f.data
+                .iter()
+                .chain(&i.data)
+                .all(|x| x.iter().all(|&c| c == 0.0))
+        );
     }
 
     #[test]

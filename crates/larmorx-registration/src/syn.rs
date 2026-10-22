@@ -335,11 +335,7 @@ fn metric_derivative<R: Real, const D: usize>(
     match (&m.state, m.kind) {
         (Some(state), _) => state.evaluate(&m.metric, moving, true, floor, warnings),
         (None, MetricKind::Gc) => crate::metric::correlation::local_derivative(
-            &m.metric,
-            moving,
-            correct_gc,
-            floor,
-            warnings,
+            &m.metric, moving, correct_gc, floor, warnings,
         ),
         (None, _) => {
             let r = demons::evaluate(&m.metric, moving, true, floor)?;
@@ -485,8 +481,10 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                             Some(Arc::new(gradient_image(&r.fixed, self.settings.n_threads)?));
                     }
                 } else if r.moving_gradient.is_none() {
-                    r.moving_gradient =
-                        Some(Arc::new(gradient_image(&r.moving, self.settings.n_threads)?));
+                    r.moving_gradient = Some(Arc::new(gradient_image(
+                        &r.moving,
+                        self.settings.n_threads,
+                    )?));
                 }
             }
             let (fi, mi, fm, mm, fg, mg) = if swapped {
@@ -1060,7 +1058,10 @@ fn run_syn_levels<R: Real, const D: usize>(
 }
 
 /// `f` run in a pool of `n_threads` threads (0: every logical CPU).
-pub(crate) fn pooled<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> Result<T, ItkException> {
+pub(crate) fn pooled<T: Send>(
+    n_threads: usize,
+    f: impl FnOnce() -> T + Send,
+) -> Result<T, ItkException> {
     larmorx_core::parallel::with_threads(n_threads, f).map_err(|e| {
         ItkException::new(
             "Modules/Core/Common/src/itkMultiThreaderBase.cxx",

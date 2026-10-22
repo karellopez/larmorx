@@ -244,8 +244,6 @@ RUNS = [
     ("larmorx-fix", "larmorx-1", "larmorx", "larmorx (port), 1 thread",
      "default mode: ITK-50 corrected"),
     ("larmorx-6-fix", "larmorx-6", "larmorx", "larmorx (port), 6 threads", "default mode"),
-    ("larmorx-seed", "larmorx-seed", "larmorx", "larmorx (port), --use-random-seed 1",
-     "seed 121212 (larmorx never reads the clock), reproduce"),
     ("ants-1-cr", "ants-1-cr", "reference", "ANTs 2.6.5, 1 thread, correctly rounded maths",
      "the same binary, CORE-MATH preloaded"),
     ("ants-1", "ants-1", "original", "ANTs 2.6.5, 1 thread, as built",
@@ -254,9 +252,7 @@ RUNS = [
      "conda-forge's build, glibc's maths"),
     ("ants-8", "ants-8", "original", "ANTs 2.6.5, 8 threads", "as built (fMRIPrep ran 8)"),
     ("ants-seed-1", "ants-seed-1", "original", "ANTs 2.6.5, --use-random-seed 1",
-     "the clock's seed, run 1 of 3"),
-    ("ants-seed-2", "ants-seed-2", "original", "ANTs 2.6.5, --use-random-seed 1",
-     "the clock's seed, run 2 of 3"),
+     "the clock's seed (one of three runs)"),
     ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran", "ANTs in its image, 8 threads"),
 ]  # fmt: skip
 
@@ -400,7 +396,9 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         ex.add(exm.Panel(pid, role, text, sub, arr))
     for t in THREADS:
         full.setdefault(f"ants-{t}", _load_run(e.dir, f"ants-{t}"))
-    full["ants-seed-3"] = _load_run(e.dir, "ants-seed-3")
+    # metrics only (the page's size): the other clock-seeded runs and larmorx's with -r 1
+    for label in ("ants-seed-2", "ants-seed-3", "larmorx-seed"):
+        full[label] = _load_run(e.dir, label)
     diffs = _diffs()
     common.compare_all(ex, diffs, OUTPUTS, full=full)
     same = common.identical(diffs)
@@ -454,14 +452,14 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "a few posteriors. Its default mode then corrects ITK-50 (the metrics below), a change "
         "smaller than ANTs' own spread when it seeds from the clock.",
     }
-    at, _k = common.largest_in_slice(ex, "ants-seed-1", "ants-seed-2", "post2", "axial")
+    at, _k = common.largest_in_slice(ex, "ants-seed-1", "ants-1", "post2", "axial")
     default = {
         "output": "post2",
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "ants-1", "larmorx", "fmriprep"],
-        "diffs": ["lx-ants1", "fix-lx", "seed2-seed1"],
-        "compare": {"a": "ants-seed-1", "b": "ants-seed-2"},
+        "diffs": ["lx-ants1", "fix-lx", "seed1-ants1"],
+        "compare": {"a": "ants-seed-1", "b": "ants-1"},
     }
     out = common.finish(
         ctx,
@@ -471,7 +469,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         default=default,
         window_panel="larmorx",
         scale="log",
-        caption="the crosshair where two of ANTs' runs with the clock's seed differ most in it; "
+        caption="the crosshair where ANTs with the clock's seed differs most from its fixed-seed "
+        "run in it; "
         "the differences on one symmetric log scale over six decades below the largest.",
     )
     vers = info.get("versions", {})
@@ -535,6 +534,9 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     }
 
 
+#: the priors example shows the classified image and the grey matter's posterior (its other
+#: posteriors are in the record: bit-identical with correctly rounded maths)
+OUTPUTS_PRIORS = [OUTPUTS[0], OUTPUTS[2]]
 PRIOR_RUNS = [
     ("larmorx", "larmorx-1-reproduce", "larmorx", "larmorx (port), 1 thread", "reproduce mode"),
     ("larmorx-6", "larmorx-6-reproduce", "larmorx", "larmorx (port), 6 threads", "reproduce"),
@@ -564,12 +566,14 @@ def _priors_example(ctx: core.Context) -> dict:
     ex.add(exm.Panel("t1w", "input", "ds000005 sub-01 T1w, N4-corrected", "Atropos' input",
                      {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
     names = {1: "CSF", 2: "cortical grey matter", 3: "white matter"}
-    for c in (1, 2, 3):
+    for c in (2,):
         ex.add(exm.Panel(f"prior{c}", "input", f"OASIS30ANTs prior: {names[c]}",
                          "in the T1w's space (fMRIPrep's transform, Gaussian interpolation)",
                          {"all": common.load(str(e.dir / f"prior{c:02d}.nii.gz"))}))  # fmt: skip
+    shown = {o["id"] for o in OUTPUTS_PRIORS}
     for pid, label, role, text, sub in PRIOR_RUNS:
-        ex.add(exm.Panel(pid, role, text, sub, _load_run(e.dir, label)))
+        arr = {k: v for k, v in _load_run(e.dir, label).items() if k in shown}
+        ex.add(exm.Panel(pid, role, text, sub, arr))
     d = common.d
     diffs = [
         d("lx-ants1", "larmorx", "ants-1", "main", "larmorx − ANTs 2.6.5, 1 thread, as built",
@@ -581,7 +585,7 @@ def _priors_example(ctx: core.Context) -> dict:
         d("lx6-lx1", "larmorx-6", "larmorx", "check", "larmorx, 6 threads − 1 thread",
           common.ROLE_SELF),
     ]  # fmt: skip
-    common.compare_all(ex, diffs, OUTPUTS)
+    common.compare_all(ex, diffs, OUTPUTS_PRIORS)
     same = common.identical(diffs)
     for x in diffs:
         i = x["id"]
@@ -621,10 +625,10 @@ def _priors_example(ctx: core.Context) -> dict:
         ctx,
         ex,
         diffs,
-        OUTPUTS,
+        OUTPUTS_PRIORS,
         default=default,
         window_panel="larmorx",
-        input_windows={"prior1": "zero", "prior2": "zero", "prior3": "zero"},
+        input_windows={"prior2": "zero"},
         scale="log",
         caption="the crosshair where larmorx and ANTs as built differ most in it.",
     )
@@ -636,7 +640,8 @@ def _priors_example(ctx: core.Context) -> dict:
             "The same T1w segmented as antsCorticalThickness segments one: OASIS30ANTs' CSF, "
             "cortical grey matter and white matter priors, brought into the T1w's space with "
             "the transform fMRIPrep's brain extraction computed, weigh 0.25 against the "
-            "likelihoods; MRF 0.1, five iterations."
+            "likelihoods; MRF 0.1, five iterations. Shown: the classified image and the grey "
+            "matter's posterior, beside its prior."
         ),
         "facts": [
             {

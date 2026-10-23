@@ -82,12 +82,22 @@ original** (`docs/licensing.md`): the replica is in `crates-gpl/larmorx-gpl-afni
   refuses it ("-prefix (null) is illegal!", exit 1). The replica refuses the first group with
   one fatal line in both modes, after the messages AFNI prints before the crash (the author
   line); the parity's crash cases check exactly that.
-- **AFNI-41 (questionable)** `3dAutomask.c:203-206, 276-283`: `-nbhrs` sets `nbhrs` directly;
+- **AFNI-41 (questionable; decided: rule B)** `3dAutomask.c:203-206, 276-283`: `-nbhrs` sets `nbhrs` directly;
   the range check reads `new_nbhrs`, which nothing sets, so it never runs, and
   `THD_automask_set_peelcounts` (`thd_automask.c:42-46`) silently replaces values outside 6..26
   by 17; values 19..26 act as 18 (`MIN(18, peelthr)`). The help says "should be between 6 and
-  26"; the dead check would have refused values outside 1..max-1. Kept as AFNI's in both modes
-  until decided.
+  26"; the dead check would have refused values outside 1..max-1. **Decided 2026-10-23, rule B**
+  (the input makes no sense and AFNI silently does something arbitrary): the replica's default
+  refuses the last `-nbhrs` value given when it is outside 6..26, the help's range, whether or
+  not `-NN1/2/3` override it (AFNI's dead check sits after the `-NNx` override but reads the
+  `-nbhrs` value itself), right after the option scan: the notice line `*+ WARNING: upstream
+  defect AFNI-41 (3dAutomask) corrected: ...` and the fatal error `-nbhrs 40 is illegal: choose
+  a value between 6 and 26 (AFNI-41; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)`,
+  exit 1. `reproduce` runs as AFNI does and names AFNI-41 (the peel count AFNI uses: 17, or
+  `min(18, n)` for `-NNx`'s). The range is the help's, not the dead check's 1..max-1: the
+  documented contract, and the one the spec gives the clean-room original (`specs/3dAutomask.md`
+  §5.3). *Validated* (parity cases `options/nbhrs-40`, `-5`, `-27`, `-0`, `nbhrs-40-then-NN1`:
+  `reproduce` bit-identical to AFNI, the default refuses naming AFNI-41; unit tests).
 - **AFNI-42 (questionable)** `3dAutomask.c:262-273`: `-NN1/2/3` also set `nbhrs` to 6, 18, 26
   ("keep historic default of 17 for NN2 unless changed via NNx or nbhrs options"), overriding a
   `-nbhrs` given before or after. The help says "the default peeling processes still use NN2"

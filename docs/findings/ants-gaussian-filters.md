@@ -165,6 +165,21 @@ multiplied by the spacing **in double** (unlike `SmoothImage`). A negative thres
 - 4D linear interpolation is ITK's `EvaluateUnoptimized` (the weighted sum of the 16
   neighbours, clamped); 2D and 3D use the optimised paths, which skip an axis whose
   fractional distance is 0. *Read; validated* (`dim4-linear-time`).
+- **Corrected by default (ANTS-32, decided 2026-10-23, rule A).** `out/in − 1` is the
+  downsampling factor less one, a number of **input voxels** (0 at the same spacing, one
+  voxel for a factor of 2): read in millimetres it makes the smoothing depend on the units of
+  the spacing, so the same image smooths differently at 1 → 2 mm and 2 → 4 mm, and an
+  anisotropic image differently along each axis for the same factor. The source's own comment
+  on the outside value says "zero regions without source" (line 189) and ITK's default is 0;
+  the value at index `(1, 1, …)` is an arbitrary voxel (outside the image for an axis of one
+  voxel). larmorx's default smooths by `out/in − 1` input voxels (`out − in` mm, printed in mm
+  as the sigma the filter receives) and gives the voxels beyond the input 0; an axis of one
+  voxel needs no such value and is resampled. At 1 mm input voxels the smoothing is ANTs'; each
+  part is named where it changes the result; `reproduce` gives ANTs'. *Validated*
+  (`sigma-in-voxels-known`: a 2 mm phantom to 4 mm gives, bit for bit, the voxels ANTs itself
+  gives for the same voxels at 1 → 2 mm, where its millimetres are voxels;
+  `outside-zero-known`: ANTs' output with its 2,949 outside voxels 0, bit for bit; the fix pass
+  of every smoothed case with a spacing other than 1 mm and of `add-voxels`).
 
 ## ResampleImage (`Examples/ResampleImage.cxx`)
 

@@ -6,8 +6,10 @@ the half-size path), with its scale image, by AFNI at 1 and 6 threads, fMRIPrep'
 and the replica; a deliberate correction (AFNI-45, ``-T2up 100``) on the BOLD reference; the
 record's cases.
 
-The replica (``larmorx-gpl``, GPL-3.0-or-later) runs as a separate program; there is no
-clean-room original yet (``specs/3dUnifize.md``).
+The replica (``larmorx-gpl``, GPL-3.0-or-later) runs as a separate program; the clean-room
+original (``larmorx afni 3dUnifize``, ``LARMORX_IMPLEMENTATION=original``) has cache entries of
+its own beside the replica's, with AFNI run again with CORE-MATH's correctly rounded functions
+preloaded (the original's squash calls a correctly rounded ``tanhf``, AFNI glibc's).
 """
 
 from __future__ import annotations
@@ -85,6 +87,90 @@ def _compute_t1w(e: fcache.Entry) -> None:
     )
 
 
+def _afni_correctly_rounded(e: fcache.Entry, args: list[str], threads: str = "1") -> None:
+    """AFNI with CORE-MATH's correctly rounded functions preloaded (``afni-cr``)."""
+    from larmorx_validation.parity import afni_replica as ar
+
+    lib = ar.crmath_preload()
+    if lib is None:
+        raise FileNotFoundError("a CORE-MATH preload with tanhf (scripts/build_crmath_preload.sh)")
+    afni, _, _ = am.binaries(PROGRAM)
+    add, unset = am.environment()
+    home = e.dir / ".home"
+    home.mkdir(exist_ok=True)
+    stem = str(e.dir / "afni-cr")
+    argv = [a.replace("{out}", stem) for a in args]
+    env = {**add, "HOME": str(home), "OMP_NUM_THREADS": threads, "LD_PRELOAD": str(lib)}
+    e.run("afni-cr", [afni, *argv], env=env, unset=unset)
+
+
+#: The clean-room original's runs.
+ORIGINAL_RUNS = [
+    ("original-1", "fix", "1"),
+    ("original-6", "fix", "6"),
+    ("original-reproduce", "reproduce", "1"),
+]
+
+
+def _compute_original(e: fcache.Entry) -> None:
+    run = common.fmriprep_run(RUN)
+    command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
+    inp = e.input("BOLD reference, masked (the node's input)", run / INPUT)
+    call = am.fmriprep_args(command, {"uni.nii.gz": "{out}.nii.gz", Path(INPUT).name: str(inp)})
+    am.run_original(e, PROGRAM, "", call, runs=ORIGINAL_RUNS)
+    t2up = [*call[:-2], "-T2up", "100", *call[-2:]]
+    am.run_original(e, PROGRAM, "t2up100-", t2up, runs=[("original", "fix", "6"),
+                    ("original-reproduce", "reproduce", "6")])  # fmt: skip
+    _afni_correctly_rounded(e, call)
+    e.finish(
+        versions={"larmorx": am.larmorx_version()},
+        command=command,
+        threads={"larmorx": ["1", "6"], "afni-cr": ["1"]},
+        settings="the clean-room original (larmorx afni 3dUnifize, LARMORX_IMPLEMENTATION="
+        "original) on fMRIPrep's call of the replica's entry: default mode at 1 and 6 threads, "
+        "reproduce at 1; with -T2up 100 (AFNI-45) in both modes; AFNI 25.2.09 at 1 thread with "
+        "CORE-MATH's correctly rounded functions preloaded (tanhf, cbrtf among them)",
+    )
+
+
+def _compute_t1w_original(e: fcache.Entry) -> None:
+    import larmorx_testdata as td
+
+    t1 = e.input("T1w", Path(td.get(T1W)))
+    args = ["-ssave", "{out}-scale.nii.gz", "-prefix", "{out}.nii.gz", "-input", str(t1)]
+    am.run_original(e, PROGRAM, "", args, runs=ORIGINAL_RUNS)
+    _afni_correctly_rounded(e, args, threads="6")
+    e.finish(
+        versions={"larmorx": am.larmorx_version()},
+        command="3dUnifize -ssave scale.nii.gz -prefix uni.nii.gz -input sub-01_T1w.nii.gz",
+        threads={"larmorx": ["1", "6"], "afni-cr": ["6"]},
+        settings="the clean-room original on ds000005 sub-01's T1w (the half-size path), default "
+        "mode at 1 and 6 threads, reproduce at 1; AFNI 25.2.09 at 6 OpenMP threads with "
+        "CORE-MATH's correctly rounded functions preloaded",
+    )
+
+
+def original_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        f"{am.CASE}-original",
+        "the clean-room original on fMRIPrep's 3dUnifize call of ds005040 sub-002 task-clip "
+        "run-1 (and with -T2up 100), and AFNI with correctly rounded maths",
+        _compute_original,
+    )
+
+
+def t1w_original_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        "ds000005-t1w-original",
+        "the clean-room original on ds000005 sub-01's T1w, and AFNI with correctly rounded maths",
+        _compute_t1w_original,
+    )
+
+
 def entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(),
@@ -120,6 +206,77 @@ REF_PANELS = [
     ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica",
      "reproduce mode, 6 threads"),
 ]  # fmt: skip
+#: The clean-room original's panels and AFNI with correctly rounded maths.
+ORIGINAL_PANELS = [
+    ("original-1", "original-1", "larmorx", "LARMORX clean-room original",
+     "default mode, 1 thread"),
+    ("original-6", "original-6", "larmorx", "LARMORX clean-room original",
+     "default mode, 6 threads"),
+    ("original-reproduce", "original-reproduce", "larmorx", "LARMORX clean-room original",
+     "reproduce mode, 1 thread"),
+    ("afni-cr", "afni-cr", "original", "AFNI 25.2.09, correctly rounded maths",
+     "CORE-MATH's tanhf, cbrtf, ... preloaded"),
+]  # fmt: skip
+
+
+def original_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("original-afni", "original-1", "afni-1", "main",
+          "original − AFNI 25.2.09, 1 thread each", common.ROLE_LX),
+        d("original-afnicr", "original-1", "afni-cr", "main",
+          "original − AFNI with correctly rounded maths", common.ROLE_LX),
+        d("original-replica", "original-1", "replica-1", "check",
+          "original − replica, 1 thread each", common.ROLE_SELF),
+        d("original6-original1", "original-6", "original-1", "check",
+          "original, 6 threads − 1 thread", common.ROLE_SELF),
+        d("original-repro", "original-1", "original-reproduce", "check",
+          "original, default − reproduce mode", common.ROLE_SELF),
+    ]  # fmt: skip
+
+
+def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
+    """The original's verdicts: bit-identical, or identical with correctly rounded maths when
+    only glibc's rounding separates it from AFNI."""
+    for x in diffs:
+        i = x["id"]
+        if i == "original-afni" and not same[i] and same.get("original-afnicr"):
+            x["verdict"] = "identical-cr"
+            x["reason"] = (
+                "AFNI's squash calls glibc's tanhf, which is not correctly rounded on some "
+                "arguments; the original's is. With CORE-MATH's correctly rounded functions "
+                "preloaded, AFNI gives the original's bytes, every value."
+            )
+        elif i == "original-afnicr" and same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = "The same values, every one: AFNI with correctly rounded maths."
+        elif i == "original6-original1" and same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = "The original's result does not depend on its thread count."
+        elif i == "original-replica" and not same[i] and same.get("original-afnicr"):
+            x["verdict"] = "identical-cr"
+            x["reason"] = (
+                "The replica carries glibc 2.35's tanhf, the original a correctly rounded one: "
+                "they differ exactly where AFNI and AFNI with correctly rounded maths do."
+            )
+        elif (
+            i == "original-fmriprep"
+            and not same[i]
+            and same.get("original-afnicr")
+            and same.get("fmriprep-afni")
+        ):
+            x["verdict"] = "identical-cr"
+            x["reason"] = (
+                "fMRIPrep's own output is AFNI's; the original differs from it only where "
+                "glibc's tanhf is not correctly rounded (AFNI with correctly rounded maths gives "
+                "the original's bytes)."
+            )
+        elif i == "original-repro" and same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = (
+                "No correction of the register applies to this input: both modes give the "
+                "same bytes."
+            )
 
 
 def _verdict(x: dict, same: dict[str, bool]) -> None:
@@ -153,8 +310,18 @@ def _verdict(x: dict, same: dict[str, bool]) -> None:
         x["reason"] = "Not accounted for by the other runs of this example."
 
 
-def _panels(ex, exm, e: fcache.Entry, panels, outputs, fmriprep: Path | None = None) -> None:
+def _panels(
+    ex, exm, e: fcache.Entry, panels, outputs, fmriprep: Path | None = None, full=None
+) -> None:
+    """The panels of ``panels`` from the entry ``e``; those named in ``full`` (a dict) are
+    loaded into it instead, compared but not shown."""
     for pid, stem, role, label, sub in panels:
+        if full is not None:
+            arrays = {"uni": common.load(str(e.dir / f"{stem}.nii.gz"))}
+            if len(outputs) > 1 and (e.dir / f"{stem}-scale.nii.gz").is_file():
+                arrays["scale"] = common.load(str(e.dir / f"{stem}-scale.nii.gz"))
+            full[pid] = arrays
+            continue
         if stem is None:
             arrays = {"uni": common.load(str(fmriprep))}
         else:
@@ -164,7 +331,7 @@ def _panels(ex, exm, e: fcache.Entry, panels, outputs, fmriprep: Path | None = N
         ex.add(exm.Panel(pid, role, label, sub, arrays))
 
 
-def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
+def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -181,8 +348,12 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
                      "3dUnifize's input in fMRIPrep's BOLD reference workflow: N4-corrected, "
                      "skull-stripped once (float32)", {"all": data}))  # fmt: skip
     _panels(ex, exm, e, REF_PANELS, OUTPUT, run / FMRIPREP_OUT)
+    _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUT)
+    full: dict = {}
+    _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUT, full=full)
     d = common.d
     diffs = [
+        *original_diffs()[:2],
         d("replica-afni", "replica-1", "afni-1", "main", "replica − AFNI 25.2.09, 1 thread each",
           common.ROLE_LX),
         d("afni6-afni1", "afni-6", "afni-1", "variability", "AFNI 25.2.09, 6 threads − 1 thread",
@@ -195,19 +366,23 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
           common.ROLE_SELF),
         d("replica-repro", "replica-6", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
+        d("original-fmriprep", "original-1", "fmriprep", "fmriprep",
+          "original − fMRIPrep's own output", common.ROLE_FMRIPREP),
+        *original_diffs()[2:],
     ]  # fmt: skip
-    common.compare_all(ex, diffs, OUTPUT)
+    common.compare_all(ex, diffs, OUTPUT, full=full)
     same = common.identical(diffs)
     for x in diffs:
         _verdict(x, same)
+    original_verdicts(diffs, same)
     at, _k = common.centre_view(ex)
     default = {
         "output": "uni",
         "plane": "axial",
         "voxel": at,
-        "panels": ["ref", "afni-1", "fmriprep", "replica-1"],
-        "diffs": ["replica-afni", "afni6-afni1", "fmriprep-afni"],
-        "compare": {"a": "afni-1", "b": "replica-1"},
+        "panels": ["ref", "afni-1", "original-1", "replica-1"],
+        "diffs": ["original-afni", "replica-afni", "afni6-afni1"],
+        "compare": {"a": "afni-1", "b": "original-1"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUT), default=default, window_panel="afni-1",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
@@ -220,8 +395,9 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
             "The 3dUnifize node fMRIPrep 25.2.6 ran on the BOLD reference of OpenNeuro ds005040 "
             "sub-002 (task clip, run 1), N4-corrected and skull-stripped once: its arguments "
             "(-T2: the contrast inverted, unifized, inverted back) given to AFNI 25.2.09 at 1 "
-            "and 6 OpenMP threads and to the larmorx-gpl replica at 1 and 6 threads in both "
-            "modes. fMRIPrep's own output is the panel it produced in its run."
+            "and 6 OpenMP threads, to the larmorx-gpl replica and to LARMORX's clean-room "
+            "original at 1 and 6 threads in both modes. fMRIPrep's own output is the panel it "
+            "produced in its run."
         ),
         "facts": [
             {
@@ -240,7 +416,9 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
                 "text": f"{vers.get('afni', '?')} (the repository's oracle build; OpenMP); AFNI "
                 f"{vers.get('afni_in_fmriprep_image', '?')} in fMRIPrep's image; "
                 f"{vers.get('larmorx-gpl', '?')} (the replica, with a port of glibc 2.35's "
-                f"tanhf), from larmorx at commit `{info['larmorx_commit'][:12]}`",
+                f"tanhf), from larmorx at commit `{info['larmorx_commit'][:12]}`; "
+                f"{o.info().get('versions', {}).get('larmorx', 'larmorx')} at commit "
+                f"`{o.info()['larmorx_commit'][:12]}` (a correctly rounded tanhf)",
             },
             {
                 "label": "Output",
@@ -252,11 +430,13 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
         **out,
         "chain": None,
         "metrics_note": _note(img),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [am.DATA]),
+        "provenance": common.provenance(
+            info, f"{TOOL}/{e.case}", [am.DATA], [am.original_provenance(o)]
+        ),
     }
 
 
-def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
+def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     import larmorx_testdata as td
     import nibabel as nib
     from scipy import ndimage
@@ -281,8 +461,12 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
          "reproduce mode, 6 threads"),
     ]  # fmt: skip
     _panels(ex, exm, e, panels, OUTPUTS_T1W)
+    _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUTS_T1W)
+    full: dict = {}
+    _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUTS_T1W, full=full)
     d = common.d
     diffs = [
+        *original_diffs()[:2],
         d("replica-afni", "replica-1", "afni-1", "main", "replica − AFNI 25.2.09, 1 thread each",
           common.ROLE_LX),
         d("afni6-afni1", "afni-6", "afni-1", "variability", "AFNI 25.2.09, 6 threads − 1 thread",
@@ -293,19 +477,21 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
           common.ROLE_SELF),
         d("replica-repro", "replica-6", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
+        *original_diffs()[2:],
     ]  # fmt: skip
-    common.compare_all(ex, diffs, OUTPUTS_T1W)
+    common.compare_all(ex, diffs, OUTPUTS_T1W, full=full)
     same = common.identical(diffs)
     for x in diffs:
         _verdict(x, same)
+    original_verdicts(diffs, same)
     at, _k = common.centre_view(ex)
     default = {
         "output": "uni",
         "plane": "axial",
         "voxel": at,
-        "panels": ["t1w", "afni-1", "replica-1", "image"],
-        "diffs": ["replica-afni", "afni6-afni1", "image-afni"],
-        "compare": {"a": "t1w", "b": "afni-1"},
+        "panels": ["t1w", "afni-1", "original-1", "replica-1"],
+        "diffs": ["original-afni", "original-afnicr", "afni6-afni1"],
+        "compare": {"a": "afni-1", "b": "original-1"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS_T1W), default=default, window_panel="afni-1",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
@@ -318,8 +504,9 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
             "3dUnifize's main use: a T1w's white matter made uniform and scaled to 1000. The "
             f"T1w of OpenNeuro ds000005 sub-01 has {n:,} voxels, more than a million: the "
             "local white-matter level is computed on a half-size copy and brought back (AFNI's "
-            "duplo path). AFNI 25.2.09 at 1 and 6 threads, fMRIPrep's build of AFNI, and the "
-            "replica in both modes; -ssave writes the scale image each voxel is multiplied by."
+            "duplo path). AFNI 25.2.09 at 1 and 6 threads, fMRIPrep's build of AFNI, the "
+            "replica and the clean-room original in both modes; -ssave writes the scale image "
+            "each voxel is multiplied by."
         ),
         "facts": [
             {
@@ -331,18 +518,21 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')}; AFNI {vers.get('afni_in_fmriprep_image', '?')} "
-                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}",
+                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}; "
+                f"{o.info().get('versions', {}).get('larmorx', 'larmorx')}",
             },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
         ],
         **out,
         "chain": None,
         "metrics_note": _note(img),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [common.DS000005]),
+        "provenance": common.provenance(
+            info, f"{TOOL}/{e.case}", [common.DS000005], [am.original_provenance(o)]
+        ),
     }
 
 
-def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
+def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -367,12 +557,22 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
          "-T2up 98.5, the default"),
     ]  # fmt: skip
     _panels(ex, exm, e, panels, OUTPUT)
+    _panels(ex, exm, o, [
+        ("original", "t2up100-original", "larmorx", "LARMORX clean-room original, -T2up 100",
+         "default mode: corrected"),
+        ("original-reproduce", "t2up100-original-reproduce", "larmorx",
+         "LARMORX clean-room original, -T2up 100", "reproduce mode"),
+    ], OUTPUT)  # fmt: skip
     d = common.d
     diffs = [
         d("replica-afni", "replica", "afni", "main", "replica (default) − AFNI, -T2up 100",
           common.ROLE_LX),
         d("repro-afni", "replica-reproduce", "afni", "main",
           "replica (reproduce) − AFNI, -T2up 100", common.ROLE_LX),
+        d("original-afni", "original", "afni", "main", "original (default) − AFNI, -T2up 100",
+          common.ROLE_LX),
+        d("original-repro-afni", "original-reproduce", "afni", "main",
+          "original (reproduce) − AFNI, -T2up 100", common.ROLE_LX),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUT)
     same = common.identical(diffs)
@@ -381,8 +581,9 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     link = [am._link(reg, "AFNI-45")]
     for x in diffs:
         x["links"] = link
-        if x["id"] == "replica-afni":
-            x["verdict"] = "d13" if not same[x["id"]] and same["repro-afni"] else "open"
+        if x["id"] in ("replica-afni", "original-afni"):
+            repro = "repro-afni" if x["id"] == "replica-afni" else "original-repro-afni"
+            x["verdict"] = "d13" if not same[x["id"]] and same[repro] else "open"
             x["reason"] = (
                 "AFNI-45, corrected by default with a warning: at -T2up 100 the percentile's "
                 "index falls one past the sorted values, where AFNI reads memory it never wrote "
@@ -404,9 +605,9 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "output": "uni",
         "plane": "axial",
         "voxel": at,
-        "panels": ["ref", "afni", "replica", "afni-default"],
-        "diffs": ["replica-afni", "repro-afni"],
-        "compare": {"a": "afni-default", "b": "replica"},
+        "panels": ["ref", "afni", "original", "afni-default"],
+        "diffs": ["original-afni", "original-repro-afni", "replica-afni"],
+        "compare": {"a": "afni-default", "b": "original"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUT), default=default, window_panel="replica",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
@@ -418,7 +619,8 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "With -T2, 3dUnifize inverts the contrast about an upper percentile of the masked "
             "values (-T2up, 98.5 by default, 90 to 100 allowed). At 100 the percentile's index "
             "is one past the end of the sorted values. fMRIPrep's call with -T2up 100 added, "
-            "given to AFNI 25.2.09 and to the replica in both modes, beside fMRIPrep's own call."
+            "given to AFNI 25.2.09, to the replica and to the clean-room original in both modes, "
+            "beside fMRIPrep's own call."
         ),
         "facts": [
             {"label": "Input", "text": "the masked BOLD reference of the first example"},
@@ -443,7 +645,9 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         **out,
         "chain": None,
         "metrics_note": _note(img),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [am.DATA]),
+        "provenance": common.provenance(
+            info, f"{TOOL}/{e.case}", [am.DATA], [am.original_provenance(o)]
+        ),
     }
 
 
@@ -451,9 +655,11 @@ def _note(img) -> str:
     n = int(np.prod(img.shape[:3]))
     return (
         f"Δ is A − B. Computed in float64 over all {n:,} voxels of the outputs, not only those "
-        "shown; the range is B's maximum minus its minimum. The record's threshold: every output "
-        "bit-identical to AFNI's, with its exit status and messages. The rows *the original "
-        "against itself* are AFNI's own variability on this input: its thread counts and builds."
+        "shown; the range is B's maximum minus its minimum. The records' thresholds: every output "
+        "bit-identical to AFNI's (the replica), or float32 values within 1e-5 of AFNI's largest "
+        "with bit-identity reported (the clean-room original); with their exit status and "
+        "messages. The rows *the original against itself* are AFNI's own variability on this "
+        "input: its thread counts and builds."
     )
 
 
@@ -461,37 +667,38 @@ def export(ctx: core.Context) -> dict:
     from larmorx_validation.parity.afni_unifize import _scenario_list
 
     reg = core.register(ctx.repo)
-    rec = records.load(ctx.repo, TOOL)
+    recs = {
+        impl: records.load(ctx.repo, f"{TOOL}{suffix}")
+        for impl, _label, suffix in am.IMPLEMENTATIONS
+    }
     examples = {
         "fmriprep/ds005040-task_clip_run_1": "fmriprep-unifize",
         "real/T1w-ds000005": "t1w-unifize",
     }
-    cs = am.cases(rec, _scenario_list(), PROGRAM, examples)
+    cs = am.cases(recs, _scenario_list(), PROGRAM, examples)
     e, t = entry(ctx), t1w_entry(ctx)
+    o, ot = original_entry(ctx), t1w_original_entry(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "3dUnifize",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": [x for rec in recs.values() for x in rec.source()],
             "benchmarks": [],
-            "cache": [fcache.provenance(e), fcache.provenance(t)],
+            "cache": [fcache.provenance(x) for x in (e, t, o, ot)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
-        "implementations": [
-            common.implementation(
-                cs,
-                "replica",
-                "larmorx-gpl replica",
-                "replica",
-                f"docs/validation/{TOOL}.md",
-                "validated",
-            )
-        ],
+        "implementations": am.implementations(
+            cs, TOOL, {impl: am.status_of(rec) for impl, rec in recs.items()}
+        ),
         "cases": cs,
         "cases_total": len(cs),
-        "examples": [_example_ref(ctx, e), _example_t1w(ctx, t), _example_t2up(ctx, e, reg)],
+        "examples": [
+            _example_ref(ctx, e, o),
+            _example_t1w(ctx, t, ot),
+            _example_t2up(ctx, e, o, reg),
+        ],
     }
 
 
@@ -499,4 +706,4 @@ if __name__ == "__main__":  # compute the cache entries only
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
-    print("done", entry(c).dir, t1w_entry(c).dir)
+    print("done", entry(c).dir, t1w_entry(c).dir, original_entry(c).dir, t1w_original_entry(c).dir)

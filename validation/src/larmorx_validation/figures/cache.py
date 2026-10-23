@@ -166,7 +166,9 @@ def rerun(e: Entry, labels: Sequence[str], why: str, cpus: int | None = None) ->
             argv = argv[3:]
         threads = int(r["env"].get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "0") or 0)
         if cpus is not None and threads > cpus:
-            argv = ["taskset", "-c", f"0-{cpus - 1}", *argv]
+            # the first ``cpus`` of the CPUs this process may use (never more than those)
+            allowed = sorted(os.sched_getaffinity(0))[:cpus]
+            argv = ["taskset", "-c", ",".join(map(str, allowed)), *argv]
         e.run(label, argv, env=r["env"], unset=("LD_PRELOAD", "NSLOTS", "OMP_NUM_THREADS"))
     new = {r.label: r.__dict__ for r in e.runs}
     info["runs"] = [new.get(r["label"], r) for r in info["runs"]]

@@ -213,8 +213,51 @@ def expect_outside_zero(args: list[str], outputs: list[Path], tmp: Path) -> tupl
     return ok and outside > 0, detail, value
 
 
+# ------------------------------------------------------------------------------------------------
+# ANTS-40: N4's zero and negative voxels
+
+
+@ants_inputs.builder("known-n4-zero-background")
+def _(t):
+    """The head phantom's brain (a smooth bias times WM, GM, CSF, with noise) on an exact 0
+    background and with 1 % of the brain's voxels 0 or -20 (dropout), 1.5 mm voxels: N4 without
+    a mask fits the zeros and negative values like tissue."""
+    rng = np.random.default_rng(40)
+    a = ants_inputs.head(3).astype(np.float32)
+    brain = ants_inputs.brain_mask().astype(bool)
+    a = np.where(brain, a, 0.0)
+    drop = brain & (rng.random(a.shape) < 0.01)
+    a = np.where(drop, np.where(rng.random(a.shape) < 0.5, 0.0, -20.0), a).astype(np.float32)
+    ants_inputs.save(a, t, affine=np.diag([1.5, 1.5, 1.5, 1.0]))
+
+
+def expect_n4_masked(args: list[str], outputs: list[Path], tmp: Path) -> tuple[bool, str, object]:
+    """N4's correct field with the non-positive voxels left out is ANTs' own field with a mask
+    of the positive voxels (where the defect cannot arise): the ANTs oracle at one thread with
+    correctly rounded maths (CORE-MATH), ``-x positive -r 0``, its bias field compared with
+    larmorx's default bias field bit for bit."""
+    import nibabel as nib
+
+    from larmorx_validation.parity.ants_programs import run_ants
+
+    i = args.index("-i")
+    img = nib.load(args[i + 1])
+    positive = tmp / "positive-mask.nii.gz"
+    ants_inputs.save(
+        (np.asarray(img.dataobj, np.float32) > 0).astype(np.uint8), positive, affine=img.affine
+    )
+    c, b = tmp / "ants-masked-c.nii.gz", tmp / "ants-masked-b.nii.gz"
+    o = args.index("-o")
+    argv = [*args[:o], "-x", str(positive), "-r", "0", "-o", f"[{c},{b}]", *args[o + 2 :]]
+    code, _out, err = run_ants("N4BiasFieldCorrection", argv, 1, correctly_rounded=True)
+    if code != 0:
+        return False, f"ANTs with the positive voxels' mask failed: {err.strip()[-200:]}", None
+    return _compare(outputs[1], _load(b), "ANTs' bias field with a mask of the positive voxels")
+
+
 __all__ = [
     "expect_contours",
+    "expect_n4_masked",
     "expect_erode",
     "expect_open_zeros",
     "expect_outside_zero",

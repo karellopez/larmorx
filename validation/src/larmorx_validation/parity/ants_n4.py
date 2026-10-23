@@ -45,6 +45,7 @@ from larmorx_validation.parity.ants_image_math.common import (
     T1_RAW,
     WM,
 )
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_programs import AntsCase, ants_version, cases_for
 from larmorx_validation.parity.harness import Case, CaseResult, CheckList, Suite
 
@@ -177,6 +178,7 @@ T1_BRAIN = "{gen:n4-t1-brain}"
 RAMP = "{gen:n4-ramp}"
 SERIES = "{gen:n4-series-4d}"
 OTHER_GRID = "{gen:n4-mask-other-grid}"
+KNOWN_N4 = "{gen:known-n4-zero-background}"
 
 
 # ------------------------------------------------------------------------------------------------
@@ -711,11 +713,33 @@ def all_cases() -> list[AntsCase]:
         ),
         # -- Inputs -----------------------------------------------------------------------------
         n4("int16-scaled", INP, "scaled int16 input", "-d", "3", "-i", HEAD_I16, "-o", "{out}"),
+        # ANTS-40 (measured, then rule A, 2026-10-23): the zero and negative voxels left out
+        # of the fit, against ANTs' own run with a mask of the positive voxels.
+        n4(
+            "zero-background-known",
+            INP,
+            "a brain on an exact 0 background with 1 % dropout (0 and -20), no mask: by default "
+            "the non-positive voxels are left out of the fit, which gives ANTs' own bias field "
+            "with a mask of the positive voxels (one thread, correctly rounded maths); ANTs fits "
+            "them like tissue",
+            "-d",
+            "3",
+            "-i",
+            KNOWN_N4,
+            "-s",
+            "2",
+            "-c",
+            "[20x20,0]",
+            "-o",
+            "[{out},{out2}]",
+            outputs=bias,
+            fix_expect=known.expect_n4_masked,
+        ),
         n4(
             "outliers",
             INP,
-            "hot, negative and zero voxels (NaN and -inf read as 0): non-positive values keep "
-            "their value in the log image",
+            "hot, negative and zero voxels (NaN and -inf read as 0): ANTs keeps non-positive "
+            "values in its log image (ANTS-40, corrected by default)",
             "-d",
             "3",
             "-i",

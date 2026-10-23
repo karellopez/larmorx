@@ -574,6 +574,19 @@ def fix_pass(
     return check.passed
 
 
+def known_summary(results: list[CaseResult]) -> list[str]:
+    """The report line of the corrections checked against a result known independently
+    (``AntsCase.fix_expect``)."""
+    known = [(r.case, ch) for r in results for ch in r.checks if ch.name == FIX_EXPECT]
+    if not known:
+        return []
+    return [
+        f"- **Corrections against a result known independently** ({FIX_EXPECT}): "
+        f"{sum(ch.passed for _, ch in known)} of {len(known)} cases give exactly it: "
+        + "; ".join(f"`{case}` ({ch.detail})" for case, ch in known)
+    ]
+
+
 def _values(path: Path) -> np.ndarray:
     import nibabel as nib
 
@@ -621,13 +634,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
             + "."
         )
     lines += defects.summary(results)
-    known = [(r.case, ch) for r in results for ch in r.checks if ch.name == FIX_EXPECT]
-    if known:
-        lines.append(
-            f"- **Corrections against a result known independently** ({FIX_EXPECT}): "
-            f"{sum(ch.passed for _, ch in known)} of {len(known)} cases give exactly it: "
-            + "; ".join(f"`{case}` ({ch.detail})" for case, ch in known)
-        )
+    lines += known_summary(results)
 
     def worst(rs: list[CaseResult]) -> str:
         values = [
@@ -726,6 +733,7 @@ __all__ = [
     "fix_pass",
     "header_differences",
     "highlights",
+    "known_summary",
     "make_suite",
     "raw_header",
     "resolve_arg",

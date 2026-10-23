@@ -55,15 +55,45 @@ pub struct Replica {
     pub family: &'static str,
     pub tool: &'static str,
     pub package: &'static Package,
+    /// Whether larmorx has a clean-room original of the tool. Without one (a tool whose
+    /// original is still to be written from its spec), the replica is the only implementation:
+    /// `auto` runs it or fails like `replica`, and `original` is an error.
+    pub original: bool,
 }
 
 /// Every tool that has a replica in another package. Add one line per replica (and the
 /// Python wrapper's `implementation` argument; see `docs/architecture.md`, "Adding a replica").
-pub const REPLICAS: &[Replica] = &[Replica {
-    family: "afni",
-    tool: "3dTshift",
-    package: &LARMORX_GPL,
-}];
+pub const REPLICAS: &[Replica] = &[
+    Replica {
+        family: "afni",
+        tool: "3dTshift",
+        package: &LARMORX_GPL,
+        original: true,
+    },
+    // The clean-room originals are to be written from specs/3dAutomask.md and
+    // specs/3dUnifize.md.
+    Replica {
+        family: "afni",
+        tool: "3dAutomask",
+        package: &LARMORX_GPL,
+        original: false,
+    },
+    Replica {
+        family: "afni",
+        tool: "3dUnifize",
+        package: &LARMORX_GPL,
+        original: false,
+    },
+];
+
+/// The tools of `family` that have a replica and no clean-room original yet: the command line
+/// lists them with the family's own tools.
+pub fn replica_only(family: &str) -> impl Iterator<Item = &'static str> {
+    REPLICAS
+        .iter()
+        .filter(move |r| r.family == family && !r.original)
+        .map(|r| r.tool)
+}
 
 /// The replica of `larmorx <family> <tool>`, if there is one.
 pub fn lookup(family: &str, tool: &str) -> Option<&'static Replica> {
@@ -131,6 +161,15 @@ pub enum Error {
         tool: &'static str,
         package: &'static Package,
     },
+    /// The tool has no clean-room original yet, and its replica's program was not found (or
+    /// `original` was asked for).
+    NoOriginal {
+        family: &'static str,
+        tool: &'static str,
+        package: &'static Package,
+        /// `original` was asked for explicitly.
+        asked: bool,
+    },
 }
 
 impl Error {
@@ -139,7 +178,7 @@ impl Error {
     pub fn exit_code(&self) -> u8 {
         match self {
             Error::BadImplementation(_) | Error::BadPath { .. } => 2,
-            Error::NotFound { .. } => EXIT_NOT_FOUND,
+            Error::NotFound { .. } | Error::NoOriginal { .. } => EXIT_NOT_FOUND,
         }
     }
 }
@@ -165,6 +204,32 @@ impl fmt::Display for Error {
                  (licence {})",
                 package.program, package.env, package.install, package.licence
             ),
+            Error::NoOriginal {
+                family,
+                tool,
+                package,
+                asked,
+            } => {
+                let start = if *asked {
+                    format!(
+                        "{IMPLEMENTATION_ENV}=original was asked for, but larmorx has no \
+                         clean-room original of {family} {tool} yet"
+                    )
+                } else {
+                    format!(
+                        "larmorx has no clean-room original of {family} {tool} yet, and the {} \
+                         program of its replica was not found ({}, the Python environment's \
+                         scripts directory, PATH)",
+                        package.program, package.env
+                    )
+                };
+                write!(
+                    f,
+                    "{start}; its bit-exact replica is in the {} package: install it with: {} \
+                     (licence {})",
+                    package.name, package.install, package.licence
+                )
+            }
         }
     }
 }
@@ -263,8 +328,18 @@ pub fn choose_with(
     replica: &Replica,
     find: impl FnOnce() -> Result<Option<PathBuf>, Error>,
 ) -> Result<Choice, Error> {
+    let no_original = |asked: bool| Error::NoOriginal {
+        family: replica.family,
+        tool: replica.tool,
+        package: replica.package,
+        asked,
+    };
     if implementation == Implementation::Original {
-        return Ok(Choice::Original);
+        return if replica.original {
+            Ok(Choice::Original)
+        } else {
+            Err(no_original(true))
+        };
     }
     match (find()?, implementation) {
         (Some(program), _) => Ok(Choice::Replica(program)),
@@ -273,6 +348,7 @@ pub fn choose_with(
             tool: replica.tool,
             package: replica.package,
         }),
+        (None, _) if !replica.original => Err(no_original(false)),
         (None, _) => Ok(Choice::Original),
     }
 }
@@ -347,6 +423,28 @@ mod tests {
     use super::*;
 
     const TSHIFT: &Replica = &REPLICAS[0];
+
+    #[test]
+    fn tools_without_an_original() {
+        let automask = lookup("afni", "3dAutomask").unwrap();
+        assert!(!automask.original && TSHIFT.original);
+        let found = || Ok(Some(PathBuf::from("bin/larmorx-gpl")));
+        let missing = || Ok(None);
+        assert!(matches!(
+            choose_with(Implementation::Auto, automask, found),
+            Ok(Choice::Replica(_))
+        ));
+        let e = choose_with(Implementation::Auto, automask, missing).unwrap_err();
+        assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
+        assert!(e.to_string().contains("no clean-room original of afni 3dAutomask"), "{e}");
+        let e = choose_with(Implementation::Original, automask, found).unwrap_err();
+        assert!(e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"), "{e}");
+        assert_eq!(
+            replica_only("afni").collect::<Vec<_>>(),
+            ["3dAutomask", "3dUnifize"]
+        );
+        assert_eq!(replica_only("ants").count(), 0);
+    }
 
     #[test]
     fn the_registry_names_each_tool_once() {

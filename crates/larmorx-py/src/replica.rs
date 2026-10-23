@@ -21,7 +21,7 @@ pub fn implementation(name: &str) -> PyResult<Implementation> {
 }
 
 /// Every tool with a replica: dicts with `family`, `tool`, `package`, `program`, `env`,
-/// `licence` and `install`.
+/// `licence`, `install` and `original` (whether larmorx has a clean-room original of it).
 #[pyfunction]
 fn replica_registry(py: Python<'_>) -> PyResult<Vec<Bound<'_, PyDict>>> {
     replica::REPLICAS
@@ -35,6 +35,7 @@ fn replica_registry(py: Python<'_>) -> PyResult<Vec<Bound<'_, PyDict>>> {
             d.set_item("env", r.package.env)?;
             d.set_item("licence", r.package.licence)?;
             d.set_item("install", r.package.install)?;
+            d.set_item("original", r.original)?;
             Ok(d)
         })
         .collect()

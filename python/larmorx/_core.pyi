@@ -23,9 +23,9 @@ def cli_tools() -> list[tuple[str, list[str]]]:
 
 # --- Replicas in other packages, run as separate programs (larmorx/_replica.py) ----------------
 
-def replica_registry() -> list[dict[str, str]]:
+def replica_registry() -> list[dict[str, str | bool]]:
     """Every tool with a replica: ``family``, ``tool``, ``package``, ``program``, ``env``,
-    ``licence``, ``install``."""
+    ``licence``, ``install`` and ``original`` (whether larmorx has a clean-room original)."""
 
 def replica_find(family: str, tool: str, dirs: list[str]) -> Path | None:
     """The replica program of ``family tool`` (its environment variable, then ``dirs``, then

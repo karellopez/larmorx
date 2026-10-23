@@ -41,7 +41,7 @@ type Exit = u8;
 /// The text libstdc++ prints when an ITK exception reaches `std::terminate`
 /// (`terminate called after throwing ...`, `what()`: the file, the line and the
 /// description); object addresses are `0x0`.
-pub(crate) fn terminate_text(e: &ItkException) -> String {
+pub fn terminate_text(e: &ItkException) -> String {
     let description = if e.class.is_empty() {
         e.description.clone()
     } else {
@@ -399,9 +399,19 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
     };
     s.transform = transform;
     // The images are used from here on: ANTs dereferences a missing one.
-    let images = |log: &mut Log<'_>| -> Result<(Image<f32, D>, Image<f32, D>), Exit> {
+    let images = |log: &mut Log<'_>, blobs: bool| -> Result<(Image<f32, D>, Image<f32, D>), Exit> {
         match (&fixed, &moving) {
             (Some(f), Some(m)) => Ok((f.clone(), m.clone())),
+            // The blob detector's Update with a null input.
+            _ if blobs => Err(uncaught(
+                log,
+                &ItkException::new(
+                    "Modules/Core/Common/src/itkProcessObject.cxx",
+                    1339,
+                    "MultiScaleLaplacianBlobDetectorImageFilter",
+                    "Input Primary is required but not set.",
+                ),
+            )),
             _ if transform.from_images() => Err(uncaught(
                 log,
                 &ItkException::new(
@@ -450,10 +460,20 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
             s.align_principal_axes = Conv::bool(&a.name).map_err(|e| conv_err(log, e))?;
         }
     }
-    let (fixed32, moving32) = images(log)?;
+    let (fixed32, moving32) = images(log, s.blobs.0 >= 3)?;
     let fixed64 = Arc::new(widened(&fixed32));
     let moving64 = Arc::new(widened(&moving32));
-    let init = initial(&s, &fixed64, &moving64, log).map_err(|e| ai_failure(log, e))?;
+    let init = initial(
+        &s,
+        &fixed64,
+        &moving64,
+        &fixed32,
+        &moving32,
+        log,
+        ctx.notices,
+        ctx.n_threads,
+    )
+    .map_err(|e| ai_failure(log, e))?;
     // The output's name.
     let output = last(p, "output").map(|o| {
         if o.parameters.is_empty() {

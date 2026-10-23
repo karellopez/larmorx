@@ -16,6 +16,7 @@
 //! [`register`] below. Then add the stubs to `python/larmorx/_core.pyi` and the wrapper to
 //! `python/larmorx/ants/`.
 
+mod blobs;
 mod components;
 mod denoise;
 mod gaussian;
@@ -74,7 +75,7 @@ pub(crate) fn array_like<'py, T: numpy::Element>(
 /// Images held in memory under placeholder names, and placeholder names standing for files
 /// (`aliases`, for programs that read numbered series such as Atropos' priors); other names
 /// are files.
-struct MemoryStore {
+pub(crate) struct MemoryStore {
     inputs: HashMap<String, ItkImage>,
     aliases: HashMap<String, String>,
     outputs: HashMap<String, OutputImage>,
@@ -350,6 +351,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ants_image_math_operations, m)?)?;
     m.add_function(wrap_pyfunction!(ants_read_float, m)?)?;
     image_math::register(m)?;
+    blobs::register(m)?;
     threshold::register(m)?;
     gaussian::register(m)?;
     resample::register(m)?;

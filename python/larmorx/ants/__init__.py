@@ -48,8 +48,11 @@ from larmorx.ants.initializers import (
     AffineInitializerError,
     AIError,
     AIResult,
+    Blob,
+    BlobAlignment,
     affine_initializer,
     ai,
+    blob_alignment,
 )
 from larmorx.ants.morphology import (
     fill_holes,
@@ -95,6 +98,8 @@ __all__ = [
     "AtroposError",
     "AtroposIteration",
     "AtroposResult",
+    "Blob",
+    "BlobAlignment",
     "BoxPlot",
     "DenoiseResult",
     "GaussianLikelihood",
@@ -120,6 +125,7 @@ __all__ = [
     "apply_transforms",
     "apply_transforms_to_points",
     "atropos",
+    "blob_alignment",
     "combine_transforms",
     "denoise_image",
     "discrete_gaussian",

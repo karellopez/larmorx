@@ -44,6 +44,7 @@ use larmorx_registration::rng::{MersenneTwister, RandomIterator};
 use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Matrix, Space};
 
+use crate::ai_blobs::{self, BlobFailure, LandmarkKind};
 use crate::registration::helper::Log;
 
 /// The metric of `--metric` (`antsAI` lowercases the name).
@@ -212,6 +213,8 @@ pub struct Initial<const D: usize> {
     /// The first and second rotation axes of the 3D search (the principal axes, or x and y).
     pub axis1: [f64; D],
     pub axis2: [f64; D],
+    /// With `--align-blobs`: the blobs, pairs and landmarks the transform came from.
+    pub blobs: Option<Box<crate::ai_blobs::BlobAlignment<D>>>,
 }
 
 fn uncaught_moments(e: MomentsError) -> AiError {
@@ -285,12 +288,17 @@ fn wahba<const D: usize>(b: &Matrix<f64, D>, log: &mut Log<'_>) -> Result<Matrix
 }
 
 /// The initial transform (`antsAI.cxx:806-1051`). `fixed` and `moving` hold the float
-/// images' values.
+/// images' values (`fixed32` and `moving32` the images as read, for the blob alignment).
+#[allow(clippy::too_many_arguments)]
 pub fn initial<const D: usize>(
     s: &AiSettings,
     fixed: &Image<f64, D>,
     moving: &Image<f64, D>,
+    fixed32: &Image<f32, D>,
+    moving32: &Image<f32, D>,
     log: &mut Log<'_>,
+    notices: &mut Notices,
+    n_threads: usize,
 ) -> Result<Initial<D>, AiError> {
     let mut transform = LinearXfm::<f64, D>::new(Kind::Affine);
     let mut axis1 = [0.0f64; D];
@@ -313,12 +321,47 @@ pub fn initial<const D: usize>(
             transform,
             axis1,
             axis2,
+            blobs: None,
         });
     }
     if s.blobs.0 >= 3 {
-        return Err(AiError::Refused(
-            "--align-blobs is not ported yet (the blob detector and landmark initializer)".into(),
-        ));
+        // GetTransformFromFeatureMatching with an AffineTransform for `affine`, else the
+        // rigid landmark class; its offset, then its matrix, set on the identity (centre 0).
+        let kind = if s.transform == AiTransform::Affine {
+            LandmarkKind::Affine
+        } else {
+            LandmarkKind::Rigid
+        };
+        let alignment = ai_blobs::align(
+            fixed32, moving32, s.blobs.0, s.blobs.1, kind, notices, n_threads,
+        );
+        let alignment = match alignment {
+            Ok(a) => a,
+            Err(BlobFailure::Uncaught(e)) => return Err(AiError::Uncaught(e)),
+            Err(BlobFailure::EmptyBlobList) => {
+                log.cerr("The moving image or fixed image blobs list is empty.\n");
+                return Err(AiError::Refused(
+                    "no blob was found in one of the images: ANTs then reads the offset of a null transform and crashes".into(),
+                ));
+            }
+            Err(BlobFailure::NoLandmark) => {
+                return Err(AiError::Refused(
+                    "no blob pair kept its distances to 3 others: there is no landmark for the rigid fit (ANTs writes a transform of NaNs, ANTS-114)".into(),
+                ));
+            }
+        };
+        for m in &alignment.messages {
+            log.cerr(m);
+        }
+        transform.set_identity();
+        transform.set_offset(alignment.offset);
+        transform.set_matrix(alignment.matrix);
+        return Ok(Initial {
+            transform,
+            axis1,
+            axis2,
+            blobs: Some(Box::new(alignment)),
+        });
     }
     let mf = moments::compute(fixed).map_err(uncaught_moments)?;
     let mm = moments::compute(moving).map_err(uncaught_moments)?;
@@ -365,6 +408,7 @@ pub fn initial<const D: usize>(
         transform,
         axis1,
         axis2,
+        blobs: None,
     })
 }
 

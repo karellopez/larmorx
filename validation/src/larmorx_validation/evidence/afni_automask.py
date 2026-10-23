@@ -113,12 +113,13 @@ def run_all(
 
 
 def image_version(program: str) -> str:
-    """The version banner of ``program`` in fMRIPrep's image (its first line)."""
+    """The version in the banner ``program`` prints in fMRIPrep's image (``-ver`` is not an
+    option: the banner, then an error)."""
     import subprocess
 
     _, _, sif = binaries(program)
     p = subprocess.run(
-        ["apptainer", "exec", "--cleanenv", "--no-home", str(sif), program],
+        ["apptainer", "exec", "--cleanenv", "--no-home", str(sif), program, "-ver"],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -139,6 +140,13 @@ def versions(program: str) -> dict[str, str]:
         .read_text(encoding="utf-8")
         .split()[0],
     }
+
+
+def short_command(command: str) -> str:
+    """A node's command line with fMRIPrep's working directory shortened to ``…/``."""
+    import re
+
+    return re.sub(r"/work/fmriprep_25_2_wf/\S*/", "…/", " ".join(command.split()))
 
 
 def fmriprep_args(command: str, subs: dict[str, str]) -> list[str]:
@@ -344,7 +352,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
                 "text": "fMRIPrep 25.2.6, `bold_fit_wf/enhance_and_skullstrip_bold_wf/"
                 "skullstrip_second_pass`",
             },
-            {"label": "Command", "text": "`" + core.short_path(info["command"]) + "`"},
+            {"label": "Command", "text": "`" + short_command(info["command"]) + "`"},
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')} (the repository's oracle build); AFNI "
@@ -664,8 +672,19 @@ def case_verdict(r: dict) -> tuple[str, str]:
     if band:
         same = [k for k, v in band.items() if v == 0]
         other = [f"{k}: {v:,} values differ" for k, v in band.items() if v]
-        if same:
-            notes.append("AFNI's own runs (" + ", ".join(same) + ") give the same bytes")
+        threads = [
+            k.removeprefix("AFNI at ").removesuffix(" thread(s)")
+            for k in same
+            if k.startswith("AFNI at ")
+        ]
+        builds = [k for k in same if not k.startswith("AFNI at ")]
+        parts = (
+            [f"AFNI at {' and '.join(threads)} thread{'s' if threads != ['1'] else ''}"]
+            if threads
+            else []
+        ) + builds
+        if parts:
+            notes.append(" and ".join(parts) + " give the oracle's bytes")
         notes += other
     for k, v in rep.items():
         if k.endswith("fMRIPrep's own output (as it ran)"):

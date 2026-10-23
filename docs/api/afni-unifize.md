@@ -72,8 +72,9 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`:
   values, where AFNI reads whatever memory holds (in its runs 0, which zeroes the output); the
   default inverts about the largest value; `reproduce` uses 0.
 - **AFNI-47**: a volume of more than a million voxels with an axis of 2 or 3 voxels: the
-  half-size scale image comes back smaller than the input and AFNI reads it past its end; the
-  default expands it to the input's grid; `reproduce` reads AFNI's image (0 past its end).
+  half-size scale image comes back smaller than the input and AFNI reads it past its end (it
+  crashed in our runs); the default expands it to the input's grid; `reproduce` reads AFNI's
+  image (0 past its end).
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
 - **AFNI-40**, **AFNI-46**: `-T2up` without its value as the last argument, and `-T2` on a 2D

@@ -89,7 +89,8 @@ The ball's radius is then `0.5f * R + 0.001f` (float).
 
 AFNI-47: with an axis of 2 or 3 voxels, the half axis has 1 voxel, and §4.4 keeps it at 1: the
 result has another size than the input. AFNI then reads it as if it had the input's size, past
-its end. The default expands it to the input's grid (§4.4 with the input's sizes); `reproduce`
+its end: what it finds there depends on the memory (observed: on a 720 × 720 × 2 input AFNI
+crashed with signal 11 in every run). The default expands it to the input's grid (§4.4 with the input's sizes); `reproduce`
 uses AFNI's smaller image linearly and 0 past its end.
 
 ### 4.3 The local mean between percentiles

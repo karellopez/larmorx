@@ -233,7 +233,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
                 "label": "Node",
                 "text": "fMRIPrep 25.2.6, `bold_fit_wf/enhance_and_skullstrip_bold_wf/unifize`",
             },
-            {"label": "Command", "text": "`" + core.short_path(info["command"]) + "`"},
+            {"label": "Command", "text": "`" + am.short_command(info["command"]) + "`"},
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')} (the repository's oracle build; OpenMP); AFNI "

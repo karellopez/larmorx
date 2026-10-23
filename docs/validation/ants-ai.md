@@ -4,42 +4,43 @@
 
 - **Validated:** `larmorx ants antsAI` / `lx.ants.ai` (crates larmorx-ants, larmorx-registration)
 - **Reference:** antsAI from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-23 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
+- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
+- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
 
 75 cases compared: 74 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 6 cases: ANTs at 2, 4, 6 threads differs from its own one-thread result by up to 1.42e-13 in a transform parameter (`search/rigid-grid` 3.33e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.42e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.28e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.85e-13 in a transform parameter (`search/rigid-grid` 4.44e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.85e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.14e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
 
-Thread band, blob alignment (2 cases: `blobs/shift-rigid`, `real/ds000005-sub-01/blobs-t1w-shift`): ANTs' `antsAI -b` crashes at 2, 4, 6 threads (ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives ANTs' one-thread result at any thread count.
+Thread band, blob alignment (2 cases: `blobs/shift-rigid`, `real/ds000005-sub-01/blobs-t1w-shift`): ANTs' `antsAI -b` crashes at 2, 4, 8 threads (ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives ANTs' one-thread result at any thread count.
 
-**Blob alignment against the known transforms** (`-b`; where the moving image is the fixed one moved by a known transform: the distance from where each program's transform sends test points to where they truly are; larmorx's default corrects ANTS-110, ANTS-111, ANTS-112, ANTS-114 and ITK-60, `reproduce` is ANTs' result):
+**Blob alignment against the known transforms** (`-b`; where the moving image is the fixed one moved by a known transform: the distance from where each program's transform sends test points to where they truly are; larmorx's default corrects ANTS-110, ANTS-111, ANTS-112, ANTS-114, ANTS-116 and ITK-60, `reproduce` is ANTs' result):
 
 | Case | ANTs 2.6.5 (one thread) | larmorx's default |
 |---|---|---|
-| `blobs/shift-rigid` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
-| `blobs/shift-affine` | 1.11e-14 mm mean, 2.2e-14 mm largest | 0.483 mm mean, 1.92 mm largest |
-| `blobs/shift-similarity` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
-| `blobs/rigid-rigid` | 34 mm mean, 66.8 mm largest | no transform |
-| `blobs/rigid-affine` | 654 mm mean, 1.52e+03 mm largest | no transform |
-| `blobs/affine-rigid` | nan mm mean, nan mm largest | no transform |
-| `blobs/2d-shift-rigid` | 0 mm mean, 0 mm largest | 0.33 mm mean, 0.422 mm largest |
-| `blobs/2d-shift-affine` | 5.81e-14 mm mean, 2.07e-13 mm largest | 0.471 mm mean, 1.16 mm largest |
-| `blobs/2d-rigid-rigid` | 6.2 mm mean, 12.3 mm largest | 1.62 mm mean, 3.54 mm largest |
-| `blobs/2d-rigid-affine` | 45.4 mm mean, 125 mm largest | 2.73 mm mean, 11.2 mm largest |
-| `blobs/2d-rigid-similarity` | 6.2 mm mean, 12.3 mm largest | 1.62 mm mean, 3.54 mm largest |
-| `blobs/shift-rigid-match-10` | 0 mm mean, 0 mm largest | 0.577 mm mean, 1.61 mm largest |
-| `blobs/shift-rigid-search` | 3.83 mm mean, 7.99 mm largest | 4.11 mm mean, 9.07 mm largest |
-| `blobs/rigid-affine-search-h5` | 603 mm mean, 1.25e+03 mm largest | no transform |
-| `blobs/principal-axes-ignored` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
-| `real/ds000005-sub-01/blobs-t1w-shift` | 5.92e-16 mm mean, 1.78e-15 mm largest | 1.19 mm mean, 2.1 mm largest |
-| `real/ds000005-sub-01/blobs-t1w-rotated` | nan mm mean, nan mm largest | 1.03 mm mean, 1.87 mm largest |
+| `blobs/shift-rigid` | 0 mm mean, 0 mm largest | 0 mm mean, 0 mm largest |
+| `blobs/shift-affine` | 1.11e-14 mm mean, 2.2e-14 mm largest | 6.69e-15 mm mean, 1.04e-14 mm largest |
+| `blobs/shift-similarity` | 0 mm mean, 0 mm largest | 0 mm mean, 0 mm largest |
+| `blobs/rigid-rigid` | 34 mm mean, 66.8 mm largest | 0.495 mm mean, 0.647 mm largest |
+| `blobs/rigid-affine` | 654 mm mean, 1.52e+03 mm largest | 1.41 mm mean, 2.89 mm largest |
+| `blobs/affine-rigid` | nan mm mean, nan mm largest | 2.44 mm mean, 5.5 mm largest |
+| `blobs/2d-shift-rigid` | 0 mm mean, 0 mm largest | 2.66e-15 mm mean, 7.11e-15 mm largest |
+| `blobs/2d-shift-affine` | 5.81e-14 mm mean, 2.07e-13 mm largest | 2.61e-14 mm mean, 7.03e-14 mm largest |
+| `blobs/2d-rigid-rigid` | 6.2 mm mean, 12.3 mm largest | 0.85 mm mean, 1.24 mm largest |
+| `blobs/2d-rigid-affine` | 45.4 mm mean, 125 mm largest | 1.44 mm mean, 4.39 mm largest |
+| `blobs/2d-rigid-similarity` | 6.2 mm mean, 12.3 mm largest | 0.85 mm mean, 1.24 mm largest |
+| `blobs/shift-rigid-match-10` | 0 mm mean, 0 mm largest | 8.88e-17 mm mean, 4.44e-16 mm largest |
+| `blobs/shift-rigid-search` | 3.83 mm mean, 7.99 mm largest | 3.83 mm mean, 7.99 mm largest |
+| `blobs/rigid-affine-search-h5` | 603 mm mean, 1.25e+03 mm largest | 4.48 mm mean, 7.33 mm largest |
+| `blobs/principal-axes-ignored` | 0 mm mean, 0 mm largest | 0 mm mean, 0 mm largest |
+| `real/ds000005-sub-01/blobs-t1w-shift` | 5.92e-16 mm mean, 1.78e-15 mm largest | 1.78e-15 mm mean, 4.07e-15 mm largest |
+| `real/ds000005-sub-01/blobs-t1w-rotated` | nan mm mean, nan mm largest | 1.08 mm mean, 1.95 mm largest |
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
-  - ANTS-110: 14 case(s) named it, 14 with changed values (largest difference inf): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid`, `blobs/2d-rigid-affine`, `blobs/2d-rigid-similarity` …
-  - ANTS-111: 16 case(s) named it, 11 with changed values (largest difference inf), 5 with other changes (a transform written by one only; exit N -> N; files ['t.hN']; files ['t.mat']): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid` …
+  - ANTS-110: 9 case(s) named it, 9 with changed values (largest difference inf): `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/affine-rigid`, `blobs/2d-rigid-rigid`, `blobs/2d-rigid-affine`, `blobs/2d-rigid-similarity`, `blobs/rigid-affine-search-h5`, `blobs/identical-rigid` …
+  - ANTS-111: 16 case(s) named it, 10 with changed values (largest difference inf), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid` …
   - ANTS-112: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/constant`
-  - ANTS-114: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/rigid-rigid`, `blobs/affine-rigid`, `blobs/no-pairs-rigid`, `blobs/2d-no-pairs-rigid`, `blobs/constant`, `blobs/noise-rigid`, `real/ds000005-sub-01/blobs-mni-rigid`
+  - ANTS-114: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/no-pairs-rigid`, `blobs/2d-no-pairs-rigid`, `blobs/constant`, `blobs/noise-rigid`, `real/ds000005-sub-01/blobs-mni-rigid`
+  - ANTS-116: 18 case(s) named it, 14 with changed values (largest difference inf): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/affine-rigid`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine` …
   - ANTS-53: 4 case(s) named it, 0 with changed values (largest difference 0), 4 with other changes (a transform written by one only): `search/align-with-iterations`, `search/align-with-iterations-quiet`, `search/align-with-iterations-2d-gc`, `search/align-with-iterations-no-start`
   - ANTS-55: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `search/grid-two-extents`, `search/grid-one-extent`
   - ITK-18: 3 case(s) named it, 2 with changed values (largest difference 0.0294): `search/affine-mi`, `search/2d-mi-dense`, `search/mi-empty-mask-dense`
@@ -56,7 +57,7 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 | Files | transforms byte for byte (HDF5: every dataset) |
 | glibc's maths | where ANTs as built differs, ANTs with CORE-MATH preloaded must be identical |
 | Aborts and crashes | everything ANTs printed before it stopped; larmorx exits 1 |
-| Thread band | reported: ANTs at 2, 4, 6 threads against 1 |
+| Thread band | reported: ANTs at 2, 4, 8 threads against 1 |
 
 ## Results by category
 
@@ -139,8 +140,8 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (708bb99389fe) |
-| larmorx-testdata | 00b862132e9c |
+| larmorx | 0.0.1 (6bf2860fb745) |
+| larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |

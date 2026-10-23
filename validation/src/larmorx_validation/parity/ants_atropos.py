@@ -18,7 +18,8 @@ Two references, as for N4 and DenoiseImage:
 - **ANTs with correctly rounded math** (CORE-MATH preloaded into the same binary), one
   thread: what larmorx computes with (CLAUDE.md rule 5). larmorx must be **bit-identical**.
 
-Atropos' own variability: its **thread band** (ANTs at 2, 4 and 8 threads, compared with one
+Atropos' own variability: its **thread band** (ANTs at 2, 4 and 8 threads, or as
+``LARMORX_PARITY_BAND_THREADS`` says, compared with one
 thread) and its **seed band** (``--use-random-seed 1`` seeds ANTs from the clock: two ANTs
 runs differ; larmorx never reads the clock and uses the seed 121212, so its distance from
 ANTs is reported next to ANTs' distance from itself). larmorx's result does not depend on
@@ -71,7 +72,11 @@ from larmorx_validation.report import table
 
 PROGRAM = "Atropos"
 LX_THREADS = 4
-BAND_THREADS = (2, 4, 8)
+#: ANTs' thread band: 2, 4 and 8 threads unless ``LARMORX_PARITY_BAND_THREADS`` (e.g.
+#: ``2,4,6`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,8").split(",") if v
+)
 NCC_MIN = 0.995
 AFFINE_ATOL = 1e-6
 _TIERS = ("smoke", "standard", "full")
@@ -2525,7 +2530,8 @@ def suite() -> Suite:
             ),
             (
                 "Reported",
-                "ANTs' thread band (2, 4, 8 threads vs 1), ANTs' seed band (two "
+                f"ANTs' thread band ({', '.join(map(str, BAND_THREADS))} threads vs 1), "
+                "ANTs' seed band (two "
                 "clock-seeded runs), the distance to fMRIPrep's own files",
             ),
         ],

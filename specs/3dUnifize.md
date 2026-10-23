@@ -25,7 +25,8 @@ code. **(observed)** marks what black-box runs confirmed.
 (`-T2up` at or near 100, §5), AFNI-47 (the half-size grid of a volume with an axis of 2 or 3
 voxels, §4.2), AFNI-01 (a negative `scl_slope` in `-EPI`'s median, §7); refused in both modes:
 AFNI-40 (`-T2up` without its value, §8.2), AFNI-46 (`-T2` on a 2D image smaller than 16 × 16,
-§5); kept as AFNI's until the user decides: AFNI-48 (`-T2` three times, §6); and those of AFNI's
+§5); refused by default, AFNI's with `reproduce` (decided 2026-10-23, rule B): AFNI-48 (`-T2` three or more
+times, §6); and those of AFNI's
 dataset reading and writing (`specs/3dTshift.md` §6, §7.1). §9 lists the defaults.
 
 ---
@@ -146,8 +147,9 @@ values 0):
 4. `-EPI`: §7, then stop.
 5. `-GM`: the grey-matter scaling (§6.1); `G` when it was applied.
 6. `-T2` once: `I`, invert the result with the **same mask** (its `U` from the result's values);
-   twice: no inversion; bright edges clipped (§6.2); three or more times: neither (AFNI-48: the
-   output stays inverted; kept as AFNI's until decided) (observed).
+   twice: no inversion; bright edges clipped (§6.2); three or more times: by default a fatal error naming AFNI-48 (exit 1;
+   decided 2026-10-23, rule B); with `reproduce`, neither (the output stays inverted, as in AFNI)
+   (observed).
 7. The final mask: the automask of the result (§3's settings); `m`; every voxel outside it 0.
    (A 2D result smaller than 16 × 16 cannot reach this point.)
 8. Write the result.
@@ -253,7 +255,7 @@ it is unset); it changes no result.
 | AFNI-45 | `-T2up` near 100: reads past the sorted values (§5) | the largest value; named | 0; named |
 | AFNI-46 | `-T2` on a 2D image smaller than 16 × 16: a crash | a fatal error, exit 1 | the same |
 | AFNI-47 | the half-size grid of an axis of 2 or 3 voxels (§4.2) | expanded to the input's grid; named | AFNI's reading, 0 past the end; named |
-| AFNI-48 | `-T2` three times: no re-inversion, no edge clipping | AFNI's (to be decided) | AFNI's |
+| AFNI-48 | `-T2` three times: no re-inversion, no edge clipping | a fatal error naming AFNI-48, exit 1 (rule B, decided 2026-10-23) | AFNI's |
 | AFNI-49 | the help's `-clfrac` default (0.1; the code uses 0.2) | – (text) | – |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing | as for 3dAutomask | AFNI's |
 

@@ -26,8 +26,9 @@ of the program's behaviour.
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): AFNI-43
 (`-peels 0`, §5.3), AFNI-01 (a negative `scl_slope` in a series, §3), AFNI-40 (an option without
 its value, §8.2), and those of AFNI's dataset reading and writing shared with 3dTshift (AFNI-02,
--07, -11, -12, -16, -18, -20, -22, -23, -26; `specs/3dTshift.md` §6, §7.1). Three behaviours are
-questionable and kept as AFNI's until the user decides (AFNI-41, -42, -44; §5.3, §5.5, §8.1).
+-07, -11, -12, -16, -18, -20, -22, -23, -26; `specs/3dTshift.md` §6, §7.1). Three behaviours were
+questionable; the user decided them on 2026-10-23: AFNI-41 refused by default (rule B), AFNI-42
+and AFNI-44 kept as AFNI's and documented (rule C) (§5.3, §5.5, §8.1).
 §9 lists what the default does for each.
 
 ---
@@ -142,10 +143,12 @@ have the largest size, the one whose first voxel comes first in storage order wi
 With `p` peels (default 1) and threshold `t` (default 17):
 - `p` is 1 for any value below 1 (AFNI-43: the help says `-peels 0` turns the peeling off; the
   default does that, `reproduce` peels once) (observed);
-- `t` is 17 for any value outside 6..26 (AFNI-41, kept: `-nbhrs 40` acts as 17) (observed);
+- `-nbhrs` outside 6..26: by default a fatal error naming AFNI-41 (exit 1; decided 2026-10-23,
+  rule B: the value makes no sense, AFNI silently replaces it); with `reproduce`, `t` is 17 as in
+  AFNI (`-nbhrs 40` acts as 17) (observed);
   the threshold used is `min(18, t)`;
 - `-NN1`, `-NN2`, `-NN3` set `t` to 6, 18 and 26 (so 18 with the minimum), whatever `-nbhrs`
-  says and whichever comes first (AFNI-42, kept; note that an explicit `-NN2` gives 18, not the
+  says and whichever comes first (AFNI-42, kept and documented, decided 2026-10-23, rule C; note that an explicit `-NN2` gives 18, not the
   default 17) (observed).
 
 Nothing happens when the grid has fewer than 27 voxels. Otherwise, with the 18 neighbours of a
@@ -332,10 +335,10 @@ to disk!", goes on and exits 0).
 |---|---|---|---|
 | AFNI-01 | a negative factor dropped when averaging several sub-bricks (§3) | applied; named whenever such a series is averaged, with the number of mask voxels it changes | AFNI's |
 | AFNI-40 | an option's value missing: a crash (§8.2) | a fatal error, exit 1 | the same refusal |
-| AFNI-41 | `-nbhrs` outside 6..26 silently 17 | AFNI's (to be decided) | AFNI's |
-| AFNI-42 | `-NN1/2/3` reset the peel threshold to 6/18/26 | AFNI's (to be decided) | AFNI's |
+| AFNI-41 | `-nbhrs` outside 6..26 silently 17 | a fatal error naming AFNI-41, exit 1 (rule B, decided 2026-10-23) | AFNI's |
+| AFNI-42 | `-NN1/2/3` reset the peel threshold to 6/18/26 | AFNI's, documented (rule C, decided 2026-10-23) | AFNI's |
 | AFNI-43 | `-peels 0` peels once | no peeling; named when the mask differs | AFNI's |
-| AFNI-44 | the large-hole step decided by the z size | AFNI's (to be decided) | AFNI's |
+| AFNI-44 | the large-hole step decided by the z size | AFNI's, documented (rule C, decided 2026-10-23: it shapes fMRIPrep's BOLD masks) | AFNI's |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing (`specs/3dTshift.md` §6.5, §7.1) | as for 3dTshift; with `AFNI_NIFTI_SCALE=NO` (AFNI-23) the data are read as without the variable (float32, `slope * x + inter`) for the mask and the masked copy | AFNI's |
 
 Every correction is named on standard error as `*+ WARNING: upstream defect <ID> (<tool>)

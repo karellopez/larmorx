@@ -290,8 +290,8 @@ fn parse(
         log.notice(&Notice::new(&defects::AFNI_48, mode, detail));
         if mode.fix() {
             return Err(Failure::Fatal(format!(
-                "-T2 given {n} times: give it once (invert back) or twice (no inversion back, the \
-                 edges clipped); AFNI's result for more is still inverted (AFNI-48)"
+                "-T2 given {n} times: AFNI's output for more than two stays inverted (AFNI-48). \
+                 Give it once (invert back) or twice (no inversion back, the edges clipped)"
             )));
         }
     }

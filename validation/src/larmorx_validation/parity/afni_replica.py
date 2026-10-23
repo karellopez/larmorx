@@ -390,6 +390,10 @@ FLOAT_RTOL = 1e-5
 #: The value of a header check whose difference AFNI-10 explains (``check_outputs``).
 AFNI_10 = "AFNI-10"
 
+#: The names' ends of the checks against fMRIPrep's own outputs (the oracle runs' node outputs).
+FMRIPREP_OWN = "fMRIPrep's own output (as it ran)"
+FMRIPREP_AFNI = "fMRIPrep's own output against AFNI's"
+
 
 def has_afni_extension(path: Path) -> bool:
     """Whether a NIfTI-1 file carries AFNI's own header extension (code 4), whose attributes
@@ -812,13 +816,38 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
                 continue
             if path.is_file() and (l_dir / name).is_file():
                 c = compare_files(path, l_dir / name)
+                passed = c.identical
+                if spec.tolerance is not None and not c.identical:
+                    # A clean-room original's float32 values: the record's threshold, as
+                    # against AFNI's oracle, and whether fMRIPrep's output is that oracle's.
+                    vf = stored(path)
+                    scale = float(np.max(np.abs(vf.astype(np.float64)))) if vf.size else 0.0
+                    passed = bool(
+                        vf.dtype.kind == "f"
+                        and np.isfinite(c.max_abs)
+                        and c.max_abs <= spec.tolerance * scale
+                    )
+                    if (a_dir / name).is_file():
+                        oracle = compare_files(path, a_dir / name)
+                        checks.add(
+                            Check(
+                                f"{name}: {FMRIPREP_AFNI}",
+                                True,
+                                metric="values that differ",
+                                value=oracle.differing,
+                                threshold="reported",
+                                detail=oracle.detail,
+                            )
+                        )
                 checks.add(
                     Check(
-                        f"{name}: fMRIPrep's own output (as it ran)",
-                        c.identical,
+                        f"{name}: {FMRIPREP_OWN}",
+                        passed,
                         metric="values that differ",
                         value=c.differing,
-                        threshold="reported",
+                        threshold="reported"
+                        if spec.tolerance is None
+                        else f"max |diff| ≤ {spec.tolerance:g} × max |fMRIPrep output|",
                         detail=c.detail,
                     )
                 )
@@ -1179,13 +1208,31 @@ def highlights(
             f"- {len(crashes)} case(s) where AFNI crashes ({crash_causes}): larmorx prints "
             "AFNI's messages up to the crash, then refuses with one line and exit status 1."
         )
-    fmri = [c for r in results for c in r.checks if "fMRIPrep's own output" in c.name]
+    fmri = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if fmri:
-        lines.append(
+        line = (
             f"- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran "
             f"them in its image): {sum(c.value == 0 for c in fmri)} of {len(fmri)} bit-identical "
-            f"to the {implementation}'s."
+            f"to the {implementation}'s"
         )
+        rest = [r for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN) and c.value]
+        if rest:
+            # The clean-room original's float differences: fMRIPrep's output is AFNI's oracle
+            # output, which AFNI with correctly rounded maths turns into the original's.
+            explained = [
+                r
+                for r in rest
+                if all(c.value == 0 for c in r.checks if c.name.endswith(FMRIPREP_AFNI))
+                and any(c.name.endswith(FMRIPREP_AFNI) for c in r.checks)
+                and all(c.value == 0 for c in r.checks if c.name == CORRECTLY_ROUNDED)
+                and any(c.name == CORRECTLY_ROUNDED for c in r.checks)
+            ]
+            line += (
+                f"; the other {len(rest)} within the threshold, and in {len(explained)} of them "
+                "fMRIPrep's output is AFNI's oracle output bit for bit, which AFNI with correctly "
+                "rounded maths turns into the original's (glibc's `tanhf`)"
+            )
+        lines.append(line + ".")
     band = [c for r in results for c in r.checks if c.name.startswith("band: ")]
     if band:
         kinds = sorted({c.name.removeprefix("band: ") for c in band})

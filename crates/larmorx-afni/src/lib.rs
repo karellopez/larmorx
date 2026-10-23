@@ -9,6 +9,9 @@
 //! - `3dTshift` (slice-timing correction) is [`tshift::tshift`], on datasets held the way AFNI
 //!   holds them ([`dataset::Bricks`]), read and written with AFNI's NIfTI rules
 //!   ([`dataset::read`], [`dataset::write`]).
+//! - `3dAutomask` (a brain mask) is [`automask::run`], its mask of an image
+//!   [`automask::form_mask`].
+//! - `3dUnifize` (the white-matter intensity made uniform) is [`unifize::run`].
 //! - The original command lines are in [`cli`].
 #![forbid(unsafe_code)]
 

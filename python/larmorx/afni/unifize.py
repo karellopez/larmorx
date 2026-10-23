@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dUnifize``: white-matter intensity uniformization of a T1- or T2-weighted volume (or, with
-``epi=True``, an EPI series), by the bit-exact replica of AFNI 25.2.09's program in
-``larmorx-gpl``, run as a separate program.
+``epi=True``, an EPI series): the clean-room original of AFNI 25.2.09's program, or its
+bit-exact replica from ``larmorx-gpl``, run as a separate program.
 
-larmorx has no clean-room original of 3dUnifize yet (it is to be written from
-``specs/3dUnifize.md``): ``implementation="auto"`` needs the ``larmorx-gpl`` package
-(``pip install "larmorx[exact]"``), and ``"original"`` raises ``NotImplementedError``.
+``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed
+(``pip install "larmorx[exact]"``), else the clean-room original; ``"replica"`` and
+``"original"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
+calls glibc's, so squashed values (above 1300) can differ in their last bit
+(``docs/validation/afni-unifize.md``).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
 ``-T2up`` at or near 100 (AFNI-45), the half-size grid of a volume with an axis of 2 or 3 voxels
@@ -105,7 +107,8 @@ def unifize(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation, upstream_defects, afni_settings
-        As for :func:`larmorx.afni.automask`.
+        As for :func:`larmorx.afni.automask`. ``t2=3`` (``-T2`` three times, AFNI-48) is not
+        accepted.
 
     Returns
     -------

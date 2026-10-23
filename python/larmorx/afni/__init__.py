@@ -9,8 +9,8 @@ run from the command line as ``larmorx afni <program> ...`` with their original 
 Bit-exact replicas translated from AFNI's source are a separate, GPL-3.0-or-later package,
 ``larmorx-gpl`` (``pip install "larmorx[exact]"``). With ``implementation="auto"`` (the
 default) a tool runs its replica's program as a separate process when it is installed
-(``docs/licensing.md``); nothing of it is imported. ``automask`` and ``unifize`` have only
-their replica so far: their clean-room originals are to be written from ``specs/``.
+(``docs/licensing.md``); nothing of it is imported, and without it the clean-room original
+runs. ``tshift``, ``automask`` and ``unifize`` have both.
 """
 
 from larmorx.afni.automask import AutomaskResult, automask

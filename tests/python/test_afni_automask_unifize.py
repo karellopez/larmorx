@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lx.afni.automask`` and ``lx.afni.unifize``: tools with only a replica (no clean-room
-original yet). Without the ``larmorx-gpl`` program they refuse clearly; with a stand-in for it
-(written by the test, as in ``test_replica.py``) they pass AFNI's options, settings and D13's
-choice to it and read its outputs back. The replica itself is checked by its own golden tests
-and by the parity suites against AFNI."""
+"""``lx.afni.automask`` and ``lx.afni.unifize`` with the replica: with a stand-in for the
+``larmorx-gpl`` program (written by the test, as in ``test_replica.py``) they pass AFNI's
+options, settings and D13's choice to it and read its outputs back; without it, ``"auto"`` runs
+the clean-room original and ``"replica"`` refuses clearly. The replica itself is checked by its
+own golden tests and by the parity suites against AFNI; the originals by
+``test_afni_masks_original.py``, the golden tests and the parity suites."""
 
 from __future__ import annotations
 
 import contextlib
+import warnings
 import io
 import json
 import os
@@ -93,24 +95,29 @@ def cli(tool: str, *args: str) -> tuple[int, str, str]:
     return code, out.getvalue(), err.getvalue()
 
 
-def test_without_the_replica_they_refuse_and_name_the_install_command(scripts, tmp_path):
+def test_without_the_replica_auto_runs_the_original(scripts, tmp_path):
     path = volume(tmp_path)
     install = r'pip install "larmorx\[exact\]"'
     with pytest.raises(lx.ReplicaNotFoundError, match=install):
-        lx.afni.automask(path)
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of afni 3dUnifize"):
-        lx.afni.unifize(path)
-    with pytest.raises(NotImplementedError, match=r"specs/3dAutomask\.md"):
-        lx.afni.automask(path, implementation="original")
-    with pytest.raises(NotImplementedError, match=r"specs/3dUnifize\.md"):
-        lx.afni.unifize(path, implementation="original")
-    code, _, err = cli("3dAutomask", "-prefix", "m.nii", str(path))
-    assert code == 127 and 'pip install "larmorx[exact]"' in err
-    code, _, err = cli("3dUnifize", "-prefix", "u.nii", str(path))
-    assert code == 127 and "no clean-room original of afni 3dUnifize" in err
-    # The help still lists them.
-    code, _, _ = cli("3dTshift")
-    assert code == 0
+        lx.afni.automask(path, implementation="replica")
+    with pytest.raises(lx.ReplicaNotFoundError, match=install):
+        lx.afni.unifize(path, implementation="replica")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for r in (lx.afni.automask(path), lx.afni.automask(path, implementation="original")):
+            assert r.mask.implementation.kind == "original"
+        u = lx.afni.unifize(path)
+    assert u.image.implementation.kind == "original"
+    out = tmp_path / "out"
+    out.mkdir()
+    code, _, err = cli("3dAutomask", "-q", "-prefix", str(out / "m.nii"), str(path))
+    assert code == 0, err
+    code, _, err = cli("3dUnifize", "-quiet", "-prefix", str(out / "u.nii"), str(path))
+    assert code == 0, err
+    # The help lists them.
+    for tool in ("3dTshift", "3dAutomask", "3dUnifize"):
+        code, _, _ = cli(tool)
+        assert code == 0
 
 
 def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):

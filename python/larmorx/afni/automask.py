@@ -1,14 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``3dAutomask``: a brain mask from an EPI series or a skull-stripped anatomical, by the
-bit-exact replica of AFNI 25.2.09's program in ``larmorx-gpl``, run as a separate program.
+"""``3dAutomask``: a brain mask from an EPI series or a skull-stripped anatomical (the
+clean-room original of AFNI 25.2.09's program, or its bit-exact replica from ``larmorx-gpl``,
+run as a separate program).
 
-larmorx has no clean-room original of 3dAutomask yet (it is to be written from
-``specs/3dAutomask.md``): ``implementation="auto"`` needs the ``larmorx-gpl`` package
-(``pip install "larmorx[exact]"``), and ``"original"`` raises ``NotImplementedError``.
+``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed
+(``pip install "larmorx[exact]"``), else the clean-room original; ``"replica"`` and
+``"original"`` force one. Both give AFNI's masks bit for bit on the parity cases
+(``docs/validation/afni-automask.md``).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
-``-peels 0`` peels once (AFNI-43), a negative ``scl_slope`` is dropped when several volumes are
-averaged (AFNI-01), and those of AFNI's dataset reading and writing (AFNI-02, -07, -16, -23).
+``-peels 0`` peels once (AFNI-43), ``-nbhrs`` outside 6..26 is silently 17 (AFNI-41: an error
+by default), a negative ``scl_slope`` is dropped when several volumes are averaged (AFNI-01),
+and those of AFNI's dataset reading and writing (AFNI-02, -07, -16, -23).
 ``upstream_defects="reproduce"`` gives AFNI's output.
 
 AFNI's environment variables are settings of the call (``afni_settings``), never read from the
@@ -91,12 +94,13 @@ def automask(
         Peel (erode) the mask this many times, then unpeel (``-peels``); 0 turns it off
         (AFNI peels once: AFNI-43, ``upstream_defects="reproduce"``).
     neighbours
-        Neighbours (of 18) a voxel needs not to be peeled (``-nbhrs``); AFNI uses 17 for values
-        outside 6 to 26 (AFNI-41, to be decided).
+        Neighbours (of 18) a voxel needs not to be peeled (``-nbhrs``), 6 to 26 (19 to 26 act
+        as 18). Outside that range AFNI silently uses 17: ``ValueError`` by default (AFNI-41),
+        17 with ``upstream_defects="reproduce"``.
     nn
         ``-NN1``, ``-NN2`` or ``-NN3``: the neighbourhood of ``dilate``, ``erode`` and
         ``depth`` (faces, edges, corners; default edges). As in AFNI it also sets
-        ``neighbours`` to 6, 18 or 26 (AFNI-42, to be decided).
+        ``neighbours`` to 6, 18 or 26 (AFNI-42, kept).
     exterior_clip
         ``-eclip``: remove exterior voxels below the clip level.
     dilate, erode
@@ -110,9 +114,9 @@ def automask(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) or ``"replica"``: the replica in ``larmorx-gpl``
-        (:class:`~larmorx.ReplicaNotFoundError` without it); ``"original"`` raises
-        ``NotImplementedError`` until the clean-room original exists.
+        ``"auto"`` (default): the replica in ``larmorx-gpl`` when it is installed, else the
+        clean-room original; ``"replica"`` (:class:`~larmorx.ReplicaNotFoundError` without
+        it) or ``"original"`` force one.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -124,7 +128,15 @@ def automask(
     -------
     AutomaskResult
         The mask, and the masked input and depth when asked for; each image's
-        :attr:`~larmorx.Image.implementation` names the replica that ran.
+        :attr:`~larmorx.Image.implementation` names the implementation that ran.
+
+    Raises
+    ------
+    ValueError
+        Invalid arguments; with the original, AFNI's fatal errors (no mask of a plane smaller
+        than 16 × 16, an empty mask).
+    larmorx.ReplicaError
+        The replica was found but failed.
     """
     args = _arguments(clfrac, gradual, peels, neighbours, nn, exterior_clip, dilate, erode, si)
     _defects.check(upstream_defects)

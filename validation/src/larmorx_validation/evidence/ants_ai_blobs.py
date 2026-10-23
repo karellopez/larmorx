@@ -43,8 +43,8 @@ MOVES = {
     "rotated": (
         "ai-blobs-t1w-rotated",
         "t1w:rotated",
-        "rotated by 8° about the voxel z axis through the centre and shifted by (5, −3, 2) "
-        "voxels (linear interpolation)",
+        "rotated by 8° (in millimetres) about the z axis through the centre and shifted by "
+        "(5, −3, 2) voxels (linear interpolation)",
     ),
 }
 LPS = np.diag([-1.0, -1.0, 1.0])
@@ -220,7 +220,7 @@ def _compute(e: fcache.Entry) -> None:
         # the moving image times it: the placed views leave the face out
         md = np.asanyarray(mimg.dataobj) > 0
         if move == "rotated":
-            m, off = pb._t1w_rotation(md.shape)
+            m, off = pb._t1w_rotation(md.shape, fimg.header.get_zooms())
             md = ndimage.affine_transform(md.astype(np.float32), m, offset=off, order=0) > 0.5
         mv = nib.load(str(moving))
         masked = e.dir / f"{move}-moving-masked.nii.gz"
@@ -545,7 +545,11 @@ def _transform_tables(move: str, mats: dict, pts: np.ndarray, crashed: dict, sam
                 "head": f"ANTs, {n} threads",
                 "class": "is-yardstick",
                 "cells": [
-                    {"text": f"crashed (exit {code})" if code else "ran"},
+                    {
+                        "text": f"crashed (signal {-code})"
+                        if code is not None and code < 0
+                        else f"exit {code}"
+                    },
                     {"text": "–"},
                     {"text": "–"},
                     {"text": "–"},
@@ -652,10 +656,10 @@ def _example(ctx: core.Context, move: str) -> dict:
     ex.add(
         exm.Panel(
             "truth",
-            "reference",
-            "placed by the true transform",
-            "known by construction",
-            {"placed": placed("truth"), **({"blobs": fdata} if move == "shift" else {})},
+            "input",
+            "its copy placed by the true transform",
+            "the transform known by construction (antsApplyTransforms as built, linear)",
+            {"all": placed("truth")},
         )
     )
     outputs = [{"id": "placed", "label": "moving T1w placed on the fixed grid", "unit": ""}]

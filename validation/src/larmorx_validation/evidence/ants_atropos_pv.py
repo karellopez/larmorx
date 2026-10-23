@@ -176,8 +176,17 @@ def example(ctx: core.Context) -> dict:
             {"all": common.load(str(e.dir / "pv.nii.gz"))},
         )
     )
+    ex.add(
+        exm.Panel(
+            "truth",
+            "input",
+            "the truth",
+            "from the known fractions: a tissue where one share is at least 0.8, else the "
+            "partial-volume class of the two largest",
+            {"all": common.load(str(e.dir / "pv-truth.nii.gz"))},
+        )
+    )
     runs = [
-        ("truth", "pv-truth", "reference", "the truth", "from the known fractions"),
         ("ants", "ants-1", "original", "Atropos: ANTs 2.6.5, 1 thread", "as built"),
         ("ants-cr", "ants-1-cr", "original", "Atropos: ANTs 2.6.5, 1 thread", "CORE-MATH"),
         ("larmorx", "larmorx-reproduce", "larmorx", "Atropos: larmorx (port)", "reproduce mode"),

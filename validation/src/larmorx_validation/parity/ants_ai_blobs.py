@@ -6,8 +6,9 @@ Inputs (``gen:`` names, built on first use):
 - the seeded blob phantoms of :mod:`blob_phantoms` (3D and 2D): a fixed image, and moving
   images that are its exact translation (origin moved), rigid transform and affine transform;
 - copies of fMRIPrep's preprocessed T1w of ds000005 (the oracle run) with a known transform:
-  its voxels with the origin moved (an exact translation) and its voxels rotated by 8 degrees
-  about the image centre and shifted (``scipy.ndimage.affine_transform``, linear);
+  its voxels with the origin moved (an exact translation), and the T1w rotated by 8 degrees in
+  millimetres about the image centre and shifted (``scipy.ndimage.affine_transform``, linear;
+  the voxels are 1 x 1.33 x 1.33 mm, so the voxel-space matrix is ``Z⁻¹ R Z``);
 - a constant image, a thin one (3 slices), pure noise.
 
 Cases where the transform from fixed to moving points is known also report how far each
@@ -27,7 +28,8 @@ from larmorx_validation.parity import ants_registration as reg
 from larmorx_validation.parity.harness import SKIPPED, Outcome
 
 DS000005_T1W = "ds000005-sub-01-noreconall/out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz"
-#: The rotated T1w: degrees about the voxel z axis through the centre, then a voxel shift.
+#: The rotated T1w: degrees about the z axis through the centre (in millimetres), then a
+#: shift in voxels.
 T1W_ROTATION = 8.0
 T1W_ROTATION_SHIFT = (5.0, -3.0, 2.0)
 T1W_ORIGIN_SHIFT = (6.0, -4.0, 3.0)
@@ -72,23 +74,28 @@ def _(t):
     nib.Nifti1Image(np.asarray(img.dataobj, dtype=np.float32), aff).to_filename(t)
 
 
-def _t1w_rotation(shape) -> tuple[np.ndarray, np.ndarray]:
+def _t1w_rotation(shape, zooms) -> tuple[np.ndarray, np.ndarray]:
+    """The voxel-space matrix and offset ``scipy.ndimage.affine_transform`` samples with: a
+    rotation in millimetres about the z axis through the volume's centre (``Z⁻¹ R Z`` for the
+    voxel sizes ``Z``; the T1w's affine is diagonal), then the voxel shift."""
     a = np.deg2rad(T1W_ROTATION)
     r = np.array([[np.cos(a), -np.sin(a), 0], [np.sin(a), np.cos(a), 0], [0, 0, 1]])
+    z = np.diag(np.asarray(zooms[:3], np.float64))
+    m = np.linalg.inv(z) @ r @ z
     c = (np.array(shape) - 1) / 2.0
-    return r, c - r @ c + np.array(T1W_ROTATION_SHIFT)
+    return m, c - m @ c + np.array(T1W_ROTATION_SHIFT)
 
 
 @ants_inputs.builder("ai-blobs-t1w-rotated")
 def _(t):
-    """ds000005's preprocessed T1w rotated by 8 degrees about the voxel z axis through its
-    centre and shifted by (5, -3, 2) voxels (linear interpolation)."""
+    """ds000005's preprocessed T1w rotated by 8 degrees (in millimetres) about the z axis
+    through its centre and shifted by (5, -3, 2) voxels (linear interpolation)."""
     import nibabel as nib
     from scipy import ndimage
 
     img = nib.load(_oracle_t1w())
     data = np.asarray(img.dataobj, dtype=np.float32)
-    m, off = _t1w_rotation(data.shape)
+    m, off = _t1w_rotation(data.shape, img.header.get_zooms())
     out = ndimage.affine_transform(data, m, offset=off, order=1)
     nib.Nifti1Image(out.astype(np.float32), img.affine).to_filename(t)
 
@@ -132,7 +139,7 @@ def truth_points(case: str, fixed_path: Path) -> tuple[np.ndarray, np.ndarray] |
     if case == "t1w:shift":
         return fixed, fixed + np.array(T1W_ORIGIN_SHIFT)
     if case == "t1w:rotated":
-        m, off = _t1w_rotation(shape)
+        m, off = _t1w_rotation(shape, img.header.get_zooms())
         # scipy samples the input at m·o + off: a fixed voxel v is at o = m⁻¹(v − off).
         moved = (grid - off) @ np.linalg.inv(m).T
         return fixed, nib.affines.apply_affine(img.affine, moved)

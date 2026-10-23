@@ -2384,6 +2384,14 @@ def _fix_pass(c: AtroposCase, tmp: Path, checks: CheckList, reproduced: _Run) ->
         ants_text = _pv_scores(ants_seg) if ants_seg.is_file() else "no labels (ANTs stopped)"
         mine = _pv_scores(fixed.outputs[0]) if fixed.ok else "no labels"
         checks(
+            "partial-volume scores: ANTs",
+            True,
+            metric="against the phantom's known fractions",
+            value=ants_text,
+            threshold="reported",
+            detail=f"ANTs 2.6.5 as built, one thread: {ants_text}",
+        )
+        checks(
             "partial-volume scores",
             True,
             metric="against the phantom's known fractions",

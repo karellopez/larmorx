@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import ants_atropos_pv, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -750,7 +750,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": [],
-            "cache": [fcache.provenance(e), fcache.provenance(p)],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(p),
+                ants_atropos_pv.provenance(ctx),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -760,7 +764,8 @@ def export(ctx: core.Context) -> dict:
         ],
         "cases": cases,
         "cases_total": len(cases),
-        "examples": [_example(ctx, reg), _priors_example(ctx)],
+        "examples": [_example(ctx, reg), _priors_example(ctx), ants_atropos_pv.example(ctx)],
+        "tables": [ants_atropos_pv.table(ctx)],
     }
 
 

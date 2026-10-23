@@ -1,0 +1,35 @@
+# Brief: AFNI-26 in clean-room original
+
+As given to agent `a0313b1bd242cb7eb` on 2026-10-12, verbatim (paths are this machine's).
+
+You are the clean-room implementer of larmorx's 3dTshift original (`crates/larmorx-afni`, Apache-2.0) for one small task: AFNI-26's compatibility switch. The repo is your worktree of github.com/karellopez/larmorx (main at a9d164d). Read the repo's `CLAUDE.md` first, then `docs/porting-guide.md` §1 (who may read what).
+
+## Clean-room rules (strict)
+Never open or read, by any tool (cat, grep, git show, editors):
+- AFNI's source anywhere: `/home/karelo/VScode_projects/super_fmriprep/afni/`, `/home/karelo/VScode_projects/super_fmriprep/tags/AFNI-25.2.09/`, `/home/karelo/VScode_projects/super_fmriprep/oracles/afni-25.2.09/build/`, any AFNI `.c`/`.h`.
+- The GPL replica's files: anything under `crates-gpl/` (you may run `cargo build/test/clippy/fmt` there, but never open its files), and its diffs.
+- `docs/findings/afni-tshift.md`, `docs/findings/fsl-mcflirt.md`, `reference_src/`, `crates-nc/`.
+- In `docs/findings/upstream-defects.md`: everything from the heading `## Restricted: AFNI 3dTshift (source-derived)` on. Read and edit only the part before it (intro, Summary, D13 gaps); if you script an edit, search and change only text before that heading.
+- Git history: commits 2644219 and eb38033 touch restricted material. Never `git show`/`git diff` them whole; if you need a diff, restrict it to allowed paths (`git show <sha> -- specs/ docs/api/ validation/ crates/larmorx-core/`).
+You may read: `specs/3dTshift.md` (§7.1 "A failed write" is your requirement), `docs/api/*`, the decision log, the register's public part, larmorx's own Apache code under `crates/` and `python/`, the validation harness, tests, records. You may run AFNI's binary `/home/karelo/VScode_projects/super_fmriprep/oracles/afni-25.2.09/bin/3dTshift` and the replica program as black boxes, never with a GUI, browser or help-viewer option.
+
+## The task
+AFNI-26 (spec §7.1, "A failed write"): when 3dTshift's NIfTI output cannot be opened for writing (a missing or read-only directory), AFNI prints `** ERROR (nifti_image_write_engine): cannot open output file 'NAME'` (plain, never coloured or labelled), writes nothing, prints `-verbose`'s `++ Wrote output: NAME` as usual, and exits 0. NAME is AFNI's name for the output (§7.1: `./out.nii` for `-prefix out.nii`).
+1. In `crates/larmorx-afni` (the command line: `larmorx_afni::cli::tshift`, `larmorx_afni::output`), with `LARMORX_UPSTREAM_DEFECTS=reproduce`: where AFNI's writer could not open the output (an existing file not writable, a new one not creatable in its directory), print AFNI's message, write nothing, keep `-verbose`'s line, exit 0, and name the defect through `larmorx_core::defects::AFNI_26` (already in the registry) as the other reproduced defects are named. Outputs that can be opened behave exactly as now. Check the condition without changing anything on disk (no truncation; a probe file, if any, removed). By default a failed write stays an error (exit 1) and names AFNI-26 (AFNI would write nothing and exit 0), in the manner of the original's AFNI-11 default. Where the spec is silent (stream, order among the other messages, `AFNI_MESSAGE_PREFIX`/`AFNI_MESSAGE_COLORIZE`, `-overwrite`, `AFNI_DECONFLICT`, copies, `.nii.gz`), settle it by black-box runs and add what you observe to the spec, marked observed. A write that fails after the file is opened (a full disk) stays an error in both modes.
+2. Parity: in `validation/src/larmorx_validation/parity/afni_tshift.py`, remove the three `errors/missing-directory*` entries from `DIVERGENCES["original"]` (keep a short comment for the record). They must then come out "both-error" with identical exit status and messages for the original, as they already do for the replica.
+3. Tests: a cross-platform Rust test (e.g. in `crates/larmorx-cli/tests/afni_globals.rs`) for both modes with an output in a missing directory: `reproduce` exits 0 with AFNI's message and writes nothing; the default exits 1 and names AFNI-26. GitHub's Windows runners give temporary directories as 8.3 short paths (`C:\Users\RUNNER~1\...`), so tests must not assume a temporary path free of `~` or blanks. Nothing can be run on Windows here; only CI checks it.
+4. Docs: the AFNI-26 rows of `docs/api/afni-tshift.md` and `docs/api/upstream-defects.md` (the original's switch done), the register's public part (the AFNI-26 Summary row's gap to "–", the gap-count paragraph's "1 **original** (AFNI-26 …)" to none left, the AFNI-26 row of the D13 gaps slice-timing table), `crates/larmorx-afni/PROVENANCE.md` if needed, README's 3dTshift numbers once the records are regenerated. Do not edit CLAUDE.md or anything restricted; the orchestrator updates those.
+
+## Gates (all must pass before the final commits)
+- Environment: `export PATH=$HOME/.cargo/bin:$(echo "$PATH" | tr ':' '\n' | grep -v /fsl | paste -sd:)`, `export PYO3_PYTHON=/home/karelo/VScode_projects/super_fmriprep/.venv/bin/python`; Python from `/home/karelo/VScode_projects/super_fmriprep/.venv/bin`.
+- Both Rust workspaces, in the root and in `crates-gpl`: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`.
+- Python: do NOT run `maturin develop` (it repoints the shared venv at your worktree). Build with `maturin build --release -o <your scratch dir>/wheel`, copy the wheel's `larmorx/_core.abi3.so` into your worktree's `python/larmorx/` (git-ignored), and run with `PYTHONPATH=<worktree>/python:<worktree>/validation/src`: `pytest tests/python tests/golden`, `ruff check`, `ruff format --check`, `python scripts/check_spdx.py`, `pytest tests/parity`. Build `crates-gpl` in release in your worktree for the replica's parity suite.
+- Records: from a clean commit (no uncommitted changes), run `python -m larmorx_validation parity afni-tshift --tier standard --out docs/validation` and commit the record. Expected: 314 cases, 0 failures, the 3 failed-write cases both-error, 1 expected divergence left (`environment/one-row-dataset`, as the replica's). Re-run the replica's suite (`--implementation replica`) only if your harness change affects it. Golden checksums should not change; if they do, re-record per `docs/validation/golden.md`.
+
+## Working rules
+- Commit early: a WIP checkpoint as soon as the code builds and its tests pass, then docs, then records. The git identity is configured. Never add `Co-Authored-By`, "Generated with" or any AI attribution to commits. Do not push, do not merge into main.
+- Scratch files go in `/tmp/claude-1000/-home-karelo-VScode-projects-super-fmriprep/d96e838f-0213-4978-9a72-dac8eae4b541/scratchpad/afni26-original/`. Never delete work products; never modify the upstream clones.
+- You are the only agent running; keep the machine otherwise quiet (no benchmarks).
+
+## Report (concise)
+What changed (files, behaviour in both modes), the black-box observations added to the spec, the parity numbers, the tests, the gates' results, the commits, and a clean-room statement: what you opened and what you did not.

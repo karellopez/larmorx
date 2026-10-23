@@ -1,0 +1,7 @@
+# The Rust compiler every machine and CI use (rustup installs it on first use). Pinned so results and
+# lints do not change with a new stable release; update it deliberately, in its own commit, with a
+# full CI run and the golden checksums re-checked (rule 10).
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -150,8 +150,22 @@ This directory holds the larmorx repo plus read-only upstream reference clones.
 The project context lives in the repo:
 
 @larmorx/CLAUDE.md
+
+The orchestrator's in-flight state (what runs, what waits to be merged, what is decided but not yet
+written into the repositories); keep it current and short:
+
+@ORCHESTRATOR-STATE.md
 EOF
   echo "wrote $WS_DIR/CLAUDE.md"
+fi
+if [[ ! -f "$WS_DIR/ORCHESTRATOR-STATE.md" ]]; then
+  printf '# Orchestrator state (in-flight work only)\n\nNothing in flight.\n' > "$WS_DIR/ORCHESTRATOR-STATE.md"
+fi
+
+# The test data: catalog, small synthetic files, downloader (github.com/karellopez/larmorx-testdata).
+if [[ ! -d "$WS_DIR/larmorx-testdata/.git" ]]; then
+  git clone -q https://github.com/karellopez/larmorx-testdata.git "$WS_DIR/larmorx-testdata" \
+    && echo "cloned larmorx-testdata" || { echo "could not clone larmorx-testdata" >&2; fail=1; }
 fi
 
 if [[ "$INSTALL_RUST" == 1 ]]; then
@@ -171,11 +185,18 @@ if [[ -n "$VENV" ]]; then
   [[ -x "$PY" ]] || { echo "no python at $PY (create the venv first)" >&2; exit 1; }
   echo "installing evaluation packages into $VENV..."
   "$PY" -m pip install -q --upgrade pip
-  "$PY" -m pip install -q pipdeptree antspyx SimpleITK
+  # The versions the validation records were made with (validation/requirements-lock.txt).
+  if [[ -f "$WS_DIR/larmorx/validation/requirements-lock.txt" ]]; then
+    "$PY" -m pip install -q -r "$WS_DIR/larmorx/validation/requirements-lock.txt"
+  else
+    "$PY" -m pip install -q pipdeptree antspyx SimpleITK
+  fi
   if [[ -d "$WS_DIR/fmriprep" ]]; then
     # Note: fmriprep's pyproject pulls smriprep from git master, not the pinned clone.
     "$PY" -m pip install -q "$WS_DIR/fmriprep"
   fi
+  [[ -d "$WS_DIR/larmorx-testdata" ]] && "$PY" -m pip install -q -e "$WS_DIR/larmorx-testdata"
+  "$PY" -m pip install -q -e "$WS_DIR/larmorx/validation"
   "$PY" -c "import ants, SimpleITK, fmriprep; print('ok: antspyx', ants.__version__, '| fmriprep', fmriprep.__version__)" || true
 fi
 
@@ -190,7 +211,7 @@ fi
 # rustup installs into ~/.cargo/bin, which may not be on PATH in this shell yet.
 RUSTC="$(command -v rustc || echo "$HOME/.cargo/bin/rustc")"
 echo "  rustc:  $([[ -x "$RUSTC" ]] && "$RUSTC" --version || echo 'missing (use --install-rust)')"
-echo "  docker: $(command -v docker >/dev/null && docker --version || echo 'missing (needed for fMRIPrep/FreeSurfer oracles)')"
+echo "  apptainer: $(command -v apptainer >/dev/null && apptainer --version || echo 'missing (needed for the fMRIPrep and FreeSurfer oracles)')"
 echo "  cores:  $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo ?)"
 [[ "$fail" == 0 ]] || { echo "some clones failed (see above)" >&2; exit 1; }
 echo "done."

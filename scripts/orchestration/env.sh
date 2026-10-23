@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Common environment of the orchestration scripts; sourced, not run.
+# LARMORX_WORKSPACE: the workspace holding larmorx/, .venv/, oracles/ (default: the parent of this repository).
+# LARMORX_VENV: the Python environment with larmorx's development and validation dependencies.
+_here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+export LARMORX_REPO=${LARMORX_REPO:-$(cd "$_here/../.." && pwd)}
+export LARMORX_WORKSPACE=${LARMORX_WORKSPACE:-$(cd "$LARMORX_REPO/.." && pwd)}
+export LARMORX_VENV=${LARMORX_VENV:-$LARMORX_WORKSPACE/.venv}
+# Cargo first; FSL kept off the path (its programs shadow nothing of ours, but the rule is explicit).
+export PATH=$LARMORX_VENV/bin:$HOME/.cargo/bin:$(echo "$PATH" | tr ':' '\n' | grep -v /fsl | paste -sd:)
+export PYO3_PYTHON=$LARMORX_VENV/bin/python

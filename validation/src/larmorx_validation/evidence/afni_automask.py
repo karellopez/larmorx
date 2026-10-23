@@ -660,18 +660,35 @@ def command(program: str, s) -> str:
 #: The register's AFNI entries the replicas correct by default (the others are kept as AFNI's
 #: until decided, or refused in both modes).
 CORRECTED = frozenset(
-    f"AFNI-{n:02d}" for n in (1, 2, 7, 8, 11, 12, 16, 18, 20, 22, 23, 26, 43, 45, 47)
+    f"AFNI-{n:02d}" for n in (1, 2, 7, 8, 11, 12, 16, 18, 20, 22, 23, 26, 41, 43, 45, 47, 48)
 )
+#: The inputs that make no sense, refused by default (rule B, decided 2026-10-23): the case's
+#: defect -> what AFNI does with it (observable behaviour only).
+REFUSED = {
+    "AFNI-41": "the help gives -nbhrs a range of 6 to 26, but AFNI accepts any value and peels "
+    "as with 17 (or as -NN1/2/3 say)",
+    "AFNI-48": "the help documents -T2 once and twice; given a third time it neither inverts the "
+    "output back nor clips its edges, so AFNI writes an inverted image",
+}
 
 
-def case_verdict(r: dict, desc: str = "") -> tuple[str, str]:
+def case_verdict(r: dict, desc: str = "", refuses: str | None = None) -> tuple[str, str]:
     """A case's verdict: the record compares the replica in reproduce mode with AFNI (every
     output byte for byte, exit status, messages); the fix pass and AFNI's variability are
     reported. A compared case without outputs (``desc`` names its defect) is AFNI's refusal
-    or AFNI's silence, reproduced."""
+    or AFNI's silence, reproduced. ``refuses``: the defect for which the default refuses an
+    input that makes no sense (rule B), a deliberate correction."""
     import re
 
     st = r["status"]
+    if refuses in REFUSED and st == "pass":
+        return "d13", common.clip(
+            f"Refused by default ({refuses}, decided 2026-10-23, rule B: the input makes no "
+            f"sense and AFNI silently does something arbitrary): {REFUSED[refuses]}. The "
+            "replica's default stops with a fatal error naming the entry (exit status 1); its "
+            "reproduce mode gives AFNI's output, which the record compares byte for byte.",
+            400,
+        )
     if st == "both-error" and "crash" in r["reason"]:
         return "divergence", common.clip(r["reason"])
     v = common.outcome_verdict(r)
@@ -734,7 +751,7 @@ def cases(rec, scenarios, program: str, examples: dict[str, str]) -> list[dict]:
     out = []
     for r in rec.results:
         desc, s = defs.get(r["case"], ("", None))
-        v, why = case_verdict(r, desc)
+        v, why = case_verdict(r, desc, s.fix_refuses if s is not None else None)
         out.append(
             {
                 "id": r["case"],

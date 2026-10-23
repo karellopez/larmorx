@@ -77,10 +77,15 @@ pub struct ResampleBySpacingPlan {
 impl ResampleBySpacingPlan {
     /// The sigma of axis `k` in physical units, as the smoothing filter receives it: ANTs'
     /// `sigmas[k]` itself ([`UpstreamDefects::Reproduce`]), or that many input voxels,
-    /// `sigmas[k] · in_spacing[k]` (ANTS-32 corrected, the default).
+    /// `sigmas[k] · in_spacing[k]` (ANTS-32 corrected, the default). A sigma ≤ 0 smooths
+    /// nothing in either mode and stays ANTs' value (what both modes print).
     pub fn physical_sigma(&self, k: usize, input: &ItkGeometry, mode: UpstreamDefects) -> f64 {
         let s = f64::from(self.sigmas[k]);
-        if mode.fix() { s * input.spacing[k] } else { s }
+        if mode.fix() && s > 0.0 {
+            s * input.spacing[k]
+        } else {
+            s
+        }
     }
 }
 
@@ -320,6 +325,17 @@ mod tests {
         }
     }
 
+    /// The plan of an upsampling of axis 1 (1.5 to 1 mm: sigma 1/1.5 − 1 < 0, no smoothing).
+    fn plan_sigma_up(input: &AntsImage<f32>) -> ResampleBySpacingPlan {
+        let options = ResampleBySpacingOptions {
+            spacing: vec![2.0, 1.0, 3.0],
+            smooth: true,
+            add_voxels: 0,
+            nearest: false,
+        };
+        plan(&input.geometry, &options).unwrap()
+    }
+
     #[test]
     fn sizes_sigmas_and_threads() {
         let input = image(&[10, 9, 8], &[1.0, 1.5, 2.0]);
@@ -337,6 +353,13 @@ mod tests {
         assert_eq!(plan.physical_sigma(2, &input.geometry, fix), 1.0);
         assert_eq!(plan.physical_sigma(2, &input.geometry, rep), 0.5);
         assert_eq!(plan.physical_sigma(0, &input.geometry, fix), 1.0);
+        // A sigma ≤ 0 smooths nothing: both modes keep (and print) ANTs' value.
+        let up = plan_sigma_up(&input);
+        assert!(up.sigmas[1] < 0.0);
+        assert_eq!(
+            up.physical_sigma(1, &input.geometry, fix),
+            up.physical_sigma(1, &input.geometry, rep)
+        );
         assert_eq!(notices[0].defect.id, "ANTS-32");
         assert!(notices[0].detail.contains("axis 2"), "{notices:?}");
         assert!(!notices[0].detail.contains("axis 0"), "{notices:?}");

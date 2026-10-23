@@ -8,6 +8,7 @@ compares larmorx's default output with it, bit for bit.
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -70,14 +71,21 @@ def _erode(region: np.ndarray) -> np.ndarray:
     return ndimage.binary_erosion(region, structure=BALL_1, border_value=1)
 
 
+# The checks that take parameters are module-level functions bound with ``partial``: the
+# parity harness sends its cases to worker processes, which pickle them (a closure does not
+# pickle).
+
+
+def _check_erode(
+    value: float, args: list[str], outputs: list[Path], _tmp: Path
+) -> tuple[bool, str, object]:
+    data = _load(args[3])
+    return _compare(outputs[0], _erode(data == np.float32(value)), "the eroded foreground")
+
+
 def expect_erode(value: float):
     """``ME 1 value``'s correct result: 1 where the voxel is still ``value`` after the erosion."""
-
-    def check(args: list[str], outputs: list[Path], _tmp: Path) -> tuple[bool, str, object]:
-        data = _load(args[3])
-        return _compare(outputs[0], _erode(data == np.float32(value)), "the eroded foreground")
-
-    return check
+    return partial(_check_erode, value)
 
 
 def expect_open_zeros(args: list[str], outputs: list[Path], _tmp: Path) -> tuple[bool, str, object]:
@@ -96,28 +104,30 @@ def expect_open_zeros(args: list[str], outputs: list[Path], _tmp: Path) -> tuple
 # ANTS-22: PadImage with a fractional pad
 
 
+def _check_pad(
+    pad: float, args: list[str], outputs: list[Path], _tmp: Path
+) -> tuple[bool, str, object]:
+    data = _load(args[3])
+    k = int(pad)
+    if k >= 0:
+        expected = np.pad(data, k)
+    else:
+        sl = tuple(slice(-k, n + k) for n in data.shape)
+        expected = data[sl]
+    ok, detail, value = _compare(outputs[0], expected, f"{k} voxel(s) on each side")
+    # The origin moves by exactly k voxels.
+    import nibabel as nib
+
+    a_in, a_out = nib.load(args[3]).affine, nib.load(outputs[0]).affine
+    shift = a_in[:3, :3] @ np.full(3, -float(k)) + a_in[:3, 3]
+    moved = float(np.abs(a_out[:3, 3] - shift).max())
+    return ok and moved < 1e-4, f"{detail}; origin off by {moved:.2g} mm", value
+
+
 def expect_pad(pad: float):
     """``PadImage pad``'s correct result: ``trunc(pad)`` voxels of 0 on each side (cropped if
     negative), the voxels where the origin says (NumPy's ``pad`` and slicing)."""
-
-    def check(args: list[str], outputs: list[Path], _tmp: Path) -> tuple[bool, str, object]:
-        data = _load(args[3])
-        k = int(pad)
-        if k >= 0:
-            expected = np.pad(data, k)
-        else:
-            sl = tuple(slice(-k, n + k) for n in data.shape)
-            expected = data[sl]
-        ok, detail, value = _compare(outputs[0], expected, f"{k} voxel(s) on each side")
-        # The origin moves by exactly k voxels.
-        import nibabel as nib
-
-        a_in, a_out = nib.load(args[3]).affine, nib.load(outputs[0]).affine
-        shift = a_in[:3, :3] @ np.full(3, -float(k)) + a_in[:3, 3]
-        moved = float(np.abs(a_out[:3, 3] - shift).max())
-        return ok and moved < 1e-4, f"{detail}; origin off by {moved:.2g} mm", value
-
-    return check
+    return partial(_check_pad, pad)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -137,29 +147,31 @@ def _(t):
     ants_inputs.save(a, t, affine=GRID)
 
 
+def _check_contours(
+    fully_connected: bool, args: list[str], outputs: list[Path], _tmp: Path
+) -> tuple[bool, str, object]:
+    data = _load(args[3])
+    p = np.pad(data, 1)
+    contour = np.zeros(data.shape, bool)
+    n = data.shape
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                if (dx, dy, dz) == (0, 0, 0):
+                    continue
+                if not fully_connected and abs(dx) + abs(dy) + abs(dz) != 1:
+                    continue
+                nb = p[1 + dx : 1 + dx + n[0], 1 + dy : 1 + dy + n[1], 1 + dz : 1 + dz + n[2]]
+                contour |= nb != data
+    expected = np.where(contour & (data != 0), data, 0.0)
+    return _compare(outputs[0], expected, "the contours of the values")
+
+
 def expect_contours(fully_connected: bool):
     """``ExtractContours``' correct result: every value its own label (0 the background), the
     voxels of a label with a neighbour of another label (26 or 6 neighbours) keep their value
     (NumPy, by shifting the image; the phantom keeps its labels off the border)."""
-
-    def check(args: list[str], outputs: list[Path], _tmp: Path) -> tuple[bool, str, object]:
-        data = _load(args[3])
-        p = np.pad(data, 1)
-        contour = np.zeros(data.shape, bool)
-        n = data.shape
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
-                for dz in (-1, 0, 1):
-                    if (dx, dy, dz) == (0, 0, 0):
-                        continue
-                    if not fully_connected and abs(dx) + abs(dy) + abs(dz) != 1:
-                        continue
-                    nb = p[1 + dx : 1 + dx + n[0], 1 + dy : 1 + dy + n[1], 1 + dz : 1 + dz + n[2]]
-                    contour |= nb != data
-        expected = np.where(contour & (data != 0), data, 0.0)
-        return _compare(outputs[0], expected, "the contours of the values")
-
-    return check
+    return partial(_check_contours, fully_connected)
 
 
 # ------------------------------------------------------------------------------------------------

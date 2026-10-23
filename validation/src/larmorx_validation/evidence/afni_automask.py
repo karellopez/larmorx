@@ -625,19 +625,27 @@ def input_name(name: str) -> str:
     if kind == "fmriprep-anat":
         return f"<{rest.split(':')[0]}: sMRIPrep's T1w × its brain mask>"
     if kind == "blank":
-        return f"'<generated: {rest}, in a directory with a blank>'"
+        return f"<generated: {rest}, in a directory with a blank>"
     return f"<generated: {name}>"
 
 
 def command(program: str, s) -> str:
+    """A case's command line: its inputs named as placeholders (``<...>``, not quoted), the
+    other arguments quoted where a shell needs it, the environment and the files present."""
     import re
+    import shlex
 
     names = [input_name(n) for n in s.inputs]
-    args = [re.sub(r"\{(\d+)\}", lambda m: names[int(m.group(1))], a) for a in s.args]
+    parts = [program]
+    for a in s.args:
+        m = re.fullmatch(r"\{(\d+)\}", a)
+        if m:
+            parts.append(names[int(m.group(1))])
+        else:
+            parts.append(shlex.quote(a) if re.search(r"\s", a) else a)
     env = " ".join(f"{k}={v}" for k, v in s.env if v is not None)
     files = " ".join(f"(with {n} present)" for n, _ in s.files)
-    text = common.command_text(program, args, lambda a: a)
-    return " ".join(x for x in (env, text, files) if x)
+    return " ".join(x for x in (env, " ".join(parts), files) if x)
 
 
 def case_verdict(r: dict) -> tuple[str, str]:
@@ -705,7 +713,7 @@ def export(ctx: core.Context) -> dict:
 
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
-    examples = {"fmriprep/ds005040-task-clip_run-1": "fmriprep-automask"}
+    examples = {"fmriprep/ds005040-task_clip_run_1": "fmriprep-automask"}
     cs = cases(rec, _scenario_list(), PROGRAM, examples)
     e = entry(ctx)
     return {

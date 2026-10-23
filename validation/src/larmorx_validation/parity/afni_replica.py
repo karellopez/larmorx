@@ -736,19 +736,30 @@ def _fix_pass(
 # The record's summary
 
 
-def highlights(results: list[CaseResult], program: str, function: str) -> list[str]:
+def highlights(
+    results: list[CaseResult], program: str, function: str, crash_causes: str
+) -> list[str]:
+    """The record's summary lines; ``crash_causes`` names what makes AFNI crash in its cases
+    (e.g. "a missing option value, AFNI-40")."""
     compared = [r for r in results if r.status == PASS]
 
-    def identical(r: CaseResult) -> bool:
-        data = [c for c in r.checks if c.name.endswith(": data")]
-        heads = [c for c in r.checks if c.name.endswith(": header bytes")]
-        return bool(data) and all(c.passed for c in data + heads)
+    def data_checks(r: CaseResult) -> list[Check]:
+        return [c for c in r.checks if c.name.endswith((": data", ": header bytes"))]
 
-    bit = [r for r in compared if identical(r)]
+    with_outputs = [r for r in compared if data_checks(r)]
+    bit = [r for r in with_outputs if all(c.passed for c in data_checks(r))]
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     lines = [
-        f"**Bit-identical to AFNI: {len(bit)} of {len(compared)} compared cases**: every output "
-        "the same bytes (data and NIfTI header), with the same exit status and messages.",
+        f"**Bit-identical to AFNI: {len(bit)} of {len(with_outputs)} compared cases that write "
+        "outputs**: every output the same bytes (data and NIfTI header), with the same exit "
+        "status and messages."
+        + (
+            f" The other {len(compared) - len(with_outputs)} compared case(s) write no output "
+            "in either program (an existing output, a directory that does not exist) and agree "
+            "on the exit status and messages."
+            if len(compared) > len(with_outputs)
+            else ""
+        ),
         f"- Messages (standard output and error, byte for byte; AFNI's version banner and compile "
         f"date, and larmorx's own lines, set aside): {sum(c.passed for c in messages)} of "
         f"{len(messages)} identical, in every case that ran both programs.",
@@ -756,9 +767,8 @@ def highlights(results: list[CaseResult], program: str, function: str) -> list[s
     crashes = [r for r in results if any(c.name == CRASH for c in r.checks)]
     if crashes:
         lines.append(
-            f"- {len(crashes)} case(s) where AFNI crashes (a missing option value, AFNI-40; a "
-            "NULL mask, AFNI-46): larmorx prints AFNI's messages up to the crash, then refuses "
-            "with one line and exit status 1."
+            f"- {len(crashes)} case(s) where AFNI crashes ({crash_causes}): larmorx prints "
+            "AFNI's messages up to the crash, then refuses with one line and exit status 1."
         )
     fmri = [c for r in results for c in r.checks if "fMRIPrep's own output" in c.name]
     if fmri:

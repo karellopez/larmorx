@@ -112,6 +112,9 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
           env=(("AFNI_NIFTI_SCALE", "NO"),)))
     add("peels-0", "defects", "-peels 0 (AFNI-43: AFNI peels once)",
         S(("-peels", "0", "-prefix", M, "{0}"), (h,), (M,), **_python_options(peels=0)))
+    add("peels-0-fmriprep", "defects", "-peels 0 added to fMRIPrep's call on its BOLD reference of ds005040 (AFNI-43)",
+        S(("-apply_prefix", "masked.nii.gz", "-dilate", "1", "-peels", "0", "-prefix", "mask.nii.gz", "{0}"),
+          ("fmriprep:ds005040-task_clip_run_1:automask",), ("mask.nii.gz", "masked.nii.gz"), tier="standard"))
     add("negative-slope-4d", "defects", "a 4D series with scl_slope -2 (AFNI-01)",
         S(("-apply_prefix", "masked.nii", "-prefix", M, "{0}"), ("series-negative",), (M, "masked.nii")))
 
@@ -179,7 +182,8 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     add("input-dir-with-blank", "global", "an input in a directory with a blank (AFNI-18)",
         S(("-prefix", M, "{0}"), ("blank:head-f32",), (M,), tier="standard"))
     add("missing-directory", "global", "an output in a missing directory (AFNI-26)",
-        S(("-prefix", "nodir/mask.nii", "{0}"), (h,), ("nodir/mask.nii",), tier="standard"))
+        S(("-prefix", "nodir/mask.nii", "{0}"), (h,), ("nodir/mask.nii",), tier="standard",
+          fix_refuses="AFNI-26"))
 
     # --- Real data -----------------------------------------------------------------------------
     for i, (label, _) in enumerate(ph.fmriprep_runs()):
@@ -286,7 +290,9 @@ def suite() -> Suite:
         cases=cases,
         run_case=run_case,
         packages=("nibabel",),
-        highlights=lambda results: ar.highlights(results, PROGRAM, "automask"),
+        highlights=lambda results: ar.highlights(
+            results, PROGRAM, "automask", "a missing option value, AFNI-40"
+        ),
         notes=(
             "Both programs run in directories of their own on the same input files, in the same "
             "environment (no AFNI variables of this process, `HOME` an empty directory, "

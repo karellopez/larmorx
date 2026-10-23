@@ -170,7 +170,8 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     add("input-dir-with-blank", "global", "an input in a directory with a blank (AFNI-18)",
         S((*p, "{0}"), ("blank:head-f32",), (U,), tier="standard"))
     add("missing-directory", "global", "an output in a missing directory (AFNI-26)",
-        S(("-prefix", "nodir/uni.nii", "{0}"), (t1,), ("nodir/uni.nii",), tier="standard"))
+        S(("-prefix", "nodir/uni.nii", "{0}"), (t1,), ("nodir/uni.nii",), tier="standard",
+          fix_refuses="AFNI-26"))
 
     # --- Real data -----------------------------------------------------------------------------
     for i, (label, _) in enumerate(ph.fmriprep_runs()):
@@ -246,7 +247,12 @@ def suite() -> Suite:
         cases=cases,
         run_case=run_case,
         packages=("nibabel",),
-        highlights=lambda results: ar.highlights(results, PROGRAM, "unifize"),
+        highlights=lambda results: ar.highlights(
+            results,
+            PROGRAM,
+            "unifize",
+            "a missing option value, AFNI-40; an empty automask dereferenced, AFNI-46",
+        ),
         notes=(
             "Both programs run in directories of their own on the same input files, in the same "
             "environment (no AFNI variables of this process, `HOME` an empty directory, "

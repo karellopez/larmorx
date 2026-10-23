@@ -697,7 +697,7 @@ def _example(ctx: core.Context, move: str) -> dict:
             ants,
             "original",
             "antsAI: ANTs 2.6.5, 1 thread",
-            "its blobs from the probe",
+            "the copy placed by its transform",
         ),
         (
             "larmorx",
@@ -705,7 +705,7 @@ def _example(ctx: core.Context, move: str) -> dict:
             lx_rep,
             "larmorx",
             "antsAI: larmorx (port)",
-            "reproduce mode, 6 threads",
+            "the copy placed by its transform; reproduce mode, 6 threads",
         ),
         (
             "larmorx-fix",
@@ -713,7 +713,7 @@ def _example(ctx: core.Context, move: str) -> dict:
             lx_fix,
             "larmorx",
             "antsAI: larmorx (port)",
-            "default mode (ANTS-110 corrected), 6 threads",
+            "the copy placed by its transform; default mode (ANTS-110 corrected), 6 threads",
         ),
     ]
     for pid, label, _steps, role, text, sub in runs:

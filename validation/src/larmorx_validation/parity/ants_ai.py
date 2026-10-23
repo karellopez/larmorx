@@ -2489,12 +2489,18 @@ def highlights(results: list[CaseResult]) -> list[str]:
         "functions (glibc's are not always correctly rounded)."
     ]
     band = []
+    crashes = []
     real = []
     for r in compared:
         for ch in r.checks:
-            m = re.search(r"larmorx vs ANTs \(1 thread\) (\S+); ANTs' own band (\S+)", ch.detail)
+            m = re.search(
+                r"larmorx vs ANTs \(1 thread\) ([^\s;]+); ANTs' own band ([^\s;]+)", ch.detail
+            )
             if ch.name == "thread band" and m:
-                band.append((r.case, float(m.group(1)), float(m.group(2))))
+                if "ANTs crashes at" in ch.detail:
+                    crashes.append(r.case)
+                else:
+                    band.append((r.case, float(m.group(1)), float(m.group(2))))
             m = re.search(r"larmorx vs fMRIPrep's output (\S+)", ch.detail)
             if ch.name == "fMRIPrep's own transform" and m:
                 real.append((r.case, m.group(1)))
@@ -2508,6 +2514,15 @@ def highlights(results: list[CaseResult]) -> list[str]:
             + ", ".join(f"`{case}` {b:.3g}" for case, _, b in band)
             + "); larmorx gives the one-thread result at any thread count, within "
             f"{max(d for _, d, _ in band):.3g} of ANTs at one thread."
+        )
+    if crashes:
+        lines.append("")
+        lines.append(
+            f"Thread band, blob alignment ({len(crashes)} cases: "
+            + ", ".join(f"`{case}`" for case in crashes)
+            + f"): ANTs' `antsAI -b` crashes at {', '.join(map(str, BAND_THREADS))} threads "
+            "(ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives "
+            "ANTs' one-thread result at any thread count."
         )
     if real:
         lines.append("")

@@ -135,7 +135,10 @@ def home() -> Path:
 def environment(extra: tuple[tuple[str, str | None], ...] = ()) -> dict[str, str]:
     """The environment both programs run in (see the module's documentation)."""
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))}
-    env.update(HOME=str(home()), AFNI_DONT_LOGFILE="YES", AFNI_NIFTI_NOEXT="YES")
+    # Two threads each (AFNI's OpenMP loop, the replica's): three parallel cases use six.
+    env.update(
+        HOME=str(home()), AFNI_DONT_LOGFILE="YES", AFNI_NIFTI_NOEXT="YES", OMP_NUM_THREADS="2"
+    )
     for name, value in extra:
         if value is None:
             env.pop(name, None)

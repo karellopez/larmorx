@@ -82,6 +82,36 @@ Changes from the originals are listed below and in each module's documentation.
 | `cli::tshift` | `src/thd_filestuff.c` | `THD_filename_ok` (to name AFNI-12, and to refuse a `-prefix` when it is reproduced) | MCW 1994-2000 |
 | `cli::tshift` | `src/nifti/nifti2/nifti2_io.c` | the message of `nifti_image_write_engine` when the output cannot be opened (AFNI-26, reproduced) | NIH, public domain |
 
+### 3dAutomask and 3dUnifize (2026-10-23)
+
+The licence of every routine that shapes their results is in
+`docs/findings/afni-automask.md` and `afni-unifize.md` ("The licence of every routine"): MCW
+library code is involved, so both are replicas here, and clean-room originals are to follow
+from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
+
+| Rust module | AFNI 25.2.09 file | Functions, macros | Copyright |
+|---|---|---|---|
+| `mask` | `src/thd_automask.c` | `THD_automask_verbose`, `_extclip`, `_set_clipfrac`, `_set_peelcounts`, `_set_gradualize` (as `MaskSettings`), `mask_count`, `mri_automask_image`, `mri_automask_image2D`, `THD_mask_clip_neighbors`, `THD_mask_fillin_once`, `THD_mask_fillin_completely`, `THD_mask_clust`, `THD_mask_clust2D`, `THD_mask_erode` (without `redilate`), `THD_mask_erodemany`, `THD_mask_erodemany2D`, `THD_mask_dilate`, `THD_mask_depth` | NIH, public domain |
+| `mask` | `src/thd_cliplevel.c` | `THD_cliplevel` (float images), `THD_cliplevel_partial`, `get_octant_clips`, `pointclip`, `THD_cliplevel_gradual` | NIH, public domain |
+| `mask` | `src/mri_get_cmass.c` | `mri_get_cmass_3D` | NIH, public domain |
+| `mask` | `src/mri_max.c`, `src/mri_cut.c`, `src/thd_makemask.c` | `mri_max` (float), `mri_cut_3D`, `THD_countmask` | MCW 1994-2000 |
+| `automask` | `src/thd_automask.c` | `THD_automask`, `thd_apply_mask` | NIH, public domain |
+| `automask` | `src/thd_median.c` | `THD_aveabs_brick` | NIH, public domain |
+| `automask` | `src/3dAutomask.c` | the dilation and erosion loop, the cut-plane report and the `-SI` clipping of `main` | NIH, public domain |
+| `automask` | `src/thd_dsetto1D.c`, `src/mri_to_float.c`, `src/thd_initdblk.c` | `THD_extract_array`, `mri_to_float`, `mri_scale_to_float`, `THD_need_brick_factor` | MCW 1994-2000 |
+| `cli::automask` | `src/3dAutomask.c` | `main` (option scan, checks, messages, outputs); the `AUTHOR`, `WROTE_DSET`, `CHECK_OPEN_ERROR` macros of `src/mrilib.h` | NIH, public domain (mrilib.h: MCW 1994-2000) |
+| `unifize` | `src/3dUnifize.c` | `median7`, `mri_double_down`, `mri_double_up`, `mri_local_percmean`, `mri_WMunifize`, `mri_GMunifize`, `mri_clipedges_inplace`, `PKVAL`, `PKMID`, `WMCUT`, `WMSCL` | NIH, public domain |
+| `unifize` | `src/mri_invert.c` | `mri_invertcontrast_inplace` (float images) | NIH, public domain |
+| `unifize` | `src/thd_dset_nbhd.c` | `mri_get_nbhd_array` with `SetSearchAboutMaskedVoxel(1)` | NIH, public domain |
+| `unifize` | `src/edt_buildmask.c` | `MCW_build_mask`, `MCW_spheremask` (unit voxels) | MCW 1994-2000 |
+| `unifize` | `src/cs_qmed.c` | `qmed_float`, `median_float4`, `median_float5`, `median_float7`, `median_float9`, `MED3` | MCW 1994-2000 |
+| `unifize` | `src/mri_percents.c` | `qsort_float` (as a sort: any correct sort gives its result on finite values) | MCW 1994-2000 |
+| `cli::unifize` | `src/3dUnifize.c` | `main` (option scan, checks, messages, the `-EPI` path, outputs) | NIH, public domain |
+| `cli::unifize` | `src/thd_dsetto3D.c`, `src/thd_median.c` | `THD_extract_float_brick`, `THD_median_brick` | NIH, public domain |
+| `cli::common` | (moved from `cli::tshift`, 2026-10-23) | the shared command-line pieces listed under `cli::tshift` above | as above |
+| `environ` | `src/afni_environ.c`, `src/Aomp.h` | the variables of 3dAutomask and 3dUnifize (`environ::AUTOMASK`, `UNIFIZE`; `AFNI_SETUP_OMP`'s `OMP_NUM_THREADS`) | MCW 1994-2000 |
+| `dataset` | `src/thd_niftiread.c` | `THD_load_nifti`'s brick factor of a loaded dataset (`read_loaded`) | NIH, public domain |
+
 Not translations (written for larmorx-gpl, GPL-3.0-or-later): `x87` (the arithmetic of x86-64's
 `long double`, for the formulas of `nifti2_io.c` that use it) and `cli::output` (writing the
 output through a temporary file and a rename; `cannot_open`, whether AFNI's NIfTI writer could
@@ -96,6 +126,17 @@ open the output, for AFNI-26).
 | `sysdeps/x86/fpu/sincosf_poly.h` | `sinf_poly` (x86 version) |
 | `sysdeps/x86/fpu/s_sincosf_data.c` | `__sincosf_table`, `__inv_pio4` |
 | `sysdeps/x86_64/fpu/multiarch/s_sinf-fma.c`, `s_cosf-fma.c`, `s_sinf-sse2.c`, `s_cosf-sse2.c` | the FMA and SSE2 builds selected at run time |
+
+## glibc files translated (`glibc_floatmath`, 2026-10-23)
+
+| glibc 2.35 file | What |
+|---|---|
+| `sysdeps/ieee754/flt-32/s_tanhf.c` | `tanhf` (from fdlibm: "Copyright (C) 1993 by Sun Microsystems, Inc. ... Permission to use, copy, modify, and distribute this software is freely granted, provided that this notice is preserved", kept in the module's header) |
+| `sysdeps/ieee754/flt-32/s_expm1f.c` | `expm1f` (fdlibm, the same notice) |
+| `sysdeps/ieee754/flt-32/s_cbrtf.c` | `cbrtf` (Copyright (C) 1997-2022 Free Software Foundation, Inc.) |
+
+On x86-64 these have one build each (no FMA variant). `frexpf` and `ldexpf` are written as
+their exact definitions.
 
 ## Changes from the originals
 
@@ -202,6 +243,8 @@ open the output, for AFNI-26).
 |---|---|---|
 | `csfft` | `tools/csfft-verify/run.sh`: AFNI's compiled `csfft_cox` (from the oracle build's `libmri.a`) and its general radix-2 loop on 3,336 + 160 input records, every length AFNI computes itself | 36,950,784 + 2,621,400 float values, 0 differ |
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
+| `glibc_floatmath` (2026-10-23) | `tools/floatmath-verify`: `tanhf` on all 2^32 inputs against glibc 2.35, input by input; both functions as a hash of all 2^32 results, against `glibc_reference.c` (a C program calling glibc) | 0 `tanhf` inputs differ; the hashes equal (`3c6bad00ea34c387`, `c679cb92d4402e33`) |
+| 3dAutomask, 3dUnifize (2026-10-23) | `python -m larmorx_validation parity afni-automask` and `afni-unifize` against the AFNI 25.2.09 binary | see `docs/validation/afni-automask.md`, `afni-unifize.md` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
 | 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` (from `c479c1a`: 279 of 279 compared cases bit-identical, 3 expected divergences) |
 | `x87` (2026-10-12) | the emulated operations against GCC's `long double` on x86-64: 3 million quotients of the kind `nifti_dmat44_to_quatern` forms, and 2 million random sums, products and quotients (scratch C programs) | 0 differ (1,071 of them differ from plain double arithmetic) |

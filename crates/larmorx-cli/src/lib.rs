@@ -350,7 +350,10 @@ mod tests {
         // Without an original, asking for it is an error naming the replica's package.
         let (code, _, err) = run_capture(&["lx", "afni", "3dAutomask", "-q", "in.nii"]);
         assert_eq!(code, replica::EXIT_NOT_FOUND);
-        assert!(err.contains("no clean-room original of afni 3dAutomask"), "{err}");
+        assert!(
+            err.contains("no clean-room original of afni 3dAutomask"),
+            "{err}"
+        );
     }
 
     #[test]

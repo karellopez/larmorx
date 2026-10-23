@@ -535,6 +535,10 @@ fn run(
         let m = automask_image(&imin, g, &ms, &mut log);
         flush(&mut log, io);
         let Some(m) = m else {
+            // AFNI's crash banner starts on a new line; so does the refusal.
+            if verbose {
+                io.raw("\n");
+            }
             return Err(
                 "the automask of a 2D image smaller than 16 x 16 is empty (NULL): AFNI crashes \
                  inverting the contrast with it (AFNI-46)"

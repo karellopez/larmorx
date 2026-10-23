@@ -436,9 +436,16 @@ mod tests {
         ));
         let e = choose_with(Implementation::Auto, automask, missing).unwrap_err();
         assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
-        assert!(e.to_string().contains("no clean-room original of afni 3dAutomask"), "{e}");
+        assert!(
+            e.to_string()
+                .contains("no clean-room original of afni 3dAutomask"),
+            "{e}"
+        );
         let e = choose_with(Implementation::Original, automask, found).unwrap_err();
-        assert!(e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"), "{e}");
+        assert!(
+            e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
+            "{e}"
+        );
         assert_eq!(
             replica_only("afni").collect::<Vec<_>>(),
             ["3dAutomask", "3dUnifize"]

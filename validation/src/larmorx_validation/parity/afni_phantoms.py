@@ -130,7 +130,7 @@ def synthetic(name: str) -> Path:
     if name == "head-i16-intercept":
         return _save("head-i16-intercept.nii", np.round((t1 - 100) * 2), a, np.int16, slope=0.5, inter=100.0)
     if name == "head-f32-slope-inter":
-        return _save("head-f32-slope-inter.nii", (t1 - 3) / 2, a, np.float32, slope=2.0, inter=3.0)
+        return _save("head-f32-slope-inter.nii", (t1 - 5) / 3, a, np.float32, slope=3.0, inter=5.0)
     if name == "head-f64":
         return _save("head-f64.nii.gz", t1, a, np.float64)
     if name == "head-i8":

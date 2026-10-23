@@ -119,7 +119,10 @@ image's sorted values) and slides the ball from voxel to voxel, adding and remov
 surfaces; the two percentiles come from block counts and the values between them are read in
 ascending order, which gives the spec's float sum exactly. Planes run in parallel, with the same
 result at any thread count; the inversion's percentile and `-GM`'s medians are selections, not
-sorts. Informal timings: TIMINGS-PLACEHOLDER. There is no benchmark report yet.
+sorts. Informal timings (2026-10-24, a shared machine; [findings](../findings/afni-masks-original.md#informal-timings-2026-10-24-not-a-benchmark-report)):
+fMRIPrep's call on a 64 × 64 × 34 BOLD reference takes AFNI 93 s at one thread and 22 s at six,
+the replica 39 s and 8.7 s, the original 3.8 s and 0.94 s; a T1w (half-size path) 67 s and 24 s,
+35 s and 15 s, 9.3 s and 2.7 s. There is no benchmark report yet.
 
 ## Rust
 

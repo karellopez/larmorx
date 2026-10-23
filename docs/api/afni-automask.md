@@ -126,7 +126,11 @@ The original decides every pass of the mask operations voxel by voxel in paralle
 (the result does not depend on the thread count), finds clusters by run-based union-find, and
 replaces two of AFNI's repeated sweeps (the exterior clip, the depth) by breadth-first searches
 with the same results ([findings](../findings/afni-masks-original.md), "Speed"). AFNI's
-3dAutomask is single-threaded; there is no benchmark report yet.
+3dAutomask is single-threaded. Its time is mostly reading and writing compressed NIfTI: in
+informal timings (2026-10-24, a shared machine) fMRIPrep's call on ds005454's BOLD reference took
+1.6 s in AFNI, 1.9 s in the replica and 1.7 s in the original at one thread, 0.72 s in the
+original at six ([findings](../findings/afni-masks-original.md#informal-timings-2026-10-24-not-a-benchmark-report)).
+There is no benchmark report yet.
 
 ## Rust
 

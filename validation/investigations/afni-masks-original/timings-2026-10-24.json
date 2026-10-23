@@ -1,0 +1,55 @@
+{
+ "machine": {
+  "nproc": 12,
+  "load": [
+   17.36669921875,
+   21.62451171875,
+   21.46923828125
+  ],
+  "load after": [
+   19.1630859375,
+   19.30712890625,
+   20.3681640625
+  ]
+ },
+ "runs": {
+  "3dAutomask, fMRIPrep's call, ds005454 BOLD reference": {
+   "AFNI 1": 1.63,
+   "replica 1": 1.85,
+   "original 1": 1.66,
+   "replica 6": 1.91,
+   "original 6": 0.72
+  },
+  "3dAutomask, a BOLD series, ds005040": {
+   "AFNI 1": 0.39,
+   "replica 1": 0.25,
+   "original 1": 0.22,
+   "replica 6": 0.24,
+   "original 6": 0.19
+  },
+  "3dUnifize, fMRIPrep's call, ds000005 BOLD reference": {
+   "AFNI 1": 93.34,
+   "replica 1": 39.37,
+   "original 1": 3.76,
+   "AFNI 6": 21.6,
+   "replica 6": 8.68,
+   "original 6": 0.94
+  },
+  "3dUnifize, fMRIPrep's call, ds005454 BOLD reference (half-size path)": {
+   "AFNI 1": 18.68,
+   "replica 1": 13.29,
+   "original 1": 4.58,
+   "AFNI 6": 7.45,
+   "replica 6": 4.85,
+   "original 6": 1.21
+  },
+  "3dUnifize, a T1w, ds000005 (half-size path)": {
+   "AFNI 1": 67.11,
+   "replica 1": 35.35,
+   "original 1": 9.26,
+   "AFNI 6": 23.55,
+   "replica 6": 14.87,
+   "original 6": 2.66
+  }
+ }
+}

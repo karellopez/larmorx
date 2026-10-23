@@ -72,5 +72,29 @@ All in the specs as *observed*; in short:
 | Everything voxel-wise | one thread | parallel over z planes (and `-EPI`'s volumes, the gradual clip level's octants) | each voxel decided from the mask before the pass |
 
 AFNI 25.2.09's 3dUnifize took 96 s at one OpenMP thread on the 64 × 64 × 40 head phantom of
-the parity suite (default radius 18.3 voxels). Informal timings of all three programs:
-[the validation records](../validation/afni-unifize.md) and the next section.
+the parity suite (default radius 18.3 voxels). Informal timings of all three programs are in the
+next section.
+
+## Informal timings (2026-10-24; not a benchmark report)
+
+Wall time in seconds of the whole program (reading and writing `.nii.gz` included), each run
+once (larmorx after one warm-up run), at 1 and 6 threads (`OMP_NUM_THREADS`; AFNI's 3dAutomask
+is single-threaded). The machine (12 logical CPUs) was shared with another agent's runs (load 17
+to 21 throughout), so these are indications, the 6-thread ones especially; a benchmark report on
+a quiet machine is still to come. Tool: [`validation/investigations/afni-masks-original/timing.py`](../../validation/investigations/afni-masks-original/timing.py)
+(numbers in `timings-2026-10-24.json` beside it).
+
+| Input | AFNI 1 | replica 1 | original 1 | AFNI 6 | replica 6 | original 6 |
+|---|---|---|---|---|---|---|
+| 3dUnifize, fMRIPrep's call, ds000005 BOLD reference (64 × 64 × 34) | 93.3 | 39.4 | **3.8** | 21.6 | 8.7 | **0.94** |
+| 3dUnifize, fMRIPrep's call, ds005454 BOLD reference (160 × 160 × 96, half-size path) | 18.7 | 13.3 | **4.6** | 7.5 | 4.9 | **1.2** |
+| 3dUnifize, a T1w, ds000005 (half-size path) | 67.1 | 35.4 | **9.3** | 23.6 | 14.9 | **2.7** |
+| 3dAutomask, fMRIPrep's call, ds005454 BOLD reference | 1.6 | 1.9 | 1.7 | – | 1.9 | **0.72** |
+| 3dAutomask, a BOLD series, ds005040 | 0.39 | 0.25 | 0.22 | – | 0.24 | 0.19 |
+
+3dUnifize's original is 4 to 25 times faster than AFNI at the same thread count, and 3 to 10
+times faster than the replica (its ball percentiles by a sliding window of ranks instead of a
+sort at every voxel); on the half-size path the ball works on an eighth of the voxels, and
+reading and writing the full-size compressed images takes a larger share of the time. 3dAutomask's time is
+mostly reading and writing compressed NIfTI: the three programs are within a few tenths of a
+second, the original faster at 6 threads.

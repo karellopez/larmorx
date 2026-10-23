@@ -34,7 +34,7 @@ line, standard error, every file), most against the unmodified binary, the rest 
 |---|---|---|---|---|---|---|
 | standard | 505 | 347 | 44 | 93 | 21 | 0 |
 | full (A5 part 2's run) | 441 | 278 | 68 | 77 | 18 | 0 |
-| full, the velocity-field cases ([record](../validation/ants-registration-velocity-full.md)) | see the record | | | | | |
+| full, A5 part 3's cases ([record](../validation/ants-registration-velocity-full.md)) | 124 | 77 | 26 | 16 | 5 | 0 |
 
 The standard record was re-run by A5 part 3 (2026-10-23, from `a9401a6`) with the
 velocity-field cases (the `exponential`, `bspline-exponential`, `time-varying` and
@@ -51,8 +51,10 @@ ANTS-72; a mesh size of 0, ANTS-77); and `syn/exponential`, an expected divergen
 larmorx refused the stage, is now compared (identical to the unmodified ANTs). Its fix pass shows
 each correction of this part. The full tier's new cases (4D, the other four oracle runs on every
 third voxel, the exponential stages at full size) ran separately, beside it
-([record](../validation/ants-registration-velocity-full.md));
-the full record above is A5 part 2's. What the corrections change is measured in
+([record](../validation/ants-registration-velocity-full.md)): all 124 agree, and every real case
+(each velocity-field stage on the five oracle runs on every third voxel, `Exponential` and
+`BSplineExponential` on ds000005 at full size) is identical to ANTs with CORE-MATH; the
+other full record is A5 part 2's run. What the corrections change is measured in
 [ants-registration-corrections](../validation/ants-registration-corrections.md) (19 cases).
 The standard record was re-run by A5 part 2 (2026-10-20, from `9a4d65a`) with the B-spline and
 displacement-field cases (the `bspline-syn`, `displacement-field` and `bspline` categories: every

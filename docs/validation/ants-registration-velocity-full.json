@@ -1,0 +1,1992 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "a9401a69f759",
+  "larmorx_testdata_commit": "00b862132e9c",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42",
+ "results": [
+  {
+   "case": "exponential/meansquares",
+   "category": "exponential",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584,
+    "thread band": "0"
+   },
+   "seconds": 3.144,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/no-collapse",
+   "category": "exponential",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 350
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.952,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/short-name",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 162792
+   },
+   "seconds": 1.838,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/collapse",
+   "category": "exponential",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 350
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.408,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/composite",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 350
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.889,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/integration-steps",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.746,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/sigmas-in-mm",
+   "category": "exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.101,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/cc",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.988,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/mattes",
+   "category": "exponential",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 182,
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 2.019,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/mi2",
+   "category": "exponential",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 182,
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 2.206,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/gc",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.194,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/demons",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.227,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/multi",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 2.4,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/masks",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.004,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/float",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 1.022,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/2d",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6384
+   },
+   "seconds": 0.193,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/4d",
+   "category": "exponential",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.059,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/oblique",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.379,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/restrict",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 217056
+   },
+   "seconds": 1.055,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/initial-field",
+   "category": "exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.804,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/per-stage",
+   "category": "exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.49,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/then-affine",
+   "category": "exponential",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "the affine stage after a displacement field samples its scales' 1000 voxels from the clock (ANTS-72): two ANTs runs differ",
+   "seconds": 2.372,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "exponential/regular-sampling",
+   "category": "exponential",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "the stage never sets its metric's sampling seed (ANTS-82): ANTs samples from the clock, two runs differ; larmorx samples with the registration's seed",
+   "seconds": 0.746,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "exponential/icp-second",
+   "category": "exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.341,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/print-similarity",
+   "category": "exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.279,
+   "status": "both-error"
+  },
+  {
+   "case": "exponential/interval-volumes",
+   "category": "exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.323,
+   "status": "both-error"
+  },
+  {
+   "case": "exponential/save-state",
+   "category": "exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "        because the the output transform will contain the this processes initializer",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "exponential/zero-iterations",
+   "category": "exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "Description: ITK ERROR: ConstantVelocityFieldTransform(0x61cf07d5b680): No displacement field is specified.",
+   "seconds": 0.174,
+   "status": "both-error"
+  },
+  {
+   "case": "exponential/zero-iterations-prefix",
+   "category": "exponential",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.191,
+   "status": "pass"
+  },
+  {
+   "case": "exponential/icp-first",
+   "category": "exponential",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: antsRegistration: an Exponential stage whose first metric is a point-set metric: ANTs allocates the velocity field on the null image of its first metric; ANTs crashes here, larmorx stops",
+   "seconds": 0.053,
+   "status": "both-error"
+  },
+  {
+   "case": "exponential/missing-parameter",
+   "category": "exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unable to convert '' to type 'f' as float",
+   "seconds": 0.023,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-exponential/meansquares",
+   "category": "bspline-exponential",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160,
+    "thread band": "0"
+   },
+   "seconds": 4.556,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/velocity-mesh",
+   "category": "bspline-exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 3.654,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/knot-spacing",
+   "category": "bspline-exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 2.235,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/cc",
+   "category": "bspline-exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 3.141,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/float",
+   "category": "bspline-exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 1.944,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/2d",
+   "category": "bspline-exponential",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 173
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 7040
+   },
+   "seconds": 0.168,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/4d",
+   "category": "bspline-exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 253440
+   },
+   "seconds": 3.088,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/masks",
+   "category": "bspline-exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 2.09,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/order-2",
+   "category": "bspline-exponential",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 380160
+   },
+   "seconds": 1.503,
+   "status": "pass"
+  },
+  {
+   "case": "bspline-exponential/mesh-dimension",
+   "category": "bspline-exponential",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.109,
+   "status": "both-error"
+  },
+  {
+   "case": "bspline-exponential/random-sampling",
+   "category": "bspline-exponential",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "the stage never sets its metric's sampling seed (ANTS-82): ANTs samples from the clock, two runs differ; larmorx samples with the registration's seed",
+   "seconds": 1.588,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "time-varying/meansquares",
+   "category": "time-varying",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 31.093,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/short-name",
+   "category": "time-varying",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 14.304,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/collapse",
+   "category": "time-varying",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 17.623,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/composite",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 18.646,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/cc",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 20.907,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/mattes",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 14.982,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/multi",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 18.801,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/masks",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 13.475,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/float",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 16.683,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/2d",
+   "category": "time-varying",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.528,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/4d",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.565,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/one-time-index",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.322,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/restrict",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 15.117,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/two-stages",
+   "category": "time-varying",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 343
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 651167
+   },
+   "seconds": 31.803,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/then-syn",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 343
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 18.601,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/per-stage",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 346
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 17.418,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/fixed-initial",
+   "category": "time-varying",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 182
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 325584
+   },
+   "seconds": 9.49,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/print-similarity",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 178
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 11.928,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/icp-second",
+   "category": "time-varying",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.149,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying/regular-sampling",
+   "category": "time-varying",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "the stage never sets its metric's sampling seed (ANTS-82): ANTs samples from the clock, two runs differ; larmorx samples with the registration's seed",
+   "seconds": 10.46,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "time-varying/zero-iterations-prefix",
+   "category": "time-varying",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 174
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.269,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying/zero-iterations",
+   "category": "time-varying",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ITK-41 (ITK) reproduced: stage 0: the time-varying velocity field transform never integrated its velocity field: ITK crashes at the next use of the transform [LARMORX_UPSTREAM",
+   "seconds": 0.104,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying/zero-time-indices",
+   "category": "time-varying",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: antsRegistration: a TimeVaryingVelocityField stage with 0 time indices: ANTs divides the velocity field's voxels by 0; ANTs crashes here, larmorx stops",
+   "seconds": 0.08,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying/icp-first",
+   "category": "time-varying",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "larmorx: antsRegistration: a TimeVaryingVelocityField stage whose first metric is a point-set metric: ANTs allocates the velocity field on the null image of its first metric; ANTs crashes here, larmor",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying/missing-parameter",
+   "category": "time-varying",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "ERROR: Unable to convert '' to type 'f' as float",
+   "seconds": 0.028,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying-bspline/meansquares",
+   "category": "time-varying-bspline",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0"
+   },
+   "seconds": 75.525,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/float",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 49.896,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/2d",
+   "category": "time-varying-bspline",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 173
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.405,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/4d",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 184
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 12.636,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/masks",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 181
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 36.07,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/fixed-mask-oblique",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 180
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 41.182,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/cc",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 43.716,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/multi",
+   "category": "time-varying-bspline",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 180,
+    "unmodified ANTs: standard output": 180
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: r0InverseWarp.nii.gz": null,
+    "unmodified ANTs: r0Warp.nii.gz": null
+   },
+   "seconds": 68.394,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/order-2",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 18.933,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/samples-2",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 14.885,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/samples-1",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 8.034,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/oblique",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 35.514,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/restrict",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 35.374,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/interval-volumes",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 20.623,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/per-stage",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 349
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 22.803,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/zero-iterations",
+   "category": "time-varying-bspline",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 177
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 13.676,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/icp",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 106
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 43675
+   },
+   "seconds": 6.935,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/pse",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 102
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 41944
+   },
+   "seconds": 4.401,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/jhct",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 102
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 42373
+   },
+   "seconds": 4.186,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/igdm",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 99
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 45749
+   },
+   "seconds": 3.724,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/cc-and-icp",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 183
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 38692
+   },
+   "seconds": 5.416,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/meansquares-icp-cc",
+   "category": "time-varying-bspline",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 186
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 36635
+   },
+   "seconds": 5.585,
+   "status": "pass"
+  },
+  {
+   "case": "time-varying-bspline/icp-ras",
+   "category": "time-varying-bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.247,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying-bspline/icp-then-cc",
+   "category": "time-varying-bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.184,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying-bspline/mesh-dimension",
+   "category": "time-varying-bspline",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 0.085,
+   "status": "both-error"
+  },
+  {
+   "case": "time-varying-bspline/mesh-0",
+   "category": "time-varying-bspline",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs computes control-point spacings of infinity, prints vnl's SVD warnings and fails with an exception on a parametric domain of no span (ANTS-77); larmorx stops with an error after the same messages",
+   "seconds": 0.136,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "corrections/igdm-k-neighbourhood",
+   "category": "corrections",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 117
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.653,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/igdm-true-gradient",
+   "category": "corrections",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 117
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.512,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/igdm-same-sets",
+   "category": "corrections",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 110
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 0.197,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/jhct-isotropic-sigma-2",
+   "category": "corrections",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 120,
+    "unmodified ANTs: standard output": 120
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 8,
+    "unmodified ANTs: r0GenericAffine.mat": null
+   },
+   "seconds": 3.815,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/jhct-anisotropic",
+   "category": "corrections",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 120
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 3.069,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/bspline-then-affine",
+   "category": "corrections",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 352
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 6.872,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/bspline-then-bspline",
+   "category": "corrections",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "1",
+   "seconds": 10.268,
+   "status": "both-error"
+  },
+  {
+   "case": "corrections/initial-bspline-then-rigid",
+   "category": "corrections",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 191
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.07,
+   "status": "pass"
+  },
+  {
+   "case": "corrections/bspline-field-coarse",
+   "category": "corrections",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 185
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 190080
+   },
+   "seconds": 11.361,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential-small/ds000005-sub-01/template",
+   "category": "real-exponential-small",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 862
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1786050,
+    "thread band": "0.113",
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 820,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 585.638,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential/ds000005-sub-01/template",
+   "category": "real-exponential",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 783
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 49687102,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 782,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 11172.138,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential-small/ds000005-sub-01/template",
+   "category": "real-bspline-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 904
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1867776,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 859,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 565.22,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential/ds000005-sub-01/template",
+   "category": "real-bspline-exponential",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 819
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 50429468,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 819,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 12996.304,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-small/ds000005-sub-01/template",
+   "category": "real-time-varying-small",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 988
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "thread band": "0.265",
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 946,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 5528.401,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-bspline-small/ds000005-sub-01/template",
+   "category": "real-time-varying-bspline-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 915
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 872,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 5275.617,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential-small/ds001600-sub-1/template",
+   "category": "real-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 886
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1786050,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 841,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 324.28,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential-small/ds001600-sub-1/template",
+   "category": "real-bspline-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 927
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1867776,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 882,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 371.213,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-small/ds001600-sub-1/template",
+   "category": "real-time-varying-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 1011
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 967,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 2183.592,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-bspline-small/ds001600-sub-1/template",
+   "category": "real-time-varying-bspline-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 962
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 915,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 4252.758,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential-small/ds005040-sub-002/template",
+   "category": "real-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 840
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1786048,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 836,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 378.018,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential-small/ds005040-sub-002/template",
+   "category": "real-bspline-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 886
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1867776,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 883,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 430.736,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-small/ds005040-sub-002/template",
+   "category": "real-time-varying-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 965
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 961,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 2173.823,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-bspline-small/ds005040-sub-002/template",
+   "category": "real-time-varying-bspline-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 922
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 921,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 4146.785,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential-small/ds005454-sub-16/template",
+   "category": "real-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 891
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1786048,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 924,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 352.166,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential-small/ds005454-sub-16/template",
+   "category": "real-bspline-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 939
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1867776,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 972,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 398.317,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-small/ds005454-sub-16/template",
+   "category": "real-time-varying-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 1009
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 1047,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 2202.207,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-bspline-small/ds005454-sub-16/template",
+   "category": "real-time-varying-bspline-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 974
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 1008,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 4160.702,
+   "status": "pass"
+  },
+  {
+   "case": "real-exponential-small/ds005752-sub-ON01016/template",
+   "category": "real-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 810
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1786050,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 807,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 376.016,
+   "status": "pass"
+  },
+  {
+   "case": "real-bspline-exponential-small/ds005752-sub-ON01016/template",
+   "category": "real-bspline-exponential-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 854
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1867776,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 851,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 398.279,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-small/ds005752-sub-ON01016/template",
+   "category": "real-time-varying-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 936
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 933,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 2130.952,
+   "status": "pass"
+  },
+  {
+   "case": "real-time-varying-bspline-small/ds005752-sub-ON01016/template",
+   "category": "real-time-varying-bspline-small",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "ANTs with CORE-MATH: standard output": 849
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "unmodified ANTs: ants_t1_to_mni_Warped.nii.gz": null,
+    "unmodified ANTs: standard output": 846,
+    "unmodified ANTs: transformComposite.h5": null,
+    "unmodified ANTs: transformInverseComposite.h5": null
+   },
+   "seconds": 3866.913,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-registration",
+ "summary": {
+  "both-error": 16,
+  "expected-divergence": 5,
+  "fail": 0,
+  "pass": 103,
+  "skipped": 0
+ },
+ "tier": "full"
+}

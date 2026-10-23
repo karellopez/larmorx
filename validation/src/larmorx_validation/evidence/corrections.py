@@ -140,6 +140,26 @@ RUNS = (
 )  # fmt: skip
 
 
+def _crosshair(ex, spec: Spec, first: str) -> list[int]:
+    """The default view's voxel: where the correction changes the first output most, within
+    ``spec.focus`` (or the shown region away from its edge); among equal changes (a mask's 0
+    and 1), the one nearest their centre, so the view is not at the region's first corner."""
+    from scipy import ndimage
+
+    va = ex.values(ex.key("larmorx", first))
+    vb = ex.values(ex.key("larmorx-reproduce", first))
+    if spec.focus is not None:
+        region = (ex.disp(spec.focus().astype(np.float32)) > 0.5) & ex.m
+    else:
+        inner = ndimage.binary_erosion(ex.m, iterations=2)
+        region = inner if inner.any() else ex.m
+    dv = np.where(region, np.abs(va.astype(np.float64) - vb), -1.0)
+    top = np.argwhere(dv == dv.max())
+    centre = top.mean(axis=0)
+    best = top[int(np.argmin(((top - centre) ** 2).sum(axis=1)))]
+    return [int(v) for v in best]
+
+
 def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
     """The worked example of ``spec``'s correction (its cache entry computed if missing)."""
     import nibabel as nib
@@ -224,14 +244,7 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example."
-    if spec.focus is not None:
-        fm = ex.disp(spec.focus().astype(np.float32)) > 0.5
-        va = ex.values(ex.key("larmorx", first))
-        vb = ex.values(ex.key("larmorx-reproduce", first))
-        dv = np.where(fm & ex.m, np.abs(va - vb), -1.0)
-        at = [int(v) for v in np.unravel_index(int(np.argmax(dv)), dv.shape)]
-    else:
-        at, _k = common.largest_in_slice(ex, "larmorx", "larmorx-reproduce", first)
+    at = _crosshair(ex, spec, first)
     inputs = [k for k, _l, _s in spec.panels]
     default = {
         "output": first,

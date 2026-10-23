@@ -843,16 +843,28 @@ def _example(ctx: core.Context, move: str) -> dict:
                     "the lengths of the pairs' displacements"
                 )
             rotation = " For a rotation ANTs keeps no landmark (the next example)."
-            x["reason"] = (
-                f"{', '.join(fix_named)} corrected by default: "
-                f"{'; '.join(why) or 'see the register'}. Here larmorx keeps "
-                f"{len(lx_fix['landmarks'])} landmarks of {len(lx_fix['pairs'])} pairs and ANTs "
-                f"{len(ants['landmarks'])} of {len(ants['pairs'])}; larmorx's transform is "
-                f"{d_fix:.2g} mm off the truth at most, ANTs' {d_ants:.2g} mm (the tables below)."
-                + (rotation if move == "shift" else "")
-                if fix_named
-                else "Not accounted for by the other runs of this example."
+            counts = (
+                f"larmorx keeps {len(lx_fix['landmarks'])} landmarks of {len(lx_fix['pairs'])} "
+                f"pairs and ANTs {len(ants['landmarks'])} of {len(ants['pairs'])}"
             )
+            if fix_named and same_img[i]:
+                # the correction changes the pairs and landmarks, not where the copy lands
+                x["verdict"] = "bit-identical"
+                x["reason"] = (
+                    "The same placed image: both transforms send the copy where the truth does "
+                    f"({d_fix:.2g} and {d_ants:.2g} mm off at most). {', '.join(fix_named)}, "
+                    f"corrected by default, changes the pairs and landmarks: {counts} (the "
+                    f"tables below); {'; '.join(why)}." + (rotation if move == "shift" else "")
+                )
+            else:
+                x["reason"] = (
+                    f"{', '.join(fix_named)} corrected by default: "
+                    f"{'; '.join(why) or 'see the register'}. Here {counts}; larmorx's transform "
+                    f"is {d_fix:.2g} mm off the truth at most, ANTs' {d_ants:.2g} mm (the tables "
+                    "below)." + (rotation if move == "shift" else "")
+                    if fix_named
+                    else "Not accounted for by the other runs of this example."
+                )
             x["links"] = [
                 {"label": k, "href": "docs/findings/ants-ai.md#blobs"}
                 for k in ("ANTS-110", "ANTS-116")

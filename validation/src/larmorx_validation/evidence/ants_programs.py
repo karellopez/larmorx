@@ -663,6 +663,8 @@ def _a17_spec(ctx: core.Context):
         effect=effect,
         settings="ImageMath ME with radius 1 and value 2 on fMRIPrep 25.2.6's dseg of ds000005 "
         "sub-01 (no fMRIPrep node: fMRIPrep erodes binary masks only)",
+        focus=lambda: common.load(str(run / DSEG)) == 1,
+        focus_text="in the grey matter, which ANTs' output keeps as 1",
     )
 
 

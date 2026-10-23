@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "50509e30b3e8",
-  "larmorx_testdata_commit": "00b862132e9c",
+  "larmorx_commit": "6bf2860fb745",
+  "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -22,8 +22,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 5.581,
+   "reported": {
+    "D13 fix pass": 78066,
+    "corrected: 1 - NCC vs ANTs' thread band": "5.35e-14",
+    "corrected: bit-identical to ANTs as built": 69747,
+    "corrected: max |diff| vs ANTs' thread band": "0.00061"
+   },
+   "seconds": 16.587,
    "status": "pass"
   },
   {
@@ -32,8 +45,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 17.441,
+   "reported": {
+    "D13 fix pass": 468307,
+    "corrected: 1 - NCC vs ANTs' thread band": "0",
+    "corrected: bit-identical to ANTs as built": 467120,
+    "corrected: max |diff| vs ANTs' thread band": "0.00439"
+   },
+   "seconds": 47.432,
    "status": "pass"
   },
   {
@@ -42,8 +68,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999995",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 214.776,
+   "reported": {
+    "D13 fix pass": 5440097,
+    "corrected: 1 - NCC vs ANTs' thread band": "4.82e-10",
+    "corrected: bit-identical to ANTs as built": 5413547,
+    "corrected: max |diff| vs ANTs' thread band": "0.241"
+   },
+   "seconds": 468.641,
    "status": "pass"
   },
   {
@@ -52,8 +91,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 135.163,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 265.801,
    "status": "pass"
   },
   {
@@ -62,8 +111,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 58.169,
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 79.428,
    "status": "pass"
   },
   {
@@ -72,8 +135,28 @@
    "checks_passed": 20,
    "checks_total": 20,
    "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999787",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "0.9999999999",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 277.202,
+   "reported": {
+    "D13 fix pass": 6592706,
+    "bias field: 1 - NCC vs ANTs' thread band": "2.13e-08",
+    "bias field: bit-identical to ANTs as built": 5898130,
+    "bias field: max |diff| vs ANTs' thread band": "7.86e-05",
+    "corrected: 1 - NCC vs ANTs' thread band": "1.25e-10",
+    "corrected: bit-identical to ANTs as built": 694333,
+    "corrected: max |diff| vs ANTs' thread band": "0.0501"
+   },
+   "seconds": 651.569,
    "status": "pass"
   },
   {
@@ -82,8 +165,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 4.339,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 9.974,
    "status": "pass"
   },
   {
@@ -92,8 +185,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 5.316,
+   "reported": {
+    "D13 fix pass": 160477,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 12.219,
    "status": "pass"
   },
   {
@@ -102,8 +205,28 @@
    "checks_passed": 20,
    "checks_total": 20,
    "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999952",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "0.9999999999",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 587.461,
+   "reported": {
+    "D13 fix pass": 18273264,
+    "bias field: 1 - NCC vs ANTs' thread band": "4.83e-09",
+    "bias field: bit-identical to ANTs as built": 11508335,
+    "bias field: max |diff| vs ANTs' thread band": "0.000274",
+    "corrected: 1 - NCC vs ANTs' thread band": "6.92e-11",
+    "corrected: bit-identical to ANTs as built": 6707886,
+    "corrected: max |diff| vs ANTs' thread band": "0.452"
+   },
+   "seconds": 981.819,
    "status": "pass"
   },
   {
@@ -112,8 +235,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.558,
+   "reported": {
+    "D13 fix pass": 171688,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.808,
    "status": "pass"
   },
   {
@@ -122,8 +259,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 82.554,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "5.77e-14",
+    "corrected: bit-identical to ANTs as built": 517729,
+    "corrected: max |diff| vs ANTs' thread band": "0.000244"
+   },
+   "seconds": 205.386,
    "status": "pass"
   },
   {
@@ -132,8 +282,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.231,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.745,
    "status": "pass"
   },
   {
@@ -142,8 +302,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.765,
+   "reported": {
+    "D13 fix pass": 46675,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.862,
    "status": "pass"
   },
   {
@@ -152,8 +326,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.698,
+   "reported": {
+    "D13 fix pass": 10840,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.533,
    "status": "pass"
   },
   {
@@ -162,8 +346,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.68,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.266,
    "status": "pass"
   },
   {
@@ -172,8 +366,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.069,
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.915,
    "status": "pass"
   },
   {
@@ -182,8 +390,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999838",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 2.23,
+   "reported": {
+    "D13 fix pass": 10834,
+    "corrected: 1 - NCC vs ANTs' thread band": "1.62e-08",
+    "corrected: bit-identical to ANTs as built": 10838,
+    "corrected: max |diff| vs ANTs' thread band": "0.0612"
+   },
+   "seconds": 11.867,
    "status": "pass"
   },
   {
@@ -192,8 +413,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 89.568,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "4.44e-15",
+    "corrected: bit-identical to ANTs as built": 33414,
+    "corrected: max |diff| vs ANTs' thread band": "0.000122"
+   },
+   "seconds": 154.445,
    "status": "pass"
   },
   {
@@ -202,8 +436,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999965",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 5.334,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "3.54e-09",
+    "corrected: bit-identical to ANTs as built": 35840,
+    "corrected: max |diff| vs ANTs' thread band": "0.133"
+   },
+   "seconds": 9.011,
    "status": "pass"
   },
   {
@@ -212,8 +459,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 83.489,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "4.44e-15",
+    "corrected: bit-identical to ANTs as built": 33414,
+    "corrected: max |diff| vs ANTs' thread band": "0.000122"
+   },
+   "seconds": 119.515,
    "status": "pass"
   },
   {
@@ -222,8 +482,28 @@
    "checks_passed": 20,
    "checks_total": 20,
    "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999997972",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "0.9999999996",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 11.662,
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: 1 - NCC vs ANTs' thread band": "2.03e-07",
+    "bias field: bit-identical to ANTs as built": 35827,
+    "bias field: max |diff| vs ANTs' thread band": "0.00427",
+    "corrected: 1 - NCC vs ANTs' thread band": "3.82e-10",
+    "corrected: bit-identical to ANTs as built": 35824,
+    "corrected: max |diff| vs ANTs' thread band": "0.0275"
+   },
+   "seconds": 18.683,
    "status": "pass"
   },
   {
@@ -232,8 +512,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999458",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 7.788,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "5.42e-08",
+    "corrected: bit-identical to ANTs as built": 35838,
+    "corrected: max |diff| vs ANTs' thread band": "1.49"
+   },
+   "seconds": 12.447,
    "status": "pass"
   },
   {
@@ -242,8 +535,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.247,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.815,
    "status": "pass"
   },
   {
@@ -252,8 +555,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.025,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.663,
    "status": "pass"
   },
   {
@@ -262,8 +575,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.28,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.364,
    "status": "pass"
   },
   {
@@ -272,8 +595,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.25,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.318,
    "status": "pass"
   },
   {
@@ -282,8 +615,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.321,
+   "reported": {
+    "D13 fix pass": 35840,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.425,
    "status": "pass"
   },
   {
@@ -292,8 +635,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.351,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.522,
    "status": "pass"
   },
   {
@@ -302,8 +655,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.406,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.615,
    "status": "pass"
   },
   {
@@ -312,8 +675,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.428,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.63,
    "status": "pass"
   },
   {
@@ -322,8 +695,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.211,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.305,
    "status": "pass"
   },
   {
@@ -332,8 +715,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.25,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.366,
    "status": "pass"
   },
   {
@@ -342,8 +735,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.27,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.366,
    "status": "pass"
   },
   {
@@ -352,8 +755,52 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999945",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 3.119,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "5.47e-09",
+    "corrected: bit-identical to ANTs as built": 35836,
+    "corrected: max |diff| vs ANTs' thread band": "0.11"
+   },
+   "seconds": 7.748,
+   "status": "pass"
+  },
+  {
+   "case": "inputs/zero-background-known",
+   "category": "inputs",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "bias field: NCC with ANTs as built": "0.9999999981",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 46622,
+    "bias field: 1 - NCC vs ANTs' thread band": "1.92e-09",
+    "bias field: bit-identical to ANTs as built": 35840,
+    "bias field: max |diff| vs ANTs' thread band": "8.7e-06",
+    "corrected: 1 - NCC vs ANTs' thread band": "1.88e-13",
+    "corrected: bit-identical to ANTs as built": 10782,
+    "corrected: max |diff| vs ANTs' thread band": "0.000389"
+   },
+   "seconds": 6.461,
    "status": "pass"
   },
   {
@@ -362,8 +809,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.384,
+   "reported": {
+    "D13 fix pass": 35838,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.72,
    "status": "pass"
   },
   {
@@ -372,8 +829,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.22,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.249,
    "status": "pass"
   },
   {
@@ -382,8 +849,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.191,
+   "reported": {
+    "D13 fix pass": 7680,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.189,
    "status": "pass"
   },
   {
@@ -392,8 +869,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999999",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.874,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "5.69e-11",
+    "corrected: bit-identical to ANTs as built": 35840,
+    "corrected: max |diff| vs ANTs' thread band": "0.0402"
+   },
+   "seconds": 1.231,
    "status": "pass"
   },
   {
@@ -402,8 +892,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.379,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.54,
    "status": "pass"
   },
   {
@@ -412,8 +912,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.354,
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.504,
    "status": "pass"
   },
   {
@@ -422,8 +936,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999844",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 1.659,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "1.56e-08",
+    "corrected: bit-identical to ANTs as built": 1280,
+    "corrected: max |diff| vs ANTs' thread band": "0.2"
+   },
+   "seconds": 2.519,
    "status": "pass"
   },
   {
@@ -432,8 +959,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 2.098,
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.94,
    "status": "pass"
   },
   {
@@ -442,8 +983,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.228,
+   "reported": {
+    "D13 fix pass": 4480,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.223,
    "status": "pass"
   },
   {
@@ -452,8 +1003,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 0.171,
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.216,
    "status": "pass"
   },
   {
@@ -462,8 +1023,21 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 4 threads and 1 thread give the same bits": "True"
+   },
    "reason": "",
-   "seconds": 5.75,
+   "reported": {
+    "D13 fix pass": 56146,
+    "corrected: 1 - NCC vs ANTs' thread band": "2.4e-13",
+    "corrected: bit-identical to ANTs as built": 53416,
+    "corrected: max |diff| vs ANTs' thread band": "0.00165"
+   },
+   "seconds": 7.709,
    "status": "pass"
   },
   {
@@ -473,7 +1047,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.046,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -482,8 +1056,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs exit -6: \"s/antsCommandLineParser.h:133:\\nITK ERROR: CommandLineParser(0x5924ed7c9da0): ERROR: Parse error occured during command line argument processing\\nERROR: Unable to convert '2.5' to type 'i' as signed int\"; larmorx exit 1: \"larmorx: N4BiasFieldCorrection: ERROR: Unable to convert '2.5' for --shrink-factor (ANTs aborts: the parser throws)\"",
-   "seconds": 0.044,
+   "reason": "ANTs exit -6: \"s/antsCommandLineParser.h:133:\\nITK ERROR: CommandLineParser(0x5bcba1094da0): ERROR: Parse error occured during command line argument processing\\nERROR: Unable to convert '2.5' to type 'i' as signed int\"; larmorx exit 1: \"larmorx: N4BiasFieldCorrection: ERROR: Unable to convert '2.5' for --shrink-factor (ANTs aborts: the parser throws)\"",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -493,7 +1070,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: 'Unsupported dimension'; larmorx exit 1: 'Unsupported dimension'",
-   "seconds": 0.026,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -503,7 +1083,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit -11: 'file <tmp>/none.nii.gz does not exist .'; larmorx exit 1: 'file <tmp>/none.nii.gz does not exist . \\nlarmorx: N4BiasFieldCorrection: cannot read the input image (ANTs crashes here)'",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -513,7 +1096,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: ''; larmorx exit 1: ''",
-   "seconds": 0.024,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -523,7 +1109,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit -6: 't occupy the same physical space! \\nInputImage Origin: [2.1000000e+01, 3.0000000e+01, -2.0000000e+01], InputImagePrimary Origin: [2.4000000e+01, 3.0000000e+01, -2.0000000e+01]\\n\\tTolerance: 1.5000000e-06'; larmorx exit 1: \"larmorx: N4BiasFieldCorrection: the mask is not on the image's grid (ITK: Inputs do not occupy the same physical space!; ANTs aborts)\"",
-   "seconds": 0.024,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.028,
    "status": "both-error"
   }
  ],
@@ -532,7 +1121,7 @@
   "both-error": 5,
   "expected-divergence": 0,
   "fail": 0,
-  "pass": 46,
+  "pass": 47,
   "skipped": 0
  },
  "tier": "standard"

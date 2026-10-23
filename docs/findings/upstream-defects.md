@@ -206,7 +206,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | PIPE-13 | sMRIPrep | the report text prints a module | f | every report | – | – |
 | PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
-| PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect | decide |
+| PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect; decided 2026-10-21: larmorprepx keeps N4's float32 result, `reproduce` fMRIPrep's int16 | – (larmorprepx) |
 | PIPE-17 | nitransforms | the first group of an `.h5` file skipped as if it were the composite: one transform fails, a list without a composite loses its first, an empty composite fails | c | none (fMRIPrep's composites) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
@@ -322,8 +322,7 @@ switch); A5 part 3 (the velocity-field stages, `antsApplyTransforms` with B-spli
 2026-10-22) corrected them, each with its measured effect ([ants-velocity.md](ants-velocity.md)),
 and added ANTS-79 to ANTS-82 and ITK-36 to ITK-42: every class (c) and (e) one corrected by
 default with a switch, ITK-41 (class (a)) completed by default and refused where ANTs crashes,
-ANTS-82 (class (b)) not reproduced. The gap column now has 19 **decide** (recounted
-2026-10-22), 1 rule 8 and 1 open.
+ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). The gap column now has 14 **decide** (recounted 2026-10-23, after A5 part 3 and A6 were merged; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -2643,8 +2642,9 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **larmorx:** not a tool defect: `larmorx ants N4BiasFieldCorrection` writes float32, as ANTs
   does. The stage comparison runs nipype's own `copy_header` on every run before comparing
   (`larmorx_validation.stages.nodes._NipypePost`).
-- **D13 / gap:** **decide** for larmorprepx: keep N4's float32 output (the default larmorprepx
-  would take), or write the input's type as fMRIPrep does.
+- **D13 / gap:** decided by the user on 2026-10-21 (decision log): larmorprepx keeps N4's
+  float32 output by default; `reproduce` writes the input's type as fMRIPrep does. To implement
+  with larmorprepx.
 
 ### PIPE-17 nitransforms skips the first group of an `.h5` file — (c)
 - **What:** `ITKCompositeH5.from_h5obj` reads `list(h5group.values())[1:]`, assuming group `0` is

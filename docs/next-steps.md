@@ -58,17 +58,26 @@ starts no other agent.
    3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority). Check each source file's licence:
    NIH public-domain files get one Apache replica; MCW (GPL) files a replica in `larmorx-gpl`
    and a clean-room original from a spec.
-6. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
+6. **The evidence infrastructure** (decision log 2026-10-23), after the two parts now running:
+   **the data panel** (one agreed set of shareable datasets used by every tool: 3T and 7T,
+   multiband and single-band, children and older adults, a lesion, low quality and motion; in
+   `larmorx-testdata` with its licences and hash-verified downloads); **differential random
+   testing** (a shared harness that generates random valid command lines and inputs per tool and
+   compares with the original, overnight on this machine, never in CI; then every finished
+   tool); **generated tables** (the README's tool table, the validation index and the site's
+   status table from one description per tool and its records). Then every finished tool is
+   re-validated on the panel, with its evidence page updated.
+7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each.
-7. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
+8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
    as a clean-room original with its atlas fetched on first use, its data packaged apart from the
    wheels; `docs/licensing.md`); pretrained models as Rust inference with the original weights
    (decision log 2026-10-19); Connectome Workbench- and MSM-compatible surface tools; the
    confounds (CompCor, DVARS, framewise displacement, ...).
-8. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
-9. **Releases on PyPI** (below).
+9. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
+10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
 
@@ -88,6 +97,11 @@ starts no other agent.
   its band per option and synthetic case would classify them.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
+- **A run-to-run variation of ANTs** (found by the orchestrator re-running A5 part 3's
+  `ants-registration-corrections` record, 2026-10-23): the reference "ANTs with the B-spline
+  transform as a displacement field" before a linear stage gave different results in two runs
+  at one thread with a fixed seed (3.75 mm, then 4.70 mm); larmorx's side identical. Assigned to
+  the `antsAI -b` part; the site's antsRegistration page says the reference varies.
 - **ANTS-106 in Atropos** (decided 2026-10-22): partial-volume classes with an MRF, a
   partial-volume label counting as a member of its own set; `reproduce` keeps ANTs' stop; parity
   in `reproduce` plus a fix pass, phantoms with known mixtures, golden case, the site's Atropos
@@ -139,6 +153,17 @@ Still to do:
   deflate (one to two days) would make them match the oracle's build only. Skipped for now.
 
 ## Waiting for the user
+
+- **14 older questionable behaviours** in the defect register (marked **decide** since the
+  register began, 2026-10-11; never put to the user until 2026-10-23). Proposed, by group:
+  - **ANTs and ITK tools already ported** (ANTS-17, -22, -23, -32, -40, -44, ITK-06): the usual
+    rule (corrected by default, `reproduce` gives the original); ANTS-40 (N4 with zero and
+    negative voxels; fMRIPrep's unmasked N4s) and ITK-06 (NaN and infinities read as 0)
+    measured first.
+  - **fMRIPrep's pipeline** (PIPE-01, -05, -07, -08): decided when larmorprepx is built, by the
+    same rule (the intended behaviour by default, fMRIPrep's on request).
+  - **nibabel** (NIB-01, -02, -03): larmorx already does the safer thing (compression from the
+    content, a zero header offset refused, complex data refused); keep it and mark them decided.
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).

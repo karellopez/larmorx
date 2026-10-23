@@ -1073,6 +1073,34 @@ developers and filed by the user. Crashes, races and nondeterminism are never th
 get a switch where they are reproducible; where it is unclear whether a behaviour is a defect,
 the user decides (D13, 2026-10-11).
 
+## 2026-10-23: How strong evidence is made and kept consistent
+
+**Proposed by the user and agreed** ("Should we make the rule to isolated agents docs, so at the
+end the main agent just merge?"; then, on the orchestrator's recommendations, "Perfect. Let's do
+that"; the goal in the user's words: "reliable programs replicas, clean room, and very very
+strong evidence"):
+1. **Agents write only their own files**; the shared documents (README, the defect register and
+   its API page, the validation index, golden.md, licensing, next-steps, the decision log,
+   CLAUDE.md, the site's status, navigation, Validation page and summary) are written by the
+   orchestrator alone, from each agent's `HANDOFF.md`, and harmonized at every merge (the
+   register's history and counts, the open decisions listed for the user). Each agent gets its
+   own range of defect IDs. Code that must change for a tool to work (registries, stubs,
+   golden checksums) stays in the agent's branch; golden checksums are re-recorded from the
+   merge.
+2. **Generated tables:** the README's tool table, the validation index and the site's status
+   table are to be generated from one description per tool and its records, never edited by
+   hand (a task).
+3. **A fixed data panel** for every tool: one agreed set of shareable datasets covering
+   scanners and field strengths (3T, 7T), multiband and single-band, children and older adults,
+   a lesion, low quality and motion; every tool validated and shown on it (a task).
+4. **Differential random testing:** for every tool a generator of random valid command lines
+   and inputs, run against the original overnight on the Linux machine (never in CI), every
+   difference reported (a task: the shared harness, then each tool, the finished ones first).
+5. **An independent review before merging large ports** (registration, FSL, FreeSurfer): a fresh
+   agent compares the port with the source (replicas) or the spec (clean-room originals) for
+   missed options and behaviours, and checks that a clean-room original was not derived from
+   its replica.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

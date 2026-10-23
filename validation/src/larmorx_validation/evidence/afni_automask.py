@@ -656,6 +656,13 @@ def command(program: str, s) -> str:
     return " ".join(x for x in (env, " ".join(parts), files) if x)
 
 
+#: The register's AFNI entries the replicas correct by default (the others are kept as AFNI's
+#: until decided, or refused in both modes).
+CORRECTED = frozenset(
+    f"AFNI-{n:02d}" for n in (1, 2, 7, 8, 11, 12, 16, 18, 20, 22, 23, 26, 43, 45, 47)
+)
+
+
 def case_verdict(r: dict, desc: str = "") -> tuple[str, str]:
     """A case's verdict: the record compares the replica in reproduce mode with AFNI (every
     output byte for byte, exit status, messages); the fix pass and AFNI's variability are
@@ -710,10 +717,13 @@ def case_verdict(r: dict, desc: str = "") -> tuple[str, str]:
                 + ("the same bytes" if not v else f"{v:,} values differ")
             )
     fix = rep.get("D13 fix pass")
-    if fix:
+    named = [d for d in re.findall(r"\b(AFNI-\d+)\b", desc) if d in CORRECTED]
+    if fix or named:
+        what = ", ".join(named) if named else "a defect of the register"
         notes.append(
-            f"the default mode corrects a defect of the register here: {fix:,} values change, "
-            "the defect named (the record's D13 section)"
+            f"in its default mode the replica corrects {what} and names it: "
+            + (f"{fix:,} values change" if fix else "the header or the messages change")
+            + " (the record's D13 section)"
         )
     return "bit-identical", common.clip("; ".join(notes), 400)
 

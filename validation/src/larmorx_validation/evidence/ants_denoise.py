@@ -763,11 +763,15 @@ def _a44_spec(ctx: core.Context):
             "smooths and corrects their Rician bias only inside the mask and leaves them the raw "
             "noise estimate of the last such centre. larmorx gives them the smoothed and "
             "corrected bias, as inside; the voxels no centre reached are not denoised, as in ITK. "
-            "Reproduce mode gives ANTs' output."
+            "Inside the mask the default also corrects ANTS-43 (the Rician correction factor's "
+            "overflow at a high SNR, corrected since 2026-10-12). Reproduce mode gives ANTs' "
+            "output."
         ),
         effect=effect,
         settings="DenoiseImage -n Rician with fMRIPrep 25.2.6's brain mask on its preprocessed "
         "T1w of ds000005 sub-01 (no fMRIPrep node: fMRIPrep denoises without a mask)",
+        focus=lambda: common.load(str(run / MASK)) == 0,
+        focus_text="outside the mask (ANTS-44; inside it the default also corrects ANTS-43)",
     )
 
 

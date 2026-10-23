@@ -626,31 +626,31 @@ def _a17_spec(ctx: core.Context):
         dseg = common.load(str(run / DSEG))
         a = common.load(str(e.dir / "ants-1-eroded.nii.gz"))
         b = common.load(str(e.dir / "larmorx-eroded.nii.gz"))
-        wm = dseg == 3
+        wm = dseg == 2
         return (
             f"of the {int(wm.sum()):,} white-matter voxels, larmorx's eroded mask keeps "
             f"{int(b.sum()):,}; ANTs' output is 1 on {int(a.sum()):,} voxels, the eroded white "
-            f"matter and every voxel of the other labels ({int(((dseg == 1) | (dseg == 2)).sum()):,}"
+            f"matter and every voxel of the other labels ({int(((dseg == 1) | (dseg == 3)).sum()):,}"
             " of CSF and grey matter)"
         )
 
     return corrections.Spec(
         tool=TOOL,
-        case="ds000005-dseg-me-wm-ants17",
+        case="ds000005-dseg-me-2-ants17",
         entry="ANTS-17",
         title="ANTS-17: eroding the white-matter label of fMRIPrep's segmentation",
         summary=(
             "`ImageMath ME` with a label value, on the segmentation fMRIPrep 25.2.6 wrote for "
-            "OpenNeuro ds000005 sub-01 (1 CSF, 2 grey matter, 3 white matter): an eroded white-"
+            "OpenNeuro ds000005 sub-01 (1 grey matter, 2 white matter, 3 CSF): an eroded white-"
             "matter mask, as for a CompCor or a boundary mask. ANTs thresholds the eroded image at "
             "0.5, so the other labels come back as 1 beside the eroded white matter; larmorx's "
             "default gives the eroded white matter alone, its reproduce mode ANTs' output."
         ),
         program="ImageMath",
-        args=("3", "{out:eroded}", "ME", "{in:dseg}", "1", "3"),
+        args=("3", "{out:eroded}", "ME", "{in:dseg}", "1", "2"),
         inputs={"dseg": ("fMRIPrep's segmentation (dseg)", run / DSEG)},
-        panels=(("dseg", "ds000005 sub-01 segmentation", "fMRIPrep's dseg: 1 CSF, 2 GM, 3 WM"),),
-        outputs=({"id": "eroded", "label": "Eroded label 3", "unit": ""},),
+        panels=(("dseg", "ds000005 sub-01 segmentation", "fMRIPrep's dseg: 1 GM, 2 WM, 3 CSF"),),
+        outputs=({"id": "eroded", "label": "Eroded label 2 (WM)", "unit": ""},),
         data=(A17_DATA,),
         show=show,
         reason=(
@@ -661,7 +661,7 @@ def _a17_spec(ctx: core.Context):
             "case `binary-morphology/ME-labels-known`); reproduce mode gives ANTs' output."
         ),
         effect=effect,
-        settings="ImageMath ME with radius 1 and value 3 on fMRIPrep 25.2.6's dseg of ds000005 "
+        settings="ImageMath ME with radius 1 and value 2 on fMRIPrep 25.2.6's dseg of ds000005 "
         "sub-01 (no fMRIPrep node: fMRIPrep erodes binary masks only)",
     )
 

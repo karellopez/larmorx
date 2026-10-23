@@ -55,6 +55,10 @@ class Spec:
     node: str = ""
     fmriprep: dict[str, Path] = field(default_factory=dict)
     settings: str = ""
+    #: where the default view looks for the correction's largest change (a mask on the
+    #: outputs' grid), and how its caption names that region; the whole shown region if None
+    focus: Callable[[], np.ndarray] | None = None
+    focus_text: str = ""
 
 
 def _argv(spec: Spec, out: Callable[[str], str]) -> list[str]:
@@ -66,6 +70,23 @@ def _argv(spec: Spec, out: Callable[[str], str]) -> list[str]:
         return a
 
     return [sub(a) for a in spec.args]
+
+
+def shown_command(spec: Spec) -> str:
+    """The command as the page shows it: each input by the last four parts of its path, each
+    output by its id; an argument quoted only where a shell would split it."""
+
+    def short(p: Path) -> str:
+        return "…/" + "/".join(p.parts[-4:]) if len(p.parts) > 4 else str(p)
+
+    def sub(a: str) -> str:
+        for k, (_label, p) in spec.inputs.items():
+            a = a.replace("{in:" + k + "}", short(Path(p)))
+        for o in spec.outputs:
+            a = a.replace("{out:" + o["id"] + "}", f"{o['id']}.nii.gz")
+        return shlex.quote(a) if any(c in a for c in " '\\\"$;&|<>*?") else a
+
+    return " ".join([spec.program, *(sub(a) for a in spec.args)])
 
 
 def entry(ctx: core.Context, spec: Spec) -> fcache.Entry:
@@ -203,7 +224,14 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example."
-    at, _k = common.largest_in_slice(ex, "larmorx", "larmorx-reproduce", first)
+    if spec.focus is not None:
+        fm = ex.disp(spec.focus().astype(np.float32)) > 0.5
+        va = ex.values(ex.key("larmorx", first))
+        vb = ex.values(ex.key("larmorx-reproduce", first))
+        dv = np.where(fm & ex.m, np.abs(va - vb), -1.0)
+        at = [int(v) for v in np.unravel_index(int(np.argmax(dv)), dv.shape)]
+    else:
+        at, _k = common.largest_in_slice(ex, "larmorx", "larmorx-reproduce", first)
     inputs = [k for k, _l, _s in spec.panels]
     default = {
         "output": first,
@@ -215,7 +243,8 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
     }
     out = common.finish(
         ctx, ex, diffs, outputs, default=default, window_panel="ants-1",
-        caption="the crosshair where larmorx's correction changes the output most in it.",
+        caption="the crosshair where larmorx's correction changes the output most"
+        + (f" {spec.focus_text}." if spec.focus is not None else " in it."),
     )  # fmt: skip
     fx = next(x for x in diffs if x["id"] == "fix-repro")
     effect = "; ".join(
@@ -231,7 +260,7 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
             f"{x['dataset']}" + (f", {x['subject']}" if x.get("subject") else "")
             + f" ({x['licence']})" for x in spec.data)},
         *([{"label": "Node", "text": spec.node}] if spec.node else []),
-        {"label": "Command", "text": "`" + info.get("command", "") + "`"},
+        {"label": "Command", "text": "`" + shown_command(spec) + "`"},
         {
             "label": "Defect",
             "text": (f"[{spec.entry}](repo:{link['href']}): {title}" if link else spec.entry)

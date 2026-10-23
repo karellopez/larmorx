@@ -189,8 +189,117 @@ pub const CONSULTED: &[(&str, Use)] = &[
 
 /// What larmorx-gpl does with `name`, if AFNI's 3dTshift consults it.
 pub fn consulted(name: &str) -> Option<Use> {
-    CONSULTED.iter().find(|(n, _)| *n == name).map(|&(_, u)| u)
+    TSHIFT.consulted(name)
 }
+
+/// An AFNI program's environment: the variables it consults, as differences from 3dTshift's
+/// [`CONSULTED`] (the dataset reading and writing, the output names and the messages are the
+/// same library code). Found by reading each program's source and confirmed by tracing the
+/// oracle's `getenv` calls (`docs/findings/afni-automask.md`, `afni-unifize.md`, "Environment
+/// variables").
+#[derive(Debug)]
+pub struct Program {
+    /// The program's name, for messages.
+    pub name: &'static str,
+    /// Variables it consults that 3dTshift does not, or that do something else for it; they
+    /// win over [`CONSULTED`].
+    pub extra: &'static [(&'static str, Use)],
+    /// Variables of [`CONSULTED`] it does not consult.
+    pub without: &'static [&'static str],
+}
+
+impl Program {
+    /// What larmorx-gpl does with `name`, if the program consults it.
+    pub fn consulted(&self, name: &str) -> Option<Use> {
+        if let Some(&(_, u)) = self.extra.iter().find(|(n, _)| *n == name) {
+            return Some(u);
+        }
+        if self.without.contains(&name) {
+            return None;
+        }
+        CONSULTED.iter().find(|(n, _)| *n == name).map(|&(_, u)| u)
+    }
+
+    /// Every variable it consults.
+    pub fn variables(&self) -> Vec<(&'static str, Use)> {
+        let mut all: Vec<(&'static str, Use)> = CONSULTED
+            .iter()
+            .filter(|(n, _)| !self.without.contains(n) && !self.extra.iter().any(|(e, _)| e == n))
+            .copied()
+            .collect();
+        all.extend_from_slice(self.extra);
+        all
+    }
+}
+
+/// 3dTshift: [`CONSULTED`].
+pub const TSHIFT: Program = Program {
+    name: "3dTshift",
+    extra: &[],
+    without: &[],
+};
+
+const NO_TEXT_FILES: &str =
+    "it changes how AFNI reads text files, which this program reads none of";
+const QUIET: Use = Use::Applied; // AFNI_QUIET_STARTUP hides "Authored by" and "Output dataset"
+
+/// 3dAutomask: 3dTshift's variables, without the slice-time files'; `AFNI_QUIET_STARTUP` hides
+/// its author line and its "Output dataset" messages (`AUTHOR`, `WROTE_DSET`).
+pub const AUTOMASK: Program = Program {
+    name: "3dAutomask",
+    extra: &[
+        ("AFNI_QUIET_STARTUP", QUIET),
+        ("AFNI_USE_FGETS", Use::NoEffect(NO_TEXT_FILES)),
+    ],
+    without: &["AFNI_1D_ZERO_TEXT"],
+};
+
+const OPENMP: &str = "a setting of the OpenMP runtime: larmorx-gpl's threads come from \
+                      OMP_NUM_THREADS, and its results do not depend on them";
+
+/// 3dUnifize: 3dAutomask's variables, and the OpenMP runtime's, which its voxel loop runs
+/// under (`OMP_NUM_THREADS`, read by `AFNI_SETUP_OMP` before the global options, so a `-D`
+/// cannot set it).
+pub const UNIFIZE: Program = Program {
+    name: "3dUnifize",
+    extra: &[
+        ("AFNI_QUIET_STARTUP", QUIET),
+        ("AFNI_USE_FGETS", Use::NoEffect(NO_TEXT_FILES)),
+        (
+            "OMP_NUM_THREADS",
+            Use::NoEffect(
+                "it sets the number of threads, which changes nothing in larmorx-gpl's results \
+                 (it is read from the process environment, before the global options)",
+            ),
+        ),
+        ("OMP_DYNAMIC", Use::NoEffect(OPENMP)),
+        ("OMP_NESTED", Use::NoEffect(OPENMP)),
+        ("OMP_SCHEDULE", Use::NoEffect(OPENMP)),
+        ("OMP_STACKSIZE", Use::NoEffect(OPENMP)),
+        ("OMP_WAIT_POLICY", Use::NoEffect(OPENMP)),
+        ("OMP_THREAD_LIMIT", Use::NoEffect(OPENMP)),
+        ("OMP_MAX_ACTIVE_LEVELS", Use::NoEffect(OPENMP)),
+        ("OMP_CANCELLATION", Use::NoEffect(OPENMP)),
+        ("OMP_DEFAULT_DEVICE", Use::NoEffect(OPENMP)),
+        ("OMP_MAX_TASK_PRIORITY", Use::NoEffect(OPENMP)),
+        ("OMP_PROC_BIND", Use::NoEffect(OPENMP)),
+        ("OMP_PLACES", Use::NoEffect(OPENMP)),
+        ("OMP_DISPLAY_ENV", Use::NoEffect(OPENMP)),
+        ("OMP_DISPLAY_AFFINITY", Use::NoEffect(OPENMP)),
+        ("OMP_AFFINITY_FORMAT", Use::NoEffect(OPENMP)),
+        ("OMP_ALLOCATOR", Use::NoEffect(OPENMP)),
+        ("OMP_TARGET_OFFLOAD", Use::NoEffect(OPENMP)),
+        ("OMP_NUM_TEAMS", Use::NoEffect(OPENMP)),
+        ("OMP_TEAMS_THREAD_LIMIT", Use::NoEffect(OPENMP)),
+        ("GOMP_CPU_AFFINITY", Use::NoEffect(OPENMP)),
+        ("GOMP_SPINCOUNT", Use::NoEffect(OPENMP)),
+        ("GOMP_STACKSIZE", Use::NoEffect(OPENMP)),
+        ("GOMP_OPENACC_DIM", Use::NoEffect(OPENMP)),
+        ("ACC_DEVICE_NUM", Use::NoEffect(OPENMP)),
+        ("ACC_DEVICE_TYPE", Use::NoEffect(OPENMP)),
+    ],
+    without: &["AFNI_1D_ZERO_TEXT"],
+};
 
 /// `YESSISH(s)`: the value starts with `Y` or `y`.
 pub fn yessish(value: Option<&str>) -> bool {
@@ -398,6 +507,17 @@ pub struct Prefiltered {
 /// effect. AFNI's other global options (`-Vname=`, `-echo_edu`, `-pif`, `-np`, `-all_opts`,
 /// `-h_view`, `<<` inclusions, ...) are not taken out: 3dTshift's scan reports them as unknown.
 pub fn prefilter(args: &[String], settings: Settings, mode: UpstreamDefects) -> Prefiltered {
+    prefilter_for(&TSHIFT, args, settings, mode)
+}
+
+/// [`prefilter`] for another AFNI program: its own variables decide which `-D` options get the
+/// warning that they have no effect, and which variables can name AFNI-22.
+pub fn prefilter_for(
+    program: &Program,
+    args: &[String],
+    settings: Settings,
+    mode: UpstreamDefects,
+) -> Prefiltered {
     let mut kept = Vec::with_capacity(args.len());
     let mut quiet_overwrite = false;
     let mut warnings = Vec::new();
@@ -418,8 +538,9 @@ pub fn prefilter(args: &[String], settings: Settings, mode: UpstreamDefects) -> 
                 plain_table.set(name.clone(), value.clone());
             }
             match if mode.fix() { &plain } else { &afni } {
-                Some((name, _)) if consulted(name).is_none() => warnings.push(format!(
-                    "{arg} has no effect: 3dTshift does not read {name} (larmorx)"
+                Some((name, _)) if program.consulted(name).is_none() => warnings.push(format!(
+                    "{arg} has no effect: {} does not read {name} (larmorx)",
+                    program.name
                 )),
                 None if mode.fix() => warnings.push(format!(
                     "{arg} sets nothing (a name and a value are needed), as in AFNI (larmorx)"
@@ -445,7 +566,8 @@ pub fn prefilter(args: &[String], settings: Settings, mode: UpstreamDefects) -> 
         }
     }
     let mut notices = Vec::new();
-    let differing: Vec<&str> = CONSULTED
+    let variables = program.variables();
+    let differing: Vec<&str> = variables
         .iter()
         .filter(|(name, u)| {
             *u == Use::Applied && !same_effect(name, plain_table.get(name), afni_table.get(name))

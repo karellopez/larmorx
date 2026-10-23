@@ -116,7 +116,7 @@ a list, `AFNI_ALLOW_MILLISECONDS`' time offset, a one-row dataset written as tex
 values with blanks; register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12, -16, -18,
 -19, -20, -22 in `docs/findings/upstream-defects.md`) and names each one
 that changed the output in a warning
-on standard error (`*+ WARNING: upstream defect AFNI-01 (3dTshift) corrected: ...`), which
+on standard error (`*+ WARNING: upstream defect AFNI-01 (AFNI) corrected: ...`), which
 the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
 `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension
 aside, and AFNI's messages (AFNI's version banner and compile date aside; a one-row dataset

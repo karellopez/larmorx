@@ -242,7 +242,7 @@ fn a_failed_write_on_every_platform() {
         assert_eq!(o.status.code(), Some(1), "{o:?}");
         let err = text(&o.stderr);
         assert!(
-            err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+            err.contains("upstream defect AFNI-26 (AFNI) corrected"),
             "{o:?}"
         );
         assert!(
@@ -266,7 +266,7 @@ fn a_failed_write_on_every_platform() {
         assert_eq!(o.status.code(), Some(0), "{o:?}");
         let err = text(&o.stderr);
         assert!(
-            err.contains("upstream defect AFNI-26 (3dTshift) reproduced"),
+            err.contains("upstream defect AFNI-26 (AFNI) reproduced"),
             "{o:?}"
         );
         // AFNI's message, plain, then -verbose's line: a labelled message after a copy, plain

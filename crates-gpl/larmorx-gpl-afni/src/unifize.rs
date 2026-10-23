@@ -277,11 +277,12 @@ pub fn double_down(far: &[f32], g: Grid) -> (Vec<f32>, Grid) {
 /// `mri_double_up`: twice the size (plus 1 along an axis whose `add` is set; an axis of size 1
 /// stays 1), each voxel `0.125f *` the sum of the 8 input voxels at half its index and the next
 /// one along each axis whose output index is odd (clamped at the edges), summed in AFNI's
-/// order.
-pub fn double_up(far: &[f32], g: Grid, add: [bool; 3]) -> (Vec<f32>, Grid) {
+/// order. `target`, when given, is the output grid instead (AFNI-47 corrected: an axis halved
+/// to 1 voxel goes back to its 2 or 3).
+pub fn double_up(far: &[f32], g: Grid, add: [bool; 3], target: Option<Grid>) -> (Vec<f32>, Grid) {
     let (nxf, nyf, nzf) = (g.nx, g.ny, g.nz);
     let up = |n: usize, a: bool| if n == 1 { 1 } else { 2 * n + usize::from(a) };
-    let h = Grid::new(up(nxf, add[0]), up(nyf, add[1]), up(nzf, add[2]));
+    let h = target.unwrap_or_else(|| Grid::new(up(nxf, add[0]), up(nyf, add[1]), up(nzf, add[2])));
     let nxyf = nxf * nyf;
     let at = |i: usize, j: usize, k: usize| far[i + j * nxf + k * nxyf];
     let pair = |o: usize, n: usize| {
@@ -382,39 +383,33 @@ fn percmean(v: &mut [f32], p1: f32, p2: f32) -> f32 {
     val / ((q2 - q1) as f32 + 1.0f32)
 }
 
-/// What [`local_percmean`] reports while it works (the letters AFNI prints with its `verb`).
-pub struct Progress<'a> {
-    pub verbose: bool,
-    pub out: &'a mut String,
+/// AFNI's progress letters (`fprintf(stderr, "A")`, ...), in order with the automask's
+/// messages: appended to the same log as [`Message::Raw`] text when `verbose`.
+fn letter(verbose: bool, log: &mut Vec<Message>, s: &str) {
+    if verbose {
+        log.push(Message::Raw(s.to_owned()));
+    }
 }
 
-/// `mri_local_percmean(fim, vrad, p1, p2)`: the local mean between percentiles `p1` and `p2`
-/// in a ball of radius `vrad` voxels, over the automasked image (`settings` and `log` for the
-/// automask; `amsave` receives the automasked image, as `-amsave` writes it). `None` where
-/// AFNI returns NULL: a radius below 4, percentiles outside [0, 100], or no automask. `p1 ==
-/// p2` (AFNI's `mri_local_percentile`) is not reachable from 3dUnifize's command line and is
-/// refused.
-#[allow(clippy::too_many_arguments)]
-pub fn local_percmean(
+/// Whether `mri_local_percmean(fim, vrad, p1, p2)` runs (AFNI returns NULL otherwise): a radius
+/// of at least 4 and percentiles in [0, 100] (in either order); equal percentiles take another
+/// routine (`mri_local_percentile`), which 3dUnifize's command line cannot reach.
+pub fn percmean_args_ok(vrad: f32, p1: f32, p2: f32) -> bool {
+    let (p1, p2) = if p1 > p2 { (p2, p1) } else { (p1, p2) };
+    !(vrad < 4.0 || p1 < 0.0 || p2 > 100.0 || p1 == p2)
+}
+
+/// The first part of `mri_local_percmean`: `A`, then the image (a float copy, non-finite values
+/// 0) with every voxel outside its automask 0, which `-amsave` writes. `None` where AFNI's
+/// automask is NULL (a 2D image smaller than 16 x 16, or with nothing above its clip level).
+pub fn masked_input(
     fim: &[f32],
     g: Grid,
-    vrad: f32,
-    p1: f32,
-    p2: f32,
-    do_double: bool,
     settings: &MaskSettings,
+    verbose: bool,
     log: &mut Vec<Message>,
-    progress: &mut Progress<'_>,
-    amsave: &mut dyn FnMut(&[f32]),
-    n_threads: usize,
 ) -> Option<Vec<f32>> {
-    let (p1, p2) = if p1 > p2 { (p2, p1) } else { (p1, p2) };
-    if vrad < 4.0 || p1 < 0.0 || p2 > 100.0 || p1 == p2 {
-        return None;
-    }
-    if progress.verbose {
-        progress.out.push('A');
-    }
+    letter(verbose, log, "A");
     let mut aar = fim.to_vec();
     crate::dataset::floatscan(&mut aar);
     let ams = mask::automask_image(&aar, g, settings, log)?;
@@ -423,9 +418,31 @@ pub fn local_percmean(
             *a = 0.0;
         }
     }
-    amsave(&aar);
-    if progress.verbose && do_double {
-        progress.out.push('D');
+    Some(aar)
+}
+
+/// The rest of `mri_local_percmean(fim, vrad, p1, p2)`, on the automasked image `aar`
+/// ([`masked_input`]): the mean between percentiles `p1` and `p2` (either order) of the non-zero
+/// values in a ball of radius `vrad` voxels around each voxel, on the half-size grid with half
+/// the radius plus 0.001 when `do_double` (`D`), expanded back (`U`). `expand_to`: the grid to
+/// expand the half-size result to, when it differs from what AFNI's `mri_double_up` gives
+/// (AFNI-47 corrected); `None` for AFNI's.
+#[allow(clippy::too_many_arguments)]
+pub fn local_percmean(
+    aar: Vec<f32>,
+    g: Grid,
+    vrad: f32,
+    p1: f32,
+    p2: f32,
+    do_double: bool,
+    expand_to: Option<Grid>,
+    verbose: bool,
+    log: &mut Vec<Message>,
+    n_threads: usize,
+) -> Vec<f32> {
+    let (p1, p2) = if p1 > p2 { (p2, p1) } else { (p1, p2) };
+    if do_double {
+        letter(verbose, log, "D");
     }
     let (bar, bg) = if do_double {
         double_down(&aar, g)
@@ -438,9 +455,7 @@ pub fn local_percmean(
         vrad
     };
     let nbhd = sphere(radius);
-    if progress.verbose {
-        progress.out.push('V');
-    }
+    letter(verbose, log, "V");
     let (nx, ny, nz) = (bg.nx as i64, bg.ny as i64, bg.nz as i64);
     let nxy = bg.nx * bg.ny;
     let one = |vvv: usize, nbar: &mut Vec<f32>| -> (f32, bool) {
@@ -461,7 +476,7 @@ pub fn local_percmean(
         let many = nbar.len() > 1;
         (percmean(nbar, p1, p2), many)
     };
-    let results: Vec<(f32, bool)> = larmorx_core::parallel::with_threads(n_threads, || {
+    let all = || -> Vec<(f32, bool)> {
         (0..bg.nvox())
             .into_par_iter()
             .map_init(
@@ -469,30 +484,42 @@ pub fn local_percmean(
                 |nbar, vvv| one(vvv, nbar),
             )
             .collect()
-    })
-    .unwrap_or_else(|_| {
+    };
+    let results = larmorx_core::parallel::with_threads(n_threads, all).unwrap_or_else(|_| {
         let mut nbar = Vec::with_capacity(nbhd.len());
         (0..bg.nvox()).map(|v| one(v, &mut nbar)).collect()
     });
-    if progress.verbose {
+    if verbose {
         // `if( verb && vvv%66666==0 ) fprintf(stderr,".")`, for voxels with two values or more.
         let dots = results
             .iter()
             .enumerate()
             .filter(|(v, r)| v % 66666 == 0 && r.1)
             .count();
-        progress.out.extend(std::iter::repeat_n('.', dots));
+        if dots > 0 {
+            log.push(Message::Raw(".".repeat(dots)));
+        }
     }
     let car: Vec<f32> = results.into_iter().map(|r| r.0).collect();
     let dim = if do_double {
-        double_up(&car, bg, [g.nx % 2 == 1, g.ny % 2 == 1, g.nz % 2 == 1]).0
+        double_up(
+            &car,
+            bg,
+            [g.nx % 2 == 1, g.ny % 2 == 1, g.nz % 2 == 1],
+            expand_to,
+        )
+        .0
     } else {
         car
     };
-    if progress.verbose {
-        progress.out.push('U');
-    }
-    Some(dim)
+    letter(verbose, log, "U");
+    dim
+}
+
+/// Whether the half-size grid of `g` expands back to another grid ([`double_up`] keeps an axis
+/// of 1 voxel at 1, and halving an axis of 2 or 3 voxels gives 1): AFNI-47.
+pub fn duplo_changes_grid(g: Grid) -> bool {
+    [g.nx, g.ny, g.nz].iter().any(|&n| n == 2 || n == 3)
 }
 
 /// The result of [`wm_unifize`]: the scaled image and the scale image (`sclim`, `-ssave`).
@@ -501,71 +528,50 @@ pub struct WmResult {
     pub scale: Vec<f32>,
     /// How many values were squashed.
     pub squashed: usize,
-    /// When the half-size grid expanded back has another size than the input (an axis of 2 or
-    /// 3 voxels in a volume of more than a million): AFNI reads its scale image past its end
-    /// (a defect); the voxels it has none for got scale 0.
-    pub short_scale: Option<usize>,
 }
 
-/// `mri_WMunifize`: every value times `1000/WMI` (0 where WMI is not positive), then, with
-/// `squash`, values above 1300 become `1300 + 200 tanhf((x - 1300)/200)`. `None` where the local
-/// mean is (no automask).
-#[allow(clippy::too_many_arguments)]
+/// The end of `mri_WMunifize`, given the local white-matter intensity `par` ([`local_percmean`]):
+/// every value of `fim` (a float copy, non-finite values 0) times `1000/WMI` (0 where WMI is
+/// not positive), then, with `squash`, values above 1300 become
+/// `1300 + 200 tanhf((x - 1300)/200)` (`W`, then `[s<count>]`). A `par` shorter than the image
+/// (AFNI-47 reproduced: AFNI reads past its end) counts as 0 beyond its end.
 pub fn wm_unifize(
     fim: &[f32],
-    g: Grid,
-    urad: f32,
-    upbot: f32,
-    uptop: f32,
-    do_double: bool,
+    mut par: Vec<f32>,
     squash: bool,
-    settings: &MaskSettings,
+    verbose: bool,
     log: &mut Vec<Message>,
-    progress: &mut Progress<'_>,
-    amsave: &mut dyn FnMut(&[f32]),
-    n_threads: usize,
-) -> Option<WmResult> {
-    let do_double = do_double && fim.len() > 1_000_000;
-    let mut par = local_percmean(
-        fim, g, urad, upbot, uptop, do_double, settings, log, progress, amsave, n_threads,
-    )?;
+) -> WmResult {
     let mut gar = fim.to_vec();
     crate::dataset::floatscan(&mut gar);
-    let short_scale = (par.len() != gar.len()).then_some(par.len());
-    if par.len() < gar.len() {
-        par.resize(gar.len(), 0.0);
-    }
+    par.resize(gar.len(), 0.0);
     let mut nsq = 0;
-    for (ii, g) in gar.iter_mut().enumerate() {
-        let pval = if par[ii] <= 0.0 { 0.0 } else { PKVAL / par[ii] };
-        par[ii] = pval;
+    for (g, p) in gar.iter_mut().zip(par.iter_mut()) {
+        let pval = if *p <= 0.0 { 0.0 } else { PKVAL / *p };
+        *p = pval;
         *g *= pval;
         if squash && *g > WMCUT {
             *g = WMCUT + WMSCL * tanhf((*g - WMCUT) / WMSCL);
             nsq += 1;
         }
     }
-    par.truncate(gar.len());
-    if progress.verbose {
-        progress.out.push('W');
-        if nsq > 0 {
-            progress.out.push_str(&format!("[s{nsq}]"));
-        }
+    letter(verbose, log, "W");
+    if nsq > 0 {
+        letter(verbose, log, &format!("[s{nsq}]"));
     }
-    Some(WmResult {
+    WmResult {
         image: gar,
         scale: par,
         squashed: nsq,
-        short_scale,
-    })
+    }
 }
 
 /// `mri_GMunifize`: from the WM-unifized image, the median `P` of the values above 1000,
 /// `pupper = 1000 - 1.987654321 (P - 1000)`, `plower` the clip level for 0.4321, the median
 /// `G` of the values in `[plower, pupper]`; then every value at or above `plower/3`
 /// (`0.333f`) becomes `(1000-666)/(1000-G) (x - 1000) + 1000` (negative results 0), the
-/// others 0. Nothing when fewer than 111 values are above 1000, or in the range.
-pub fn gm_unifize(gar: &mut [f32], progress: &mut Progress<'_>) {
+/// others 0 (`G`). Nothing when fewer than 111 values are above 1000, or in the range.
+pub fn gm_unifize(gar: &mut [f32], verbose: bool, log: &mut Vec<Message>) {
     let mut pval: Vec<f32> = gar.iter().copied().filter(|&v| v > PKVAL).collect();
     if pval.len() < 111 {
         return;
@@ -594,19 +600,23 @@ pub fn gm_unifize(gar: &mut [f32], progress: &mut Progress<'_>) {
             *v = 0.0;
         }
     }
-    if progress.verbose {
-        progress.out.push('G');
-    }
+    letter(verbose, log, "G");
 }
 
-/// `mri_clipedges_inplace(im, uclip, vclip)`: repeatedly, voxels at or above `uclip` with more
-/// than 2 of their 6 face neighbours 0, and voxels at or above `vclip` with more than 4, become
-/// 0 (both tests on the image as it was at the start of the pass), until a pass clips nothing.
-pub fn clip_edges(qmar: &mut [f32], g: Grid, uclip: f32, vclip: f32, progress: &mut Progress<'_>) {
+/// `mri_clipedges_inplace(im, uclip, vclip)` (`e`): repeatedly, voxels at or above `uclip`
+/// with more than 2 of their 6 face neighbours 0, and voxels at or above `vclip` with more than
+/// 4, become 0 (both tests on the image as it was at the start of the pass), until a pass clips
+/// nothing.
+pub fn clip_edges(
+    qmar: &mut [f32],
+    g: Grid,
+    uclip: f32,
+    vclip: f32,
+    verbose: bool,
+    log: &mut Vec<Message>,
+) {
     let (nx, ny, nz, nxy) = (g.nx, g.ny, g.nz, g.nx * g.ny);
-    if progress.verbose {
-        progress.out.push('e');
-    }
+    letter(verbose, log, "e");
     let edges = |imar: &[f32], pp: usize| {
         let kk = pp / nxy;
         let ii = pp % nx;
@@ -776,10 +786,17 @@ mod tests {
         let (d, h) = double_down(&im, g);
         assert_eq!(h, Grid::new(2, 2, 2));
         assert_eq!(d.len(), 8);
-        let (u, h) = double_up(&d, h, [false, false, false]);
+        let (u, h) = double_up(&d, h, [false, false, false], None);
         assert_eq!(h, g);
         assert_eq!(u.len(), 64);
-        let (_, h) = double_up(&d, Grid::new(2, 2, 2), [true, false, true]);
+        let (_, h) = double_up(&d, Grid::new(2, 2, 2), [true, false, true], None);
         assert_eq!(h, Grid::new(5, 4, 5));
+        // An axis halved to 1 stays 1 (AFNI-47), unless a target grid is given.
+        let (_, h) = double_up(&[1.0; 4], Grid::new(1, 2, 2), [true, false, false], None);
+        assert_eq!(h, Grid::new(1, 4, 4));
+        let t = Grid::new(3, 4, 4);
+        let (v, h) = double_up(&[1.0; 4], Grid::new(1, 2, 2), [true, false, false], Some(t));
+        assert_eq!((h, v.len()), (t, 48));
+        assert!(duplo_changes_grid(Grid::new(3, 400, 400)) && !duplo_changes_grid(g));
     }
 }

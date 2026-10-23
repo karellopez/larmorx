@@ -80,12 +80,12 @@ use crate::shift::Method;
 use crate::tpattern::{TpatternError, parse_tpattern};
 use crate::tshift::{Rlt, TshiftParams, fft_length, slice_shift, tshift};
 
+#[cfg(test)]
+use super::common::Deconflict;
 use super::common::{
     Fail, Io, Output, afni_output_name, echo_command_line, filename_ok, open_dataset,
     output_name_ok, output_path, write_dataset,
 };
-#[cfg(test)]
-use super::common::Deconflict;
 use super::threads;
 
 /// The first `-verbose` line: which implementation runs (larmorx's addition, not AFNI's).

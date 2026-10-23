@@ -213,7 +213,7 @@ def test_negative_slope(tmp_path):
         code, err = _cli(
             "afni", "3dTshift", "-linear", "-tpattern", "alt+z", "-prefix", out, src, env=env
         )
-        assert code == 0 and f"upstream defect AFNI-01 (3dTshift) {mode}" in err
+        assert code == 0 and f"upstream defect AFNI-01 (AFNI) {mode}" in err
         np.testing.assert_array_equal(np.asanyarray(nib.load(out).dataobj), expected.data)
     code, err = _cli(
         "afni", "3dTshift", "-tpattern", "alt+z", "-prefix", tmp_path / "x.nii", src, env="exact"

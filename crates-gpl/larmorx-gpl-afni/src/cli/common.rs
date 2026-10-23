@@ -317,7 +317,12 @@ impl Output {
     /// already exists", exit 1). By default, an existing output that `AFNI_DECONFLICT` does
     /// not allow to overwrite or rename is an error (AFNI-11), where AFNI finds out after the
     /// work, writes nothing and exits with status 0.
-    pub(crate) fn check(&self, shift: bool, notices: &Notices, io: &mut Io<'_>) -> Result<(), Fail> {
+    pub(crate) fn check(
+        &self,
+        shift: bool,
+        notices: &Notices,
+        io: &mut Io<'_>,
+    ) -> Result<(), Fail> {
         if shift && self.deathcon && self.exists() {
             return Err(format!(
                 "output dataset already exists '{}'",

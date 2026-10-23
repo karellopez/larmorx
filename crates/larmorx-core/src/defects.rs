@@ -318,36 +318,42 @@ defects! {
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
-    AFNI_01 = "AFNI-01", "3dTshift", true,
-        "a negative scl_slope is applied on output but not on input, so shifted slices come out sign-flipped and scaled";
-    AFNI_02 = "AFNI-02", "3dTshift", true,
+    AFNI_01 = "AFNI-01", "AFNI", true,
+        "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
+    AFNI_02 = "AFNI-02", "AFNI", true,
         "float32 data with a slope and an intercept are scaled when read and keep the slope in the output header, so they are scaled twice";
     AFNI_03 = "AFNI-03", "3dTshift", true,
         "header slice code 2 (sequential decreasing) gives every slice time 0, so nothing is shifted";
     AFNI_05 = "AFNI-05", "3dTshift", true,
         "-no_detrend removes and restores the mean of only the first voxel of each pair; the second is shifted as raw values";
-    AFNI_07 = "AFNI-07", "3dTshift", true,
+    AFNI_07 = "AFNI-07", "AFNI", true,
         "metre and micron units: the voxel sizes and directions are converted to millimetres but the origin is not (and an oblique matrix is not converted at all)";
-    AFNI_08 = "AFNI-08", "3dTshift", true,
+    AFNI_08 = "AFNI-08", "AFNI", true,
         "a copy of the input whose slice times are all within 0.003 of 0 is written with slice_end 0";
-    AFNI_11 = "AFNI-11", "3dTshift", true,
+    AFNI_11 = "AFNI-11", "AFNI", true,
         "an output file that exists already is not written, and the program exits with status 0";
-    AFNI_12 = "AFNI-12", "3dTshift", true,
+    AFNI_12 = "AFNI-12", "AFNI", true,
         "a -prefix with blanks, shell metacharacters or non-ASCII characters anywhere in its path is refused";
-    AFNI_16 = "AFNI-16", "3dTshift", true,
+    AFNI_16 = "AFNI-16", "AFNI", true,
         "a voxel-to-world matrix within about 0.01 to 0.024 degrees of plumb (a single-precision test; the angle depends on the voxel size) is written as the exactly plumb matrix of its axes, its tilt discarded";
-    AFNI_18 = "AFNI-18", "3dTshift", true,
+    AFNI_18 = "AFNI-18", "AFNI", true,
         "an input name with a blank is read as a list of datasets to join in time (unless AFNI_PATH_SPACES_OK is YES), so an input in a directory whose name has a blank cannot be opened";
     AFNI_19 = "AFNI-19", "3dTshift", true,
         "with AFNI_ALLOW_MILLISECONDS set and -TR in milliseconds, the time offset (toffset) is written in milliseconds while the TR is written in seconds, both labelled seconds";
-    AFNI_20 = "AFNI-20", "3dTshift", true,
+    AFNI_20 = "AFNI-20", "AFNI", true,
         "a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI output name (unless AFNI_WRITE_1D_AS_PREFIX is YES)";
-    AFNI_22 = "AFNI-22", "3dTshift", true,
+    AFNI_22 = "AFNI-22", "AFNI", true,
         "a -Dname=value global option whose value has blanks, or a blank around its '=', sets another value (-DX=a b sets X to 'a=b'), and one longer than 255 or 1023 characters is cut";
-    AFNI_23 = "AFNI-23", "3dTshift", true,
+    AFNI_23 = "AFNI-23", "AFNI", true,
         "with AFNI_NIFTI_SCALE=NO, uint8 and int16 data with both a slope and an intercept stay integers with the slope as their scale factor and lose the intercept, so the values written are off by it";
-    AFNI_26 = "AFNI-26", "3dTshift", true,
+    AFNI_26 = "AFNI-26", "AFNI", true,
         "an output that cannot be written (its directory is missing or cannot be written) is not written, and the program exits with status 0";
+    AFNI_43 = "AFNI-43", "3dAutomask", true,
+        "-peels 0 peels once: the help says that 0 turns the peeling off, but the peel count is set to 1 for any value below 1";
+    AFNI_45 = "AFNI-45", "3dUnifize", true,
+        "with -T2up at or near 100, the contrast is inverted about the value one past the sorted mask values (whatever the memory there holds; usually 0, which zeroes the output)";
+    AFNI_47 = "AFNI-47", "3dUnifize", true,
+        "a volume of more than a million voxels with an axis of 2 or 3 voxels: its half-size scale image expands back to a grid of another size, which AFNI reads as if it were the input's, past its end";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

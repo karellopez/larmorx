@@ -126,6 +126,8 @@ class AtroposCase:
     #: Why ANTs' values depend on memory it never wrote: they are reported, not required to
     #: match (everything else is compared).
     undefined: str = ""
+    #: Score the labels against the partial-volume phantom's truth (ANTS-106; reported).
+    pv_truth: bool = False
 
 
 # ------------------------------------------------------------------------------------------------
@@ -189,6 +191,71 @@ def _priors() -> list[np.ndarray]:
     smooth = [_smooth((ph["labels"] == c).astype(np.float64)) for c in (1, 2, 3)]
     total = np.sum(smooth, axis=0) + 1e-6
     return [(p / total * ph["mask"]).astype(np.float32) for p in smooth]
+
+
+PV_SHAPE = (40, 40, 40)
+
+
+@functools.cache
+def _pv_phantom() -> dict[str, np.ndarray]:
+    """Nested spheres (radii 8.3, 13.7, 17.9 voxels: values 200, 130, 60, over 0) rendered on a
+    grid five times finer and box-averaged, so every voxel's tissue fractions are known; noise
+    of sd 6 (seeded). The truth: a tissue where one tissue's share (of the three) is at least
+    0.8, else the partial-volume class of its two largest (4 = 1x2, 5 = 2x3)."""
+    n, up = PV_SHAPE[0], 5
+    c = (n - 1) / 2.0
+    g = (np.indices((n * up,) * 3) + 0.5) / up - 0.5
+    r = np.sqrt(((g - c) ** 2).sum(0))
+    tissue = np.where(r < 8.3, 3, np.where(r < 13.7, 2, np.where(r < 17.9, 1, 0)))
+    frac = np.stack([(tissue == k).reshape(n, up, n, up, n, up).mean((1, 3, 5)) for k in range(4)])
+    img = np.tensordot(np.array([0.0, 60.0, 130.0, 200.0]), frac, 1)
+    img = img + np.random.default_rng(7).normal(scale=6.0, size=img.shape)
+    mask = (frac[0] < 0.5).astype(np.uint8)
+    f = frac[1:] / np.maximum(frac[1:].sum(0), 1e-9)
+    order = np.argsort(-f, 0)
+    top, second = order[0] + 1, order[1] + 1
+    lo, hi = np.minimum(top, second), np.maximum(top, second)
+    truth = np.zeros(PV_SHAPE, np.int16)
+    pure = f.max(0) >= 0.8
+    truth[pure] = top[pure]
+    truth[~pure & (lo == 1) & (hi == 2)] = 4
+    truth[~pure & (lo == 2) & (hi == 3)] = 5
+    truth[mask == 0] = 0
+    return {"t1": img.astype(np.float32), "mask": mask, "truth": truth}
+
+
+def _pv_save(data: np.ndarray, t: Path) -> None:
+    ants_inputs.save(np.asarray(data), t, affine=np.eye(4))
+
+
+@ants_inputs.builder("atropos-pv")
+def _(t):
+    """Atropos' partial-volume phantom: nested spheres (200, 130, 60 over 0) box-averaged from
+    a five-times finer grid, so each voxel's tissue fractions are known; noise sd 6, 40^3."""
+    _pv_save(_pv_phantom()["t1"], t)
+
+
+@ants_inputs.builder("atropos-pv-mask")
+def _(t):
+    """The partial-volume phantom's mask: voxels less than half background (uint8)."""
+    _pv_save(_pv_phantom()["mask"], t)
+
+
+def _pv_scores(seg: Path) -> str:
+    """Dice per class (1-3 tissues, 4 = 1x2, 5 = 2x3) and the share of voxels labelled as
+    the truth says."""
+    labels = _load(seg)[0]
+    truth = _pv_phantom()["truth"]
+    dice = []
+    for k in (1, 2, 3, 4, 5):
+        a, b = labels == k, truth == k
+        dice.append(2 * float((a & b).sum()) / max(float(a.sum() + b.sum()), 1.0))
+    inside = truth > 0
+    accuracy = float((labels[inside] == truth[inside]).mean())
+    return (
+        f"Dice {' '.join(f'{d:.3f}' for d in dice)} (classes 1-5), "
+        f"{accuracy:.3f} of the voxels as the truth"
+    )
 
 
 @ants_inputs.builder("atropos-t1")
@@ -1011,6 +1078,42 @@ def _phantom_cases() -> list[AtroposCase]:
             silent_ok=("ITK-50", "ANTS-96"),
             tier="standard",
         ),
+        *(
+            _c(
+                f"partial-volume-phantom-mrf-{beta}",
+                "partial volume",
+                f"the partial-volume phantom, classes 1x2 and 2x3 with their likelihoods, MRF "
+                f"{beta} (ANTS-106), scored against the known fractions",
+                "-d",
+                "3",
+                "-a",
+                "{gen:atropos-pv}",
+                "-x",
+                "{gen:atropos-pv-mask}",
+                "-i",
+                "KMeans[3]",
+                "-s",
+                "1x2",
+                "-s",
+                "2x3",
+                "--use-partial-volume-likelihoods",
+                "1",
+                "-m",
+                f"[{beta},1x1x1]",
+                "-c",
+                "[5,0]",
+                "-r",
+                "0",
+                "-o",
+                "[{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
+                outputs=("seg.nii.gz", *(f"post{k:02d}.nii.gz" for k in range(1, 6))),
+                expect=expect,
+                silent_ok=("ITK-50", "ANTS-96"),
+                tier="standard",
+                pv_truth=True,
+            )
+            for beta, expect in (("0", "pass"), ("0.1", "pass"), ("0.3", "error"))
+        ),
         _c(
             "2d",
             "dimensions",
@@ -1694,6 +1797,47 @@ def _real_cases() -> list[AtroposCase]:
                 tier=tier,
             )
         )
+    for run, tier in (
+        ("ds000005-sub-01-noreconall", "standard"),
+        ("ds005040-sub-002-noreconall", "full"),
+    ):
+        short = run.split("-noreconall")[0]
+        out.append(
+            _c(
+                f"real/{short}/smriprep-partial-volume",
+                "real (partial volume)",
+                f"sMRIPrep's options on {short}'s N4-corrected T1w and brain mask with "
+                "partial-volume classes 1x2 and 2x3 (ANTS-106: ANTs stops)",
+                "-d",
+                "3",
+                "-a",
+                f"{{node-image:{run}}}",
+                "-x",
+                f"{{node-mask:{run}}}",
+                "-i",
+                "KMeans[3]",
+                "-k",
+                "Gaussian",
+                "-s",
+                "1x2",
+                "-s",
+                "2x3",
+                "--use-partial-volume-likelihoods",
+                "1",
+                "-m",
+                "[0.1,1x1x1]",
+                "-c",
+                "[3,0]",
+                "-r",
+                "0",
+                "-o",
+                "[{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
+                outputs=("seg.nii.gz", *(f"post{k:02d}.nii.gz" for k in range(1, 6))),
+                expect="error",
+                silent_ok=("ITK-50", "ANTS-96"),
+                tier=tier,
+            )
+        )
     ds5 = "ds000005-sub-01-noreconall"
     out += [
         _c(
@@ -2237,6 +2381,30 @@ def _fix_pass(c: AtroposCase, tmp: Path, checks: CheckList, reproduced: _Run) ->
     check = defects.add_fix_check(
         checks, entries, change, other_changes="; ".join(other), silent_ok=c.silent_ok
     )
+    if c.pv_truth:
+        ants_seg = tmp / "ants" / "seg.nii.gz"
+        ants_text = _pv_scores(ants_seg) if ants_seg.is_file() else "no labels (ANTs stopped)"
+        mine = _pv_scores(fixed.outputs[0]) if fixed.ok else "no labels"
+        checks(
+            "partial-volume scores",
+            True,
+            metric="against the phantom's known fractions",
+            value=mine,
+            threshold="reported",
+            detail=f"ANTs: {ants_text}; larmorx's default: {mine}",
+        )
+    if c.category == "real (partial volume)" and fixed.ok:
+        labels = _load(fixed.outputs[0])[0]
+        counts = [int((labels == k).sum()) for k in range(1, 6)]
+        checks(
+            "partial-volume voxels",
+            True,
+            metric="voxels per class (larmorx's default)",
+            value=" ".join(map(str, counts)),
+            threshold="reported",
+            detail="classes 1-3 (CSF, GM, WM) and 4 = 1x2, 5 = 2x3: "
+            + ", ".join(f"{k}: {n}" for k, n in zip(range(1, 6), counts, strict=True)),
+        )
     if fixed.ok and reproduced.ok:
         named = [e for e in entries if e not in c.one_mode]
         before = [e for e in defects.notices_in(reproduced.err) if e not in c.one_mode]

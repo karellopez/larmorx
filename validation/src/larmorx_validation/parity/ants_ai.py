@@ -40,7 +40,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.parity import ants_inputs, defects
+from larmorx_validation.parity import ants_ai_blobs, ants_inputs, defects
 from larmorx_validation.parity import ants_registration as reg
 from larmorx_validation.parity.ants_programs import ants_bin, ants_version, crmath_preload
 from larmorx_validation.parity.harness import (
@@ -56,7 +56,11 @@ from larmorx_validation.parity.harness import (
 
 PROGRAM = "antsAI"
 LX_THREADS = 4
-BAND_THREADS = (2, 4, 8)
+#: ANTs' thread band: 2, 4 and 8 threads unless ``LARMORX_PARITY_BAND_THREADS`` (e.g.
+#: ``2,4,6`` when the machine is shared) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,8").split(",") if v
+)
 _TIERS = ("smoke", "standard", "full")
 GLIBC = reg.GLIBC
 #: How long a case whose ANTs never finishes lets it run.
@@ -84,7 +88,9 @@ class AiCase:
     - ``"divergence"``: a documented difference (``reason``).
 
     ``seed`` is ``ANTS_RANDOM_SEED`` (``None``: unset). ``band`` runs ANTs' thread band;
-    ``fmriprep`` names the transform fMRIPrep wrote for a real case.
+    ``fmriprep`` names the transform fMRIPrep wrote for a real case; ``truth`` names the known
+    transform of a blob case (``phantom:<move>``, ``t1w:shift``, ``t1w:rotated``), against which
+    ANTs' and larmorx's transforms are scored.
     """
 
     id: str
@@ -98,6 +104,7 @@ class AiCase:
     band: bool = False
     program: str = PROGRAM
     fmriprep: str = ""
+    truth: str = ""
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1562,6 +1569,362 @@ def _random_cases() -> list[AiCase]:
     ]
 
 
+def _blob_cases() -> list[AiCase]:
+    """``-b`` (the blob alignment): phantoms with known transforms, ANTs' failure paths,
+    real T1w images."""
+    d3, d2 = ("-d", "3"), ("-d", "2")
+    f3, f2 = "{gen:ai-blobs-fixed-3d}", "{gen:ai-blobs-fixed-2d}"
+
+    def mv(move: str) -> str:
+        return "{gen:ai-blobs-moving-" + move + "}"
+
+    def m(fixed: str, moving: str) -> str:
+        return f"Mattes[{fixed},{moving},32,Regular,0.25]"
+
+    out = []
+    for move, dims, f in (
+        ("shift", d3, f3),
+        ("rigid", d3, f3),
+        ("affine", d3, f3),
+        ("2d-shift", d2, f2),
+        ("2d-rigid", d2, f2),
+    ):
+        for transform in ("Rigid", "Affine", "Similarity"):
+            if transform == "Similarity" and move not in ("shift", "2d-rigid"):
+                continue
+            what = {
+                "shift": "an exact translation (ANTs' own test keeps the true pairs)",
+                "rigid": "a rotation of 7 and 4 degrees and a shift",
+                "affine": "a rotation of 5 degrees with scales 1.06 and 0.96",
+                "2d-shift": "a 2D translation",
+                "2d-rigid": "a 2D rotation of 9 degrees and a shift",
+            }[move]
+            expect = "abort" if (move == "affine" and transform == "Affine") else "pass"
+            out.append(
+                ai(
+                    f"blobs/{move}-{transform.lower()}",
+                    "blobs",
+                    f"{transform} from 30 blobs of a phantom and its copy moved by {what}",
+                    *dims,
+                    "-m",
+                    m(f, mv(move)),
+                    "-t",
+                    f"{transform}[0.1]",
+                    "-b",
+                    "30",
+                    *O_MAT,
+                    *V,
+                    expect=expect,
+                    truth=f"phantom:{move}",
+                    band=(move == "shift" and transform == "Rigid"),
+                )
+            )
+    out += [
+        ai(
+            "blobs/shift-rigid-match-10",
+            "blobs",
+            "-b [30,10]: 30 blobs extracted, at most 10 pairs",
+            *d3,
+            "-m",
+            m(f3, mv("shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "[30,10]",
+            *O_MAT,
+            *V,
+            truth="phantom:shift",
+        ),
+        ai(
+            "blobs/shift-rigid-search",
+            "blobs",
+            "The blob alignment, then a search over rotations about the image axes",
+            *d3,
+            "-m",
+            m(f3, mv("shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "30",
+            "-s",
+            "[30,0.12]",
+            "-c",
+            "[3,1e-6,5]",
+            *O_MAT,
+            *V,
+            truth="phantom:shift",
+        ),
+        ai(
+            "blobs/rigid-affine-search-h5",
+            "blobs",
+            "Affine from the blobs of the rotated phantom, a search, an HDF5 output",
+            *d3,
+            "-m",
+            m(f3, mv("rigid")),
+            "-t",
+            "Affine[0.1]",
+            "-b",
+            "30",
+            "-s",
+            "[30,0.12]",
+            "-c",
+            "[2,1e-6,5]",
+            "-o",
+            "{out}/t.h5",
+            *V,
+            truth="phantom:rigid",
+        ),
+        ai(
+            "blobs/identical-rigid",
+            "blobs",
+            "An image against itself: every displacement is 0, so ANTs' ratios are 0/0 (ANTS-110)",
+            *d3,
+            "-m",
+            m(f3, f3),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "20",
+            *O_MAT,
+            *V,
+        ),
+        ai(
+            "blobs/no-pairs-rigid",
+            "blobs",
+            "-b [5,0]: no pair to match; the rigid fit of no landmark (ANTS-114)",
+            *d3,
+            "-m",
+            m(f3, mv("shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "[5,0]",
+            *O_MAT,
+            *V,
+        ),
+        ai(
+            "blobs/no-pairs-affine",
+            "blobs",
+            "-b [5,0] with Affine: too few landmarks, ITK's exception",
+            *d3,
+            "-m",
+            m(f3, mv("shift")),
+            "-t",
+            "Affine[0.1]",
+            "-b",
+            "[5,0]",
+            *O_MAT,
+            *V,
+            expect="abort",
+        ),
+        ai(
+            "blobs/2d-no-pairs-rigid",
+            "blobs",
+            "2D, no pair: ITK's warning (fewer than 2 landmarks), then NaN (ANTS-114)",
+            *d2,
+            "-m",
+            m(f2, mv("2d-shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "[5,0]",
+            *O_MAT,
+            *V,
+        ),
+        ai(
+            "blobs/constant",
+            "blobs",
+            "Two constant images: every voxel is a maximum of value 0",
+            *d3,
+            "-m",
+            m("{gen:ai-blobs-constant}", "{gen:ai-blobs-constant}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "5",
+            *O_MAT,
+            *V,
+        ),
+        ai(
+            "blobs/noise-rigid",
+            "blobs",
+            "Noise against itself, 48^3: patches barely fit",
+            *d3,
+            "-m",
+            m("{gen:ai-blobs-noise}", "{gen:ai-blobs-noise}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "10",
+            *O_MAT,
+            *V,
+        ),
+        ai(
+            "blobs/thin",
+            "blobs",
+            "An axis of 3 voxels: the Laplacian of Gaussian refuses it (ITK's exception)",
+            *d3,
+            "-m",
+            m("{gen:ai-blobs-thin}", "{gen:ai-blobs-thin}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "5",
+            *O_MAT,
+            *V,
+            expect="abort",
+        ),
+        ai(
+            "blobs/missing-fixed",
+            "blobs",
+            "A fixed image that does not exist: the blob detector's input is not set",
+            *d3,
+            "-m",
+            m("{missing:nothere.nii.gz}", mv("shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "5",
+            *O_MAT,
+            *V,
+            expect="abort",
+        ),
+        ai(
+            "blobs/missing-moving",
+            "blobs",
+            "A moving image that does not exist (after the fixed image's blobs)",
+            *d3,
+            "-m",
+            m(f3, "{missing:nothere.nii.gz}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "5",
+            *O_MAT,
+            *V,
+            expect="abort",
+        ),
+        ai(
+            "blobs/principal-axes-ignored",
+            "blobs",
+            "-p 1 with -b: the blobs decide the initial transform",
+            *d3,
+            "-m",
+            m(f3, mv("shift")),
+            "-t",
+            "Rigid[0.1]",
+            "-p",
+            "1",
+            "-b",
+            "30",
+            *O_MAT,
+            *V,
+            truth="phantom:shift",
+        ),
+        ai(
+            "real/ds000005-sub-01/blobs-t1w-shift",
+            "real",
+            "fMRIPrep's T1w of ds000005 against its copy with the origin moved (6, -4, 3) mm",
+            *d3,
+            "-m",
+            m("{oracle:" + ants_ai_blobs.DS000005_T1W + "}", "{gen:ai-blobs-t1w-shift}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "30",
+            *O_MAT,
+            *V,
+            truth="t1w:shift",
+            band=True,
+        ),
+        ai(
+            "real/ds000005-sub-01/blobs-t1w-rotated",
+            "real",
+            "fMRIPrep's T1w of ds000005 against its copy rotated by 8 degrees and shifted",
+            *d3,
+            "-m",
+            m("{oracle:" + ants_ai_blobs.DS000005_T1W + "}", "{gen:ai-blobs-t1w-rotated}"),
+            "-t",
+            "Rigid[0.1]",
+            "-b",
+            "30",
+            *O_MAT,
+            *V,
+            truth="t1w:rotated",
+        ),
+        ai(
+            "real/ds000005-sub-01/blobs-t1w-rotated-affine",
+            "real",
+            "The same with Affine (ANTs: too few landmarks)",
+            *d3,
+            "-m",
+            m("{oracle:" + ants_ai_blobs.DS000005_T1W + "}", "{gen:ai-blobs-t1w-rotated}"),
+            "-t",
+            "Affine[0.1]",
+            "-b",
+            "30",
+            *O_MAT,
+            *V,
+            expect="abort",
+            truth="t1w:rotated",
+        ),
+    ]
+    tpl = "{tf:tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz}"
+    oasis = "{tf:tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz}"
+    runs = (
+        ("ds000005-sub-01-noreconall", "sub-01/anat/sub-01_desc-preproc_T1w.nii.gz", "standard"),
+        ("ds001600-sub-1-noreconall", "sub-1/anat/sub-1_desc-preproc_T1w.nii.gz", "full"),
+        ("ds005040-sub-002-noreconall", "sub-002/anat/sub-002_desc-preproc_T1w.nii.gz", "full"),
+        ("ds005454-sub-16-noreconall", "sub-16/anat/sub-16_desc-preproc_T1w.nii.gz", "full"),
+        (
+            "ds005752-sub-ON01016-noreconall",
+            "sub-ON01016/ses-01/anat/sub-ON01016_ses-01_acq-FSPGR_rec-SCIC_desc-preproc_T1w.nii.gz",
+            "full",
+        ),
+    )
+    for run, t1w, tier in runs:
+        label = run.split("-noreconall")[0]
+        out.append(
+            ai(
+                f"real/{label}/blobs-mni-rigid",
+                "real",
+                f"MNI152NLin2009cAsym (2 mm) against {label}'s T1w, Rigid from 30 blobs",
+                *d3,
+                "-m",
+                m(tpl, "{oracle:" + run + "/out/" + t1w + "}"),
+                "-t",
+                "Rigid[0.1]",
+                "-b",
+                "30",
+                *O_MAT,
+                *V,
+                tier=tier,
+            )
+        )
+    out.append(
+        ai(
+            "real/ds005040-sub-002/blobs-oasis-affine",
+            "real",
+            "OASIS30ANTs (1 mm) against ds005040's T1w, Affine from 100 blobs",
+            *d3,
+            "-m",
+            m(
+                oasis,
+                "{oracle:ds005040-sub-002-noreconall/out/sub-002/anat/sub-002_desc-preproc_T1w.nii.gz}",
+            ),
+            "-t",
+            "Affine[0.1]",
+            "-b",
+            "100",
+            *O_MAT,
+            *V,
+            tier="full",
+            expect="abort",
+        )
+    )
+    return out
+
+
 #: fMRIPrep's antsAI nodes in the oracle runs: (run, node directory, tier).
 REAL_NODES = (
     (
@@ -1630,7 +1993,7 @@ def _real_cases() -> list[AiCase]:
 
 
 def all_cases() -> list[AiCase]:
-    return _search_cases() + _message_cases() + _random_cases() + _real_cases()
+    return _search_cases() + _message_cases() + _random_cases() + _real_cases() + _blob_cases()
 
 
 def cases_for(tier: str) -> list[Case]:
@@ -2039,22 +2402,29 @@ def run_case(case: Case, checks: CheckList) -> None:
         if c.band and ants[0] == 0:
             ref = _parameters(a_dir)
             band = 0.0
+            crashed = []
             for n in BAND_THREADS:
                 b_dir = tmp / f"ants-{n}"
                 b_dir.mkdir()
-                _run_ants(program, _resolve(c, b_dir, tmp)[0], seed, threads=n)
+                code = _run_ants(program, _resolve(c, b_dir, tmp)[0], seed, threads=n)[0]
+                if code is not None and code < 0:
+                    # ANTS-60: the blob detector indexes its per-thread heaps past their end.
+                    crashed.append(f"{n} threads (signal {-code})")
+                    continue
                 other = _parameters(b_dir)
                 if ref is not None and other is not None and other.shape == ref.shape:
                     band = max(band, float(np.max(np.abs(other - ref))))
             dist = _distance(_parameters(l_dir), ref)
+            crash_text = f"; ANTs crashes at {', '.join(crashed)}" if crashed else ""
             checks(
                 "thread band",
                 True,
                 metric="max |parameter difference|",
                 value=f"{dist:.3g}",
                 threshold=f"reported; ANTs at {', '.join(map(str, BAND_THREADS))} threads vs 1: "
-                f"{band:.3g}",
-                detail=f"larmorx vs ANTs (1 thread) {dist:.3g}; ANTs' own band {band:.3g}",
+                f"{band:.3g}{crash_text}",
+                detail=f"larmorx vs ANTs (1 thread) {dist:.3g}; ANTs' own band {band:.3g}"
+                f"{crash_text}",
             )
         # D13: larmorx's default on the same arguments.
         f_dir = tmp / "larmorx-fix"
@@ -2083,6 +2453,30 @@ def run_case(case: Case, checks: CheckList) -> None:
             other_changes="; ".join(other),
             silent_ok=("ITK-18", "ANTS-54"),
         )
+        if c.truth:
+            _score(checks, c, a_args, a_dir, f_dir)
+
+
+def _score(checks: CheckList, c: AiCase, args: list[str], a_dir: Path, f_dir: Path) -> None:
+    """How far ANTs' and larmorx's default transforms are from the known one (reported)."""
+    fixed = Path(re.match(r"\w+\[([^,\]]+)", args[args.index("-m") + 1]).group(1))
+    name = "t.h5" if "{out}/t.h5" in c.args else "t.mat"
+
+    def text(err: tuple[float, float] | None) -> str:
+        if err is None:
+            return "no transform"
+        return f"{err[0]:.3g} mm mean, {err[1]:.3g} mm largest"
+
+    ants = ants_ai_blobs.transform_error(a_dir / name, c.truth, fixed)
+    mine = ants_ai_blobs.transform_error(f_dir / name, c.truth, fixed)
+    checks(
+        "alignment error",
+        True,
+        metric="distance to the true transform",
+        value=text(mine),
+        threshold="reported",
+        detail=f"ANTs {text(ants)}; larmorx's default {text(mine)}",
+    )
 
 
 def highlights(results: list[CaseResult]) -> list[str]:

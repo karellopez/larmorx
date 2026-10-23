@@ -2,6 +2,7 @@
 // Copyright 2026 Karel Lopez Vilaret.
 //! The AFNI command lines of the replicas (`larmorx-gpl afni <program> ...`).
 
+mod common;
 mod output;
 pub mod tshift;
 

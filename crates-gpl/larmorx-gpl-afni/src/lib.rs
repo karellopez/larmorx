@@ -17,12 +17,18 @@
 //!   detrending ([`detrend`]), and a port of glibc's `sinf`/`cosf` ([`glibc_sincosf`]) for the
 //!   weighted-sinc method.
 //! - Inputs: slice patterns ([`tpattern`]) and AFNI's 1D text files ([`oned`]).
+//! - `3dAutomask` (a brain mask): AFNI's automask and clip level ([`mask`]) and the program's
+//!   own steps ([`automask`]); the command line is [`cli::automask`].
+//! - `3dUnifize` (white-matter uniformization): the local percentile mean, the scalings and the
+//!   T2 inversion ([`unifize`]), with a port of glibc's `tanhf` and `cbrtf`
+//!   ([`glibc_floatmath`]); the command line is [`cli::unifize`].
 //! - AFNI's environment variables and global options (`-Dname=value`, `-overwrite`), as a
 //!   settings table that never changes the process environment ([`environ`]), and AFNI's
 //!   messages ([`message`]).
 #![forbid(unsafe_code)]
 
 pub mod afni_ext;
+pub mod automask;
 pub mod axes;
 pub mod cli;
 pub mod cnum;
@@ -30,10 +36,13 @@ pub mod csfft;
 pub mod dataset;
 pub mod detrend;
 pub mod environ;
+pub mod glibc_floatmath;
 pub mod glibc_sincosf;
+pub mod mask;
 pub mod message;
 pub mod oned;
 pub mod shift;
 pub mod tpattern;
 pub mod tshift;
+pub mod unifize;
 pub mod x87;

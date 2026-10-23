@@ -754,6 +754,33 @@ pub fn read(
     messages: &mut Vec<Message>,
     notices: &mut Notices,
 ) -> Result<Dataset, ReadError> {
+    read_as(path, n_threads, settings, messages, notices, false)
+}
+
+/// Reads a NIfTI file as `THD_open_dataset` + `DSET_load` give it, without the copy 3dTshift
+/// makes (3dAutomask, 3dUnifize). The only difference from [`read`] is a brick factor that
+/// loading sets: data stored without conversion, with a finite non-zero `scl_slope` and no
+/// scaling at load (`scl_inter` 0), get the slope as their factor even when it is 1
+/// (`THD_load_nifti`, "pass slope as brick_fac"), where the copy has none. A factor of 1 scales
+/// nothing, but `3dAutomask -apply_prefix` copies it into its output, as `scl_slope` 1.
+pub fn read_loaded(
+    path: &str,
+    n_threads: usize,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+    notices: &mut Notices,
+) -> Result<Dataset, ReadError> {
+    read_as(path, n_threads, settings, messages, notices, true)
+}
+
+fn read_as(
+    path: &str,
+    n_threads: usize,
+    settings: &Settings,
+    messages: &mut Vec<Message>,
+    notices: &mut Notices,
+    loaded: bool,
+) -> Result<Dataset, ReadError> {
     let mode = notices.mode();
     let lower = path.to_ascii_lowercase();
     if !(lower.ends_with(".nii") || lower.ends_with(".nii.gz")) {
@@ -1034,6 +1061,11 @@ pub fn read(
             "{shown}: {} voxel values for a grid of {nvox} voxels and {nvals} sub-bricks",
             data.len()
         )));
+    }
+    // THD_load_nifti: without scaling at load, a finite non-zero slope becomes the factor of
+    // the loaded dataset (the copy keeps the factor set when the header was opened).
+    if loaded && !scale_load && slope.is_finite() && slope != 0.0 {
+        factor = slope as f32;
     }
     Ok(Dataset {
         nxyz,

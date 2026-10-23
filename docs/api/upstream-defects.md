@@ -82,20 +82,24 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | HDF-01 | HDF5 1.12 | `lx.transforms.read`, `-t x.h5` (non-native floating-point parameters) | conversion state carried from one element to the next (denormals) | each element converted on its own ([transforms-hdf5.md](transforms-hdf5.md)) |
 | SCI-03 | SciPy `ndimage` | `lx.ndimage.*`, `resample_series(mode=...)` | the spline prefilter's reflect boundary (modes `reflect`, `grid-mirror`, `nearest`) reads a coefficient it has already updated: the splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: splines through the samples |
 | AFNI-01 | 3dTshift | `lx.afni.tshift`, `larmorx afni 3dTshift` (both implementations) | a negative `scl_slope` is applied on output only: shifted slices come out sign-flipped and scaled | the factor is applied on input too |
-| AFNI-02 | 3dTshift | same | float32 data with a slope and an intercept are scaled, and the slope is kept as a scale factor: scaled twice | scaled once, no factor |
+| AFNI-02 | 3dTshift, 3dAutomask, 3dUnifize | same | float32 data with a slope and an intercept are scaled, and the slope is kept as a scale factor: scaled twice | scaled once, no factor |
 | AFNI-03 | 3dTshift | `larmorx afni 3dTshift` (header slice timing) | header slice code 2 (sequential decreasing) gives every slice time 0: nothing is shifted | slices `slice_end` down to `slice_start`, as NIfTI defines the code |
 | AFNI-05 | 3dTshift | `lx.afni.tshift(detrend=False)`, `-no_detrend` | only the first voxel of each pair has its mean removed and restored; the second is shifted raw (its edges fall toward 0) | every voxel has its mean removed and restored |
-| AFNI-07 | 3dTshift | both | metre and micron units: the voxel sizes are converted to millimetres, the origin is not, and an oblique sform not at all | the whole matrix is converted |
+| AFNI-07 | 3dTshift, 3dAutomask, 3dUnifize | both | metre and micron units: the voxel sizes are converted to millimetres, the origin is not, and an oblique sform not at all | the whole matrix is converted |
 | AFNI-08 | 3dTshift | `larmorx afni 3dTshift` | a copy of the input whose kept slice times are all within 3 ms of 0 is written with `slice_end` 0 | the defaults: no slice code, `slice_end` = nz − 1 (with the slice fields AFNI derives from the times otherwise) |
-| AFNI-11 | 3dTshift | `larmorx afni 3dTshift` | an existing output is not written, exit 0 | an error, exit 1 (`reproduce` writes nothing and exits 0) |
-| AFNI-12 | 3dTshift | `larmorx afni 3dTshift` | a `-prefix` with blanks, shell metacharacters or non-ASCII characters is refused; one that passes only through AFNI's exception for names beginning with `3dcalc` is refused when written (nothing written, exit 0) | any name is written, with a warning when AFNI would refuse it (`reproduce` refuses it at both checks) |
-| AFNI-16 | 3dTshift | both | a grid within about 0.01° to 0.024° of plumb (a single-precision test) is written exactly plumb, its tilt discarded | the input's matrix is kept, sform and qform (decided 2026-10-12; `reproduce` writes AFNI's plumb matrix, byte for byte) |
-| AFNI-18 | 3dTshift | `larmorx afni 3dTshift` | an input name with a blank is read as a list of datasets to join in time (unless `AFNI_PATH_SPACES_OK` is yes), so an input in a directory whose name has a blank cannot be opened | the name is one file (`reproduce` reads AFNI's list) |
+| AFNI-11 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | an existing output is not written, exit 0 | an error, exit 1 (`reproduce` writes nothing and exits 0) |
+| AFNI-12 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | a `-prefix` with blanks, shell metacharacters or non-ASCII characters is refused; one that passes only through AFNI's exception for names beginning with `3dcalc` is refused when written (nothing written, exit 0) | any name is written, with a warning when AFNI would refuse it (`reproduce` refuses it at both checks) |
+| AFNI-16 | 3dTshift, 3dAutomask, 3dUnifize | both | a grid within about 0.01° to 0.024° of plumb (a single-precision test) is written exactly plumb, its tilt discarded | the input's matrix is kept, sform and qform (decided 2026-10-12; `reproduce` writes AFNI's plumb matrix, byte for byte) |
+| AFNI-18 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | an input name with a blank is read as a list of datasets to join in time (unless `AFNI_PATH_SPACES_OK` is yes), so an input in a directory whose name has a blank cannot be opened | the name is one file (`reproduce` reads AFNI's list) |
 | AFNI-19 | 3dTshift | `larmorx afni 3dTshift` | with `AFNI_ALLOW_MILLISECONDS` yes and `-TR` in milliseconds, `toffset` is written in milliseconds, labelled seconds | `toffset` in seconds, with the TR |
 | AFNI-20 | 3dTshift | `larmorx afni 3dTshift` | a dataset of one row (one voxel along y and z) is written as a 1D text file under the NIfTI name, unless `AFNI_WRITE_1D_AS_PREFIX` is yes | NIfTI, in both modes: AFNI's file holds a random identifier, so it is not reproduced; the warning says what AFNI would do |
 | AFNI-22 | 3dTshift | `larmorx afni 3dTshift` | `-Dname=value` with blanks in the value or around `=` sets another value (`-DX=a b` sets `X` to `a=b`) | the value as written, after the first `=` |
-| AFNI-23 | 3dTshift | both, with `AFNI_NIFTI_SCALE=NO` (command line, or `lx.afni.tshift(afni_settings=...)`) | uint8 and int16 data with a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the values are off by it | AFNI's integers and `scl_slope` kept, the intercept written as `scl_inter`; with `-rlt -ignore`, the data read as without the variable (decided 2026-10-12) |
-| AFNI-26 | 3dTshift | `larmorx afni 3dTshift` | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error, exit 1 (`reproduce` prints AFNI's message, writes nothing and exits 0: both implementations, since 2026-10-12) |
+| AFNI-23 | 3dTshift, 3dAutomask, 3dUnifize | both, with `AFNI_NIFTI_SCALE=NO` (command line, or `lx.afni.tshift(afni_settings=...)`) | uint8 and int16 data with a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the values are off by it | AFNI's integers and `scl_slope` kept, the intercept written as `scl_inter`; with `-rlt -ignore`, the data read as without the variable (decided 2026-10-12) |
+| AFNI-26 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error, exit 1 (`reproduce` prints AFNI's message, writes nothing and exits 0: both implementations, since 2026-10-12) |
+| AFNI-43 | 3dAutomask | `lx.afni.automask(peels=0)`, `larmorx afni 3dAutomask -peels 0` | peels once | no peeling, as the help says |
+| AFNI-45 | 3dUnifize | `lx.afni.unifize(t2=True, t2_percentile=100)`, `-T2up` near 100 | the percentile is read one past the sorted values (memory never written; AFNI read 0 and wrote zeros) | the largest value (the 100th percentile); `reproduce` uses 0 |
+| AFNI-47 | 3dUnifize | inputs of more than a million voxels with an axis of 2 or 3 | the half-size scale image is read past its end | brought back to the input's grid; `reproduce` reads AFNI's image, 0 past its end |
+| AFNI-01 | 3dAutomask, 3dUnifize `-EPI` | a series with a negative `scl_slope` | the factor dropped when the series is averaged (3dAutomask) or its median taken (3dUnifize `-EPI`: all zeros) | the factor applied |
 | FSL-01 | mcflirt | `lx.mri.hmc`, `larmorx mri hmc` | the last volume of the series starts the first stage from the identity instead of its predecessor's result (every fMRIPrep run's last volume) | it continues its chain like every other volume |
 | FSL-03 | mcflirt | both | the in-plane mode pads the first stage's reference grid twice | once, like the other stages |
 | FSL-14 | mcflirt | both | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN | non-finite voxels are left out of the centre of mass and the cost |
@@ -238,6 +242,10 @@ the clean-room original followed the replica that day (completing 3dTshift, part
 values within the original's thresholds (the last bits of its own numerics) and everything
 else byte for byte.
 
+The 3dAutomask and 3dUnifize replicas (`larmorx-gpl`, 2026-10-23) have the switch for every
+AFNI entry that applies to them; they have no clean-room original yet. AFNI-40 and AFNI-46
+(crashes) are refused in both modes.
+
 ## How the switch is validated
 
 - **Parity** compares larmorx with the original in `reproduce` mode, where bit-identity held
@@ -246,7 +254,7 @@ else byte for byte.
   fMRIPrep too, since it compares with fMRIPrep as it ran). A second pass runs the default and
   reports, case by case, which defects were named and what the corrections changed. It also
   checks the rule above: a defect is named exactly when the two passes differ (`D13 fix pass`
-  in the records: [afni-tshift.md](../validation/afni-tshift.md),
+  in the records: [afni-tshift.md](../validation/afni-tshift.md), [afni-automask.md](../validation/afni-automask.md), [afni-unifize.md](../validation/afni-unifize.md),
   [mri-hmc.md](../validation/mri-hmc.md), [resample-series.md](../validation/resample-series.md),
   and every ANTs record, such as [ants-image-math.md](../validation/ants-image-math.md)).
   Where the original's output depends on memory it never wrote, the comparison covers

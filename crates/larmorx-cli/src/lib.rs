@@ -30,10 +30,15 @@ const EXIT_IO_ERROR: u8 = 1;
 /// and to `run_tool`; every tool listed needs a golden case (`tests/golden/registry.py`,
 /// `docs/validation/golden.md`), which the golden coverage test checks through this list.
 pub const FAMILIES: &[(&str, &[&str])] = &[
-    ("afni", larmorx_afni::cli::TOOLS),
+    ("afni", AFNI_TOOLS),
     ("ants", larmorx_ants::cli::TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
 ];
+
+/// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`) and those with a
+/// replica only, which run when the `larmorx-gpl` program is installed
+/// ([`replica::replica_only`]; a test checks the list).
+const AFNI_TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize"];
 
 /// How a command line runs, besides its arguments.
 pub struct Options<'a> {
@@ -335,6 +340,20 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("afni   3dTshift"), "{out}");
+        // The AFNI tools: the originals' and those with a replica only.
+        let listed: Vec<&str> = larmorx_afni::cli::TOOLS
+            .iter()
+            .copied()
+            .chain(replica::replica_only("afni"))
+            .collect();
+        assert_eq!(listed, AFNI_TOOLS);
+        // Without an original, asking for it is an error naming the replica's package.
+        let (code, _, err) = run_capture(&["lx", "afni", "3dAutomask", "-q", "in.nii"]);
+        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert!(
+            err.contains("no clean-room original of afni 3dAutomask"),
+            "{err}"
+        );
     }
 
     #[test]

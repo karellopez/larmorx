@@ -168,7 +168,7 @@ fn tshift_upstream_defects_switch() {
     let (code, err) = run("taken.nii", None);
     assert_eq!(code, Some(1), "{err}");
     assert!(
-        err.contains("upstream defect AFNI-11 (3dTshift) corrected"),
+        err.contains("upstream defect AFNI-11 (AFNI) corrected"),
         "{err}"
     );
     let (code, err) = run("taken.nii", Some("reproduce"));
@@ -194,7 +194,7 @@ fn tshift_upstream_defects_switch() {
     let (code, err) = run("with blank.nii", None);
     assert_eq!(code, Some(0), "{err}");
     assert!(
-        err.contains("upstream defect AFNI-12 (3dTshift) corrected"),
+        err.contains("upstream defect AFNI-12 (AFNI) corrected"),
         "{err}"
     );
     assert!(dir.path().join("with blank.nii").exists());
@@ -207,11 +207,11 @@ fn tshift_upstream_defects_switch() {
         err.contains("** ERROR: Illegal filename for NIfTI output: ./3dcalc a b.nii"),
         "{err}"
     );
-    assert!(err.contains("upstream defect AFNI-12 (3dTshift) reproduced"));
+    assert!(err.contains("upstream defect AFNI-12 (AFNI) reproduced"));
     assert!(!dir.path().join("3dcalc a b.nii").exists());
     let (code, err) = run("3dcalc a b.nii", None);
     assert_eq!(code, Some(0), "{err}");
-    assert!(err.contains("upstream defect AFNI-12 (3dTshift) corrected"));
+    assert!(err.contains("upstream defect AFNI-12 (AFNI) corrected"));
     assert!(dir.path().join("3dcalc a b.nii").exists());
 
     // AFNI-26: an output in a missing directory. AFNI's NIfTI writer cannot open it; AFNI
@@ -225,13 +225,13 @@ fn tshift_upstream_defects_switch() {
         "{err}"
     );
     assert!(
-        err.contains("upstream defect AFNI-26 (3dTshift) reproduced"),
+        err.contains("upstream defect AFNI-26 (AFNI) reproduced"),
         "{err}"
     );
     let (code, err) = run("nodir/out.nii", None);
     assert_eq!(code, Some(1), "{err}");
     assert!(
-        err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+        err.contains("upstream defect AFNI-26 (AFNI) corrected"),
         "{err}"
     );
     assert!(!dir.path().join("nodir").exists());
@@ -260,7 +260,7 @@ fn tshift_upstream_defects_switch() {
         let (code, err) = tshift_in(dir.path(), &args, &[]);
         assert_eq!(code, Some(1), "{err}");
         assert!(
-            err.contains("upstream defect AFNI-26 (3dTshift) corrected"),
+            err.contains("upstream defect AFNI-26 (AFNI) corrected"),
             "{err}"
         );
         assert_eq!(std::fs::read(&readonly).unwrap(), b"kept");
@@ -445,8 +445,8 @@ fn tshift_nifti_scale_no_keeps_the_intercept() {
             .zip(b)
             .fold(0.0f64, |m, (x, y)| m.max((x - y).abs()))
     };
-    let corrected = "upstream defect AFNI-23 (3dTshift) corrected";
-    let reproduced = "upstream defect AFNI-23 (3dTshift) reproduced";
+    let corrected = "upstream defect AFNI-23 (AFNI) corrected";
+    let reproduced = "upstream defect AFNI-23 (AFNI) reproduced";
 
     // Without the variable: float32, slope * x + inter.
     let (plain, _, h, err) = run(&[], "plain.nii", &[]);

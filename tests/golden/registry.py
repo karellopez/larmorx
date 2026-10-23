@@ -866,12 +866,42 @@ def image_math_operations() -> list[str]:
     return [f"imagemath:{op}" for op in lx.ants.image_math_operations()]
 
 
+#: The public functions that run a tool which has only a replica (no clean-room original yet),
+#: with the tool: the replica's program is not installed where these tests run, so their golden
+#: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs``, run on every
+#: platform by the GPL job). ``replica_only`` checks that each tool has one there.
+REPLICA_ONLY_FUNCTIONS = {
+    "lx.afni.automask": "afni 3dAutomask",
+    "lx.afni.unifize": "afni 3dUnifize",
+}
+
+#: The replica's golden cases.
+GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
+
+
+def replica_only() -> dict[str, str]:
+    """``{key: tool}`` of every command-line tool and public function that has only a replica
+    (``larmorx_cli::replica::REPLICAS`` without an original), keyed as :func:`required` keys
+    them."""
+    out = {
+        f"cli:{r['family']} {r['tool']}": f"{r['family']} {r['tool']}"
+        for r in _core.replica_registry()
+        if not r["original"]
+    }
+    for name, tool in REPLICA_ONLY_FUNCTIONS.items():
+        out[f"fn:{id(resolve(name))}"] = tool
+    return out
+
+
 def required() -> dict[str, str]:
-    """Every name that needs a golden case: ``{key: public name}``. Functions are keyed by
-    identity (``fn:<id>``), so aliases (``lx.save``, ``lx.io.save``) count once."""
+    """Every name that needs a golden case here: ``{key: public name}``. Functions are keyed by
+    identity (``fn:<id>``), so aliases (``lx.save``, ``lx.io.save``) count once. The tools and
+    functions with only a replica (:func:`replica_only`) have theirs in ``crates-gpl``."""
     out = {key: key for key in [*cli_tools(), *image_math_operations()]}
     for fn, name in public_functions().items():
         out[f"fn:{id(fn)}"] = name
+    for key in replica_only():
+        out.pop(key, None)
     return out
 
 
@@ -2733,6 +2763,12 @@ def _(ctx: Context) -> dict[str, Any]:
             implementation=ORIGINAL,
         )
     return image_outputs("out", img, header=True)
+
+
+@case("py.afni.fmriprep_unifize_options", covers=("lx.afni.fmriprep_unifize_options",))
+def _(ctx: Context) -> dict[str, Any]:
+    o = lx.afni.fmriprep_unifize_options()
+    return {"options": np.array([o["clfrac"], o["radius"], *o["percentiles"], float(o["t2"])])}
 
 
 @case("py.afni.fmriprep_slice_timing", covers=("lx.afni.fmriprep_slice_timing",))

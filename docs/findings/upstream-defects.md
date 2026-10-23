@@ -11,8 +11,9 @@ corrected, never deleted.
 
 > **Restricted entries (†).** The sections "Restricted: AFNI 3dTshift" and "Restricted: FSL
 > mcflirt" were written from AFNI's MCW (GPL) and FSL's (non-commercial) source, through
-> [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md). **Clean-room
-> implementers must not read those two sections.** The summary table and the gap lists below
+> [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md); the section "Restricted: AFNI 3dAutomask and
+> 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md). **Clean-room
+> implementers must not read those sections.** The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
 > so anyone may read them.
@@ -225,32 +226,42 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
-| AFNI-01 † | 3dTshift | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12) | – |
-| AFNI-02 † | 3dTshift | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12) | – |
+| AFNI-01 † | 3dTshift, 3dAutomask, 3dUnifize | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12) | – |
+| AFNI-02 † | 3dTshift, 3dAutomask, 3dUnifize | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12) | – |
 | AFNI-03 † | 3dTshift | header slice code 2 (sequential decreasing): no shift | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
 | AFNI-04 † | 3dTshift | can crash for a shift beyond the series on odd slices | a | none | defined (zeros) | – |
 | AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
 | AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | f | none | AFNI's behaviour, in both implementations and both modes; larmorx's docs say what `-rlt+` does | – (decided 2026-10-12: the help text is the error) |
-| AFNI-07 † | 3dTshift | metre or micron units: voxel sizes converted; the origin not (plumb grid) or the whole sform not (oblique grid) | c | rare | corrected by default in both implementations (converts), `reproduce` gives AFNI's geometry in both (the original since 2026-10-12, spec §6.1) | – |
-| AFNI-08 † | 3dTshift | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | c | none | corrected by default in both implementations, with a switch (the original since 2026-10-12, spec §6.2) | – |
+| AFNI-07 † | 3dTshift, 3dAutomask, 3dUnifize | metre or micron units: voxel sizes converted; the origin not (plumb grid) or the whole sform not (oblique grid) | c | rare | corrected by default in both implementations (converts), `reproduce` gives AFNI's geometry in both (the original since 2026-10-12, spec §6.1) | – |
+| AFNI-08 † | 3dTshift, 3dAutomask, 3dUnifize | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | c | none | corrected by default in both implementations, with a switch (the original since 2026-10-12, spec §6.2) | – |
 | AFNI-09 † | 3dTshift | slice-time files rounded two ways | d | none | replica reproduces | – |
 | AFNI-10 † | 3dTshift | AFNI's own header extension (7 digits) wins over the NIfTI header | d | AFNI-written inputs | replica reproduces; original ignores | – |
-| AFNI-11 † | 3dTshift | existing output: not written, exit 0 (unless `-overwrite` or `AFNI_DECONFLICT` says to overwrite, rename or stop) | e | none | error (exit 1) in both implementations; `reproduce` exits 0 without writing; `-overwrite` and `AFNI_DECONFLICT` as AFNI in both modes (both implementations, the original since 2026-10-12; spec §6.3, §7.1) | – |
-| AFNI-12 † | 3dTshift | output names with blanks or non-ASCII refused, at the option scan (exit 1) and, for names starting with `3dcalc`, when written (nothing written, exit 0); with `AFNI_ALLOW_ARBITRARY_FILENAMES` only empty names and, when written, names starting with `-` | e | paths with blanks | any name accepted in both implementations; `reproduce` refuses them at both checks, with the variable as AFNI (the original since 2026-10-12; spec §6.3, §7.1) | – |
+| AFNI-11 † | 3dTshift, 3dAutomask, 3dUnifize | existing output: not written, exit 0 (unless `-overwrite` or `AFNI_DECONFLICT` says to overwrite, rename or stop) | e | none | error (exit 1) in both implementations; `reproduce` exits 0 without writing; `-overwrite` and `AFNI_DECONFLICT` as AFNI in both modes (both implementations, the original since 2026-10-12; spec §6.3, §7.1) | – |
+| AFNI-12 † | 3dTshift, 3dAutomask, 3dUnifize | output names with blanks or non-ASCII refused, at the option scan (exit 1) and, for names starting with `3dcalc`, when written (nothing written, exit 0); with `AFNI_ALLOW_ARBITRARY_FILENAMES` only empty names and, when written, names starting with `-` | e | paths with blanks | any name accepted in both implementations; `reproduce` refuses them at both checks, with the variable as AFNI (the original since 2026-10-12; spec §6.3, §7.1) | – |
 | AFNI-13 † | 3dTshift | unknown pattern: "ERROR", not "FATAL ERROR" | f | none | AFNI's text in both implementations (the original since 2026-10-12) | – |
 | AFNI-14 † | 3dTshift | `-no_detrend` with Fourier: "changing default", then fatal | f | none | AFNI's text in both implementations (the original since 2026-10-12) | – |
 | AFNI-15 † | AFNI build | parallel make races | b | none | – | – |
-| AFNI-16 † | 3dTshift | a matrix within about 0.01° to 0.024° of plumb (a single-precision test; the angle depends on the voxel size) is written plumb, its tilt discarded | c | slightly oblique inputs | corrected by default in both implementations (keeps the matrix; decided 2026-10-12); `reproduce` writes AFNI's plumb matrix byte for byte in both (the original since 2026-10-12, spec §6.1) | – |
+| AFNI-16 † | 3dTshift, 3dAutomask, 3dUnifize | a matrix within about 0.01° to 0.024° of plumb (a single-precision test; the angle depends on the voxel size) is written plumb, its tilt discarded | c | slightly oblique inputs | corrected by default in both implementations (keeps the matrix; decided 2026-10-12); `reproduce` writes AFNI's plumb matrix byte for byte in both (the original since 2026-10-12, spec §6.1) | – |
 | AFNI-17 † | 3dTshift | the slice fields of a copy describe its slice times only to within 3 ms (slices less than 3 ms apart can be shifted by one in the range) | d | none | both implementations reproduce it in both modes (the original since 2026-10-12, spec §6.2) | – |
-| AFNI-18 † | 3dTshift | an input name with a blank is read as a list of datasets (unless `AFNI_PATH_SPACES_OK`): an input in a directory with a blank cannot be opened | e | paths with blanks | both implementations read one file by default, AFNI's list in `reproduce` (2026-10-12; spec §7.1) | – |
+| AFNI-18 † | 3dTshift, 3dAutomask, 3dUnifize | an input name with a blank is read as a list of datasets (unless `AFNI_PATH_SPACES_OK`): an input in a directory with a blank cannot be opened | e | paths with blanks | both implementations read one file by default, AFNI's list in `reproduce` (2026-10-12; spec §7.1) | – |
 | AFNI-19 † | 3dTshift | `AFNI_ALLOW_MILLISECONDS` with `-TR` in ms: `toffset` written in ms, labelled seconds | c | none | both implementations write seconds by default, AFNI's in `reproduce` (2026-10-12; spec §7.1) | – |
-| AFNI-20 † | 3dTshift | a one-row dataset written as a 1D text file under the NIfTI name (unless `AFNI_WRITE_1D_AS_PREFIX`) | c | none | NIfTI in both implementations and both modes, the decision named (AFNI's file has a random identifier) | – |
+| AFNI-20 † | 3dTshift, 3dAutomask, 3dUnifize | a one-row dataset written as a 1D text file under the NIfTI name (unless `AFNI_WRITE_1D_AS_PREFIX`) | c | none | NIfTI in both implementations and both modes, the decision named (AFNI's file has a random identifier) | – |
 | AFNI-21 † | 3dTshift | warning and error labels in terminal colour codes, also in files and pipes | f | log files | `reproduce` writes them in both implementations (the original since 2026-10-12); plain labels by default | – |
-| AFNI-22 † | 3dTshift | `-Dname=value` with blanks or a blank around `=` sets another value (`-DX=a b` sets `a=b`) | e | none | both implementations read the value as written by default, as AFNI in `reproduce` (2026-10-12; spec §7.1) | – |
-| AFNI-23 † | 3dTshift | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in both implementations (decided 2026-10-12; the original the same day): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1) | – |
+| AFNI-22 † | 3dTshift, 3dAutomask, 3dUnifize | `-Dname=value` with blanks or a blank around `=` sets another value (`-DX=a b` sets `a=b`) | e | none | both implementations read the value as written by default, as AFNI in `reproduce` (2026-10-12; spec §7.1) | – |
+| AFNI-23 † | 3dTshift, 3dAutomask, 3dUnifize | `AFNI_NIFTI_SCALE=NO`: integer data keep the slope and lose the intercept, so their values are off by it | c | none | corrected by default in both implementations (decided 2026-10-12; the original the same day): AFNI's integers kept, the intercept written as `scl_inter`; with `-rlt -ignore`, read as without the variable; reproduced with the switch (spec §7.1) | – |
 | AFNI-24 † | NIfTI library | the quaternion's quotients and sums in `long double`, so results depend on the build (x87 on x86-64) | d | none | both implementations give x86-64's results on every platform (2026-10-12) | – |
 | AFNI-25 † | 3dTshift | `-ignore` as the last argument: a crash (exit 1 from AFNI's signal handler, with a crash banner) | a | none | "-ignore needs an argument!", exit 1, in both implementations and both modes | – |
-| AFNI-26 † | 3dTshift | an output that cannot be opened for writing (a missing or read-only directory, a read-only file, a directory of that name): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
+| AFNI-26 † | 3dTshift, 3dAutomask, 3dUnifize | an output that cannot be opened for writing (a missing or read-only directory, a read-only file, a directory of that name): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
+| AFNI-40 † | 3dAutomask, 3dUnifize | an option's value missing as the last argument (`-peels`, `-nbhrs`, `-clfrac`, `-SI`, `-dilate`, `-erode`; `-T2up`): a crash | a | none | an error (exit 1) in both modes, after AFNI's messages | – |
+| AFNI-41 † | 3dAutomask | `-nbhrs` outside 6..26 silently becomes 17 (the range check never runs); 19..26 act as 18 | c? | none | AFNI's behaviour in both modes | decide |
+| AFNI-42 † | 3dAutomask | `-NN1`, `-NN2`, `-NN3` also set the peeling threshold to 6, 18, 26, overriding `-nbhrs` (an explicit `-NN2` peels with 18, the default with 17) | c? | none | AFNI's behaviour in both modes | decide |
+| AFNI-43 † | 3dAutomask | `-peels 0` peels once; the help says 0 turns the peeling off | c | none | corrected by default (no peel), named when the mask changes; `reproduce` peels once | – |
+| AFNI-44 † | 3dAutomask | the large-hole filling runs or not depending on the number of slices only (32 to 93 slices: yes; fewer: no) | c? | every BOLD reference (fMRIPrep's) | AFNI's behaviour in both modes | decide |
+| AFNI-45 † | 3dUnifize | `-T2up` at or near 100: the percentile read one past the sorted values (memory never written; in AFNI's runs 0, which zeroes the output) | a | none | inverts about the largest value by default, named; `reproduce` fills the read with 0 | – |
+| AFNI-46 † | 3dUnifize | `-T2` on a 2D image smaller than 16 × 16: an empty automask dereferenced, a crash | a | none | an error (exit 1) in both modes, after AFNI's messages | – |
+| AFNI-47 † | 3dUnifize | more than a million voxels with an axis of 2 or 3: the half-size scale image comes back smaller than the input and is read past its end (a crash in AFNI's runs, or values from that memory) | a | none | the scale brought back to the input's grid by default, named; `reproduce` reads AFNI's smaller image, 0 past its end | – |
+| AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | c? | none | AFNI's behaviour in both modes | decide |
+| AFNI-49 † | 3dUnifize | the help gives `-clfrac`'s default as 0.1, then says it was raised to 0.2 in 2016; the code uses 0.2 | f | none | 0.2; larmorx's docs say so | – |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -270,17 +281,17 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
 
-**Counts** (178 entries, recounted from the table on 2026-10-18; an entry with two classes
+**Counts** (233 entries, recounted from the table on 2026-10-23; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 27 | |
-| (b) race, nondeterminism | 8 | |
-| (c) deterministic bug that changes results | 79 | 19 |
+| (a) crash, undefined behaviour, out of bounds | 38 | |
+| (b) race, nondeterminism | 11 | |
+| (c) deterministic bug that changes results | 114 | 19 |
 | (d) imprecision | 20 | |
-| (e) command-line or parsing quirk | 33 | |
-| (f) documentation or message only | 10 | |
+| (e) command-line or parsing quirk | 38 | |
+| (f) documentation or message only | 11 | |
 | explained, not a defect | 1 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
@@ -322,7 +333,16 @@ switch); A5 part 3 (the velocity-field stages, `antsApplyTransforms` with B-spli
 2026-10-22) corrected them, each with its measured effect ([ants-velocity.md](ants-velocity.md)),
 and added ANTS-79 to ANTS-82 and ITK-36 to ITK-42: every class (c) and (e) one corrected by
 default with a switch, ITK-41 (class (a)) completed by default and refused where ANTs crashes,
-ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). The gap column now has 14 **decide** (recounted 2026-10-23, after A5 part 3 and A6 were merged; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
+ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). The gap column has 22 **decide** (recounted 2026-10-23 from the table, after A5 part 3, A6 and the AFNI masks part were merged; an earlier count of 14 that day had missed the † rows; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
+The AFNI part of 2026-10-23 (3dAutomask and 3dUnifize, a GPL replica each; in parallel with
+`antsAI -b`) added AFNI-40 to AFNI-49 and extended AFNI-01 (3dAutomask's average of a series
+and 3dUnifize's `-EPI` median drop a negative scale factor, as 3dTshift's extraction does):
+AFNI-43 (class (c)) corrected by default with a switch; AFNI-45 and AFNI-47 (class (a), reads
+of memory AFNI never wrote) defined by default, filled deterministically with 0 on request;
+AFNI-40 and AFNI-46 (crashes) refused in both modes; AFNI-49 a help text; AFNI-41, -42, -44 and
+-48 to decide. The dataset defects 3dTshift found (AFNI-01, -02, -07, -08, -11, -12, -16, -18,
+-20, -22, -23, -26) apply to both programs and are handled by the same replica code; their
+tool in `larmorx_core::defects` is now "AFNI".
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -3333,6 +3353,141 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** none.
 - **larmorx:** the oracle script works around both.
 - **D13 / gap:** no larmorx code. No gap.
+
+## Restricted: AFNI 3dAutomask and 3dUnifize (source-derived)
+
+> **Clean-room implementers: do not read this section.** Written from AFNI 25.2.09's source
+> (NIH and MCW files), through [afni-automask.md](afni-automask.md) and
+> [afni-unifize.md](afni-unifize.md). The clean-room originals' implementers work from
+> `specs/3dAutomask.md` and `specs/3dUnifize.md`.
+
+### AFNI-40 † An option's missing value crashes — (a)
+- **What:** 3dAutomask's `-peels`, `-nbhrs`, `-clfrac`/`-mfrac`, `-SI`, `-dilate` and `-erode`
+  read `argv[++iarg]` without checking it exists (`3dAutomask.c:139-245`), and so does
+  3dUnifize's `-T2up` (`3dUnifize.c:1036`; its other options check). As the last argument,
+  `strtod(NULL)`/`strtol(NULL)` crash: signal 11, AFNI's crash banner, exit 1. 3dAutomask's
+  `-prefix`, `-apply_prefix` and `-depth` pass the NULL to `THD_filename_ok` instead: "-prefix
+  (null) is illegal!", exit 1 (reproduced as is).
+- **Evidence:** read; verified with the oracle for each option (2026-10-23); parity cases
+  `errors/missing-value-*` (3dAutomask) and `errors/T2up-missing` (3dUnifize): AFNI crashes,
+  the replica refuses, the messages before the crash compared.
+- **fMRIPrep:** none.
+- **larmorx:** the replica stops with one fatal line naming the option and AFNI-40, exit 1, in
+  both modes, after the messages AFNI prints before the crash. Not reproduced: the crash banner.
+- **D13 / gap:** never reproduced. No gap.
+
+### AFNI-41 † `-nbhrs` outside 6..26 is silently 17 — (c?)
+- **What:** `-nbhrs` sets `nbhrs` directly; the range check reads `new_nbhrs`, which nothing
+  sets, so it never runs (`3dAutomask.c:203-206`, `:276-283`); `THD_automask_set_peelcounts`
+  replaces values outside 6..26 by 17 (`thd_automask.c:42-46`), and the peeling uses
+  `MIN(18, peelthr)` (`:1335`), so 19..26 act as 18. The help: "should be between 6 and 26".
+- **Evidence:** read; verified (2026-10-23; parity cases `options/nbhrs-*`).
+- **fMRIPrep:** none (it never passes `-nbhrs`).
+- **larmorx:** AFNI's behaviour in both modes.
+- **D13 / gap:** decide: refuse values outside 6..26 (what the dead check meant), or keep.
+
+### AFNI-42 † `-NN1/2/3` change the peeling threshold — (c?)
+- **What:** `-NN1`, `-NN2`, `-NN3` also set `nbhrs` to 6, 18 and 26 (`3dAutomask.c:262-273`,
+  "keep historic default of 17 for NN2 unless changed via NNx or nbhrs options"), overriding
+  any `-nbhrs`. The help says "the default peeling processes still use NN2", true of the
+  neighbourhood only: an explicit `-NN2` peels with 18 of 18 neighbours where the default peels
+  with 17, and `-NN1` with 6.
+- **Evidence:** read; verified (parity cases `options/NN*-dilate-erode-depth`,
+  `options/nbhrs-then-NN2`).
+- **fMRIPrep:** none.
+- **larmorx:** AFNI's behaviour in both modes.
+- **D13 / gap:** decide.
+
+### AFNI-43 † `-peels 0` peels once — (c)
+- **What:** `THD_automask_set_peelcounts`: `peelcount = (p > 0) ? p : 1`
+  (`thd_automask.c:44`), so `-peels 0` peels once; the help: "Turn off by setting to 0".
+- **Evidence:** read; verified (AFNI's `-peels 0` mask equals its `-peels 1` mask on fMRIPrep's
+  BOLD reference of ds005040; parity case `defects/peels-0`; the site's worked example).
+- **fMRIPrep:** none (it never passes `-peels`).
+- **larmorx:** corrected by default: no peeling, named when the mask changes; `reproduce`
+  peels once (`larmorx_gpl_afni::mask::MaskSettings::set_peelcounts`).
+- **D13 / gap:** done.
+
+### AFNI-44 † The large-hole filling depends on the number of slices — (c?)
+- **What:** the large-hole step runs when `nmm > 1 || jj > 0` (`thd_automask.c:388-393`), `jj`
+  being the last value assigned to it, `rint(0.016 nz)`. With no axis of 94 voxels or more, a
+  volume of 32 to 93 slices runs `THD_mask_fillin_completely(1)` (the small holes, until none is
+  left) and one with fewer than 32 does not. Whether `jj > 0` was meant is not clear.
+- **Evidence:** read. The parity cases meet both sides (the 40-slice phantoms and fMRIPrep's
+  BOLD references, which run the step; the 2-slice and 2 × 2 × 2 inputs, which do not), all
+  bit-identical to AFNI; no case isolates the step's effect.
+- **fMRIPrep:** its BOLD references (most have 32 to 93 slices): AFNI's behaviour is what
+  fMRIPrep gets.
+- **larmorx:** AFNI's behaviour in both modes.
+- **D13 / gap:** decide (probably keep: changing it changes fMRIPrep's masks).
+
+### AFNI-45 † `-T2up` near 100 reads past the sorted values — (a)
+- **What:** `mri_invertcontrast_inplace` (`mri_invert.c:44`): `ii = (int)rintf(nhist * uperc *
+  0.01f); ucut = hist[ii]` reads `hist[nhist]` when the index rounds to `nhist`: at `-T2up 100`
+  always, and for `u` near 100 when `nhist (1 − u/100) < 0.5`. `hist` is a `malloc` of `nvox`
+  floats: what it holds there is memory never written (past the allocation when the whole image
+  is in the mask). In AFNI's runs it read 0, which inverts every value to 0: the output is all
+  zeros.
+- **Evidence:** read; verified (2026-10-23; parity cases `defects/T2up-100`,
+  `defects/T2up-99.99`; the site's worked example on fMRIPrep's BOLD reference of ds005040).
+- **fMRIPrep:** none (it uses the default 98.5).
+- **larmorx:** by default the 100th percentile (the largest sorted value), named;
+  `reproduce` fills the read with 0 (D13's deterministic fill), named
+  (`larmorx_gpl_afni::unifize::invert_contrast`).
+- **D13 / gap:** done.
+
+### AFNI-46 † `-T2` on a small 2D image crashes — (a)
+- **What:** with `-T2`, the automask of a 2D image smaller than 16 × 16 is NULL
+  (`thd_automask.c:2104`); `mri_invertcontrast_inplace` computes it again and dereferences it
+  (`3dUnifize.c:1105-1106`, `mri_invert.c:28-34`): signal 11, exit 1.
+- **Evidence:** read; verified (parity case `errors/slice-small-T2`).
+- **fMRIPrep:** none.
+- **larmorx:** an error (exit 1) in both modes, after AFNI's messages.
+- **D13 / gap:** never reproduced. No gap.
+
+### AFNI-47 † A thin volume of more than a million voxels reads past its scale image — (a)
+- **What:** above 1,000,000 voxels the local white-matter level is computed on a half-size copy
+  (`3dUnifize.c:557`). Halving keeps at least one voxel per axis and doubling keeps an axis of 1
+  at 1 (`:166-168`, `:227-229`), so an axis of 2 or 3 voxels comes back as 1: the scale image is
+  smaller than the input, and `mri_WMunifize` reads it with the input's indices, past its end
+  (`:570-576`); `-ssave` writes it the same way.
+- **Evidence:** read; verified on a 720 × 720 × 2 phantom (parity case `defects/slab`): AFNI
+  crashed (signal 11) reading past the scale image in every run of 2026-10-23; the case
+  compares its messages before the crash and is an expected divergence (with other memory
+  AFNI would instead multiply the second slice by whatever it reads).
+- **fMRIPrep:** none.
+- **larmorx:** by default the half-size image is brought back to the input's grid, named;
+  `reproduce` reads AFNI's smaller image linearly with 0 past its end, named
+  (`larmorx_gpl_afni::unifize::double_up`).
+- **D13 / gap:** done.
+
+### AFNI-48 † `-T2` three times leaves the output inverted — (c?)
+- **What:** `do_T2 == 1` inverts back, `do_T2 == 2` clips the bright edges instead
+  (`3dUnifize.c:1193-1198`); a third `-T2` does neither. The help documents once and twice.
+- **Evidence:** read; verified (parity case `options/T2-T2-T2`).
+- **fMRIPrep:** none.
+- **larmorx:** AFNI's behaviour in both modes.
+- **D13 / gap:** decide (refuse a third `-T2`, or treat it as two).
+
+### AFNI-49 † `-clfrac`'s default in 3dUnifize's help — (f)
+- **What:** the help gives the default as 0.1 and then says it was raised to 0.2 in 2016
+  (`3dUnifize.c:818-822`); the code uses 0.2 (`:659`).
+- **Evidence:** read.
+- **fMRIPrep:** none (it passes 0.2).
+- **larmorx:** 0.2; `docs/api/afni-unifize.md` says so.
+- **D13 / gap:** not D13.
+
+### AFNI-01 †, extended to 3dAutomask and 3dUnifize
+- **What:** 3dAutomask averages a series' sub-bricks through `THD_extract_array`
+  (`thd_median.c:273-308`), whose positive-factor test (`thd_dsetto1D.c:187-191`) drops a
+  negative factor and its magnitude; 3dUnifize's `-EPI` median goes through the same routine
+  (`thd_median.c:35-38`) while each volume is scaled with its factor, so a series with a
+  negative `scl_slope` unifizes to all zeros.
+- **Evidence:** read; verified (parity cases `defects/negative-slope-4d` of 3dAutomask and
+  `defects/EPI-negative-slope` of 3dUnifize).
+- **larmorx:** both replicas apply the factor by default, named whenever a negative factor is
+  met (with the number of mask voxels it changes, in 3dAutomask); `reproduce` drops it.
+- **D13 / gap:** done.
 
 ## Restricted: FSL mcflirt (source-derived)
 

@@ -25,6 +25,9 @@ class Panel:
     full: dict[str, np.ndarray]  # output id ("all" for an input) -> the file's array, as stored
     scale: float | None = None  # an integer image's scale factor (scl_slope)
     inter: float = 0.0
+    #: output id -> {"on": panel id, "window": [lo, hi]}: the output (a mask) is drawn over
+    #: that panel's image, in that window
+    overlay: dict | None = None
 
 
 class Example:
@@ -156,10 +159,14 @@ class Example:
         return {"metrics": m, "display": shown}
 
     def describe_panels(self) -> list[dict]:
-        return [
-            {"id": p.id, "role": p.role, "label": p.label, "sub": p.sub, "arrays": self.specs[p.id]}
-            for p in self.panels
-        ]
+        out = []
+        for p in self.panels:
+            d = {"id": p.id, "role": p.role, "label": p.label, "sub": p.sub}
+            d["arrays"] = self.specs[p.id]
+            if p.overlay:
+                d["overlay"] = p.overlay
+            out.append(d)
+        return out
 
 
 def own_windows(ex: Example, panels: list[dict], outputs: list[dict]) -> None:
@@ -238,6 +245,28 @@ def poster_diff(
     col = np.where((t > 0)[..., None], col, np.array([128, 128, 128])).astype(np.uint8)
     alpha = np.where(mask, np.where(t > 0, 60 + 195 * t, 28), 0).astype(np.uint8)
     return _webp(np.dstack([col, alpha]), ctx)
+
+
+#: A mask over its image, as the viewer draws it on light paper: the fill (AFNI's pastel), mixed
+#: half and half with the grey level, and the mask's edge in the slice (AFNI's deeper pastel).
+MASK_FILL = (227, 199, 121)
+MASK_EDGE = (152, 126, 46)
+
+
+def poster_overlay(
+    ctx: Context, base: np.ndarray, mask: np.ndarray, shown: np.ndarray, lo: float, hi: float
+) -> str:
+    """A still mask over the image it was made from: grey levels of ``base`` in the window, the
+    voxels where ``mask`` is not zero tinted, its edge in this slice drawn in full, transparent
+    outside ``shown`` (lossless WebP)."""
+    g = np.clip((base.astype(np.float64) - lo) * 255.0 / ((hi - lo) or 1.0), 0, 255)[..., None]
+    on = (mask != 0) & shown
+    rgb = np.where(on[..., None], g + (np.array(MASK_FILL) - g) * 0.5, np.repeat(g, 3, axis=2))
+    pad = np.pad(on, 1)
+    inner = pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:]
+    rgb = np.where((on & ~inner)[..., None], np.array(MASK_EDGE, dtype=np.float64), rgb)
+    rgba = np.dstack([np.rint(rgb).astype(np.uint8), np.where(shown, 255, 0).astype(np.uint8)])
+    return _webp(rgba, ctx)
 
 
 def aspect(grid: Grid, plane: str) -> float:

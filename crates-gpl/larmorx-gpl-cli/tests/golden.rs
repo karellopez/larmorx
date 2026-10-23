@@ -55,6 +55,16 @@ enum Input {
     /// int16 with `scl_slope` 0.25 and `scl_inter` 100, whose intercept `AFNI_NIFTI_SCALE=NO`
     /// drops (AFNI-23).
     Int16Intercept,
+    /// A T1-like head of 24 × 24 × 16 voxels, int16 ([`head_values`]).
+    Head,
+    /// The T2-like contrast of the same head, float32.
+    HeadT2,
+    /// 4 volumes of the T2-like head, int16, 4 mm voxels (3dUnifize -EPI; 3dAutomask's average).
+    Head4d,
+    /// The same 4 volumes stored negated with `scl_slope` -1 (AFNI-01).
+    Head4dNegative,
+    /// One axial slice of the head, 24 × 24 × 1, float32 (the 2D automask).
+    Slice,
 }
 
 struct Case {
@@ -71,6 +81,9 @@ struct Case {
     env: &'static [(&'static str, &'static str)],
     /// Whether a file of the output's name exists before the run.
     existing: bool,
+    /// More outputs: `(option, name)`; the option is given `<id>.<name>.nii`, and the file's
+    /// fingerprints are recorded as `<name>.header` and `<name>.data`.
+    outputs: &'static [(&'static str, &'static str)],
 }
 
 const CASES: &[Case] = &[
@@ -79,6 +92,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -89,6 +103,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -99,6 +114,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -109,6 +125,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -119,6 +136,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -129,6 +147,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-05"],
         mode: "fix",
         input: Input::Uint8,
@@ -139,6 +158,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -158,6 +178,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Int16,
@@ -168,6 +189,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-01"],
         mode: "fix",
         input: Input::Int16Negative,
@@ -178,6 +200,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-02", "AFNI-07", "AFNI-03"],
         mode: "fix",
         input: Input::Float32Defects,
@@ -188,6 +211,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-08"],
         mode: "fix",
         input: Input::Float32TinyOffsets,
@@ -198,6 +222,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-16"],
         mode: "fix",
         input: Input::Float32NearlyPlumb,
@@ -208,6 +233,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-05"],
         mode: "reproduce",
         input: Input::Uint8,
@@ -218,6 +244,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-01"],
         mode: "reproduce",
         input: Input::Int16Negative,
@@ -228,6 +255,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-02", "AFNI-07", "AFNI-03"],
         mode: "reproduce",
         input: Input::Float32Defects,
@@ -238,6 +266,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-08"],
         mode: "reproduce",
         input: Input::Float32TinyOffsets,
@@ -248,6 +277,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-16"],
         mode: "reproduce",
         input: Input::Float32NearlyPlumb,
@@ -258,6 +288,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: true,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -268,6 +299,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -278,6 +310,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[("AFNI_NIFTI_WRITE_TYPE", "2")],
         existing: false,
+        outputs: &[],
         named: &[],
         mode: "fix",
         input: Input::Float32,
@@ -288,6 +321,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-19"],
         mode: "fix",
         input: Input::Float32,
@@ -305,6 +339,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-23"],
         mode: "fix",
         input: Input::Int16Intercept,
@@ -315,6 +350,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-23"],
         mode: "reproduce",
         input: Input::Int16Intercept,
@@ -325,6 +361,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-23"],
         mode: "fix",
         input: Input::Int16Intercept,
@@ -343,6 +380,7 @@ const CASES: &[Case] = &[
         tool: "afni 3dTshift",
         env: &[],
         existing: false,
+        outputs: &[],
         named: &["AFNI-19"],
         mode: "reproduce",
         input: Input::Float32,
@@ -354,6 +392,184 @@ const CASES: &[Case] = &[
             "-linear",
             "-DAFNI_ALLOW_MILLISECONDS=YES",
         ],
+    },
+    Case {
+        id: "3dAutomask.fmriprep.int16",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[("-apply_prefix", "apply"), ("-depth", "depth")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head,
+        args: &["-dilate", "1"],
+    },
+    Case {
+        id: "3dAutomask.eclip.nograd.NN1.erode",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::HeadT2,
+        args: &[
+            "-q", "-eclip", "-nograd", "-clfrac", "0.3", "-NN1", "-erode", "1", "-peels", "2",
+        ],
+    },
+    Case {
+        id: "3dAutomask.4d.si",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[("-apply_prefix", "apply")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4d,
+        args: &["-SI", "30", "-NN3", "-dilate", "2"],
+    },
+    Case {
+        id: "3dAutomask.2d",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Slice,
+        args: &["-q"],
+    },
+    Case {
+        id: "3dAutomask.peels0",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-43"],
+        mode: "fix",
+        input: Input::Head,
+        args: &["-q", "-peels", "0"],
+    },
+    Case {
+        id: "3dAutomask.peels0.reproduce",
+        tool: "afni 3dAutomask",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-43"],
+        mode: "reproduce",
+        input: Input::Head,
+        args: &["-q", "-peels", "0"],
+    },
+    Case {
+        id: "3dUnifize.default.int16",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[("-ssave", "scale"), ("-amsave", "automasked")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head,
+        args: &["-Urad", "5"],
+    },
+    Case {
+        id: "3dUnifize.fmriprep.T2",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::HeadT2,
+        args: &["-clfrac", "0.2", "-rbt", "6", "65.0", "90.0", "-T2"],
+    },
+    Case {
+        id: "3dUnifize.GM.nosquash",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Head,
+        args: &["-quiet", "-GM", "-nosquash", "-Urad", "5"],
+    },
+    Case {
+        id: "3dUnifize.T2T2",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::HeadT2,
+        args: &["-T2", "-T2", "-Urad", "5"],
+    },
+    Case {
+        id: "3dUnifize.EPI",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4d,
+        args: &["-EPI"],
+    },
+    Case {
+        id: "3dUnifize.EPI.negative",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-01"],
+        mode: "fix",
+        input: Input::Head4dNegative,
+        args: &["-EPI", "-quiet"],
+    },
+    Case {
+        id: "3dUnifize.EPI.negative.reproduce",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-01"],
+        mode: "reproduce",
+        input: Input::Head4dNegative,
+        args: &["-EPI", "-quiet"],
+    },
+    Case {
+        id: "3dUnifize.T2up100",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-45"],
+        mode: "fix",
+        input: Input::HeadT2,
+        args: &["-T2", "-T2up", "100", "-Urad", "5"],
+    },
+    Case {
+        id: "3dUnifize.T2up100.reproduce",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["AFNI-45"],
+        mode: "reproduce",
+        input: Input::HeadT2,
+        args: &["-T2", "-T2up", "100", "-Urad", "5"],
+    },
+    Case {
+        id: "3dUnifize.2d",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Slice,
+        args: &["-quiet", "-Urad", "5"],
     },
 ];
 
@@ -457,6 +673,124 @@ fn nearly_plumb_header() -> NiftiHeader {
     h
 }
 
+/// The grid of the head inputs.
+const HEAD: [usize; 3] = [24, 24, 16];
+
+/// A synthetic head on [`HEAD`], from integers only: in an ellipsoid (doubled coordinates
+/// `x = 2i - 23`, `y = 2j - 23`, `z = 2k - 15`; `r = x^2 + y^2 + 2z^2`), white matter
+/// (`r < 150`), grey matter (`r < 300`), CSF (`r < 360`), a bright skull (`r < 440`) and
+/// background, with the tissue values given; shaded along x (`(80 + 2i) / 100`) and with noise
+/// (SplitMix64, `seed`, uniform in [-20, 20]).
+fn head_values(levels: [i64; 5], seed: u64) -> Vec<i64> {
+    let [nx, ny, nz] = HEAD;
+    let noise = splitmix64(seed, nx * ny * nz);
+    let mut v = Vec::with_capacity(nx * ny * nz);
+    for k in 0..nz as i64 {
+        for j in 0..ny as i64 {
+            for i in 0..nx as i64 {
+                let (x, y, z) = (2 * i - 23, 2 * j - 23, 2 * k - 15);
+                let r = x * x + y * y + 2 * z * z;
+                let level = match r {
+                    0..150 => levels[0],
+                    150..300 => levels[1],
+                    300..360 => levels[2],
+                    360..440 => levels[3],
+                    _ => levels[4],
+                };
+                let n = (noise[v.len()] % 41) as i64 - 20;
+                v.push(level * (80 + 2 * i) / 100 + n);
+            }
+        }
+    }
+    v
+}
+
+/// The T1-like levels (white, grey, CSF, skull, background) and the T2-like ones.
+const T1_LEVELS: [i64; 5] = [1000, 700, 250, 900, 30];
+const T2_LEVELS: [i64; 5] = [400, 700, 1500, 200, 30];
+
+/// A header for a head input: plumb, `zoom` mm voxels, `scl_slope` = `slope`, TR 2 s for 4D.
+fn head_header(shape: &[usize], data_type: DataType, zoom: f64, slope: f64) -> NiftiHeader {
+    let mut h = NiftiHeader::new(NiftiVersion::V1, shape, data_type).unwrap();
+    let affine = Affine::from_zooms([zoom, zoom, zoom], [-30.0, -40.0, -20.0]);
+    h.set_sform(&affine, 1);
+    h.set_qform(&affine, 1).unwrap();
+    if shape.len() == 4 {
+        h.pixdim[4] = 2.0;
+        h.xyzt_units = 2 | 8;
+    } else {
+        h.xyzt_units = 2;
+    }
+    h.scl_slope = slope;
+    h.scl_inter = 0.0;
+    h
+}
+
+fn write_shaped<T: Element>(path: &Path, h: &NiftiHeader, shape: &[usize], data: &[T]) {
+    let view = ArrayViewD::from_shape(IxDyn(shape).f(), data).unwrap();
+    nifti::write(path, h, view, &WriteOptions::default()).unwrap();
+}
+
+/// The head inputs: `head`, `head-t2`, `head-4d`, `head-4d-negative` and `slice`.
+fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
+    let [nx, ny, nz] = HEAD;
+    let t1 = head_values(T1_LEVELS, 21);
+    let t2 = head_values(T2_LEVELS, 22);
+    let p = |name: &'static str, paths: &mut BTreeMap<&'static str, PathBuf>| {
+        let path = dir.join(format!("{name}.nii"));
+        paths.insert(name, path.clone());
+        path
+    };
+    let i16s: Vec<i16> = t1.iter().map(|&v| v as i16).collect();
+    write_shaped(
+        &p("head", paths),
+        &head_header(&HEAD, DataType::I16, 2.0, 0.0),
+        &HEAD,
+        &i16s,
+    );
+    let f32s: Vec<f32> = t2.iter().map(|&v| v as f32 / 2.0).collect();
+    write_shaped(
+        &p("head-t2", paths),
+        &head_header(&HEAD, DataType::F32, 2.0, 0.0),
+        &HEAD,
+        &f32s,
+    );
+    let shape4 = [nx, ny, nz, 4];
+    let noise = splitmix64(23, nx * ny * nz * 4);
+    let series: Vec<i64> = (0..nx * ny * nz * 4)
+        .map(|f| {
+            let (v, t) = (f % (nx * ny * nz), (f / (nx * ny * nz)) as i64);
+            t2[v] * (100 + 3 * t) / 100 + (noise[f] % 21) as i64 - 10
+        })
+        .collect();
+    let i16s: Vec<i16> = series.iter().map(|&v| v as i16).collect();
+    write_shaped(
+        &p("head-4d", paths),
+        &head_header(&shape4, DataType::I16, 4.0, 0.0),
+        &shape4,
+        &i16s,
+    );
+    let negated: Vec<i16> = series.iter().map(|&v| -v as i16).collect();
+    write_shaped(
+        &p("head-4d-negative", paths),
+        &head_header(&shape4, DataType::I16, 4.0, -1.0),
+        &shape4,
+        &negated,
+    );
+    let plane = nx * ny * 8;
+    let slice: Vec<f32> = t1[plane..plane + nx * ny]
+        .iter()
+        .map(|&v| v as f32)
+        .collect();
+    let shape2 = [nx, ny, 1];
+    write_shaped(
+        &p("slice", paths),
+        &head_header(&shape2, DataType::F32, 2.0, 0.0),
+        &shape2,
+        &slice,
+    );
+}
+
 fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let values = series_values();
     let paths = BTreeMap::from([
@@ -490,6 +824,8 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let mut intercept = input_header(DataType::I16, 0.25);
     intercept.scl_inter = 100.0;
     write_with(&paths["int16-intercept"], &intercept, &i16s);
+    let mut paths = paths;
+    write_head_inputs(dir, &mut paths);
     paths
 }
 
@@ -756,6 +1092,11 @@ fn golden() {
             Input::Float32TinyOffsets => &inputs["float32-tiny-offsets"],
             Input::Float32NearlyPlumb => &inputs["float32-nearly-plumb"],
             Input::Int16Intercept => &inputs["int16-intercept"],
+            Input::Head => &inputs["head"],
+            Input::HeadT2 => &inputs["head-t2"],
+            Input::Head4d => &inputs["head-4d"],
+            Input::Head4dNegative => &inputs["head-4d-negative"],
+            Input::Slice => &inputs["slice"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];
@@ -763,6 +1104,9 @@ fn golden() {
         // The output is named relative to the temporary directory, so that a blank in its path
         // cannot make the -prefix one AFNI refuses (AFNI-12).
         args.extend(["-prefix".into(), format!("{}.nii", case.id)]);
+        for (option, name) in case.outputs {
+            args.extend([(*option).to_owned(), format!("{}.{name}.nii", case.id)]);
+        }
         args.push(input.display().to_string());
         if case.existing {
             std::fs::write(&output, "taken").unwrap();
@@ -777,7 +1121,7 @@ fn golden() {
         }
         let out = command.output().unwrap();
         assert!(out.status.success(), "{}: {out:?}", case.id);
-        // The notices (`*+ WARNING: upstream defect <ID> (3dTshift) corrected: ...`).
+        // The notices (`*+ WARNING: upstream defect <ID> (<tool>) corrected: ...`).
         let stderr = String::from_utf8_lossy(&out.stderr);
         let found: Vec<&str> = stderr
             .lines()
@@ -791,14 +1135,19 @@ fn golden() {
             "reproduced"
         };
         for id in case.named {
-            assert!(
-                stderr.contains(&format!("upstream defect {id} (3dTshift) {verb}: ")),
-                "{}: {stderr}",
-                case.id
-            );
+            let named = stderr.lines().any(|l| {
+                l.contains(&format!("upstream defect {id} (")) && l.contains(&format!(") {verb}: "))
+            });
+            assert!(named, "{}: {stderr}", case.id);
         }
         for (name, fp) in nifti_fingerprints(&output) {
             actual.insert((case.id.to_owned(), name.to_owned()), fp);
+        }
+        for (_, extra) in case.outputs {
+            let path = dir.path().join(format!("{}.{extra}.nii", case.id));
+            for (name, fp) in nifti_fingerprints(&path) {
+                actual.insert((case.id.to_owned(), format!("{extra}.{name}")), fp);
+            }
         }
         files.insert(case.id, output);
     }

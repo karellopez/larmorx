@@ -112,7 +112,9 @@ class ReplicaError(RuntimeError):
 
 @dataclass(frozen=True)
 class Replica:
-    """A tool with a replica: ``<program> <family> <tool> <the tool's original arguments>``."""
+    """A tool with a replica: ``<program> <family> <tool> <the tool's original arguments>``.
+    ``original`` is false for a tool whose clean-room original is still to be written: the
+    replica is then its only implementation."""
 
     family: str
     tool: str
@@ -121,6 +123,7 @@ class Replica:
     env: str
     licence: str
     install: str
+    original: bool = True
 
 
 def registry() -> dict[tuple[str, str], Replica]:
@@ -172,18 +175,34 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
 
     ``"auto"``: the replica if its program is found, else ``None``; ``"replica"``: the replica,
     or :class:`ReplicaNotFoundError` with the command that installs it; ``"original"``:
-    ``None``.
+    ``None``. A tool without a clean-room original (:attr:`Replica.original` false) has only
+    its replica: ``"auto"`` without its program raises :class:`ReplicaNotFoundError`, and
+    ``"original"`` raises ``NotImplementedError``.
     """
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(
             f"implementation must be 'auto', 'replica' or 'original', not {implementation!r}"
         )
-    if implementation == "original":
-        return None
     replica = registry()[(family, tool)]
+    if implementation == "original":
+        if not replica.original:
+            raise NotImplementedError(
+                f"larmorx has no clean-room original of {family} {tool} yet (it is to be "
+                f"written from specs/{tool}.md); its bit-exact replica is in the "
+                f"{replica.package} package ({replica.licence}): install it with "
+                f"{replica.install} and use implementation='auto' or 'replica'"
+            )
+        return None
     program = find(family, tool)
     if program is not None:
         return Selected(replica, program)
+    if not replica.original:
+        raise ReplicaNotFoundError(
+            f"larmorx has no clean-room original of {family} {tool} yet, and its replica's "
+            f"{replica.program} program was not found ({replica.env}, "
+            f"{', '.join(search_dirs()) or 'no scripts directory'}, PATH). Install the "
+            f"{replica.package} package ({replica.licence}) with: {replica.install}"
+        )
     if implementation == "replica":
         raise ReplicaNotFoundError(
             f"implementation='replica' needs the {replica.package} package ({replica.licence}), "

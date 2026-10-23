@@ -24,6 +24,7 @@ starts no other agent.
 | A5.1 | `7f2a61e` (10-20) | `antsRegistration`'s SyN stages; displacement fields as initial transforms; parity `--jobs` | the other deformable stages (A5.2, A5.3) |
 | A5.2 | `a5-part2-bspline` (10-21) | `antsRegistration`'s BSplineSyN, BSpline, GaussianDisplacementField and BSplineDisplacementField stages; the Python API's `mesh_size`, `total_mesh_size`, `spline_order` | `antsApplyTransforms` with `BSplineTransform` files; ANTS-78 and ITK-35 (below); A5.3 |
 | Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
+| AFNI masks | `worktree-agent-af5a27ad72e66b922` (10-23) | 3dAutomask and 3dUnifize: GPL replicas (both depend on MCW routines), bit-identical to AFNI in every compared case; specs for the clean-room originals; two evidence pages; AFNI-40 to AFNI-49 | the clean-room originals; AFNI-41, -42, -44, -48 (below) |
 | A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
 | A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | ANTS-106 (below) |
 
@@ -47,17 +48,22 @@ starts no other agent.
 4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
    (`docs/findings/ants-ai.md`, "Blobs").
-5. **AFNI:** 3dUnifize, 3dAutomask (fMRIPrep's BOLD reference enhancement). Checked 2026-10-19:
-   current fMRIPrep, niworkflows and sdcflows do not call 3dvolreg (to drop unless wanted);
-   optional paths of its libraries use 3dQwarp (sdcflows' alternative PEPOLAR estimator) and
-   3dSkullStrip with 3dcalc (niworkflows' legacy AFNI skull-stripping): **planned for later**
-   (user, 2026-10-19). Licence per file (`docs/licensing.md`, "Notes checked 2026-10-19"):
-   3dUnifize and 3dAutomask may need only one Apache replica. **A later AFNI analysis track
-   (decided by the user, 2026-10-19; not fMRIPrep):** 3dTproject, 3dDespike, 3dReHo, 3dRSFC,
-   3dDeconvolve/3dREMLfit, 3dFWHMx/3dClustSim, 3dAllineate, 3dcalc, 3dTstat,
-   3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority). Check each source file's licence:
-   NIH public-domain files get one Apache replica; MCW (GPL) files a replica in `larmorx-gpl`
-   and a clean-room original from a spec.
+5. **AFNI 3dAutomask and 3dUnifize: the replicas done** (2026-10-23, in parallel with `antsAI
+   -b`). Both depend on MCW library routines (`docs/licensing.md`), so each has a GPL replica in
+   `larmorx-gpl`, bit-identical to AFNI 25.2.09 in every compared case (fMRIPrep's calls on
+   every oracle run's BOLD reference, T1w images, BOLD series, at 1, 2 and 6 threads, and
+   fMRIPrep's own build of AFNI), and a spec for a clean-room original (`specs/3dAutomask.md`,
+   `specs/3dUnifize.md`). **Next for them: the clean-room originals**, by an agent that has
+   never read AFNI's source, from the specs only (the porting guide's speed rules: the ball's
+   percentile mean is the hot loop); `larmorx afni 3dAutomask` / `3dUnifize` then get
+   `implementation="auto"|"replica"|"original"` as 3dTshift. Optional later AFNI paths of
+   fMRIPrep's libraries: 3dQwarp (sdcflows' alternative PEPOLAR estimator), 3dSkullStrip with
+   3dcalc (niworkflows' legacy AFNI skull-stripping): **planned for later** (user,
+   2026-10-19). **A later AFNI analysis track (decided by the user, 2026-10-19; not fMRIPrep):**
+   3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit, 3dFWHMx/3dClustSim,
+   3dAllineate, 3dcalc, 3dTstat, 3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority).
+   Check each program's call graph routine by routine (2026-10-23: the programs' own files can
+   be NIH while the library routines they rely on are MCW).
 6. **The evidence infrastructure** (decision log 2026-10-23), after the two parts now running:
    **the data panel** (one agreed set of shareable datasets used by every tool: 3T and 7T,
    multiband and single-band, children and older adults, a lesion, low quality and motion; in
@@ -97,6 +103,8 @@ starts no other agent.
   its band per option and synthetic case would classify them.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
+- **The clean-room originals of 3dAutomask and 3dUnifize** (from `specs/3dAutomask.md`,
+  `specs/3dUnifize.md`); a benchmark report for each once the original exists.
 - **A run-to-run variation of ANTs** (found by the orchestrator re-running A5 part 3's
   `ants-registration-corrections` record, 2026-10-23): the reference "ANTs with the B-spline
   transform as a displacement field" before a linear stage gave different results in two runs
@@ -154,7 +162,13 @@ Still to do:
 
 ## Waiting for the user
 
-- **14 older questionable behaviours** in the defect register (marked **decide** since the
+- **Four new questionable behaviours of AFNI** (2026-10-23; register entries marked
+  **decide**), each kept as AFNI's until decided: AFNI-41 (3dAutomask's `-nbhrs` outside 6..26
+  silently 17: proposed, refuse it as the dead check meant), AFNI-42 (`-NN1/2/3` change the
+  peeling threshold: proposed, keep AFNI's, document), AFNI-44 (the large-hole filling depends
+  on the number of slices: proposed, keep, since it shapes fMRIPrep's BOLD masks), AFNI-48
+  (3dUnifize's third `-T2`: proposed, refuse).
+- **18 older questionable behaviours** in the defect register (marked **decide** since the
   register began, 2026-10-11; never put to the user until 2026-10-23). Proposed, by group:
   - **ANTs and ITK tools already ported** (ANTS-17, -22, -23, -32, -40, -44, ITK-06): the usual
     rule (corrected by default, `reproduce` gives the original); ANTS-40 (N4 with zero and
@@ -164,6 +178,12 @@ Still to do:
     same rule (the intended behaviour by default, fMRIPrep's on request).
   - **nibabel** (NIB-01, -02, -03): larmorx already does the safer thing (compression from the
     content, a zero header offset refused, complex data refused); keep it and mark them decided.
+  - **mcflirt** (FSL-02 †, -11 †, -15 †, -18 †; the head-motion correction): FSL-02 (the
+    normalised correlation effectively uncentred; the corrected count is opt-in and measured,
+    no gain against the ground truth) and FSL-15, FSL-18 (`-init` affecting only the final
+    resampling; the Woods cost's squared bin counts) decided when the mcflirt replica is built;
+    FSL-11 (`FSLOUTPUTTYPE` unset fails after writing the matrices; larmorx writes `.nii.gz`)
+    keep larmorx's behaviour.
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).

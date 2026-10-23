@@ -51,7 +51,9 @@ evidence").
   implementation, default and `reproduce` modes, 1 and 12 threads). `Example.add` stores each
   panel once; `Example.compare` computes A − B over every voxel of the files (largest |Δ| and
   where, values that differ and their share, RMS, |Δ| over B's range, 1 − NCC) and where the
-  shown brain differs most. Each comparison's verdict is decided by code from these metrics
+  shown brain differs most. A mask is drawn over the image it was made from (a panel's
+  `overlay`, `Panel(..., overlay={output: {"on": panel, "window": [lo, hi]}})`; the still
+  poster the same, `example.poster_overlay`; 3dAutomask's page). Each comparison's verdict is decided by code from these metrics
   (e.g. *identical with correctly rounded maths* only when larmorx − original-with-CORE-MATH is
   bit-identical), never typed; the chain of causes asserts every identity it shows.
 - **The display data**: the file's voxels reoriented to RAS (flips and transposes only) and
@@ -106,7 +108,10 @@ with itself (thread counts, builds, versions) carry no verdict: they are the yar
    `ants_registration.py` (several outputs: an image and a displacement field's components;
    tables), `mri_hmc.py` (a clean-room original against a perturbation band; a subset of
    volumes; line charts), `ants_programs.py` (six programs on one page, one case explorer each)
-   or `itk_hdf5.py` (no images: tables) as the model, and `common.py`'s pieces.
+   or `itk_hdf5.py` (no images: tables), `afni_automask.py` (a replica only, masks drawn over
+   their input; its helpers run AFNI, fMRIPrep's AFNI and the replica) as the model, and
+   `common.py`'s pieces. Give each example its own copy of a module-level outputs list
+   (`copy.deepcopy`): `common.finish` writes the windows into it.
 2. The cache entry: the pipeline's real call on real data where there is one (an fMRIPrep
    oracle run's node), the original as built, with CORE-MATH, at the thread counts its record's
    band uses, fMRIPrep's own build if it differs; larmorx in both modes and at 1 and 12 threads.
@@ -142,6 +147,7 @@ dedication (CC0-1.0, PDDL-1.0) or CC-BY (credited), and templates with their not
 ICBM 152 notice). Brain slices only, masked, never a face. The cases used so far: ds000005 sub-01
 (PDDL-1.0; T1w and BOLD, fMRIPrep 25.2.6's oracle run: denoising, N4, the brain extraction's
 calls, the template registration, the T1w in MNI space, head-motion estimation; its `.h5`
-composite; the NIfTI files of its run), ds005040 sub-002 (CC0-1.0; BOLD: slice timing, the
-one-shot resampling with its field map), MNI152NLin2009cAsym (the MNI notice) and OASIS30ANTs
+composite; the NIfTI files of its run; its raw T1w: 3dUnifize), ds005040 sub-002 (CC0-1.0;
+BOLD: slice timing, the one-shot resampling with its field map; its BOLD reference: 3dUnifize
+and 3dAutomask as fMRIPrep calls them; the raw series: 3dAutomask), MNI152NLin2009cAsym (the MNI notice) and OASIS30ANTs
 (CC-BY 4.0) from TemplateFlow.

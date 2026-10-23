@@ -25,10 +25,11 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 
 | Crate | What |
 |---|---|
-| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`, and x87 extended precision where AFNI's NIfTI library uses `long double`, `x87`) and 1D reader, AFNI's global options and environment variables (`environ`) and messages (`message`), and a port of glibc's `sinf`/`cosf`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
-| `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl afni 3dTshift <AFNI's arguments>` |
+| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`, and x87 extended precision where AFNI's NIfTI library uses `long double`, `x87`) and 1D reader, AFNI's global options and environment variables (`environ`) and messages (`message`), and a port of glibc's `sinf`/`cosf`; `3dAutomask` (a brain mask: `mask`, `automask`) and `3dUnifize` (white-matter uniformization: `unifize`, with a port of glibc's `tanhf` and `cbrtf`, `glibc_floatmath`), whose clean-room originals are still to be written from `specs/`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
+| `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl afni 3dTshift|3dAutomask|3dUnifize <AFNI's arguments>` |
 | `larmorx-gpl-afni/tools/csfft-verify` | compares the FFT with AFNI's compiled code, bit for bit (needs the AFNI oracle build) |
 | `larmorx-gpl-afni/tools/sincosf-verify` | compares the `sinf`/`cosf` port with the C library, on all 2^32 inputs |
+| `larmorx-gpl-afni/tools/floatmath-verify` | compares the `tanhf`/`cbrtf` port with glibc, on all 2^32 inputs (with a small C program for `cbrtf`) |
 | `pyproject.toml`, `NOTICE`, `LICENSES/` | the `larmorx-gpl` wheel and the licences and notices it carries (below) |
 
 ## Building and testing
@@ -56,6 +57,8 @@ Parity with AFNI (needs the AFNI oracle, `scripts/build_afni_oracle.sh`, and the
 
 ```bash
 python -m larmorx_validation parity afni-tshift --tier standard --implementation replica
+python -m larmorx_validation parity afni-automask --tier standard
+python -m larmorx_validation parity afni-unifize --tier standard
 ```
 
 The parity suite finds the binary through `LARMORX_GPL_BIN`, else `crates-gpl/target/release`
@@ -116,7 +119,7 @@ a list, `AFNI_ALLOW_MILLISECONDS`' time offset, a one-row dataset written as tex
 values with blanks; register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12, -16, -18,
 -19, -20, -22 in `docs/findings/upstream-defects.md`) and names each one
 that changed the output in a warning
-on standard error (`*+ WARNING: upstream defect AFNI-01 (3dTshift) corrected: ...`), which
+on standard error (`*+ WARNING: upstream defect AFNI-01 (AFNI) corrected: ...`), which
 the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
 `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension
 aside, and AFNI's messages (AFNI's version banner and compile date aside; a one-row dataset

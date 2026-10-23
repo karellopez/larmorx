@@ -17,7 +17,8 @@ Translated works
 ================
 
 AFNI 25.2.09 (tag AFNI_25.2.09) - GNU General Public License, version 2 or any later version
-  Translated: the 3dTshift program and the routines it uses (crate larmorx-gpl-afni).
+  Translated: the 3dTshift, 3dAutomask and 3dUnifize programs and the routines they use
+  (crate larmorx-gpl-afni).
   Major portions of AFNI are copyrighted by the Medical College of Wisconsin, 1994-2000
   (Robert W. Cox et al.), and are released under the GNU General Public License, Version 2.
   AFNI's doc/README/README.copyright: "The MCW-copyrighted part of this software is released
@@ -28,10 +29,15 @@ AFNI 25.2.09 (tag AFNI_25.2.09) - GNU General Public License, version 2 or any l
   The translation is modified from the originals; larmorx-gpl-afni/PROVENANCE.md lists the
   changes.
 
-The GNU C Library 2.35 (sinf, cosf) - GNU Lesser General Public License, version 2.1 or any
-later version
-  Copyright (C) 2018-2022 Free Software Foundation, Inc.
-  Translated in larmorx-gpl-afni/src/glibc_sincosf.rs, modified from the original. Section 3
+The GNU C Library 2.35 (sinf, cosf, tanhf, expm1f, cbrtf) - GNU Lesser General Public
+License, version 2.1 or any later version
+  Copyright (C) 2018-2022 Free Software Foundation, Inc. (sinf, cosf); Copyright (C) 1997-2022
+  Free Software Foundation, Inc. (cbrtf). tanhf and expm1f come from fdlibm: "Copyright (C)
+  1993 by Sun Microsystems, Inc. All rights reserved. Developed at SunPro, a Sun Microsystems,
+  Inc. business. Permission to use, copy, modify, and distribute this software is freely
+  granted, provided that this notice is preserved."
+  Translated in larmorx-gpl-afni/src/glibc_sincosf.rs and glibc_floatmath.rs, modified from the
+  originals. Section 3
   of the LGPL-2.1 permits applying the GNU GPL (version 2 or later) instead; this translation
   is distributed as part of larmorx-gpl under the GNU GPL version 3 or later. The text of the
   LGPL-2.1 is in LICENSES/LGPL-2.1.txt.

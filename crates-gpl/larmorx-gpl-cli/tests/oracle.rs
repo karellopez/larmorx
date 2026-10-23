@@ -164,7 +164,7 @@ fn nearly_plumb_and_write_time_names_as_afni() {
     let (f, _) = run(exe, true, "fix.nii", "fix");
     assert_eq!((a, r, f), (Some(0), Some(0), Some(0)), "{err}");
     assert!(
-        err.contains("upstream defect AFNI-16 (3dTshift) reproduced"),
+        err.contains("upstream defect AFNI-16 (AFNI) reproduced"),
         "{err}"
     );
     let raw = |name: &str| std::fs::read(dir.path().join(name)).unwrap();

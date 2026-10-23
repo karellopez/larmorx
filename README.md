@@ -122,6 +122,8 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 | Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [93 cases](docs/validation/ants-atropos.md): 25 of 56 compared bit-identical to ANTs, 56 of 56 with correctly rounded maths, sMRIPrep's call on the five oracle runs included |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original; exact replica in `larmorx-gpl` | original: [279 of 279](docs/validation/afni-tshift.md) compared agree, 176 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [279 of 279](docs/validation/afni-tshift-replica.md) bit-identical |
+| 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | exact replica in `larmorx-gpl`; clean-room original planned ([spec](specs/3dAutomask.md)) | [105 cases](docs/validation/afni-automask.md): 81 of 81 compared cases that write outputs bit-identical to AFNI, fMRIPrep's call on every oracle run's BOLD reference included |
+| 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | exact replica in `larmorx-gpl`; clean-room original planned ([spec](specs/3dUnifize.md)) | [97 cases](docs/validation/afni-unifize.md): 72 of 72 compared cases that write outputs bit-identical to AFNI (at 1, 2 and 6 threads), fMRIPrep's call on every oracle run's BOLD reference included |
 | Head-motion correction (mcflirt-style options) | `larmorx mri hmc`, `lx.mri.hmc` | clean-room original, `experimental` | [compared with FSL's mcflirt](docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](docs/benchmarks/mri-hmc.md) with threads |
 
 ## Roadmap
@@ -198,7 +200,7 @@ python -m larmorx_validation bench nifti-io --out docs/benchmarks
 | `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-image` | ITK transforms, interpolators and image filters |
 | `crates/larmorx-registration`, `crates/larmorx-ants` | ITK's v4 registration framework; the ANTs programs |
 | `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, head-motion correction |
-| `crates-gpl/` | the GPL-3.0-or-later replicas (`larmorx-gpl`), a separate Cargo workspace |
+| `crates-gpl/` | the GPL-3.0-or-later replicas (`larmorx-gpl`: 3dTshift, 3dAutomask, 3dUnifize), a separate Cargo workspace |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
 | `python/larmorx` | the Python package, including `pipelines/larmorprepx` |

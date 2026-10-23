@@ -656,16 +656,33 @@ def command(program: str, s) -> str:
     return " ".join(x for x in (env, " ".join(parts), files) if x)
 
 
-def case_verdict(r: dict) -> tuple[str, str]:
+def case_verdict(r: dict, desc: str = "") -> tuple[str, str]:
     """A case's verdict: the record compares the replica in reproduce mode with AFNI (every
     output byte for byte, exit status, messages); the fix pass and AFNI's variability are
-    reported."""
+    reported. A compared case without outputs (``desc`` names its defect) is AFNI's refusal
+    or AFNI's silence, reproduced."""
+    import re
+
     st = r["status"]
     if st == "both-error" and "crash" in r["reason"]:
         return "divergence", common.clip(r["reason"])
     v = common.outcome_verdict(r)
     if v is not None:
         return v
+    measured = r.get("measured", {})
+    if not any(k.endswith(": data") for k in measured) and "exit status" in measured:
+        m = re.search(r"\((AFNI-\d+)\)", desc)
+        defect = m.group(1) if m else "the defect"
+        if measured["exit status"]:
+            return "both-reject", (
+                f"AFNI refuses it (exit {measured['exit status']}), and so does the replica in "
+                f"reproduce mode, with AFNI's messages; its default mode accepts it and names "
+                f"{defect} (the record's D13 section)."
+            )
+        return "bit-identical", (
+            f"Neither writes an output; the exit status (0) and the messages are AFNI's. The "
+            f"default mode refuses instead (exit 1) and names {defect} (the record's D13 section)."
+        )
     rep = r.get("reported", {})
     notes = []
     band = {k.removeprefix("band: "): v for k, v in rep.items() if k.startswith("band: ")}
@@ -706,7 +723,7 @@ def cases(rec, scenarios, program: str, examples: dict[str, str]) -> list[dict]:
     out = []
     for r in rec.results:
         desc, s = defs.get(r["case"], ("", None))
-        v, why = case_verdict(r)
+        v, why = case_verdict(r, desc)
         out.append(
             {
                 "id": r["case"],

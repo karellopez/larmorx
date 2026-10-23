@@ -723,6 +723,13 @@ def _cases(ctx: core.Context) -> list[dict]:
                     )
                 if band is not None:
                     v = (v[0], v[1] + f"; larmorx − ANTs at 1 thread: {band} in a parameter")
+                if "alignment error" in rep:
+                    v = (
+                        v[0],
+                        v[1]
+                        + f"; from the known transform: ANTs {rep.get('alignment error: ANTs')}, "
+                        f"larmorx's default {rep['alignment error']}",
+                    )
             out.append(
                 {
                     "id": f"{program}/{r['case']}",

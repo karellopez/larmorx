@@ -89,12 +89,14 @@ def extract_contours(
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath d out ExtractContours in fully_connected``: ITK's
-    ``LabelContourImageFilter``. Each voxel's label is its value truncated to an unsigned
-    integer (so 1.7 is 1 and 0.6 is 0: contours of probability maps vanish); voxels of a
-    non-zero label that touch another label (through a face, or anywhere in the ``3^D``
-    neighbourhood when ``fully_connected``) keep their label, the others become 0. A negative
-    value is background; ANTs on x86-64 wraps it to a label near 2^64 (ANTS-06), which
-    ``upstream_defects="reproduce"`` gives."""
+    ``LabelContourImageFilter``. Every distinct value is a label (0 is the background); voxels
+    of a label that touch another label (through a face, or anywhere in the ``3^D``
+    neighbourhood when ``fully_connected``) keep their value, the others become 0.
+
+    ANTs labels each voxel by its value truncated to an unsigned integer instead (ANTS-23):
+    1.2 and 1.7 are one label with no contour between them, values below 1 are background (so
+    contours of probability maps vanish), and ANTs on x86-64 wraps a negative value to a label
+    near 2^64 (ANTS-06); ``upstream_defects="reproduce"`` gives its result."""
     check(upstream_defects)
     a = float_input(image, n_threads)
     data, notices = _core.ants_extract_contours(

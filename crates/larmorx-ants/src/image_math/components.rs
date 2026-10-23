@@ -206,15 +206,20 @@ pub fn x86_f32_to_u64(v: f32) -> u64 {
 }
 
 /// `ExtractContours`: `ImageMath d out ExtractContours image [fullyConnected=1]`: ITK's
-/// `LabelContourImageFilter<float, float>` with background 0. Each voxel's label is its
-/// value converted to `unsigned long` (`static_cast`, so 1.7 is 1 and 0.6 is 0); voxels whose
-/// label is not 0 and that touch a voxel with another label (through a face, or anywhere in
-/// the `3^D` neighbourhood when fully connected) keep their label, as a float; the others are
-/// 0.
+/// `LabelContourImageFilter<float, float>` with background 0: voxels whose label is not the
+/// background and that touch a voxel with another label (through a face, or anywhere in the
+/// `3^D` neighbourhood when fully connected) keep their label, as a float; the others are 0.
+///
+/// **ANTS-23.** ITK's filter takes each voxel's label as its value converted to `unsigned
+/// long` (`static_cast`: 1.7 is 1, 0.6 is 0), so 1.2 and 1.7 are one label with no contour
+/// between them, a value below 1 is background, and a contour voxel holds the truncated
+/// value ([`UpstreamDefects::Reproduce`]). Corrected (the default): **the labels are the
+/// values themselves**, every distinct value its own label (`-0.0` is the background 0, every
+/// NaN one label), and a contour voxel keeps its value; named where the two differ.
 ///
 /// A negative or NaN value has no `unsigned long` (ANTS-06): x86-64 builds of ANTs wrap a
-/// negative value to near 2^64 ([`x86_f32_to_u64`], [`UpstreamDefects::Reproduce`]); larmorx
-/// clamps it to 0, background (the default).
+/// negative value to near 2^64 ([`x86_f32_to_u64`]), named in both modes; the corrected
+/// labels need no conversion.
 pub fn extract_contours(
     input: VolumeRef<'_, f32>,
     fully_connected: bool,
@@ -222,18 +227,13 @@ pub fn extract_contours(
     mode: UpstreamDefects,
 ) -> Result<(Vec<f32>, Vec<Notice>), FilterError> {
     let undefined = |v: f32| !(v > -1.0 && v < 18_446_744_073_709_551_616.0);
+    // ITK's labels: the truncated values (wrapped as x86-64 converts them).
     let (labels, wrapped): (Vec<u64>, usize) = parallel::with_threads(n_threads, || {
         let labels = input
             .data
             .par_iter()
             .with_min_len(CHUNK)
-            .map(|&v| {
-                if mode.fix() && undefined(v) {
-                    v as u64
-                } else {
-                    x86_f32_to_u64(v)
-                }
-            })
+            .map(|&v| x86_f32_to_u64(v))
             .collect();
         let wrapped = input
             .data
@@ -243,14 +243,66 @@ pub fn extract_contours(
             .count();
         (labels, wrapped)
     })?;
+    let contour = label_contour(&labels, input.size, fully_connected, 0, n_threads)?;
+    let ants: Vec<f32> = parallel::with_threads(n_threads, || {
+        labels
+            .par_iter()
+            .zip(contour.par_iter())
+            .with_min_len(CHUNK)
+            .map(|(&l, &c)| if c { l as f32 } else { 0.0 })
+            .collect()
+    })?;
+    drop((labels, contour));
+    // The corrected labels: each value its own label, by its bits (0 for ±0, one for NaN).
+    let keys: Vec<u64> = parallel::with_threads(n_threads, || {
+        input
+            .data
+            .par_iter()
+            .with_min_len(CHUNK)
+            .map(|&v| value_label(v))
+            .collect()
+    })?;
+    let contour = label_contour(&keys, input.size, fully_connected, 0, n_threads)?;
+    drop(keys);
+    let fixed: Vec<f32> = parallel::with_threads(n_threads, || {
+        input
+            .data
+            .par_iter()
+            .zip(contour.par_iter())
+            .with_min_len(CHUNK)
+            .map(|(&v, &c)| if c { v } else { 0.0 })
+            .collect()
+    })?;
+    let changed = ants
+        .iter()
+        .zip(&fixed)
+        .filter(|(a, f)| a.to_bits() != f.to_bits() && !(a.is_nan() && f.is_nan()))
+        .count();
     let mut notices = Notices::new(mode);
+    if changed > 0 {
+        notices.add(
+            &defects::ANTS_23,
+            if mode.fix() {
+                format!(
+                    "the labels are the values themselves: {changed} voxel(s) differ from ANTs', \
+                     which labels each voxel by its value truncated to an unsigned integer (1.2 \
+                     and 1.7 one label, values below 1 background)"
+                )
+            } else {
+                format!(
+                    "the labels are the values truncated to unsigned integers, as in ANTs: \
+                     {changed} voxel(s) differ from the contours of the values themselves"
+                )
+            },
+        );
+    }
     if wrapped > 0 {
         notices.add(
             &defects::ANTS_06,
             if mode.fix() {
                 format!(
-                    "{wrapped} value(s) are negative, NaN or beyond 2^64: their labels are \
-                     clamped (0 for negative values and NaN); ANTs on x86-64 wraps them around"
+                    "{wrapped} value(s) are negative, NaN or beyond 2^64: they are labels like \
+                     any other value; ANTs on x86-64 wraps their truncated labels around"
                 )
             } else {
                 format!(
@@ -260,16 +312,19 @@ pub fn extract_contours(
             },
         );
     }
-    let contour = label_contour(&labels, input.size, fully_connected, 0, n_threads)?;
-    let out = parallel::with_threads(n_threads, || {
-        labels
-            .par_iter()
-            .zip(contour.par_iter())
-            .with_min_len(CHUNK)
-            .map(|(&l, &c)| if c { l as f32 } else { 0.0 })
-            .collect()
-    })?;
-    Ok((out, notices.into_vec()))
+    Ok((if mode.fix() { fixed } else { ants }, notices.into_vec()))
+}
+
+/// The corrected `ExtractContours` label of a value: 0 for `±0` (the background), one label
+/// for every NaN, otherwise the value's bits (plus one, so that no value is the background).
+fn value_label(v: f32) -> u64 {
+    if v == 0.0 {
+        0
+    } else if v.is_nan() {
+        u64::from(f32::NAN.to_bits()) + 1
+    } else {
+        u64::from(v.to_bits()) + 1
+    }
 }
 
 #[cfg(test)]
@@ -339,22 +394,42 @@ mod tests {
         assert_eq!(x86_f32_to_u64(1.7), 1);
         assert_eq!(x86_f32_to_u64(-1.5), u64::MAX);
         assert_eq!(x86_f32_to_u64(1.0e19), 9_999_999_980_506_447_872);
-        // 1.2 and 1.7 are both label 1: no contour between them; 2 differs.
-        let data = [0.0f32, 1.2, 1.7, 1.2, 2.0, 2.0, 0.0];
+        // Integer labels: both modes agree, nothing named.
+        let data = [0.0f32, 1.0, 1.0, 1.0, 2.0, 2.0, 0.0];
         for mode in [R, F] {
             let out = extract_contours(VolumeRef::new(&data, &[7], &[1.0]), true, 1, mode);
             assert_eq!(out.unwrap(), (vec![0., 1., 0., 1., 2., 2., 0.], vec![]));
         }
-        // ANTS-06: a negative value wraps to near 2^64 in ANTs, is background here.
+        // ANTS-23: 1.2 and 1.7 are both label 1 in ANTs (no contour between them), 0.6 is
+        // background; corrected, each value is its own label and keeps its value.
+        let data = [0.0f32, 1.2, 1.2, 1.7, 1.7, 2.0, 2.0, 0.0, 0.6, 0.6, 0.6, 0.0];
+        let v = VolumeRef::new(&data, &[12], &[1.0]);
+        let (ants, notices) = extract_contours(v, true, 1, R).unwrap();
+        assert_eq!(ants, [0., 1., 0., 0., 1., 2., 2., 0., 0., 0., 0., 0.]);
+        assert_eq!(notices[0].defect.id, "ANTS-23");
+        let (fixed, notices) = extract_contours(v, true, 1, F).unwrap();
+        assert_eq!(
+            fixed,
+            [0., 1.2, 1.2, 1.7, 1.7, 2., 2., 0., 0.6, 0., 0.6, 0.]
+        );
+        assert_eq!(notices[0].defect.id, "ANTS-23");
+        // ANTS-06: a negative value wraps to near 2^64 in ANTs; corrected, it is a label.
         let data = [0.0f32, -1.5, -1.5, 0.0];
         let (out, notices) =
             extract_contours(VolumeRef::new(&data, &[4], &[1.0]), true, 1, R).unwrap();
         assert_eq!(out[1], u64::MAX as f32);
-        assert_eq!(notices[0].defect.id, "ANTS-06");
+        assert_eq!(notices[1].defect.id, "ANTS-06");
         let (out, notices) =
             extract_contours(VolumeRef::new(&data, &[4], &[1.0]), true, 1, F).unwrap();
-        assert_eq!(out, [0.0; 4]);
-        assert_eq!(notices[0].defect.id, "ANTS-06");
+        assert_eq!(out, [0.0, -1.5, -1.5, 0.0]);
+        assert_eq!(notices[0].defect.id, "ANTS-23");
+        assert_eq!(notices[1].defect.id, "ANTS-06");
+        // -0.0 is the background, and every NaN one label.
+        let data = [-0.0f32, 3.0, f32::NAN, f32::NAN, 0.0];
+        let (out, _) = extract_contours(VolumeRef::new(&data, &[5], &[1.0]), true, 1, F).unwrap();
+        assert_eq!(out[..2], [0.0, 3.0]);
+        assert!(out[2].is_nan() && out[3].is_nan());
+        assert_eq!(out[4], 0.0);
     }
 
     #[test]

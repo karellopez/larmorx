@@ -28,8 +28,9 @@
 //! ANTs' single-thread result (`docs/findings/ants-denoise.md`).
 //!
 //! **Upstream defects (D13).** By default larmorx refuses a mask it cannot read (ANTS-47),
-//! clamps mask values outside `unsigned char`'s range (ANTS-06) and corrects the filter's
-//! Rician correction factor (ANTS-43); `LARMORX_UPSTREAM_DEFECTS=reproduce` gives ANTs'
+//! clamps mask values outside `unsigned char`'s range (ANTS-06), corrects the filter's
+//! Rician correction factor (ANTS-43) and gives the voxels outside a mask the smoothed and
+//! corrected Rician bias (ANTS-44); `LARMORX_UPSTREAM_DEFECTS=reproduce` gives ANTs'
 //! behaviour.
 
 use std::io::Write;

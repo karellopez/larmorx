@@ -11,7 +11,7 @@
 use larmorx_ants::VolumeRef;
 use larmorx_ants::image::{AntsImage, OutputImage};
 use larmorx_ants::image_math::{FillHolesError, Morphology, fill_holes, morphological, pad_image};
-use numpy::{PyArrayDyn, PyReadonlyArrayDyn, PyUntypedArrayMethods};
+use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -23,9 +23,10 @@ use crate::defects::{mode_from_py, with_notices};
 use larmorx_core::defects::Notices;
 
 /// `ants::Morphological`: `operation` is ImageMath's name (`MD`, `ME`, `MO`, `MC`, `GD`, `GE`,
-/// `GO`, `GC`), `radius` in voxels, `value` the binary operations' foreground.
+/// `GO`, `GC`), `radius` in voxels, `value` the binary operations' foreground: `(data,
+/// notices)` (ANTS-17).
 #[pyfunction]
-#[pyo3(signature = (a, operation, radius = 1, value = 1.0, n_threads = 1))]
+#[pyo3(signature = (a, operation, radius = 1, value = 1.0, n_threads = 1, upstream_defects = "fix"))]
 fn ants_morphology<'py>(
     py: Python<'py>,
     a: PyReadonlyArrayDyn<'py, f32>,
@@ -33,7 +34,9 @@ fn ants_morphology<'py>(
     radius: usize,
     value: f32,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArrayDyn<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = mode_from_py(upstream_defects)?;
     let op = Morphology::from_name(operation).ok_or_else(|| {
         PyValueError::new_err(format!(
             "unknown morphological operation {operation:?} (MD, ME, MO, MC, GD, GE, GO, GC)"
@@ -41,7 +44,7 @@ fn ants_morphology<'py>(
     })?;
     let spacing = vec![1.0; a.shape().len()];
     let (shape, data) = checked(&a, &spacing)?;
-    let out = py
+    let (out, notices) = py
         .detach(|| {
             morphological(
                 VolumeRef::new(&data, &shape, &spacing),
@@ -49,10 +52,11 @@ fn ants_morphology<'py>(
                 radius,
                 value,
                 n_threads,
+                mode,
             )
         })
         .map_err(value_err)?;
-    array_like(py, out, &shape)
+    with_notices(py, array_like(py, out, &shape)?.into_any(), notices)
 }
 
 /// ImageMath `FillHoles` with `hole_param` (2: every hole): `(data, notices)`.
@@ -83,9 +87,9 @@ fn ants_fill_holes<'py>(
 
 /// ImageMath `PadImage`: the image (a path, read as a `dim`-dimensional float image, or an
 /// in-memory tuple) padded by `pad` voxels of `value` on both sides of every axis (cropped if
-/// negative). Returns `(data, ras_affine, descrip, spacing)`.
+/// negative). Returns `((data, ras_affine, descrip, spacing), notices)` (ANTS-22).
 #[pyfunction]
-#[pyo3(signature = (image, dim, pad, value = 0.0, n_threads = 1))]
+#[pyo3(signature = (image, dim, pad, value = 0.0, n_threads = 1, upstream_defects = "fix"))]
 fn ants_pad_image<'py>(
     py: Python<'py>,
     image: &Bound<'py, PyAny>,
@@ -93,12 +97,20 @@ fn ants_pad_image<'py>(
     pad: f32,
     value: f32,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads, &mut Notices::default())?;
-    let out = py
-        .detach(|| pad_image(&input, pad, value))
+    let mode = mode_from_py(upstream_defects)?;
+    let mut notices = Notices::new(mode);
+    let input: AntsImage<f32> = ants_input(py, image, dim, n_threads, &mut notices)?;
+    let (out, pad_notices) = py
+        .detach(|| pad_image(&input, pad, value, mode))
         .map_err(value_err)?;
-    output_with_spacing(py, OutputImage::F32(out))
+    notices.extend(pad_notices);
+    with_notices(
+        py,
+        output_with_spacing(py, OutputImage::F32(out))?.into_any(),
+        notices.into_vec(),
+    )
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -23,10 +23,16 @@
 //!
 //! Afterwards each output voxel is divided by its count. With the Rician model, the bias image
 //! is smoothed (`DiscreteGaussianImageFilter`, variance 2 in physical units); where the
-//! smoothed value `s` is above 0 (and the mask is not 0) the bias becomes
+//! smoothed value `s` is above 0 (and, in ITK, the mask is not 0) the bias becomes
 //! `2s / CF(mean / √s)`, with `CF` the Rician correction factor built from the modified Bessel
 //! functions `I₀` and `I₁` of `GaussianOperator`; elsewhere the bias keeps its unsmoothed
 //! value. The output is `√max(0, value − bias)`.
+//!
+//! **ANTS-44.** Patches about centres in the mask reach voxels outside it, which get an
+//! estimate like any other; ITK leaves their bias the raw noise estimate `h` of the last such
+//! centre (neither smoothed nor corrected, `UpstreamDefects::Reproduce`). Corrected (the
+//! default): every voxel with an estimate gets the smoothed and corrected bias; named where
+//! the output changes.
 //!
 //! Every quantity is a `float` computed in ITK's order, with `std::exp(float)` (`expf`) and
 //! `exp` (in the Bessel functions) correctly rounded here (`larmorx_core::math`).
@@ -872,6 +878,9 @@ fn run(
     let mut bias_image = Vec::new();
     let overflowed = std::sync::atomic::AtomicUsize::new(0);
     let fix = parameters.upstream_defects.fix();
+    // ANTS-44: the voxels outside the mask whose bias ITK leaves unsmoothed, with the bias
+    // the other mode gives them.
+    let mut other_bias: Vec<(usize, f32)> = Vec::new();
     if rician {
         let options = DiscreteGaussianOptions::new(d, f64::from(parameters.smoothing_variance));
         let smoothed = discrete_gaussian(
@@ -879,6 +888,54 @@ fn run(
             &options,
             n_threads,
         )?;
+        // `ItS.Get() > 0`: false for NaN too.
+        let positive = |s: f32| s.partial_cmp(&0.0) == Some(std::cmp::Ordering::Greater);
+        let outside_mask = |lin: usize| -> bool {
+            ctx.mask.is_some() && {
+                let c = coordinates(&ctx, lin);
+                let rc: [usize; MAXD] = std::array::from_fn(|k| c[k] as usize);
+                !ctx.mask_allows(&rc, rc[0])
+            }
+        };
+        // The smoothed and corrected bias, and whether ITK's factor overflowed (ANTS-43).
+        let corrected = |s: f32, m: f32| -> (f32, bool) {
+            let snr = m / s.sqrt();
+            let factor = correction_factor(snr);
+            let mut v = 2.0f32 * s / factor;
+            let overflow = factor.is_nan() && (v.is_nan() || v.is_infinite());
+            if v.is_nan() || v.is_infinite() {
+                v = if fix && factor.is_nan() {
+                    2.0f32 * s / corrected_correction_factor(snr)
+                } else {
+                    0.0
+                };
+                if v.is_nan() || v.is_infinite() {
+                    v = 0.0;
+                }
+            }
+            (v, overflow)
+        };
+        if ctx.mask.is_some() {
+            other_bias = larmorx_core::parallel::with_threads(n_threads, || {
+                (0..len)
+                    .into_par_iter()
+                    .with_min_len(1 << 12)
+                    .filter(|&lin| {
+                        !almost_equal_f32(counts[lin], 0.0)
+                            && positive(smoothed[lin])
+                            && outside_mask(lin)
+                    })
+                    .map(|lin| {
+                        let other = if fix {
+                            raw_bias[lin]
+                        } else {
+                            corrected(smoothed[lin], mean[lin]).0
+                        };
+                        (lin, other)
+                    })
+                    .collect()
+            })?;
+        }
         bias_image = raw_bias;
         larmorx_core::parallel::with_threads(n_threads, || {
             bias_image
@@ -888,33 +945,19 @@ fn run(
                 .enumerate()
                 .with_min_len(1 << 12)
                 .for_each(|(lin, ((b, &s), &m))| {
-                    // `ItS.Get() > 0`: false for NaN too.
-                    if s.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+                    if !positive(s) {
                         return;
                     }
-                    if ctx.mask.is_some() {
-                        let c = coordinates(&ctx, lin);
-                        let rc: [usize; MAXD] = std::array::from_fn(|k| c[k] as usize);
-                        if !ctx.mask_allows(&rc, rc[0]) {
-                            return;
-                        }
+                    // ITK keeps the unsmoothed bias outside the mask (ANTS-44); corrected,
+                    // every voxel gets the smoothed and corrected bias.
+                    let outside = outside_mask(lin);
+                    if outside && !fix {
+                        return;
                     }
-                    let snr = m / s.sqrt();
-                    let factor = correction_factor(snr);
-                    let mut v = 2.0f32 * s / factor;
-                    if v.is_nan() || v.is_infinite() {
-                        // ANTS-43: a NaN factor is ITK's overflow at a high SNR.
-                        if factor.is_nan() {
-                            overflowed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        }
-                        v = if fix && factor.is_nan() {
-                            2.0f32 * s / corrected_correction_factor(snr)
-                        } else {
-                            0.0
-                        };
-                        if v.is_nan() || v.is_infinite() {
-                            v = 0.0;
-                        }
+                    let (v, overflow) = corrected(s, m);
+                    // ANTS-43 is counted where both modes compute the factor.
+                    if overflow && !outside {
+                        overflowed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                     *b = v;
                 });
@@ -938,27 +981,51 @@ fn run(
             },
         );
     }
+    let estimate = |lin: usize, bias: f32| -> f32 {
+        let (s, n) = (sums[lin], counts[lin]);
+        if almost_equal_f32(n, 0.0) {
+            return s;
+        }
+        let mut estimate = s / n;
+        if rician {
+            estimate -= bias;
+            if estimate < 0.0 {
+                estimate = 0.0;
+            }
+            estimate = estimate.sqrt();
+        }
+        estimate
+    };
     let denoised: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
-        sums.par_iter()
-            .zip(counts.par_iter())
-            .enumerate()
+        (0..len)
+            .into_par_iter()
             .with_min_len(1 << 14)
-            .map(|(lin, (&s, &n))| {
-                if almost_equal_f32(n, 0.0) {
-                    return s;
-                }
-                let mut estimate = s / n;
-                if rician {
-                    estimate -= bias_image[lin];
-                    if estimate < 0.0 {
-                        estimate = 0.0;
-                    }
-                    estimate = estimate.sqrt();
-                }
-                estimate
-            })
+            .map(|lin| estimate(lin, if rician { bias_image[lin] } else { 0.0 }))
             .collect()
     })?;
+    let changed = other_bias
+        .iter()
+        .filter(|&&(lin, other)| estimate(lin, other).to_bits() != denoised[lin].to_bits())
+        .count();
+    if changed > 0 {
+        let reached = other_bias.len();
+        notices.add(
+            &defects::ANTS_44,
+            if fix {
+                format!(
+                    "{reached} voxel(s) outside the mask that patches reach get the smoothed and \
+                     corrected Rician bias, which changes {changed} of them; ITK leaves them the \
+                     raw noise estimate of a centre in the mask"
+                )
+            } else {
+                format!(
+                    "{reached} voxel(s) outside the mask that patches reach keep the raw noise \
+                     estimate of a centre in the mask, as in ITK ({changed} differ from the \
+                     smoothed and corrected bias)"
+                )
+            },
+        );
+    }
     Ok(AdaptiveNlmOutput {
         denoised,
         rician_bias: bias_image,
@@ -1228,12 +1295,22 @@ mod tests {
         if p.rician {
             let options = DiscreteGaussianOptions::new(3, f64::from(p.smoothing_variance));
             let s = discrete_gaussian(VolumeRef::new(&bias, &size, &spacing), &options, 1).unwrap();
+            let fix = p.upstream_defects.fix();
             for i in 0..n {
-                if s[i] > 0.0 && mask.is_none_or(|m| m[i] != 0) {
+                // ANTS-44: ITK corrects the bias only in the mask; fixed, wherever s > 0.
+                if s[i] > 0.0 && (fix || mask.is_none_or(|m| m[i] != 0)) {
                     let snr = mean[i] / s[i].sqrt();
-                    let mut b = 2.0 * s[i] / correction_factor(snr);
+                    let factor = correction_factor(snr);
+                    let mut b = 2.0 * s[i] / factor;
                     if b.is_nan() || b.is_infinite() {
-                        b = 0.0;
+                        b = if fix && factor.is_nan() {
+                            2.0 * s[i] / corrected_correction_factor(snr)
+                        } else {
+                            0.0
+                        };
+                        if b.is_nan() || b.is_infinite() {
+                            b = 0.0;
+                        }
                     }
                     bias[i] = b;
                 }
@@ -1298,30 +1375,40 @@ mod tests {
         let spacing = [1.0, 1.2, 1.5];
         let data = phantom(size, 7);
         let mask: Vec<u8> = (0..data.len()).map(|i| u8::from(i % 7 != 3)).collect();
-        for rician in [true, false] {
-            for (patch, search) in [(1usize, 2usize), (1, 1), (2, 1), (0, 3)] {
-                let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
-                p.upstream_defects = UpstreamDefects::Reproduce;
-                p.patch_radius = vec![patch; 3];
-                p.search_radius = vec![search; 3];
-                for m in [None, Some(&mask[..])] {
-                    let expected = reference(&data, size, spacing, m, &p);
-                    let v = VolumeRef::new(&data, &size, &spacing);
-                    let mref = m.map(|d| MaskRef {
-                        data: d,
-                        size: &size,
-                    });
-                    for threads in [1, 3] {
-                        let got = adaptive_non_local_means(v, mref, &p, threads).unwrap();
-                        assert!(
-                            got.denoised
-                                .iter()
-                                .zip(&expected)
-                                .all(|(a, b)| a.to_bits() == b.to_bits()),
-                            "rician {rician}, patch {patch}, search {search}, mask {}, \
-                             {threads} threads",
-                            m.is_some()
-                        );
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            for rician in [true, false] {
+                for (patch, search) in [(1usize, 2usize), (1, 1), (2, 1), (0, 3)] {
+                    let mut p = AdaptiveNlmParameters::denoise_image(3, rician);
+                    p.upstream_defects = mode;
+                    p.patch_radius = vec![patch; 3];
+                    p.search_radius = vec![search; 3];
+                    for m in [None, Some(&mask[..])] {
+                        let expected = reference(&data, size, spacing, m, &p);
+                        let v = VolumeRef::new(&data, &size, &spacing);
+                        let mref = m.map(|d| MaskRef {
+                            data: d,
+                            size: &size,
+                        });
+                        for threads in [1, 3] {
+                            let got = adaptive_non_local_means(v, mref, &p, threads).unwrap();
+                            assert!(
+                                got.denoised
+                                    .iter()
+                                    .zip(&expected)
+                                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                                "{mode}, rician {rician}, patch {patch}, search {search}, \
+                                 mask {}, {threads} threads",
+                                m.is_some()
+                            );
+                            // ANTS-44 is met only with a mask and the Rician model (the
+                            // centres' patches reach the voxels the mask leaves out).
+                            let named = got.notices.iter().any(|n| n.defect.id == "ANTS-44");
+                            if !(rician && m.is_some()) {
+                                assert!(!named);
+                            } else if patch > 0 {
+                                assert!(named, "{mode}, patch {patch}, search {search}");
+                            }
+                        }
                     }
                 }
             }

@@ -81,7 +81,15 @@ fn run_morph(ctx: &mut Context<'_>) -> Result<(), OpError> {
             ctx.op()
         )));
     };
-    let data = morphological(image.view(), operation, radius, value, ctx.n_threads)?;
+    let (data, notices) = morphological(
+        image.view(),
+        operation,
+        radius,
+        value,
+        ctx.n_threads,
+        ctx.notices.mode(),
+    )?;
+    ctx.notices.extend(notices);
     ctx.write_if_long(&output, image.derived(data))?;
     Ok(())
 }
@@ -122,11 +130,12 @@ fn run_pad_image(ctx: &mut Context<'_>) -> Result<(), OpError> {
             format!("the image '{fn1}' is read like any other name; ANTs' PadImage reads no name of 3 characters or fewer"),
         );
     }
-    let padded = pad_image(&image, pad, value).map_err(|e| {
+    let (padded, notices) = pad_image(&image, pad, value, ctx.notices.mode()).map_err(|e| {
         OpError::crash(format!(
             "larmorx: {e} (ANTs cannot allocate or write such an image)"
         ))
     })?;
+    ctx.notices.extend(notices);
     ctx.write(&output, padded)?;
     Ok(())
 }

@@ -28,6 +28,8 @@ PARITY_MODULES = {
     "ants-apply-transforms": "ants_apply_transforms",
     "itk-hdf5": "itk_hdf5",
     "afni-tshift": "afni_tshift",
+    "afni-automask": "afni_automask",
+    "afni-unifize": "afni_unifize",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
     "mri-hmc": "mri_hmc",

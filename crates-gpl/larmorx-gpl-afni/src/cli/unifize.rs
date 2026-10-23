@@ -294,7 +294,7 @@ fn parse(
                 // AFNI reads argv[argc] (NULL) as a number and crashes.
                 return Err(Fail::Fatal(
                     "-T2up needs a value: AFNI crashes (Fatal Signal 11) when an option's \
-                     value is missing (upstream defect AFNI-40)"
+                     value is missing (AFNI-40)"
                         .into(),
                 ));
             };
@@ -537,7 +537,7 @@ fn run(
         let Some(m) = m else {
             return Err(
                 "the automask of a 2D image smaller than 16 x 16 is empty (NULL): AFNI crashes \
-                 inverting the contrast with it (upstream defect AFNI-46)"
+                 inverting the contrast with it (AFNI-46)"
                     .into(),
             );
         };
@@ -697,7 +697,7 @@ fn run(
     let Some(mmm) = mmm else {
         return Err(
             "the automask of the unifized 2D image is empty (NULL): AFNI crashes applying it \
-             (upstream defect AFNI-46)"
+             (AFNI-46)"
                 .into(),
         );
     };

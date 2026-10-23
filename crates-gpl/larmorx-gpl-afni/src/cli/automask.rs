@@ -219,7 +219,7 @@ fn parse(
                 // AFNI's crash banner is not reproduced: a refusal, in both modes.
                 Err(Fail::Fatal(format!(
                     "{name} needs a value: AFNI crashes (Fatal Signal 11) when an option's value \
-                     is missing (upstream defect AFNI-40)"
+                     is missing (AFNI-40)"
                 )))
             }
         }
@@ -566,25 +566,28 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, quiet: bool, io: &mut Io<'_>) -
             verbose: false,
             ..o.settings.clone()
         };
+        // The averaged values differ by the factor's magnitude, so the clip levels AFNI
+        // prints do; the mask, which scales with the data, seldom does.
         let medim = aveabs(&ds, other);
         let other_mask = mask::automask_image(&medim, g, &s, &mut Vec::new());
-        if other_mask.as_deref() != Some(&mask[..]) {
-            let n = other_mask.map_or(0, |m| m.iter().zip(&mask).filter(|(a, b)| a != b).count());
-            notices.add(
-                &defects::AFNI_01,
-                if mode.fix() {
-                    format!(
-                        "a negative scale factor is applied when the sub-bricks are averaged: \
-                         the mask differs from AFNI's in {n} voxels, where AFNI drops the factor"
-                    )
-                } else {
-                    format!(
-                        "a negative scale factor is dropped when the sub-bricks are averaged, as \
-                         AFNI does: the mask differs in {n} voxels from the one with the factor"
-                    )
-                },
-            );
-        }
+        let n = other_mask.map_or(mask.len(), |m| {
+            m.iter().zip(&mask).filter(|(a, b)| a != b).count()
+        });
+        notices.add(
+            &defects::AFNI_01,
+            if mode.fix() {
+                format!(
+                    "a negative scale factor is applied when the sub-bricks are averaged, where \
+                     AFNI drops it (and its magnitude): the mask differs from AFNI's in {n} \
+                     voxels"
+                )
+            } else {
+                format!(
+                    "a negative scale factor is dropped when the sub-bricks are averaged, as AFNI \
+                     does: the mask differs in {n} voxels from the one with the factor"
+                )
+            },
+        );
     }
 
     let depth = if o.depth_prefix.is_some() {

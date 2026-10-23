@@ -158,7 +158,7 @@ and sources in [findings/ants-image-programs.md](../findings/ants-image-programs
 - **`TruncateImageIntensity`** counts positive, finite voxels inside the mask (read as
   `int`, so ≥ 1) and clips every voxel.
 - **Non-finite input values are read as 0** (ITK's NIfTI reader), so NaN never reaches an
-  operation.
+  operation (ITK-06, kept in both modes by decision, 2026-10-23: [io.md](io.md)).
 - `Neg`, `TruncateImageIntensity` and `Normalize` keep the input's `descrip` in the output
   header (they write the image they read); the others do not.
 - **Gaussian operations** ([findings](../findings/ants-gaussian-filters.md)): the recursive

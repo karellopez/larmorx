@@ -76,6 +76,14 @@ The header is the image's header, updated as nibabel updates it: the qform/sform
 | `get_fdata` on complex data | drops the imaginary part | error | no silent data loss |
 | RGB24/RGBA32 data | structured arrays | not supported yet | planned |
 
+`lx.load` keeps NaN and infinities as they are, as nibabel does. The ANTs programs' reader
+(`larmorx ants ...` and the `lx.ants` functions given a file name) reads them as 0, as ITK's
+NIfTI reader (nifti_clib) does for every ANTs user: an image that marks missing data with NaN is
+read with 0 there. This is kept in both modes by decision (ITK-06, rule C, 2026-10-23: no fMRIPrep
+input has such a value, and keeping them would spread one NaN through every smoothing step;
+[register](../findings/upstream-defects.md),
+[investigation](../../validation/investigations/itk-06-nonfinite/README.md)).
+
 ## Performance
 
 From the [benchmark report](../benchmarks/nifti-io.md) (real data from 2 MB templates to a 1.4 GB 7 T BOLD run; median times, warm OS cache):

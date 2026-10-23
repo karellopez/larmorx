@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.parity import ants_inputs, ants_threaded
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_image_math.common import (
     BOLD_MASK,
     BOLDREF,
@@ -45,7 +46,6 @@ from larmorx_validation.parity.ants_image_math.common import (
     T1_RAW,
     WM,
 )
-from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_programs import AntsCase, ants_version, cases_for
 from larmorx_validation.parity.harness import Case, CaseResult, CheckList, Suite
 

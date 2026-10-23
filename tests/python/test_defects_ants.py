@@ -246,13 +246,14 @@ def test_components_and_holes():
     ants_, aw = entries(lx.ants.fill_holes, image(data), 0.9, upstream_defects=REPRODUCE)
     assert fixed.data[3, 3, 0] == 1 and ants_.data[3, 3, 0] == 0
     assert fw == aw == ["ANTS-19"]
-    # ANTS-06: a negative label.
+    # ANTS-23 and ANTS-06: a negative label is a label like any other (its contour keeps -2);
+    # ANTs truncates it to an unsigned label, which x86-64 wraps to near 2^64.
     labels = np.zeros((4, 4, 4), np.float32)
     labels[1:3, 1:3, 1:3] = -2
     fixed, fw = entries(lx.ants.extract_contours, image(labels))
     ants_, aw = entries(lx.ants.extract_contours, image(labels), upstream_defects=REPRODUCE)
-    assert (fixed.data == 0).all() and ants_.data.max() > 1e19
-    assert fw == aw == ["ANTS-06"]
+    assert set(np.unique(fixed.data)) == {0.0, -2.0} and ants_.data.max() > 1e19
+    assert fw == aw == ["ANTS-23", "ANTS-06"]
 
 
 # --- ThresholdImage, MultiplyImages -------------------------------------------------------------
@@ -315,7 +316,8 @@ def test_resample_defects(tmp_path):
     r, w = entries(
         lx.ants.resample_image_by_spacing, thin, [2.0, 2.0, 6.0], upstream_defects=REPRODUCE
     )
-    assert w == ["ANTS-28"] and not r.data.any()
+    # ANTS-32 too: the phantom's spacing is not 1 mm, so the sigma's units matter.
+    assert w == ["ANTS-28", "ANTS-32"] and not r.data.any()
     code, stdout, err = ants("ResampleImageBySpacing", 3, thin, out, 2, 2, 6, env=REPRODUCE)
     assert code == 0 and "Exception catched !" in stdout and "ANTS-28" in err
     # ANTS-31: 2D reads nn from addvox in ANTs.

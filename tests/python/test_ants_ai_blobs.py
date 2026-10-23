@@ -89,10 +89,15 @@ def test_a_translation_is_found_exactly_in_both_modes(tmp_path):
         values = [blob.value for blob in r.fixed_blobs]
         assert values == sorted(values, reverse=True)
     # ANTS-111: once no positive correlation is left, ANTs pairs blob 0 with blob 0 again.
-    assert "ANTS-111" in fw and "ANTS-111" in aw
-    assert len(ants_.pairs) == 10 and ants_.pairs[-1] == (0, 0) and len(fixed.pairs) == 9
+    assert "ANTS-111" in aw and ants_.pairs[-1] == (0, 0)
+    # ANTS-116: ANTs compares some copies' patches reflected or turned; corrected, every
+    # patch is compared in the orientation that matches best, so every blob pairs with its
+    # copy and no correlation runs out.
+    assert "ANTS-116" in fw and "ANTS-116" in aw and "ANTS-111" not in fw
+    assert sorted(fixed.pairs) == [(i, i) for i in range(10)]
+    d_fixed, d_ants = np.diag(fixed.correspondence), np.diag(ants_.correspondence)
+    assert (d_fixed >= d_ants).all() and d_fixed.min() > 0.95 and d_ants.min() < 0.1
     assert fixed.fixed_blobs == ants_.fixed_blobs
-    np.testing.assert_array_equal(fixed.correspondence, ants_.correspondence)
 
 
 def test_the_result_does_not_depend_on_the_threads(tmp_path):
@@ -120,9 +125,12 @@ def test_a_rotation_needs_the_corrected_distance_test(tmp_path):
     # The LPS axes are the voxel axes here, so the angle is the voxel grid's.
     angle = np.rad2deg(np.arctan2(m[1, 0], m[0, 0]))
     assert abs(abs(angle) - 10.0) < 3.0
-    # The affine fit needs D + 1 landmarks: ITK's exception, which antsAI does not catch.
+    # The affine fit needs D + 1 landmarks: ITK's exception, which antsAI does not catch
+    # (ANTs keeps none here; corrected, the patches oriented as they match best, 5).
     with pytest.raises(lx.ants.AIError, match="insufficient number of landmarks"):
-        lx.ants.blob_alignment(a, b, blobs=10, transform="Affine")
+        lx.ants.blob_alignment(a, b, blobs=10, transform="Affine", upstream_defects="reproduce")
+    affine = lx.ants.blob_alignment(a, b, blobs=10, transform="Affine")
+    assert len(affine.landmarks) >= 3
 
 
 def test_ai_starts_from_the_blobs_as_on_the_command_line(tmp_path):

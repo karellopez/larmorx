@@ -685,7 +685,10 @@ pub fn align<const D: usize>(
                     a.pairs.len()
                 ),
                 Err(BlobFailure::NoLandmark) => "no landmark".into(),
-                Err(e) => format!("{e:?}"),
+                Err(BlobFailure::EmptyBlobList) => "no blob".into(),
+                Err(BlobFailure::Uncaught(e)) => {
+                    format!("ITK's exception ({})", e.description.trim())
+                }
             }
         };
         let same = match (&result, &alternative) {
@@ -713,11 +716,11 @@ pub fn align<const D: usize>(
                 &defects::ANTS_116,
                 if notices.fix() {
                     format!(
-                        "{changed} of {total} patch correlations change when the patches are                          compared in the orientation that matches best (the rotation's                          determinant checked, the axes' signs tried): {fixed_outcome}; ANTs                          compares them as its rotation leaves them: {ants}"
+                        "{changed} of {total} patch correlations change when the patches are compared in the orientation that matches best (the rotation's determinant checked, the axes' signs tried): {fixed_outcome}; ANTs compares them as its rotation leaves them: {ants}"
                     )
                 } else {
                     format!(
-                        "the patches are compared as ANTs' rotation leaves them (possibly                          reflected or turned): {ants}; in the orientation that matches best                          {changed} of {total} patch correlations change: {fixed_outcome}"
+                        "the patches are compared as ANTs' rotation leaves them (possibly reflected or turned): {ants}; in the orientation that matches best {changed} of {total} patch correlations change: {fixed_outcome}"
                     )
                 },
             );

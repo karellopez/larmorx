@@ -105,7 +105,9 @@ def main() -> int:
         print(json.dumps(rec), flush=True)
         results.append(rec)
     (args.out / "phantom.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
-    print("| Phantom | zero voxels | field shape error: ANTs, excluded | WM CV: input, ANTs, excluded |")
+    print(
+        "| Phantom | zero voxels | field shape error: ANTs, excluded | WM CV: input, ANTs, excluded |"
+    )
     print("|---|---|---|---|")
     for r in results:
         a, x = r["ants"], r["excluded"]

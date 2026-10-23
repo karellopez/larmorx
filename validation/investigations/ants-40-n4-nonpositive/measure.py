@@ -51,6 +51,7 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 
+
 def _workspace() -> Path:
     """``LARMORX_WORKSPACE``, else the nearest parent of this file with ``oracles/``."""
     if env := os.environ.get("LARMORX_WORKSPACE"):
@@ -151,9 +152,7 @@ def run_larmorx(argv: list[str], mode: str) -> tuple[int, str]:
 
 def run_ants(argv: list[str], threads: int) -> int:
     env = {
-        k: v
-        for k, v in os.environ.items()
-        if k not in ("LD_PRELOAD", "NSLOTS", "OMP_NUM_THREADS")
+        k: v for k, v in os.environ.items() if k not in ("LD_PRELOAD", "NSLOTS", "OMP_NUM_THREADS")
     }
     env["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     p = subprocess.run([str(ANTS), *argv], env=env, capture_output=True, timeout=7200)

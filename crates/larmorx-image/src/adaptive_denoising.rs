@@ -31,7 +31,9 @@
 //! **ANTS-44.** Patches about centres in the mask reach voxels outside it, which get an
 //! estimate like any other; ITK leaves their bias the raw noise estimate `h` of the last such
 //! centre (neither smoothed nor corrected, `UpstreamDefects::Reproduce`). Corrected (the
-//! default): every voxel with an estimate gets the smoothed and corrected bias; named where
+//! default): every voxel the patch of a centre in the mask reaches gets the smoothed and
+//! corrected bias (the voxels outside the mask no such patch reaches are not denoised and keep
+//! 0, as in ITK); named where
 //! the output changes.
 //!
 //! Every quantity is a `float` computed in ITK's order, with `std::exp(float)` (`expf`) and
@@ -812,6 +814,9 @@ fn run(
     let mut sums = vec![0.0f32; len];
     let mut counts = vec![0.0f32; len];
     let mut raw_bias = vec![0.0f32; len];
+    // Whether a centre that took part wrote a noise estimate at the voxel (its patch reached
+    // it): ANTS-44's voxels outside the mask are those.
+    let mut bias_written = vec![false; len];
     let mut window = Window {
         start: 0,
         contribution: Vec::new(),
@@ -858,6 +863,7 @@ fn run(
                     &mut sums[next_output..complete],
                     &mut counts[next_output..complete],
                     &mut raw_bias[next_output..complete],
+                    &mut bias_written[next_output..complete],
                 );
                 next_output = complete;
             }
@@ -921,7 +927,8 @@ fn run(
                     .into_par_iter()
                     .with_min_len(1 << 12)
                     .filter(|&lin| {
-                        !almost_equal_f32(counts[lin], 0.0)
+                        bias_written[lin]
+                            && !almost_equal_f32(counts[lin], 0.0)
                             && positive(smoothed[lin])
                             && outside_mask(lin)
                     })
@@ -949,9 +956,11 @@ fn run(
                         return;
                     }
                     // ITK keeps the unsmoothed bias outside the mask (ANTS-44); corrected,
-                    // every voxel gets the smoothed and corrected bias.
+                    // the voxels the patches of centres in the mask reach get the smoothed and
+                    // corrected bias too (the others outside the mask, which no centre that
+                    // took part reached, are not denoised and keep 0).
                     let outside = outside_mask(lin);
-                    if outside && !fix {
+                    if outside && !(fix && bias_written[lin]) {
                         return;
                     }
                     let (v, overflow) = corrected(s, m);
@@ -1044,6 +1053,7 @@ fn gather(
     sums: &mut [f32],
     counts: &mut [f32],
     bias: &mut [f32],
+    written: &mut [bool],
 ) {
     const CHUNK: usize = 1 << 12;
     let patch = &ctx.image_patch;
@@ -1051,8 +1061,9 @@ fn gather(
     sums.par_chunks_mut(CHUNK)
         .zip(counts.par_chunks_mut(CHUNK))
         .zip(bias.par_chunks_mut(CHUNK))
+        .zip(written.par_chunks_mut(CHUNK))
         .enumerate()
-        .for_each(|(chunk, ((sums, counts), bias))| {
+        .for_each(|(chunk, (((sums, counts), bias), written))| {
             let first = from + chunk * CHUNK;
             let mut c = coordinates(ctx, first);
             for i in 0..sums.len() {
@@ -1099,6 +1110,7 @@ fn gather(
                 sums[i] = sum;
                 counts[i] = count;
                 bias[i] = last_bias.unwrap_or(0.0);
+                written[i] = last_bias.is_some();
             }
         });
 }
@@ -1166,6 +1178,7 @@ mod tests {
         let mut out = vec![0.0f32; n];
         let mut count = vec![0.0f32; n];
         let mut bias = vec![0.0f32; n];
+        let mut written = vec![false; n];
         let mt = p.mean_threshold;
         let vt = p.variance_threshold;
         for z in 0..size[2] as isize {
@@ -1228,6 +1241,7 @@ mod tests {
                                     } else {
                                         min_d
                                     };
+                                    written[j] = true;
                                 }
                             }
                         }
@@ -1297,8 +1311,9 @@ mod tests {
             let s = discrete_gaussian(VolumeRef::new(&bias, &size, &spacing), &options, 1).unwrap();
             let fix = p.upstream_defects.fix();
             for i in 0..n {
-                // ANTS-44: ITK corrects the bias only in the mask; fixed, wherever s > 0.
-                if s[i] > 0.0 && (fix || mask.is_none_or(|m| m[i] != 0)) {
+                // ANTS-44: ITK corrects the bias only in the mask; fixed, also where a centre
+                // that took part wrote one.
+                if s[i] > 0.0 && ((fix && written[i]) || mask.is_none_or(|m| m[i] != 0)) {
                     let snr = mean[i] / s[i].sqrt();
                     let factor = correction_factor(snr);
                     let mut b = 2.0 * s[i] / factor;

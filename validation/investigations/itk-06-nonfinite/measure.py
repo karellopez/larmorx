@@ -28,7 +28,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import sys
 import warnings
 from pathlib import Path
@@ -140,8 +139,9 @@ def catalog_files() -> list[dict]:
 
 def downstream(threads: int) -> list[dict]:
     """The tools on the 2 mm T1w with and without its non-finite values."""
-    import larmorx as lx
     import larmorx_testdata as td
+
+    import larmorx as lx
 
     raw = lx.ants.resample_image_by_spacing(
         str(td.get("openneuro/ds000005/sub-01/anat/sub-01_T1w.nii.gz")),
@@ -175,15 +175,15 @@ def downstream(threads: int) -> list[dict]:
         "TruncateImageIntensity (0.025, 0.975)": lambda im: lx.ants.truncate_image_intensity(
             im, 0.025, 0.975, n_threads=threads
         ),
-        "N4BiasFieldCorrection (shrink 2, 2 levels)": lambda im: lx.ants.n4_bias_field_correction(
-            im, shrink_factor=2, convergence=((20, 20), 0.0), n_threads=threads
-        ).corrected,
-        "DenoiseImage (Rician)": lambda im: lx.ants.denoise_image(
-            im, n_threads=threads
-        ).denoised,
-        "Atropos (K-means, 3 classes, head mask)": lambda im: lx.ants.atropos(
-            im, mask, classes=3, n_threads=threads
-        ).labels,
+        "N4BiasFieldCorrection (shrink 2, 2 levels)": lambda im: (
+            lx.ants.n4_bias_field_correction(
+                im, shrink_factor=2, convergence=((20, 20), 0.0), n_threads=threads
+            ).corrected
+        ),
+        "DenoiseImage (Rician)": lambda im: lx.ants.denoise_image(im, n_threads=threads).denoised,
+        "Atropos (K-means, 3 classes, head mask)": lambda im: (
+            lx.ants.atropos(im, mask, classes=3, n_threads=threads).labels
+        ),
     }
     out = []
     for name, f in tools.items():
@@ -194,7 +194,8 @@ def downstream(threads: int) -> list[dict]:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     results[label] = np.asarray(f(as_image(data)).data, np.float64)
-            except Exception as e:  # noqa: BLE001: what a tool does with them is the finding
+            # What a tool does with them, an error included, is the finding.
+            except Exception as e:
                 results[label] = f"{type(e).__name__}: {str(e)[:200]}"
         for label, r in results.items():
             if isinstance(r, str):
@@ -243,8 +244,10 @@ def main() -> int:
     print("| Tool | read as nifti_clib does (0) | kept | finite values that differ |")
     print("|---|---|---|---|")
     for r in res["downstream"]:
+
         def cell(x):
             return x.get("error") or f"{x['nonfinite']} of {x['values']} non-finite"
+
         print(
             f"| {r['tool']} | {cell(r['zeroed (nifti_clib)'])} | {cell(r['kept'])} | "
             f"{r.get('finite_values_differing', '–')} (max rel {r.get('max_rel_diff_finite', 0):.2g}) |"

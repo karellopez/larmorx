@@ -182,7 +182,9 @@ def _(t):
     ants_inputs.save(a, t, affine=GRID)
 
 
-def expect_sigma_in_voxels(args: list[str], outputs: list[Path], tmp: Path) -> tuple[bool, str, object]:
+def expect_sigma_in_voxels(
+    args: list[str], outputs: list[Path], tmp: Path
+) -> tuple[bool, str, object]:
     """The smoothing in voxels does not depend on the units: the 2 mm phantom resampled to
     4 mm gives the voxels that ANTs itself gives for the same voxels at 1 mm resampled to 2 mm,
     where its millimetres are voxels (the outputs compared bit for bit)."""
@@ -203,7 +205,9 @@ def expect_sigma_in_voxels(args: list[str], outputs: list[Path], tmp: Path) -> t
     return _compare(outputs[0], _load(out), "ANTs' output at 1 mm (where mm are voxels)")
 
 
-def expect_outside_zero(args: list[str], outputs: list[Path], tmp: Path) -> tuple[bool, str, object]:
+def expect_outside_zero(
+    args: list[str], outputs: list[Path], tmp: Path
+) -> tuple[bool, str, object]:
     """The voxels beyond the input are 0 and the others ANTs': ANTs' output (``ants/out``) with
     its outside value, the marker 7777 at index (1, 1, 1), replaced by 0."""
     ants_out = _load(tmp / "ants" / "out.nii.gz")
@@ -257,8 +261,8 @@ def expect_n4_masked(args: list[str], outputs: list[Path], tmp: Path) -> tuple[b
 
 __all__ = [
     "expect_contours",
-    "expect_n4_masked",
     "expect_erode",
+    "expect_n4_masked",
     "expect_open_zeros",
     "expect_outside_zero",
     "expect_pad",

@@ -33,7 +33,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.parity import ants_ai_blobs as aib
 from larmorx_validation.parity import ants_inputs, blob_phantoms
 
@@ -79,7 +78,8 @@ def analyse(name, fixed, moving, truth, blobs, threads) -> dict:
                 a = lx.ants.blob_alignment(
                     str(fixed), str(moving), n_threads=threads, upstream_defects=mode, **kw
                 )
-            except Exception as e:  # noqa: BLE001: the outcome is the finding
+            # The outcome, an error included, is the finding.
+            except Exception as e:
                 rec[mode] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
                 continue
         named = sorted({getattr(x.message, "entry", "") for x in w} - {""})
@@ -155,7 +155,9 @@ def main() -> int:
         print(json.dumps(rec), flush=True)
         results.append(rec)
     (args.out / "results.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
-    print("| Case | mode | identical pairs at 1 | true pairs / pairs | true landmarks / landmarks | error (mean, max mm) |")
+    print(
+        "| Case | mode | identical pairs at 1 | true pairs / pairs | true landmarks / landmarks | error (mean, max mm) |"
+    )
     print("|---|---|---|---|---|---|")
     for r in results:
         for mode in ("reproduce", "fix"):
@@ -164,7 +166,9 @@ def main() -> int:
                 print(f"| {r['case']} | {mode} | {x['error']} | | | |")
                 continue
             ident = (
-                f"{x['identical_at_1']} of {x['identical_pairs']}" if "identical_pairs" in x else "–"
+                f"{x['identical_at_1']} of {x['identical_pairs']}"
+                if "identical_pairs" in x
+                else "–"
             )
             print(
                 f"| {r['case']} | {mode} | {ident} | {x.get('true_pairs', '–')} / {x['pairs']} | "

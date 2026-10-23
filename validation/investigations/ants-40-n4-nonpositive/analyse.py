@@ -24,7 +24,7 @@ import nibabel as nib
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from measure import RUNS, arguments, brain_mask  # noqa: E402
+from measure import RUNS, arguments, brain_mask
 
 
 def wm_mask(run: Path, img: nib.Nifti1Image) -> np.ndarray | None:

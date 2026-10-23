@@ -5,6 +5,7 @@ spacings, the smoothing sigmas and the output size)."""
 
 from __future__ import annotations
 
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_image_math.common import (
     BOLD_4D,
     BOLDREF,
@@ -21,7 +22,6 @@ from larmorx_validation.parity.ants_image_math.common import (
     THIN,
     TINY,
 )
-from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_programs import AntsCase, make_suite
 
 PROGRAM = "ResampleImageBySpacing"

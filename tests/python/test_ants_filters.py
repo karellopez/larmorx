@@ -206,7 +206,12 @@ def test_resample_image_by_spacing_grid_and_command_line(tmp_path):
     np.testing.assert_array_equal(from_path.data, out.data)
     nn = lx.ants.resample_image_by_spacing(img, [1.0, 1.0, 3.0], smooth=False, nearest=True)
     assert nn.shape == (20, 18, 8)
-    assert set(np.unique(nn.data)) <= set(np.unique(img.data))
+    # The voxels beyond the input are 0 (ANTS-32; ANTs gives them the value at (1, 1, 1)).
+    assert set(np.unique(nn.data)) <= set(np.unique(img.data)) | {0.0}
+    ants = lx.ants.resample_image_by_spacing(
+        img, [1.0, 1.0, 3.0], smooth=False, nearest=True, upstream_defects="reproduce"
+    )
+    assert set(np.unique(ants.data)) <= set(np.unique(img.data))
     code, _, _ = run(["SmoothImage", "3", str(src), "1.5", str(dst)])
     assert code == 0
     np.testing.assert_array_equal(lx.load(dst).data, lx.ants.smooth_image(src, 1.5).data)
@@ -290,10 +295,14 @@ def test_typed_morphology_equals_image_math():
     closed = lx.ants.morphological_close(mask, 1).data
     assert closed[5, 5, 5] == 1 and lx.ants.fill_holes(mask).data[5, 5, 5] == 1
     assert lx.ants.morphological_open(mask, 1).data[0, 0, 0] == 0
-    # ME's output is 0/1, and voxels above 0.5 that are not the foreground stay 1.
+    # ME's output is 0/1: the eroded foreground. ANTs keeps the voxels above 0.5 that are not
+    # the foreground as 1 (ANTS-17).
     labels = mask.data * 2
     eroded = lx.ants.morphological_erode(image(labels), 1).data
-    np.testing.assert_array_equal(eroded, (labels > 0.5).astype(np.float32))
+    np.testing.assert_array_equal(eroded, np.zeros_like(eroded))
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-17"):
+        ants = lx.ants.morphological_erode(image(labels), 1, upstream_defects="reproduce").data
+    np.testing.assert_array_equal(ants, (labels > 0.5).astype(np.float32))
     for n in (1, 4):
         np.testing.assert_array_equal(
             lx.ants.grayscale_close(img, 2, n_threads=n).data, pairs[8][0].data
@@ -320,9 +329,16 @@ def test_pad_image_moves_the_origin(tmp_path):
     np.testing.assert_allclose(generic.affine, padded.affine)
     src = tmp_path / "in.nii.gz"
     lx.save(img, src)
-    from_path = lx.ants.pad_image(src, 2.5)
-    assert from_path.shape == (11, 10, 9)
+    # A fractional pad: 2 voxels on each side (ANTS-22; ANTs adds 2 before and 3 after).
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-22"):
+        from_path = lx.ants.pad_image(src, 2.5)
+    assert from_path.shape == (10, 9, 8)
     np.testing.assert_array_equal(from_path.data[2:8, 2:7, 2:6], img.data)
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-22"):
+        ants = lx.ants.pad_image(src, 2.5, upstream_defects="reproduce")
+    assert ants.shape == (11, 10, 9)
+    np.testing.assert_array_equal(ants.data[2:8, 2:7, 2:6], img.data)
+    np.testing.assert_allclose(ants.affine, from_path.affine)
     with pytest.raises(ValueError, match="voxels"):
         lx.ants.pad_image(img, -2)
 
@@ -447,6 +463,14 @@ def test_denoise_image_mask_shrink_and_errors(tmp_path):
     far = np.ones(mask.shape, bool)
     far[2:22, 1:17, 0:14] = False
     np.testing.assert_allclose(masked.denoised.data[far], img.data[far], rtol=1e-5)
+    # ANTS-44: just outside the mask, the voxels the patches reach get the corrected bias;
+    # ANTs leaves them the raw noise estimate.
+    with pytest.warns(lx.UpstreamDefectWarning, match="ANTS-44"):
+        ants = lx.ants.denoise_image(img, mask=lx.Image(mask, AFFINE), upstream_defects="reproduce")
+    near = ~far & (mask == 0)
+    assert (ants.denoised.data[near] != masked.denoised.data[near]).any()
+    # (Inside the mask the two modes differ by ANTS-43 alone; far from it not at all.)
+    np.testing.assert_array_equal(ants.denoised.data[far], masked.denoised.data[far])
     assert masked.denoised.data.tobytes() != full.denoised.data.tobytes()
     shrunk = lx.ants.denoise_image(img, shrink_factor=2)
     assert shrunk.denoised.data.shape == img.data.shape

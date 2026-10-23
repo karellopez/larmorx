@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """antsApplyTransforms's evidence: fMRIPrep's resampling of a real T1w into MNI space through
 its ``.h5`` composite transform (affine and SyN displacement field) with Lanczos
-interpolation, as fMRIPrep ran it (``--float 1``) and in double precision, by fMRIPrep, by ANTs
+interpolation (and, in ``ants_apply_transforms_bspline``, a B-spline transform), as fMRIPrep ran it (``--float 1``) and in double precision, by fMRIPrep, by ANTs
 2.6.5 (as built, with correctly rounded maths, at 1 and 8 threads) and by larmorx (1 and 12
 threads, default and ``reproduce`` modes); the record's cases (images, ``--float 1``,
 transform outputs); speed.
@@ -698,6 +698,8 @@ def export(ctx: core.Context) -> dict:
         "(the report predates `--float 1`).",
         inputs=list(SPEED_LABELS),
     )
+    from larmorx_validation.evidence import ants_apply_transforms_bspline as bspline
+
     e = entry(ctx)
     return {
         "schema": 1,
@@ -707,7 +709,7 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e)],
+            "cache": [fcache.provenance(e), fcache.provenance(bspline.entry(ctx))],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -718,7 +720,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cases,
         "cases_total": len(cases),
         "speed": speed,
-        "examples": [_example(ctx)],
+        "examples": [_example(ctx), bspline.example(ctx)],
     }
 
 

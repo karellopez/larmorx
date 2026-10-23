@@ -461,6 +461,8 @@ impl<const D: usize> Search<'_, D> {
             estimate_learning_rate_at_each_iteration: false,
             estimate_learning_rate_once: true,
             scales: Some(self.scales.to_vec()),
+            unit_equal_scales: false,
+            replaced_scales: None,
         };
         // `if (localSearchIterations > 0) SetLocalOptimizer(localoptimizer)`.
         let local = (self.iterations > 0).then_some(&mut local);

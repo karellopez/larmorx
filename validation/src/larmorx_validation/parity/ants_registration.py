@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (linear,
-SyN, B-spline and displacement-field stages; the SyN cases are in :mod:`ants_registration_syn`,
-the BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline cases in
-:mod:`ants_registration_bspline`).
+"""Parity of ``larmorx ants antsRegistration`` with ANTs 2.6.5's ``antsRegistration`` (every
+stage; the SyN cases are in :mod:`ants_registration_syn`, the BSplineSyN,
+GaussianDisplacementField, BSplineDisplacementField and BSpline cases in
+:mod:`ants_registration_bspline`, the Exponential, BSplineExponential, TimeVaryingVelocityField
+and TimeVaryingBSplineVelocityField cases and the corrections' paths in
+:mod:`ants_registration_velocity`).
 
 ANTs runs as its own binary with one thread and a fixed sampling seed
 (``ANTS_RANDOM_SEED``; without one ANTs seeds from the clock and is not repeatable); larmorx
@@ -13,7 +15,8 @@ ANTs' defects reproduced (``LARMORX_UPSTREAM_DEFECTS=reproduce``, D13). Compared
 - **standard output** (``-v 1``: the stage set-up, ITK's image dumps, every ``DIAGNOSTIC``
   line with the metric and convergence values to 12 digits), after masking what cannot be
   reproduced: object addresses, modification times and reference counts, timings, the build's
-  source paths in exception prints, and the two output directories;
+  source paths in exception prints, the signs of printed NaNs (unspecified by IEEE 754), and
+  the two output directories;
 - **standard error**, larmorx's notice lines removed;
 - **every file** each program writes: transform files byte for byte (``.mat``, ``.txt``),
   HDF5 transform files dataset by dataset (``/OSName`` and ``/OSVersion`` aside), images
@@ -61,6 +64,7 @@ from larmorx_validation.parity.ants_registration_bspline import (
 )
 from larmorx_validation.parity.ants_registration_syn import syn_cases
 from larmorx_validation.parity.ants_registration_syn import transform_file as syn_transform_file
+from larmorx_validation.parity.ants_registration_velocity import velocity_cases
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -870,6 +874,7 @@ def all_cases() -> list[RegCase]:
     cases += _point_set_cases()
     cases += syn_cases(_syn_case)
     cases += bspline_cases(_syn_case)
+    cases += velocity_cases(_syn_case)
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -981,6 +986,35 @@ def all_cases() -> list[RegCase]:
                             tier="full",
                         )
                     )
+                # The velocity-field stages in place of its SyN stage (A5 part 3), with its
+                # levels, iterations and metric: on every third voxel (the standard tier's
+                # first run, the full tier's others), and the exponential ones full size for the
+                # first run (full tier).
+                for kind, stage_text in VELOCITY_STAGES.items():
+                    first_run = run.startswith("ds000005")
+                    cases.append(
+                        RegCase(
+                            f"real-{kind}-small/{name}/{short}",
+                            f"real-{kind}-small",
+                            f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
+                            f"{stage_text} for its SyN stage, on one voxel in {SMALL} along "
+                            "each axis of its images",
+                            (f"{{fmriprep-small-{kind}:{run}/{subject}/{node}}}",),
+                            tier="standard" if first_run else "full",
+                            band=first_run and kind in ("exponential", "time-varying"),
+                        )
+                    )
+                    if first_run and kind in ("exponential", "bspline-exponential"):
+                        cases.append(
+                            RegCase(
+                                f"real-{kind}/{name}/{short}",
+                                f"real-{kind}",
+                                f"fMRIPrep 25.2.6's {node.split('/')[-1]} of {run} with "
+                                f"{stage_text} for its SyN stage, full size",
+                                (f"{{fmriprep-whole-{kind}:{run}/{subject}/{node}}}",),
+                                tier="full",
+                            )
+                        )
     return cases
 
 
@@ -1415,6 +1449,8 @@ def _fmriprep_args(
 
 #: The 2D and 4D transform files the cases start from: class, parameters, fixed parameters.
 _TRANSFORMS_ND: dict[str, tuple[str, list[float], list[float]]] = {
+    # Half a voxel of the point-set phantoms along x: every point's nearest neighbour 1 mm away.
+    "half-voxel-x.txt": ("TranslationTransform_double_3_3", [1.0, 0.0, 0.0], []),
     "affine-2d.mat": ("AffineTransform_double_2_2", [1.01, 0.02, -0.03, 0.99, 1.5, -0.5], [2, -1]),
     "euler-2d.txt": ("Euler2DTransform_double_2_2", [0.05, 1.0, -2.0], [1.0, 0.5]),
     "rigid-2d.mat": ("Rigid2DTransform_double_2_2", [-0.04, 0.5, 1.0], [0.0, 1.0]),
@@ -1658,6 +1694,14 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep-small-bsplinesyn:"):
         args = _fmriprep_args(c.args[0][27:-1], out, tmp=tmp, stand_ins=True, small=SMALL)
         return _bsplinesyn(args)
+    for kind, stage_text in VELOCITY_STAGES.items():
+        for size, small in (("small", SMALL), ("whole", 0)):
+            head = f"{{fmriprep-{size}-{kind}:"
+            if len(c.args) == 1 and c.args[0].startswith(head):
+                args = _fmriprep_args(
+                    c.args[0][len(head) : -1], out, tmp=tmp, stand_ins=True, small=small
+                )
+                return _replace_syn(args, stage_text)
 
     def sub(m: re.Match[str]) -> str:
         key = m.group(1)
@@ -1684,6 +1728,27 @@ def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
         raise KeyError(f"unknown placeholder {{{key}}}")
 
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args]
+
+
+#: The velocity-field stages the real cases put in place of the template registration's SyN
+#: stage: antsRegistrationSyN.sh has none, so they take its SyN stage's smoothing (variance 3)
+#: and BSplineSyN's knot spacing (26 mm); the time-varying B-spline field a mesh of 4 x 4 x 4
+#: over 2 time spans.
+VELOCITY_STAGES = {
+    "exponential": "Exponential[0.25,3,0.5]",
+    "bspline-exponential": "BSplineExponential[0.25,26,0,0,3]",
+    "time-varying": "TimeVaryingVelocityField[0.5,4,3,0,0,0]",
+    "time-varying-bspline": "TimeVaryingBSplineVelocityField[0.5,4x4x4x2,4,3]",
+}
+
+
+def _replace_syn(args: list[str], stage_text: str) -> list[str]:
+    """The arguments with their SyN stage's transform replaced by ``stage_text``."""
+    out = list(args)
+    for i, a in enumerate(out[:-1]):
+        if a in ("--transform", "-t") and out[i + 1].startswith("SyN["):
+            out[i + 1] = stage_text
+    return out
 
 
 def _bsplinesyn(args: list[str]) -> list[str]:
@@ -1781,6 +1846,9 @@ def _normalise(text: str, out: Path) -> list[str]:
         # An exception's what() inside another's description: the thrower's file and line.
         line = re.sub(r"^\S*?/(Modules|Utilities|Examples)/(\S+:\d+:)$", r"\1/\2", line)
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
+        # The sign of a NaN result: IEEE 754 leaves it unspecified, the compiler's operand order
+        # decides it (docs/findings/ants-registration.md).
+        line = re.sub(r"-nan\b", "nan", line)
         if "DIAGNOSTIC," in line and not line.startswith("DIAGNOSTIC"):
             fields = line.split(", ")
             line = ", ".join(fields[:4] + fields[6:])
@@ -2026,13 +2094,14 @@ def run_case(case: Case, checks: CheckList) -> None:
         if pa is not None and pb is not None and pa.shape == pb.shape:
             change = defects.Change.of(pb, pa)
         # ANTS-62's extra record repeats the last point: in a moving point set it may change
-        # no nearest neighbour.
+        # no nearest neighbour. ITK-41's notice is about the next use of a transform that never
+        # integrated, which a run without warped images or later stages does not make.
         defects.add_fix_check(
             checks,
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ANTS-62",),
+            silent_ok=("ANTS-62", "ITK-41"),
         )
 
 
@@ -2070,7 +2139,8 @@ def highlights(results: list[CaseResult]) -> list[str]:
 def suite() -> Suite:
     return Suite(
         name="ants-registration",
-        title="antsRegistration (linear, SyN, B-spline and displacement-field stages)",
+        title="antsRegistration (every stage: linear, SyN, B-spline, displacement-field and "
+        "velocity-field)",
         tool="`larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, "
         "larmorx-ants)",
         reference=f"antsRegistration from {ants_version()}, the binary built by "

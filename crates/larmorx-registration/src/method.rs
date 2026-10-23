@@ -21,7 +21,7 @@ use crate::metric::joint_histogram::JointHistogramMi;
 use crate::metric::mattes::Mattes;
 use crate::metric::neighborhood_correlation::NeighborhoodCorrelation;
 use crate::metric::{ImageMetricv4, correlation, mean_squares, no_valid_points_warning};
-use crate::optimizer::{ConjugateGradientLineSearch, Observer, Outcome, Problem, scales};
+use crate::optimizer::{LevelOptimizer, Observer, Outcome, Problem, scales};
 use crate::pointset::{PointSetEvents, PointSetMetric};
 use crate::rng::{MersenneTwister, RandomIterator};
 use crate::transform::{Composite, Xfm};
@@ -148,6 +148,9 @@ pub struct Stage<R, const D: usize> {
     pub bspline_mesh: Option<BSplineMesh<D>>,
     /// ITK-30 corrected: GC's derivative for a displacement field is each voxel's own.
     pub correct_gc_derivative: bool,
+    /// ITK-35 corrected: a B-spline transform applied after the stage's transform has its
+    /// Jacobian with respect to position (ITK throws at the first derivative).
+    pub correct_bspline_jacobian: bool,
     pub n_threads: usize,
 }
 
@@ -302,6 +305,9 @@ pub struct LevelProblem<'a, R, const D: usize> {
     /// The level's virtual domain.
     virtual_space: Space<D>,
     floor: &'a IndexFloor,
+    /// ITK-35 corrected: B-spline transforms after the active one have a Jacobian with
+    /// respect to position.
+    bspline_jacobian: bool,
     /// Warnings ITK's output window would print (`itkWarningMacro`).
     pub warnings: Vec<String>,
 }
@@ -338,6 +344,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             point_set_samples: false,
             virtual_space,
             floor,
+            bspline_jacobian: false,
             warnings: Vec::new(),
         })
     }
@@ -356,11 +363,12 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         moving: &Composite<R, D>,
         derivative: bool,
         floor: &IndexFloor,
+        bspline_jacobian: bool,
         warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
         // A B-spline transform after the active one throws at the first point whose
-        // derivative is computed (any valid point).
-        let jacobian_error = if derivative {
+        // derivative is computed (any valid point); ITK-35 corrected, it has its Jacobian.
+        let jacobian_error = if derivative && !bspline_jacobian {
             moving.position_jacobian_error()
         } else {
             None
@@ -422,6 +430,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
                 &self.moving,
                 derivative,
                 self.floor,
+                self.bspline_jacobian,
                 &mut self.warnings,
             );
         }
@@ -435,6 +444,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
                 &self.moving,
                 derivative,
                 self.floor,
+                self.bspline_jacobian,
                 &mut self.warnings,
             )?;
             if j == 0 {
@@ -691,22 +701,40 @@ pub fn gradient_image<R: Real, const D: usize>(
     image: &Image<R, D>,
     n_threads: usize,
 ) -> Result<Image<[f64; D], D>, ItkException> {
-    let space = &image.space;
     let mut sigma = 0.0f64;
-    for &s in &space.spacing {
+    for &s in &image.space.spacing {
         if s > sigma {
             sigma = s;
         }
     }
-    let components = R::gradient(&image.data, &space.size, &space.spacing, sigma, n_threads)
-        .map_err(|e| {
-            ItkException::new(
-                "Modules/Filtering/ImageFilterBase/include/itkRecursiveSeparableImageFilter.hxx",
-                223,
-                "RecursiveGaussianImageFilter",
-                e.to_string(),
-            )
-        })?;
+    gradient_image_with(image, sigma, true, n_threads)
+}
+
+/// `GradientRecursiveGaussianImageFilter` of `sigma` (physical units) with
+/// `UseImageDirection` on: each vector turned by the image's direction.
+pub fn gradient_image_with<R: Real, const D: usize>(
+    image: &Image<R, D>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Image<[f64; D], D>, ItkException> {
+    let space = &image.space;
+    let components = R::gradient(
+        &image.data,
+        &space.size,
+        &space.spacing,
+        sigma,
+        normalize_across_scale,
+        n_threads,
+    )
+    .map_err(|e| {
+        ItkException::new(
+            "Modules/Filtering/ImageFilterBase/include/itkRecursiveSeparableImageFilter.hxx",
+            223,
+            "RecursiveGaussianImageFilter",
+            e.to_string(),
+        )
+    })?;
     let data = (0..space.len())
         .map(|o| {
             let local: [f64; D] = std::array::from_fn(|k| components[k][o]);
@@ -775,10 +803,10 @@ fn crash(description: impl Into<String>) -> ItkException {
 }
 
 /// Runs a stage: returns the optimised transform and each level's outcome.
-pub fn run_stage<R: Real, const D: usize, O>(
+pub fn run_stage<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -802,10 +830,10 @@ type StageRun<R, const D: usize> = (
 );
 
 /// The levels of [`run_stage`]; also the stage's point-set metrics as they end.
-fn run_levels<R: Real, const D: usize, O>(
+fn run_levels<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -835,10 +863,10 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn levels<R: Real, const D: usize, O>(
+fn levels<R: Real, const D: usize, O, Opt: LevelOptimizer<R>>(
     stage: &Stage<R, D>,
     output: Xfm<R, D>,
-    optimizer: &mut ConjugateGradientLineSearch<R>,
+    optimizer: &mut Opt,
     observer: &mut O,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
@@ -887,6 +915,19 @@ where
             {
                 *update_control_points = meshes.control_points(&meshes.update_mesh, level);
                 *total_control_points = meshes.control_points(&meshes.total_mesh, level);
+            }
+            // BSplineExponentialDiffeomorphicTransformParametersAdaptor: the level's numbers of
+            // control points for the update and the velocity fields.
+            if let (Some(meshes), Some(crate::field::FieldSmoothing::Exponential(e))) =
+                (&stage.field_meshes, &mut f.smoothing)
+                && let crate::exponential::ExponentialSmoothing::BSpline {
+                    update_control_points,
+                    velocity_control_points,
+                    ..
+                } = &mut e.smoothing
+            {
+                *update_control_points = meshes.control_points(&meshes.update_mesh, level);
+                *velocity_control_points = meshes.control_points(&meshes.total_mesh, level);
             }
         }
         // A B-spline transform's adaptor: the level's mesh on the level's virtual domain.
@@ -1088,9 +1129,10 @@ where
             point_set_samples,
             virtual_space: virtual_space.clone(),
             floor,
+            bspline_jacobian: stage.correct_bspline_jacobian,
             warnings: level_warnings,
         };
-        let outcome = optimizer.start(&mut problem, observer);
+        let outcome = optimizer.start_level(&mut problem, observer);
         warnings.append(&mut problem.warnings);
         output = problem.moving.active().clone();
         for (j, entry) in problem.metrics.into_iter().enumerate() {
@@ -1123,4 +1165,122 @@ pub fn check_sampling_percentage(p: f64) -> Result<(), ItkException> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transform::bspline::BSplineXfm;
+    use crate::transform::{Kind, LinearXfm};
+
+    /// A smooth blob on a grid of `n`³ voxels of 1.5 mm from `origin`, centred at `c` (mm).
+    fn blob(n: usize, origin: f64, c: [f64; 3]) -> Image<f64, 3> {
+        let space = Space::new(
+            [n; 3],
+            [0; 3],
+            [1.5; 3],
+            [origin; 3],
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        )
+        .unwrap();
+        let data = (0..space.len())
+            .map(|o| {
+                let p = space.index_to_point(&space.index_of(o));
+                let r2: f64 = (0..3).map(|k| ((p[k] - c[k]) / 6.0).powi(2)).sum();
+                let s2: f64 = (0..3).map(|k| ((p[k] - c[k] - 3.0) / 4.0).powi(2)).sum();
+                100.0 * (-0.5 * r2).exp() + 40.0 * (-0.5 * s2).exp()
+            })
+            .collect();
+        Image::new(space, data)
+    }
+
+    /// The derivative of MeanSquares through a composite against central finite differences
+    /// of its value: the best scalar `c` with `derivative ≈ c·fd` and the relative residual.
+    fn derivative_check(composite: Composite<f64, 3>) -> (f64, f64) {
+        // The moving image extends far beyond the fixed one, so no point leaves it (a point
+        // that does changes the number of points and makes the value jump).
+        let fixed = Arc::new(blob(24, 0.0, [17.0, 17.0, 17.0]));
+        let moving = Arc::new(blob(40, -12.0, [18.5, 16.0, 17.5]));
+        let metric = ImageMetricv4 {
+            fixed: Arc::clone(&fixed),
+            moving,
+            fixed_mask: None,
+            moving_mask: None,
+            fixed_transform: None,
+            virtual_space: fixed.space.clone(),
+            samples: None,
+            fixed_gradient_image: None,
+            moving_gradient_image: None,
+            pixel_f32: false,
+            local_support: false,
+        };
+        let floor = IndexFloor::new(larmorx_core::defects::UpstreamDefects::Fix);
+        let mut problem =
+            LevelProblem::single(metric, MetricKind::MeanSquares, composite, &floor).unwrap();
+        problem.bspline_jacobian = true;
+        let (_, derivative) = problem.value_and_derivative().unwrap();
+        let theta = problem.parameters();
+        let mut fd = vec![0.0; theta.len()];
+        for k in 0..theta.len() {
+            let h = 1e-5;
+            let mut q = theta.clone();
+            q[k] += h;
+            problem.set_parameters(&q).unwrap();
+            let plus = problem.value().unwrap();
+            q[k] -= 2.0 * h;
+            problem.set_parameters(&q).unwrap();
+            let minus = problem.value().unwrap();
+            fd[k] = (plus - minus) / (2.0 * h);
+        }
+        problem.set_parameters(&theta).unwrap();
+        problem.set_parameters(&theta).unwrap();
+        let dot: f64 = derivative.iter().zip(&fd).map(|(a, b)| a * b).sum();
+        let ff: f64 = fd.iter().map(|b| b * b).sum();
+        let c = dot / ff;
+        let res: f64 = derivative
+            .iter()
+            .zip(&fd)
+            .map(|(a, b)| (a - c * b).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        let norm: f64 = derivative.iter().map(|a| a * a).sum::<f64>().sqrt();
+        (c, res / norm)
+    }
+
+    /// ITK-35 corrected: an affine transform optimised under a B-spline transform applied after
+    /// it gets the metric derivative of the composite, as accurate as without the B-spline
+    /// transform (MeanSquares' derivative is minus the value's gradient; the residual, a few
+    /// per cent, is the central-difference image gradient against the exact derivative of the
+    /// linear interpolation the finite differences see: about 2 % without the B-spline
+    /// transform, 4 % through it).
+    #[test]
+    fn the_derivative_through_a_bspline_transform_matches_finite_differences() {
+        let mut affine = LinearXfm::<f64, 3>::new(Kind::Affine);
+        affine.set_matrix([
+            [1.02, 0.03, -0.01],
+            [-0.02, 0.98, 0.02],
+            [0.01, -0.03, 1.01],
+        ]);
+        affine.set_offset([0.4, -0.6, 0.3]);
+        let plain = derivative_check(Composite::new(vec![Xfm::Linear(affine.clone())]));
+        let mut b = BSplineXfm::<f64, 3>::new_default();
+        b.set_domain_origin([0.0; 3]).unwrap();
+        b.set_domain_physical([34.5; 3]).unwrap();
+        b.set_domain_mesh([2, 2, 2]).unwrap();
+        let mut rng = crate::rng::MersenneTwister::from_int(9);
+        for c in &mut b.coefficients {
+            *c = 3.0 * (rng.closed() - 0.5);
+        }
+        let chained = derivative_check(Composite::new(vec![Xfm::BSpline(b), Xfm::Linear(affine)]));
+        eprintln!("plain {plain:?}, through the B-spline transform {chained:?}");
+        for (c, residual) in [plain, chained] {
+            assert!((c + 1.0).abs() < 0.02, "scale {c}");
+            assert!(residual < 0.05, "residual {residual}");
+        }
+        // As accurate as the affine transform alone (within a factor of 2 of its residual).
+        assert!(
+            chained.1 < 2.0 * plain.1.max(1e-3),
+            "{chained:?} vs {plain:?}"
+        );
+    }
 }

@@ -62,6 +62,7 @@ pub fn chain_parameters(chain: &TransformChain) -> usize {
         .map(|t| match t {
             Transform::Linear(l) => l.parameters.len(),
             Transform::DisplacementField(f) => 3 * f.grid.len(),
+            Transform::BSpline(b) => b.number_of_parameters(),
             Transform::Composite(_) => 0,
         })
         .sum()

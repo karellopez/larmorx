@@ -162,6 +162,18 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-63 | antsRegistration | a binary VTK point set's labels read only as far as one point's components | every label read (`reproduce`: ANTs' bytes, the unread labels 0) |
 | ANTS-65 | antsRegistration | IGDM's estimated intensity sigma: the minima never updated, the moving maximum subtracted | the range of both point sets' intensities |
 | ANTS-66 | antsRegistration | IGDM's value reads before its intensity arrays for neighbourhoods of more than one voxel | the centre intensity, as the derivative reads it (`reproduce`: the two intensities taken as equal) |
+| ANTS-67 | antsRegistration | IGDM's `kNeighborhood` and `gradientSigma` are ignored (one neighbour, central differences) | the mean over the k nearest points, Gaussian gradients of that sigma |
+| ANTS-68 | antsRegistration | IGDM's derivative lacks the Gaussians' `1/σ²`: not the value's gradient | the value's gradient |
+| ANTS-70 | antsRegistration | IGDM's estimated distance sigma can be 0 (NaN parameters, the stage dropped) | at least one voxel |
+| ANTS-71 | antsRegistration SyN | `--print-similarity-measure-interval` crashes without some transforms or with several metrics | the missing transforms are the identity, the first metric's images used |
+| ANTS-73 | antsRegistration | an initial transform image that is not a field is read as one | refused |
+| ANTS-74 | antsRegistration | `--save-state` after linear stages that follow SyN saves the SyN state alone | every transform |
+| ANTS-75 | antsRegistration | the full-scale similarity and interval volumes fail with a field or a B-spline transform | the transforms used as they are |
+| ANTS-76 | antsRegistration | the collapse loses transforms around B-spline transforms | every transform kept |
+| ANTS-78 | antsRegistration | `BSplineDisplacementField`'s and `BSplineExponential`'s base-level meshes doubled at the base level | the mesh as given (twice it gives ANTs' result) |
+| ANTS-79 | antsRegistration | the time-varying stages read their time indices and mesh from the last `-t` | each stage's own |
+| ANTS-80 | antsRegistration | the exponential stages take their sigmas as millimetres | the units given |
+| ANTS-81 | antsRegistration | `Exp` (the short name) writes no `InverseWarp` with `-z 0` | written |
 | ANTS-90 | Atropos | `KMeans` with several images: the second k-means seeded from the mask's statistics, its labels never read | the second k-means from each class's means, its labels kept |
 | ANTS-91 | Atropos | `Otsu`'s range from `FLT_MIN` with `else if` | the image's range in the mask |
 | ANTS-92 | Atropos | `Random` labels voxels outside the mask, which enter the first estimates | only the mask's voxels labelled |
@@ -196,6 +208,20 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-25 | ITK manifold Parzen windows (`JHCT`) | fewer points than the covariance neighbourhood: a read past the list of neighbours | the neighbours there are (in both modes) |
 | ITK-26 | ITK manifold Parzen windows (`JHCT`) | anisotropic covariances count each diagonal product twice | once |
 | ITK-28 | ITK `JHCT` | an alpha within 4 ulps of 1 takes the logarithm and divides by `alpha − 1` | both tests treat it as 1 |
+| ITK-24 | ITK `JHCT` | the total number of points leaves out the fixed ones | fixed and moving points |
+| ITK-29 | ITK manifold Parzen windows (`JHCT`) | the kernel sigma used as a variance | as a sigma (`σ²·I`) |
+| ITK-30 | ITK `GC` with a displacement field | every point's derivative in the first voxel | each voxel its own |
+| ITK-31 | ITK SyN | a stage with one of its two masks keeps a stale resampled mask | the current one |
+| ITK-32 | ITK labelled point-set metrics | SyN evaluations use the first `Initialize`'s per-label metrics | the current ones |
+| ITK-33 | ITK SyN | point-set metrics among several metrics get identity transforms | their composites |
+| ITK-35 | ITK B-spline transforms | no Jacobian with respect to position: later linear, field and `BSpline` stages fail | the derivative of the B-spline sum |
+| ITK-36 | ITK time-varying B-spline method | every metric evaluated with the last metric's transforms | each its own |
+| ITK-37 | ITK time-varying B-spline method | stale inverse fields at the first and last time samples | zeroed |
+| ITK-38 | ITK time-varying B-spline method | a single point-set metric's points fitted at physical positions in the parametric domain (throws on oblique and RAS grids) | mapped into the parametric domain |
+| ITK-39 | ITK time-varying method | `-q` ignored | applied |
+| ITK-40 | ITK time-varying methods | masks not moved with the resampled images | moved |
+| ITK-41 | ITK velocity-field transforms | a transform that never integrated crashes or has no inverse | integrated |
+| ITK-42 | ITK scales estimator | scales all below epsilon (a vanished probe) refused | ones (equal scales cancel) |
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` (Atropos `KMeans`) | the point each divided k-d tree node is split at is left out of the new centres | every point counted |
 | ITK-51 | ITK `TDistribution` (Atropos' Grubbs-Rosner) | NaN above about 340 degrees of freedom: no outlier is ever found in an image | the Gamma ratio through its logarithm where it would overflow |
 

@@ -225,7 +225,7 @@ fn crash(description: impl Into<String>) -> ItkException {
 
 /// `ResampleImageFilter<Image<R>, Image<R>, R>` with the linear interpolator and default 0
 /// onto the virtual domain through a composite holding a displacement field.
-fn resample_image<R: Real, const D: usize>(
+pub(crate) fn resample_image<R: Real, const D: usize>(
     image: &Image<R, D>,
     output: &Space<D>,
     transform: &Composite<R, D>,
@@ -242,25 +242,25 @@ fn resample_image<R: Real, const D: usize>(
 }
 
 /// One image metric's images and masks resampled onto the virtual domain in an iteration.
-struct Resampled<R, const D: usize> {
-    fixed: Arc<Image<R, D>>,
-    moving: Arc<Image<R, D>>,
-    fixed_mask: Option<Mask<D>>,
-    moving_mask: Option<Mask<D>>,
+pub(crate) struct Resampled<R, const D: usize> {
+    pub(crate) fixed: Arc<Image<R, D>>,
+    pub(crate) moving: Arc<Image<R, D>>,
+    pub(crate) fixed_mask: Option<Mask<D>>,
+    pub(crate) moving_mask: Option<Mask<D>>,
     /// The gradient images (`useGradientFilter`), computed on demand.
-    fixed_gradient: Option<Arc<Image<[f64; D], D>>>,
-    moving_gradient: Option<Arc<Image<[f64; D], D>>>,
+    pub(crate) fixed_gradient: Option<Arc<Image<[f64; D], D>>>,
+    pub(crate) moving_gradient: Option<Arc<Image<[f64; D], D>>>,
 }
 
 /// The stage's per-level image metric: its kind and its level images.
-struct LevelImageMetric<R, const D: usize> {
-    kind: MetricKind,
-    fixed: Arc<Image<R, D>>,
-    moving: Arc<Image<R, D>>,
-    fixed_mask: Option<Mask<D>>,
-    moving_mask: Option<Mask<D>>,
-    use_gradient_filter: bool,
-    samples: Option<Arc<Vec<[f64; D]>>>,
+pub(crate) struct LevelImageMetric<R, const D: usize> {
+    pub(crate) kind: MetricKind,
+    pub(crate) fixed: Arc<Image<R, D>>,
+    pub(crate) moving: Arc<Image<R, D>>,
+    pub(crate) fixed_mask: Option<Mask<D>>,
+    pub(crate) moving_mask: Option<Mask<D>>,
+    pub(crate) use_gradient_filter: bool,
+    pub(crate) samples: Option<Arc<Vec<[f64; D]>>>,
 }
 
 /// An image metric after `Initialize` with SyN's identity transforms.
@@ -283,13 +283,14 @@ fn initialize_metric<R: Real, const D: usize>(
     moving_gradient: Option<Arc<Image<[f64; D], D>>>,
     virtual_space: &Space<D>,
     samples: &Option<Arc<Vec<[f64; D]>>>,
+    fixed_transform: Option<Composite<R, D>>,
 ) -> Result<Initialized<R, D>, ItkException> {
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
         moving: Arc::clone(moving),
         fixed_mask: fixed_mask.clone(),
         moving_mask: moving_mask.clone(),
-        fixed_transform: None,
+        fixed_transform,
         virtual_space: virtual_space.clone(),
         samples: samples.clone(),
         fixed_gradient_image: fixed_gradient,
@@ -317,6 +318,7 @@ fn initialize_metric<R: Real, const D: usize>(
 fn metric_derivative<R: Real, const D: usize>(
     m: &Initialized<R, D>,
     correct_gc: bool,
+    moving: &Composite<R, D>,
     floor: &IndexFloor,
     warnings: &mut Vec<String>,
 ) -> Result<(R, Vec<R>), ItkException> {
@@ -330,18 +332,13 @@ fn metric_derivative<R: Real, const D: usize>(
             "VirtualSampledPointSet must have 1 or more points.",
         ));
     }
-    let identity = Composite::new(Vec::new());
     match (&m.state, m.kind) {
-        (Some(state), _) => state.evaluate(&m.metric, &identity, true, floor, warnings),
+        (Some(state), _) => state.evaluate(&m.metric, moving, true, floor, warnings),
         (None, MetricKind::Gc) => crate::metric::correlation::local_derivative(
-            &m.metric,
-            &Composite::new(Vec::new()),
-            correct_gc,
-            floor,
-            warnings,
+            &m.metric, moving, correct_gc, floor, warnings,
         ),
         (None, _) => {
-            let r = demons::evaluate(&m.metric, &identity, true, floor)?;
+            let r = demons::evaluate(&m.metric, moving, true, floor)?;
             if r.no_valid_points {
                 warnings.push(no_valid_points_warning(
                     VERIFY_FILE,
@@ -355,7 +352,7 @@ fn metric_derivative<R: Real, const D: usize>(
 }
 
 /// The multi-metric's weights, normalised at each `Initialize` (`m_MetricWeights / sum`).
-fn normalise_weights<R: Real>(weights: &mut [R]) -> Result<(), ItkException> {
+pub(crate) fn normalise_weights<R: Real>(weights: &mut [R]) -> Result<(), ItkException> {
     let mut sum = R::ZERO;
     for &w in weights.iter() {
         sum = sum + w;
@@ -377,37 +374,61 @@ fn normalise_weights<R: Real>(weights: &mut [R]) -> Result<(), ItkException> {
     Ok(())
 }
 
+/// What a gradient call takes from its stage.
+#[derive(Clone, Copy)]
+pub(crate) struct CallSettings<'a, R> {
+    pub n_threads: usize,
+    /// ITK-30 corrected.
+    pub correct_gc_derivative: bool,
+    /// `SetOptimizerWeights` (`-g`), set only when it has `D` values.
+    pub optimizer_weights: Option<&'a [R]>,
+}
+
+impl<'a, R: Real> CallSettings<'a, R> {
+    fn of<const D: usize>(stage: &'a SynStage<R, D>) -> Self {
+        CallSettings {
+            n_threads: stage.n_threads,
+            correct_gc_derivative: stage.correct_gc_derivative,
+            optimizer_weights: stage.optimizer_weights.as_deref(),
+        }
+    }
+}
+
 /// The metric and its level state (`m_Metric`) for one call of `ComputeMetricGradientField`:
 /// `swapped` gives the moving images the role of the fixed ones (the moving-to-middle
 /// update).
-struct GradientCall<'a, R, const D: usize> {
+pub(crate) struct GradientCall<'a, R, const D: usize> {
     /// The image metrics (`None` where the stage has a point-set metric).
-    metrics: &'a [Option<LevelImageMetric<R, D>>],
-    resampled: &'a mut [Option<Resampled<R, D>>],
+    pub(crate) metrics: &'a [Option<LevelImageMetric<R, D>>],
+    pub(crate) resampled: &'a mut [Option<Resampled<R, D>>],
     /// The point-set metrics (`None` where the stage has an image metric).
-    point_sets: &'a mut [Option<PointSetMetric<R, D>>],
+    pub(crate) point_sets: &'a mut [Option<PointSetMetric<R, D>>],
     /// The iteration's fixed and moving composites.
-    fixed_composite: &'a Composite<R, D>,
-    moving_composite: &'a Composite<R, D>,
+    pub(crate) fixed_composite: &'a Composite<R, D>,
+    pub(crate) moving_composite: &'a Composite<R, D>,
     /// The identity displacement field transform ITK gives every metric of a multi-metric
     /// (ITK-33 reproduced), or `None`.
-    identity: Option<&'a Composite<R, D>>,
-    virtual_space: &'a Space<D>,
-    weights: &'a mut Vec<R>,
-    multi: bool,
-    stage: &'a SynStage<R, D>,
-    floor: &'a IndexFloor,
+    pub(crate) identity: Option<&'a Composite<R, D>>,
+    pub(crate) virtual_space: &'a Space<D>,
+    pub(crate) weights: &'a mut Vec<R>,
+    pub(crate) multi: bool,
+    pub(crate) settings: CallSettings<'a, R>,
+    pub(crate) floor: &'a IndexFloor,
     /// Each metric's fixed and moving masks as the metric object holds them between calls:
     /// ITK sets a resampled mask only where the stage has one, so a role without a mask keeps
     /// the mask the previous call set (ITK-31, reproduced when `stale_masks`).
-    masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
-    stale_masks: bool,
+    pub(crate) masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
+    pub(crate) stale_masks: bool,
+    /// The fixed and moving transforms the image metrics are evaluated through, on top of
+    /// their resampled images (ITK-36 reproduced: a time-varying B-spline velocity field's
+    /// multi-metric whose last metric is a point-set metric); `None`: the identity.
+    pub(crate) through: Option<(&'a Composite<R, D>, &'a Composite<R, D>)>,
 }
 
 impl<R: Real, const D: usize> GradientCall<'_, R, D> {
     /// `ComputeMetricGradientField`: the metric's value and its derivative over the virtual
     /// domain as a field, multiplied by the optimizer weights.
-    fn gradient_field(
+    pub(crate) fn gradient_field(
         &mut self,
         swapped: bool,
         warnings: &mut Vec<String>,
@@ -457,11 +478,13 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 if uses_moving == swapped {
                     if r.fixed_gradient.is_none() {
                         r.fixed_gradient =
-                            Some(Arc::new(gradient_image(&r.fixed, self.stage.n_threads)?));
+                            Some(Arc::new(gradient_image(&r.fixed, self.settings.n_threads)?));
                     }
                 } else if r.moving_gradient.is_none() {
-                    r.moving_gradient =
-                        Some(Arc::new(gradient_image(&r.moving, self.stage.n_threads)?));
+                    r.moving_gradient = Some(Arc::new(gradient_image(
+                        &r.moving,
+                        self.settings.n_threads,
+                    )?));
                 }
             }
             let (fi, mi, fm, mm, fg, mg) = if swapped {
@@ -507,6 +530,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 mg,
                 self.virtual_space,
                 &lm.samples,
+                self.through.map(|(f, _)| f.clone()),
             );
             match result {
                 Ok(m) => initialized.push(Some(m)),
@@ -525,7 +549,15 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         for (j, m) in initialized.iter().enumerate() {
             let (v, d) = match m {
                 Some(m) => {
-                    metric_derivative(m, self.stage.correct_gc_derivative, self.floor, warnings)?
+                    let identity = Composite::new(Vec::new());
+                    let moving = self.through.map_or(&identity, |(_, m)| m);
+                    metric_derivative(
+                        m,
+                        self.settings.correct_gc_derivative,
+                        moving,
+                        self.floor,
+                        warnings,
+                    )?
                 }
                 None => self.point_sets[j]
                     .as_mut()
@@ -560,7 +592,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         } else {
             (values[0], derivatives.pop().expect("one metric"))
         };
-        if let Some(w) = &self.stage.optimizer_weights
+        if let Some(w) = self.settings.optimizer_weights
             && w.len() == D
             && !weights_are_identity(w)
         {
@@ -582,7 +614,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
     /// the optimizer weights, and the B-spline fitted to the fixed points' virtual positions
     /// (`SetBSplineDomainFromImage` of the virtual domain); a zero field without fixed points
     /// or with 0 control points.
-    fn bspline_point_update(
+    pub(crate) fn bspline_point_update(
         &mut self,
         swapped: bool,
         control_points: &[u32; D],
@@ -604,7 +636,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
         let p = self.point_sets[0].as_mut().expect("a point-set metric");
         p.tangent_initialize(&call, warnings)?;
         let (value, mut derivative) = p.tangent_evaluate(warnings)?;
-        if let Some(w) = &self.stage.optimizer_weights
+        if let Some(w) = self.settings.optimizer_weights
             && w.len() == D
             && !weights_are_identity(w)
         {
@@ -906,10 +938,11 @@ fn run_syn_levels<R: Real, const D: usize>(
                     virtual_space: &virtual_space,
                     weights: &mut weights,
                     multi,
-                    stage,
+                    settings: CallSettings::of(stage),
                     floor,
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
+                    through: None,
                 };
                 // B-spline SyN with a single point-set metric: the B-spline fitted to the
                 // points' derivatives.
@@ -1025,7 +1058,10 @@ fn run_syn_levels<R: Real, const D: usize>(
 }
 
 /// `f` run in a pool of `n_threads` threads (0: every logical CPU).
-fn pooled<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> Result<T, ItkException> {
+pub(crate) fn pooled<T: Send>(
+    n_threads: usize,
+    f: impl FnOnce() -> T + Send,
+) -> Result<T, ItkException> {
     larmorx_core::parallel::with_threads(n_threads, f).map_err(|e| {
         ItkException::new(
             "Modules/Core/Common/src/itkMultiThreaderBase.cxx",

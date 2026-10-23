@@ -24,6 +24,7 @@ starts no other agent.
 | A5.1 | `7f2a61e` (10-20) | `antsRegistration`'s SyN stages; displacement fields as initial transforms; parity `--jobs` | the other deformable stages (A5.2, A5.3) |
 | A5.2 | `a5-part2-bspline` (10-21) | `antsRegistration`'s BSplineSyN, BSpline, GaussianDisplacementField and BSplineDisplacementField stages; the Python API's `mesh_size`, `total_mesh_size`, `spline_order` | `antsApplyTransforms` with `BSplineTransform` files; ANTS-78 and ITK-35 (below); A5.3 |
 | Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
+| A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
 | A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | ANTS-106 (below) |
 
 ## The order from here
@@ -38,14 +39,11 @@ starts no other agent.
    against the current oracle (on a quiet machine). **Part 2b merged 2026-10-21:** every tool's
    page in this form, every case classified. Each later part brings its tool's evidence in the
    same form.
-2. **A5 part 3** (running since 2026-10-22): the time-varying velocity fields and the exponential transforms; with it the
-   corrections decided on 2026-10-21 (decision log): ANTS-78 (the base-level mesh as given),
-   ITK-35 (B-spline transforms' Jacobian with respect to position, so later stages run), and the
-   point-set metrics' ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29; each with `reproduce` giving
-   ANTs' behaviour, parity in `reproduce` mode plus a fix pass.
+2. **A5 part 3: done** (merged 2026-10-23): every `antsRegistration` stage, the corrections of
+   2026-10-21, `antsApplyTransforms` with `BSplineTransform` files.
 3. **A6, Atropos: done** (merged 2026-10-22, run in parallel with A5 part 3 at the user's
    request). With A4 to A6, sMRIPrep's brain extraction and MNI normalisation run in larmorx
-   once A5 part 3 is merged.
+   (A5 part 3 merged).
 4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
    correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
    (`docs/findings/ants-ai.md`, "Blobs").
@@ -78,7 +76,9 @@ starts no other agent.
   after `--float`; the BOLD resampler; SyN (one informal measurement: 96³ CC, ANTs 122 s at one
   thread, larmorx 24 to 41 s, bit-identical); the B-spline and displacement-field stages (4D
   `BSpline` on a small phantom: ANTs 461 s, larmorx 23 s at one thread, identical); HDF5 reading
-  against h5py and ANTs.
+  against h5py and ANTs; the velocity-field stages; informally, sMRIPrep's registration with
+  `BSpline[0.1,26]` (about a million parameters at the last level): ANTs at 4 threads unfinished
+  after 3 h 50 min, larmorx 38 s at one thread.
 - **Figures:** every new part brings its tool's figures (`docs/figures.md`); the site's pages
   for antsRegistration, antsAI and the HDF5 files say their benchmark is pending until the
   reports above exist. The figures take about 12 MB of the site's repository (four SVGs each,
@@ -86,8 +86,6 @@ starts no other agent.
 - **Head-motion correction's open cases** (91 of the record's 134, shown as "open" on its
   evidence page): mcflirt's own variability is measured for the real-data cases only; measuring
   its band per option and synthetic case would classify them.
-- **`antsApplyTransforms` with `BSplineTransform` files** (the `BSpline` stage's output; refused
-  with a message today, `warped=True` gives the warped image), with parity cases.
 - **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
 - **ANTS-106 in Atropos** (decided 2026-10-22): partial-volume classes with an MRF, a

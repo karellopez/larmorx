@@ -740,12 +740,10 @@ def syn_cases(make) -> list:
         make(
             f"{SYN}/exponential",
             SYN,
-            "Exponential: A5 part 3",
+            "Exponential[0.1,3,0] with CC in SyN's settings (the velocity-field stages have "
+            "their own categories)",
             *_stage("Exponential[0.1,3,0]", [cc]),
             out=PRE,
-            expect="divergence",
-            reason="the exponential and velocity-field transforms are milestone A5 part 3; larmorx "
-            "refuses with a message",
         ),
     ]
     return cases + _point_set_cases(make)

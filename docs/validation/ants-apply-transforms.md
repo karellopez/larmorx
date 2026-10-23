@@ -1,16 +1,16 @@
 # Parity: antsApplyTransforms
 
-**All cases agree.** 220 cases on the `standard` tier: 202 pass, 14 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 258 cases on the `standard` tier: 234 pass, 20 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsApplyTransforms` / `lx.ants.apply_transforms` (crates larmorx-ants, -interp, -transform, -io)
 - **Reference:** antsApplyTransforms from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with 4 threads
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
+- **Generated:** 2026-10-22 on Linux x86_64, with `python -m larmorx_validation parity ants-apply-transforms --tier standard`
 
-**Bit-identical to the unmodified antsApplyTransforms, all cases: 160 of 174** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 174 of 174.
-**Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 89 of 89** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 89 of 89.
-Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `sincos`, `sinf`, `cosf` or `sincosf` (bit-identical with CORE-MATH preloaded; Gaussian and windowed-sinc weights, Euler and versor matrices; docs/findings/platform-math.md): `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `time-series/LanczosWindowedSinc`.
-**Transform outputs** (`-o Linear[...]`, `-o CompositeTransform[...]`, `-o DisplacementField[...]`): 28 of 28 cases write ANTs's files: text and MATLAB files byte for byte, NIfTI fields header and vectors bit for bit, HDF5 files dataset for dataset; written with ITK's strings and object times, 8 of 8 HDF5 files are ITK's byte for byte given ITK's compressed chunks, 5 with larmorx's own deflate.
+**Bit-identical to the unmodified antsApplyTransforms, all cases: 185 of 200** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 200 of 200.
+**Bit-identical to the unmodified antsApplyTransforms, `--float 1` cases: 102 of 102** passing cases produce exactly the bytes of its output data; with CORE-MATH's correctly rounded functions preloaded into ANTs, 102 of 102.
+Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `sincos`, `sinf`, `cosf` or `sincosf` (bit-identical with CORE-MATH preloaded; Gaussian and windowed-sinc weights, Euler and versor matrices; docs/findings/platform-math.md): `bspline/lanczos`, `fmriprep/GM-probseg-to-MNI`, `fmriprep/T1w-to-MNI-lanczos`, `fmriprep/bold-series-to-T1w`, `fmriprep/boldref-to-T1w-lanczos`, `geometry/oblique-to-axial-lanczos`, `interpolation/BlackmanWindowedSinc`, `interpolation/CosineWindowedSinc`, `interpolation/Gaussian`, `interpolation/Gaussian[1.5,2]`, `interpolation/Gaussian[1x2x3]`, `interpolation/HammingWindowedSinc`, `interpolation/LanczosWindowedSinc`, `interpolation/WelchWindowedSinc`, `time-series/LanczosWindowedSinc`.
+**Transform outputs** (`-o Linear[...]`, `-o CompositeTransform[...]`, `-o DisplacementField[...]`): 34 of 34 cases write ANTs's files: text and MATLAB files byte for byte, NIfTI fields header and vectors bit for bit, HDF5 files dataset for dataset; written with ITK's strings and object times, 10 of 10 HDF5 files are ITK's byte for byte given ITK's compressed chunks, 7 with larmorx's own deflate.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-06: 4 case(s) named it, 4 with changed values (largest difference 255): `output/-u-char`, `output/-u-uchar`, `float/output/-u-char`, `float/output/-u-uchar`
 
@@ -31,15 +31,16 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| errors | 4 | 0 | 4 | 0 | 0 |
-| float | 91 | 87 | 4 | 0 | 0 |
+| bspline | 13 | 13 | 0 | 0 | 0 |
+| errors | 6 | 0 | 6 | 0 | 0 |
+| float | 106 | 100 | 6 | 0 | 0 |
 | fmriprep | 7 | 7 | 0 | 0 | 0 |
 | geometry | 13 | 13 | 0 | 0 | 0 |
 | interpolation | 20 | 20 | 0 | 0 | 0 |
 | output | 9 | 9 | 0 | 0 | 0 |
 | time-series | 5 | 5 | 0 | 0 | 0 |
 | transform | 33 | 33 | 0 | 0 | 0 |
-| transform-output | 38 | 28 | 6 | 4 | 0 |
+| transform-output | 46 | 34 | 8 | 4 | 0 |
 
 ## Expected divergences
 
@@ -56,15 +57,21 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 |---|---|---|
 | `errors/4d-as-scalar` | a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `errors/invert-field` | inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-mjsa0kes/missing.mat |
+| `errors/invert-bspline` | inverting a B-spline transform: it has no inverse | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
+| `errors/invert-bspline-composite` | inverting a composite that holds a B-spline transform | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
+| `errors/missing-transform` | a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-70o4607h/missing.mat |
 | `errors/unknown-interpolator` | -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `float/errors/4d-as-scalar` | --float 1: a 4D image with -e 0 | ANTs exit 1; larmorx: Input image dimension does not match. Expected: 3, but got: 4 See -e option for available input types. |
 | `float/errors/invert-field` | --float 1: inverting a displacement field | ANTs exit 1; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead |
-| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-vso8qcwr/missing.mat |
+| `float/errors/invert-bspline` | --float 1: inverting a B-spline transform: it has no inverse | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
+| `float/errors/invert-bspline-composite` | --float 1: inverting a composite that holds a B-spline transform | ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse |
+| `float/errors/missing-transform` | --float 1: a transform file that does not exist | ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-603ac3bl/missing.mat |
 | `float/errors/unknown-interpolator` | --float 1: -n Cubic | ANTs exit 1; larmorx: Error: Unrecognized interpolation option. cubic |
 | `transform-output/errors/linear-no-parameter` | -o Linear without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
 | `transform-output/errors/composite-no-parameter` | -o CompositeTransform without a file name | ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o Composi… |
 | `transform-output/errors/linear-with-field` | -o Linear[...] of a chain with a displacement field: not linear | ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear. |
+| `transform-output/errors/linear-with-bspline` | -o Linear[...] of a chain with a B-spline transform: not linear | ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear. |
+| `transform-output/errors/inverted-bspline` | -o CompositeTransform[...] -t [bspline,1]: a B-spline transform has no inverse | ANTs: Inverse does not exist for /tmp/lx-aat-2vvu341w/gen-bspline.txt; larmorx: Inverse does not exist: a B-spline transform has no inverse |
 | `transform-output/errors/field-no-reference` | -o DisplacementField[...] without -r | ANTs: A reference image is required.; larmorx: A reference image is required. |
 | `transform-output/errors/image-no-input` | -o [x.nii.gz,0] without -i: an image output needs an input | ANTs: An input image is required.; larmorx: An input image is required. |
 | `transform-output/errors/inverted-field` | -o CompositeTransform[...] -t [field,1]: a displacement field has no inverse | ANTs: Inverse does not exist for <larmorx-testdata>/data/synthetic/resampling/transforms/warp-lps-vector.nii.gz; larmorx: Inverse does not exist: a displacemen… |
@@ -73,7 +80,7 @@ Differing from ANTs as built only through glibc's `exp`, `log`, `sin`, `cos`, `s
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1dfe56c0dc60) |
+| larmorx | 0.0.1 (88bb1fffccbf) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -143,6 +150,19 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `transform/chain-h5-itk-dense` | pass | 8/8 | -t composite.h5: nine affines ITK wrote (a dense group: fractal heap, v2 B-tree) |
 | `transform/chain-h5-itk-warp-float` | pass | 8/8 | -t composite.h5: a field and an affine in float (ITK's --float 1 output) |
 | `transform/chain-h5-larmorx-dense` | pass | 8/8 | the nine-affine composite rewritten by lx.transforms.write (dense) |
+| `bspline/text` | pass | 8/8 | -t bspline.txt: a BSplineTransform_double_3_3 in ITK's text format |
+| `bspline/matlab` | pass | 8/8 | -t bspline.mat: the same in ITK's MATLAB format |
+| `bspline/hdf5` | pass | 8/8 | -t bspline.h5: the same in HDF5 |
+| `bspline/float-class` | pass | 8/8 | -t a BSplineTransform_float_3_3 (float coefficients) |
+| `bspline/composite-hdf5` | pass | 8/8 | -t composite.h5: an affine and a B-spline transform in one HDF5 composite (-a 1) |
+| `bspline/chain-affine` | pass | 8/8 | -t bspline -t affine: the affine first, then the B-spline transform |
+| `bspline/chain-warp` | pass | 8/8 | -t warp -t bspline: the B-spline transform first, then the displacement field |
+| `bspline/chain-inverse-affine` | pass | 8/8 | -t [affine,1] -t bspline: an inverted affine after the B-spline transform |
+| `bspline/nearest` | pass | 8/8 | -n NearestNeighbor through the B-spline transform |
+| `bspline/bspline-interpolation` | pass | 8/8 | -n BSpline through the B-spline transform |
+| `bspline/lanczos` | pass | 8/8 | -n LanczosWindowedSinc through the B-spline transform |
+| `bspline/time-series` | pass | 8/8 | -e 3: each volume of a 4D series through the B-spline transform |
+| `bspline/labels-genericlabel` | pass | 8/8 | -n GenericLabel -u uchar: a label image through the B-spline transform |
 | `geometry/oblique-to-axial` | pass | 8/8 | oblique anisotropic input onto an axis-aligned grid |
 | `geometry/oblique-to-axial-lanczos` | pass | 8/8 | oblique anisotropic input, Lanczos |
 | `geometry/scaled-int16-las` | pass | 8/8 | int16 LAS image with scl_slope/scl_inter (ITK rescales through float32) |
@@ -172,6 +192,8 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `time-series/named-type` | pass | 8/8 | -e time-series (the name instead of the number) |
 | `errors/4d-as-scalar` | both-error | 1/1 | a 4D image with -e 0 |
 | `errors/invert-field` | both-error | 1/1 | inverting a displacement field |
+| `errors/invert-bspline` | both-error | 1/1 | inverting a B-spline transform: it has no inverse |
+| `errors/invert-bspline-composite` | both-error | 1/1 | inverting a composite that holds a B-spline transform |
 | `errors/missing-transform` | both-error | 1/1 | a transform file that does not exist |
 | `errors/unknown-interpolator` | both-error | 1/1 | -n Cubic |
 | `fmriprep/boldref-to-T1w-lanczos` | pass | 8/8 | boldref → T1w through fMRIPrep's ITK text affine, Lanczos |
@@ -234,6 +256,19 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `float/transform/chain-h5-itk-dense` | pass | 8/8 | --float 1: -t composite.h5: nine affines ITK wrote (a dense group: fractal heap, v2 B-tree) |
 | `float/transform/chain-h5-itk-warp-float` | pass | 8/8 | --float 1: -t composite.h5: a field and an affine in float (ITK's --float 1 output) |
 | `float/transform/chain-h5-larmorx-dense` | pass | 8/8 | --float 1: the nine-affine composite rewritten by lx.transforms.write (dense) |
+| `float/bspline/text` | pass | 8/8 | --float 1: -t bspline.txt: a BSplineTransform_double_3_3 in ITK's text format |
+| `float/bspline/matlab` | pass | 8/8 | --float 1: -t bspline.mat: the same in ITK's MATLAB format |
+| `float/bspline/hdf5` | pass | 8/8 | --float 1: -t bspline.h5: the same in HDF5 |
+| `float/bspline/float-class` | pass | 8/8 | --float 1: -t a BSplineTransform_float_3_3 (float coefficients) |
+| `float/bspline/composite-hdf5` | pass | 8/8 | --float 1: -t composite.h5: an affine and a B-spline transform in one HDF5 composite (-a 1) |
+| `float/bspline/chain-affine` | pass | 8/8 | --float 1: -t bspline -t affine: the affine first, then the B-spline transform |
+| `float/bspline/chain-warp` | pass | 8/8 | --float 1: -t warp -t bspline: the B-spline transform first, then the displacement field |
+| `float/bspline/chain-inverse-affine` | pass | 8/8 | --float 1: -t [affine,1] -t bspline: an inverted affine after the B-spline transform |
+| `float/bspline/nearest` | pass | 8/8 | --float 1: -n NearestNeighbor through the B-spline transform |
+| `float/bspline/bspline-interpolation` | pass | 8/8 | --float 1: -n BSpline through the B-spline transform |
+| `float/bspline/lanczos` | pass | 8/8 | --float 1: -n LanczosWindowedSinc through the B-spline transform |
+| `float/bspline/time-series` | pass | 8/8 | --float 1: -e 3: each volume of a 4D series through the B-spline transform |
+| `float/bspline/labels-genericlabel` | pass | 8/8 | --float 1: -n GenericLabel -u uchar: a label image through the B-spline transform |
 | `float/geometry/oblique-to-axial` | pass | 8/8 | --float 1: oblique anisotropic input onto an axis-aligned grid |
 | `float/geometry/oblique-to-axial-lanczos` | pass | 8/8 | --float 1: oblique anisotropic input, Lanczos |
 | `float/geometry/scaled-int16-las` | pass | 8/8 | --float 1: int16 LAS image with scl_slope/scl_inter (ITK rescales through float32) |
@@ -261,6 +296,8 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `float/time-series/named-type` | pass | 8/8 | --float 1: -e time-series (the name instead of the number) |
 | `float/errors/4d-as-scalar` | both-error | 1/1 | --float 1: a 4D image with -e 0 |
 | `float/errors/invert-field` | both-error | 1/1 | --float 1: inverting a displacement field |
+| `float/errors/invert-bspline` | both-error | 1/1 | --float 1: inverting a B-spline transform: it has no inverse |
+| `float/errors/invert-bspline-composite` | both-error | 1/1 | --float 1: inverting a composite that holds a B-spline transform |
 | `float/errors/missing-transform` | both-error | 1/1 | --float 1: a transform file that does not exist |
 | `float/errors/unknown-interpolator` | both-error | 1/1 | --float 1: -n Cubic |
 | `float/fmriprep/boldref-to-T1w-lanczos` | pass | 8/8 | --float 1: boldref → T1w through fMRIPrep's ITK text affine, Lanczos |
@@ -291,6 +328,10 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `transform-output/composite/float-hdf5` | pass | 4/4 | --float 1 -o CompositeTransform[x.h5]: the field read in float |
 | `transform-output/composite/float-matlab` | pass | 3/3 | --float 1 -o CompositeTransform[x.mat] |
 | `transform-output/composite/no-transforms` | pass | 3/3 | -o CompositeTransform[x.txt] without -t |
+| `transform-output/composite/bspline-text` | pass | 3/3 | -o CompositeTransform[x.txt]: a B-spline transform after a centred affine |
+| `transform-output/composite/bspline-matlab` | pass | 3/3 | -o CompositeTransform[x.mat]: a B-spline transform read from MATLAB |
+| `transform-output/composite/bspline-hdf5` | pass | 4/4 | -o CompositeTransform[x.h5]: an affine and B-spline composite and an inverted Euler |
+| `transform-output/composite/bspline-float` | pass | 4/4 | --float 1 -o CompositeTransform[x.h5]: a double B-spline transform read in float and a float one |
 | `transform-output/composite/fmriprep` | pass | 4/4 | -o CompositeTransform[x.h5]: fMRIPrep's T1w-to-MNI composite (ds000005) after its BOLD-to-T1w affine |
 | `transform-output/field/nifti` | pass | 4/4 | -o DisplacementField[x.nii.gz]: a NIfTI field after a centred affine (pointwise) |
 | `transform-output/field/legacy-form` | pass | 4/4 | -o [x.nii.gz,1]: a linear chain (scan lines interpolated) |
@@ -298,11 +339,15 @@ Both programs read the same files with the same arguments; the outputs are read 
 | `transform-output/field/hdf5-field` | pass | 4/4 | -o DisplacementField[x.h5]: a RAS displacement field (NIFTI_INTENT_DISPVECT) on a grid of exact ties |
 | `transform-output/field/float-linear` | pass | 4/4 | --float 1 -o DisplacementField[x.nii.gz]: float transforms on double points |
 | `transform-output/field/float-composite` | pass | 4/4 | --float 1 -o DisplacementField[x.nii]: an .h5 composite with a field, uncompressed NIfTI |
+| `transform-output/field/bspline` | pass | 4/4 | -o DisplacementField[x.nii.gz]: an affine and B-spline composite (pointwise) |
+| `transform-output/field/bspline-float` | pass | 4/4 | --float 1 -o DisplacementField[x.nii.gz]: a B-spline transform in float |
 | `transform-output/field/no-transforms` | pass | 4/4 | -o DisplacementField[x.nii.gz] without -t: zero vectors |
 | `transform-output/field/fmriprep` | pass | 4/4 | -o DisplacementField[x.nii.gz]: fMRIPrep's T1w-to-MNI composite (ds000005) on its 2 mm MNI grid |
 | `transform-output/errors/linear-no-parameter` | both-error | 1/1 | -o Linear without a file name |
 | `transform-output/errors/composite-no-parameter` | both-error | 1/1 | -o CompositeTransform without a file name |
 | `transform-output/errors/linear-with-field` | both-error | 1/1 | -o Linear[...] of a chain with a displacement field: not linear |
+| `transform-output/errors/linear-with-bspline` | both-error | 1/1 | -o Linear[...] of a chain with a B-spline transform: not linear |
+| `transform-output/errors/inverted-bspline` | both-error | 1/1 | -o CompositeTransform[...] -t [bspline,1]: a B-spline transform has no inverse |
 | `transform-output/errors/field-no-reference` | both-error | 1/1 | -o DisplacementField[...] without -r |
 | `transform-output/errors/image-no-input` | both-error | 1/1 | -o [x.nii.gz,0] without -i: an image output needs an input |
 | `transform-output/errors/inverted-field` | both-error | 1/1 | -o CompositeTransform[...] -t [field,1]: a displacement field has no inverse |

@@ -359,6 +359,17 @@ def field_xfm() -> ItkTransform:
     return ItkTransform("DisplacementFieldTransform_double_3_3", vectors, np.array(fixed, float))
 
 
+@functools.cache
+def bspline_xfm() -> ItkTransform:
+    """A cubic B-spline transform (``antsRegistration``'s ``BSpline`` stage output) of mesh
+    2 x 2 x 2 whose valid region is [-30, 30) mm on each LPS axis, its coefficients multiples of
+    1/8 up to ±1.5 mm."""
+    n = 5 * 5 * 5
+    coefficients = ints(13, (3 * n,), -12, 13) / 8
+    fixed = [5, 5, 5, -60.0, -60.0, -60.0, 30.0, 30.0, 30.0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
+    return ItkTransform("BSplineTransform_double_3_3", coefficients, np.array(fixed, float))
+
+
 def itk_text(matrices: list[list[float]], centre: str = "0 0 0") -> str:
     """An ITK text transform file with one ``MatrixOffsetTransformBase`` per parameter list
     (parameters written with ``repr``, so they read back exactly)."""
@@ -512,6 +523,15 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "rigid.txt": lambda p: lx.transforms.write(p, RIGID_XFM),
     "warp.nii.gz": _write_warp,
     "composite.h5": _write_composite,
+    "bspline.txt": lambda p: lx.transforms.write(p, bspline_xfm()),
+    "affine_bspline.h5": lambda p: lx.transforms.write(
+        p,
+        [
+            ItkTransform("CompositeTransform_double_3_3", np.zeros(0), np.zeros(0)),
+            AFFINE_XFM,
+            bspline_xfm(),
+        ],
+    ),
     "hmc.txt": lambda p: p.write_bytes(itk_text(HMC_PARAMS).encode()),
     "coreg.txt": lambda p: p.write_bytes(itk_text([COREG_PARAMS], "1.7 -0.9 2.3").encode()),
 }
@@ -1159,6 +1179,25 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.ants.antsApplyTransforms.bspline", covers=("cli:ants antsApplyTransforms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """B-spline transforms (``antsRegistration``'s ``BSpline`` stage output): a text file after
+    an affine (``-t bspline -t affine``); an HDF5 composite of the affine and the B-spline
+    transform in float (``--float 1``)."""
+    out, float_out = ctx.out("out.nii"), ctx.out("float.nii")
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3",
+        "-i", ctx.file("anat.nii"), "-r", ctx.file("reference.nii"), "-o", out,
+        "-t", ctx.file("bspline.txt"), "-t", ctx.file("affine.mat"),
+    )  # fmt: skip
+    cli(
+        "ants", "antsApplyTransforms", "-d", "3", "--float", "1",
+        "-i", ctx.file("anat.nii"), "-r", ctx.file("reference.nii"), "-o", float_out,
+        "-n", "BSpline[3]", "-t", ctx.file("affine_bspline.h5"),
+    )  # fmt: skip
+    return {"out": Nifti(out), "float": Nifti(float_out)}
+
+
 @case("cli.ants.antsRegistration", covers=("cli:ants antsRegistration",))
 def _(ctx: Context) -> dict[str, Any]:
     """Two linear registrations of ``anat2`` onto ``anat``: a rigid stage with Mattes mutual
@@ -1598,6 +1637,68 @@ def _(ctx: Context) -> dict[str, Any]:
     return {
         "bspline": File(p + "0BSpline.txt"),
         "files": "\n".join(sorted(x.name for x in Path(r).parent.glob("bsp1r_*"))),
+    }
+
+
+@case("cli.ants.antsRegistration.velocity", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The velocity-field stages, one level of two iterations each: Exponential (MeanSquares,
+    scaling and squaring, the Gaussian update; ``-z 0`` writes the velocity field),
+    BSplineExponential (CC), TimeVaryingVelocityField (MeanSquares, RK4 integration of the
+    space-time field, its Gaussian smoothing), TimeVaryingBSplineVelocityField (MeanSquares,
+    the space-time B-spline fit) and, in float, TimeVaryingVelocityField with Mattes."""
+    a, b = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    files: dict[str, Any] = {}
+    one = ("-c", "[2,1e-6,3]", "-f", "1", "-s", "0")
+    runs = [
+        ("exp", "Exponential[0.5,2,0.5]", f"MeanSquares[{a},{b},1,0]", ("-z", "0"), ("0Warp.nii.gz", "0InverseWarp.nii.gz", "0VelocityField.nii.gz")),
+        ("bexp", "BSplineExponential[0.5,2x2x2,0,0,3]", f"CC[{a},{b},1,2]", (), ("0Warp.nii.gz", "0InverseWarp.nii.gz")),
+        ("tvf", "TimeVaryingVelocityField[0.5,4,1,0,1,0]", f"MeanSquares[{a},{b},1,0]", ("-z", "0"), ("0Warp.nii.gz", "0InverseWarp.nii.gz", "0VelocityField.nii.gz")),
+        ("tvb", "TimeVaryingBSplineVelocityField[0.5,2x2x2x2,3,3]", f"MeanSquares[{a},{b},1,0]", (), ("0Warp.nii.gz", "0InverseWarp.nii.gz")),
+        ("tvf_float", "TimeVaryingVelocityField[0.5,3,1,0,1,0]", f"Mattes[{a},{b},1,12]", ("--float", "1"), ("0Warp.nii.gz", "0InverseWarp.nii.gz")),
+    ]  # fmt: skip
+    for name, transform, metric, extra, outputs in runs:
+        prefix = ctx.out(f"{name}_")
+        cli(
+            "ants", "antsRegistration", "-d", "3", *extra, "-o", prefix,
+            "-t", transform, "-m", metric, *one,
+        )  # fmt: skip
+        for o in outputs:
+            files[f"{name}.{o.removesuffix('.nii.gz')}"] = Nifti(prefix + o)
+    return files
+
+
+@case("cli.ants.antsRegistration.corrections", covers=("cli:ants antsRegistration",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Paths of the corrections decided on 2026-10-21: an affine stage after a ``BSpline``
+    stage, through the B-spline transform's Jacobian with respect to position (ITK-35); IGDM
+    over its k nearest points with Gaussian gradients and its true derivative (ANTS-67,
+    ANTS-68); a B-spline displacement field with its base-level mesh at the base level
+    (ANTS-78)."""
+    a, b, m = ctx.file("anat.nii"), ctx.file("anat2.nii"), ctx.file("mask.nii")
+    m2 = ctx.file("mask2.nii")
+    one = ("-c", "[2,1e-6,3]", "-f", "1", "-s", "0")
+    p = ctx.out("chain_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-x", m, "-o", p,
+        "-t", "BSpline[0.2,1x1x1]", "-m", f"MeanSquares[{a},{b},1,0]", *one,
+        "-t", "Affine[0.1]", "-m", f"MeanSquares[{a},{b},1,0]", *one,
+    )  # fmt: skip
+    q = ctx.out("igdm_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-x", m, "-o", q,
+        "-t", "Rigid[0.1]", "-m", f"IGDM[{a},{b},1,{m},{m2},0x0x0,0,0,3,1.5]", *one,
+    )  # fmt: skip
+    r = ctx.out("bdf_")
+    cli(
+        "ants", "antsRegistration", "-d", "3", "-o", r,
+        "-t", "BSplineDisplacementField[0.3,4x4x4,0,3]", "-m", f"MeanSquares[{a},{b},1,0]", *one,
+    )  # fmt: skip
+    return {
+        "chain.bspline": File(p + "0BSpline.txt"),
+        "chain.affine": File(p + "1GenericAffine.mat"),
+        "igdm": File(q + "0GenericAffine.mat"),
+        "bdf": Nifti(r + "0Warp.nii.gz"),
     }
 
 

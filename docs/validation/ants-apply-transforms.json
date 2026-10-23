@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "1dfe56c0dc60",
+  "larmorx_commit": "88bb1fffccbf",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -33,7 +33,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.305,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -53,7 +53,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.186,
    "status": "pass"
   },
   {
@@ -73,7 +73,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.092,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -93,7 +93,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.074,
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -113,7 +113,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.074,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -133,7 +133,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -153,7 +153,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -173,7 +173,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -193,7 +193,7 @@
     "bit-identical": 16,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -213,7 +213,7 @@
     "bit-identical": 56,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.093,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -233,7 +233,7 @@
     "bit-identical": 44,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -253,7 +253,7 @@
     "bit-identical": 53,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.097,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -273,7 +273,7 @@
     "bit-identical": 37,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.097,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -293,7 +293,7 @@
     "bit-identical": 65,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.092,
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -313,7 +313,7 @@
     "bit-identical": 31,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.139,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -333,7 +333,7 @@
     "bit-identical": 44,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.099,
+   "seconds": 0.146,
    "status": "pass"
   },
   {
@@ -353,7 +353,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -373,7 +373,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -393,7 +393,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.084,
+   "seconds": 0.114,
    "status": "pass"
   },
   {
@@ -413,7 +413,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -433,7 +433,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -453,7 +453,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -473,7 +473,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -493,7 +493,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -513,7 +513,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -533,7 +533,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -553,7 +553,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.093,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -573,7 +573,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -593,7 +593,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -613,7 +613,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.083,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -633,7 +633,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.096,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -653,7 +653,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -693,7 +693,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.093,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -713,7 +713,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -733,7 +733,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -753,7 +753,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -773,7 +773,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -793,7 +793,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -813,7 +813,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -833,7 +833,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -853,7 +853,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -873,7 +873,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -893,7 +893,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -913,7 +913,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.106,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -933,7 +933,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.195,
+   "seconds": 0.197,
    "status": "pass"
   },
   {
@@ -953,7 +953,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.169,
+   "seconds": 0.19,
    "status": "pass"
   },
   {
@@ -973,7 +973,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.178,
+   "seconds": 0.186,
    "status": "pass"
   },
   {
@@ -993,7 +993,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.207,
+   "seconds": 0.215,
    "status": "pass"
   },
   {
@@ -1013,7 +1013,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.206,
+   "seconds": 0.234,
    "status": "pass"
   },
   {
@@ -1033,7 +1033,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.233,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
@@ -1053,7 +1053,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.201,
+   "seconds": 0.234,
    "status": "pass"
   },
   {
@@ -1073,7 +1073,267 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.257,
+   "seconds": 0.288,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/text",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.115,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/matlab",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.109,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/hdf5",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.123,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/float-class",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/composite-hdf5",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.102,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/chain-affine",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.111,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/chain-warp",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.101,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/chain-inverse-affine",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/nearest",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "labels identical": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/bspline-interpolation",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/lanczos",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "3.9e-16"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 81,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.127,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/time-series",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float64",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.239,
+   "status": "pass"
+  },
+  {
+   "case": "bspline/labels-genericlabel",
+   "category": "bspline",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "uint8",
+    "labels identical": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.081,
    "status": "pass"
   },
   {
@@ -1093,7 +1353,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.09,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -1113,7 +1373,7 @@
     "bit-identical": 226,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.183,
+   "seconds": 0.212,
    "status": "pass"
   },
   {
@@ -1133,7 +1393,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1153,7 +1413,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1173,7 +1433,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1193,7 +1453,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -1213,7 +1473,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1233,7 +1493,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -1253,7 +1513,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -1273,7 +1533,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -1293,7 +1553,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -1313,7 +1573,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -1333,7 +1593,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1353,7 +1613,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -1373,7 +1633,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -1393,7 +1653,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -1413,7 +1673,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -1433,7 +1693,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -1453,7 +1713,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1473,7 +1733,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.084,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1493,7 +1753,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1513,7 +1773,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -1533,7 +1793,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.143,
+   "seconds": 0.18,
    "status": "pass"
   },
   {
@@ -1553,7 +1813,7 @@
     "bit-identical": 528,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.346,
+   "seconds": 0.426,
    "status": "pass"
   },
   {
@@ -1573,7 +1833,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.16,
+   "seconds": 0.202,
    "status": "pass"
   },
   {
@@ -1593,7 +1853,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1613,7 +1873,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.148,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -1626,7 +1886,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -1639,7 +1899,33 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.031,
+   "seconds": 0.04,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/invert-bspline",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/invert-bspline-composite",
+   "category": "errors",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1648,11 +1934,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-mjsa0kes/missing.mat",
+   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-70o4607h/missing.mat",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1665,7 +1951,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1685,7 +1971,7 @@
     "bit-identical": 25341,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 9.052,
+   "seconds": 13.634,
    "status": "pass"
   },
   {
@@ -1705,7 +1991,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 3.915,
+   "seconds": 5.474,
    "status": "pass"
   },
   {
@@ -1725,7 +2011,7 @@
     "bit-identical": 9074,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 5.763,
+   "seconds": 8.285,
    "status": "pass"
   },
   {
@@ -1745,7 +2031,7 @@
     "bit-identical": 749,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 4.342,
+   "seconds": 6.651,
    "status": "pass"
   },
   {
@@ -1765,7 +2051,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.571,
+   "seconds": 0.837,
    "status": "pass"
   },
   {
@@ -1785,7 +2071,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 9.179,
+   "seconds": 13.933,
    "status": "pass"
   },
   {
@@ -1805,7 +2091,7 @@
     "bit-identical": 180059,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 62.041,
+   "seconds": 106.158,
    "status": "pass"
   },
   {
@@ -1825,7 +2111,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.146,
    "status": "pass"
   },
   {
@@ -1845,7 +2131,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.07,
+   "seconds": 0.134,
    "status": "pass"
   },
   {
@@ -1865,7 +2151,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.16,
    "status": "pass"
   },
   {
@@ -1885,7 +2171,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -1905,7 +2191,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -1925,7 +2211,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -1945,7 +2231,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -1965,7 +2251,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
@@ -1985,7 +2271,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -2005,7 +2291,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -2025,7 +2311,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.083,
+   "seconds": 0.167,
    "status": "pass"
   },
   {
@@ -2045,7 +2331,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -2065,7 +2351,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.09,
+   "seconds": 0.196,
    "status": "pass"
   },
   {
@@ -2085,7 +2371,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.115,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -2105,7 +2391,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.089,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -2125,7 +2411,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.2,
    "status": "pass"
   },
   {
@@ -2145,7 +2431,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.055,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -2165,7 +2451,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.102,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -2185,7 +2471,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.089,
+   "seconds": 0.163,
    "status": "pass"
   },
   {
@@ -2205,7 +2491,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -2225,7 +2511,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -2245,7 +2531,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -2265,7 +2551,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -2285,7 +2571,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -2305,7 +2591,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -2325,7 +2611,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -2345,7 +2631,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -2365,7 +2651,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.128,
    "status": "pass"
   },
   {
@@ -2385,7 +2671,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -2405,7 +2691,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.076,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -2425,7 +2711,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -2445,7 +2731,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -2465,7 +2751,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -2485,7 +2771,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.07,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -2505,7 +2791,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -2525,7 +2811,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -2545,7 +2831,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.114,
    "status": "pass"
   },
   {
@@ -2565,7 +2851,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -2585,7 +2871,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -2605,7 +2891,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -2625,7 +2911,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.074,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -2645,7 +2931,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.114,
    "status": "pass"
   },
   {
@@ -2665,7 +2951,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -2685,7 +2971,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -2705,7 +2991,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.101,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -2725,7 +3011,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.17,
+   "seconds": 0.255,
    "status": "pass"
   },
   {
@@ -2745,7 +3031,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.162,
+   "seconds": 0.295,
    "status": "pass"
   },
   {
@@ -2765,7 +3051,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.174,
+   "seconds": 0.326,
    "status": "pass"
   },
   {
@@ -2785,7 +3071,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.208,
+   "seconds": 0.375,
    "status": "pass"
   },
   {
@@ -2805,7 +3091,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.2,
+   "seconds": 0.296,
    "status": "pass"
   },
   {
@@ -2825,7 +3111,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.22,
+   "seconds": 0.363,
    "status": "pass"
   },
   {
@@ -2845,7 +3131,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.198,
+   "seconds": 0.333,
    "status": "pass"
   },
   {
@@ -2865,7 +3151,267 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.271,
+   "seconds": 0.45,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/text",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.162,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/matlab",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.168,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/hdf5",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.124,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/float-class",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/composite-hdf5",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.1,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/chain-affine",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/chain-warp",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/chain-inverse-affine",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.124,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/nearest",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "labels identical": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/bspline-interpolation",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.128,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/lanczos",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.148,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/time-series",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "float32",
+    "values": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.259,
+   "status": "pass"
+  },
+  {
+   "case": "float/bspline/labels-genericlabel",
+   "category": "float",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.00e+00",
+    "data type": "uint8",
+    "labels identical": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "bit-identical with CORE-MATH": 0
+   },
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -2885,7 +3431,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.089,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -2905,7 +3451,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.16,
+   "seconds": 0.248,
    "status": "pass"
   },
   {
@@ -2925,7 +3471,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.058,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -2945,7 +3491,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -2965,7 +3511,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -2985,7 +3531,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -3005,7 +3551,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -3025,7 +3571,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -3045,7 +3591,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -3065,7 +3611,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -3085,7 +3631,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -3105,7 +3651,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -3125,7 +3671,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -3145,7 +3691,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -3165,7 +3711,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.124,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -3185,7 +3731,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -3205,7 +3751,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -3225,7 +3771,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -3245,7 +3791,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -3265,7 +3811,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -3285,7 +3831,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.106,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -3305,7 +3851,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.342,
+   "seconds": 0.461,
    "status": "pass"
   },
   {
@@ -3325,7 +3871,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.115,
+   "seconds": 0.203,
    "status": "pass"
   },
   {
@@ -3345,7 +3891,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -3365,7 +3911,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.102,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -3378,7 +3924,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -3391,7 +3937,33 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.032,
+   "seconds": 0.04,
+   "status": "both-error"
+  },
+  {
+   "case": "float/errors/invert-bspline",
+   "category": "float",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "float/errors/invert-bspline-composite",
+   "category": "float",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exit 1; larmorx: Inverse does not exist: a B-spline transform has no inverse",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -3400,11 +3972,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-vso8qcwr/missing.mat",
+   "reason": "ANTs exit 1; larmorx: Transform file does not exist: /tmp/lx-aat-603ac3bl/missing.mat",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -3437,7 +4009,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 8.336,
+   "seconds": 14.613,
    "status": "pass"
   },
   {
@@ -3457,7 +4029,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 3.143,
+   "seconds": 4.681,
    "status": "pass"
   },
   {
@@ -3477,7 +4049,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 5.372,
+   "seconds": 8.523,
    "status": "pass"
   },
   {
@@ -3497,7 +4069,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 4.023,
+   "seconds": 5.45,
    "status": "pass"
   },
   {
@@ -3517,7 +4089,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.533,
+   "seconds": 0.77,
    "status": "pass"
   },
   {
@@ -3537,7 +4109,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 9.311,
+   "seconds": 15.073,
    "status": "pass"
   },
   {
@@ -3557,7 +4129,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 58.243,
+   "seconds": 83.292,
    "status": "pass"
   },
   {
@@ -3577,7 +4149,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -3597,7 +4169,7 @@
     "bit-identical": 0,
     "bit-identical with CORE-MATH": 0
    },
-   "seconds": 0.106,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -3610,7 +4182,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3623,7 +4195,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -3639,7 +4211,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.028,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -3652,7 +4224,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3665,7 +4237,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -3678,7 +4250,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.027,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -3691,7 +4263,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3704,7 +4276,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -3720,7 +4292,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.028,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -3733,7 +4305,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3746,7 +4318,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -3759,7 +4331,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3772,7 +4344,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3788,7 +4360,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.062,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -3804,7 +4376,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -3817,7 +4389,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3833,7 +4405,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -3846,7 +4418,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3859,7 +4431,65 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/bspline-text",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/bspline-matlab",
+   "category": "transform-output",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/bspline-hdf5",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "compb.h5: bytes, ITK's strings and object times": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.048,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/composite/bspline-float",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "compbf.h5: bytes, ITK's strings and object times": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -3875,7 +4505,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 29.32,
+   "seconds": 46.238,
    "status": "pass"
   },
   {
@@ -3889,7 +4519,7 @@
     "D13 fix pass": 0,
     "df.nii.gz: vectors bit for bit": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -3903,7 +4533,7 @@
     "D13 fix pass": 0,
     "dfold.nii.gz: vectors bit for bit": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -3919,7 +4549,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -3935,7 +4565,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -3949,7 +4579,7 @@
     "D13 fix pass": 0,
     "dff.nii.gz: vectors bit for bit": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -3963,7 +4593,35 @@
     "D13 fix pass": 0,
     "dffw.nii: vectors bit for bit": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/bspline",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "dfb.nii.gz: vectors bit for bit": 0
+   },
+   "seconds": 0.12,
+   "status": "pass"
+  },
+  {
+   "case": "transform-output/field/bspline-float",
+   "category": "transform-output",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "dfbf.nii.gz: vectors bit for bit": 0
+   },
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -3977,7 +4635,7 @@
     "D13 fix pass": 0,
     "dfid.nii.gz: vectors bit for bit": 0
    },
-   "seconds": 0.03,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -3991,7 +4649,7 @@
     "D13 fix pass": 0,
     "fmriprep.nii.gz: vectors bit for bit": 0
    },
-   "seconds": 3.968,
+   "seconds": 6.051,
    "status": "pass"
   },
   {
@@ -4001,7 +4659,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o CompositeTransform, see usage",
-   "seconds": 0.016,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -4011,7 +4669,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: An output parameter is required with -o Linear or -o CompositeTransform, see usage; larmorx: An output parameter is required with -o Linear or -o CompositeTransform, see usage",
-   "seconds": 0.017,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -4021,7 +4679,27 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear.",
-   "seconds": 0.022,
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/linear-with-bspline",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: The transform or set of transforms is not linear.; larmorx: The transform or set of transforms is not linear.",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "transform-output/errors/inverted-bspline",
+   "category": "transform-output",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs: Inverse does not exist for /tmp/lx-aat-2vvu341w/gen-bspline.txt; larmorx: Inverse does not exist: a B-spline transform has no inverse",
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -4031,7 +4709,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: A reference image is required.; larmorx: A reference image is required.",
-   "seconds": 0.016,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -4041,7 +4719,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: An input image is required.; larmorx: An input image is required.",
-   "seconds": 0.015,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -4051,7 +4729,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs: Inverse does not exist for <larmorx-testdata>/data/synthetic/resampling/transforms/warp-lps-vector.nii.gz; larmorx: Inverse does not exist: a displacement field cannot be inverted; use its inverse field instead",
-   "seconds": 0.023,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -4061,7 +4739,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ITK's transform writer finds no IO for the extension and throws; antsApplyTransforms does not catch it and aborts. larmorx refuses with a message",
-   "seconds": 0.072,
+   "seconds": 0.024,
    "status": "expected-divergence"
   },
   {
@@ -4071,7 +4749,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "an input image is resampled onto the reference even for a transform output; without one ANTs dereferences a null image and crashes. larmorx refuses",
-   "seconds": 0.034,
+   "seconds": 0.051,
    "status": "expected-divergence"
   },
   {
@@ -4081,7 +4759,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs reads the Gaussian interpolator's default sigmas from the first input image even when there is none (an empty vector) and crashes. larmorx refuses",
-   "seconds": 0.015,
+   "seconds": 0.043,
    "status": "expected-divergence"
   },
   {
@@ -4091,16 +4769,16 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs's CollapseLinearTransforms takes an IdentityTransform for a matrix-offset transform and dereferences a null pointer. larmorx refuses",
-   "seconds": 0.016,
+   "seconds": 0.029,
    "status": "expected-divergence"
   }
  ],
  "suite": "ants-apply-transforms",
  "summary": {
-  "both-error": 14,
+  "both-error": 20,
   "expected-divergence": 4,
   "fail": 0,
-  "pass": 202,
+  "pass": 234,
   "skipped": 0
  },
  "tier": "standard"

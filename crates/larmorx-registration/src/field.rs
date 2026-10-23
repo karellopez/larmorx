@@ -54,21 +54,32 @@ pub fn vector_linear<R: Real, const D: usize>(
     c: &[R; D],
     floor: &IndexFloor,
 ) -> [f64; D] {
+    vector_linear_nd(field, c, floor)
+}
+
+/// [`vector_linear`] for an image of `K`-component vectors in `E` dimensions (a time-varying
+/// velocity field: `D` components in `D + 1` dimensions).
+#[inline]
+pub fn vector_linear_nd<R: Real, const K: usize, const E: usize>(
+    field: &Image<[R; K], E>,
+    c: &[R; E],
+    floor: &IndexFloor,
+) -> [f64; K] {
     let space = &field.space;
-    let mut base = [0i64; D];
-    let mut distance = [R::ZERO; D];
-    for d in 0..D {
+    let mut base = [0i64; E];
+    let mut distance = [R::ZERO; E];
+    for d in 0..E {
         base[d] = floor.pick(c[d].itk_floor(), c[d].to_f64());
         distance[d] = c[d] - R::from_i64(base[d]);
     }
     let strides = space.strides();
-    let mut output = [0.0f64; D];
+    let mut output = [0.0f64; K];
     let mut total = 0.0f64;
-    for counter in 0..(1usize << D) {
+    for counter in 0..(1usize << E) {
         let mut overlap = R::ONE;
         let mut upper = counter;
         let mut offset = 0usize;
-        for d in 0..D {
+        for d in 0..E {
             let index = if upper & 1 == 1 {
                 overlap = overlap * distance[d];
                 (base[d] + 1).min(space.start[d] + space.size[d] as i64 - 1)
@@ -81,7 +92,7 @@ pub fn vector_linear<R: Real, const D: usize>(
         }
         if overlap != R::ZERO {
             let v = &field.data[offset];
-            for k in 0..D {
+            for k in 0..K {
                 output[k] += (overlap * v[k]).to_f64();
             }
             total += overlap.to_f64();
@@ -268,7 +279,11 @@ pub fn invert<R: Real, const D: usize>(
 
 /// `GaussianOperator<R, D>` along an axis: [`larmorx_image::discrete_gaussian::gaussian_kernel`]
 /// (variance in voxels², maximum error, maximum width), stored in `R`.
-fn gaussian_operator<R: Real>(variance: R, maximum_error: f64, maximum_width: usize) -> Vec<R> {
+pub(crate) fn gaussian_operator<R: Real>(
+    variance: R,
+    maximum_error: f64,
+    maximum_width: usize,
+) -> Vec<R> {
     larmorx_image::discrete_gaussian::gaussian_kernel(
         variance.to_f64(),
         maximum_error,
@@ -283,25 +298,25 @@ fn gaussian_operator<R: Real>(variance: R, maximum_error: f64, maximum_width: us
 /// (zero-flux Neumann boundary: the nearest voxel of the region): each component the inner
 /// product of the kernel with the voxels along the axis, summed in `R` from the kernel's first
 /// tap.
-fn convolve_axis<R: Real, const D: usize>(
-    field: &Field<R, D>,
+pub(crate) fn convolve_axis<R: Real, const K: usize, const E: usize>(
+    field: &Image<[R; K], E>,
     axis: usize,
     kernel: &[R],
-) -> Field<R, D> {
+) -> Image<[R; K], E> {
     let space = &field.space;
     let radius = (kernel.len() / 2) as i64;
     let stride = space.strides()[axis];
     let size = space.size[axis] as i64;
-    let data: Vec<[R; D]> = (0..space.len())
+    let data: Vec<[R; K]> = (0..space.len())
         .into_par_iter()
         .map(|o| {
             let i = ((o / stride) % size as usize) as i64;
             let line_start = o - i as usize * stride;
-            let mut sum = [R::ZERO; D];
+            let mut sum = [R::ZERO; K];
             for (k, &c) in kernel.iter().enumerate() {
                 let j = (i + k as i64 - radius).clamp(0, size - 1) as usize;
                 let v = &field.data[line_start + j * stride];
-                for d in 0..D {
+                for d in 0..K {
                     sum[d] = sum[d] + c * v[d];
                 }
             }
@@ -400,11 +415,11 @@ fn cast_component<R: Real>(v: f64) -> R {
 /// `SetSize` gives): the scan-line path (`LinearThreadedGenerateData`), each component
 /// interpolated as the scalar interpolator does it, cast with bounds checking; zero vectors
 /// outside the input.
-pub fn resample_to<R: Real, const D: usize>(
-    field: &Field<R, D>,
+pub fn resample_to<R: Real, const K: usize, const D: usize>(
+    field: &Image<[R; K], D>,
     output: &Space<D>,
     floor: &IndexFloor,
-) -> Field<R, D> {
+) -> Image<[R; K], D> {
     let n0 = output.size[0];
     if n0 == 0 || output.is_empty() {
         return Image::new(output.clone(), Vec::new());
@@ -418,7 +433,7 @@ pub fn resample_to<R: Real, const D: usize>(
     };
     let input = &field.space;
     let lines = output.len() / n0;
-    let rows: Vec<Vec<[R; D]>> = (0..lines)
+    let rows: Vec<Vec<[R; K]>> = (0..lines)
         .into_par_iter()
         .map(|line| {
             let mut index = output.index_of(line * n0);
@@ -434,7 +449,7 @@ pub fn resample_to<R: Real, const D: usize>(
                         R::from_f64(start[k].to_f64() + alpha * vector[k].to_f64())
                     });
                     if !input.is_inside_buffer(&c) {
-                        return [R::ZERO; D];
+                        return [R::ZERO; K];
                     }
                     std::array::from_fn(|k| {
                         cast_component(at_cindex_with(input, &c, floor, |o| {
@@ -455,6 +470,17 @@ pub fn adapt<R: Real, const D: usize>(
     space: &Space<D>,
     floor: &IndexFloor,
 ) -> FieldXfm<R, D> {
+    // ConstantVelocityFieldTransformParametersAdaptor: the velocity field resampled (when its
+    // geometry is not the level's), then integrated.
+    if let Some(FieldSmoothing::Exponential(e)) = &t.smoothing {
+        let mut e = e.clone();
+        let mut out = t.clone();
+        if e.adapt(space, floor) {
+            out.integrate_exponential(&e);
+        }
+        out.smoothing = Some(FieldSmoothing::Exponential(e));
+        return out;
+    }
     let s = &t.field.space;
     let same = s.size == space.size
         && s.origin == space.origin
@@ -486,7 +512,7 @@ pub fn adapt<R: Real, const D: usize>(
 /// How a displacement field transform smooths a parameter update
 /// (`UpdateTransformParameters`), for the subclasses ANTs optimises.
 #[derive(Clone, Debug, PartialEq)]
-pub enum FieldSmoothing<R> {
+pub enum FieldSmoothing<R, const D: usize> {
     /// `GaussianSmoothingOnUpdateDisplacementFieldTransform`: the update smoothed in place
     /// with the update variance (voxels²), added, and the total field smoothed with the total
     /// variance (each skipped when ≤ 0).
@@ -502,6 +528,15 @@ pub enum FieldSmoothing<R> {
         update_control_points: Vec<u32>,
         total_control_points: Vec<u32>,
     },
+    /// `GaussianExponentialDiffeomorphicTransform` and `BSplineExponentialDiffeomorphicTransform`
+    /// (`Exponential` and `BSplineExponential` stages): the field is the exponential of a
+    /// constant velocity field ([`crate::exponential`]).
+    Exponential(Box<crate::exponential::Exponential<R, D>>),
+    /// `GaussianSmoothingOnUpdateTimeVaryingVelocityFieldTransform` and
+    /// `TimeVaryingBSplineVelocityFieldTransform` after their stage
+    /// ([`crate::time_varying`]): the fields are the integrated velocity field; what the stage
+    /// ends with is kept for the outputs (`VelocityField.nii.gz`).
+    TimeVarying(Arc<crate::time_varying::VelocityOutput<R>>),
 }
 
 /// `DisplacementFieldTransform<R, D>` as SyN and ANTs use it: the displacement field and,
@@ -514,7 +549,7 @@ pub struct FieldXfm<R, const D: usize> {
     /// ITK's.
     pub exact_floor: bool,
     /// The subclass that smooths its updates (`None`: `DisplacementFieldTransform`).
-    pub smoothing: Option<FieldSmoothing<R>>,
+    pub smoothing: Option<FieldSmoothing<R, D>>,
 }
 
 impl<R: Real, const D: usize> FieldXfm<R, D> {
@@ -537,6 +572,18 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
             Some(FieldSmoothing::BSpline { .. }) => {
                 "BSplineSmoothingOnUpdateDisplacementFieldTransform"
             }
+            Some(FieldSmoothing::Exponential(e)) => e.class(),
+            Some(FieldSmoothing::TimeVarying(t)) => t.class(),
+        }
+    }
+
+    /// `GetNumberOfParameters()`: the displacement field's vectors, or a velocity field
+    /// transform's velocity field (its parameters object; `ConstantVelocityFieldTransform` gives
+    /// its displacement field's once it has integrated).
+    pub fn number_of_parameters(&self) -> usize {
+        match &self.smoothing {
+            Some(FieldSmoothing::TimeVarying(t)) => t.number_of_parameters(),
+            _ => D * self.field.data.len(),
         }
     }
 
@@ -645,8 +692,31 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
                     field.data = smoothed.data;
                 }
             }
+            Some(FieldSmoothing::Exponential(mut e)) => {
+                e.update(update, factor)?;
+                self.integrate_exponential(&e);
+                self.smoothing = Some(FieldSmoothing::Exponential(e));
+            }
+            Some(FieldSmoothing::TimeVarying(t)) => {
+                return Err(ItkException::new(
+                    "Modules/Filtering/DisplacementField/include/itkVelocityFieldTransform.hxx",
+                    0,
+                    t.class(),
+                    "a time-varying velocity field transform is optimised by its own registration method only",
+                ));
+            }
         }
         Ok(())
+    }
+
+    /// `ConstantVelocityFieldTransform::IntegrateVelocityField`: the fields are `exp(v)` and
+    /// `exp(−v)` of the exponential's velocity field.
+    pub fn integrate_exponential(&mut self, e: &crate::exponential::Exponential<R, D>) {
+        let floor = self.floor();
+        let (forward, inverse) =
+            crate::exponential::integrate(&e.velocity, e.integration, &floor, !self.exact_floor);
+        self.field = Arc::new(forward);
+        self.inverse = Some(Arc::new(inverse));
     }
 
     /// The interpolator's floor.

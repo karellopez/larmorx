@@ -3,8 +3,8 @@
 //!
 //! Transforms map **LPS** physical points, as ITK and ANTs do. [`LinearTransform`] covers
 //! ITK's matrix-offset family (affine, Euler, versor rigid, similarity, translation),
-//! [`DisplacementField`] dense deformations, and [`Transform::Composite`] ITK's composite
-//! transforms. [`TransformChain`] is what `antsApplyTransforms` builds from its `-t` options.
+//! [`DisplacementField`] dense deformations, [`BSplineTransform`] cubic B-spline free-form
+//! deformations, and [`Transform::Composite`] ITK's composite transforms. [`TransformChain`] is what `antsApplyTransforms` builds from its `-t` options.
 //!
 //! Two modules follow other conventions: [`nitransforms`] maps **RAS** points as nitransforms
 //! does (fMRIPrep's transforms), and [`resample_series`] is fMRIPrep's one-shot BOLD resampler
@@ -16,6 +16,7 @@
 use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, ItkReal};
 
+pub mod bspline;
 pub mod field;
 pub mod itk_object;
 pub mod linear;
@@ -23,6 +24,7 @@ pub mod nitransforms;
 pub mod openblas;
 pub mod resample_series;
 
+pub use bspline::BSplineTransform;
 pub use field::{DisplacementField, FieldData};
 pub use itk_object::{ItkObject, MatrixOffsetState, ObjectParameters};
 pub use linear::{LinearKind, LinearTransform, MatrixOffset};
@@ -36,6 +38,8 @@ pub enum TransformError {
     Invalid(String),
     #[error("a displacement field cannot be inverted; use its inverse field instead")]
     NotInvertible,
+    #[error("a B-spline transform has no inverse")]
+    BSplineNotInvertible,
 }
 
 /// One ITK transform.
@@ -43,6 +47,7 @@ pub enum TransformError {
 pub enum Transform {
     Linear(LinearTransform),
     DisplacementField(DisplacementField),
+    BSpline(BSplineTransform),
     /// ITK's `CompositeTransform`: transforms in queue order, applied **last first**.
     Composite(Vec<Transform>),
 }
@@ -53,16 +58,18 @@ impl Transform {
         match self {
             Transform::Linear(t) => t.transform_point(p),
             Transform::DisplacementField(t) => t.transform_point(p),
+            Transform::BSpline(t) => t.transform_point(p),
             Transform::Composite(ts) => ts.iter().rev().fold(p, |q, t| t.transform_point(q)),
         }
     }
 
     /// The inverse: linear transforms invert exactly; composites invert each component in
-    /// reverse order; displacement fields cannot be inverted.
+    /// reverse order; displacement fields and B-spline transforms cannot be inverted.
     pub fn inverse(&self) -> Result<Transform, TransformError> {
         match self {
             Transform::Linear(t) => Ok(Transform::Linear(t.inverse()?)),
             Transform::DisplacementField(_) => Err(TransformError::NotInvertible),
+            Transform::BSpline(_) => Err(TransformError::BSplineNotInvertible),
             Transform::Composite(ts) => Ok(Transform::Composite(
                 ts.iter()
                     .rev()
@@ -116,6 +123,7 @@ fn push_flattened(
             from.push(Some(l));
         }
         (Transform::DisplacementField(_), true) => return Err(TransformError::NotInvertible),
+        (Transform::BSpline(_), true) => return Err(TransformError::BSplineNotInvertible),
         (t, false) => {
             out.push(t);
             from.push(None);
@@ -183,6 +191,7 @@ impl TransformChain {
                 }
                 (Transform::Linear(l), None) => Step::Linear(instantiate(l)?),
                 (Transform::DisplacementField(f), _) => Step::Field(f),
+                (Transform::BSpline(b), _) => Step::BSpline(b),
                 (Transform::Composite(_), _) => unreachable!("composites are expanded"),
             });
         }
@@ -240,6 +249,7 @@ pub struct PrecisionChain<'a, R> {
 enum Step<'a, R> {
     Linear(MatrixOffset<R>),
     Field(&'a DisplacementField),
+    BSpline(&'a BSplineTransform),
 }
 
 impl<R: ItkReal> PrecisionChain<'_, R> {
@@ -257,6 +267,7 @@ impl<R: ItkReal> PrecisionChain<'_, R> {
         self.steps.iter().rev().fold(p, |q, step| match step {
             Step::Linear(m) => m.transform_point(q),
             Step::Field(f) => f.transform_point_with(q, floor),
+            Step::BSpline(b) => b.transform_point_as(q),
         })
     }
 

@@ -16,7 +16,9 @@ use std::path::Path;
 use larmorx_core::defects::{Notices, UpstreamDefects};
 use larmorx_core::linalg::Mat3;
 use larmorx_core::{Grid3, Precision};
-use larmorx_transform::{DisplacementField, FieldData, LinearTransform, Transform, TransformError};
+use larmorx_transform::{
+    BSplineTransform, DisplacementField, FieldData, LinearTransform, Transform, TransformError,
+};
 
 use crate::nifti;
 
@@ -169,6 +171,17 @@ fn single_from_parts(p: &ItkTransformParts) -> Result<Transform, TransformError>
             &p.fixed_parameters,
         )?));
     }
+    if p.name.starts_with("BSplineTransform_") {
+        let data = match &p.parameters {
+            Parameters::F32(v) => FieldData::F32(v.clone()),
+            Parameters::F64(v) => FieldData::F64(v.clone()),
+        };
+        return Ok(Transform::BSpline(BSplineTransform::from_itk(
+            &p.name,
+            data,
+            &p.fixed_parameters,
+        )?));
+    }
     Ok(Transform::Linear(LinearTransform::from_itk(
         &p.name,
         &p.parameters.to_f64(),
@@ -194,6 +207,14 @@ pub fn transform_to_parts(t: &Transform) -> Vec<ItkTransformParts> {
                     FieldData::F64(v) => Parameters::F64(v.clone()),
                 },
                 fixed_parameters: f.fixed_parameters(),
+            }),
+            Transform::BSpline(b) => out.push(ItkTransformParts {
+                name: b.itk_name.clone(),
+                parameters: match &b.coefficients {
+                    FieldData::F32(v) => Parameters::F32(v.clone()),
+                    FieldData::F64(v) => Parameters::F64(v.clone()),
+                },
+                fixed_parameters: b.fixed_parameters(),
             }),
             Transform::Composite(ts) => ts.iter().for_each(|t| push(t, out)),
         }

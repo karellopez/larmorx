@@ -252,6 +252,40 @@ defects! {
         "a BSpline stage with a mesh size of 0, or fewer mesh sizes than dimensions (read past the end of the list), divides by zero: NaN grid geometry, vnl SVD warnings and an exception on garbage indices";
     ANTS_75 = "ANTS-75", "ANTs", true,
         "--print-similarity-measure-interval and --write-interval-volumes copy the stage's transforms by setting each copy's parameters before its fixed parameters, which a displacement field refuses, and a B-spline transform whose number of parameters is not a new one's (a mesh of 1): with such a transform among the stage's (an initial transform, or a GaussianDisplacementField, BSplineDisplacementField or BSpline stage) the stage fails at its first iteration";
+    ANTS_67 = "ANTS-67", "antsRegistration", true,
+        "IGDM's kNeighborhood and gradientSigma are read and never used: one nearest point, central-difference gradients";
+    ANTS_68 = "ANTS-68", "antsRegistration", true,
+        "IGDM's derivative lacks the Gaussians' 1/sigma^2 factors, so it is not the gradient of IGDM's value";
+    ANTS_70 = "ANTS-70", "antsRegistration", true,
+        "IGDM's estimated distance sigma is the standard deviation of the nearest distances, 0 when they are all equal (an image registered to itself), and the parameters become NaN";
+    ANTS_78 = "ANTS-78", "antsRegistration", true,
+        "BSplineDisplacementField and BSplineExponential take their meshes 'at the base level' but double them already at the base level (mesh << (level + 1))";
+    ANTS_79 = "ANTS-79", "antsRegistration", true,
+        "TimeVaryingVelocityField's number of time indices and TimeVaryingBSplineVelocityField's mesh are read from the last -t option on the command line, not the stage's own";
+    ANTS_80 = "ANTS-80", "antsRegistration", true,
+        "Exponential and BSplineExponential stages take their smoothing sigmas as millimetres even when they are given in voxels (the stage never passes the sigmas' units to its registration method, whose default is millimetres)";
+    ANTS_81 = "ANTS-81", "antsRegistration", true,
+        "without collapsing, an Exponential stage given the short name Exp writes no InverseWarp file: the list of transforms with an inverse has only the long name";
+    ITK_24 = "ITK-24", "ITK", true,
+        "JHCT's total number of points leaves out the fixed points (counted only after it is used): the prefactors use the moving points alone";
+    ITK_29 = "ITK-29", "ITK", true,
+        "ManifoldParzenWindowsPointSetFunction uses its kernel sigma as a variance (identity times sigma), where the regularisation sigma is squared";
+    ITK_35 = "ITK-35", "ITK", true,
+        "BSplineTransform has no Jacobian with respect to position: a stage after a BSpline stage, or with a B-spline initial transform, fails at its first derivative unless its metric works on identity fields";
+    ITK_36 = "ITK-36", "ITK", true,
+        "TimeVaryingBSplineVelocityFieldImageRegistrationMethod sets each metric's transforms on the whole multi-metric, so every metric is evaluated through the transforms the last metric set: point-set metrics listed before an image metric see identity fields (never the deformation), image metrics after a point-set metric are warped twice (their resampled images through the flows again)";
+    ITK_37 = "ITK-37", "ITK", true,
+        "TimeVaryingBSplineVelocityFieldImageRegistrationMethod zeroes the flow's displacement field at the first time sample (and at the last) but keeps the previous integration's inverse field, which the point-set metrics use to map their points";
+    ITK_38 = "ITK-38", "ITK", true,
+        "TimeVaryingBSplineVelocityFieldImageRegistrationMethod with a single point-set metric fits the points (and the domain's boundary points) at their physical positions in the B-spline's parametric domain, which leaves out the domain's direction: with any direction but the identity (an image stored in RAS order, as NIfTI files are) the points fall outside it and the fit throws";
+    ITK_39 = "ITK-39", "ITK", true,
+        "TimeVaryingVelocityFieldImageRegistrationMethodv4 resamples the fixed images through the flow alone: the fixed initial transforms (antsRegistration's -q) are ignored";
+    ITK_40 = "ITK-40", "ITK", true,
+        "the time-varying velocity field registration methods resample the fixed and moving images through the flows but give the metric the stage's masks unchanged (with identity transforms), so the masks no longer cover the images they belong to";
+    ITK_41 = "ITK-41", "ITK", true,
+        "a velocity field transform that never integrated its velocity field (a stage of no iteration and no resampling) is incomplete: a time-varying one's displacement field has no interpolator input (the next point it maps crashes), an exponential one keeps its velocity image as its field and has no inverse field (its inverse throws 'No displacement field is specified.')";
+    ITK_42 = "ITK-42", "ITK", true,
+        "the scales estimator probes a transform of local support with a unit change of the central voxel's parameters; where a B-spline-smoothed update field pins every control point to its stationary boundary (a coarse mesh at a shrunken level), the probe vanishes and the scales, all below epsilon (equal but for rounding), make the optimizer throw 'm_Scales values must be > epsilon', although equal scales cancel in the estimated learning rate";
     ITK_32 = "ITK-32", "ITK", true,
         "the labelled point-set metric (ANTs' ICP, PSE, JHCT) appends new per-label metrics at every Initialize and keeps using the first ones: in SyN, which initialises the metric twice per iteration, every evaluation compares with the moving points as the stage's first evaluation mapped them (in the moving-to-middle update, with the moving points themselves)";
     ITK_33 = "ITK-33", "ITK", true,

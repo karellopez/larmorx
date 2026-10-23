@@ -147,6 +147,9 @@ pub type FixedMoving<T> = (Arc<T>, Arc<T>);
 #[derive(Clone, Debug)]
 pub struct TransformMethod<R> {
     pub method: XfrmMethod,
+    /// The name the stage was given, in lower case (`TransformTypeNames`: it names the stage's
+    /// files when the output transforms are not collapsed).
+    pub name: String,
     pub gradient_step: R,
     pub update_field_variance: R,
     pub total_field_variance: R,
@@ -162,6 +165,13 @@ pub struct TransformMethod<R> {
     pub total_field_mesh: Vec<u32>,
     /// `BSpline`: `m_MeshSizeAtBaseLevel`.
     pub mesh_size: Vec<u32>,
+    /// `Exponential`: `m_VelocityFieldVarianceInVarianceSpace`.
+    pub velocity_field_variance: R,
+    /// `BSplineExponential`: `m_VelocityFieldMeshSizeAtBaseLevel`; `TimeVaryingBSplineVelocityField`:
+    /// `m_VelocityFieldMeshSize` (space and time).
+    pub velocity_field_mesh: Vec<u32>,
+    /// `TimeVaryingBSplineVelocityField`: `m_NumberOfTimePointSamples` (default 4).
+    pub number_of_time_point_samples: u32,
 }
 
 impl<R: Real> TransformMethod<R> {
@@ -169,6 +179,7 @@ impl<R: Real> TransformMethod<R> {
     pub fn linear(method: XfrmMethod, gradient_step: R) -> Self {
         TransformMethod {
             method,
+            name: method.as_str().to_lowercase(),
             gradient_step,
             update_field_variance: R::ZERO,
             total_field_variance: R::ZERO,
@@ -179,6 +190,9 @@ impl<R: Real> TransformMethod<R> {
             update_field_mesh: Vec::new(),
             total_field_mesh: Vec::new(),
             mesh_size: Vec::new(),
+            velocity_field_variance: R::ZERO,
+            velocity_field_mesh: Vec::new(),
+            number_of_time_point_samples: 4,
         }
     }
 }
@@ -1001,6 +1015,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             _ => PointSetMetricKind::Igdm {
                                 intensity_sigma: m.intensity_distance_sigma,
                                 euclidean_sigma: m.euclidean_distance_sigma,
+                                k: m.evaluation_k_neighborhood.to_f64() as u32 as usize,
                             },
                         };
                         let inputs = match (&m.labeled, &m.intensity) {
@@ -1173,6 +1188,50 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
                 continue;
             }
+            if method == XfrmMethod::TimeVaryingVelocityField {
+                let inputs = super::syn::SynInputs {
+                    stage,
+                    iterations: iterations.clone(),
+                    threshold,
+                    window,
+                    levels,
+                    kinds: stage_metrics.iter().map(|m| m.kind).collect(),
+                    prepared,
+                    shrink_factors: per_level,
+                    sigmas: sigmas_r,
+                    sampling,
+                    percentage: R::r(f64::from(percentage)),
+                };
+                self.tvvf_stage(log, floor, inputs)?;
+                let elapsed = timer.elapsed().as_secs_f64();
+                log.logger(&format!(
+                    "  Elapsed time (stage {stage}): {}\n\n",
+                    log.f(elapsed)
+                ));
+                continue;
+            }
+            if method == XfrmMethod::TimeVaryingBSplineVelocityField {
+                let inputs = super::syn::SynInputs {
+                    stage,
+                    iterations: iterations.clone(),
+                    threshold,
+                    window,
+                    levels,
+                    kinds: stage_metrics.iter().map(|m| m.kind).collect(),
+                    prepared,
+                    shrink_factors: per_level,
+                    sigmas: sigmas_r,
+                    sampling,
+                    percentage: R::r(f64::from(percentage)),
+                };
+                self.tvbsvf_stage(log, floor, inputs)?;
+                let elapsed = timer.elapsed().as_secs_f64();
+                log.logger(&format!(
+                    "  Elapsed time (stage {stage}): {}\n\n",
+                    log.f(elapsed)
+                ));
+                continue;
+            }
             // GaussianDisplacementField, BSplineDisplacementField: ImageRegistrationMethodv4
             // optimising a displacement field with smoothing on update.
             let field_stage = matches!(
@@ -1189,7 +1248,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ));
             }
             let bspline_stage = method == XfrmMethod::BSpline;
-            let mut output = if field_stage || bspline_stage {
+            // Exponential, BSplineExponential: ImageRegistrationMethodv4 with a gradient descent
+            // optimising a constant velocity field.
+            let exponential = matches!(
+                method,
+                XfrmMethod::Exponential | XfrmMethod::BSplineExponential
+            );
+            let mut output = if field_stage || bspline_stage || exponential {
                 // A placeholder until the field is allocated or the B-spline's domain set
                 // (after PrepareRegistrationMethod).
                 Xfm::Identity
@@ -1207,11 +1272,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     "BSplineSmoothingOnUpdateDisplacementFieldTransform"
                 }
                 XfrmMethod::BSpline => "BSplineTransform",
+                XfrmMethod::Exponential => "GaussianExponentialDiffeomorphicTransform",
+                XfrmMethod::BSplineExponential => "BSplineExponentialDiffeomorphicTransform",
                 _ => output.class(),
             };
             // PrepareRegistrationMethod's parametersDimensionSize: the dimension for the
             // displacement fields and the B-spline transform.
-            let n_parameters = if field_stage || bspline_stage {
+            let n_parameters = if field_stage || bspline_stage || exponential {
                 D
             } else {
                 output.number_of_parameters()
@@ -1239,11 +1306,13 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 estimate_learning_rate_at_each_iteration: true,
                 estimate_learning_rate_once: false,
                 scales: None,
+                unit_equal_scales: self.upstream_defects.fix(),
+                replaced_scales: None,
             };
             // PrepareRegistrationMethod: with --initialize-transforms-per-stage, the stage starts
             // from the last transform of the composite when it can, and that transform leaves
             // the composite.
-            if self.initialize_transforms_per_stage {
+            if self.initialize_transforms_per_stage && !exponential {
                 let queue = self.composite.as_mut().expect("set above");
                 if !queue.is_empty() {
                     log.logger(&format!(
@@ -1287,14 +1356,17 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                             "The mesh size(s) don't match the ImageDimension.".into(),
                         ));
                     }
+                    let (update_mesh, total_mesh) =
+                        (t.update_field_mesh.clone(), t.total_field_mesh.clone());
+                    let order = t.spline_order;
                     field_meshes = Some(method::FieldMeshes {
-                        order: t.spline_order,
-                        update_mesh: t.update_field_mesh.clone(),
-                        total_mesh: t.total_field_mesh.clone(),
-                        shift: 1,
+                        order,
+                        shift: self.ants_78_shift(stage, method, &update_mesh, &total_mesh),
+                        update_mesh,
+                        total_mesh,
                     });
                     FieldSmoothing::BSpline {
-                        order: t.spline_order,
+                        order,
                         update_control_points: vec![4; D],
                         total_control_points: vec![0; D],
                     }
@@ -1307,8 +1379,66 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 f.smoothing = Some(smoothing);
                 output = Xfm::Field(f);
             }
+            if exponential {
+                // The constant velocity field: zero vectors on the stage's first preprocessed
+                // fixed image, allocated first (a point-set metric first has none: ANTs
+                // allocates on a null image).
+                let Some(space) = prepared.first().and_then(|m| match m {
+                    StageMetric::Image(i) => Some(i.fixed.space.clone()),
+                    StageMetric::PointSet(_) => None,
+                }) else {
+                    return Err(self.crash(
+                        log,
+                        &format!(
+                            "an {} stage whose first metric is a point-set metric: ANTs allocates the velocity field on the null image of its first metric",
+                            method.as_str()
+                        ),
+                    ));
+                };
+                let t = &self.transforms[stage];
+                let integration = larmorx_registration::exponential::Integration::for_stage(
+                    t.number_of_time_indices,
+                );
+                let smoothing = if method == XfrmMethod::Exponential {
+                    larmorx_registration::exponential::ExponentialSmoothing::Gaussian {
+                        update_variance: t.update_field_variance.to_f64(),
+                        velocity_variance: t.velocity_field_variance.to_f64(),
+                    }
+                } else {
+                    if t.update_field_mesh.len() != D || t.velocity_field_mesh.len() != D {
+                        log.logger("ERROR:  The mesh size(s) don't match the ImageDimension.\n");
+                        return Err(RegistrationFailed(
+                            "The mesh size(s) don't match the ImageDimension.".into(),
+                        ));
+                    }
+                    let (update_mesh, total_mesh) =
+                        (t.update_field_mesh.clone(), t.velocity_field_mesh.clone());
+                    let order = t.spline_order;
+                    field_meshes = Some(method::FieldMeshes {
+                        order,
+                        shift: self.ants_78_shift(stage, method, &update_mesh, &total_mesh),
+                        update_mesh,
+                        total_mesh,
+                    });
+                    larmorx_registration::exponential::ExponentialSmoothing::BSpline {
+                        order,
+                        update_control_points: vec![4; D],
+                        velocity_control_points: vec![4; D],
+                    }
+                };
+                let zero = larmorx_registration::field::zero_field(&space);
+                let mut f = FieldXfm::new(zero.clone(), None, self.upstream_defects.fix());
+                f.smoothing = Some(FieldSmoothing::Exponential(Box::new(
+                    larmorx_registration::exponential::Exponential {
+                        velocity: Arc::new(zero),
+                        integration,
+                        smoothing,
+                    },
+                )));
+                output = Xfm::Field(f);
+            }
             // ITK-30: GC's derivative with a displacement field being optimised.
-            if field_stage
+            if (field_stage || exponential)
                 && prepared
                     .iter()
                     .any(|m| matches!(m, StageMetric::Image(i) if i.kind == MethodMetric::Gc))
@@ -1393,11 +1523,37 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             } else {
                 self.default_seed
             };
+            // ANTS-80: the exponential stages never tell their registration method the sigmas'
+            // units, so ITK's default, millimetres, applies to sigmas given in voxels.
+            let mut sigmas_in_physical_units = self.sigmas_in_physical_units[stage];
+            if exponential && !sigmas_in_physical_units && sigmas_r.iter().any(|&s| s > R::ZERO) {
+                let fix = self.upstream_defects.fix();
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ANTS_80,
+                        self.upstream_defects,
+                        if fix {
+                            format!(
+                                "stage {stage}: the smoothing sigmas are in voxels, as given; ANTs's {} stage takes them as millimetres",
+                                method.as_str()
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: the smoothing sigmas given in voxels are taken as millimetres, as in ANTs"
+                            )
+                        },
+                    ),
+                );
+                if !fix {
+                    sigmas_in_physical_units = true;
+                }
+            }
             let stage_spec = Stage {
                 metrics: prepared,
                 shrink_factors: per_level,
                 smoothing_sigmas: sigmas_r,
-                sigmas_in_physical_units: self.sigmas_in_physical_units[stage],
+                sigmas_in_physical_units,
                 sampling,
                 sampling_percentage: percentage_r,
                 seed,
@@ -1407,8 +1563,28 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 field_meshes,
                 bspline_mesh,
                 correct_gc_derivative: self.upstream_defects.fix(),
+                correct_bspline_jacobian: self.upstream_defects.fix(),
                 n_threads: self.n_threads,
             };
+            if composite.iter().any(Xfm::is_bspline) {
+                let fix = self.upstream_defects.fix();
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_35,
+                        self.upstream_defects,
+                        if fix {
+                            format!(
+                                "stage {stage}: the B-spline transform applied after this stage's transform has its Jacobian with respect to position (the derivative of its cubic B-spline sum); ITK throws 'ComputeJacobianWithRespectToPosition not yet implemented for BSplineTransform' at the first derivative and the stage fails"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: a B-spline transform applied after this stage's transform has no Jacobian with respect to position: the stage fails at its first derivative, as in ITK"
+                            )
+                        },
+                    ),
+                );
+            }
             let t = &self.transforms[stage];
             match method {
                 XfrmMethod::BSpline => {
@@ -1431,6 +1607,22 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     log.f(t.update_field_variance.to_f64()),
                     log.f(t.total_field_variance.to_f64())
                 )),
+                XfrmMethod::Exponential => {
+                    let t = &self.transforms[stage];
+                    log.logger(&format!(
+                        "\n*** Running gaussian exponential field registration (varianceForUpdateField = {}, varianceForVelocityField = {}) ***\n\n",
+                        log.f(t.update_field_variance.to_f64()),
+                        log.f(t.velocity_field_variance.to_f64())
+                    ))
+                }
+                XfrmMethod::BSplineExponential => {
+                    let t = &self.transforms[stage];
+                    log.logger(&format!(
+                        "\n*** Running bspline exponential field registration (updateMeshSizeAtBaseLevel = {}, velocityMeshSizeAtBaseLevel = {}) ***\n\n",
+                        super::bspline_syn::print_array(&t.update_field_mesh),
+                        super::bspline_syn::print_array(&t.velocity_field_mesh)
+                    ))
+                }
                 XfrmMethod::BSplineDisplacementField => log.logger(&format!(
                     "\n*** Running bspline displacement field registration (updateMeshSizeAtBaseLevel = {}, totalMeshSizeAtBaseLevel = {}) ***\n\n",
                     super::bspline_syn::print_array(&t.update_field_mesh),
@@ -1530,6 +1722,25 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             }
             let result = match failed_early {
                 Some(e) => Err(e),
+                None if exponential => {
+                    // optimizer2: GradientDescentOptimizerv4, no scales estimator.
+                    let mut gd = larmorx_registration::optimizer::GradientDescent {
+                        learning_rate,
+                        number_of_iterations: iterations.first().copied().unwrap_or(0) as usize,
+                        minimum_convergence_value: threshold,
+                        convergence_window_size: window as usize,
+                        weights: optimizer.weights.clone(),
+                    };
+                    method::run_stage(
+                        &stage_spec,
+                        output,
+                        &mut gd,
+                        &mut observer,
+                        floor,
+                        &mut warnings,
+                        &mut events,
+                    )
+                }
                 None => method::run_stage(
                     &stage_spec,
                     output,
@@ -1541,6 +1752,19 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 ),
             };
             self.point_set_notices(&events);
+            if let Some(s) = optimizer.replaced_scales {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_42,
+                        self.upstream_defects,
+                        format!(
+                            "stage {stage}: every estimated scale is below epsilon (at most {}: the scales estimator's probe vanished): ones are used, the steps equal scales give (they cancel in the learning rate); ITK throws 'm_Scales values must be > epsilon' and the stage fails",
+                            larmorx_registration::format::OStream::default().float(s)
+                        ),
+                    ),
+                );
+            }
             if observer.ants_75 {
                 let mode = self.upstream_defects;
                 push_once(
@@ -1567,16 +1791,56 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             self.warnings.extend(observed);
             self.warnings.extend(warnings);
             match result {
-                Ok((t, _)) => {
+                Ok((mut t, _)) => {
+                    // An exponential transform that never integrated (no iteration, no
+                    // resampling) keeps its velocity image as its field and has no inverse
+                    // field: ITK's inverse then has no field and throws when it maps a point
+                    // (ITK-41). Corrected: integrated, exp(v) and exp(-v).
+                    if let Xfm::Field(f) = &mut t
+                        && let Some(FieldSmoothing::Exponential(e)) = f.smoothing.clone()
+                        && f.inverse.is_none()
+                    {
+                        push_once(
+                            &mut self.notices,
+                            Notice::new(
+                                &defects::ITK_41,
+                                self.upstream_defects,
+                                if self.upstream_defects.fix() {
+                                    format!(
+                                        "stage {stage}: the exponential transform never integrated its velocity field; integrated now, so it has an inverse; ITK's inverse has no field and fails when it maps a point"
+                                    )
+                                } else {
+                                    format!(
+                                        "stage {stage}: the exponential transform never integrated its velocity field and has no inverse field, as in ITK"
+                                    )
+                                },
+                            ),
+                        );
+                        if self.upstream_defects.fix() {
+                            f.integrate_exponential(&e);
+                        }
+                    }
                     self.composite.as_mut().expect("set above").push(t);
                     self.origins.push(Some(stage));
                 }
                 Err(e) if e.file == method::CRASH_FILE => {
                     return Err(self.crash(log, &e.description));
                 }
-                Err(e) if field_stage || bspline_stage => {
+                Err(e) if field_stage || bspline_stage || exponential => {
                     // The displacement field stages return EXIT_FAILURE themselves.
                     log.logger(&format!("Exception caught: {}\n", e.print()));
+                    if self.upstream_defects.fix()
+                        && matches!(
+                            method,
+                            XfrmMethod::BSplineDisplacementField | XfrmMethod::BSplineExponential
+                        )
+                        && e.description.contains("m_Scales values must be > epsilon")
+                    {
+                        log.cerr(&format!(
+                            "larmorx: antsRegistration: stage {stage}: the B-spline update mesh is too coarse for this level: every control point touches the stationary boundary, the update vanishes and the scales fall below epsilon; ANTs doubles base-level meshes (ANTS-78), so twice this mesh gives ANTs' result ({}=reproduce gives it as ANTs does)\n",
+                            defects::ENV
+                        ));
+                    }
                     return Err(RegistrationFailed(e.description));
                 }
                 Err(e) => {
@@ -1621,6 +1885,34 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         let elapsed = total.elapsed().as_secs_f64();
         log.logger(&format!("\nTotal elapsed time: {}\n", log.f(elapsed)));
         Ok(())
+    }
+
+    /// ANTS-78: the level shift of a B-spline field stage's meshes (`mesh << (level + shift)`):
+    /// ANTs' 1 (the base-level mesh doubled already at the base level) reproduced, 0 corrected;
+    /// a notice wherever a mesh is positive (the correction changes the result).
+    fn ants_78_shift(&mut self, stage: usize, method: XfrmMethod, a: &[u32], b: &[u32]) -> u32 {
+        let fix = self.upstream_defects.fix();
+        if a.iter().chain(b).any(|&m| m > 0) {
+            push_once(
+                &mut self.notices,
+                Notice::new(
+                    &defects::ANTS_78,
+                    self.upstream_defects,
+                    if fix {
+                        format!(
+                            "stage {stage}: {}'s meshes are used as given at the base level; ANTs doubles them there",
+                            method.as_str()
+                        )
+                    } else {
+                        format!(
+                            "stage {stage}: {}'s meshes are doubled already at the base level, as in ANTs",
+                            method.as_str()
+                        )
+                    },
+                ),
+            );
+        }
+        if fix { 0 } else { 1 }
     }
 
     /// The transform a linear stage optimises, as its traits choose it.
@@ -1706,9 +1998,23 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
         if e.stale_clones {
             add(
                 &defects::ITK_32,
-                "SyN's point-set evaluations use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
-                "SyN's point-set evaluations use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
+                "the point-set evaluations of SyN and the time-varying velocity field stages use the per-label metrics of their own initialisation; ITK keeps using the stage's first ones (the moving points as the first evaluation mapped them)",
+                "the point-set evaluations of SyN and the time-varying velocity field stages use the stage's first per-label metrics, as in ITK (the moving points as the first evaluation mapped them)",
             );
+        }
+        if let Some((estimate, floor)) = e.igdm_distance_floor {
+            let f = OStream::default();
+            let fixed = format!(
+                "IGDM's estimated distance sigma, {} (the standard deviation of the nearest distances), is below one voxel; larmorx uses {}; ANTs uses the estimate (0 gives NaN parameters)",
+                f.float(estimate),
+                f.float(floor)
+            );
+            let reproduced = format!(
+                "IGDM's estimated distance sigma, {}, is below one voxel ({}): used as in ANTs",
+                f.float(estimate),
+                f.float(floor)
+            );
+            add(&defects::ANTS_70, &fixed, &reproduced);
         }
         if e.igdm_centre {
             add(

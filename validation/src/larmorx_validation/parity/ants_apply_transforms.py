@@ -12,8 +12,10 @@ read with nibabel, a reader independent of both, and compared.
 Cases cover:
 - every interpolator;
 - every transform type and file format ANTs reads, including inverses, chains, displacement
-  fields and HDF5 composites (fMRIPrep's, and files ITK writes: ``-o Linear[...]``, float
-  parameters, dense groups, larmorx's own rewrites);
+  fields, B-spline transforms (``antsRegistration``'s ``BSpline`` stage output, in text,
+  MATLAB and HDF5 files, in float, inside composites and chains, and the inverse ANTs
+  refuses; ``ants_bspline_transforms``) and HDF5 composites (fMRIPrep's, and files ITK
+  writes: ``-o Linear[...]``, float parameters, dense groups, larmorx's own rewrites);
 - awkward geometries: oblique, flipped, anisotropic, single-slice, qform-only, scaled
   integers, nearest-neighbour ties and voxels outside the input;
 - output types, time series and the errors both programs must raise;
@@ -43,8 +45,8 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
+from larmorx_validation.parity import ants_bspline_transforms, defects
 from larmorx_validation.parity import ants_transform_output as outputs
-from larmorx_validation.parity import defects
 from larmorx_validation.parity.ants_programs import (
     affine_difference,
     ants_bin,
@@ -241,6 +243,38 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     for name, (desc, chain) in chains.items():
         add(f"transform/chain-{name}", "transform", desc, Scenario(AXIAL, R_OBLIQUE, chain))
 
+    # B-spline transforms (antsRegistration's BSpline stage output), mesh 3x3x3 over the
+    # phantom.
+    b = "gen-bspline:"
+    bsp = ((f"{b}bspline.txt", False),)
+    bspline = [
+        ("text", "-t bspline.txt: a BSplineTransform_double_3_3 in ITK's text format", bsp, "Linear"),
+        ("matlab", "-t bspline.mat: the same in ITK's MATLAB format", ((f"{b}bspline.mat", False),), "Linear"),
+        ("hdf5", "-t bspline.h5: the same in HDF5", ((f"{b}bspline.h5", False),), "Linear"),
+        ("float-class", "-t a BSplineTransform_float_3_3 (float coefficients)", ((f"{b}bspline-float.txt", False),), "Linear"),
+        ("composite-hdf5", "-t composite.h5: an affine and a B-spline transform in one HDF5 composite (-a 1)", ((f"{b}affine-bspline.h5", False),), "Linear"),
+        ("chain-affine", "-t bspline -t affine: the affine first, then the B-spline transform", (*bsp, (T["affine-centered.mat"], False)), "Linear"),
+        ("chain-warp", "-t warp -t bspline: the B-spline transform first, then the displacement field", ((T["warp-lps-vector.nii.gz"], False), *bsp), "Linear"),
+        ("chain-inverse-affine", "-t [affine,1] -t bspline: an inverted affine after the B-spline transform", ((T["affine-centered.mat"], True), *bsp), "Linear"),
+        ("nearest", "-n NearestNeighbor through the B-spline transform", bsp, "NearestNeighbor"),
+        ("bspline-interpolation", "-n BSpline through the B-spline transform", bsp, "BSpline"),
+        ("lanczos", "-n LanczosWindowedSinc through the B-spline transform", bsp, "LanczosWindowedSinc"),
+    ]  # fmt: skip
+    for cid, desc, chain, interp in bspline:
+        add(f"bspline/{cid}", "bspline", desc, Scenario(AXIAL, R_OBLIQUE, chain, interp))
+    add(
+        "bspline/time-series",
+        "bspline",
+        "-e 3: each volume of a 4D series through the B-spline transform",
+        Scenario(SERIES, R_OBLIQUE, bsp, "Linear", ("-e", "3")),
+    )
+    add(
+        "bspline/labels-genericlabel",
+        "bspline",
+        "-n GenericLabel -u uchar: a label image through the B-spline transform",
+        Scenario(LABELS, R_OBLIQUE, bsp, "GenericLabel", ("-u", "uchar")),
+    )
+
     # Geometry.
     geometry = [
         (
@@ -404,6 +438,18 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
             "invert-field",
             "inverting a displacement field",
             Scenario(AXIAL, R_OBLIQUE, ((T["warp-lps-vector.nii.gz"], True),), expect_error=True),
+        ),
+        (
+            "invert-bspline",
+            "inverting a B-spline transform: it has no inverse",
+            Scenario(AXIAL, R_OBLIQUE, (("gen-bspline:bspline.txt", True),), expect_error=True),
+        ),
+        (
+            "invert-bspline-composite",
+            "inverting a composite that holds a B-spline transform",
+            Scenario(
+                AXIAL, R_OBLIQUE, (("gen-bspline:affine-bspline.h5", True),), expect_error=True
+            ),
         ),
         (
             "missing-transform",
@@ -585,6 +631,8 @@ def _resolve(path: str, tmp: Path) -> str:
             encoding="utf-8",
         )
         return str(out)
+    if path.startswith("gen-bspline:"):
+        return str(ants_bspline_transforms.bspline_file(path.removeprefix("gen-bspline:"), tmp))
     if path.startswith("ants-h5:"):
         # A file ITK writes (the oracle's antsApplyTransforms or CompositeTransformUtil).
         from larmorx_validation.parity import itk_hdf5

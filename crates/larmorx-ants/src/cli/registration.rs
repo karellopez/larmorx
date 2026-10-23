@@ -15,12 +15,12 @@
 //! - the option values are read newest first (`GetFunction(0)` is the last one given), the
 //!   stages are numbered from the last on the command line (`AssignStages`).
 //!
-//! **Scope.** The linear stages (`Translation`, `Rigid`, `Similarity`, `Affine`,
-//! `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
-//! `BSplineDisplacementField` and `BSpline`, with every image metric and point-set metric, in 2,
-//! 3 and 4 dimensions, float and double. The velocity-field transforms are parsed as ANTs
-//! parses them and refused before the registration runs (A5 part 3). What is not ported yet is
-//! refused with a message naming it.
+//! **Scope.** Every stage ANTs has: the linear ones (`Translation`, `Rigid`, `Similarity`,
+//! `Affine`, `CompositeAffine`), `SyN`, `BSplineSyN`, `GaussianDisplacementField`,
+//! `BSplineDisplacementField`, `BSpline`, `Exponential`, `BSplineExponential`,
+//! `TimeVaryingVelocityField` and `TimeVaryingBSplineVelocityField`, with every image metric and
+//! point-set metric, in 2, 3 and 4 dimensions, float and double. What is not ported (`--minc`)
+//! is refused with a message naming it.
 
 use std::io::Write;
 use std::path::Path;
@@ -1189,6 +1189,12 @@ fn flatten<R: Compute, const D: usize>(
         larmorx_transform::Transform::DisplacementField(_) => Err(LoadError::Unsupported(
             "displacement fields among the initial transforms are not supported yet".into(),
         )),
+        larmorx_transform::Transform::BSpline(_) => {
+            for part in larmorx_io::itk_transform::transform_to_parts(t) {
+                out.push(bspline_from_part::<R, D>("", &part)?);
+            }
+            Ok(())
+        }
         larmorx_transform::Transform::Linear(l) => {
             let o = LinearObject::<R>::read(l, mode)
                 .map_err(|e| LoadError::Report(format!("{e}\n")))?;
@@ -1523,7 +1529,6 @@ fn do_registration<R: Compute, const D: usize>(
         let ids = p.stage_ids("metric");
         ids.into_iter().rev().collect()
     };
-    let mut deformable: Option<XfrmMethod> = None;
     for current in (0..n_transforms).rev() {
         let c = &convergence[current];
         let iterations = if c.parameters.is_empty() {
@@ -1585,6 +1590,7 @@ fn do_registration<R: Compute, const D: usize>(
             return Err(1);
         };
         let mut transform_method = TransformMethod::linear(method, R::r(f64::from(step)));
+        transform_method.name = method_name.clone();
         if !method.is_linear() {
             // The stage's first metric's fixed image (`fixedImageFileName`), read where a mesh
             // is given as a knot spacing.
@@ -1671,10 +1677,101 @@ fn do_registration<R: Compute, const D: usize>(
                     }
                     transform_method.mesh_size = mesh;
                 }
-                _ => {
-                    parse_deformable(t, method, &transforms).map_err(|e| throw(log, e))?;
-                    deformable.get_or_insert(method);
+                XfrmMethod::TimeVaryingVelocityField => {
+                    // ANTs reads the number of time indices from the newest transform option
+                    // (GetFunction(0)), not the stage's own (ANTS-79).
+                    let source = if ctx.notices.fix() { t } else { &transforms[0] };
+                    let own = Conv::u32(param(source, 1)).map_err(|e| throw(log, e))?;
+                    if param(&transforms[0], 1) != param(t, 1) {
+                        ctx.notices.add(
+                            &larmorx_core::defects::ANTS_79,
+                            if ctx.notices.fix() {
+                                format!("stage {current}: TimeVaryingVelocityField's number of time indices is the stage's own, {own}; ANTs reads '{}' from the last -t option", param(&transforms[0], 1))
+                            } else {
+                                format!("stage {current}: TimeVaryingVelocityField's number of time indices read from the last -t option ({own}), as in ANTs")
+                            },
+                        );
+                    }
+                    let mut v = [0f32; 4];
+                    for (i, x) in v.iter_mut().enumerate() {
+                        *x = Conv::f32(param(t, i + 2)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.number_of_time_indices = own;
+                    transform_method.update_field_variance = R::r(f64::from(v[0]));
+                    transform_method.update_field_time_sigma = R::r(f64::from(v[1]));
+                    transform_method.total_field_variance = R::r(f64::from(v[2]));
+                    transform_method.total_field_time_sigma = R::r(f64::from(v[3]));
                 }
+                XfrmMethod::TimeVaryingBSplineVelocityField => {
+                    // The mesh, like the number of time indices, from the newest transform
+                    // option (ANTS-79).
+                    let source = if ctx.notices.fix() { t } else { &transforms[0] };
+                    let mesh = Conv::vec_u32(param(source, 1)).map_err(|e| throw(log, e))?;
+                    if param(&transforms[0], 1) != param(t, 1) {
+                        ctx.notices.add(
+                            &larmorx_core::defects::ANTS_79,
+                            if ctx.notices.fix() {
+                                format!("stage {current}: TimeVaryingBSplineVelocityField's mesh is the stage's own, {}; ANTs reads '{}' from the last -t option", param(t, 1), param(&transforms[0], 1))
+                            } else {
+                                format!("stage {current}: TimeVaryingBSplineVelocityField's mesh read from the last -t option ({}), as in ANTs", param(&transforms[0], 1))
+                            },
+                        );
+                    }
+                    let n = t.parameters.len();
+                    let mut samples = 4u32;
+                    if n > 2 {
+                        samples = Conv::u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    }
+                    let mut order = 3u32;
+                    if n > 3 {
+                        order = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.velocity_field_mesh = mesh;
+                    transform_method.number_of_time_point_samples = samples;
+                    transform_method.spline_order = order;
+                }
+                XfrmMethod::Exponential => {
+                    let update = Conv::f32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    let velocity = Conv::f32(param(t, 2)).map_err(|e| throw(log, e))?;
+                    let mut steps = 0u32;
+                    if t.parameters.len() > 3 {
+                        steps = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.update_field_variance = R::r(f64::from(update));
+                    transform_method.velocity_field_variance = R::r(f64::from(velocity));
+                    transform_method.number_of_time_indices = steps;
+                }
+                XfrmMethod::BSplineExponential => {
+                    let n = t.parameters.len();
+                    let mut order = 3u32;
+                    if n > 4 {
+                        order = Conv::u32(param(t, 4)).map_err(|e| throw(log, e))?;
+                    }
+                    // A single value (read as unsigned int) is a knot spacing.
+                    let mut update = Conv::vec_u32(param(t, 1)).map_err(|e| throw(log, e))?;
+                    if update.len() == 1 {
+                        update = knots(log, R::r(f64::from(update[0])), order)?;
+                    }
+                    let velocity = if n > 2 {
+                        let mut v = Conv::vec_u32(param(t, 2)).map_err(|e| throw(log, e))?;
+                        if v.len() == 1 {
+                            v = knots(log, R::r(f64::from(v[0])), order)?;
+                        }
+                        v
+                    } else {
+                        vec![0; D]
+                    };
+                    let mut steps = 0u32;
+                    if n > 3 {
+                        steps = Conv::u32(param(t, 3)).map_err(|e| throw(log, e))?;
+                    }
+                    transform_method.update_field_mesh = update;
+                    transform_method.velocity_field_mesh = velocity;
+                    transform_method.number_of_time_indices = steps;
+                    transform_method.spline_order = order;
+                }
+                // The linear methods: no deformable parameters.
+                _ => {}
             }
         }
         helper.transforms.push(transform_method);
@@ -1776,15 +1873,6 @@ fn do_registration<R: Compute, const D: usize>(
         }
         helper.metrics.push(metric);
     }
-    if let Some(method) = deformable {
-        return Err(refuse(
-            log,
-            &format!(
-                "{} stages are deformable registration that larmorx ports in milestone A5 part 3; this version runs the linear stages (Translation, Rigid, Similarity, Affine, CompositeAffine), SyN, BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline",
-                method.as_str()
-            ),
-        ));
-    }
     // DoRegistration.
     let floor = IndexFloor::new(ctx.notices.mode());
     let done = match (&helper.metrics[0].fixed, &helper.metrics[0].moving) {
@@ -1881,11 +1969,44 @@ fn point_set_metric<R: Compute, const D: usize>(
             k = Conv::u32(param(m, 8)).map_err(|e| caught(log, &e))?;
         }
         metric.evaluation_k_neighborhood = R::r(f64::from(k));
-        // The gradient sigma (parameter 9) is read and then not used: the filter computes
-        // central differences.
+        // The gradient sigma (parameter 9, default 1): ANTs hands it to a filter that
+        // computes central differences and never uses it (ANTS-67).
+        let mut gradient_sigma = 1.0f64;
         if n > 9 {
-            let _ = Conv::real::<R>(param(m, 9)).map_err(|e| caught(log, &e))?;
+            gradient_sigma = Conv::real::<R>(param(m, 9))
+                .map_err(|e| caught(log, &e))?
+                .to_f64();
         }
+        let fix = ctx.notices.fix();
+        let gradient = (fix && gradient_sigma > 0.0).then_some(gradient_sigma);
+        let f = larmorx_registration::format::OStream::default();
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_67,
+            if fix {
+                format!(
+                    "IGDM uses its kNeighborhood ({k} nearest moving point(s), averaged) and its gradientSigma ({}: {}); ANTs uses the nearest point and central differences",
+                    f.float(gradient_sigma),
+                    if gradient.is_some() {
+                        "Gaussian derivatives of that sigma in mm"
+                    } else {
+                        "not above 0, so central differences"
+                    }
+                )
+            } else {
+                format!(
+                    "IGDM's kNeighborhood ({k}) and gradientSigma ({}) are ignored, as in ANTs: the nearest moving point, central differences",
+                    f.float(gradient_sigma)
+                )
+            },
+        );
+        ctx.notices.add(
+            &larmorx_core::defects::ANTS_68,
+            if fix {
+                "IGDM's derivative is the value's gradient (its distance term over the distance sigma squared, its intensity term over the intensity sigma squared); ANTs leaves both factors out"
+            } else {
+                "IGDM's derivative lacks the 1/sigma^2 factors of its two terms, as in ANTs"
+            },
+        );
         let radius = if n > 5 {
             Conv::vec_u32(param(m, 5)).map_err(|e| caught(log, &e))?
         } else {
@@ -1900,6 +2021,7 @@ fn point_set_metric<R: Compute, const D: usize>(
             &fixed_name,
             &fixed_mask,
             &radius,
+            gradient,
             ctx.n_threads,
             ctx.notices,
         );
@@ -1916,6 +2038,7 @@ fn point_set_metric<R: Compute, const D: usize>(
             &moving_name,
             &moving_mask,
             &radius,
+            gradient,
             ctx.n_threads,
             ctx.notices,
         );
@@ -1955,6 +2078,27 @@ fn point_set_metric<R: Compute, const D: usize>(
     if n > 8 {
         metric.use_anisotropic_covariances =
             Conv::bool(param(m, 8)).map_err(|e| caught(log, &e))?;
+    }
+    if name == "jhct" {
+        let fix = ctx.notices.fix();
+        ctx.notices.add(
+            &larmorx_core::defects::ITK_24,
+            if fix {
+                "JHCT's total number of points counts each label's fixed and moving points; ITK counts the moving points alone (its prefactors scale the value and the derivative)"
+            } else {
+                "JHCT's total number of points counts the moving points alone, as in ITK"
+            },
+        );
+        if metric.use_anisotropic_covariances {
+            ctx.notices.add(
+                &larmorx_core::defects::ITK_29,
+                if fix {
+                    "JHCT's Parzen kernel sigma (10) is used as a sigma, the kernel covariance 100 I; ITK uses it as a variance (10 I), which weighs the neighbours of the local covariances"
+                } else {
+                    "JHCT's Parzen kernel covariance is 10 I (the kernel sigma used as a variance), as in ITK"
+                },
+            );
+        }
     }
     let fixed_name = param(m, 0).to_owned();
     let moving_name = param(m, 1).to_owned();
@@ -2461,6 +2605,111 @@ fn writes_inverse(kind: &str) -> bool {
     )
 }
 
+/// `RegTypeToFileName`'s `writeVelocityField`.
+fn writes_velocity(kind: &str) -> bool {
+    matches!(
+        kind,
+        "timevaryingvelocityfield" | "tvf" | "exp" | "exponential" | "bsplineexponential"
+    )
+}
+
+/// A velocity field as ITK's writer takes it: the dimension, size, spacing, origin, direction
+/// (row by row) and the vectors.
+type VelocityImage<R> = (usize, Vec<usize>, Vec<f64>, Vec<f64>, Vec<Vec<f64>>, Vec<R>);
+
+/// The velocity field of a transform (`VelocityField.nii.gz` without collapsing): a
+/// time-varying velocity field transform's (`D + 1` dimensions) or a Gaussian exponential
+/// transform's constant one, as ITK's `ImageFileWriter` writes vector images; other transforms
+/// (a B-spline exponential or time-varying B-spline transform, which ANTs' casts do not
+/// recognise) write nothing. A failure is reported only with `--verbose`, as ANTs does.
+fn write_velocity_field<R: Compute, const D: usize>(
+    log: &mut Log<'_>,
+    ctx: &mut Context<'_, '_>,
+    name: &str,
+    t: &Xfm<R, D>,
+) {
+    use larmorx_registration::exponential::ExponentialSmoothing;
+    use larmorx_registration::field::FieldSmoothing;
+    let Xfm::Field(f) = t else { return };
+    let (ndim, size, spacing, origin, direction, data): VelocityImage<R> = match &f.smoothing {
+        Some(FieldSmoothing::TimeVarying(v)) if !v.bspline => {
+            let n = v.size.len();
+            (
+                n,
+                v.size.clone(),
+                v.spacing.clone(),
+                v.origin.clone(),
+                v.direction.chunks(n).map(<[f64]>::to_vec).collect(),
+                v.data.clone(),
+            )
+        }
+        Some(FieldSmoothing::Exponential(e))
+            if matches!(e.smoothing, ExponentialSmoothing::Gaussian { .. }) =>
+        {
+            let s = &e.velocity.space;
+            (
+                D,
+                s.size.to_vec(),
+                s.spacing.to_vec(),
+                s.origin.to_vec(),
+                s.direction.iter().map(|r| r.to_vec()).collect(),
+                e.velocity.data.iter().flatten().copied().collect(),
+            )
+        }
+        _ => return,
+    };
+    if ndim > 4 {
+        // NiftiImageIO::WriteImageInformation refuses vector images of more than four
+        // dimensions.
+        if log.verbose {
+            let e = ItkException::new(
+                "Modules/IO/NIFTI/src/itkNiftiImageIO.cxx",
+                1576,
+                "NiftiImageIO",
+                format!(
+                    "Can not store a vector image of more than 4 dimensions in a Nifti file. Dimension={ndim}"
+                ),
+            );
+            log.cerr(&format!(
+                "Can't write velocity field transform file {name}\nException Object caught: \n{}\n",
+                e.print()
+            ));
+        }
+        return;
+    }
+    let geometry = ItkGeometry {
+        ndim,
+        size,
+        spacing,
+        origin,
+        direction,
+        source: GeometrySource::Sform,
+        flipped: vec![false; ndim],
+    };
+    let options = larmorx_io::nifti::WriteOptions {
+        n_threads: ctx.n_threads,
+        ..Default::default()
+    };
+    let meta = larmorx_io::nifti::itk::ItkMeta::default();
+    let written = match R::PRECISION {
+        Precision::Double => {
+            let d: Vec<f64> = data.iter().map(|v| v.to_f64()).collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &d, &options)
+        }
+        Precision::Float => {
+            let d: Vec<f32> = data.iter().map(|v| v.to_f64() as f32).collect();
+            larmorx_io::nifti::itk::write_itk_vector_image(name, &geometry, D, &meta, &d, &options)
+        }
+    };
+    if let Err(e) = written
+        && log.verbose
+    {
+        log.cerr(&format!(
+            "Can't write velocity field transform file {name}\nException Object caught: \n{e}\n"
+        ));
+    }
+}
+
 /// A displacement field as ITK's `ImageFileWriter<Image<Vector<R, D>, D>>` writes it (a NIfTI
 /// vector image); on failure ANTs' "Can't write transform file" report.
 fn write_field_image<R: Compute, const D: usize>(
@@ -2677,6 +2926,22 @@ fn write_outputs<R: Compute, const D: usize>(
             &queue,
         );
     };
+    // ITK-41 reproduced: a time-varying velocity field transform that never integrated maps
+    // points through an interpolator without input (a crash); an exponential one without an
+    // inverse field gives an inverse without a field (an exception in main).
+    let never_integrated = queue.iter().any(|t| {
+        matches!(t, Xfm::Field(f) if matches!(
+            &f.smoothing,
+            Some(larmorx_registration::field::FieldSmoothing::TimeVarying(v)) if !v.integrated
+        ))
+    });
+    if ctx.notices.reproduce()
+        && never_integrated
+        && (!warped_name.is_empty() || !inverse_warped_name.is_empty())
+    {
+        log.cerr("larmorx: antsRegistration: a TimeVaryingVelocityField transform that never integrated its velocity field maps a point: ANTs's displacement field interpolator has no input (ITK-41); ANTs crashes here, larmorx stops\n");
+        return Err(1);
+    }
     if !warped_name.is_empty() {
         let data =
             resample(moving, fixed, &queue, &interpolation, ctx).map_err(|e| refuse(log, &e))?;
@@ -2691,6 +2956,21 @@ fn write_outputs<R: Compute, const D: usize>(
         .map_err(|e| refuse(log, &e))?;
     }
     if !inverse_warped_name.is_empty() {
+        if queue.iter().any(|t| {
+            matches!(t, Xfm::Field(f) if f.inverse.is_none() && matches!(
+                &f.smoothing,
+                Some(larmorx_registration::field::FieldSmoothing::Exponential(_))
+            ))
+        }) {
+            let e = ItkException::new(
+                "Modules/Filtering/DisplacementField/include/itkDisplacementFieldTransform.hxx",
+                73,
+                "ConstantVelocityFieldTransform",
+                "No displacement field is specified.",
+            );
+            log.cerr(&format!("Exception Object caught: \n{}\n", e.print()));
+            return Err(1);
+        }
         let inverse: Option<Vec<Xfm<R, D>>> = queue.iter().rev().map(invert_xfm).collect();
         if let Some(inverse) = inverse {
             let data = resample(fixed, moving, &inverse, &interpolation, ctx)
@@ -2865,11 +3145,7 @@ fn write_transforms<R: Compute, const D: usize>(
             }
         }
     } else {
-        let names = helper
-            .transforms
-            .iter()
-            .map(|t| t.method.as_str().to_lowercase())
-            .collect();
+        let names = helper.transforms.iter().map(|t| t.name.clone()).collect();
         (queue.to_vec(), names)
     };
     if write_composite {
@@ -2923,9 +3199,7 @@ fn write_transforms<R: Compute, const D: usize>(
             .origins
             .iter()
             .enumerate()
-            .filter_map(|(i, o)| {
-                o.map(|s| (i, helper.transforms[s].method.as_str().to_lowercase()))
-            })
+            .filter_map(|(i, o)| o.map(|s| (i, helper.transforms[s].name.clone())))
             .collect();
         let differs = runs_out || ants_files != fixed_files;
         let files = if ctx.notices.reproduce() {
@@ -2945,6 +3219,18 @@ fn write_transforms<R: Compute, const D: usize>(
             }
             fixed_files
         };
+        // ANTS-81: ANTs names a stage's files after the name it was given, and the short
+        // name Exp is missing from its list of transforms with an inverse.
+        if helper.transforms.iter().any(|t| t.name == "exp") {
+            ctx.notices.add(
+                &larmorx_core::defects::ANTS_81,
+                if ctx.notices.fix() {
+                    "an Exponential stage named Exp writes its InverseWarp file, as one named Exponential does; ANTs writes none"
+                } else {
+                    "an Exponential stage named Exp writes no InverseWarp file, as in ANTs"
+                },
+            );
+        }
         for (i, kind) in &files {
             let name = format!("{prefix}{i}{}", file_suffix(kind));
             write_one_transform(log, ctx, &name, &to_write[*i]);
@@ -2953,6 +3239,10 @@ fn write_transforms<R: Compute, const D: usize>(
             {
                 let name = format!("{prefix}{i}Inverse{}", file_suffix(kind));
                 write_inverse_field(log, ctx, &name, f);
+            }
+            if writes_velocity(kind) {
+                let name = format!("{prefix}{i}VelocityField.nii.gz");
+                write_velocity_field(log, ctx, &name, &to_write[*i]);
             }
         }
         if runs_out && ctx.notices.reproduce() {

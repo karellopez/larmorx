@@ -5,23 +5,27 @@ and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crate
 `larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
 
 **Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 220 cases:
+[validation record](../validation/ants-apply-transforms.md)). The record covers 258 cases:
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
-  included;
+  included, and B-spline transforms (antsRegistration's `BSpline` stage output, A5 part 3: text,
+  MATLAB and HDF5 files, float coefficients, inside composites and chains, the inverse refused);
 - awkward geometries, output types and time series;
 - real fMRIPrep derivatives;
 - all of them again with `--float 1`, ANTs' single-precision pipeline;
 - the transform outputs, every form and format, and the errors around them.
 
-All 220 agree (14 of them errors both programs report; 4 expected divergences, where ANTs
-crashes and larmorx refuses, ANTS-48). Of the 174 resampling cases compared, 160 are
-byte-identical to the unmodified ANTs program, among them all 89 `--float 1` cases; the other
-14 (two of them through fMRIPrep's `.h5` composite) differ only where ITK calls the platform's
-`exp`, `log`, `sin` or `cos` (Gaussian and windowed sinc in double), by at most about 1e-15
-relative ([why](../findings/platform-math.md)). With correctly rounded maths preloaded into
-ANTs, all 174 are byte-identical. The 28 transform-output cases (`-o Linear[...]`,
+All 258 agree (20 of them errors both programs report; 4 expected divergences, where ANTs
+crashes and larmorx refuses, ANTS-48). Of the 200 resampling cases compared, 185 are
+byte-identical to the unmodified ANTs program, among them all 102 `--float 1` cases; the other
+15 (two of them through fMRIPrep's `.h5` composite, one through a B-spline transform with
+Lanczos) differ only where ITK calls the platform's `exp`, `log`, `sin` or `cos` (Gaussian and
+windowed sinc in double), by at most about 1e-15 relative ([why](../findings/platform-math.md)).
+With correctly rounded maths preloaded into ANTs, all 200 are byte-identical. The 40 cases of
+B-spline transforms (A5 part 3: text, MATLAB and HDF5 files, float coefficients, composites,
+chains, interpolators, time series, `--float 1`, the transform outputs, and the inverses both
+programs refuse) all agree. The 46 transform-output cases (`-o Linear[...]`,
 `-o CompositeTransform[...]`, `-o DisplacementField[...]`) write ANTs's files: text and MATLAB
 byte for byte, NIfTI fields bit for bit, HDF5 dataset for dataset. All 14 of fMRIPrep's
 `--float 1` outputs in the ds000005 oracle run are byte-identical to fMRIPrep's own
@@ -91,7 +95,7 @@ are placed by their affine.
 | `-o Linear[file,<invert=0>]` | `combine_transforms(..., output="linear", invert_linear=)` | [below](#transform-outputs) |
 | `-o CompositeTransform[file]` | `combine_transforms(..., output="composite")` | [below](#transform-outputs) |
 | `-o DisplacementField[file]`, `-o [file,1]` | `combine_transforms(..., output="displacement_field", reference=)` | [below](#transform-outputs) |
-| `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists; linear transforms only can be inverted. **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
+| `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists: linear transforms, displacement fields, B-spline transforms (`BSplineTransform_double_3_3`, `_float_3_3`, as antsRegistration's `BSpline` stage writes them) and composites of them; linear transforms only can be inverted (a field or a B-spline transform has no inverse: `[file,1]` fails, as in ANTs). **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
 | `-t identity` | `transforms=()` | |
 | `-n Linear` | `interpolation="linear"` | default |
 | `-n NearestNeighbor` | `"nearest"` | |
@@ -132,8 +136,8 @@ the same transforms as `ItkTransform` objects, which `lx.transforms.write` write
   fixed parameters).
 - **`Linear[file,<invert>]`** collapses a chain of linear transforms into one `AffineTransform`
   (ANTs's `CollapseLinearTransforms`: centred on the last matrix-offset transform of the
-  queue); with `invert` 1, its inverse, centred at 0. A chain with a displacement field is
-  refused ("The transform or set of transforms is not linear.").
+  queue); with `invert` 1, its inverse, centred at 0. A chain with a displacement field or a
+  B-spline transform is refused ("The transform or set of transforms is not linear.").
 - **`DisplacementField[file]`** samples the chain on the reference grid (`-r`, required):
   `T(p) − p` for every voxel (ITK's `TransformToDisplacementFieldFilter`, with points in
   double; a linear chain maps each scan line's two ends and interpolates). `.h5` and `.hdf5`

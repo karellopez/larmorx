@@ -70,10 +70,12 @@ pub enum PointSetMetricKind<R> {
         alpha: R,
         anisotropic: bool,
     },
-    /// The intensity and Euclidean distance sigmas, estimated when not above 0.
+    /// The intensity and Euclidean distance sigmas, estimated when not above 0, and the
+    /// `kNeighborhood` (ANTs passes it to no one: ANTS-67).
     Igdm {
         intensity_sigma: R,
         euclidean_sigma: R,
+        k: usize,
     },
 }
 
@@ -134,6 +136,19 @@ pub struct PointSetCorrections {
     /// ITK-32: a SyN evaluation looks its points up in the label metrics of the same
     /// `Initialize` (ITK appends new ones at every `Initialize` and keeps using the first).
     pub current_clones: bool,
+    /// ANTS-67: IGDM averages over its `k` nearest moving points (ANTs uses the nearest).
+    pub igdm_neighbourhood: bool,
+    /// ANTS-68: IGDM's derivative is the value's gradient, its distance term over `σd²` and
+    /// its intensity term over `σi²` (ANTs leaves both factors out).
+    pub igdm_true_gradient: bool,
+    /// ANTS-70: IGDM's estimated distance sigma is at least one voxel of the virtual domain
+    /// (ANTs' estimate, the standard deviation of the nearest distances, can be 0).
+    pub igdm_distance_floor: bool,
+    /// ITK-24: JHCT's total number of points counts the fixed points too (ITK counts the
+    /// moving points alone).
+    pub jhct_fixed_points: bool,
+    /// ITK-29: the Parzen kernel sigma is a sigma, its covariance `σ²·I` (ITK: `σ·I`).
+    pub parzen_kernel_sigma: bool,
 }
 
 impl PointSetCorrections {
@@ -147,6 +162,11 @@ impl PointSetCorrections {
             igdm_intensity_range: fix,
             igdm_value_centre: fix,
             current_clones: fix,
+            igdm_neighbourhood: fix,
+            igdm_true_gradient: fix,
+            igdm_distance_floor: fix,
+            jhct_fixed_points: fix,
+            parzen_kernel_sigma: fix,
         }
     }
 }
@@ -171,6 +191,8 @@ pub struct PointSetEvents {
     /// ITK-32: a SyN evaluation used label metrics whose moving points differ from the
     /// current ones.
     pub stale_clones: bool,
+    /// ANTS-70: IGDM's estimated distance sigma and the floor (one voxel) it fell below.
+    pub igdm_distance_floor: Option<(f64, f64)>,
 }
 
 impl PointSetEvents {
@@ -185,6 +207,9 @@ impl PointSetEvents {
         self.stale_clones |= o.stale_clones;
         if self.igdm_sigma.is_none() {
             self.igdm_sigma = o.igdm_sigma;
+        }
+        if self.igdm_distance_floor.is_none() {
+            self.igdm_distance_floor = o.igdm_distance_floor;
         }
     }
 }
@@ -268,9 +293,11 @@ fn almost_equals<R: Real>(a: R, b: R) -> bool {
 
 impl<R: Real, const D: usize> LabelMetric<R, D> {
     /// The clone's `Initialize()`: its moving points' locator (and its constants).
+    /// `fixed_count`: the clone's fixed points (JHCT's total with ITK-24 corrected).
     fn new(
         kind: &PointSetMetricKind<R>,
         moving: &[[f32; D]],
+        fixed_count: usize,
         corrections: &PointSetCorrections,
         events: &mut PointSetEvents,
         warnings: &mut Vec<String>,
@@ -314,14 +341,21 @@ impl<R: Real, const D: usize> LabelMetric<R, D> {
                     normalize: true,
                     normalise_identity: corrections.normalise_identity,
                     single_diagonal: corrections.single_diagonal,
+                    kernel_as_sigma: corrections.parzen_kernel_sigma,
                 };
                 let mut density_events = super::gaussian::ParzenEvents::default();
                 let density = ParzenWindows::new(moving, &settings, warnings, &mut density_events)?;
                 events.identity_gaussians |= density_events.identity;
                 events.covariances |= density_events.covariances;
                 events.short_neighbourhood |= density_events.short_neighbourhood;
-                // m_NumberOfValidPoints is 0 here: the clone never runs InitializeForIteration.
-                let total = R::from_i64(moving.len() as i64);
+                // m_NumberOfValidPoints is 0 here: the clone never runs InitializeForIteration
+                // (ITK-24). Corrected: the clone's valid fixed points, all of them (a clone has
+                // no virtual domain), and its moving points.
+                let total = if corrections.jhct_fixed_points {
+                    R::from_i64((fixed_count + moving.len()) as i64)
+                } else {
+                    R::from_i64(moving.len() as i64)
+                };
                 let mut prefactor0 = -R::ONE / total;
                 let near_one = almost_equals(alpha, R::ONE);
                 if alpha != R::ONE && near_one {
@@ -540,6 +574,7 @@ struct Igdm<R, const D: usize> {
     tree: KdTree<D>,
     intensity_sigma: R,
     euclidean_sigma: R,
+    k: usize,
 }
 
 /// A point-set metric of a stage: its inputs and the state ITK keeps from level to level.
@@ -744,9 +779,11 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                         .filter(|(_, l)| **l == label)
                         .map(|(p, _)| *p)
                         .collect();
+                    let fixed_count = fl.iter().filter(|l| **l == label).count();
                     clones.push(LabelMetric::new(
                         &self.kind,
                         &subset,
+                        fixed_count,
                         &self.corrections,
                         &mut events,
                         warnings,
@@ -770,6 +807,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 let PointSetMetricKind::Igdm {
                     intensity_sigma,
                     euclidean_sigma,
+                    k,
                 } = self.kind
                 else {
                     unreachable!("an intensity point set is IGDM's")
@@ -790,11 +828,13 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 }
                 if es <= R::ZERO {
                     es = estimate_euclidean_sigma(&fixed_t, &tree)?;
+                    es = self.floor_distance_sigma(es);
                 }
                 self.igdm = Some(Igdm {
                     tree,
                     intensity_sigma: is,
                     euclidean_sigma: es,
+                    k,
                 });
             }
         }
@@ -806,6 +846,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
     fn initialize_for_iteration(
         &mut self,
         moving: &Composite<R, D>,
+        derivative: bool,
         warnings: &mut Vec<String>,
     ) -> Result<TransformedPoints<D>, ItkException> {
         let (virt, fixed_t) = self.transform_fixed(moving);
@@ -814,6 +855,25 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
             return Err(no_points());
         }
         if fixed_t.iter().any(|p| p.iter().any(|c| c.is_nan())) {
+            if let PointSetInputs::Intensity { .. } = &self.inputs {
+                // IGDM: the nearest-neighbour search of the first point that is not a number
+                // finds no point, and GetPointData of that id throws.
+                let first = (0..fixed_t.len())
+                    .find(|&i| self.inside(&virt[i]) && fixed_t[i].iter().any(|c| c.is_nan()));
+                if let Some(i) = first {
+                    let coords: Vec<f64> = fixed_t[i].iter().map(|&c| f64::from(c)).collect();
+                    return Err(ItkException::new(
+                        IGDM_FILE,
+                        if derivative { 387 } else { 334 },
+                        "MeanSquaresPointSetToPointSetIntensityMetricv4",
+                        format!(
+                            "The corresponding data for point {} (pointId = {}) does not exist.",
+                            crate::format::OStream::default().array(&coords),
+                            u64::MAX
+                        ),
+                    ));
+                }
+            }
             return Err(ItkException::new(
                 crate::method::CRASH_FILE,
                 0,
@@ -892,7 +952,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         moving: &Composite<R, D>,
         warnings: &mut Vec<String>,
     ) -> Result<R, ItkException> {
-        let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, warnings)?;
+        let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, false, warnings)?;
         let mut thread = CompensatedSum::default();
         for index in 0..fixed_t.len() {
             if !self.takes_part(index, &virt) {
@@ -929,7 +989,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         moving: &Composite<R, D>,
         warnings: &mut Vec<String>,
     ) -> Result<PointSetValue<R>, ItkException> {
-        let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, warnings)?;
+        let (virt, fixed_t, valid) = self.initialize_for_iteration(moving, true, warnings)?;
         if moving.active().has_local_support() {
             return self.local_value_and_derivative(moving, &virt, &fixed_t, valid, warnings);
         }
@@ -1076,6 +1136,9 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
     /// arrays (ANTS-66): corrected, the centre as the derivative reads it; reproduced, the two
     /// values read as equal (the intensity term 1).
     fn igdm_value(&self, point: &[f32; D], pixel: &[R], moving: &IntensityPointSet<R, D>) -> R {
+        if self.igdm_corrected_path() {
+            return self.igdm_corrected(point, pixel, moving).0;
+        }
         let igdm = self.igdm.as_ref().expect("initialised");
         let (id, closest_pixel) = self.igdm_closest(point, moving);
         let closest = &moving.points[id];
@@ -1104,6 +1167,9 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         pixel: &[R],
         moving: &IntensityPointSet<R, D>,
     ) -> Result<(R, [R; D]), ItkException> {
+        if self.igdm_corrected_path() {
+            return Ok(self.igdm_corrected(point, pixel, moving));
+        }
         let igdm = self.igdm.as_ref().expect("initialised");
         let (id, closest_pixel) = self.igdm_closest(point, moving);
         let closest = &moving.points[id];
@@ -1129,6 +1195,88 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                     * closest_pixel[centre + 1 + d];
         }
         Ok((measure, local))
+    }
+
+    /// Whether IGDM is evaluated with ANTS-67 or ANTS-68 corrected.
+    fn igdm_corrected_path(&self) -> bool {
+        let k = self.igdm.as_ref().map_or(1, |g| g.k);
+        self.corrections.igdm_true_gradient || (self.corrections.igdm_neighbourhood && k > 1)
+    }
+
+    /// IGDM's value and derivative with ANTS-67 (the mean over the `k` nearest moving
+    /// points, ANTs using only the nearest) and ANTS-68 (the value's true gradient: the
+    /// distance term over `σd²`, the intensity term over `σi²`) corrected as the flags say,
+    /// in double. Each neighbour `j` at `c_j`, with intensity difference
+    /// `Δ_j = I(point) − I_j` and moving gradient `∇I_j`, contributes
+    /// `w_j = exp(−½ |c_j − p|²/σd²) · exp(−½ Δ_j²/σi²)`: the value is `−mean(w_j)`, the
+    /// derivative (ITK's descent direction, as for the other point-set metrics)
+    /// `mean(w_j · ((c_j − p)/σd² + Δ_j ∇I_j/σi²))`. The intensities are the neighbourhoods'
+    /// centres (ANTS-66 corrected).
+    fn igdm_corrected(
+        &self,
+        point: &[f32; D],
+        pixel: &[R],
+        moving: &IntensityPointSet<R, D>,
+    ) -> (R, [R; D]) {
+        let igdm = self.igdm.as_ref().expect("initialised");
+        let k = if self.corrections.igdm_neighbourhood {
+            igdm.k.clamp(1, igdm.tree.len())
+        } else {
+            1
+        };
+        let ids = if k == 1 {
+            vec![igdm.tree.closest(point)]
+        } else {
+            igdm.tree.search(point, k)
+        };
+        let voxels = pixel.len() / (1 + D);
+        let centre = ((0.5 * voxels as f64) as usize) * (D + 1);
+        let sd = igdm.euclidean_sigma.to_f64();
+        let si = igdm.intensity_sigma.to_f64();
+        let (a, b) = if self.corrections.igdm_true_gradient {
+            (1.0 / (sd * sd), 1.0 / (si * si))
+        } else {
+            (1.0, 1.0)
+        };
+        let mut value = 0.0f64;
+        let mut local = [0.0f64; D];
+        for &id in &ids {
+            let c = &moving.points[id];
+            let cp = &moving.data[id];
+            let d2 = squared_distance(point, c);
+            let dp = larmorx_core::math::exp(-0.5 * d2 / (sd * sd));
+            let delta = (pixel[centre] - cp[centre]).to_f64();
+            let r = delta / si;
+            let ip = larmorx_core::math::exp(-0.5 * r * r);
+            let w = ip * dp;
+            value -= w;
+            for d in 0..D {
+                let toward = f64::from(c[d]) - f64::from(point[d]);
+                local[d] += w * (toward * a + delta * cp[centre + 1 + d].to_f64() * b);
+            }
+        }
+        let n = ids.len() as f64;
+        (
+            R::from_f64(value / n),
+            std::array::from_fn(|d| R::from_f64(local[d] / n)),
+        )
+    }
+
+    /// ANTS-70: an estimated distance sigma below one voxel of the virtual domain (the
+    /// smallest spacing; 1 without a domain), 0 above all when every nearest distance is the
+    /// same, is raised to that voxel when corrected; ANTs keeps it (0 gives NaN parameters).
+    fn floor_distance_sigma(&mut self, estimate: R) -> R {
+        let floor = self.virtual_space.as_ref().map_or(1.0, |s| {
+            s.spacing.iter().copied().fold(f64::INFINITY, f64::min)
+        });
+        let e = estimate.to_f64();
+        if e.is_nan() || e < floor {
+            self.events.igdm_distance_floor = Some((estimate.to_f64(), floor));
+            if self.corrections.igdm_distance_floor {
+                return R::from_f64(floor);
+            }
+        }
+        estimate
     }
 }
 
@@ -1403,9 +1551,11 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
                 .filter(|(_, l)| **l == label)
                 .map(|(p, _)| moving_inverse.apply(p))
                 .collect();
+            let fixed_count = fl.iter().filter(|l| **l == label).count();
             clones.push(LabelMetric::new(
                 &self.kind,
                 &subset,
+                fixed_count,
                 &self.corrections,
                 &mut events,
                 warnings,
@@ -1520,6 +1670,7 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         let PointSetMetricKind::Igdm {
             intensity_sigma,
             euclidean_sigma,
+            k,
         } = self.kind
         else {
             unreachable!("an intensity point set is IGDM's")
@@ -1540,11 +1691,13 @@ impl<R: Real, const D: usize> PointSetMetric<R, D> {
         }
         if es <= R::ZERO {
             es = estimate_euclidean_sigma(&virt, &tree)?;
+            es = self.floor_distance_sigma(es);
         }
         self.igdm = Some(Igdm {
             tree,
             intensity_sigma: is,
             euclidean_sigma: es,
+            k,
         });
         Ok(IntensityPointSet {
             points: moved_points,

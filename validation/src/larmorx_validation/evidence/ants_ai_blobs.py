@@ -351,6 +351,29 @@ def _affine(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return m, np.asarray(common.itk_linear(path)[0], np.float64)
 
 
+def _truth_exact(move: str, fimg) -> np.ndarray:
+    """The true transform (fixed to moving points, LPS mm) as a 4 × 4 matrix, from the
+    construction: the shift's translation, or the rotation ``R`` in millimetres (the moving
+    voxel ``o`` shows the fixed voxel ``m o + off`` with ``m = Z⁻¹ R Z``, so a fixed point ``p``
+    is at ``Rᵀ (p − b) − Rᵀ Z off + b`` for the T1w's diagonal affine ``[Z | b]``)."""
+    from larmorx_validation.parity import ants_ai_blobs as pb
+
+    out = np.eye(4)
+    if move == "shift":
+        out[:3, 3] = LPS @ np.asarray(pb.T1W_ORIGIN_SHIFT, np.float64)
+        return out
+    aff = np.asarray(fimg.affine, np.float64)
+    assert np.count_nonzero(aff[:3, :3] - np.diag(np.diag(aff[:3, :3]))) == 0
+    z, b = aff[:3, :3], aff[:3, 3]
+    _m, off = pb._t1w_rotation(fimg.shape[:3], fimg.header.get_zooms())
+    a = np.deg2rad(pb.T1W_ROTATION)
+    rt = np.array([[np.cos(a), np.sin(a), 0.0], [-np.sin(a), np.cos(a), 0.0], [0.0, 0.0, 1.0]])
+    t = b - rt @ b - rt @ (z @ off)
+    out[:3, :3] = LPS @ rt @ LPS
+    out[:3, 3] = LPS @ t
+    return out
+
+
 def _angle(r: np.ndarray) -> float:
     """The rotation angle (degrees) of a rotation matrix."""
     return float(np.degrees(np.arccos(np.clip((np.trace(r) - 1.0) / 2.0, -1.0, 1.0))))
@@ -619,9 +642,7 @@ def _example(ctx: core.Context, move: str) -> dict:
     show = ndimage.binary_dilation(brain, iterations=2)
     grid = core.Grid.around(fimg, show)
     ex = exm.Example(ctx, grid, show)
-    zooms = fimg.header.get_zooms()
     fdata = common.load(str(fixed))
-    hi = float(np.percentile(fdata[brain], 99.5)) * 1.3
 
     ants = _probe_parse(e.dir / f"{move}-probe.log")
     steps = {
@@ -663,8 +684,6 @@ def _example(ctx: core.Context, move: str) -> dict:
         )
     )
     outputs = [{"id": "placed", "label": "moving T1w placed on the fixed grid", "unit": ""}]
-    if move == "shift":
-        outputs.append({"id": "blobs", "label": "the fixed T1w with the blobs found", "unit": ""})
     runs = [
         (
             "ants",
@@ -691,14 +710,11 @@ def _example(ctx: core.Context, move: str) -> dict:
             "default mode (ANTS-110 corrected), 6 threads",
         ),
     ]
-    for pid, label, side, role, text, sub in runs:
+    for pid, label, _steps, role, text, sub in runs:
         arr = placed(label)
         if arr is None:
             continue
-        full = {"placed": arr}
-        if move == "shift":
-            full["blobs"] = _shells(fdata, side["fixed_blobs"], zooms, hi)
-        ex.add(exm.Panel(pid, role, text, sub, full))
+        ex.add(exm.Panel(pid, role, text, sub, {"placed": arr}))
     shown = {p.id for p in ex.panels}
     dd = common.d
     diffs = []
@@ -737,12 +753,6 @@ def _example(ctx: core.Context, move: str) -> dict:
                 )
             )
     common.compare_all(ex, diffs, outputs)
-    # the true transform has no blobs: its panel shows the fixed T1w itself there, and the
-    # comparisons with it are about the placed images only
-    for x in diffs:
-        if x["kind"] == "reference":
-            x["metrics"].pop("blobs", None)
-            x.get("display", {}).pop("blobs", None)
     same_img = common.identical(diffs)
 
     mats = {}
@@ -750,6 +760,11 @@ def _example(ctx: core.Context, move: str) -> dict:
         m, p = _affine(e.dir / f"{move}-{k}.mat")
         if np.all(np.isfinite(p)):
             mats[k] = (m, p)
+    # the tables' truth from the construction (the placed copy used the fit in truth.mat,
+    # within 1e-12 mm of it)
+    exact = _truth_exact(move, fimg)
+    assert np.abs(exact - mats["truth"][0]).max() < 1e-9
+    mats["truth"] = (exact, mats["truth"][1])
     pts = _points(fimg, brain)
 
     def same_file(a, b):
@@ -811,9 +826,10 @@ def _example(ctx: core.Context, move: str) -> dict:
                 "ImageMath's MatchBlobs say), where ANTs compares the lengths of the pairs' "
                 f"displacements. Here larmorx keeps {len(lx_fix['landmarks'])} of "
                 f"{len(lx_fix['pairs'])} pairs and ANTs {len(ants['landmarks'])}: for a pure "
-                "translation ANTs' test is the stricter one, and larmorx's transform is "
-                f"{d_fix:.2g} mm off the truth at most, ANTs' {d_ants:.2g} mm (the tables "
-                "below); for a rotation ANTs keeps no landmark (the next example)."
+                "translation ANTs' test is the stricter one: larmorx's transform is "
+                f"{d_fix:.2g} mm off the truth at most, ANTs' is exact up to rounding "
+                f"({d_ants:.1g} mm; the tables below). For a rotation ANTs keeps no landmark (the "
+                "next example)."
                 if fix_named
                 else "Not accounted for by the other runs of this example."
             )
@@ -888,8 +904,7 @@ def _example(ctx: core.Context, move: str) -> dict:
     summary = {
         "shift": "antsAI's blob alignment (`-b 30`) between fMRIPrep's T1w of ds000005 sub-01 "
         "and the same voxels with the origin moved by (6, −4, 3) mm, so the true transform is "
-        "known. Each program's blobs are drawn on the fixed T1w (output *the fixed T1w with the "
-        "blobs found*), its pairs and landmarks are listed, and its transform places the copy "
+        "known. Each program's pairs and landmarks are listed, and its transform places the copy "
         "back on the fixed grid.",
         "rotated": "The same T1w against a copy rotated by 8° and shifted: ANTs' distance test "
         "keeps no landmark and its transform is NaN; larmorx's corrected test keeps the pairs "
@@ -907,14 +922,153 @@ def _example(ctx: core.Context, move: str) -> dict:
             ["reference", "Each against the true transform (known by construction)"],
         ],
         "tables": tables,
-        "metrics_note": "Δ is A − B between the placed images (and the drawn blobs), over every "
-        f"voxel of the {' × '.join(map(str, fimg.shape))} grid.",
+        "metrics_note": "Δ is A − B between the placed images, over every voxel of the "
+        f"{' × '.join(map(str, fimg.shape))} grid.",
+        "provenance": common.provenance(info, f"{TOOL}/{CASE}", [common.DS000005]),
+    }
+
+
+def _blobs_example(ctx: core.Context) -> dict:
+    """The blobs each program found in the fixed T1w, drawn as spheres of their radius."""
+    from scipy import ndimage
+
+    from larmorx_validation.evidence import example as exm
+
+    e = entry(ctx)
+    info = e.info()
+    run_dir = common.fmriprep_run(RUN)
+    fixed = run_dir / BRAIN.replace("desc-brain_mask", "desc-preproc_T1w")
+    fimg, brain = _brain(fixed, run_dir / BRAIN)
+    show = ndimage.binary_dilation(brain, iterations=2)
+    grid = core.Grid.around(fimg, show)
+    ex = exm.Example(ctx, grid, show)
+    zooms = fimg.header.get_zooms()
+    fdata = common.load(str(fixed))
+    hi = float(np.percentile(fdata[brain], 99.5)) * 1.3
+    ants = _probe_parse(e.dir / "shift-probe.log")
+    rotated = _probe_parse(e.dir / "rotated-probe.log")
+    steps = {
+        m: _side(json.loads((e.dir / f"shift-steps-{m}.json").read_text()))
+        for m in ("reproduce", "fix")
+    }
+    # the fixed image is the same in both moves: so are its blobs
+    assert ants["fixed_blobs"] == rotated["fixed_blobs"]
+    ex.add(
+        exm.Panel(
+            "fixed",
+            "input",
+            "ds000005 sub-01 T1w (fixed)",
+            "fMRIPrep's preprocessed T1w",
+            {"all": fdata},
+        )
+    )
+    for pid, side, role, text, sub_ in (
+        ("ants", ants, "original", "ANTs 2.6.5's blobs", "antsAI's code with prints (the probe)"),
+        ("larmorx", steps["reproduce"], "larmorx", "larmorx's blobs", "reproduce mode, 6 threads"),
+        (
+            "larmorx-fix",
+            steps["fix"],
+            "larmorx",
+            "larmorx's blobs",
+            "default mode (ANTS-112 corrected)",
+        ),
+    ):
+        ex.add(
+            exm.Panel(
+                pid, role, text, sub_, {"blobs": _shells(fdata, side["fixed_blobs"], zooms, hi)}
+            )
+        )
+    dd = common.d
+    diffs = [
+        dd("lx-ants", "larmorx", "ants", "main", "larmorx (reproduce) − ANTs", common.ROLE_LX),
+        dd("fix-ants", "larmorx-fix", "ants", "main", "larmorx's default − ANTs", common.ROLE_LX),
+    ]
+    outputs = [
+        {
+            "id": "blobs",
+            "label": "the fixed T1w with each blob drawn as a sphere of its radius",
+            "unit": "",
+        }
+    ]
+    common.compare_all(ex, diffs, outputs)
+    same = common.identical(diffs)
+    exact = _same_steps(ants, steps["reproduce"])
+    for x in diffs:
+        x["links"] = []
+        if x["id"] == "lx-ants":
+            ok = same["lx-ants"] and exact
+            x["verdict"] = "bit-identical" if ok else "open"
+            x["reason"] = (
+                f"The same {len(ants['fixed_blobs'])} blobs, each at the same voxel with the same "
+                "radius and the same Laplacian value, bit for bit, as ANTs' own code finds them."
+                if ok
+                else "Not accounted for."
+            )
+        else:
+            x["verdict"] = "bit-identical" if same["fix-ants"] else "d13"
+            x["reason"] = (
+                "ANTS-112's correction keeps the strongest maxima; here the largest scales fill "
+                "the list before ANTs' early threshold can drop one, so both lists are the same."
+                if same["fix-ants"]
+                else "ANTS-112 corrected by default: the strongest maxima."
+            )
+            x["links"] = [{"label": "ANTS-112", "href": "docs/findings/ants-ai.md#blobs"}]
+    radii = sorted(b[3] for b in ants["fixed_blobs"])
+    centre = max(ants["fixed_blobs"], key=lambda b: b[4])
+    default = {
+        "output": "blobs",
+        "plane": "axial",
+        "voxel": [
+            int(v) for v in np.rint(np.linalg.solve(grid.to_file(), np.r_[centre[:3], 1.0])[:3])
+        ],
+        "panels": ["fixed", "ants", "larmorx", "larmorx-fix"],
+        "diffs": ["lx-ants", "fix-ants"],
+        "compare": {"a": "fixed", "b": "ants"},
+    }
+    out = common.finish(
+        ctx,
+        ex,
+        diffs,
+        outputs,
+        default=default,
+        window_panel="ants",
+        caption="each program's blobs on the fixed T1w (the brightest blob at the crosshair).",
+    )
+    vers = info.get("versions", {})
+    return {
+        "id": "blobs-found",
+        "title": "The blobs ANTs and larmorx find in a T1w",
+        "summary": f"antsAI `-b 30` keeps the {len(ants['fixed_blobs'])} strongest maxima of the "
+        "scale-normalised Laplacian of Gaussian over 53 scales; here they lie at the edges of "
+        f"ventricles, vessels and sulci, with radii from {radii[0]:.2g} to {radii[-1]:.2g} mm. "
+        "Each is drawn as a sphere of its radius around its voxel.",
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{common.DS000005['dataset']}, sub-01's T1w ({common.DS000005['licence']}), "
+                "as fMRIPrep 25.2.6 preprocessed it",
+            },
+            {
+                "label": "Programs",
+                "text": f"{vers.get('ants', '?')}; ANTs' blobs from the blob probe "
+                "(`validation/probes/ants-ai-blobs`, antsAI's code with prints, built against the "
+                f"same ITK); larmorx's from `lx.ants.blob_alignment` at commit "
+                f"`{info['larmorx_commit'][:12]}`",
+            },
+            {"label": "Grid", "text": common.describe_grid(fimg, grid.shape)},
+        ],
+        **out,
+        "chain": None,
+        "groups": [["main", "LARMORX against ANTs"]],
+        "tables": [],
+        "metrics_note": "Δ is A − B between the drawn blobs, over every voxel of the "
+        f"{' × '.join(map(str, fimg.shape))} grid.",
         "provenance": common.provenance(info, f"{TOOL}/{CASE}", [common.DS000005]),
     }
 
 
 def examples(ctx: core.Context) -> list[dict]:
-    return [_example(ctx, "shift"), _example(ctx, "rotated")]
+    return [_blobs_example(ctx), _example(ctx, "shift"), _example(ctx, "rotated")]
 
 
 def provenance(ctx: core.Context) -> dict:

@@ -2470,6 +2470,14 @@ def _score(checks: CheckList, c: AiCase, args: list[str], a_dir: Path, f_dir: Pa
     ants = ants_ai_blobs.transform_error(a_dir / name, c.truth, fixed)
     mine = ants_ai_blobs.transform_error(f_dir / name, c.truth, fixed)
     checks(
+        "alignment error: ANTs",
+        True,
+        metric="distance to the true transform",
+        value=text(ants),
+        threshold="reported",
+        detail=f"ANTs 2.6.5 as built, one thread: {text(ants)}",
+    )
+    checks(
         "alignment error",
         True,
         metric="distance to the true transform",
@@ -2491,6 +2499,12 @@ def highlights(results: list[CaseResult]) -> list[str]:
     band = []
     crashes = []
     real = []
+    aligned = []
+    for r in results:
+        for ch in r.checks:
+            m = re.match(r"ANTs (.*); larmorx's default (.*)", ch.detail)
+            if ch.name == "alignment error" and m:
+                aligned.append((f"`{r.case}`", m.group(1), m.group(2)))
     for r in compared:
         for ch in r.checks:
             m = re.search(
@@ -2524,6 +2538,19 @@ def highlights(results: list[CaseResult]) -> list[str]:
             "(ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives "
             "ANTs' one-thread result at any thread count."
         )
+    if aligned:
+        lines += [
+            "",
+            "**Blob alignment against the known transforms** (`-b`; where the moving image is "
+            "the fixed one moved by a known transform: the distance from where each program's "
+            "transform sends test points to where they truly are; larmorx's default corrects "
+            "ANTS-110, ANTS-111, ANTS-112, ANTS-114 and ITK-60, `reproduce` is ANTs' result):",
+            "",
+            "| Case | ANTs 2.6.5 (one thread) | larmorx's default |",
+            "|---|---|---|",
+            *(f"| {case} | {a} | {b} |" for case, a, b in aligned),
+        ]
+    lines += ["", *defects.summary(results)]
     if real:
         lines.append("")
         lines.append(

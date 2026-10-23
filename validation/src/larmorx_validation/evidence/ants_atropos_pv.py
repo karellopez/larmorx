@@ -244,7 +244,7 @@ def example(ctx: core.Context) -> dict:
                     "The same labels." if same[i] else "ANTs' glibc maths moves a few labels."
                 )
         elif i == "fix-1-6":
-            x["verdict"] = None
+            x["verdict"] = "bit-identical" if same[i] else "open"
             x["reason"] = (
                 "The same labels at any thread count." if same[i] else "Threads change the labels."
             )

@@ -178,9 +178,9 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
                                                                                    env=(("AFNI_MESSAGE_COLORIZE", "NO"),), tier="standard"))
     add("nifti-priority-q", "environment", "AFNI_NIFTI_PRIORITY=Q on an oblique input", S(("-prefix", M, "{0}"), ("head-oblique",), (M,),
                                                                                             env=(("AFNI_NIFTI_PRIORITY", "Q"),), tier="standard"))
-    add("prefix-with-blank", "global", "a -prefix with a blank (AFNI-12)", S(("-prefix", "a b.nii", "{0}"), (h,), ("a b.nii",)))
+    add("prefix-with-blank", "global", "a -prefix with a blank (AFNI-12)", S(("-prefix", "a b.nii", "{0}"), (h,), ("a b.nii",), fix_writes="AFNI-12"))
     add("input-dir-with-blank", "global", "an input in a directory with a blank (AFNI-18)",
-        S(("-prefix", M, "{0}"), ("blank:head-f32",), (M,), tier="standard"))
+        S(("-prefix", M, "{0}"), ("blank:head-f32",), (M,), tier="standard", fix_writes="AFNI-18"))
     add("missing-directory", "global", "an output in a missing directory (AFNI-26)",
         S(("-prefix", "nodir/mask.nii", "{0}"), (h,), ("nodir/mask.nii",), tier="standard",
           fix_refuses="AFNI-26"))

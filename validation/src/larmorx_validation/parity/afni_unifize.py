@@ -166,9 +166,9 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
                                                                   env=(("AFNI_MESSAGE_PREFIX", "UN"),), tier="standard"))
     add("echo-commandline", "environment", "AFNI_ECHO_COMMANDLINE=YES", S((*p, "{0}"), (t1,), (U,),
                                                                           env=(("AFNI_ECHO_COMMANDLINE", "YES"), ("AFNI_DONT_LOGFILE", None)), tier="standard"))
-    add("prefix-with-blank", "global", "a -prefix with a blank (AFNI-12)", S(("-prefix", "a b.nii", "{0}"), (t1,), ("a b.nii",)))
+    add("prefix-with-blank", "global", "a -prefix with a blank (AFNI-12)", S(("-prefix", "a b.nii", "{0}"), (t1,), ("a b.nii",), fix_writes="AFNI-12"))
     add("input-dir-with-blank", "global", "an input in a directory with a blank (AFNI-18)",
-        S((*p, "{0}"), ("blank:head-f32",), (U,), tier="standard"))
+        S((*p, "{0}"), ("blank:head-f32",), (U,), tier="standard", fix_writes="AFNI-18"))
     add("missing-directory", "global", "an output in a missing directory (AFNI-26)",
         S(("-prefix", "nodir/uni.nii", "{0}"), (t1,), ("nodir/uni.nii",), tier="standard",
           fix_refuses="AFNI-26"))

@@ -437,6 +437,9 @@ class Scenario:
     #: The defect whose correction makes the default refuse what AFNI does (exit status 1,
     #: the defect named): the fix pass checks that instead of comparing outputs.
     fix_refuses: str | None = None
+    #: The defect whose correction makes the default write what AFNI refuses (exit status 0,
+    #: the defect named, every output written): the fix pass checks that.
+    fix_writes: str | None = None
 
 
 @dataclass(frozen=True)
@@ -542,6 +545,9 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
                 checks("both reject the arguments", False, detail="AFNI succeeded")
             return
         check_outputs(checks, a_dir, l_dir, tuple(a_out))
+        if s.expect == "pass" and afni.code != 0 and s.fix_writes is not None:
+            _fix_writes(checks, program, s, args, env, tmp)
+            return
         if s.expect != "pass" or afni.code != 0:
             return
         for name, source in s.fmriprep:
@@ -666,6 +672,35 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
     )
 
 
+def _fix_writes(
+    checks: CheckList,
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+) -> None:
+    """The fix pass of a case AFNI refuses and larmorx's default corrects (``fix_writes``): the
+    default exits 0, names the defect and writes every output."""
+    d = tmp / "fix"
+    _setup(d, s)
+    r = run_larmorx(program, args, defects.FIX, env, d)
+    named = defects.notices_in(r.err)
+    written = _produced(d, s)
+    ok = r.code == 0 and s.fix_writes in named and written == list(s.outputs)
+    checks.add(
+        Check(
+            defects.FIX_PASS,
+            ok,
+            metric="values changed by the corrections",
+            value=0,
+            threshold="reported (named iff changed)",
+            detail=f"{', '.join(named) or 'no defect named'}: no values; the outputs written "
+            f"where AFNI refuses ({', '.join(written) or 'none'}, exit {r.code}) changed",
+        )
+    )
+
+
 def _fix_pass(
     checks: CheckList,
     program: str,
@@ -755,8 +790,9 @@ def highlights(
         "status and messages."
         + (
             f" The other {len(compared) - len(with_outputs)} compared case(s) write no output "
-            "in either program (an existing output, a directory that does not exist) and agree "
-            "on the exit status and messages."
+            "in either program (an existing output, a name with a blank, a directory that does "
+            "not exist) and agree on the exit status and messages; the default mode's "
+            "corrections there are in the D13 lines below."
             if len(compared) > len(with_outputs)
             else ""
         ),

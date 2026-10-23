@@ -30,6 +30,7 @@ pub mod csfft;
 pub mod dataset;
 pub mod detrend;
 pub mod environ;
+pub mod glibc_floatmath;
 pub mod glibc_sincosf;
 pub mod message;
 pub mod oned;

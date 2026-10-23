@@ -257,6 +257,12 @@ def finish(
 
     post_p, post_d, ranges = {}, {}, {}
     for pid in default["panels"]:
+        ov = (ex.panel(pid).overlay or {}).get(out)
+        if ov:  # a mask over the image it was made from
+            base = sl(ex.values(ex.key(ov["on"], out)))
+            a = sl(ex.values(ex.key(pid, out)))
+            post_p[pid] = exm.poster_overlay(ctx, base, a, m2, *ov["window"])
+            continue
         lo, hi = win[pid] if win.get(pid) else (ow["lo"], ow["hi"])
         post_p[pid] = exm.poster_gray(ctx, sl(ex.values(ex.key(pid, out))), m2, lo, hi)
     shared = [

@@ -128,7 +128,9 @@ def synthetic(name: str) -> Path:
     if name == "head-i16-slope1":
         return _save("head-i16-slope1.nii", np.round(t1), a, np.int16, slope=1.0)
     if name == "head-i16-intercept":
-        return _save("head-i16-intercept.nii", np.round((t1 - 100) * 2), a, np.int16, slope=0.5, inter=100.0)
+        return _save(
+            "head-i16-intercept.nii", np.round((t1 - 100) * 2), a, np.int16, slope=0.5, inter=100.0
+        )
     if name == "head-f32-slope-inter":
         return _save("head-f32-slope-inter.nii", (t1 - 5) / 3, a, np.float32, slope=3.0, inter=5.0)
     if name == "head-f64":
@@ -180,9 +182,13 @@ def synthetic(name: str) -> Path:
     if name == "series-f32":
         return _save("series-f32.nii", _series(), _affine(GRID), np.float32)
     if name == "series-negative":
-        return _save("series-negative.nii", -np.round(_series() / 2), _affine(GRID), np.int16, slope=-2.0)
+        return _save(
+            "series-negative.nii", -np.round(_series() / 2), _affine(GRID), np.int16, slope=-2.0
+        )
     if name == "series-slope":
-        return _save("series-slope.nii", np.round(_series() / 2), _affine(GRID), np.int16, slope=2.0)
+        return _save(
+            "series-slope.nii", np.round(_series() / 2), _affine(GRID), np.int16, slope=2.0
+        )
     if name == "series-one":
         return _save("series-one.nii", _series(1), _affine(GRID), np.float32)
     if name == "slice":
@@ -221,7 +227,11 @@ def fmriprep_runs() -> list[tuple[str, Path]]:
     if ws is None:
         return []
     out = []
-    for wf in sorted((ws / FMRIPREP_RUNS).glob("*/work/fmriprep_25_2_wf/*/*/bold_fit_wf/enhance_and_skullstrip_bold_wf")):
+    for wf in sorted(
+        (ws / FMRIPREP_RUNS).glob(
+            "*/work/fmriprep_25_2_wf/*/*/bold_fit_wf/enhance_and_skullstrip_bold_wf"
+        )
+    ):
         run = wf.parts[-7].split("-")[0]
         bold = wf.parts[-3].removeprefix("bold_").removesuffix("_wf")
         out.append((f"{run}-{bold}", wf))

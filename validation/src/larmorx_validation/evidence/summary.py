@@ -129,6 +129,18 @@ PAGES = [
         ],
     ),
     (
+        "/tools/afni-automask/",
+        "3dAutomask",
+        "afni",
+        [("larmorx-gpl replica", "afni-automask", "validated", None, None)],
+    ),
+    (
+        "/tools/afni-unifize/",
+        "3dUnifize",
+        "afni",
+        [("larmorx-gpl replica", "afni-unifize", "validated", None, None)],
+    ),
+    (
         "/tools/mri-hmc/",
         "Head-motion correction",
         "fsl",

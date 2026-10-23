@@ -35,6 +35,7 @@ def _python_options(**kw):
 
 
 def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
+    # fmt: off
     out: list[tuple[str, str, str, ar.Scenario]] = []
 
     def add(cid: str, category: str, desc: str, s: ar.Scenario) -> None:
@@ -202,6 +203,7 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
             S(("-prefix", "mask.nii.gz", "{0}"), (bold,), ("mask.nii.gz",), tier=tier, band=(1,)))
     add("t1w-brain", "real", "the skull-stripped T1w of an fMRIPrep run (ds000005, sMRIPrep's desc-brain)",
         S(("-prefix", "mask.nii.gz", "{0}"), ("fmriprep-anat:ds000005:brain",), ("mask.nii.gz",), tier="standard", band=(1,)))
+    # fmt: on
     return out
 
 
@@ -237,7 +239,9 @@ def _input(name: str):
         if not t1 or not mask:
             raise FileNotFoundError(name)
         img = nib.load(t1[0])
-        brain = np.asarray(img.dataobj, dtype=np.float32) * (np.asarray(nib.load(mask[0]).dataobj) > 0)
+        brain = np.asarray(img.dataobj, dtype=np.float32) * (
+            np.asarray(nib.load(mask[0]).dataobj) > 0
+        )
         nib.save(nib.Nifti1Image(brain.astype(np.float32), img.affine), target)
         return target
     return ph.input_path(name)
@@ -266,9 +270,18 @@ def suite() -> Suite:
         ),
         reference=f"3dAutomask from AFNI ({ar.afni_build(PROGRAM)}), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
-            ("Exit status", "the same (both succeed, or both reject the arguments); where AFNI crashes, larmorx exits 1"),
-            ("Messages", "standard output and error byte for byte (AFNI's banner and compile date, larmorx's own lines set aside)"),
-            ("Every output (mask, masked input, depth)", "the same values, bit for bit, and the same NIfTI header bytes"),
+            (
+                "Exit status",
+                "the same (both succeed, or both reject the arguments); where AFNI crashes, larmorx exits 1",
+            ),
+            (
+                "Messages",
+                "standard output and error byte for byte (AFNI's banner and compile date, larmorx's own lines set aside)",
+            ),
+            (
+                "Every output (mask, masked input, depth)",
+                "the same values, bit for bit, and the same NIfTI header bytes",
+            ),
         ],
         cases=cases,
         run_case=run_case,

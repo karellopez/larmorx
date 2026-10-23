@@ -24,6 +24,8 @@ TOOLS: dict[str, str] = {
     "ants-atropos": "ants_atropos",
     "itk-hdf5": "itk_hdf5",
     "afni-tshift": "afni_tshift",
+    "afni-automask": "afni_automask",
+    "afni-unifize": "afni_unifize",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

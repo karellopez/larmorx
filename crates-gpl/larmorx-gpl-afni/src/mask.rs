@@ -313,15 +313,9 @@ fn octant_clips(im: &[f32], g: Grid, mfrac: f32) -> ClipVec {
 
 /// `pointclip`: the clip level at voxel `(ii, jj, kk)`, trilinear between the octants' centres.
 fn pointclip(ii: usize, jj: usize, kk: usize, cv: &ClipVec) -> f32 {
-    let clamp = |v: f32| {
-        if v < 0.0 {
-            0.0
-        } else if v > 1.0 {
-            1.0
-        } else {
-            v
-        }
-    };
+    // AFNI's `if( x < 0 ) x = 0 ; else if( x > 1 ) x = 1`: the same as `clamp` for every
+    // value, NaN and -0 included.
+    let clamp = |v: f32| v.clamp(0.0, 1.0);
     let x1 = clamp((ii as f32 - cv.x0) * cv.dxi);
     let y1 = clamp((jj as f32 - cv.y0) * cv.dyi);
     let z1 = clamp((kk as f32 - cv.z0) * cv.dzi);

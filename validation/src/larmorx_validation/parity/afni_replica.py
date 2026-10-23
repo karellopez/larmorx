@@ -48,7 +48,8 @@ from typing import Any
 import numpy as np
 
 from larmorx_validation.parity import defects
-from larmorx_validation.parity.afni_tshift import replica_binary, replica_version
+from larmorx_validation.parity.afni_tshift import replica_binary
+from larmorx_validation.parity.afni_tshift import replica_version as replica_version
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -295,7 +296,9 @@ def check_crash(checks: CheckList, afni: Run, ours: Run) -> None:
     checks(
         CRASH,
         before.strip() == ours_before.strip(),
-        detail="identical" if before.strip() == ours_before.strip() else first_difference(before, ours_before),
+        detail="identical"
+        if before.strip() == ours_before.strip()
+        else first_difference(before, ours_before),
     )
 
 
@@ -348,7 +351,11 @@ def compare_files(a: Path, b: Path) -> Comparison:
     total = int(va.size)
     if va.dtype != vb.dtype or va.shape != vb.shape:
         return Comparison(
-            False, ha == hb, total, total, float("inf"),
+            False,
+            ha == hb,
+            total,
+            total,
+            float("inf"),
             f"AFNI {va.dtype} {va.shape}, larmorx {vb.dtype} {vb.shape}",
         )
     same = np.ascontiguousarray(va).view(np.uint8) == np.ascontiguousarray(vb).view(np.uint8)
@@ -359,19 +366,27 @@ def compare_files(a: Path, b: Path) -> Comparison:
     n = int(np.count_nonzero(fa != fb))
     finite = diff[np.isfinite(diff)]
     max_abs = float(finite.max()) if finite.size else 0.0
-    detail = "bit-identical" if identical else f"{n} of {total} values differ, max |diff| {max_abs:.6g}"
+    detail = (
+        "bit-identical" if identical else f"{n} of {total} values differ, max |diff| {max_abs:.6g}"
+    )
     del same
     return Comparison(identical, ha == hb, n, total, max_abs, detail)
 
 
-def check_outputs(checks: CheckList, afni_dir: Path, ours_dir: Path, outputs: tuple[str, ...]) -> bool:
+def check_outputs(
+    checks: CheckList, afni_dir: Path, ours_dir: Path, outputs: tuple[str, ...]
+) -> bool:
     """Every output of the case: present in both, data and header identical. Returns whether
     every output was found in both."""
     ok = True
     for name in outputs:
         a, b = afni_dir / name, ours_dir / name
         if not (a.is_file() and b.is_file()):
-            checks(f"{name}: written by both", False, detail=f"AFNI {a.is_file()}, larmorx {b.is_file()}")
+            checks(
+                f"{name}: written by both",
+                False,
+                detail=f"AFNI {a.is_file()}, larmorx {b.is_file()}",
+            )
             ok = False
             continue
         c = compare_files(a, b)
@@ -468,7 +483,9 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     if afni_binary(program) is None:
         raise Outcome("skipped", f"the AFNI {program} oracle was not found (LARMORX_AFNI_BIN)")
     if replica_binary() is None:
-        raise Outcome("skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)")
+        raise Outcome(
+            "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
+        )
     try:
         paths = [spec.inputs(name) for name in s.inputs]
     except FileNotFoundError as e:
@@ -505,7 +522,9 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             if ok:
                 raise Outcome(EXPECTED, s.reason)
             return
-        checks(EXIT, afni.code == ours.code, metric="exit status", value=ours.code, threshold=afni.code)
+        checks(
+            EXIT, afni.code == ours.code, metric="exit status", value=ours.code, threshold=afni.code
+        )
         check_messages(checks, afni, ours)
         checks(
             "the same outputs written",
@@ -564,7 +583,10 @@ def _band(
     variants: list[tuple[str, Callable[[Path], Run]]] = []
     for t in s.band:
         variants.append(
-            (f"AFNI at {t} thread(s)", lambda d, t=t: run_afni(spec.program, args, dict(env, OMP_NUM_THREADS=str(t)), d))
+            (
+                f"AFNI at {t} thread(s)",
+                lambda d, t=t: run_afni(spec.program, args, dict(env, OMP_NUM_THREADS=str(t)), d),
+            )
         )
     if fmriprep_image() is not None:
         binds = sorted({p.parent for p in paths})
@@ -579,7 +601,16 @@ def _band(
         _setup(d, s)
         r = runner(d)
         if r.code != 0:
-            checks.add(Check(f"band: {label}", True, metric="exit status", value=r.code, threshold="reported", detail=last_error(r.err)))
+            checks.add(
+                Check(
+                    f"band: {label}",
+                    True,
+                    metric="exit status",
+                    value=r.code,
+                    threshold="reported",
+                    detail=last_error(r.err),
+                )
+            )
             continue
         worst = 0
         details = []
@@ -618,8 +649,12 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
         img = getattr(result, attr)
         want = lx.load(l_dir / name)
         a, b = np.asarray(img.data), np.asarray(want.data)
-        same = a.dtype == b.dtype and a.shape == b.shape and np.array_equal(
-            np.ascontiguousarray(a).view(np.uint8), np.ascontiguousarray(b).view(np.uint8)
+        same = (
+            a.dtype == b.dtype
+            and a.shape == b.shape
+            and np.array_equal(
+                np.ascontiguousarray(a).view(np.uint8), np.ascontiguousarray(b).view(np.uint8)
+            )
         )
         same = same and np.array_equal(np.asarray(img.affine), np.asarray(want.affine))
         if not same:
@@ -659,7 +694,11 @@ def _fix_pass(
         )
         return
     if r.code != 0:
-        checks(defects.FIX_PASS, False, detail=f"the fix pass failed (exit {r.code}): {last_error(r.err)}")
+        checks(
+            defects.FIX_PASS,
+            False,
+            detail=f"the fix pass failed (exit {r.code}): {last_error(r.err)}",
+        )
         return
     change = defects.Change(0, 0, 0.0)
     other = []
@@ -681,10 +720,16 @@ def _fix_pass(
     if _ANSI.sub("", plain[0]) != _ANSI.sub("", plain[1]):
         other.append("messages")
     entries = defects.notices_in(r.err)
-    defects.add_fix_check(checks, entries, change, other_changes=", ".join(other), silent_ok=s.silent_ok)
+    defects.add_fix_check(
+        checks, entries, change, other_changes=", ".join(other), silent_ok=s.silent_ok
+    )
     reproduced_entries = defects.notices_in(reproduced.err)
     if entries != reproduced_entries:
-        checks("D13 notices in both modes", False, detail=f"fix: {entries}; reproduce: {reproduced_entries}")
+        checks(
+            "D13 notices in both modes",
+            False,
+            detail=f"fix: {entries}; reproduce: {reproduced_entries}",
+        )
 
 
 # ------------------------------------------------------------------------------------------------

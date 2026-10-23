@@ -37,6 +37,7 @@ def _py(outputs=None, **kw):
 
 
 def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
+    # fmt: off
     out: list[tuple[str, str, str, ar.Scenario]] = []
 
     def add(cid: str, category: str, desc: str, s: ar.Scenario) -> None:
@@ -197,6 +198,7 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     ):
         add(f"EPI-{name}", "real", f"-EPI on the BOLD series of {name}",
             S(("-EPI", "-prefix", "uni.nii.gz", "{0}"), (bold,), ("uni.nii.gz",), tier=tier, band=(6,)))
+    # fmt: on
     return out
 
 
@@ -228,9 +230,18 @@ def suite() -> Suite:
         ),
         reference=f"3dUnifize from AFNI ({ar.afni_build(PROGRAM)}, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
-            ("Exit status", "the same (both succeed, or both reject the arguments); where AFNI crashes, larmorx exits 1"),
-            ("Messages", "standard output and error byte for byte (AFNI's banner and compile date, larmorx's own lines and the elapsed time set aside)"),
-            ("Every output (the unifized image, -ssave, -amsave)", "the same values, bit for bit, and the same NIfTI header bytes"),
+            (
+                "Exit status",
+                "the same (both succeed, or both reject the arguments); where AFNI crashes, larmorx exits 1",
+            ),
+            (
+                "Messages",
+                "standard output and error byte for byte (AFNI's banner and compile date, larmorx's own lines and the elapsed time set aside)",
+            ),
+            (
+                "Every output (the unifized image, -ssave, -amsave)",
+                "the same values, bit for bit, and the same NIfTI header bytes",
+            ),
         ],
         cases=cases,
         run_case=run_case,

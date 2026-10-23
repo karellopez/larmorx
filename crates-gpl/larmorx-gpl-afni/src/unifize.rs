@@ -154,6 +154,8 @@ fn med3(a: f32, b: f32, c: f32) -> f32 {
 /// `qmed_float`: the median of `a` (partially sorting it), with AFNI's special cases and its
 /// partial quicksort; an even length averages the two middle values (`0.5*(x+y)`, in double,
 /// rounded to float).
+// `!(a < b)` is AFNI's loop condition, kept as written (the values are finite).
+#[allow(clippy::neg_cmp_op_on_partial_ord)]
 pub fn qmed(a: &mut [f32]) -> f32 {
     let n = a.len();
     match n {

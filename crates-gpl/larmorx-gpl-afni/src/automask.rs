@@ -150,6 +150,7 @@ pub fn apply_mask(ds: &Dataset, mask: &[u8]) -> Dataset {
 /// erosions, each followed by the same filling; then every hole (a cluster of non-mask voxels
 /// other than the largest) is filled. The messages are AFNI's (`verbose`: 3dAutomask's own
 /// `verb`; the clustering messages follow the mask settings).
+#[allow(clippy::too_many_arguments)] // 3dAutomask's settings, as its `main` holds them
 pub fn dilate_erode(
     g: Grid,
     mask: &mut [u8],

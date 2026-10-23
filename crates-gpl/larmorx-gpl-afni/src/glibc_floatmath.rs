@@ -179,6 +179,8 @@ pub fn expm1f(x: f32) -> f32 {
 }
 
 /// `cbrtf(x)`: glibc 2.35's `__cbrtf` (a rational approximation in double precision).
+// glibc's constants, as its source writes them (the same doubles as the shorter forms).
+#[allow(clippy::excessive_precision)]
 pub fn cbrtf(x: f32) -> f32 {
     const CBRT2: f64 = 1.259_921_049_894_873_164_8;
     const SQR_CBRT2: f64 = 1.587_401_051_968_199_474_8;

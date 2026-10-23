@@ -282,7 +282,7 @@ fn qr_step(
         x = subdiag[k];
         if k < end - 1 {
             z = -s * subdiag[k + 1];
-            subdiag[k + 1] = c * subdiag[k + 1];
+            subdiag[k + 1] *= c;
         }
         // q.applyOnTheRight(k, k + 1, rot): the rotation's transpose (c, −s) applied to
         // columns k and k + 1, row by row (`apply_rotation_in_the_plane` returns at once for

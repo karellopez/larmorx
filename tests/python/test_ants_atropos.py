@@ -289,8 +289,7 @@ def test_partial_volume_classes_with_the_mrf():
             with pytest.raises(lx.ants.AtroposError, match="non-zero label sets"):
                 lx.ants.atropos(**kw, mrf_smoothing=beta, upstream_defects="reproduce")
         assert any(
-            str(w.message).startswith("ANTS-106") and "reproduced" in str(w.message)
-            for w in caught
+            str(w.message).startswith("ANTS-106") and "reproduced" in str(w.message) for w in caught
         )
     # Without the MRF the correction does not apply.
     with warnings.catch_warnings(record=True) as caught:

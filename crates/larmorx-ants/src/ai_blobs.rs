@@ -456,7 +456,8 @@ pub fn pair_blobs(
                 best = k;
             }
         }
-        if stop_when_exhausted && !(tmp > 0.0) {
+        // No positive correlation left (the matrix holds no NaN: ANTs' 0 for those).
+        if stop_when_exhausted && tmp.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
             break;
         }
         let (row, col) = (best / nm, best % nm);

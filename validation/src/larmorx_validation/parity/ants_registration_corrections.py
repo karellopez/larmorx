@@ -516,6 +516,50 @@ def run_case(case: Case, checks: CheckList) -> None:
         {"point-set": _point_set, "mesh": _mesh, "chain": _chain}[sc.kind](sc, tmp, checks)
 
 
+def highlights(results: list) -> list[str]:
+    """ITK-35's references, with the spread of those that vary from run to run (ANTS-72)."""
+    rows = []
+    for r in results:
+        if not r.case.startswith("chain/"):
+            continue
+        found: dict[str, dict[str, str]] = {}
+        for ch in r.checks:
+            label, _, name = ch.name.partition(": ")
+            if not label.startswith("ANTs "):
+                continue
+            ref = label.removeprefix("ANTs ")
+            m = re.search(r"\(range ([^)]+)\)", ch.detail)
+            value = f"{ch.value} ({m.group(1)})" if m else str(ch.value)
+            found.setdefault(ref, {})[name] = value
+        for ref, values in found.items():
+            rows.append(
+                (
+                    f"`{r.case}`",
+                    ref,
+                    values.get("largest distance (mm)", ""),
+                    values.get("mean distance (mm)", ""),
+                    values.get("ANTs' own runs", "– (one construction, repeatable)"),
+                )
+            )
+    if not rows:
+        return []
+    header = (
+        "| Case | ANTs reference | largest distance (mm) | mean distance (mm) | "
+        "ANTs' own runs: largest distance (mm) |"
+    )
+    lines = [
+        "**ITK-35's references** (how far each maps the fixed points from larmorx's corrected "
+        "stage, in the mask). A linear stage after a displacement field is not repeatable in "
+        f"ANTs (ANTS-72): those references ran {FIELD_RUNS} times each, and show the median "
+        "with the range in brackets, and the largest distance between two of ANTs' own runs.",
+        "",
+        header,
+        "|---|---|---|---|---|",
+        *(f"| {' | '.join(row)} |" for row in rows),
+    ]
+    return lines
+
+
 def suite() -> Suite:
     return Suite(
         name="ants-registration-corrections",
@@ -534,6 +578,7 @@ def suite() -> Suite:
         run_case=run_case,
         packages=("nibabel",),
         notes="The phantoms are the ants-registration suite's (`gen:reg-*`, `gen:ps-*`).",
+        highlights=highlights,
     )
 
 

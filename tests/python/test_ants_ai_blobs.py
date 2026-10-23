@@ -169,7 +169,7 @@ def test_failures(tmp_path):
     thin = save(np.ones((40, 3)), tmp_path / "thin.nii.gz")
     with pytest.raises(lx.ants.AIError, match="less than 4"):
         lx.ants.blob_alignment(thin, thin, blobs=5)
-    with pytest.raises(lx.ants.AIError, match="does not exist|No such file|not found"):
+    with pytest.raises(lx.ants.AIError, match="does not exist"):
         lx.ants.blob_alignment(a, tmp_path / "missing.nii.gz")
     # In memory, the same as from the files.
     mem = lx.ants.blob_alignment(lx.load(a), lx.load(b), blobs=10)

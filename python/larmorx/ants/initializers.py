@@ -414,7 +414,9 @@ def blob_alignment(
     nf, nm = len(value["fixed_blobs"]), len(value["moving_blobs"])
 
     def blob_list(items: list) -> list[Blob]:
-        return [Blob(tuple(int(i) for i in c), float(s), float(r), float(v)) for c, s, r, v in items]
+        return [
+            Blob(tuple(int(i) for i in c), float(s), float(r), float(v)) for c, s, r, v in items
+        ]
 
     matrix = np.asarray(value["matrix"], dtype=np.float64).reshape(d, d)
     offset = np.asarray(value["offset"], dtype=np.float64).reshape(d)

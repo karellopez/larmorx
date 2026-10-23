@@ -82,8 +82,12 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`:
 - The defects of AFNI's dataset reading and writing (AFNI-02, -07, -11, -12, -16, -18, -20, -22,
   -23, -26), as for 3dAutomask.
 
-Kept as AFNI's until decided: AFNI-48 (`-T2` three times: neither the inversion back nor the
-edge clipping).
+Refused by default (decided 2026-10-23, rule B: the input makes no sense): **AFNI-48**, `-T2`
+given three or more times. The help documents once (a T2-weighted input, inverted back) and
+twice (no inversion back, the bright edges clipped); AFNI's third `-T2` does neither and leaves
+the output inverted. The default stops with a fatal error naming AFNI-48 (exit 1) before
+reading the input; `reproduce` runs as AFNI does. `-EPI` sets a single `-T2` whatever was
+given, so it is not refused.
 
 ## Deliberate differences
 

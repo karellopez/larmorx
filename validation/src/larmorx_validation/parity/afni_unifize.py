@@ -62,7 +62,14 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     add("T2", "options", "-T2 on the T2-like phantom", S(("-T2", *p, "{0}"), (t2,), (U,), **_py(t2=True)))
     add("T2-T2", "options", "-T2 -T2: no second inversion, bright edges clipped",
         S(("-T2", "-T2", *p, "{0}"), (t2,), (U,), **_py(t2=2)))
-    add("T2-T2-T2", "options", "-T2 three times: neither (AFNI-48)", S(("-T2", "-T2", "-T2", *p, "{0}"), (t2,), (U,), tier="standard"))
+    # AFNI-48 (rule B, decided 2026-10-23): three or more -T2 are refused by default; AFNI leaves the
+    # output inverted, which `reproduce` gives.
+    add("T2-T2-T2", "options", "-T2 three times: AFNI neither inverts back nor clips; refused by default (AFNI-48)",
+        S(("-T2", "-T2", "-T2", *p, "{0}"), (t2,), (U,), fix_refuses="AFNI-48"))
+    add("T2-x4", "options", "-T2 four times: as three (AFNI-48)",
+        S(("-T2", "-T2", "-T2", "-T2", *p, "{0}"), (t2,), (U,), tier="standard", fix_refuses="AFNI-48"))
+    add("T2-x3-EPI", "options", "-T2 three times with -EPI: -EPI sets one -T2, nothing refused",
+        S(("-T2", "-T2", "-T2", "-EPI", *p, "{0}"), ("series-f32",), (U,), tier="standard"))
     add("T2up-95", "options", "-T2 -T2up 95", S(("-T2", "-T2up", "95", *p, "{0}"), (t2,), (U,), **_py(t2=True, t2_percentile=95.0)))
     add("GM", "options", "-GM", S(("-GM", *p, "{0}"), (t1,), (U,), **_py(gm=True)))
     add("GM-T2", "options", "-GM -T2", S(("-GM", "-T2", *p, "{0}"), (t2,), (U,), tier="standard"))

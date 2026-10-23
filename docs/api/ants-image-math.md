@@ -121,18 +121,18 @@ has a defect (below, "Upstream defects") take `upstream_defects="fix"` or `"repr
 | `Grad a sigma normalize` | `gradient_magnitude(a, sigma=1.0, normalize=False)` | `GradientMagnitudeRecursiveGaussianImageFilter`, sigma in mm |
 | `UnsharpMask a amount radius threshold physical` | `unsharp_mask(a, amount=0.5, radius=1.0, threshold=0.0, radius_in_physical_units=False)` | `UnsharpMaskImageFilter` in float; `radius` is the Gaussian's sigma |
 | `MD a r value` | `morphological_dilate(a, radius=1, value=1.0)` | ITK's `BinaryDilateImageFilter` with its ball (offsets with `Σ o² ≤ r(r+1)`, in voxels); `value` is the foreground |
-| `ME a r value` | `morphological_erode(a, radius=1, value=1.0)` | `BinaryErodeImageFilter` (the border does not erode), then 1 where the eroded value and the input exceed 0.5, else 0 |
-| `MO a r value`, `MC a r value` | `morphological_open(...)`, `morphological_close(...)` | the binary opening (eroded voxels set to 0) and closing (padded by `r` first; voxels that do not end as `value` keep their input) |
+| `ME a r value` | `morphological_erode(a, radius=1, value=1.0)` | `BinaryErodeImageFilter` (the border does not erode), as a 0/1 mask: 1 where the voxel is still `value` after the erosion (ANTs: 1 where the eroded value and the input exceed 0.5, ANTS-17) |
+| `MO a r value`, `MC a r value` | `morphological_open(...)`, `morphological_close(...)` | the binary opening (removed voxels set to 0, or to 1 when `value` is 0; ANTs: 0, ANTS-17) and closing (padded by `r` first; voxels that do not end as `value` keep their input) |
 | `GD a r`, `GE a r`, `GO a r`, `GC a r` | `grayscale_dilate(a, radius=1)`, `grayscale_erode`, `grayscale_open`, `grayscale_close` | maximum / minimum over the ball; opening and closing pad by `r` |
 | any of the eight | `morphology(a, operation, radius=1, value=1.0)` | `operation` is ImageMath's name |
 | `FillHoles a p` | `fill_holes(a, hole_param=2.0)` | the background regions other than the largest set to 1 (all of them for 2; by their share of object neighbours for `p ≤ 1`) |
 | `GetLargestComponent a n` | `largest_component(a, min_size=50)` | 1 in the largest face-connected component(s) of the voxels in `[0.25, 1e9]` (ties keep all of them), 0 elsewhere; components under `n` voxels are dropped first, and if none is left every voxel becomes 0 (ANTs: 1, ANTS-20) |
 | `D a` | `distance_map(a)` | ITK's Danielsson map: the distance (mm) to the nearest non-zero voxel; sequential, as ITK's |
 | `MaurerDistance a f` | `maurer_distance(a, foreground=1.0)` | ITK's signed Maurer map of the voxels equal to `f`: the distance (mm) to the object's inner contour, negative inside, `-0.0` on the contour |
-| `ExtractContours a full` | `extract_contours(a, fully_connected=True)` | ITK's `LabelContourImageFilter` on the values truncated to integer labels |
+| `ExtractContours a full` | `extract_contours(a, fully_connected=True)` | ITK's `LabelContourImageFilter`, every distinct value a label (ANTs truncates them to integers, ANTS-23) |
 | `ThresholdAtMean a f` | `threshold_at_mean(a, fraction=1.0)` | 1 where `mean·f ≤ v ≤ max` (float mean in image order) |
 | `ReplaceVoxelValue a lo hi v` | `replace_voxel_value(a, low, high, value)` | voxels in `[lo, hi]` become `v` |
-| `PadImage a p value` | `pad_image(a, pad, value=0.0)` | `p` voxels of `value` added on each side of every axis (removed if negative); the origin moves so voxels keep their positions; a fractional `p` grows by `int(2p)` and shifts by `int(p)` |
+| `PadImage a p value` | `pad_image(a, pad, value=0.0)` | `int(p)` voxels of `value` added on each side of every axis (removed if negative); the origin moves so voxels keep their positions (ANTs: a fractional `p` grows by `int(2p)` and shifts by `int(p)`, ANTS-22) |
 
 ## Command-line behaviour (as in ANTs)
 
@@ -166,10 +166,10 @@ and sources in [findings/ants-image-programs.md](../findings/ants-image-programs
   the image edges as extending to infinity; a sigma ≤ 0 becomes 0.5 for `Laplacian` and
   `Grad`.
 - **Morphology** ([findings](../findings/ants-morphology.md)): radii are in voxels and
-  truncated (`2.9` is 2; `-1` makes ANTs abort); `ME`'s output is 0/1 and keeps voxels that
-  are above 0.5 but not the foreground (a label 2 stays 1); `MO r 0` is a dilation of the
-  zeros (the opening's eroded voxels become 0, the foreground); the binary erosion does not
-  erode at the image border. Their outputs and `PadImage`'s have no `descrip`; `FillHoles` writes
+  truncated (`2.9` is 2; `-1` makes ANTs abort); `ME`'s output is 0/1; in ANTs it keeps
+  voxels that are above 0.5 but not the foreground (a label 2 stays 1) and `MO r 0` is a
+  dilation of the zeros (the opening's eroded voxels become 0, the foreground), both corrected
+  by default (ANTS-17); the binary erosion does not erode at the image border. Their outputs and `PadImage`'s have no `descrip`; `FillHoles` writes
   the image it read (keeping it). `PadImage` needs its pad argument (ANTs crashes without
   it) and crashes ANTs when an axis would end with 0 or fewer voxels.
 - **Components and distance maps** ([findings](../findings/ants-morphology.md)):
@@ -177,8 +177,8 @@ and sources in [findings/ants-image-programs.md](../findings/ants-image-programs
   read (keeping its `descrip`). `D` is Danielsson's
   propagation, not an exact Euclidean transform, and an image without non-zero voxels gets
   distances near `2·max(size)` mm; `MaurerDistance` gives `∓1.8446743e19` when there is
-  nothing to measure from. `ExtractContours` truncates values to integer labels (1.7 is 1,
-  0.6 is 0). `ThresholdAtMean` with a fraction above
+  nothing to measure from. ANTs' `ExtractContours` truncates values to integer labels (1.7
+  is 1, 0.6 is 0; corrected by default, ANTS-23). `ThresholdAtMean` with a fraction above
   `max/mean` and `ReplaceVoxelValue` with fewer than three numbers make ANTs abort or
   crash; larmorx exits 1.
 
@@ -197,7 +197,7 @@ the entry wherever it changed the result, in both modes
 | ANTS-03 | a file name of fewer than 3 characters is neither read nor written, silently, and the arithmetic, `TruncateImageIntensity`, `Normalize`, morphology, `GetLargestComponent` and `D` operations write no name of 3 characters or fewer; `PadImage` reads no such name (and crashes) | read and written like any other name; the warning comes when such a file was read or written |
 | ANTS-04 | exit 0 after an operation that reports an error and writes nothing | exit 1 (no operation ported so far reports one; their failures are crashes in ANTs and exit 1 in both modes) |
 | ANTS-05 | the operand of the arithmetic operations: `1e` and `-` are the number 0, `1e40` is `FLT_MAX`, no operand at all is the number 1 | a malformed or out-of-range number is an error; no operand is an error, except for `abs`, `exp`, `total`, `mean` and `vtotal`, where ANTs' 1 means the image alone |
-| ANTS-06 | `ExtractContours` labels a negative value by its wrapped conversion (near 2^64; x86-64's answer to an undefined conversion) | negative values and NaN clamp to 0 (background), with a warning |
+| ANTS-06 | `ExtractContours` labels a negative value by its wrapped conversion (near 2^64; x86-64's answer to an undefined conversion) | no conversion: a negative value is a label like any other (ANTS-23), with a warning |
 | ANTS-07 | a second image smaller than the first is read at the first image's indices, past its own voxels (the reads beyond its memory are undefined: `reproduce` takes them as 0 and warns) | an error |
 | ANTS-08 | `/` divides only where the divisor is positive; other voxels keep the previous voxel's result | divides wherever the divisor is not 0, and writes 0 where it is |
 | ANTS-09 | `total` and `mean` write the running sum into each voxel | every voxel holds the printed value (the total, or the mean) |
@@ -208,8 +208,11 @@ the entry wherever it changed the result, in both modes
 | ANTS-14 | `G` with a variance above about 709 voxels² writes NaN everywhere (the kernel's Bessel function overflows) | the kernel computed with exponentially scaled Bessel functions, so it stays finite; elsewhere ITK's kernel bit for bit |
 | ANTS-15 | `G` with a sigma list of the wrong length prints "Incorrect sigma vector size" and returns the image unchanged, exit 0 | an error |
 | ANTS-16 | `Laplacian` reads its normalize flag from the sigma's argument (`stoi("1.5")` is 1; `.5` aborts) | the flag from its own argument, as `Grad`; the warning comes when the two readings differ |
+| ANTS-17 | `ME` makes 1 every voxel its erosion keeps that is above 0.5, so on a label map the other labels become 1, and a remaining foreground of 0.5 or less (`ME r 0.3`, `ME r 0`) becomes 0; `MO r 0` sets the voxels its erosion removes to 0, the foreground itself, so it only dilates the zeros | `ME`: the eroded foreground as a 0/1 mask (1 where the voxel is still the foreground after the erosion); `MO` with the foreground 0: the removed voxels become 1 (for a 0/1 mask, the opening of its zeros, the closing of its ones by duality). On a 0/1 mask with the foreground 1, every pipeline's call, both agree (decided 2026-10-23, rule A) |
 | ANTS-19 | `FillHoles` with `p ≤ 1` counts neighbours outside the image at their unclamped offsets: the next row's voxels, or memory before or after the image on the first or last slice (undefined: `reproduce` takes it as background and warns) | neighbours outside the image are not counted |
 | ANTS-20 | `GetLargestComponent` turns every voxel into 1 when no component is kept | every voxel 0 |
+| ANTS-22 | `PadImage` with a fractional pad grows each axis by `int(2·pad)` but shifts the image by `int(pad)`: 2.5 adds 2 voxels before and 3 after; a negative fractional pad also moves the voxels by one more than the origin (a one-voxel shift in space) and leaves the last row of every axis the pad value | `int(pad)` voxels on each side, the voxels where the origin says (decided 2026-10-23, rule A); integer pads (sMRIPrep's ±10) are unchanged |
+| ANTS-23 | `ExtractContours` labels each voxel by its value truncated to an unsigned integer: 1.2 and 1.7 are one label with no contour between them, values below 1 are background, a contour voxel holds the truncated value | every distinct value is a label (`±0` the background, every NaN one label) and a contour voxel keeps its value (decided 2026-10-23, rule A); integer labels are unchanged |
 | ITK-02 | a file with more dimensions than the operation's (a 4D series read in 3D) is read with an identity direction | the file's direction of its first `D` axes, where they do not reach into the others (every NIfTI time series) |
 | ITK-03 | the connected components relabelled in a float image stop getting new labels at 2^24 | counted in integers |
 | ITK-08 | asked for `x.nii.gz`, ITK's NIfTI reader takes the voxels from `x.nii` when that file exists too | the named file's |

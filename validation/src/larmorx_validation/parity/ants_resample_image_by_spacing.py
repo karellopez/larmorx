@@ -21,9 +21,12 @@ from larmorx_validation.parity.ants_image_math.common import (
     THIN,
     TINY,
 )
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_programs import AntsCase, make_suite
 
 PROGRAM = "ResampleImageBySpacing"
+KNOWN_2MM = "{gen:known-head-2mm}"
+KNOWN_MARKER = "{gen:known-corner-marker}"
 
 
 def resample(cid, category, description, image, *args, dim="3", **kw) -> AntsCase:
@@ -101,6 +104,34 @@ def all_cases() -> list[AntsCase]:
             "3",
             "2.4",
             "2",
+        ),
+        # ANTS-32 (rule A, 2026-10-23): the sigma in input voxels and 0 beyond the input, each
+        # against a result known independently.
+        resample(
+            "sigma-in-voxels-known",
+            S,
+            "2 mm voxels to 4 mm: by default smoothed by one voxel (2 mm), the voxels ANTs gives "
+            "for the same voxels at 1 mm to 2 mm, where its millimetres are voxels; ANTs smooths "
+            "by half a voxel",
+            KNOWN_2MM,
+            "4",
+            "4",
+            "4",
+            fix_expect=known.expect_sigma_in_voxels,
+        ),
+        resample(
+            "outside-zero-known",
+            S,
+            "1 to 2 mm with addvox 3, nearest neighbour, no smoothing: by default the voxels "
+            "beyond the input are 0; ANTs gives them the value at index (1, 1, 1), 7777 here",
+            KNOWN_MARKER,
+            "2",
+            "2",
+            "2",
+            "0",
+            "3",
+            "1",
+            fix_expect=known.expect_outside_zero,
         ),
         resample("nearest", N, "nearest neighbour to 1 mm", HEAD, "1", "1", "1", "0", "0", "1"),
         resample(

@@ -194,7 +194,9 @@ fn parse(
                 let r = strtod(&args[i + 1]) as f32;
                 let b = strtod(&args[i + 2]) as f32;
                 let t = strtod(&args[i + 3]) as f32;
-                if !(5.0..=99.0).contains(&r) || !(30.0..=80.0).contains(&b) || !(b < t && t <= 90.0)
+                if !(5.0..=99.0).contains(&r)
+                    || !(30.0..=80.0).contains(&b)
+                    || !(b < t && t <= 90.0)
                 {
                     return Err(Failure::Fatal(format!(
                         "Illegal values (R pb pt) after '{arg}'"
@@ -468,26 +470,59 @@ mod tests {
     #[test]
     fn options() {
         let o = parse_args(
-            &["-t2", "-gm", "-NOSQUASH", "-rbt", "18.3", "65", "90", "-prefix", "u.nii", "in.nii"],
+            &[
+                "-t2",
+                "-gm",
+                "-NOSQUASH",
+                "-rbt",
+                "18.3",
+                "65",
+                "90",
+                "-prefix",
+                "u.nii",
+                "in.nii",
+            ],
             FIX,
         )
         .unwrap();
         assert_eq!(o.options.t2, 1);
         assert!(o.options.gm && !o.options.squash);
-        assert_eq!((o.options.radius, o.options.bottom, o.options.top), (18.3, 65.0, 90.0));
+        assert_eq!(
+            (o.options.radius, o.options.bottom, o.options.top),
+            (18.3, 65.0, 90.0)
+        );
         assert_eq!(o.dataset, "in.nii");
         for (args, message) in [
-            (&["-Urad", "3", "in.nii"][..], "Illegal value 3.000000 after option -Urad"),
-            (&["-rbt", "18", "20", "80", "in.nii"], "Illegal values (R pb pt) after '-rbt'"),
-            (&["-rbt", "18", "60"], "Need 3 arguments (R pb pt) after '-rbt'"),
-            (&["-clfrac", "0.05", "in.nii"], "-clfrac value 0.050000 is illegal!"),
-            (&["-T2up", "89", "in.nii"], "-T2up value is out of range 90..100 :-("),
+            (
+                &["-Urad", "3", "in.nii"][..],
+                "Illegal value 3.000000 after option -Urad",
+            ),
+            (
+                &["-rbt", "18", "20", "80", "in.nii"],
+                "Illegal values (R pb pt) after '-rbt'",
+            ),
+            (
+                &["-rbt", "18", "60"],
+                "Need 3 arguments (R pb pt) after '-rbt'",
+            ),
+            (
+                &["-clfrac", "0.05", "in.nii"],
+                "-clfrac value 0.050000 is illegal!",
+            ),
+            (
+                &["-T2up", "89", "in.nii"],
+                "-T2up value is out of range 90..100 :-(",
+            ),
             (&["-prefix"], "Need argument after '-prefix'"),
             (&["-bogus", "in.nii"], "Unknown option: -bogus"),
             (&["-quiet"], "No dataset name on command line?"),
             (&["-NODUPLO", "in.nii"], "Unknown option: -NODUPLO"),
         ] {
-            assert_eq!(parse_args(args, FIX).err().as_deref(), Some(message), "{args:?}");
+            assert_eq!(
+                parse_args(args, FIX).err().as_deref(),
+                Some(message),
+                "{args:?}"
+            );
         }
         assert!(parse_args(&["-T2up"], FIX).unwrap_err().contains("AFNI-40"));
         // AFNI-48: refused by default, AFNI's in reproduce mode.

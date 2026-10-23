@@ -340,11 +340,20 @@ pub fn exterior_clip(outside: &mut [u8], v: &[f32], dims: [usize; 3], level: f32
         i >= 1 && i + 1 < nx && j >= 1 && j + 1 < ny && k >= 1 && k + 1 < nz
     };
     let candidate = |o: &[u8], p: usize| o[p] == 0 && (v[p] < level || v[p] > top) && interior(p);
-    let faces = [1isize, -1, nx as isize, -(nx as isize), plane as isize, -(plane as isize)];
+    let faces = [
+        1isize,
+        -1,
+        nx as isize,
+        -(nx as isize),
+        plane as isize,
+        -(plane as isize),
+    ];
     let touches = |o: &[u8], p: usize| faces.iter().any(|&d| o[(p as isize + d) as usize] != 0);
     let mut queue: Vec<usize> = {
         let o = &*outside;
-        select(dims, 1..nz - 1, |p, _, _, _| candidate(o, p) && touches(o, p))
+        select(dims, 1..nz - 1, |p, _, _, _| {
+            candidate(o, p) && touches(o, p)
+        })
     };
     for &p in &queue {
         outside[p] = 1;
@@ -429,7 +438,11 @@ mod tests {
     /// voxel at the clamped index along each axis.
     fn count_by_hand(m: &[u8], dims: [usize; 3], p: usize, offsets: &[[i64; 3]]) -> u32 {
         let [nx, ny, nz] = dims;
-        let (i, j, k) = ((p % nx) as i64, ((p / nx) % ny) as i64, (p / (nx * ny)) as i64);
+        let (i, j, k) = (
+            (p % nx) as i64,
+            ((p / nx) % ny) as i64,
+            (p / (nx * ny)) as i64,
+        );
         offsets
             .iter()
             .map(|o| {
@@ -448,11 +461,18 @@ mod tests {
         assert_eq!(plane_offsets().len(), 8);
         let dims = [5, 4, 3];
         let m = random_mask(dims, 50, 3);
-        for nn in [Neighbourhood::Faces, Neighbourhood::Edges, Neighbourhood::Corners] {
+        for nn in [
+            Neighbourhood::Faces,
+            Neighbourhood::Edges,
+            Neighbourhood::Corners,
+        ] {
             let s = Stencil::new(dims, nn.offsets());
             for p in 0..m.len() {
                 let (i, j, k) = (p % 5, (p / 5) % 4, p / 20);
-                assert_eq!(s.count(&m, p, i, j, k), count_by_hand(&m, dims, p, &nn.offsets()));
+                assert_eq!(
+                    s.count(&m, p, i, j, k),
+                    count_by_hand(&m, dims, p, &nn.offsets())
+                );
             }
         }
     }
@@ -505,7 +525,11 @@ mod tests {
 
     fn fill_by_hand(m: &mut [u8], dims: [usize; 3], s: usize) -> usize {
         let [nx, ny, nz] = dims;
-        let side = [((nx - 1) / 2).min(s), ((ny - 1) / 2).min(s), ((nz - 1) / 2).min(s)];
+        let side = [
+            ((nx - 1) / 2).min(s),
+            ((ny - 1) / 2).min(s),
+            ((nz - 1) / 2).min(s),
+        ];
         if side == [0, 0, 0] {
             return 0;
         }
@@ -529,7 +553,7 @@ mod tests {
                             before[at(dims, c[0], c[1], c[2]).unwrap()] != 0
                         };
                         let sa = sa as i64;
-                        if (1..=sa).any(|d| get(-d)) && (1..=sa).any(|d| get(d)) {
+                        if (1..=sa).any(|d| get(-d)) && (1..=sa).any(get) {
                             fill = true;
                         }
                     }
@@ -561,7 +585,11 @@ mod tests {
     fn erosion_and_dilation_against_the_spec() {
         for dims in [[8, 7, 6], [5, 5, 5], [9, 4, 3]] {
             for density in [40, 70, 90] {
-                for nn in [Neighbourhood::Faces, Neighbourhood::Edges, Neighbourhood::Corners] {
+                for nn in [
+                    Neighbourhood::Faces,
+                    Neighbourhood::Edges,
+                    Neighbourhood::Corners,
+                ] {
                     let m = random_mask(dims, density, density * 7);
                     let offsets = nn.offsets();
                     // Erosion: border voxels, and voxels with a clear neighbour, cleared.
@@ -605,7 +633,11 @@ mod tests {
     fn depth_is_the_number_of_erosions() {
         for dims in [[10, 9, 8], [6, 6, 6]] {
             for density in [70, 95] {
-                for nn in [Neighbourhood::Faces, Neighbourhood::Edges, Neighbourhood::Corners] {
+                for nn in [
+                    Neighbourhood::Faces,
+                    Neighbourhood::Edges,
+                    Neighbourhood::Corners,
+                ] {
                     let m = random_mask(dims, density, density + 1);
                     let (d, counts) = depth(&m, dims, nn);
                     let mut e = m.clone();
@@ -652,14 +684,8 @@ mod tests {
                             let p = at(dims, i as i64, j as i64, k as i64).unwrap();
                             let t = (9999.9 * f64::from(level)) as f32;
                             if expected[p] == 0 && (v[p] < level || v[p] > t) {
-                                let faces = [
-                                    p - 1,
-                                    p + 1,
-                                    p - nx,
-                                    p + nx,
-                                    p - nx * ny,
-                                    p + nx * ny,
-                                ];
+                                let faces =
+                                    [p - 1, p + 1, p - nx, p + nx, p - nx * ny, p + nx * ny];
                                 if faces.iter().any(|&q| expected[q] != 0) {
                                     expected[p] = 1;
                                     added += 1;

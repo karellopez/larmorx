@@ -217,9 +217,9 @@ fn parse(
                 UpstreamDefects::Fix => format!(
                     "-nbhrs {text} is outside 6..26: an error (exit status 1); AFNI silently uses 17"
                 ),
-                UpstreamDefects::Reproduce => format!(
-                    "-nbhrs {text} is outside 6..26: 17 is used, as AFNI does"
-                ),
+                UpstreamDefects::Reproduce => {
+                    format!("-nbhrs {text} is outside 6..26: 17 is used, as AFNI does")
+                }
             };
             log.notice(&Notice::new(&defects::AFNI_41, mode, detail));
             if mode.fix() {
@@ -448,7 +448,9 @@ mod tests {
     #[test]
     fn options() {
         let o = parse_args(
-            &["-nogrxyz", "-peelx", "2.9", "-nbhr", "12", "-dilate", " +3", "in.nii", "-q"],
+            &[
+                "-nogrxyz", "-peelx", "2.9", "-nbhr", "12", "-dilate", " +3", "in.nii", "-q",
+            ],
             FIX,
         )
         .unwrap();
@@ -482,7 +484,11 @@ mod tests {
             parse_args(&["-prefix"], FIX).unwrap_err(),
             "-prefix (null) is illegal!"
         );
-        assert!(parse_args(&["-peels"], FIX).unwrap_err().contains("AFNI-40"));
+        assert!(
+            parse_args(&["-peels"], FIX)
+                .unwrap_err()
+                .contains("AFNI-40")
+        );
         assert_eq!(
             parse_args(&["-bogus", "in.nii"], FIX).unwrap_err(),
             "ILLEGAL option: -bogus"

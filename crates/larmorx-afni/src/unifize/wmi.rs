@@ -299,7 +299,7 @@ pub fn local_intensity(
                 loop {
                     let p = i as usize + nx * j as usize;
                     slab[p] = w.value(&ranked.values, bottom, top);
-                    if (k as usize * plane + p) % 66_666 == 0 && w.n >= 2 {
+                    if (k as usize * plane + p).is_multiple_of(66_666) && w.n >= 2 {
                         dots += 1;
                     }
                     // The next voxel: along x, or a step in y at the row's end.
@@ -362,7 +362,13 @@ pub(crate) fn local_intensity_by_hand(
                     .iter()
                     .filter_map(|o| {
                         let (x, y, z) = (i + o[0], j + o[1], k + o[2]);
-                        if x < 0 || y < 0 || z < 0 || x >= nx as i64 || y >= ny as i64 || z >= nz as i64 {
+                        if x < 0
+                            || y < 0
+                            || z < 0
+                            || x >= nx as i64
+                            || y >= ny as i64
+                            || z >= nz as i64
+                        {
                             return None;
                         }
                         let val = a[x as usize + nx * (y as usize + ny * z as usize)];
@@ -446,7 +452,10 @@ mod tests {
                     let a = image(dims, 9 + t as u64 * 31 + zeros + levels, zeros, levels);
                     let (fast, _) = local_intensity(&a, dims, r, b, top);
                     let slow = local_intensity_by_hand(&a, dims, r, b, top);
-                    let same = fast.iter().zip(&slow).all(|(x, y)| x.to_bits() == y.to_bits());
+                    let same = fast
+                        .iter()
+                        .zip(&slow)
+                        .all(|(x, y)| x.to_bits() == y.to_bits());
                     assert!(same, "{dims:?} r {r} zeros {zeros} levels {levels}");
                 }
             }
@@ -457,10 +466,12 @@ mod tests {
     fn the_same_at_any_thread_count() {
         let dims = [11, 10, 9];
         let a = image(dims, 5, 30, 500);
-        let one = larmorx_core::parallel::with_threads(1, || local_intensity(&a, dims, 3.2, 70.0, 80.0))
-            .unwrap();
-        let four = larmorx_core::parallel::with_threads(4, || local_intensity(&a, dims, 3.2, 70.0, 80.0))
-            .unwrap();
+        let one =
+            larmorx_core::parallel::with_threads(1, || local_intensity(&a, dims, 3.2, 70.0, 80.0))
+                .unwrap();
+        let four =
+            larmorx_core::parallel::with_threads(4, || local_intensity(&a, dims, 3.2, 70.0, 80.0))
+                .unwrap();
         assert_eq!(one, four);
     }
 }

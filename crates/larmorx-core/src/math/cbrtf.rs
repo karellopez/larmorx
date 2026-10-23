@@ -36,7 +36,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#![allow(clippy::unreadable_literal)]
+#![allow(clippy::unreadable_literal, clippy::manual_range_contains)]
 
 const fn fb(bits: u64) -> f64 {
     f64::from_bits(bits)

@@ -45,24 +45,26 @@ pub fn down(a: &[f32], dims: [usize; 3]) -> (Vec<f32>, [usize; 3]) {
     let [hx, hy, _] = h;
     let at = |x: usize, y: usize, z: usize| a[x + nx * (y + ny * z)];
     let mut out = vec![0f32; h.iter().product()];
-    out.par_chunks_mut(hx * hy).enumerate().for_each(|(k, slab)| {
-        for j in 0..hy {
-            for i in 0..hx {
-                let (x, y, z) = (2 * i, 2 * j, 2 * k);
-                let (x, y, z) = (x.min(nx - 1), y.min(ny - 1), z.min(nz - 1));
-                let v = [
-                    at(x, y, z),
-                    at(x.saturating_sub(1), y, z),
-                    at((x + 1).min(nx - 1), y, z),
-                    at(x, y.saturating_sub(1), z),
-                    at(x, (y + 1).min(ny - 1), z),
-                    at(x, y, z.saturating_sub(1)),
-                    at(x, y, (z + 1).min(nz - 1)),
-                ];
-                slab[i + hx * j] = median7(v);
+    out.par_chunks_mut(hx * hy)
+        .enumerate()
+        .for_each(|(k, slab)| {
+            for j in 0..hy {
+                for i in 0..hx {
+                    let (x, y, z) = (2 * i, 2 * j, 2 * k);
+                    let (x, y, z) = (x.min(nx - 1), y.min(ny - 1), z.min(nz - 1));
+                    let v = [
+                        at(x, y, z),
+                        at(x.saturating_sub(1), y, z),
+                        at((x + 1).min(nx - 1), y, z),
+                        at(x, y.saturating_sub(1), z),
+                        at(x, (y + 1).min(ny - 1), z),
+                        at(x, y, z.saturating_sub(1)),
+                        at(x, y, (z + 1).min(nz - 1)),
+                    ];
+                    slab[i + hx * j] = median7(v);
+                }
             }
-        }
-    });
+        });
     (out, h)
 }
 

@@ -122,10 +122,10 @@ fn clusters(mask: &[u8], dims: [usize; 3]) -> Clusters {
     }
     let mut root = vec![0u32; n];
     let mut size = vec![0usize; n];
-    for i in 0..n {
+    for (i, (slot, run)) in root.iter_mut().zip(&runs.runs).enumerate() {
         let r = find(&mut parent, i as u32);
-        root[i] = r;
-        size[r as usize] += runs.runs[i].len as usize;
+        *slot = r;
+        size[r as usize] += run.len as usize;
     }
     Clusters { runs, root, size }
 }

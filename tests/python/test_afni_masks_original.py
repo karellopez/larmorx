@@ -25,10 +25,7 @@ def head(shape=(26, 24, 20), seed=3, t2=False) -> np.ndarray:
     """A small head: background noise, a bright shell, grey and white matter, a dark core, a
     thin protrusion (peeling cuts it), under a smooth shading."""
     rng = np.random.default_rng(seed)
-    nx, ny, nz = shape
-    x, y, z = np.meshgrid(
-        *(np.linspace(-1, 1, n) for n in shape), indexing="ij"
-    )
+    x, y, z = np.meshgrid(*(np.linspace(-1, 1, n) for n in shape), indexing="ij")
     r = np.sqrt(x**2 + y**2 + (1.1 * z) ** 2)
     wm, gm, csf, skull = (420.0, 700.0, 1400.0, 150.0) if t2 else (1000.0, 650.0, 250.0, 900.0)
     v = np.full(shape, 15.0)
@@ -75,7 +72,9 @@ def same(a: lx.Image, b: lx.Image) -> bool:
     return (
         x.dtype == y.dtype
         and x.shape == y.shape
-        and np.array_equal(np.ascontiguousarray(x).view(np.uint8), np.ascontiguousarray(y).view(np.uint8))
+        and np.array_equal(
+            np.ascontiguousarray(x).view(np.uint8), np.ascontiguousarray(y).view(np.uint8)
+        )
         and np.array_equal(a.affine, b.affine)
     )
 
@@ -189,16 +188,16 @@ def test_d13_switches(t1, t2):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         fixed = lx.afni.automask(t1, peels=0, implementation=ORIGINAL)
-        once = lx.afni.automask(
-            t1, peels=0, upstream_defects="reproduce", implementation=ORIGINAL
-        )
+        once = lx.afni.automask(t1, peels=0, upstream_defects="reproduce", implementation=ORIGINAL)
     named = [w for w in caught if "AFNI-43" in str(w.message)]
     differ = not same(fixed.mask, once.mask)
     assert bool(named) == differ
     assert same(once.mask, lx.afni.automask(t1, peels=1, implementation=ORIGINAL).mask)
     # AFNI-45: -T2up 100 reads one past the sorted values; AFNI's 0 zeroes the output.
     with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-45"):
-        fixed = lx.afni.unifize(t2, t2=True, t2_percentile=100.0, radius=6.0, implementation=ORIGINAL)
+        fixed = lx.afni.unifize(
+            t2, t2=True, t2_percentile=100.0, radius=6.0, implementation=ORIGINAL
+        )
     with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-45"):
         afni = lx.afni.unifize(
             t2,

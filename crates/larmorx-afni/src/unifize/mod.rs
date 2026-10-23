@@ -396,8 +396,12 @@ fn progress(events: &mut Vec<Event>, text: &str) {
 }
 
 fn volume(dims: [usize; 3], v: Vec<f32>) -> Bricks {
-    Bricks::new([dims[0], dims[1], dims[2], 1], BrickData::Float(v), vec![0.0])
-        .expect("the data fit the grid")
+    Bricks::new(
+        [dims[0], dims[1], dims[2], 1],
+        BrickData::Float(v),
+        vec![0.0],
+    )
+    .expect("the data fit the grid")
 }
 
 const NO_TIME: crate::dataset::OutputTiming = crate::dataset::OutputTiming {
@@ -526,7 +530,8 @@ fn run_here(
         progress(&mut events, "D");
         let (h, hd) = duplo::down(&a, dims);
         progress(&mut events, "V");
-        let (hv, dots) = wmi::local_intensity(&h, hd, 0.5f32 * o.radius + 0.001f32, o.bottom, o.top);
+        let (hv, dots) =
+            wmi::local_intensity(&h, hd, 0.5f32 * o.radius + 0.001f32, o.bottom, o.top);
         let up = duplo::up_dims(hd, dims);
         let full = if up == dims {
             duplo::up(&hv, hd, dims)
@@ -670,13 +675,11 @@ fn run_here(
     let fin = automask_of(&x, dims, o.clfrac, o.verb, &mut events)
         .map_err(|NoMask| "the final automask of a plane smaller than 16 x 16".to_string())?;
     progress(&mut events, "m");
-    x.par_iter_mut()
-        .zip(fin.par_iter())
-        .for_each(|(v, &m)| {
-            if m == 0 {
-                *v = 0.0;
-            }
-        });
+    x.par_iter_mut().zip(fin.par_iter()).for_each(|(v, &m)| {
+        if m == 0 {
+            *v = 0.0;
+        }
+    });
     progress(&mut events, "\n");
     let bricks = volume(dims, x);
     let header = header_of(&bricks, &NO_TIME, &mut notices, &mut out_messages)?;

@@ -103,7 +103,11 @@ pub fn run(
 
 /// The AFNI-23 notice of 3dAutomask and 3dUnifize, and the correction: data
 /// `AFNI_NIFTI_SCALE=NO` kept as stored are read as without the variable by default.
-pub fn intercept_correction(image: &mut AfniImage, mode: UpstreamDefects, tool: &str) -> Option<Notice> {
+pub fn intercept_correction(
+    image: &mut AfniImage,
+    mode: UpstreamDefects,
+    tool: &str,
+) -> Option<Notice> {
     let kept = image.kept_intercept?;
     let name = match kept.stored {
         larmorx_core::element::DataType::U8 => "UINT8",
@@ -129,7 +133,11 @@ pub fn intercept_correction(image: &mut AfniImage, mode: UpstreamDefects, tool: 
 
 /// The time fields of an output that keeps the input's time axis (the masked input, `-EPI`'s
 /// output): the input's TR and `toffset`, and the slice fields of its header's slice timing.
-pub fn copy_timing(image: &AfniImage, mode: UpstreamDefects, notices: &mut Vec<Notice>) -> OutputTiming {
+pub fn copy_timing(
+    image: &AfniImage,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> OutputTiming {
     let slices = image.slice_timing.as_ref().map(|h| {
         let (fields, zero) = timing::copy_slice_fields(&h.times, mode);
         if zero {
@@ -154,7 +162,8 @@ pub fn header_for(
     notices: &mut Vec<Notice>,
     messages: &mut Vec<Message>,
 ) -> Result<NiftiHeader, String> {
-    let (header, n, m) = dataset::output_header(&image.geometry, bricks, timing, None, mode, settings)?;
+    let (header, n, m) =
+        dataset::output_header(&image.geometry, bricks, timing, None, mode, settings)?;
     for x in n {
         defects::push_once(notices, x);
     }
@@ -199,7 +208,11 @@ fn run_here(
     let mut mask = match formed {
         Ok(m) => m,
         Err(NoMask) => {
-            return Ok(failed("Mask creation fails for unknown reasons!", messages, notices));
+            return Ok(failed(
+                "Mask creation fails for unknown reasons!",
+                messages,
+                notices,
+            ));
         }
     };
     // AFNI-43: -peels below 1 (AFNI peels once).
@@ -345,7 +358,10 @@ fn differing(a: &[u8], b: &[u8]) -> usize {
     if b.len() != a.len() {
         return a.len();
     }
-    a.par_iter().zip(b.par_iter()).filter(|(x, y)| x != y).count()
+    a.par_iter()
+        .zip(b.par_iter())
+        .filter(|(x, y)| x != y)
+        .count()
 }
 
 /// The input with every voxel outside `mask` 0, in its storage type and with its factors.
@@ -501,7 +517,10 @@ pub fn form_mask(
     }
     let [nx, ny, nz] = dims;
     let fixed = clip_level(v, dims, settings.clfrac);
-    log.push(format!("Fixed clip level = {}", crate::cfmt::f(f64::from(fixed))));
+    log.push(format!(
+        "Fixed clip level = {}",
+        crate::cfmt::f(f64::from(fixed))
+    ));
     let mut mask = vec![0u8; v.len()];
     if settings.gradual {
         let g = GradualLevel::new(v, dims, settings.clfrac);

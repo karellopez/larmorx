@@ -461,8 +461,8 @@ mod tests {
         let dims = [8, 6, 4];
         let v: Vec<f32> = (0..8 * 6 * 4).map(|i| (i % 13) as f32 * 10.0).collect();
         let g = GradualLevel::new(&v, dims, 0.5);
-        for a in 0..3 {
-            for i in 0..dims[a] {
+        for (a, &n) in dims.iter().enumerate() {
+            for i in 0..n {
                 let w = g.weight(a, i);
                 assert!((0.0..=1.0).contains(&w));
             }

@@ -643,8 +643,7 @@ fn afni_unifize_file<'py>(
         scale: save_scale,
         automasked: save_automask,
     };
-    let (mut image, messages, mut notices) =
-        read_for_masks(py, &path, &settings, mode, n_threads)?;
+    let (mut image, messages, mut notices) = read_for_masks(py, &path, &settings, mode, n_threads)?;
     let run = py
         .detach(|| unifize::run(&mut image, &options, mode, &settings, n_threads))
         .map_err(value_err)?;

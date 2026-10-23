@@ -501,15 +501,13 @@ def check_outputs(
                 )
             )
         else:
-            checks(
-                f"{name}: header bytes", c.header, detail="identical" if c.header else "differ"
-            )
+            checks(f"{name}: header bytes", c.header, detail="identical" if c.header else "differ")
     return ok
 
 
 def afni_10_explainer(
     program: str,
-    s: "Scenario",
+    s: Scenario,
     args: list[str],
     env: dict[str, str],
     tmp: Path,
@@ -1048,9 +1046,8 @@ def highlights(
 
     def identical(r: CaseResult) -> bool:
         reported = [c for c in r.checks if c.name.endswith(": values bit-identical to AFNI's")]
-        return (
-            all(c.passed and c.value != AFNI_10 for c in data_checks(r))
-            and all(c.value == 0 for c in reported)
+        return all(c.passed and c.value != AFNI_10 for c in data_checks(r)) and all(
+            c.value == 0 for c in reported
         )
 
     with_outputs = [r for r in compared if data_checks(r)]

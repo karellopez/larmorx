@@ -9,11 +9,11 @@ own golden tests and by the parity suites against AFNI; the originals by
 from __future__ import annotations
 
 import contextlib
-import warnings
 import io
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np

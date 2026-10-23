@@ -505,6 +505,89 @@ def check_outputs(
     return ok
 
 
+#: The check of a clean-room original's outputs against AFNI with correctly rounded maths.
+CORRECTLY_ROUNDED = "values bit-identical to AFNI's with correctly rounded maths"
+
+
+def crmath_preload() -> Path | None:
+    """CORE-MATH's correctly rounded functions for ``LD_PRELOAD`` into AFNI
+    (``scripts/build_crmath_preload.sh``), when the build has ``tanhf`` and ``cbrtf`` (3dUnifize's
+    squash and ``-EPI``): ``LARMORX_CRMATH_PRELOAD``, else the workspace's
+    ``oracles/core-math-preload``."""
+    if env := os.environ.get("LARMORX_CRMATH_PRELOAD"):
+        lib = Path(env)
+    else:
+        ws = workspace()
+        if ws is None:
+            return None
+        lib = ws / "oracles/core-math-preload/libcrmath.so"
+    info = lib.parent / "BUILD_INFO.txt"
+    if not lib.is_file() or not info.is_file():
+        return None
+    functions = re.search(r"functions: (.+)", info.read_text(encoding="utf-8"))
+    names = set(functions.group(1).split()) if functions else set()
+    return lib if {"tanhf", "cbrtf"} <= names else None
+
+
+def _correctly_rounded(
+    checks: CheckList,
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    a_dir: Path,
+    l_dir: Path,
+    outputs: tuple[str, ...],
+) -> None:
+    """For a clean-room original whose float32 outputs differ from AFNI's in their last bits:
+    AFNI again with CORE-MATH's correctly rounded functions preloaded (the original uses
+    correctly rounded ``tanhf``; AFNI calls glibc's). Reported: how many values still differ."""
+    differ = [
+        n
+        for n in outputs
+        if (a_dir / n).is_file()
+        and (l_dir / n).is_file()
+        and nifti_parts(a_dir / n)[1] != nifti_parts(l_dir / n)[1]
+    ]
+    if not differ:
+        return
+    lib = crmath_preload()
+    if lib is None:
+        checks.add(
+            Check(
+                CORRECTLY_ROUNDED,
+                True,
+                metric="values that differ",
+                value="not run",
+                threshold="reported",
+                detail="no CORE-MATH preload with tanhf and cbrtf (scripts/build_crmath_preload.sh)",
+            )
+        )
+        return
+    d = tmp / "afni-correctly-rounded"
+    _setup(d, s)
+    r = run_afni(program, args, dict(env, LD_PRELOAD=str(lib)), d)
+    worst, details = 0, []
+    for name in differ:
+        if r.code != 0 or not (d / name).is_file():
+            worst, details = -1, [f"AFNI with the preload: exit {r.code}"]
+            break
+        c = compare_files(d / name, l_dir / name)
+        worst = max(worst, c.differing)
+        details.append(f"{name}: {c.detail}")
+    checks.add(
+        Check(
+            CORRECTLY_ROUNDED,
+            True,
+            metric="values that differ",
+            value=worst,
+            threshold="reported",
+            detail="; ".join(details),
+        )
+    )
+
+
 def afni_10_explainer(
     program: str,
     s: Scenario,
@@ -715,6 +798,8 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             else None
         )
         check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance, explain)
+        if spec.tolerance is not None and afni.code == 0:
+            _correctly_rounded(checks, program, s, args, env, tmp, a_dir, l_dir, tuple(a_out))
         if s.expect == "pass" and afni.code != 0 and s.fix_writes is not None:
             _fix_writes(checks, program, s, args, env, tmp, impl)
             return
@@ -1070,6 +1155,15 @@ def highlights(
         f"date, and larmorx's own lines, set aside): {sum(c.passed for c in messages)} of "
         f"{len(messages)} identical, in every case that ran both programs.",
     ]
+    rounded = [c for r in with_outputs for c in r.checks if c.name == CORRECTLY_ROUNDED]
+    if rounded:
+        same = [c for c in rounded if c.value == 0]
+        lines.append(
+            f"- The other {len(rounded)} compared case(s) write float32 values within the threshold "
+            "(AFNI's squash calls glibc's `tanhf`, which is not correctly rounded on some "
+            "arguments; the original's is): with CORE-MATH's correctly rounded functions "
+            f"preloaded into AFNI, {len(same)} of them are bit-identical to the original."
+        )
     if afni_10:
         names = ", ".join(f"`{r.case}`" for r in afni_10)
         lines.append(

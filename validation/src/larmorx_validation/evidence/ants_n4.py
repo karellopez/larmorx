@@ -884,6 +884,7 @@ def rerun_larmorx(ctx: core.Context) -> None:
         entry(ctx),
         ["larmorx-1", "larmorx-1-reproduce", "larmorx-12", "larmorx-12-reproduce"],
         "ANTS-40 corrected by default (2026-10-23): the default mode's outputs change",
+        cpus=6,
     )
 
 

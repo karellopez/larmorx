@@ -29,9 +29,10 @@
 //! **Upstream defects (D13)**, corrected unless `LARMORX_UPSTREAM_DEFECTS=reproduce`
 //! (`docs/findings/afni-automask.md`; the notices `*+ WARNING: upstream defect ...`): those of
 //! the shared dataset and output code (AFNI-02, -11, -12, -16, -18, -20, -22, -23, -26), AFNI-01
-//! in the average of several sub-bricks ([`crate::automask::aveabs`]), and an option given
-//! without its value as the last argument, where AFNI crashes (AFNI-40): a refusal, in both
-//! modes.
+//! in the average of several sub-bricks ([`crate::automask::aveabs`]), `-peels 0` (AFNI-43),
+//! `-nbhrs` outside 6..26 refused (AFNI-41, rule B: AFNI's range check never runs and the
+//! value becomes 17), and an option given without its value as the last argument, where AFNI
+//! crashes (AFNI-40): a refusal, in both modes.
 
 use std::io::Write;
 
@@ -70,7 +71,8 @@ Options (before the dataset):
   -peels pp         peel (erode) the mask pp times, then unpeel (default 1)
   -NN1 -NN2 -NN3    neighbours for -erode, -dilate and -depth: faces, edges (default),
                     corners
-  -nbhrs nn         neighbours (of 18) a voxel needs not to be peeled (default 17)
+  -nbhrs nn         neighbours (of 18) a voxel needs not to be peeled (default 17; 6 to 26,
+                    another value is an error, AFNI-41)
   -q                no progress messages
   -eclip            remove exterior voxels below the clip level
   -dilate nd        dilate the mask outwards nd times
@@ -152,6 +154,8 @@ struct Options {
     dataset: Option<String>,
     /// The names AFNI would refuse (`THD_filename_ok`), accepted by larmorx-gpl (AFNI-12).
     refused_names: Vec<String>,
+    /// The last `-nbhrs` value given (its text and `(int) strtod`), whatever `-NNx` does.
+    given_nbhrs: Option<(String, i32)>,
 }
 
 /// `(int) strtod(s, NULL)`: truncation toward zero (saturating where C is undefined).
@@ -204,6 +208,7 @@ fn parse(
         settings: MaskSettings::default(),
         dataset: None,
         refused_names: Vec::new(),
+        given_nbhrs: None,
     };
     let mut new_nn = 0u8;
     let mut iarg = 0;
@@ -262,7 +267,9 @@ fn parse(
             continue;
         }
         if n5("-nbhr") {
-            o.nbhrs = strtod_int(&value(&mut iarg, "-nbhrs", false)?);
+            let text = value(&mut iarg, "-nbhrs", false)?;
+            o.nbhrs = strtod_int(&text);
+            o.given_nbhrs = Some((text, o.nbhrs));
             iarg += 1;
             continue;
         }
@@ -336,6 +343,28 @@ fn parse(
     };
     if new_nn != 0 {
         o.nbhrs = max_nbhrs;
+    }
+    // AFNI-41: AFNI's check of -nbhrs reads `new_nbhrs`, which nothing sets, so it never runs;
+    // `THD_automask_set_peelcounts` then replaces a value outside 6..26 (the help's range) by
+    // 17. Corrected (rule B, decided 2026-10-23): a value outside 6..26 is an error, whether
+    // or not -NN1/2/3 override it; `reproduce` keeps AFNI's behaviour, named in `run`.
+    if let Some((text, v)) = &o.given_nbhrs
+        && !(6..=26).contains(v)
+        && mode.fix()
+    {
+        let used = if o.nbhrs == *v { 17 } else { o.nbhrs.min(18) };
+        io.notice(&Notice::new(
+            &defects::AFNI_41,
+            mode,
+            format!(
+                "-nbhrs {text} is outside 6..26 (the range the help gives): an error (exit status \
+                 1); AFNI silently peels as with {used}"
+            ),
+        ));
+        return Err(Fail::Fatal(format!(
+            "-nbhrs {text} is illegal: choose a value between 6 and 26 (AFNI-41; \
+             LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
+        )));
     }
     o.settings.set_peelcounts(o.peels, o.nbhrs);
     if o.dilate_flag && o.erode_flag {
@@ -485,6 +514,20 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, quiet: bool, io: &mut Io<'_>) -
             format!(
                 "the {name} has blanks, shell metacharacters or non-ASCII characters: accepted; \
                  AFNI refuses it"
+            ),
+        );
+    }
+    if let Some((text, v)) = &o.given_nbhrs
+        && !(6..=26).contains(v)
+    {
+        // Only `reproduce` gets here (the default refused it in `parse`): AFNI's peel count
+        // is 17 for the value itself, min(18, n) for -NNx's.
+        let used = if o.nbhrs == *v { 17 } else { o.nbhrs.min(18) };
+        notices.add(
+            &defects::AFNI_41,
+            format!(
+                "-nbhrs {text} is outside 6..26 (the range the help gives): the peeling acts as \
+                 with {used}, as in AFNI; by default it is an error"
             ),
         );
     }
@@ -706,13 +749,20 @@ mod tests {
     use super::*;
 
     fn parse_args(args: &[&str]) -> Result<Options, String> {
+        parse_in(args, UpstreamDefects::Fix).0
+    }
+
+    /// `parse` in `mode`, with what it printed on standard error.
+    fn parse_in(args: &[&str], mode: UpstreamDefects) -> (Result<Options, String>, String) {
         let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let settings = Settings::empty();
-        let mut io = Io::new(&mut out, &mut err, &settings, UpstreamDefects::Fix);
-        parse(&args, UpstreamDefects::Fix, &settings, &mut io).map_err(|e| match e {
+        let mut io = Io::new(&mut out, &mut err, &settings, mode);
+        let r = parse(&args, mode, &settings, &mut io).map_err(|e| match e {
             Fail::Fatal(m) | Fail::Error(m) => m,
-        })
+        });
+        drop(io);
+        (r, String::from_utf8(err).unwrap())
     }
 
     #[test]
@@ -726,11 +776,25 @@ mod tests {
         assert_eq!((o.nn, o.settings.peelthr), (1, 6));
         let o = parse_args(&["-NN2", "x.nii"]).unwrap();
         assert_eq!(o.settings.peelthr, 18);
-        // Out of range: 17, silently.
-        assert_eq!(
-            parse_args(&["-nbhrs", "40", "x"]).unwrap().settings.peelthr,
-            17
-        );
+        // AFNI-41: out of range, AFNI's 17 silently; corrected, an error naming the entry.
+        let reproduce = UpstreamDefects::Reproduce;
+        for v in ["40", "5", "0", "abc", "27"] {
+            let (o, _) = parse_in(&["-nbhrs", v, "x"], reproduce);
+            assert_eq!(o.unwrap().settings.peelthr, 17, "{v}");
+            let (e, err) = parse_in(&["-nbhrs", v, "x"], UpstreamDefects::Fix);
+            assert!(e.unwrap_err().contains("AFNI-41"), "{v}");
+            assert!(
+                err.contains("upstream defect AFNI-41 (3dAutomask)"),
+                "{err}"
+            );
+        }
+        // The help's range is accepted (19 to 26 peel as 18), and -NN1 does not excuse 40.
+        for v in ["6", "18", "26", "6.9"] {
+            assert!(parse_args(&["-nbhrs", v, "x"]).is_ok(), "{v}");
+        }
+        assert!(parse_args(&["-nbhrs", "40", "-NN1", "x"]).is_err());
+        let (o, _) = parse_in(&["-nbhrs", "40", "-NN1", "x"], reproduce);
+        assert_eq!(o.unwrap().settings.peelthr, 6);
         assert!(
             !parse_args(&["-nogradual", "x"])
                 .unwrap()

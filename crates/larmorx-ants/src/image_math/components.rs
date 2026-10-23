@@ -402,7 +402,9 @@ mod tests {
         }
         // ANTS-23: 1.2 and 1.7 are both label 1 in ANTs (no contour between them), 0.6 is
         // background; corrected, each value is its own label and keeps its value.
-        let data = [0.0f32, 1.2, 1.2, 1.7, 1.7, 2.0, 2.0, 0.0, 0.6, 0.6, 0.6, 0.0];
+        let data = [
+            0.0f32, 1.2, 1.2, 1.7, 1.7, 2.0, 2.0, 0.0, 0.6, 0.6, 0.6, 0.0,
+        ];
         let v = VolumeRef::new(&data, &[12], &[1.0]);
         let (ants, notices) = extract_contours(v, true, 1, R).unwrap();
         assert_eq!(ants, [0., 1., 0., 0., 1., 2., 2., 0., 0., 0., 0., 0.]);

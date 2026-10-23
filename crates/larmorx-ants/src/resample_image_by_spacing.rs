@@ -356,7 +356,10 @@ mod tests {
         assert_eq!(c.size(), [7, 11, 7]);
         // Beyond the input: ANTs' value at (1, 1, 1); corrected, 0.
         assert_eq!(*c.data.last().unwrap(), input.data[1 + 10 + 90]);
-        assert!(notices[0].detail.contains("beyond the input"), "{notices:?}");
+        assert!(
+            notices[0].detail.contains("beyond the input"),
+            "{notices:?}"
+        );
         let (d, _, notices) = resample_image_by_spacing(&input, &more, 2, fix).unwrap();
         assert_eq!(*d.data.last().unwrap(), 0.0);
         assert!(notices[0].detail.contains("are 0"), "{notices:?}");
@@ -374,7 +377,10 @@ mod tests {
         let (e, _, notices) = resample_image_by_spacing(&flat, &flat_options, 1, fix).unwrap();
         assert_eq!(e.size(), [11, 10, 2]);
         assert_eq!(*e.data.last().unwrap(), 0.0);
-        assert!(notices[0].detail.contains("axis of one voxel"), "{notices:?}");
+        assert!(
+            notices[0].detail.contains("axis of one voxel"),
+            "{notices:?}"
+        );
     }
 
     #[test]

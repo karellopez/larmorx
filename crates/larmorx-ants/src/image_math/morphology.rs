@@ -668,7 +668,9 @@ mod tests {
         assert_eq!(fixed.size(), [4, 3]);
         assert_eq!(
             fixed.data,
-            [7.0, 8.0, 9.0, 10.0, 13.0, 14.0, 15.0, 16.0, 19.0, 20.0, 21.0, 22.0]
+            [
+                7.0, 8.0, 9.0, 10.0, 13.0, 14.0, 15.0, 16.0, 19.0, 20.0, 21.0, 22.0
+            ]
         );
         assert_eq!(fixed.geometry.origin, ants.geometry.origin);
         assert!(notices[0].detail.contains("one more than its origin"));
@@ -766,7 +768,9 @@ mod tests {
     fn erosion_and_opening_with_labels_and_zero() {
         let (r, f) = (UpstreamDefects::Reproduce, UpstreamDefects::Fix);
         // A line: labels 1 (5 voxels), 2 (3 voxels), and a run of 0.3.
-        let data = [0.0f32, 1., 1., 1., 1., 1., 0., 2., 2., 2., 0., 0.3, 0.3, 0.3, 0.];
+        let data = [
+            0.0f32, 1., 1., 1., 1., 1., 0., 2., 2., 2., 0., 0.3, 0.3, 0.3, 0.,
+        ];
         let size = [15usize];
         let v = VolumeRef::new(&data, &size, &[1.0]);
         // ANTS-17, ME 1 1: ANTs keeps label 2 as 1; corrected, only the eroded label 1.
@@ -775,7 +779,11 @@ mod tests {
         assert_eq!(n[0].defect.id, "ANTS-17");
         let (fixed, n) = morphological(v, Morphology::BinaryErode, 1, 1.0, 1, f).unwrap();
         assert_eq!(&fixed[..10], &[0., 0., 1., 1., 1., 0., 0., 0., 0., 0.]);
-        assert!(n[0].detail.contains("3 voxel(s) that are not the foreground"), "{n:?}");
+        assert!(
+            n[0].detail
+                .contains("3 voxel(s) that are not the foreground"),
+            "{n:?}"
+        );
         // ME 1 0.3: the eroded run of 0.3 is 0 in ANTs (not above 0.5), 1 corrected.
         let (ants, _) = morphological(v, Morphology::BinaryErode, 1, 0.3, 1, r).unwrap();
         assert_eq!(ants[12], 0.0);
@@ -800,7 +808,10 @@ mod tests {
         assert_eq!(fixed, [1., 1., 1., 1., 1., 1., 1., 1., 0., 0., 0., 0.]);
         // Any other foreground: ITK's opening in both modes.
         let a = morphological(h, Morphology::BinaryOpen, 1, 1.0, 1, r).unwrap();
-        assert_eq!(a, morphological(h, Morphology::BinaryOpen, 1, 1.0, 1, f).unwrap());
+        assert_eq!(
+            a,
+            morphological(h, Morphology::BinaryOpen, 1, 1.0, 1, f).unwrap()
+        );
         assert!(a.1.is_empty());
     }
 

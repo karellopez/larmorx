@@ -26,6 +26,7 @@
 #![forbid(unsafe_code)]
 
 pub mod adaptive_denoising;
+pub mod blobs;
 pub mod bspline;
 pub mod components;
 pub mod discrete_gaussian;

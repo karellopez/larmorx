@@ -21,6 +21,7 @@
 pub mod affine;
 pub mod array;
 pub mod defects;
+pub mod eigen_sym;
 pub mod element;
 pub mod grid;
 pub mod image;
@@ -31,6 +32,7 @@ pub mod parallel;
 pub mod rotation;
 pub mod vnl_eigen;
 pub mod vnl_fixed;
+pub mod vnl_qr;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
 

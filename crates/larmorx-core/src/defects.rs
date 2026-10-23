@@ -406,8 +406,20 @@ defects! {
         "ManifoldParzenWindows' local covariances (a covariance neighbourhood above 0) double the running diagonal sums at every neighbour and add the running upper values to the lower triangle";
     ANTS_105 = "ANTS-105", "Atropos", true,
         "--minimize-memory-usage with prior probability images and a mask crashes: the check of the priors against the mask rebuilds a prior on the first intensity image before any is read";
+    ANTS_106 = "ANTS-106", "Atropos", true,
+        "partial-volume classes with their likelihoods and an MRF never win a voxel: the MRF compares the tissue labels of each partial-volume set but never the partial-volume label itself, so a partial-volume label costs +1 against every neighbour and Atropos stops";
     ANTS_107 = "ANTS-107", "Atropos", true,
         "with GrubbsRosner, whose output keeps growing (ANTS-94), Atropos weighs the samples beyond the masked voxels with weights it never sets (uninitialized memory): the class parameters depend on what the memory held";
+    ITK_60 = "ITK-60", "ITK", true,
+        "LandmarkBasedTransformInitializer's 2D rigid fit takes the angle -pi/2 whenever the landmarks' summed dot product is within 5e-5 of 0, whatever the sign of their cross product (a quarter turn the other way gives the opposite rotation)";
+    ANTS_110 = "ANTS-110", "antsAI", true,
+        "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
+    ANTS_111 = "ANTS-111", "antsAI", true,
+        "once no blob pair with a positive patch correlation is left, the pairing takes the first fixed and the first moving blob again at every step (an uncorrelated and repeated pair) until it has as many pairs as asked or has tried every fixed blob";
+    ANTS_112 = "ANTS-112", "antsAI", true,
+        "the blob detector does not keep the N strongest maxima: after each scale it drops every later maximum below the weakest one kept even while fewer than N are kept, and when a heap has just filled it lets a weaker maximum push out the heap's weakest one";
+    ANTS_114 = "ANTS-114", "antsAI", true,
+        "a rigid or similarity blob alignment that keeps no landmark writes a transform of NaNs (ITK's rigid landmark fits divide the landmark sums by their count, 0)";
 }
 
 /// The register entry with ID `id`.

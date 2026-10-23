@@ -49,6 +49,7 @@ pub mod format;
 pub mod image;
 pub mod initializer;
 pub mod interp;
+pub mod landmark;
 pub mod mask;
 pub mod method;
 pub mod metric;

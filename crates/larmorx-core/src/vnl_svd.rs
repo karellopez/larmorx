@@ -57,7 +57,7 @@ use crate::linalg::Mat3;
 // ------------------------------------------------------------------------------------------------
 // Reference BLAS (unit stride), as in v3p/netlib/blas.
 
-fn dnrm2(x: &[f64]) -> f64 {
+pub(crate) fn dnrm2(x: &[f64]) -> f64 {
     match x.len() {
         0 => 0.0,
         1 => x[0].abs(),
@@ -81,7 +81,7 @@ fn dnrm2(x: &[f64]) -> f64 {
     }
 }
 
-fn ddot(x: &[f64], y: &[f64]) -> f64 {
+pub(crate) fn ddot(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len();
     let m = n % 5;
     let mut t = 0.0f64;
@@ -102,7 +102,7 @@ fn ddot(x: &[f64], y: &[f64]) -> f64 {
 }
 
 /// `y += a·x` (elementwise, so unrolling does not change the result).
-fn daxpy(a: f64, x: &[f64], y: &mut [f64]) {
+pub(crate) fn daxpy(a: f64, x: &[f64], y: &mut [f64]) {
     if a == 0.0 {
         return;
     }
@@ -111,7 +111,7 @@ fn daxpy(a: f64, x: &[f64], y: &mut [f64]) {
     }
 }
 
-fn dscal(a: f64, x: &mut [f64]) {
+pub(crate) fn dscal(a: f64, x: &mut [f64]) {
     for xi in x {
         *xi *= a;
     }
@@ -140,7 +140,7 @@ fn drotg(a: f64, b: f64) -> (f64, f64, f64, f64) {
 }
 
 /// `d_sign(a, b)`: |a| with the sign of b (b ≥ 0 counts as positive).
-fn d_sign(a: f64, b: f64) -> f64 {
+pub(crate) fn d_sign(a: f64, b: f64) -> f64 {
     let x = if a >= 0.0 { a } else { -a };
     if b >= 0.0 { x } else { -x }
 }

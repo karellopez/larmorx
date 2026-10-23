@@ -4,20 +4,19 @@
 T1-weighted volume made uniform across space and scaled to about 1000 (or, with `-T2`, of a
 T2-weighted one; with `-EPI`, of an EPI series), as AFNI 25.2.09's `3dUnifize` computes it.
 
-**Replica only, for now.** 3dUnifize's results depend on AFNI library routines copyrighted by
-the Medical College of Wisconsin (GPL-2: the neighbourhood ball, the sorts and medians, the
-automask's conversions; `docs/licensing.md`), so larmorx needs two implementations: the
-bit-exact **replica** `larmorx-gpl afni 3dUnifize` (package `larmorx-gpl`, GPL-3.0-or-later,
-with a port of glibc 2.35's `tanhf` and `cbrtf`) and a clean-room **original**, still to be
-written from [`specs/3dUnifize.md`](../../specs/3dUnifize.md). Until then `larmorx afni
-3dUnifize` and `lx.afni.unifize` run the replica when it is installed (`pip install
-"larmorx[exact]"`), and otherwise stop with a message naming that command (exit status 127;
-`lx.ReplicaNotFoundError`); `implementation="original"` is an error.
+**Two implementations.** 3dUnifize's results depend on AFNI library routines copyrighted by the
+Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
+`larmorx-gpl afni 3dUnifize` (package `larmorx-gpl`, GPL-3.0-or-later, with a port of glibc
+2.35's `tanhf` and `cbrtf`) and the clean-room **original** in the main package
+(`crates/larmorx-afni`, Apache-2.0), written from [`specs/3dUnifize.md`](../../specs/3dUnifize.md)
+and black-box runs of AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)).
+`implementation="auto"` (and `larmorx afni 3dUnifize`) runs the replica, as a separate program,
+when it is installed (`pip install "larmorx[exact]"`), else the original; `"replica"` or
+`"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
+that ran.
 
-**Status: `validated`** (the replica) against AFNI 25.2.09 itself: every output of every
-compared parity case is AFNI's, bit for bit, with AFNI's exit status and messages; fMRIPrep's
-own call on the BOLD reference of every oracle run gives fMRIPrep's own outputs; AFNI's results
-do not depend on its OpenMP thread count ([validation record](../validation/afni-unifize.md)).
+**Status** against AFNI 25.2.09 itself (records: [original](../validation/afni-unifize.md),
+[replica](../validation/afni-unifize-replica.md)): RESULTS-PLACEHOLDER
 
 ## Quick start
 
@@ -41,7 +40,7 @@ larmorx afni 3dUnifize -clfrac 0.2 -rbt 18.3 65.0 90.0 -prefix uni.nii.gz -T2 -i
 Returns an `UnifizeResult`: `image` (float32; with `epi=True` every volume), `scale` (with
 `save_scale=True`) and `automasked` (with `save_automask=True`). `lx.afni.fmriprep_unifize_options()`
 gives fMRIPrep's arguments. The arguments are checked before anything runs (`ValueError`, with
-3dUnifize's ranges).
+3dUnifize's ranges); with the original, AFNI's fatal errors (no automask) are `ValueError`s too.
 
 ### Option mapping
 
@@ -51,12 +50,13 @@ gives fMRIPrep's arguments. The arguments are checked before anything runs (`Val
 | `-input d`, `-inset d`, or the last argument | `image` | |
 | `-T2` | `t2=True` (or 1) | invert the contrast, unifize, invert back |
 | `-T2 -T2` | `t2=2` | no inversion back; bright edges clipped |
+| `-T2` three or more times | – | AFNI neither inverts back nor clips edges: refused by default (AFNI-48) |
 | `-T2up u` | `t2_percentile` | 90 to 100; near 100 see AFNI-45 |
 | `-GM` | `gm=True` | grey-matter scaling (not with `-EPI`) |
 | `-Urad R`, `-rbt R b t`, `-param R b t` | `radius`, `percentiles=(b, t)` | 5 ≤ R ≤ 99, 30 ≤ b ≤ 80, b < t ≤ 90 |
 | `-clfrac c`, `-mfrac c` | `clfrac` | the automask's clip level fraction (default 0.2; AFNI's help says 0.1, AFNI-49) |
 | `-noduplo`, `-nodouble` | `duplo=False` | the half-size copy is only used above a million voxels |
-| `-EPI` | `epi=True` | implies `-T2` and `-noduplo`, turns off `-GM`, sets the radius from the voxel size |
+| `-EPI` | `epi=True` | implies `-T2` (once, whatever `-T2` gave) and `-noduplo`, turns off `-GM`, sets the radius from the voxel size |
 | `-nosquash`, `-oink` | `squash=False` | |
 | `-ssave s`, `-amsave a` | `save_scale`, `save_automask` | |
 | `-quiet`, `-verb` | (always quiet) | warnings become Python warnings |
@@ -66,7 +66,7 @@ gives fMRIPrep's arguments. The arguments are checked before anything runs (`Val
 
 ## Upstream defects (D13)
 
-Corrected by default, reproduced with `upstream_defects="reproduce"`:
+Corrected by default, reproduced with `upstream_defects="reproduce"`, by both implementations:
 
 - **AFNI-45**: with `-T2up` at or near 100 the percentile index falls one past the sorted mask
   values, where AFNI reads whatever memory holds (in its runs 0, which zeroes the output); the
@@ -75,6 +75,9 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`:
   half-size scale image comes back smaller than the input and AFNI reads it past its end (it
   crashed in our runs); the default expands it to the input's grid; `reproduce` reads AFNI's
   image (0 past its end).
+- **AFNI-48** (decided 2026-10-23, rule B): `-T2` three or more times neither inverts back nor
+  clips edges in AFNI (the output stays inverted); the default refuses it (exit 1); `reproduce`
+  gives AFNI's result.
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
 - **AFNI-40**, **AFNI-46**: `-T2up` without its value as the last argument, and `-T2` on a 2D
@@ -82,22 +85,36 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`:
 - The defects of AFNI's dataset reading and writing (AFNI-02, -07, -11, -12, -16, -18, -20, -22,
   -23, -26), as for 3dAutomask.
 
-Kept as AFNI's until decided: AFNI-48 (`-T2` three times: neither the inversion back nor the
-edge clipping).
-
 ## Deliberate differences
 
 As for 3dAutomask (NIfTI only, no history extension, no banner; an existing output is an
-error by default). The elapsed time printed is the replica's own.
+error by default). The elapsed time printed is larmorx's own.
 
 ## Known last-bit differences
 
-None: the replica is bit-identical to AFNI on every compared case. A clean-room original that
-uses a correctly rounded `tanhf` will differ in the last bit of squashed values (values above
-1300) wherever glibc's `tanhf` is not correctly rounded (2.8 % of float arguments).
+The replica is bit-identical to AFNI on every compared case. The clean-room original's squash
+(values above 1300) uses a correctly rounded `tanhf` (`larmorx_core::math::tanhf`, a port of
+CORE-MATH's) where AFNI calls glibc 2.35's, which is not correctly rounded on some arguments
+(2.8 % of float arguments): squashed values can differ in their last bit. AFNI run with
+CORE-MATH's correctly rounded functions preloaded gives the original's bytes
+([findings](../findings/afni-masks-original.md)). Likewise `-EPI`'s radius uses a correctly
+rounded `cbrtf`.
+
+## Speed
+
+The local white-matter intensity (the ball's percentile mean at every voxel) dominates
+3dUnifize's time: AFNI gathers and sorts every ball (about 25,000 values at the default radius).
+The original keeps the ball's values as counts per rank (each distinct value's position in the
+image's sorted values) and slides the ball from voxel to voxel, adding and removing only its two
+surfaces; the two percentiles come from block counts and the values between them are read in
+ascending order, which gives the spec's float sum exactly. Planes run in parallel, with the same
+result at any thread count; the inversion's percentile and `-GM`'s medians are selections, not
+sorts. Informal timings: TIMINGS-PLACEHOLDER. There is no benchmark report yet.
 
 ## Rust
 
-The replica's Rust API is in the GPL crate `larmorx-gpl-afni` (`unifize::{local_percmean,
-wm_unifize, gm_unifize, invert_contrast, clip_edges, qmed}`, `cli::unifize::main`); the Apache-2.0
-crates cannot use it.
+The original's Rust API is `larmorx_afni::unifize`: `run(image, options, mode, settings,
+n_threads)` on an `AfniImage` with `UnifizeOptions`; its steps `unifize::{wmi, duplo}`,
+`invert`, `grey_matter`, `clip_edges`, `median_volume`; the command line is
+`cli::unifize::main`. The replica's Rust API is in the GPL crate `larmorx-gpl-afni`; the
+Apache-2.0 crates cannot use it.

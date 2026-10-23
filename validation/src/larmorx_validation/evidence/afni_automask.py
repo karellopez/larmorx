@@ -396,6 +396,12 @@ def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
                 "The original's result does not depend on its thread count: the same bytes at 1 "
                 "and 6 threads."
             )
+        elif x["id"] == "original-repro" and same["original-repro"]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = (
+                "No correction of the register applies to this input: both modes give the same "
+                "bytes."
+            )
         elif x["id"] == "original-replica" and same["original-replica"]:
             x["verdict"] = "bit-identical"
             x["reason"] = (

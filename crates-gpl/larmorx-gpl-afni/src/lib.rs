@@ -23,6 +23,7 @@
 #![forbid(unsafe_code)]
 
 pub mod afni_ext;
+pub mod automask;
 pub mod axes;
 pub mod cli;
 pub mod cnum;
@@ -32,9 +33,11 @@ pub mod detrend;
 pub mod environ;
 pub mod glibc_floatmath;
 pub mod glibc_sincosf;
+pub mod mask;
 pub mod message;
 pub mod oned;
 pub mod shift;
 pub mod tpattern;
 pub mod tshift;
+pub mod unifize;
 pub mod x87;

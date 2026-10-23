@@ -2516,14 +2516,19 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.ants.n4.reproduce", covers=("lx.ants.n4_bias_field_correction",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``py.ants.n4``'s masked case with ITK's defects reproduced (ANTS-38)."""
+    """``py.ants.n4``'s masked case with ITK's defects reproduced (ANTS-38), and its unmasked
+    4D case, whose zero voxels ITK keeps in its log image (ANTS-40)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = lx.ants.n4_bias_field_correction(anat2(), mask=mask(), shrink_factor=2, convergence=([30], 0.02), rescale_intensities=True, upstream_defects=REPRODUCE)  # fmt: skip
+        b = lx.ants.n4_bias_field_correction(bold(), shrink_factor=2, convergence=([3, 2], 0.0), upstream_defects=REPRODUCE)  # fmt: skip
     return {
         "threshold.corrected": r.corrected.data,
         "threshold.bias": r.bias_field.data,
         "threshold.convergence": np.array([it.convergence for it in r.iterations], np.float32),
+        "bold.corrected": b.corrected.data,
+        "bold.bias": b.bias_field.data,
+        "bold.convergence": np.array([it.convergence for it in b.iterations], np.float32),
     }
 
 

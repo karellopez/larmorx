@@ -13,7 +13,7 @@ Inputs (``gen:`` names, built on first use):
 
 Cases where the transform from fixed to moving points is known also report how far each
 program's transform is from it: ANTs' (as built, one thread) and larmorx's default (its
-corrections of ANTS-110, ANTS-111, ANTS-112, ANTS-114 and ITK-60), at the blob centres
+corrections of ANTS-110, ANTS-111, ANTS-112, ANTS-114, ANTS-116 and ITK-60), at the blob centres
 (phantoms) or at 27 points spanning the brain (T1w).
 """
 

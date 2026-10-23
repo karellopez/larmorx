@@ -1,0 +1,395 @@
+[
+ {
+  "case": "T1w vs its origin-shifted copy",
+  "fix": {
+   "named": [
+    "ANTS-116"
+   ],
+   "pairs": 13,
+   "landmarks": 13,
+   "identical_pairs": 30,
+   "identical_at_1": 13,
+   "identical_correlations": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.0
+   ],
+   "true_pairs": 13,
+   "true_landmarks": 13,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-116"
+   ],
+   "pairs": 11,
+   "landmarks": 10,
+   "identical_pairs": 30,
+   "identical_at_1": 4,
+   "identical_correlations": [
+    0.0,
+    0.0,
+    0.0,
+    0.1037,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.3146,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.2682,
+    0.0,
+    0.0,
+    1.0,
+    0.3355,
+    0.2128,
+    0.0,
+    0.6719,
+    0.0,
+    0.0
+   ],
+   "true_pairs": 10,
+   "true_landmarks": 10,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ {
+  "case": "T1w vs its rotated (8\u00b0) and shifted copy",
+  "fix": {
+   "named": [
+    "ANTS-110",
+    "ANTS-116"
+   ],
+   "pairs": 8,
+   "landmarks": 8,
+   "true_pairs": 7,
+   "true_landmarks": 7,
+   "error_mm": [
+    1.08,
+    1.947
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-114",
+    "ANTS-116"
+   ],
+   "pairs": 7,
+   "landmarks": 0,
+   "true_pairs": 5,
+   "true_landmarks": 0,
+   "error_mm": null
+  }
+ },
+ {
+  "case": "phantom 3d, shift (shift)",
+  "fix": {
+   "named": [
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 19,
+   "landmarks": 19,
+   "identical_pairs": 30,
+   "identical_at_1": 19,
+   "identical_correlations": [
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "true_pairs": 19,
+   "true_landmarks": 19,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 26,
+   "landmarks": 24,
+   "identical_pairs": 30,
+   "identical_at_1": 5,
+   "identical_correlations": [
+    0.1539,
+    0.7259,
+    0.0,
+    0.6373,
+    1.0,
+    0.0,
+    0.0,
+    0.5206,
+    1.0,
+    0.5222,
+    0.066,
+    1.0,
+    0.195,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.456,
+    0.0,
+    0.0,
+    0.4436,
+    0.3213,
+    0.2462,
+    1.0,
+    0.13,
+    0.415,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "true_pairs": 24,
+   "true_landmarks": 24,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ {
+  "case": "phantom 3d, rigid (rigid)",
+  "fix": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 11,
+   "landmarks": 9,
+   "true_pairs": 9,
+   "true_landmarks": 9,
+   "error_mm": [
+    0.495,
+    0.647
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 16,
+   "landmarks": 13,
+   "true_pairs": 15,
+   "true_landmarks": 13,
+   "error_mm": [
+    33.967,
+    66.782
+   ]
+  }
+ },
+ {
+  "case": "phantom 2d, shift (2d-shift)",
+  "fix": {
+   "named": [
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 28,
+   "landmarks": 28,
+   "identical_pairs": 30,
+   "identical_at_1": 28,
+   "identical_correlations": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "true_pairs": 28,
+   "true_landmarks": 28,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 20,
+   "landmarks": 19,
+   "identical_pairs": 30,
+   "identical_at_1": 14,
+   "identical_correlations": [
+    0.6874,
+    0.2658,
+    1.0,
+    1.0,
+    0.7498,
+    1.0,
+    1.0,
+    0.3,
+    1.0,
+    0.0894,
+    0.0,
+    1.0,
+    0.3599,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.5587,
+    0.0,
+    0.038,
+    0.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0
+   ],
+   "true_pairs": 19,
+   "true_landmarks": 19,
+   "error_mm": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ {
+  "case": "phantom 2d, rigid (2d-rigid)",
+  "fix": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 16,
+   "landmarks": 11,
+   "true_pairs": 10,
+   "true_landmarks": 10,
+   "error_mm": [
+    0.85,
+    1.24
+   ]
+  },
+  "reproduce": {
+   "named": [
+    "ANTS-110",
+    "ANTS-111",
+    "ANTS-116"
+   ],
+   "pairs": 17,
+   "landmarks": 7,
+   "true_pairs": 9,
+   "true_landmarks": 6,
+   "error_mm": [
+    6.195,
+    12.338
+   ]
+  }
+ }
+]

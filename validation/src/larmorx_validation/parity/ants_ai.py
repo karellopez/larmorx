@@ -105,6 +105,9 @@ class AiCase:
     program: str = PROGRAM
     fmriprep: str = ""
     truth: str = ""
+    #: Defects the fix pass may name without a change in the written transform (the blob
+    #: pairs change, the fitted transform does not).
+    silent_ok: tuple[str, ...] = ()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1600,6 +1603,9 @@ def _blob_cases() -> list[AiCase]:
                 "2d-rigid": "a 2D rotation of 9 degrees and a shift",
             }[move]
             expect = "abort" if (move == "affine" and transform == "Affine") else "pass"
+            # An exact translation: the corrections (ANTS-111, ANTS-116) change the blob pairs,
+            # but ANTs' pairs and larmorx's both give the exact translation, bit for bit.
+            exact = ("ANTS-111", "ANTS-116") if move == "shift" and transform != "Affine" else ()
             out.append(
                 ai(
                     f"blobs/{move}-{transform.lower()}",
@@ -1617,6 +1623,7 @@ def _blob_cases() -> list[AiCase]:
                     expect=expect,
                     truth=f"phantom:{move}",
                     band=(move == "shift" and transform == "Rigid"),
+                    silent_ok=exact,
                 )
             )
     out += [
@@ -1653,6 +1660,7 @@ def _blob_cases() -> list[AiCase]:
             *O_MAT,
             *V,
             truth="phantom:shift",
+            silent_ok=("ANTS-111", "ANTS-116"),
         ),
         ai(
             "blobs/rigid-affine-search-h5",
@@ -1820,6 +1828,7 @@ def _blob_cases() -> list[AiCase]:
             *O_MAT,
             *V,
             truth="phantom:shift",
+            silent_ok=("ANTS-111", "ANTS-116"),
         ),
         ai(
             "real/ds000005-sub-01/blobs-t1w-shift",
@@ -2451,7 +2460,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ITK-18", "ANTS-54"),
+            silent_ok=("ITK-18", "ANTS-54", *c.silent_ok),
         )
         if c.truth:
             _score(checks, c, a_args, a_dir, f_dir)
@@ -2544,7 +2553,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
             "**Blob alignment against the known transforms** (`-b`; where the moving image is "
             "the fixed one moved by a known transform: the distance from where each program's "
             "transform sends test points to where they truly are; larmorx's default corrects "
-            "ANTS-110, ANTS-111, ANTS-112, ANTS-114 and ITK-60, `reproduce` is ANTs' result):",
+            "ANTS-110, ANTS-111, ANTS-112, ANTS-114, ANTS-116 and ITK-60, `reproduce` is ANTs' result):",
             "",
             "| Case | ANTs 2.6.5 (one thread) | larmorx's default |",
             "|---|---|---|",

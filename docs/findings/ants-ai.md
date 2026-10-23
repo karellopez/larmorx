@@ -36,8 +36,8 @@ The v4 framework both programs run on (metrics, scales, the conjugate-gradient o
   correspondence matrix, the pairs, the landmarks, the transform; checked with an instrumented
   copy of `antsAI`'s code on phantoms and real T1w images, and end to end in the record). ANTs'
   `-b` crashes at any thread count above one (ANTS-60) and its distance test keeps the wrong pairs
-  whenever the images are rotated (ANTS-110); five defects are corrected by default (ANTS-110,
-  ANTS-111, ANTS-112, ANTS-114, ITK-60), one is for the user (ANTS-116); see "Blobs".
+  whenever the images are rotated (ANTS-110); six defects are corrected by default (ANTS-110,
+  ANTS-111, ANTS-112, ANTS-114, ANTS-116 since 2026-10-23, ITK-60); see "Blobs".
 
 ## antsAI
 
@@ -283,11 +283,21 @@ default, `upstream_defects="reproduce"` gives ANTs' result bit for bit):
   preserved; for any rotation ANTs' test keeps no pair or the wrong ones.
 - **ANTS-114** (no landmark): corrected, a rigid fit without a landmark is an error.
 - **ITK-60** (the 2D rigid fit near a quarter turn): corrected, `atan2` there too.
-- **ANTS-116** (questionable, not changed): the patch rotation `A = V·Uᵀ` is not checked for a
-  determinant of −1 (the main Wahba code of `antsAI` is), and the eigenvectors' signs are
-  arbitrary, so identical patches can be compared reflected or turned: on a T1w against its own
-  translated copy only 4 of 11 identical blob pairs correlate at 1. A remedy (trying the sign
-  combinations) would change the method: for the user to decide.
+- **ANTS-116** (questionable; decided 2026-10-23, rule A): the patch rotation `A = V·Uᵀ` is not
+  checked for a determinant of −1 (the main Wahba code of `antsAI` is), and the eigenvectors'
+  signs are arbitrary, so identical patches can be compared reflected or turned (with the two
+  largest axes, `B` has rank 2 and the singular vector of its zero singular value an arbitrary
+  sign too). Corrected by default: every sign combination of the moving axes (4 in 3D, 2 in 2D),
+  each with Kabsch's proper rotation, the largest correlation kept; ANTs' rotation is one of the
+  candidates when it is proper (its correlation reused bit for bit), a reflection never is. Named
+  where the pairs, the landmarks or the transform change; `reproduce` keeps ANTs' method.
+  Measured ([investigation](../../validation/investigations/ants-116-blob-orientation/README.md)):
+  of the identical blob pairs whose patches fit in both images, ANTs correlates 4 of 13 at 1 on
+  the T1w and its shifted copy (5 of 19 and 14 of 28 on the 3D and 2D phantoms), larmorx all of
+  them; with it the blob alignment finds every translation exactly (0.33 to 1.19 mm off before),
+  the 3D rotated phantom 0.50 mm off (ANTs 34 mm; before, no landmark), the 2D rotated phantom
+  0.85 mm off (ANTs 6.2 mm; before 1.62 mm), the rotated T1w 1.08 mm off (ANTs no landmark).
+  The cost: up to four patch comparisons per blob pair instead of one.
 
 **What the blob alignment achieves** (the [record](../validation/ants-ai.md), its table "Blob
 alignment against the known transforms"; mean and largest distance from the true transform):

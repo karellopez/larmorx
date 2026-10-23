@@ -109,7 +109,8 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     add("EPI-negative-slope", "defects", "-EPI on a series with scl_slope -2 (AFNI-01)",
         S(("-EPI", *p, "{0}"), ("series-negative",), (U,)))
     add("slab", "defects", "1 million voxels with an axis of 2: the half-size grid keeps 1 (AFNI-47)",
-        S(("-prefix", "uni.nii.gz", "{0}"), ("slab",), ("uni.nii.gz",), tier="standard"))
+        S(("-prefix", "uni.nii.gz", "{0}"), ("slab",), ("uni.nii.gz",), tier="standard",
+          undefined="AFNI-47", defined=720 * 720))
 
     # --- Dimensions ----------------------------------------------------------------------------
     for img, desc, tier in (

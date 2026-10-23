@@ -91,9 +91,15 @@ original.
   axis and doubling keeps an axis of 1 at 1, so an axis of 2 or 3 voxels comes back as 1 (in a
   volume of more than a million voxels, where the half size is used). `mri_WMunifize` then reads
   the smaller scale image `par[ii]` with the input's indices (`:570-576`), past its end, and
-  `-ssave` writes it the same way. The default expands the half grid to the input's
-  (`unifize::double_up` with the target grid); `reproduce` reads AFNI's smaller image linearly
-  with 0 past its end; both named.
+  `-ssave` writes it the same way. What AFNI reads there depends on the memory after the
+  allocation: on the 720 × 720 × 2 phantom of the parity case `defects/slab` (the scale image
+  720 × 720 × 1, the second slice read past it) AFNI crashed with signal 11 in every run of
+  2026-10-23 (two threads); with other memory it would multiply the second slice by whatever it
+  finds. The default expands the half grid to the input's (`unifize::double_up` with the target
+  grid); `reproduce` reads AFNI's smaller image linearly with 0 past its end (D13's
+  deterministic fill); both named. The parity case compares AFNI's messages before the crash
+  (or, when AFNI does not crash, the header and the values that do not come from that memory)
+  and is an expected divergence.
 - **AFNI-48 (questionable)** `3dUnifize.c:1193-1198`: `do_T2 == 1` re-inverts, `do_T2 == 2`
   clips edges, and a third `-T2` does neither, so the output stays inverted (verified). The help
   documents once and twice only. Kept as AFNI's until decided.

@@ -440,6 +440,13 @@ class Scenario:
     #: The defect whose correction makes the default write what AFNI refuses (exit status 0,
     #: the defect named, every output written): the fix pass checks that.
     fix_writes: str | None = None
+    #: AFNI reads memory it never wrote in this case (the defect): what it does then depends
+    #: on that memory, a crash or values from it. When AFNI crashes, its messages before the
+    #: crash are compared; when it does not, every output's first ``defined`` values (the
+    #: part that does not come from that memory) and its header. Either way the case is an
+    #: expected divergence unless every value agrees.
+    undefined: str | None = None
+    defined: int = 0
 
 
 @dataclass(frozen=True)
@@ -504,6 +511,9 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
 
+        if s.undefined is not None:
+            _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir)
+            return
         if s.expect == "crash" or crashed(afni):
             check_crash(checks, afni, ours)
             if s.expect != "crash":
@@ -670,6 +680,88 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
         not bad,
         detail="bit-identical" if not bad else f"differ: {', '.join(bad)}",
     )
+
+
+def _undefined(
+    checks: CheckList,
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    afni: Run,
+    ours: Run,
+    a_dir: Path,
+    l_dir: Path,
+) -> None:
+    """A case where AFNI reads memory it never wrote (``Scenario.undefined``): AFNI crashes or
+    writes values from that memory, depending on the memory; larmorx's ``reproduce`` mode
+    fills the read deterministically (D13). Compared: the messages before AFNI's crash, or
+    the exit status, the messages, every header and the outputs' defined part."""
+    why = f"AFNI reads memory it never wrote ({s.undefined})"
+    checks("larmorx completes (reproduce)", ours.code == 0, detail=last_error(ours.err))
+    if crashed(afni):
+        before = afni_text(afni.err.split("\nFatal Signal", 1)[0]).rstrip("\n")
+        mine = larmorx_text(ours.err)
+        ok = mine.startswith(before)
+        checks(
+            CRASH,
+            ok,
+            detail="larmorx prints what AFNI printed before its crash, then goes on"
+            if ok
+            else first_difference(before, mine[: len(before)]),
+        )
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+        if all(c.passed for c in checks.checks):
+            raise Outcome(
+                EXPECTED,
+                f"{why}: this run crashed (Fatal Signal 11) after the same messages; larmorx "
+                "fills the read with 0 in reproduce mode and corrects it by default",
+            )
+        return
+    checks(EXIT, afni.code == ours.code, metric="exit status", value=ours.code, threshold=afni.code)
+    check_messages(checks, afni, ours)
+    beyond = 0
+    for name in s.outputs:
+        a, b = a_dir / name, l_dir / name
+        if not (a.is_file() and b.is_file()):
+            checks(f"{name}: written by both", False)
+            continue
+        ha, da = nifti_parts(a)
+        hb, db = nifti_parts(b)
+        checks(f"{name}: header bytes", ha == hb)
+        size = stored(a).dtype.itemsize
+        k = s.defined * size
+        checks(
+            f"{name}: the defined values ({s.defined})",
+            da[:k] == db[:k],
+            detail="bit-identical" if da[:k] == db[:k] else "they differ",
+        )
+        va = np.frombuffer(da[k:], dtype=stored(a).dtype)
+        vb = np.frombuffer(db[k:], dtype=stored(b).dtype)
+        n = int(
+            np.count_nonzero(
+                va.view(np.uint8).reshape(-1, size) != vb.view(np.uint8).reshape(-1, size)
+            )
+        )
+        beyond += n
+        checks.add(
+            Check(
+                f"{name}: values from memory AFNI never wrote",
+                True,
+                metric="values that differ",
+                value=n,
+                threshold="reported",
+                detail=f"{n} of {va.size} differ",
+            )
+        )
+    _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+    if beyond and all(c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"{why}: {beyond} values come from that memory in AFNI's run; the defined values "
+            "are bit-identical",
+        )
 
 
 def _fix_writes(

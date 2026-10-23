@@ -12,6 +12,7 @@ clean-room original yet (``specs/3dUnifize.md``).
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -208,7 +209,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
         "diffs": ["replica-afni", "afni6-afni1", "fmriprep-afni"],
         "compare": {"a": "afni-1", "b": "replica-1"},
     }
-    out = common.finish(ctx, ex, diffs, OUTPUT, default=default, window_panel="afni-1",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUT), default=default, window_panel="afni-1",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
     vers = info.get("versions", {})
     u = common.load(str(e.dir / "afni-1.nii.gz"))
@@ -306,7 +307,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry) -> dict:
         "diffs": ["replica-afni", "afni6-afni1", "image-afni"],
         "compare": {"a": "t1w", "b": "afni-1"},
     }
-    out = common.finish(ctx, ex, diffs, OUTPUTS_T1W, default=default, window_panel="afni-1",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS_T1W), default=default, window_panel="afni-1",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
     vers = info.get("versions", {})
     n = int(np.prod(img.shape))
@@ -407,7 +408,7 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "diffs": ["replica-afni", "repro-afni"],
         "compare": {"a": "afni-default", "b": "replica"},
     }
-    out = common.finish(ctx, ex, diffs, OUTPUT, default=default, window_panel="replica",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUT), default=default, window_panel="replica",
                         caption="the crosshair at the brain's centre.")  # fmt: skip
     a45 = reg.get("AFNI-45", {})
     return {

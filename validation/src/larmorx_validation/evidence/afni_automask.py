@@ -15,6 +15,7 @@ The helpers that run AFNI, fMRIPrep's AFNI and the replica are shared with 3dUni
 
 from __future__ import annotations
 
+import copy
 import os
 import shlex
 from pathlib import Path
@@ -325,7 +326,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry) -> dict:
         "diffs": ["replica-afni", "image-afni"],
         "compare": {"a": "afni", "b": "replica"},
     }
-    out = common.finish(ctx, ex, diffs, OUTPUTS, default=default, window_panel="afni",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS), default=default, window_panel="afni",
                         caption="the crosshair on the mask's edge.")  # fmt: skip
     vers = info.get("versions", {})
     a = arrays["afni"]["mask"]
@@ -427,7 +428,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry) -> dict:
         "diffs": ["replica-afni", "image-afni"],
         "compare": {"a": "afni", "b": "replica"},
     }
-    out = common.finish(ctx, ex, diffs, MASK_ONLY, default=default, window_panel="afni",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(MASK_ONLY), default=default, window_panel="afni",
                         caption="the crosshair on the mask's edge.")  # fmt: skip
     vers = info.get("versions", {})
     a = arrays["afni"]["mask"]
@@ -539,7 +540,7 @@ def _example_peels(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "diffs": ["replica-afni", "repro-afni", "afni-peels"],
         "compare": {"a": "afni", "b": "replica"},
     }
-    out = common.finish(ctx, ex, diffs, OUTPUTS, default=default, window_panel="afni",
+    out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS), default=default, window_panel="afni",
                         caption="the crosshair where the corrected mask differs from AFNI's.")  # fmt: skip
     m = next(x for x in diffs if x["id"] == "replica-afni")["metrics"]["mask"]
     a43 = reg.get("AFNI-43", {})

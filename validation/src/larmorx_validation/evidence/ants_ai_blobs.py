@@ -384,21 +384,27 @@ def _distance(m1: np.ndarray, m2: np.ndarray, pts: np.ndarray) -> dict:
     return {"max": float(d.max()), "mean": float(d.mean())}
 
 
-def _shells(data: np.ndarray, blobs: list, zooms, value: float) -> np.ndarray:
-    """``data`` with each blob drawn as the shell of a sphere of its radius (mm) around its
-    centre voxel, at ``value``."""
-    out = np.array(data, dtype=np.float32, copy=True)
+def _spheres(shape, blobs: list, zooms) -> np.ndarray:
+    """A mask of the voxels within each blob's radius (mm) of its centre voxel."""
+    out = np.zeros(shape, dtype=bool)
     z = np.asarray(zooms[:3], np.float64)
     for bl in blobs:
         c = np.asarray(bl[:3], np.int64)
-        r = float(bl[3] if len(bl) == 5 else bl[4])
-        half = np.ceil((r + 1.0) / z).astype(int)
+        r = float(bl[3])
+        half = np.ceil(r / z).astype(int)
         lo = np.maximum(c - half, 0)
-        hi = np.minimum(c + half + 1, np.array(out.shape))
+        hi = np.minimum(c + half + 1, np.array(shape))
         idx = np.indices(tuple(hi - lo)).reshape(3, -1).T + lo
-        dist = np.linalg.norm((idx - c) * z, axis=1)
-        sel = idx[np.abs(dist - r) <= 0.5 * float(z.min()) + 0.15]
-        out[tuple(sel.T)] = value
+        sel = idx[np.linalg.norm((idx - c) * z, axis=1) <= r]
+        out[tuple(sel.T)] = True
+    return out
+
+
+def _drawn(data: np.ndarray, blobs: list, zooms, value: float) -> np.ndarray:
+    """``data`` at half its intensity with each blob a filled sphere of its radius at
+    ``value`` (above the T1w's range, so the blobs stand out in any window)."""
+    out = (np.asarray(data, dtype=np.float32) * np.float32(0.5)).astype(np.float32)
+    out[_spheres(out.shape, blobs, zooms)] = np.float32(value)
     return out
 
 
@@ -975,7 +981,7 @@ def _blobs_example(ctx: core.Context) -> dict:
     ):
         ex.add(
             exm.Panel(
-                pid, role, text, sub_, {"blobs": _shells(fdata, side["fixed_blobs"], zooms, hi)}
+                pid, role, text, sub_, {"blobs": _drawn(fdata, side["fixed_blobs"], zooms, hi)}
             )
         )
     dd = common.d
@@ -986,7 +992,7 @@ def _blobs_example(ctx: core.Context) -> dict:
     outputs = [
         {
             "id": "blobs",
-            "label": "the fixed T1w with each blob drawn as a sphere of its radius",
+            "label": "the blobs: spheres of their radius over the T1w at half intensity",
             "unit": "",
         }
     ]
@@ -1014,13 +1020,23 @@ def _blobs_example(ctx: core.Context) -> dict:
             )
             x["links"] = [{"label": "ANTS-112", "href": "docs/findings/ants-ai.md#blobs"}]
     radii = sorted(b[3] for b in ants["fixed_blobs"])
-    centre = max(ants["fixed_blobs"], key=lambda b: b[4])
+    # the view: the axial slice (display grid) with the most blob voxels, the crosshair at the
+    # centre of the largest blob that slice cuts
+    to_disp = np.linalg.inv(grid.to_file())
+    shown = ex.values("ants:blobs") >= float(np.float32(hi))
+    k = int(np.argmax(shown.sum(axis=(0, 1))))
+    cut = [
+        b
+        for b in ants["fixed_blobs"]
+        if abs((to_disp @ np.r_[b[:3], 1.0])[2] - k) * grid.spacing[2] <= b[3]
+    ]
+    centre = max(cut or ants["fixed_blobs"], key=lambda b: b[3])
+    at = [int(v) for v in np.rint((to_disp @ np.r_[centre[:3], 1.0])[:3])]
+    at[2] = k
     default = {
         "output": "blobs",
         "plane": "axial",
-        "voxel": [
-            int(v) for v in np.rint(np.linalg.solve(grid.to_file(), np.r_[centre[:3], 1.0])[:3])
-        ],
+        "voxel": at,
         "panels": ["fixed", "ants", "larmorx", "larmorx-fix"],
         "diffs": ["lx-ants", "fix-ants"],
         "compare": {"a": "fixed", "b": "ants"},
@@ -1032,7 +1048,8 @@ def _blobs_example(ctx: core.Context) -> dict:
         outputs,
         default=default,
         window_panel="ants",
-        caption="each program's blobs on the fixed T1w (the brightest blob at the crosshair).",
+        caption="each program's blobs, filled spheres over the fixed T1w at half its intensity "
+        "(the crosshair at the largest blob this slice cuts).",
     )
     vers = info.get("versions", {})
     return {
@@ -1041,7 +1058,8 @@ def _blobs_example(ctx: core.Context) -> dict:
         "summary": f"antsAI `-b 30` keeps the {len(ants['fixed_blobs'])} strongest maxima of the "
         "scale-normalised Laplacian of Gaussian over 53 scales; here they lie at the edges of "
         f"ventricles, vessels and sulci, with radii from {radii[0]:.2g} to {radii[-1]:.2g} mm. "
-        "Each is drawn as a sphere of its radius around its voxel.",
+        "Each is drawn as a filled sphere of its radius around its voxel, over the T1w at half "
+        "its intensity.",
         "facts": [
             {
                 "label": "Data",

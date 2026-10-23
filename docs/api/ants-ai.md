@@ -157,9 +157,11 @@ indexes per-thread heaps past their end; verified at 2, 4 and 6 threads); its on
 is what larmorx computes, on any thread count.
 
 **What to expect.** The blob alignment is a rough initialiser for images of one subject: on a
-T1w against its own copy moved by a translation ANTs finds the translation exactly; rotated by
-8 degrees, ANTs' distance test (ANTS-110) keeps no landmark and its rigid transform is NaN, while
-larmorx's corrected test finds a rotation within a few degrees. Between subjects or to a template
-the patch matching rarely pairs the same anatomy and neither keeps a landmark with 30 blobs.
+T1w against its own copy moved by a translation ANTs finds the translation exactly and larmorx's
+default is within about 2 mm (its distance test keeps one more pair, matched to a neighbouring
+blob); rotated by 8 degrees, ANTs' test (ANTS-110) keeps no landmark and its rigid transform is
+NaN, while larmorx's corrected test keeps five pairs and lands within about 2 mm of the truth.
+Between subjects or to a template the patch matching rarely pairs the same anatomy and neither
+keeps a landmark with 30 blobs.
 Numbers: the [validation record](../validation/ants-ai.md) (category `blobs`) and the
 [findings](../findings/ants-ai.md#blobs).

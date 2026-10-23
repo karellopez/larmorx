@@ -128,9 +128,11 @@ three tissues box-averaged from a five-times finer grid; the record's `partial-v
 cases; classes 1x2 and 2x3, five iterations): with the MRF at 0.1, ANTs labels 0.295 and 0.405
 (Dice) of the two partial-volume classes and 94.0 % of the voxels as the truth; corrected, 0.862,
 0.805 and 97.7 %. With the MRF at 0.3 (Atropos' default) ANTs stops ("2 non-zero label sets but
-5 is requested"); corrected, 0.835, 0.801 and 97.8 %. Without the MRF both give 0.73 and 0.58
-(93.7 %). On sMRIPrep's call with partial-volume classes on fMRIPrep's T1w the correction is what
-lets Atropos finish (the record's `real/*/smriprep-partial-volume`).
+5 is requested"); corrected, 0.835, 0.801 and 97.8 %. Without the MRF ANTs gives 0.728 and 0.578
+(93.7 %), larmorx's default 0.711 and 0.594 (93.4 %: ITK-50's and ANTS-96's corrections alone).
+On sMRIPrep's call with partial-volume classes on fMRIPrep's T1w the correction is what lets
+Atropos finish (the record's `real/*/smriprep-partial-volume`: ANTs stops; corrected, 31 % of
+ds000005's brain voxels fall in the two partial-volume classes).
 
 On sMRIPrep's call ITK-50 is met (its K-means): on the five oracle runs the correction
 changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels (Dice at least 0.99999 for every

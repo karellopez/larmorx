@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "8b747322f536-dirty",
+  "larmorx_commit": "708bb99389fe",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -49,7 +49,7 @@
     "seg: ANTs' thread band": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 4.908,
+   "seconds": 5.556,
    "status": "pass"
   },
   {
@@ -89,7 +89,7 @@
     "post04: bit-identical to ANTs as built": 16,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.731,
+   "seconds": 4.376,
    "status": "pass"
   },
   {
@@ -121,7 +121,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.336,
+   "seconds": 2.685,
    "status": "pass"
   },
   {
@@ -153,7 +153,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.731,
+   "seconds": 3.203,
    "status": "pass"
   },
   {
@@ -188,7 +188,7 @@
     "post03: bit-identical to ANTs as built": 25,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.568,
+   "seconds": 3.652,
    "status": "pass"
   },
   {
@@ -220,7 +220,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.209,
+   "seconds": 3.856,
    "status": "pass"
   },
   {
@@ -255,7 +255,7 @@
     "post03: bit-identical to ANTs as built": 28,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.972,
+   "seconds": 4.614,
    "status": "pass"
   },
   {
@@ -290,7 +290,7 @@
     "post03: bit-identical to ANTs as built": 28,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.946,
+   "seconds": 5.098,
    "status": "pass"
   },
   {
@@ -325,7 +325,7 @@
     "post03: bit-identical to ANTs as built": 44,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.927,
+   "seconds": 5.001,
    "status": "pass"
   },
   {
@@ -360,7 +360,7 @@
     "post03: bit-identical to ANTs as built": 25,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.67,
+   "seconds": 4.838,
    "status": "pass"
   },
   {
@@ -395,7 +395,7 @@
     "post03: bit-identical to ANTs as built": 28,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.231,
+   "seconds": 4.261,
    "status": "pass"
   },
   {
@@ -430,7 +430,7 @@
     "post03: bit-identical to ANTs as built": 39,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.8,
+   "seconds": 4.546,
    "status": "pass"
   },
   {
@@ -465,7 +465,7 @@
     "post03: bit-identical to ANTs as built": 38,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.739,
+   "seconds": 4.187,
    "status": "pass"
   },
   {
@@ -478,7 +478,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.396,
+   "seconds": 1.777,
    "status": "expected-divergence"
   },
   {
@@ -540,7 +540,7 @@
     "post03: bit-identical to ANTs as built": 28,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 4.759,
+   "seconds": 5.271,
    "status": "pass"
   },
   {
@@ -614,7 +614,7 @@
     "post03: bit-identical to ANTs as built": 44,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 7.309,
+   "seconds": 7.994,
    "status": "pass"
   },
   {
@@ -649,7 +649,7 @@
     "post03: bit-identical to ANTs as built": 34,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.613,
+   "seconds": 2.986,
    "status": "pass"
   },
   {
@@ -684,7 +684,7 @@
     "post03: bit-identical to ANTs as built": 34,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.631,
+   "seconds": 3.259,
    "status": "pass"
   },
   {
@@ -719,7 +719,7 @@
     "post03: bit-identical to ANTs as built": 57,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.9,
+   "seconds": 3.664,
    "status": "pass"
   },
   {
@@ -754,7 +754,7 @@
     "post03: bit-identical to ANTs as built": 77,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.857,
+   "seconds": 3.906,
    "status": "pass"
   },
   {
@@ -786,7 +786,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.708,
+   "seconds": 3.065,
    "status": "pass"
   },
   {
@@ -818,7 +818,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 10.502,
+   "seconds": 11.198,
    "status": "pass"
   },
   {
@@ -852,7 +852,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 9.263,
+   "seconds": 9.413,
    "status": "pass"
   },
   {
@@ -887,7 +887,7 @@
     "post03: bit-identical to ANTs as built": 232,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 42.034,
+   "seconds": 44.32,
    "status": "pass"
   },
   {
@@ -919,7 +919,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 185.282,
+   "seconds": 184.877,
    "status": "pass"
   },
   {
@@ -951,7 +951,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.413,
+   "seconds": 1.6,
    "status": "pass"
   },
   {
@@ -986,7 +986,7 @@
     "post03: bit-identical to ANTs as built": 7,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 3.556,
+   "seconds": 3.279,
    "status": "pass"
   },
   {
@@ -1021,7 +1021,7 @@
     "post03: bit-identical to ANTs as built": 95,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.219,
+   "seconds": 1.924,
    "status": "pass"
   },
   {
@@ -1053,7 +1053,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.511,
+   "seconds": 1.531,
    "status": "pass"
   },
   {
@@ -1089,7 +1089,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.813,
+   "seconds": 3.649,
    "status": "pass"
   },
   {
@@ -1121,7 +1121,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.079,
+   "seconds": 2.504,
    "status": "pass"
   },
   {
@@ -1156,7 +1156,7 @@
     "post03: bit-identical to ANTs as built": 12,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.885,
+   "seconds": 2.9,
    "status": "pass"
   },
   {
@@ -1188,7 +1188,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.283,
+   "seconds": 2.001,
    "status": "pass"
   },
   {
@@ -1220,7 +1220,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.621,
+   "seconds": 1.703,
    "status": "pass"
   },
   {
@@ -1248,7 +1248,7 @@
     "post03: values against ANTs with correctly rounded math (not required)": 33885,
     "seg: values against ANTs with correctly rounded math (not required)": 22
    },
-   "seconds": 2.881,
+   "seconds": 2.381,
    "status": "pass"
   },
   {
@@ -1276,7 +1276,7 @@
     "post03: values against ANTs with correctly rounded math (not required)": 0,
     "seg: values against ANTs with correctly rounded math (not required)": 0
    },
-   "seconds": 2.069,
+   "seconds": 1.985,
    "status": "pass"
   },
   {
@@ -1289,7 +1289,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.738,
+   "seconds": 0.701,
    "status": "both-error"
   },
   {
@@ -1321,7 +1321,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.815,
+   "seconds": 1.919,
    "status": "pass"
   },
   {
@@ -1353,7 +1353,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.822,
+   "seconds": 2.262,
    "status": "pass"
   },
   {
@@ -1366,7 +1366,90 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.738,
+   "seconds": 1.234,
+   "status": "both-error"
+  },
+  {
+   "case": "partial-volume-phantom-mrf-0",
+   "category": "partial volume",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "measured": {
+    "larmorx: 4 threads and 1 thread give the same bits": "True",
+    "post01: affine": "0.0e+00",
+    "post01: bit-identical to ANTs with correctly rounded math": 0,
+    "post01: header (every field)": 0,
+    "post02: affine": "0.0e+00",
+    "post02: bit-identical to ANTs with correctly rounded math": 0,
+    "post02: header (every field)": 0,
+    "post03: affine": "0.0e+00",
+    "post03: bit-identical to ANTs with correctly rounded math": 0,
+    "post03: header (every field)": 0,
+    "seg: affine": "0.0e+00",
+    "seg: bit-identical to ANTs with correctly rounded math": 0,
+    "seg: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 72122,
+    "partial-volume scores": "Dice 0.971 0.948 0.971 0.711 0.594 (classes 1-5), 0.934 of the voxels as the truth",
+    "partial-volume scores: ANTs": "Dice 0.975 0.944 0.975 0.728 0.578 (classes 1-5), 0.937 of the voxels as the truth",
+    "post01: bit-identical to ANTs as built": 0,
+    "post02: bit-identical to ANTs as built": 0,
+    "post03: bit-identical to ANTs as built": 0,
+    "seg: bit-identical to ANTs as built": 0
+   },
+   "seconds": 3.008,
+   "status": "pass"
+  },
+  {
+   "case": "partial-volume-phantom-mrf-0.1",
+   "category": "partial volume",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "measured": {
+    "larmorx: 4 threads and 1 thread give the same bits": "True",
+    "post01: affine": "0.0e+00",
+    "post01: bit-identical to ANTs with correctly rounded math": 0,
+    "post01: header (every field)": 0,
+    "post02: affine": "0.0e+00",
+    "post02: bit-identical to ANTs with correctly rounded math": 0,
+    "post02: header (every field)": 0,
+    "post03: affine": "0.0e+00",
+    "post03: bit-identical to ANTs with correctly rounded math": 0,
+    "post03: header (every field)": 0,
+    "seg: affine": "0.0e+00",
+    "seg: bit-identical to ANTs with correctly rounded math": 0,
+    "seg: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 73481,
+    "partial-volume scores": "Dice 0.991 0.983 0.985 0.862 0.805 (classes 1-5), 0.977 of the voxels as the truth",
+    "partial-volume scores: ANTs": "Dice 0.980 0.951 0.964 0.295 0.405 (classes 1-5), 0.940 of the voxels as the truth",
+    "post01: bit-identical to ANTs as built": 0,
+    "post02: bit-identical to ANTs as built": 0,
+    "post03: bit-identical to ANTs as built": 0,
+    "seg: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.704,
+   "status": "pass"
+  },
+  {
+   "case": "partial-volume-phantom-mrf-0.3",
+   "category": "partial volume",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: ''; larmorx exit 1: 'rrects it]\\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMORX_UPSTREAM_DEFECTS=fix corrects it]'",
+   "reported": {
+    "D13 fix pass": 0,
+    "partial-volume scores": "Dice 0.991 0.983 0.986 0.835 0.801 (classes 1-5), 0.978 of the voxels as the truth",
+    "partial-volume scores: ANTs": "no labels (ANTs stopped)"
+   },
+   "seconds": 1.355,
    "status": "both-error"
   },
   {
@@ -1398,7 +1481,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 0.241,
+   "seconds": 0.22,
    "status": "pass"
   },
   {
@@ -1430,7 +1513,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 11.541,
+   "seconds": 12.829,
    "status": "pass"
   },
   {
@@ -1439,11 +1522,11 @@
    "checks_passed": 4,
    "checks_total": 4,
    "failed_checks": [],
-   "reason": "ANTs exit 1: 'nListSampleFunction.hxx, line 105\\nGaussianListSampleFunction (0x5c40f396ff10): The input list sample has <= 1 element.  Function evaluations will be equal to 0.'; larmorx exit 1: \"x: upstream defect ANTS-98 (Atropos) reproduced: the first image's range taken from the voxels labelled 1 in the mask [LARMORX_UPSTREAM_DEFECTS=fix corrects it]\"",
+   "reason": "ANTs exit 1: 'nListSampleFunction.hxx, line 105\\nGaussianListSampleFunction (0x57ccfd938f10): The input list sample has <= 1 element.  Function evaluations will be equal to 0.'; larmorx exit 1: \"x: upstream defect ANTS-98 (Atropos) reproduced: the first image's range taken from the voxels labelled 1 in the mask [LARMORX_UPSTREAM_DEFECTS=fix corrects it]\"",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.592,
+   "seconds": 0.629,
    "status": "both-error"
   },
   {
@@ -1475,7 +1558,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.839,
+   "seconds": 2.466,
    "status": "pass"
   },
   {
@@ -1507,7 +1590,7 @@
     "post03: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 2.199,
+   "seconds": 2.25,
    "status": "pass"
   },
   {
@@ -1520,7 +1603,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.09,
    "status": "both-error"
   },
   {
@@ -1530,7 +1613,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.051,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1540,7 +1623,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1553,7 +1636,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1566,7 +1649,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1579,7 +1662,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1592,7 +1675,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.016,
+   "seconds": 0.025,
    "status": "expected-divergence"
   },
   {
@@ -1605,7 +1688,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -1618,7 +1701,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1631,7 +1714,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1644,7 +1727,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -1657,7 +1740,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -1670,7 +1753,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -1683,7 +1766,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -1696,7 +1779,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -1709,7 +1792,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1722,7 +1805,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1735,7 +1818,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1748,7 +1831,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -1761,7 +1844,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -1774,7 +1857,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -1787,7 +1870,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
@@ -1800,7 +1883,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1813,7 +1896,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.079,
    "status": "both-error"
   },
   {
@@ -1833,7 +1916,7 @@
     "D13 fix pass": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 0.896,
+   "seconds": 1.405,
    "status": "pass"
   },
   {
@@ -1846,7 +1929,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.034,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -1859,7 +1942,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.161,
+   "seconds": 0.29,
    "status": "expected-divergence"
   },
   {
@@ -1872,7 +1955,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.027,
    "status": "expected-divergence"
   },
   {
@@ -1892,7 +1975,7 @@
     "D13 fix pass": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 0.661,
+   "seconds": 0.965,
    "status": "pass"
   },
   {
@@ -1914,7 +1997,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.405,
+   "seconds": 0.465,
    "status": "expected-divergence"
   },
   {
@@ -1938,7 +2021,7 @@
     "p: bit-identical to ANTs as built": 0,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 1.507,
+   "seconds": 1.19,
    "status": "pass"
   },
   {
@@ -1971,7 +2054,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "stdout as ANTs as built prints it": "True"
    },
-   "seconds": 2.854,
+   "seconds": 2.45,
    "status": "pass"
   },
   {
@@ -2004,7 +2087,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "stdout as ANTs as built prints it": "True"
    },
-   "seconds": 1.887,
+   "seconds": 2.636,
    "status": "pass"
   },
   {
@@ -2037,7 +2120,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "stdout as ANTs as built prints it": "True"
    },
-   "seconds": 3.12,
+   "seconds": 3.296,
    "status": "pass"
   },
   {
@@ -2073,7 +2156,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "stdout as ANTs as built prints it": "False"
    },
-   "seconds": 3.229,
+   "seconds": 3.699,
    "status": "pass"
   },
   {
@@ -2107,7 +2190,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "stdout as ANTs as built prints it": "True"
    },
-   "seconds": 2.296,
+   "seconds": 1.797,
    "status": "pass"
   },
   {
@@ -2124,7 +2207,7 @@
     "post03: larmorx vs ANTs' two runs": "3.63588e-06",
     "seg: larmorx vs ANTs' two runs": "1"
    },
-   "seconds": 2.818,
+   "seconds": 2.286,
    "status": "expected-divergence"
   },
   {
@@ -2136,12 +2219,12 @@
    "reason": "ANTs draws its seed from the clock; larmorx uses 121212",
    "reported": {
     "D13 fix pass": 110896,
-    "post01: larmorx vs ANTs' two runs": "0.999559",
-    "post02: larmorx vs ANTs' two runs": "0.998815",
-    "post03: larmorx vs ANTs' two runs": "0.989702",
-    "seg: larmorx vs ANTs' two runs": "0.256217"
+    "post01: larmorx vs ANTs' two runs": "0.998817",
+    "post02: larmorx vs ANTs' two runs": "0.988943",
+    "post03: larmorx vs ANTs' two runs": "0.990414",
+    "seg: larmorx vs ANTs' two runs": "0.271868"
    },
-   "seconds": 3.445,
+   "seconds": 2.927,
    "status": "expected-divergence"
   },
   {
@@ -2184,7 +2267,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "seg: vs fMRIPrep's file": 0
    },
-   "seconds": 104.247,
+   "seconds": 101.153,
    "status": "pass"
   },
   {
@@ -2220,7 +2303,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "seg: vs fMRIPrep's file": 0
    },
-   "seconds": 113.553,
+   "seconds": 110.839,
    "status": "pass"
   },
   {
@@ -2259,7 +2342,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "seg: vs fMRIPrep's file": 0
    },
-   "seconds": 195.604,
+   "seconds": 192.852,
    "status": "pass"
   },
   {
@@ -2298,7 +2381,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "seg: vs fMRIPrep's file": 0
    },
-   "seconds": 197.977,
+   "seconds": 189.933,
    "status": "pass"
   },
   {
@@ -2337,7 +2420,7 @@
     "seg: bit-identical to ANTs as built": 0,
     "seg: vs fMRIPrep's file": 0
    },
-   "seconds": 110.092,
+   "seconds": 108.415,
    "status": "pass"
   },
   {
@@ -2372,7 +2455,7 @@
     "post03: bit-identical to ANTs as built": 934,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 144.955,
+   "seconds": 147.697,
    "status": "pass"
   },
   {
@@ -2407,7 +2490,7 @@
     "post03: bit-identical to ANTs as built": 2971,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 466.521,
+   "seconds": 440.245,
    "status": "pass"
   },
   {
@@ -2442,7 +2525,7 @@
     "post03: bit-identical to ANTs as built": 1760,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 254.043,
+   "seconds": 271.177,
    "status": "pass"
   },
   {
@@ -2477,7 +2560,7 @@
     "post03: bit-identical to ANTs as built": 4448,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 447.072,
+   "seconds": 446.777,
    "status": "pass"
   },
   {
@@ -2512,7 +2595,7 @@
     "post03: bit-identical to ANTs as built": 1423,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 275.196,
+   "seconds": 248.389,
    "status": "pass"
   },
   {
@@ -2562,8 +2645,36 @@
     "post06: bit-identical to ANTs as built": 1111,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 206.876,
+   "seconds": 236.62,
    "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/smriprep-partial-volume",
+   "category": "real (partial volume)",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: ''; larmorx exit 1: 'rrects it]\\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMORX_UPSTREAM_DEFECTS=fix corrects it]'",
+   "reported": {
+    "D13 fix pass": 0,
+    "partial-volume voxels": "110433 224560 214642 109362 137019"
+   },
+   "seconds": 26.412,
+   "status": "both-error"
+  },
+  {
+   "case": "real/ds005040-sub-002/smriprep-partial-volume",
+   "category": "real (partial volume)",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "ANTs exit 1: ''; larmorx exit 1: 'rrects it]\\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMORX_UPSTREAM_DEFECTS=fix corrects it]'",
+   "reported": {
+    "D13 fix pass": 0,
+    "partial-volume voxels": "277931 822401 769812 262474 395475"
+   },
+   "seconds": 73.138,
+   "status": "both-error"
   },
   {
    "case": "real/ds000005/otsu",
@@ -2597,7 +2708,7 @@
     "post03: bit-identical to ANTs as built": 37,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 48.929,
+   "seconds": 50.708,
    "status": "pass"
   },
   {
@@ -2632,7 +2743,7 @@
     "post03: bit-identical to ANTs as built": 23,
     "seg: bit-identical to ANTs as built": 0
    },
-   "seconds": 86.261,
+   "seconds": 84.2,
    "status": "pass"
   },
   {
@@ -2644,21 +2755,21 @@
    "reason": "ANTs draws its seed from the clock; larmorx uses 121212",
    "reported": {
     "D13 fix pass": 2209476,
-    "post01: larmorx vs ANTs' two runs": "0.142588",
-    "post02: larmorx vs ANTs' two runs": "0.142588",
-    "post03: larmorx vs ANTs' two runs": "0.116019",
-    "seg: larmorx vs ANTs' two runs": "0.999345"
+    "post01: larmorx vs ANTs' two runs": "0.112559",
+    "post02: larmorx vs ANTs' two runs": "0.139421",
+    "post03: larmorx vs ANTs' two runs": "0.139377",
+    "seg: larmorx vs ANTs' two runs": "0.999487"
    },
-   "seconds": 47.319,
+   "seconds": 53.649,
    "status": "expected-divergence"
   }
  ],
  "suite": "ants-atropos",
  "summary": {
-  "both-error": 25,
+  "both-error": 28,
   "expected-divergence": 8,
   "fail": 0,
-  "pass": 64,
+  "pass": 66,
   "skipped": 0
  },
  "tier": "full"

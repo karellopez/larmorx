@@ -289,14 +289,25 @@ default, `upstream_defects="reproduce"` gives ANTs' result bit for bit):
   translated copy only 4 of 11 identical blob pairs correlate at 1. A remedy (trying the sign
   combinations) would change the method: for the user to decide.
 
-**What the blob alignment achieves** (the [record](../validation/ants-ai.md), category `blobs`):
-on phantoms whose moving image is an exact translation, ANTs' landmarks give the translation
-exactly and larmorx's default, with one extra pair, about 0.5 mm off; on a phantom rotated by 7
-and 4 degrees ANTs' rigid fit is tens of millimetres off and its affine fit hundreds, larmorx's
-corrected test keeps no landmark (an error); in 2D, rotated by 9 degrees, ANTs is 6 mm off and
-larmorx 1.6 mm. Between a T1w and the MNI template (2 mm) neither keeps a landmark with 30 blobs:
-the patch matching rarely pairs the same anatomy across subjects. `-b` is a rough initialiser
-for images of one subject; fMRIPrep does not use it.
+**What the blob alignment achieves** (the [record](../validation/ants-ai.md), its table "Blob
+alignment against the known transforms"; mean and largest distance from the true transform):
+
+| Moving image | ANTs (one thread) | larmorx's default |
+|---|---|---|
+| 3D phantom, an exact translation (rigid fit) | 0 | 0.50, 1.4 mm |
+| 3D phantom rotated by 7° and 4° (rigid; affine) | 34, 67 mm; 654, 1520 mm | no landmark: an error |
+| 3D phantom rotated and scaled (rigid) | NaN (ANTS-114) | no landmark: an error |
+| 2D phantom, a translation (rigid) | 0 | 0.33, 0.42 mm |
+| 2D phantom rotated by 9° (rigid; affine) | 6.2, 12 mm; 45, 125 mm | 1.6, 3.5 mm; 2.7, 11 mm |
+| fMRIPrep's T1w of ds000005, origin moved (rigid) | 0 (to rounding) | 1.2, 2.1 mm |
+| the same T1w rotated by 8° in millimetres and shifted (rigid) | NaN (no landmark) | 1.0, 1.9 mm |
+
+For a translation ANTs' displacement-length test keeps exactly the true pairs; the corrected
+distance test also keeps a pair matched to a neighbouring blob (on the T1w a blob 3 mm from its
+true partner), which costs about a millimetre. For any rotation ANTs keeps no landmark or the
+wrong ones. Between a T1w and the MNI template (2 mm) neither keeps a landmark with 30 blobs, on
+any of the five oracle runs: the patch matching rarely pairs the same anatomy across subjects.
+`-b` is a rough initialiser for images of one subject; fMRIPrep does not use it.
 
 ## antsAffineInitializer
 

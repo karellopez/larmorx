@@ -220,8 +220,9 @@ Each is an entry of the [register](upstream-defects.md), with its evidence; the 
   tissue where one share is at least 0.8, else the partial-volume class of the two largest):
   MRF 0.1, partial-volume Dice 0.295 and 0.405 in ANTs, 0.862 and 0.805 corrected (voxels as the
   truth: 94.0 % and 97.7 %); MRF 0.3, ANTs stops, corrected 0.835 and 0.801 (97.8 %); no MRF,
-  0.73 and 0.58 in both. The MRF thus helps the partial-volume classes once they are members of
-  their sets, as it helps the tissues.
+  ANTs 0.728 and 0.578 (93.7 %), larmorx's default 0.711 and 0.594 (93.4 %, ITK-50 and ANTS-96
+  corrected). The MRF thus helps the partial-volume classes once they are members of their
+  sets, as it helps the tissues.
 - **ANTS-107** With Grubbs-Rosner the sample grows (ANTS-94); `UpdateClassLabeling` allocates
   the weights for the grown sample (`WeightArrayType weights(totalSampleSize)`, uninitialized)
   and sets those of the masked voxels only (`Atropos.hxx:1361-1372`): the rest is whatever the

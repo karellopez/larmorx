@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "1dfe56c0dc60",
+  "larmorx_commit": "708bb99389fe",
   "larmorx_testdata_commit": "00b862132e9c",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -29,7 +29,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.421,
+   "seconds": 0.771,
    "status": "pass"
   },
   {
@@ -45,7 +45,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.807,
    "status": "pass"
   },
   {
@@ -61,7 +61,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.747,
    "status": "pass"
   },
   {
@@ -79,7 +79,7 @@
     "D13 fix pass": 0,
     "unmodified ANTs: t.mat": null
    },
-   "seconds": 0.088,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -95,7 +95,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.04,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -111,7 +111,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -127,7 +127,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.036,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -143,7 +143,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -159,7 +159,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -176,7 +176,7 @@
     "D13 fix pass": 0,
     "thread band": "0"
    },
-   "seconds": 38.632,
+   "seconds": 107.742,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.86,
+   "seconds": 10.461,
    "status": "pass"
   },
   {
@@ -209,7 +209,7 @@
     "D13 fix pass": 12,
     "thread band": "0"
    },
-   "seconds": 5.784,
+   "seconds": 20.293,
    "status": "pass"
   },
   {
@@ -226,7 +226,7 @@
     "D13 fix pass": 0,
     "thread band": "0"
    },
-   "seconds": 6.616,
+   "seconds": 26.436,
    "status": "pass"
   },
   {
@@ -242,7 +242,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.854,
+   "seconds": 11.056,
    "status": "pass"
   },
   {
@@ -258,7 +258,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.878,
+   "seconds": 4.169,
    "status": "pass"
   },
   {
@@ -274,7 +274,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.542,
+   "seconds": 2.359,
    "status": "pass"
   },
   {
@@ -290,7 +290,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.98,
+   "seconds": 6.524,
    "status": "pass"
   },
   {
@@ -306,7 +306,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.1,
+   "seconds": 6.887,
    "status": "pass"
   },
   {
@@ -322,7 +322,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.833,
+   "seconds": 10.961,
    "status": "pass"
   },
   {
@@ -339,7 +339,7 @@
     "D13 fix pass": 0,
     "thread band": "0"
    },
-   "seconds": 2.006,
+   "seconds": 6.949,
    "status": "pass"
   },
   {
@@ -355,7 +355,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.291,
+   "seconds": 0.903,
    "status": "pass"
   },
   {
@@ -371,7 +371,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.257,
+   "seconds": 0.957,
    "status": "pass"
   },
   {
@@ -387,7 +387,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.181,
+   "seconds": 1.099,
    "status": "pass"
   },
   {
@@ -403,7 +403,7 @@
    "reported": {
     "D13 fix pass": 6
    },
-   "seconds": 0.157,
+   "seconds": 0.554,
    "status": "pass"
   },
   {
@@ -419,7 +419,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.456,
+   "seconds": 14.765,
    "status": "pass"
   },
   {
@@ -435,7 +435,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 11.647,
+   "seconds": 28.707,
    "status": "pass"
   },
   {
@@ -451,7 +451,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.928,
+   "seconds": 10.013,
    "status": "pass"
   },
   {
@@ -467,7 +467,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.136,
+   "seconds": 0.353,
    "status": "pass"
   },
   {
@@ -483,7 +483,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.142,
+   "seconds": 0.341,
    "status": "pass"
   },
   {
@@ -499,7 +499,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.996,
+   "seconds": 4.985,
    "status": "pass"
   },
   {
@@ -515,7 +515,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.881,
+   "seconds": 5.335,
    "status": "pass"
   },
   {
@@ -531,7 +531,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.979,
+   "seconds": 5.209,
    "status": "pass"
   },
   {
@@ -547,7 +547,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 7.385,
+   "seconds": 18.669,
    "status": "pass"
   },
   {
@@ -563,7 +563,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.01,
+   "seconds": 4.506,
    "status": "pass"
   },
   {
@@ -579,7 +579,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.06,
+   "seconds": 5.11,
    "status": "pass"
   },
   {
@@ -595,7 +595,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.92,
+   "seconds": 5.276,
    "status": "pass"
   },
   {
@@ -611,7 +611,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 8.659,
+   "seconds": 20.228,
    "status": "pass"
   },
   {
@@ -627,7 +627,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -643,7 +643,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -659,7 +659,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -675,7 +675,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -691,7 +691,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -707,7 +707,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -723,7 +723,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -739,7 +739,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -755,7 +755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 12.107,
+   "seconds": 26.729,
    "status": "pass"
   },
   {
@@ -771,7 +771,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 6.994,
+   "seconds": 18.853,
    "status": "pass"
   },
   {
@@ -781,7 +781,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "          Print the help menu.",
-   "seconds": 0.019,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -797,7 +797,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.016,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -813,7 +813,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -823,7 +823,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.015,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -833,7 +833,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.015,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -843,7 +843,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Image dimensionality not specified.  See command line option --dimensionality",
-   "seconds": 0.015,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -853,7 +853,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized dimensionality.  Please see help menu.",
-   "seconds": 0.016,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -863,7 +863,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized dimensionality.  Please see help menu.",
-   "seconds": 0.015,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -873,7 +873,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Input metric not specified.",
-   "seconds": 0.016,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -892,7 +892,7 @@
     }
    ],
    "reason": "Input metric not specified.",
-   "seconds": 0.015,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -902,7 +902,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Fixed and/or moving images not specified.",
-   "seconds": 0.015,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -912,7 +912,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized sampling strategy.",
-   "seconds": 0.047,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -922,7 +922,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized transform option.",
-   "seconds": 0.037,
+   "seconds": 0.066,
    "status": "both-error"
   },
   {
@@ -932,7 +932,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized transform option.",
-   "seconds": 0.035,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -942,7 +942,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Unrecognized transform option.",
-   "seconds": 0.035,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -952,7 +952,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unrecognized metric.",
-   "seconds": 0.04,
+   "seconds": 0.08,
    "status": "both-error"
   },
   {
@@ -962,7 +962,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR: Unrecognized metric.",
-   "seconds": 0.038,
+   "seconds": 0.072,
    "status": "both-error"
   },
   {
@@ -972,7 +972,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Please specify a greater number of blobs (>=3).",
-   "seconds": 0.036,
+   "seconds": 0.068,
    "status": "both-error"
   },
   {
@@ -982,7 +982,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "Please specify a greater number of blobs (>=3).",
-   "seconds": 0.036,
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -992,7 +992,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ERROR:  Invalid flag provided bogus",
-   "seconds": 0.014,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1002,7 +1002,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.029,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -1012,7 +1012,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.024,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -1022,7 +1022,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.024,
+   "seconds": 0.057,
    "status": "both-error"
   },
   {
@@ -1032,7 +1032,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.046,
+   "seconds": 0.065,
    "status": "both-error"
   },
   {
@@ -1042,7 +1042,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.033,
+   "seconds": 0.079,
    "status": "both-error"
   },
   {
@@ -1052,7 +1052,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.013,
+   "seconds": 0.035,
    "status": "both-error"
   },
   {
@@ -1062,7 +1062,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.038,
+   "seconds": 0.079,
    "status": "both-error"
   },
   {
@@ -1072,7 +1072,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.039,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -1082,7 +1082,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.038,
+   "seconds": 0.068,
    "status": "both-error"
   },
   {
@@ -1092,7 +1092,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.031,
+   "seconds": 0.066,
    "status": "both-error"
   },
   {
@@ -1108,7 +1108,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.032,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1118,7 +1118,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.029,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -1128,7 +1128,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.027,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -1138,7 +1138,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 1.401,
+   "seconds": 2.764,
    "status": "both-error"
   },
   {
@@ -1148,7 +1148,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.042,
+   "seconds": 0.066,
    "status": "both-error"
   },
   {
@@ -1158,7 +1158,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.05,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -1168,7 +1168,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.046,
+   "seconds": 0.082,
    "status": "both-error"
   },
   {
@@ -1178,7 +1178,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.052,
+   "seconds": 0.093,
    "status": "both-error"
   },
   {
@@ -1188,7 +1188,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
-   "seconds": 0.058,
+   "seconds": 0.107,
    "status": "both-error"
   },
   {
@@ -1198,7 +1198,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: no start point (a negative arc fraction or translation grid): ANTs reads the best parameters from an empty list and crashes",
-   "seconds": 0.017,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1208,7 +1208,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.049,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -1218,7 +1218,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.047,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -1228,7 +1228,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.046,
+   "seconds": 0.082,
    "status": "both-error"
   },
   {
@@ -1238,7 +1238,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-53 (antsAI) reproduced: AlignGeometricCenters and AlignCentersOfMass with iterations write no transform, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.041,
+   "seconds": 0.078,
    "status": "both-error"
   },
   {
@@ -1248,7 +1248,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
-   "seconds": 0.038,
+   "seconds": 0.07,
    "status": "both-error"
   },
   {
@@ -1258,7 +1258,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [-2.43059e+37, 33.1286]); ITK's Mattes metric is",
-   "seconds": 0.057,
+   "seconds": 0.108,
    "status": "both-error"
   },
   {
@@ -1268,7 +1268,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [16.229, -2.43059e+37]); ITK's Mattes metric is ",
-   "seconds": 0.064,
+   "seconds": 0.109,
    "status": "both-error"
   },
   {
@@ -1278,7 +1278,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: antsAI: every start point threw: ANTs' observer reads the best metric value from an empty list and crashes",
-   "seconds": 0.075,
+   "seconds": 0.093,
    "status": "both-error"
   },
   {
@@ -1288,7 +1288,7 @@
    "checks_total": 3,
    "failed_checks": [],
    "reason": "larmorx: upstream defect ANTS-06 (ANTs) reproduced: the Regular sampling step: unsigned long of inf is undefined; 9223372036854775808, as x86-64 converts it [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.051,
+   "seconds": 0.064,
    "status": "both-error"
   },
   {
@@ -1298,7 +1298,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.274,
+   "seconds": 20.223,
    "status": "expected-divergence"
   },
   {
@@ -1308,7 +1308,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "ANTs never finishes (class (a)); larmorx refuses",
-   "seconds": 20.635,
+   "seconds": 20.64,
    "status": "expected-divergence"
   },
   {
@@ -1319,9 +1319,9 @@
    "failed_checks": [],
    "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
    "reported": {
-    "ANTs' own runs": "0.0098"
+    "ANTs' own runs": "0.0256"
    },
-   "seconds": 2.778,
+   "seconds": 4.211,
    "status": "expected-divergence"
   },
   {
@@ -1332,9 +1332,9 @@
    "failed_checks": [],
    "reason": "ANTs seeds from the clock (ANTS-58): two runs differ; larmorx is repeatable",
    "reported": {
-    "ANTs' own runs": "0.0314"
+    "ANTs' own runs": "0.0263"
    },
-   "seconds": 2.376,
+   "seconds": 3.691,
    "status": "expected-divergence"
   },
   {
@@ -1352,7 +1352,7 @@
     "fMRIPrep's own transform": "1.56e-13",
     "thread band": "0"
    },
-   "seconds": 286.673,
+   "seconds": 467.806,
    "status": "pass"
   },
   {
@@ -1370,16 +1370,480 @@
     "fMRIPrep's own transform": "1.28e-13",
     "thread band": "0"
    },
-   "seconds": 676.416,
+   "seconds": 832.51,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/shift-rigid",
+   "category": "blobs",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "0.497 mm mean, 1.38 mm largest",
+    "alignment error: ANTs": "0 mm mean, 0 mm largest",
+    "thread band": "0"
+   },
+   "seconds": 27.278,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/shift-affine",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12,
+    "alignment error": "0.483 mm mean, 1.92 mm largest",
+    "alignment error: ANTs": "1.11e-14 mm mean, 2.2e-14 mm largest"
+   },
+   "seconds": 23.167,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/shift-similarity",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "0.497 mm mean, 1.38 mm largest",
+    "alignment error: ANTs": "0 mm mean, 0 mm largest"
+   },
+   "seconds": 22.047,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/rigid-rigid",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "alignment error": "no transform",
+    "alignment error: ANTs": "34 mm mean, 66.8 mm largest"
+   },
+   "seconds": 19.782,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/rigid-affine",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "alignment error": "no transform",
+    "alignment error: ANTs": "654 mm mean, 1.52e+03 mm largest"
+   },
+   "seconds": 20.501,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/affine-rigid",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "alignment error": "no transform",
+    "alignment error: ANTs": "nan mm mean, nan mm largest"
+   },
+   "seconds": 26.092,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/affine-affine",
+   "category": "blobs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 23.201,
+   "status": "both-error"
+  },
+  {
+   "case": "blobs/2d-shift-rigid",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3,
+    "alignment error": "0.33 mm mean, 0.422 mm largest",
+    "alignment error: ANTs": "0 mm mean, 0 mm largest"
+   },
+   "seconds": 1.227,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/2d-shift-affine",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "0.471 mm mean, 1.16 mm largest",
+    "alignment error: ANTs": "5.81e-14 mm mean, 2.07e-13 mm largest"
+   },
+   "seconds": 1.119,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/2d-rigid-rigid",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3,
+    "alignment error": "1.62 mm mean, 3.54 mm largest",
+    "alignment error: ANTs": "6.2 mm mean, 12.3 mm largest"
+   },
+   "seconds": 1.229,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/2d-rigid-affine",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "2.73 mm mean, 11.2 mm largest",
+    "alignment error: ANTs": "45.4 mm mean, 125 mm largest"
+   },
+   "seconds": 1.26,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/2d-rigid-similarity",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4,
+    "alignment error": "1.62 mm mean, 3.54 mm largest",
+    "alignment error: ANTs": "6.2 mm mean, 12.3 mm largest"
+   },
+   "seconds": 1.329,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/shift-rigid-match-10",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "0.577 mm mean, 1.61 mm largest",
+    "alignment error: ANTs": "0 mm mean, 0 mm largest"
+   },
+   "seconds": 20.79,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/shift-rigid-search",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 14
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "4.11 mm mean, 9.07 mm largest",
+    "alignment error: ANTs": "3.83 mm mean, 7.99 mm largest"
+   },
+   "seconds": 34.45,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/rigid-affine-search-h5",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 14
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "alignment error": "no transform",
+    "alignment error: ANTs": "603 mm mean, 1.25e+03 mm largest"
+   },
+   "seconds": 29.817,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/identical-rigid",
+   "category": "blobs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3
+   },
+   "seconds": 23.479,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/no-pairs-rigid",
+   "category": "blobs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 19.466,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/no-pairs-affine",
+   "category": "blobs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 16.246,
+   "status": "both-error"
+  },
+  {
+   "case": "blobs/2d-no-pairs-rigid",
+   "category": "blobs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.28,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/constant",
+   "category": "blobs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.757,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/noise-rigid",
+   "category": "blobs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.643,
+   "status": "pass"
+  },
+  {
+   "case": "blobs/thin",
+   "category": "blobs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "blobs/missing-fixed",
+   "category": "blobs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 0.085,
+   "status": "both-error"
+  },
+  {
+   "case": "blobs/missing-moving",
+   "category": "blobs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1",
+   "seconds": 5.932,
+   "status": "both-error"
+  },
+  {
+   "case": "blobs/principal-axes-ignored",
+   "category": "blobs",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "0.497 mm mean, 1.38 mm largest",
+    "alignment error: ANTs": "0 mm mean, 0 mm largest"
+   },
+   "seconds": 31.019,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/blobs-t1w-shift",
+   "category": "real",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "1.19 mm mean, 2.1 mm largest",
+    "alignment error: ANTs": "5.92e-16 mm mean, 1.78e-15 mm largest",
+    "thread band": "0"
+   },
+   "seconds": 279.281,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/blobs-t1w-rotated",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6,
+    "alignment error": "1.03 mm mean, 1.87 mm largest",
+    "alignment error: ANTs": "nan mm mean, nan mm largest"
+   },
+   "seconds": 272.465,
+   "status": "pass"
+  },
+  {
+   "case": "real/ds000005-sub-01/blobs-t1w-rotated-affine",
+   "category": "real",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "larmorx: upstream defect ANTS-110 (antsAI) reproduced: 5 of 7 blob pairs preserve their distances to at least 3 others; ANTs' test of the displacement lengths keeps 0 [LARMORX_UPSTREAM_DEFECTS=fix cor",
+   "seconds": 243.08,
+   "status": "both-error"
+  },
+  {
+   "case": "real/ds000005-sub-01/blobs-mni-rigid",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "unmodified ANTs: standard output": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 154.655,
    "status": "pass"
   }
  ],
  "suite": "ants-ai",
  "summary": {
-  "both-error": 46,
+  "both-error": 52,
   "expected-divergence": 4,
   "fail": 0,
-  "pass": 52,
+  "pass": 75,
   "skipped": 0
  },
  "tier": "standard"

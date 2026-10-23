@@ -188,6 +188,10 @@ every N-th iteration, `<prefix>Stage<n>_level<l>_Iter<iiii>.nii.gz`, and prints 
   (`RegistrationParameterScalesFromPhysicalShift`, `SizeOfSmallDomain`), drawn with ITK's
   `ImageRandomConstIteratorWithIndex`, whose generator is seeded from the clock: two runs of
   ANTs differ, whatever `--random-seed` says. larmorx draws them with the stage's seed.
+  Verified again on 2026-10-23 with the corrections record's ITK-35 references (a B-spline
+  transform sampled as a field, then a linear stage): five runs, five transforms, up to
+  8.5 mm apart; identical once `time()` and `clock()` are fixed
+  ([ants-velocity.md](ants-velocity.md)).
 
 ## Validation notes
 

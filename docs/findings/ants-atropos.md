@@ -34,9 +34,9 @@ parser in [ants-cli.md](ants-cli.md). The defects have their entries in the
 - **Twenty defects**, from crashes to results that depend on the heap's contents: ITK-50
   (k-means skips the split points), ITK-51 (Student quantiles NaN beyond 340 degrees of
   freedom, so Grubbs-Rosner never finds an outlier in an image), ANTS-90 to ANTS-107. Each is
-  corrected by default and reproduced on request (D13), except ANTS-106, a modelling limit with
-  no defined correction. On sMRIPrep's call only ITK-50 is met: on the five runs the
-  correction changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels and the posteriors by
+  corrected by default and reproduced on request (D13), ANTS-106 included since 2026-10-23 (the
+  user's decision of 2026-10-22: a partial-volume label is a member of its own set in the MRF).
+  On sMRIPrep's call only ITK-50 is met: on the five runs the correction changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels and the posteriors by
   at most 0.14, less than ANTs' own spread with the clock's seed.
 
 ## How sMRIPrep calls it
@@ -207,12 +207,22 @@ Each is an entry of the [register](upstream-defects.md), with its evidence; the 
   `Atropos.cxx:440` reads a prior through `GetPriorProbabilityImage`, which with minimized
   memory rebuilds it on the first intensity image before any is set.
 - **ANTS-106** Partial-volume classes with their likelihoods (`--use-partial-volume-likelihoods
-  1`) and an MRF can never win a voxel: the MRF energy of a partial-volume label with any tissue
-  neighbour is +1 (`ComputeMRFDeltaMatrix`, `Atropos.hxx:546-600`, compares the tissue labels
-  of each set, never the partial-volume label itself), against −2 for a tissue with its own
-  kind, and no voxel starts with a partial-volume label. Atropos stops ("N non-zero label sets
-  but N + P is requested"). Without the MRF (`-m [0,...]`) they work. No correction is defined
-  (the intended energy is not stated); both modes behave as ANTs and the API page says so.
+  1`) and an MRF hardly win a voxel: the MRF energy of a partial-volume label with any tissue
+  neighbour, its own tissues included, is +1 (`ComputeMRFDeltaMatrix`, `Atropos.hxx:546-600`,
+  compares the tissue labels of each set, never the partial-volume label itself), against −2
+  for a tissue with its own kind, and no voxel starts with a partial-volume label. Atropos stops
+  when a partial-volume class wins no voxel ("N non-zero label sets but N + P is requested"; the
+  test is on the largest label). Without the MRF (`-m [0,...]`) they work. **Corrected by
+  default** (decided by the user, 2026-10-22): a partial-volume label counts as a member of its
+  own set, −1 with its two tissues, −2 with itself, +1 with any other label
+  (`compute_mrf_neighborhood`); `reproduce` keeps ANTs' energies. Measured on a phantom with known
+  fractions (nested spheres box-averaged from a five-times finer grid, noise sd 6; truth: a
+  tissue where one share is at least 0.8, else the partial-volume class of the two largest):
+  MRF 0.1, partial-volume Dice 0.295 and 0.405 in ANTs, 0.862 and 0.805 corrected (voxels as the
+  truth: 94.0 % and 97.7 %); MRF 0.3, ANTs stops, corrected 0.835 and 0.801 (97.8 %); no MRF,
+  ANTs 0.728 and 0.578 (93.7 %), larmorx's default 0.711 and 0.594 (93.4 %, ITK-50 and ANTS-96
+  corrected). The MRF thus helps the partial-volume classes once they are members of their
+  sets, as it helps the tissues.
 - **ANTS-107** With Grubbs-Rosner the sample grows (ANTS-94); `UpdateClassLabeling` allocates
   the weights for the grown sample (`WeightArrayType weights(totalSampleSize)`, uninitialized)
   and sets those of the masked voxels only (`Atropos.hxx:1361-1372`): the rest is whatever the

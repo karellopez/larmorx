@@ -194,7 +194,12 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-103 | Atropos | the joint shape and orientation model at the raw components and an unset coordinate | at the tensor's eigenvalues and direction (`reproduce`: the unset coordinate 0) |
 | ANTS-104 | Atropos | `ManifoldParzenWindows`' local covariances double their running sums | the local covariance |
 | ANTS-105 | Atropos | `-u 1` with priors and a mask crashes | runs (`reproduce`: exit 1 where ANTs crashes) |
+| ANTS-106 | Atropos | partial-volume classes with an MRF hardly win a voxel (Atropos stops) | a partial-volume label is a member of its own set in the MRF |
 | ANTS-107 | Atropos | Grubbs-Rosner's grown sample weighed with uninitialized memory | not met (ANTS-94 corrected; `reproduce`: those weights 0) |
+| ANTS-110 | antsAI `-b` | landmarks kept by the lengths of the pairs' displacements | by their preserved distances to three other pairs |
+| ANTS-111 | antsAI `-b` | after the correlations run out, the first blobs paired again and again | the pairing stops |
+| ANTS-112 | antsAI `-b` | the blob detector does not keep the N strongest maxima | the N strongest |
+| ANTS-114 | antsAI `-b` | no landmark: a rigid transform of NaNs, exit 0 | an error |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -228,6 +233,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ITK-42 | ITK scales estimator | scales all below epsilon (a vanished probe) refused | ones (equal scales cancel) |
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` (Atropos `KMeans`) | the point each divided k-d tree node is split at is left out of the new centres | every point counted |
 | ITK-51 | ITK `TDistribution` (Atropos' Grubbs-Rosner) | NaN above about 340 degrees of freedom: no outlier is ever found in an image | the Gamma ratio through its logarithm where it would overflow |
+| ITK-60 | ITK `LandmarkBasedTransformInitializer` (antsAI `-b`, 2D) | −90° whenever the dot product is near 0 | `atan2` |
 
 **Not the default yet:**
 

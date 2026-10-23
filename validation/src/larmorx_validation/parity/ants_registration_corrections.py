@@ -17,7 +17,12 @@ transform, which ANTs cannot run), against the closest runs ANTs can do.
   displacement field (on the moving grid and on one of half its spacing): how far the
   resulting transforms map the fixed image's points apart (mm, within the mask) and the mean
   squared difference each leaves, computed exactly through the B-spline transform and the stage's
-  result. ``reproduce`` must fail as ANTs does.
+  result. ``reproduce`` must fail as ANTs does. The references with a displacement field are not
+  repeatable: a linear stage after a displacement field estimates its scales and learning rate
+  from 1000 voxels that ITK draws with a generator seeded from the clock (ANTS-72; with
+  ``time`` and ``clock`` fixed, the runs are identical), so each runs ``FIELD_RUNS`` times and
+  the record gives the median and the range of each number, and how far ANTs' own runs map the
+  points apart.
 
 Every number is reported; a case fails only where a correction is not named, a mode does not
 run as it should, or an equivalence that must be exact is not.
@@ -43,6 +48,8 @@ from larmorx_validation.parity.harness import SKIPPED, Case, CheckList, Outcome,
 TRUE_SHIFT = np.array([-2.0, 2.0, 2.5])
 SEED = "42"
 REPORTED = "reported"
+#: How many times each reference with a displacement field runs (ANTS-72: they vary).
+FIELD_RUNS = 5
 
 
 @dataclass(frozen=True)
@@ -397,18 +404,19 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
         code,
         d / f"r{sc.second_file}".replace("r1", "r0", 1),
     )
+    repeated = {}
     for tag, ref in (("moving grid", m), ("half its spacing", fine)):
         fld = tmp / f"bspline-field-{'fine' if ref == fine else 'grid'}.nii.gz"
         _apply(["-i", str(m), "-r", str(ref), "-t", str(bsp), "-o", f"[{fld},1]"])
-        d = tmp / f"ants-field-{'fine' if ref == fine else 'grid'}"
-        d.mkdir()
-        code, _o, err = _ants(
-            ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args]
-        )
-        constructions[f"ANTs with the B-spline transform as a displacement field ({tag})"] = (
-            code,
-            d / f"r{sc.second_file}",
-        )
+        runs = []
+        for r in range(FIELD_RUNS):
+            d = tmp / f"ants-field-{'fine' if ref == fine else 'grid'}-{r}"
+            d.mkdir()
+            code, _o, err = _ants(
+                ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args]
+            )
+            runs.append((code, d / f"r{sc.second_file}"))
+        repeated[f"ANTs with the B-spline transform as a displacement field ({tag})"] = runs
     checks(
         "default: mean squared difference left (exact composite)",
         True,
@@ -416,6 +424,8 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
         value=_fmt(_true_mse(bsp, second, tmp)),
         threshold=REPORTED,
     )
+    for label, runs in repeated.items():
+        _repeated_reference(checks, label, runs, second, bsp, tmp)
     for label, (code, path) in constructions.items():
         if code != 0 or not path.exists():
             checks(label, False, detail=f"ANTs exit {code}")
@@ -445,6 +455,58 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
         )
 
 
+def _repeated_reference(
+    checks: CheckList,
+    label: str,
+    runs: list[tuple[int, Path]],
+    second: Path,
+    bsp: Path,
+    tmp: Path,
+) -> None:
+    """A reference that varies from run to run (ANTS-72): the median and range over its runs of
+    each number, and the largest distance between its own runs' transforms."""
+    ok = [path for code, path in runs if code == 0 and path.exists()]
+    if len(ok) < len(runs):
+        checks(label, False, detail=f"ANTs failed in {len(runs) - len(ok)} of {len(runs)} runs")
+        if not ok:
+            return
+    metric = "where the two results map the fixed points apart, in the mask"
+    note = f"ANTs varies from run to run (ANTS-72): median and range over {len(ok)} runs"
+    dist = [_distance(second, path, tmp) for path in ok]
+    mse = [_true_mse(bsp, path, tmp) for path in ok]
+
+    def spread(values: list[float]) -> tuple[str, str]:
+        v = np.asarray(values)
+        return _fmt(float(np.median(v))), f"{_fmt(float(v.min()))} to {_fmt(float(v.max()))}"
+
+    for name, values in (
+        ("largest distance (mm)", [d[0] for d in dist]),
+        ("mean distance (mm)", [d[1] for d in dist]),
+        ("mean squared difference left", mse),
+    ):
+        median, rng = spread(values)
+        checks(
+            f"{label}: {name}",
+            True,
+            metric=metric if "distance" in name else "(fixed − moving through both)² in the mask",
+            value=median,
+            threshold=REPORTED,
+            detail=f"{note}: {median} (range {rng})",
+        )
+    own = 0.0
+    for i in range(len(ok)):
+        for j in range(i + 1, len(ok)):
+            own = max(own, _distance(ok[i], ok[j], tmp)[0])
+    checks(
+        f"{label}: ANTs' own runs",
+        True,
+        metric="the largest distance between two of ANTs' runs, in the mask",
+        value=_fmt(own),
+        threshold=REPORTED,
+        detail=f"{len(ok)} runs at one thread with ANTS_RANDOM_SEED={SEED} (ANTS-72)",
+    )
+
+
 def run_case(case: Case, checks: CheckList) -> None:
     sc: Scenario = case.payload
     if ants_bin() is None:
@@ -452,6 +514,50 @@ def run_case(case: Case, checks: CheckList) -> None:
     with tempfile.TemporaryDirectory(prefix="lx-reg-corr-") as t:
         tmp = Path(t)
         {"point-set": _point_set, "mesh": _mesh, "chain": _chain}[sc.kind](sc, tmp, checks)
+
+
+def highlights(results: list) -> list[str]:
+    """ITK-35's references, with the spread of those that vary from run to run (ANTS-72)."""
+    rows = []
+    for r in results:
+        if not r.case.startswith("chain/"):
+            continue
+        found: dict[str, dict[str, str]] = {}
+        for ch in r.checks:
+            label, _, name = ch.name.partition(": ")
+            if not label.startswith("ANTs "):
+                continue
+            ref = label.removeprefix("ANTs ")
+            m = re.search(r"\(range ([^)]+)\)", ch.detail)
+            value = f"{ch.value} ({m.group(1)})" if m else str(ch.value)
+            found.setdefault(ref, {})[name] = value
+        for ref, values in found.items():
+            rows.append(
+                (
+                    f"`{r.case}`",
+                    ref,
+                    values.get("largest distance (mm)", ""),
+                    values.get("mean distance (mm)", ""),
+                    values.get("ANTs' own runs", "– (one construction, repeatable)"),
+                )
+            )
+    if not rows:
+        return []
+    header = (
+        "| Case | ANTs reference | largest distance (mm) | mean distance (mm) | "
+        "ANTs' own runs: largest distance (mm) |"
+    )
+    lines = [
+        "**ITK-35's references** (how far each maps the fixed points from larmorx's corrected "
+        "stage, in the mask). A linear stage after a displacement field is not repeatable in "
+        f"ANTs (ANTS-72): those references ran {FIELD_RUNS} times each, and show the median "
+        "with the range in brackets, and the largest distance between two of ANTs' own runs.",
+        "",
+        header,
+        "|---|---|---|---|---|",
+        *(f"| {' | '.join(row)} |" for row in rows),
+    ]
+    return lines
 
 
 def suite() -> Suite:
@@ -472,6 +578,7 @@ def suite() -> Suite:
         run_case=run_case,
         packages=("nibabel",),
         notes="The phantoms are the ants-registration suite's (`gen:reg-*`, `gen:ps-*`).",
+        highlights=highlights,
     )
 
 

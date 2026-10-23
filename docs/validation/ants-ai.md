@@ -1,15 +1,48 @@
 # Parity: antsAI
 
-**All cases agree.** 102 cases on the `standard` tier: 52 pass, 46 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 131 cases on the `standard` tier: 75 pass, 52 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsAI` / `lx.ants.ai` (crates larmorx-ants, larmorx-registration)
 - **Reference:** antsAI from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
+- **Generated:** 2026-10-23 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
 
-52 cases compared: 51 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
+75 cases compared: 74 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.85e-13 in a transform parameter (`search/rigid-grid` 3.33e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 8.88e-16, `real/ds000005-sub-01/brain-extraction` 1.85e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.35e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 6 cases: ANTs at 2, 4, 6 threads differs from its own one-thread result by up to 1.42e-13 in a transform parameter (`search/rigid-grid` 3.33e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.42e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.28e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+
+Thread band, blob alignment (2 cases: `blobs/shift-rigid`, `real/ds000005-sub-01/blobs-t1w-shift`): ANTs' `antsAI -b` crashes at 2, 4, 6 threads (ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives ANTs' one-thread result at any thread count.
+
+**Blob alignment against the known transforms** (`-b`; where the moving image is the fixed one moved by a known transform: the distance from where each program's transform sends test points to where they truly are; larmorx's default corrects ANTS-110, ANTS-111, ANTS-112, ANTS-114 and ITK-60, `reproduce` is ANTs' result):
+
+| Case | ANTs 2.6.5 (one thread) | larmorx's default |
+|---|---|---|
+| `blobs/shift-rigid` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
+| `blobs/shift-affine` | 1.11e-14 mm mean, 2.2e-14 mm largest | 0.483 mm mean, 1.92 mm largest |
+| `blobs/shift-similarity` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
+| `blobs/rigid-rigid` | 34 mm mean, 66.8 mm largest | no transform |
+| `blobs/rigid-affine` | 654 mm mean, 1.52e+03 mm largest | no transform |
+| `blobs/affine-rigid` | nan mm mean, nan mm largest | no transform |
+| `blobs/2d-shift-rigid` | 0 mm mean, 0 mm largest | 0.33 mm mean, 0.422 mm largest |
+| `blobs/2d-shift-affine` | 5.81e-14 mm mean, 2.07e-13 mm largest | 0.471 mm mean, 1.16 mm largest |
+| `blobs/2d-rigid-rigid` | 6.2 mm mean, 12.3 mm largest | 1.62 mm mean, 3.54 mm largest |
+| `blobs/2d-rigid-affine` | 45.4 mm mean, 125 mm largest | 2.73 mm mean, 11.2 mm largest |
+| `blobs/2d-rigid-similarity` | 6.2 mm mean, 12.3 mm largest | 1.62 mm mean, 3.54 mm largest |
+| `blobs/shift-rigid-match-10` | 0 mm mean, 0 mm largest | 0.577 mm mean, 1.61 mm largest |
+| `blobs/shift-rigid-search` | 3.83 mm mean, 7.99 mm largest | 4.11 mm mean, 9.07 mm largest |
+| `blobs/rigid-affine-search-h5` | 603 mm mean, 1.25e+03 mm largest | no transform |
+| `blobs/principal-axes-ignored` | 0 mm mean, 0 mm largest | 0.497 mm mean, 1.38 mm largest |
+| `real/ds000005-sub-01/blobs-t1w-shift` | 5.92e-16 mm mean, 1.78e-15 mm largest | 1.19 mm mean, 2.1 mm largest |
+| `real/ds000005-sub-01/blobs-t1w-rotated` | nan mm mean, nan mm largest | 1.03 mm mean, 1.87 mm largest |
+
+- **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
+  - ANTS-110: 14 case(s) named it, 14 with changed values (largest difference inf): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid`, `blobs/2d-rigid-affine`, `blobs/2d-rigid-similarity` …
+  - ANTS-111: 16 case(s) named it, 11 with changed values (largest difference inf), 5 with other changes (a transform written by one only; exit N -> N; files ['t.hN']; files ['t.mat']): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid` …
+  - ANTS-112: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/constant`
+  - ANTS-114: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/rigid-rigid`, `blobs/affine-rigid`, `blobs/no-pairs-rigid`, `blobs/2d-no-pairs-rigid`, `blobs/constant`, `blobs/noise-rigid`, `real/ds000005-sub-01/blobs-mni-rigid`
+  - ANTS-53: 4 case(s) named it, 0 with changed values (largest difference 0), 4 with other changes (a transform written by one only): `search/align-with-iterations`, `search/align-with-iterations-quiet`, `search/align-with-iterations-2d-gc`, `search/align-with-iterations-no-start`
+  - ANTS-55: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `search/grid-two-extents`, `search/grid-one-extent`
+  - ITK-18: 3 case(s) named it, 2 with changed values (largest difference 0.0294): `search/affine-mi`, `search/2d-mi-dense`, `search/mi-empty-mask-dense`
 
 fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is within 1.56e-13 (`real/ds000005-sub-01/brain-extraction`), 1.28e-13 (`real/ds000005-sub-01/bold-mixedgamblestask-run-01`) of them.
 
@@ -23,16 +56,17 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 | Files | transforms byte for byte (HDF5: every dataset) |
 | glibc's maths | where ANTs as built differs, ANTs with CORE-MATH preloaded must be identical |
 | Aborts and crashes | everything ANTs printed before it stopped; larmorx exits 1 |
-| Thread band | reported: ANTs at 2, 4, 8 threads against 1 |
+| Thread band | reported: ANTs at 2, 4, 6 threads against 1 |
 
 ## Results by category
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
+| blobs | 25 | 20 | 5 | 0 | 0 |
 | initial | 9 | 9 | 0 | 0 | 0 |
 | messages | 51 | 3 | 46 | 2 | 0 |
 | random | 2 | 0 | 0 | 2 | 0 |
-| real | 2 | 2 | 0 | 0 | 0 |
+| real | 6 | 5 | 1 | 0 | 0 |
 | search | 38 | 38 | 0 | 0 | 0 |
 
 ## Expected divergences
@@ -94,12 +128,18 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 | `messages/mattes-empty-moving-mask` | Mattes with an empty moving mask (ITK-20) | larmorx: antsAI: start point 0 threw (Negative spacing is not supported and may result in undefined behavior. Refusing to change spacing from [1, 1] to [16.229… |
 | `messages/mattes-one-start-point` | Mattes with an empty mask and one start point: the best value of an empty list | larmorx: antsAI: every start point threw: ANTs' observer reads the best metric value from an empty list and crashes |
 | `messages/percentage-zero` | Regular sampling of 0 (ANTS-06), one sample point: one intensity (ITK-20) | larmorx: upstream defect ANTS-06 (ANTs) reproduced: the Regular sampling step: unsigned long of inf is undefined; 9223372036854775808, as x86-64 converts it [L… |
+| `blobs/affine-affine` | Affine from 30 blobs of a phantom and its copy moved by a rotation of 5 degrees with scales 1.06 and 0.96 | larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `blobs/no-pairs-affine` | -b [5,0] with Affine: too few landmarks, ITK's exception | larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `blobs/thin` | An axis of 3 voxels: the Laplacian of Gaussian refuses it (ITK's exception) | larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `blobs/missing-fixed` | A fixed image that does not exist: the blob detector's input is not set | larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `blobs/missing-moving` | A moving image that does not exist (after the fixed image's blobs) | larmorx: antsAI: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
+| `real/ds000005-sub-01/blobs-t1w-rotated-affine` | The same with Affine (ANTs: too few landmarks) | larmorx: upstream defect ANTS-110 (antsAI) reproduced: 5 of 7 blob pairs preserve their distances to at least 3 others; ANTs' test of the displacement lengths … |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1dfe56c0dc60) |
+| larmorx | 0.0.1 (708bb99389fe) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -218,3 +258,32 @@ Inputs named `gen:<name>` are built by the suites (seeded phantoms); the real ca
 | `random/seed-zero` | expected-divergence | 3/3 | --random-seed 0: ANTs seeds Regular sampling from the clock (ANTS-58) |
 | `real/ds000005-sub-01/brain-extraction` | pass | 8/8 | fMRIPrep's init_aff, brain extraction, with fMRIPrep's seed |
 | `real/ds000005-sub-01/bold-mixedgamblestask-run-01` | pass | 8/8 | fMRIPrep's init_aff, BOLD reference (mixedgamblestask_run_01), with fMRIPrep's seed |
+| `blobs/shift-rigid` | pass | 9/9 | Rigid from 30 blobs of a phantom and its copy moved by an exact translation (ANTs' own test keeps the true pairs) |
+| `blobs/shift-affine` | pass | 8/8 | Affine from 30 blobs of a phantom and its copy moved by an exact translation (ANTs' own test keeps the true pairs) |
+| `blobs/shift-similarity` | pass | 8/8 | Similarity from 30 blobs of a phantom and its copy moved by an exact translation (ANTs' own test keeps the true pairs) |
+| `blobs/rigid-rigid` | pass | 8/8 | Rigid from 30 blobs of a phantom and its copy moved by a rotation of 7 and 4 degrees and a shift |
+| `blobs/rigid-affine` | pass | 8/8 | Affine from 30 blobs of a phantom and its copy moved by a rotation of 7 and 4 degrees and a shift |
+| `blobs/affine-rigid` | pass | 8/8 | Rigid from 30 blobs of a phantom and its copy moved by a rotation of 5 degrees with scales 1.06 and 0.96 |
+| `blobs/affine-affine` | both-error | 3/3 | Affine from 30 blobs of a phantom and its copy moved by a rotation of 5 degrees with scales 1.06 and 0.96 |
+| `blobs/2d-shift-rigid` | pass | 8/8 | Rigid from 30 blobs of a phantom and its copy moved by a 2D translation |
+| `blobs/2d-shift-affine` | pass | 8/8 | Affine from 30 blobs of a phantom and its copy moved by a 2D translation |
+| `blobs/2d-rigid-rigid` | pass | 8/8 | Rigid from 30 blobs of a phantom and its copy moved by a 2D rotation of 9 degrees and a shift |
+| `blobs/2d-rigid-affine` | pass | 8/8 | Affine from 30 blobs of a phantom and its copy moved by a 2D rotation of 9 degrees and a shift |
+| `blobs/2d-rigid-similarity` | pass | 8/8 | Similarity from 30 blobs of a phantom and its copy moved by a 2D rotation of 9 degrees and a shift |
+| `blobs/shift-rigid-match-10` | pass | 8/8 | -b [30,10]: 30 blobs extracted, at most 10 pairs |
+| `blobs/shift-rigid-search` | pass | 8/8 | The blob alignment, then a search over rotations about the image axes |
+| `blobs/rigid-affine-search-h5` | pass | 8/8 | Affine from the blobs of the rotated phantom, a search, an HDF5 output |
+| `blobs/identical-rigid` | pass | 6/6 | An image against itself: every displacement is 0, so ANTs' ratios are 0/0 (ANTS-110) |
+| `blobs/no-pairs-rigid` | pass | 6/6 | -b [5,0]: no pair to match; the rigid fit of no landmark (ANTS-114) |
+| `blobs/no-pairs-affine` | both-error | 3/3 | -b [5,0] with Affine: too few landmarks, ITK's exception |
+| `blobs/2d-no-pairs-rigid` | pass | 6/6 | 2D, no pair: ITK's warning (fewer than 2 landmarks), then NaN (ANTS-114) |
+| `blobs/constant` | pass | 6/6 | Two constant images: every voxel is a maximum of value 0 |
+| `blobs/noise-rigid` | pass | 6/6 | Noise against itself, 48^3: patches barely fit |
+| `blobs/thin` | both-error | 3/3 | An axis of 3 voxels: the Laplacian of Gaussian refuses it (ITK's exception) |
+| `blobs/missing-fixed` | both-error | 3/3 | A fixed image that does not exist: the blob detector's input is not set |
+| `blobs/missing-moving` | both-error | 3/3 | A moving image that does not exist (after the fixed image's blobs) |
+| `blobs/principal-axes-ignored` | pass | 8/8 | -p 1 with -b: the blobs decide the initial transform |
+| `real/ds000005-sub-01/blobs-t1w-shift` | pass | 9/9 | fMRIPrep's T1w of ds000005 against its copy with the origin moved (6, -4, 3) mm |
+| `real/ds000005-sub-01/blobs-t1w-rotated` | pass | 8/8 | fMRIPrep's T1w of ds000005 against its copy rotated by 8 degrees and shifted |
+| `real/ds000005-sub-01/blobs-t1w-rotated-affine` | both-error | 3/3 | The same with Affine (ANTs: too few landmarks) |
+| `real/ds000005-sub-01/blobs-mni-rigid` | pass | 6/6 | MNI152NLin2009cAsym (2 mm) against ds000005-sub-01's T1w, Rigid from 30 blobs |

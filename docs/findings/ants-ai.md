@@ -31,6 +31,13 @@ The v4 framework both programs run on (metrics, scales, the conjugate-gradient o
   ITK-19 (a start point that throws keeps the previous value), ITK-20 (the Mattes metric
   unusable after a refused histogram spacing), ITK-21 (the learning rate carried from one start
   point to the next). All in the [register](upstream-defects.md).
+- **`-b` (blob alignment) is ported** (2026-10-23): the detector, the patch correlations, the
+  pairing and the landmark fits reproduce ANTs at every stage, bit for bit (blobs, the
+  correspondence matrix, the pairs, the landmarks, the transform; checked with an instrumented
+  copy of `antsAI`'s code on phantoms and real T1w images, and end to end in the record). ANTs'
+  `-b` crashes at any thread count above one (ANTS-60) and its distance test keeps the wrong pairs
+  whenever the images are rotated (ANTS-110); five defects are corrected by default (ANTS-110,
+  ANTS-111, ANTS-112, ANTS-114, ITK-60), one is for the user (ANTS-116); see "Blobs".
 
 ## antsAI
 
@@ -171,33 +178,136 @@ start point after the first.
 
 ### Blobs
 
-`-b n` (at least 3 blobs) detects up to `n` blobs per image with
-`MultiScaleLaplacianBlobDetectorImageFilter` (`Utilities/`, scales from 1 to 1024 in 10 steps
-per octave), keeps the pairs whose patch correlation is highest, filters them by preserved
-distances, and fits an affine (or a rigid, `LandmarkBasedTransformInitializer`) transform to the
-pairs. The detector keeps one heap per thread of `GetGlobalDefaultNumberOfThreads()` entries but
-is run on more work units than that with more than one thread (an index past the end,
-ANTS-60). larmorx does not implement `-b` yet: it refuses it with a message.
+`-b n` or `-b [n,m]` (at least 3 blobs) replaces the centres of mass and principal axes by a
+transform fitted to matched blobs (`GetTransformFromFeatureMatching`, `antsAI.cxx:156-604`). It
+is parsed only for the transforms that are not the two alignments, and `-p` is then ignored. Ported
+in full (2026-10-23): [`larmorx_image::blobs`](../../crates/larmorx-image/src/blobs.rs) (the
+detector), [`larmorx_ants::ai_blobs`](../../crates/larmorx-ants/src/ai_blobs.rs) (the patches, the
+pairing, the landmarks), [`larmorx_registration::landmark`](../../crates/larmorx-registration/src/landmark.rs)
+(ITK's `LandmarkBasedTransformInitializer`), [`larmorx_core::vnl_qr`](../../crates/larmorx-core/src/vnl_qr.rs)
+and [`larmorx_core::eigen_sym`](../../crates/larmorx-core/src/eigen_sym.rs). What each step computes:
 
-What a replica needs, read on 2026-10-17 (for the task that ports it):
+1. **The detector** (`Utilities/itkMultiScaleLaplacianBlobDetectorImageFilter.hxx`, a public-domain
+   work of the National Library of Medicine), `t` from `pow(1, 1)` to `pow(2, 10)` (stored in
+   `float`), 10 steps per octave: `k = 2^0.1`, `σ₀ = 1/k`, `⌈ln(32 k)/ln k⌉ + 1 = 53` scales
+   `σ_i = σ₀ k^(52 − i)` from the largest (34.3 mm) down (`ln(32k)/ln k` is 51.00000000000002 with
+   glibc's and CORE-MATH's `log`, so the 53 does not depend on the C library). Each scale is
+   `LaplacianRecursiveGaussianImageFilter<float, float>` normalised across scale (an axis of fewer
+   than 4 voxels throws: "The number of pixels along direction 2 is less than 4", and `antsAI`
+   aborts). The maxima of the middle of three consecutive scales against the 81 values of their
+   `3^D` neighbourhoods in the three (a test `center < neighbour`: ties are maxima, NaN centres
+   always pass), the faces of `ImageBoundaryFacesCalculator` visited interior first, each in
+   raster order, the boundary faces reading the nearest voxel inside. A blob keeps the middle
+   scale's σ; its radius is `√(D/2) σ · √2`.
+2. **The heaps**: per work unit a min-heap of at most `n` blobs with libstdc++'s `push_heap`,
+   `pop_heap` and `sort_heap` (with `a.value > b.value`, ties as the heap leaves them), merged with
+   `std::merge` into the list kept (ties: the earlier scale first), cut to `n`.
+3. **The patches** (`GetBlobCorrespondenceMatrix`, `PatchCorrelation`): every fixed and moving blob
+   whose centre voxel is above `1e-4`; a sphere of radius 20 voxels (33,401 offsets in 3D, 1,257 in
+   2D), weights `expf(−d/400)` normalised by their float sum (from 1 to 0.95: almost uniform; a
+   Gaussian `exp(−d²/r²)` may have been meant, recorded here only). A patch that leaves either
+   image (a centre within 20 voxels of an edge) has correlation 0, so a blob needs 41 voxels of
+   image along every axis around it. Each image's gradient (`GradientRecursiveGaussianImageFilter`,
+   σ 1, not normalised, `CovariantVector<float>`, the direction applied in double and stored in
+   float) times the weights gives `GᵀG` in float; `vnl_symmetric_eigensystem<float>` (EISPACK in
+   double, stored in float) gives each patch's axes (the largest two in 3D, the largest in 2D);
+   Wahba's `A = V·Uᵀ` of `vnl_svd<float>` of `Σ outer(moving axis, fixed axis)` rotates the moving
+   patch's points about their centroid (the points in double, the rotation in float); the rotated
+   points, rounded to `Point<float>` (the interpolator's point type), are interpolated linearly,
+   and the correlation of the centred samples is computed in float (NaN and infinity are 0,
+   negative values become 0).
+4. **The pairs**: repeatedly `arg_max` of the matrix (the first largest in row order), accepted
+   when the moving blob's radius is above 1, the radii are within 0.25 (`float(|r_m − r_f|) <
+   0.25f`) and both centres above `1e-4`; the row and column are then zeroed; until `m` pairs or as
+   many steps as fixed blobs. Once no positive entry is left, `arg_max` returns entry 0 and the loop
+   pairs fixed blob 0 with moving blob 0 again at every step (ANTS-111).
+5. **The landmarks**: the pairs with at least 3 others whose ratio, stored in float, is within 0.1
+   of 1. ANTs' ratio is `|f_j − m_j|² / |f_i − m_i|²`, the squared lengths of two pairs'
+   displacements, not the ratio of distances between the blobs that its comment and ImageMath's
+   `MatchBlobs` describe (ANTS-110); its symmetric assignment `r(i, j) = r(j, i) = …` inside the
+   double loop leaves `r(i, j) = D_min(i,j)/D_max(i,j)` by index. A pair with no displacement (an
+   image against itself) gives 0/0.
+6. **The fit** (`LandmarkBasedTransformInitializer`): `AffineTransform` for `Affine` (Kim's normal
+   equations, the identity weights divided by their Frobenius norm √n through vnl's matrix
+   products, `vnl_qr<double>(Q).solve(C)`: LINPACK's `dqrdc` without pivoting and `dqrsl` with
+   job 100; fewer than `D + 1` landmarks throw "insufficient number of landmarks, expected 4 got
+   0", uncaught: `antsAI` aborts); otherwise `VersorRigid3DTransform` (Horn's 4 × 4 matrix and
+   Eigen's `SelfAdjointEigenSolver`; with fewer than 3 landmarks no rotation) or `Rigid2DTransform`
+   (`atan2` of the summed cross and dot products; `−π/2` when the dot product is within 5e-5 of 0,
+   ITK-60; fewer than 2 landmarks: ITK's warning "Less than 2 landmarks available. Rotation is not
+   computed"). `Similarity` takes the rigid fit too. No landmark at all: the centroids are 0/0 and
+   the rigid transform is NaN, which `antsAI` writes (ANTS-114). The fitted matrix and offset become
+   the initial transform, centred at 0, and the search (with iterations) rotates about the image
+   axes.
+7. If either blob list is empty, `antsAI` prints "The moving image or fixed image blobs list is
+   empty." and dereferences a null transform (it crashes; ANTS-115). A missing image reaches the
+   detector as a null input: "Input Primary is required but not set." (`itkProcessObject.cxx:1339`),
+   and `antsAI` aborts.
 
-- the detector: `LaplacianRecursiveGaussianImageFilter<float, float>` (normalised across scale)
-  at `ceil(log(32 k)/log k) + 1` scales, `k = 2^(1/10)`, from the largest σ down; the local
-  maxima of each scale against its 26 neighbours in it and the two adjacent scales
-  (`ImageBoundaryFacesCalculator` faces, zero-flux Neumann outside), kept in a min-heap of
-  `n` blobs with libstdc++'s `push_heap`/`pop_heap`/`sort_heap` and merged with `std::merge`
-  (the order of equal values depends on them);
-- the patch correlations: `GradientRecursiveGaussianImageFilter<float, CovariantVector<float>>`
-  (σ 1 mm, not normalised), spherical patches of radius 20 voxels weighted by
-  `expf(−d/400)`, sums in float over about 33,500 points, `vnl_symmetric_eigensystem<float>`
-  (computed in double), `vnl_svd<float>` (single-precision LINPACK), the linear interpolator
-  with float coordinates;
-- the landmark fit (`LandmarkBasedTransformInitializer`): for `Affine` a least-squares system
-  solved with `vnl_qr` (LINPACK `dqrdc`/`dqrsl`); for `Rigid`/`Similarity` in 3D
-  `VersorRigid3DTransform` from Horn's quaternion, the eigenvectors of a 4 × 4 matrix from
-  **Eigen's `SelfAdjointEigenSolver`** (`SymmetricEigenAnalysisFixedDimension`, vectorised by
-  Eigen); in 2D `Rigid2DTransform`. The initial transform then has its centre at 0 and the
-  search rotates about the image axes.
+**Eigen's solver works on a column-major copy.** `SelfAdjointEigenSolver<Matrix<double, 4, 4,
+RowMajor>>` keeps its eigenvectors as `Matrix<double, 4, 4, ColMajor>` and tridiagonalises that
+copy, so the self-adjoint product takes the column-major single-column loop (each column from its
+diagonal down); the row-major loop gives other last bits (found when 8,418 of 20,003 random
+matrices differed in an early port). ANTs' build vectorises Eigen for SSE4.2, but for a 4 × 4
+matrix every reduction is over at most 3 entries and starts with one packet of the first two
+terms, which is the sequential order, and the rotations are element-wise: the port computes
+Eigen's bits with scalar code, checked on 650,003 matrices (random of every scale, Horn matrices
+of random landmark sets, repeated eigenvalues, tiny subdiagonals, singular) against the solver
+compiled with ANTs' flags. The landmark fits match ITK's build on 50,000 random landmark sets
+(the 2D rigid fit once glibc's `atan2`, `sin` and `cos` are replaced by CORE-MATH's).
+
+**Threads (ANTS-60, class (a)).** The detector sizes its vector of heaps by
+`GetGlobalDefaultNumberOfThreads()` but runs on the multi-threader's work units, four times as
+many when there is more than one thread. Verified 2026-10-23: `antsAI -b` **crashes (signal 11)
+at 2, 4 and 6 threads, in every one of three runs**, on fMRIPrep's T1w of ds000005 and on a
+phantom; at one thread its three runs are identical. In practice ANTs' blob alignment runs only
+with `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=1`. larmorx computes the one-work-unit result on any
+thread count (the Laplacians and the maxima test in parallel, the heaps fed in ANTs' order).
+
+**The defects and what larmorx does** (each in the [register](upstream-defects.md); corrected by
+default, `upstream_defects="reproduce"` gives ANTs' result bit for bit):
+
+- **ANTS-112** (the detector's two thresholds): after each scale the smallest kept value becomes
+  the threshold of the next scales even while fewer than `n` blobs are kept, and when a work
+  unit's heap has just filled the next candidate is compared with that threshold instead of the
+  heap's smallest value. Corrected, the `n` strongest maxima are kept. Both lists are computed
+  from the same candidates, and the notice fires where they differ (it did not on the phantoms
+  and real images of the record, whose largest scales already fill the list).
+- **ANTS-111** (pairs after the correlations run out): corrected, the pairing stops when no
+  positive correlation is left.
+- **ANTS-110** (the distance test): corrected, the ratio is `|m_i − m_j|² / |f_i − f_j|²`, the
+  distances between the two pairs' blobs in the moving and the fixed image (as `MatchBlobs`
+  computes it, `ImageMath_Templates.hxx:14340-14366`). For a pure translation ANTs' test happens to
+  be stricter (every true pair has the same displacement) and the corrected one admits a pair
+  matched to a neighbouring blob a few voxels away, whose distances to far blobs are nearly
+  preserved; for any rotation ANTs' test keeps no pair or the wrong ones.
+- **ANTS-114** (no landmark): corrected, a rigid fit without a landmark is an error.
+- **ITK-60** (the 2D rigid fit near a quarter turn): corrected, `atan2` there too.
+- **ANTS-116** (questionable, not changed): the patch rotation `A = V·Uᵀ` is not checked for a
+  determinant of −1 (the main Wahba code of `antsAI` is), and the eigenvectors' signs are
+  arbitrary, so identical patches can be compared reflected or turned: on a T1w against its own
+  translated copy only 4 of 11 identical blob pairs correlate at 1. A remedy (trying the sign
+  combinations) would change the method: for the user to decide.
+
+**What the blob alignment achieves** (the [record](../validation/ants-ai.md), its table "Blob
+alignment against the known transforms"; mean and largest distance from the true transform):
+
+| Moving image | ANTs (one thread) | larmorx's default |
+|---|---|---|
+| 3D phantom, an exact translation (rigid fit) | 0 | 0.50, 1.4 mm |
+| 3D phantom rotated by 7° and 4° (rigid; affine) | 34, 67 mm; 654, 1520 mm | no landmark: an error |
+| 3D phantom rotated and scaled (rigid) | NaN (ANTS-114) | no landmark: an error |
+| 2D phantom, a translation (rigid) | 0 | 0.33, 0.42 mm |
+| 2D phantom rotated by 9° (rigid; affine) | 6.2, 12 mm; 45, 125 mm | 1.6, 3.5 mm; 2.7, 11 mm |
+| fMRIPrep's T1w of ds000005, origin moved (rigid) | 0 (to rounding) | 1.2, 2.1 mm |
+| the same T1w rotated by 8° in millimetres and shifted (rigid) | NaN (no landmark) | 1.0, 1.9 mm |
+
+For a translation ANTs' displacement-length test keeps exactly the true pairs; the corrected
+distance test also keeps a pair matched to a neighbouring blob (on the T1w a blob 3 mm from its
+true partner), which costs about a millimetre. For any rotation ANTs keeps no landmark or the
+wrong ones. Between a T1w and the MNI template (2 mm) neither keeps a landmark with 30 blobs, on
+any of the five oracle runs: the patch matching rarely pairs the same anatomy across subjects.
+`-b` is a rough initialiser for images of one subject; fMRIPrep does not use it.
 
 ## antsAffineInitializer
 

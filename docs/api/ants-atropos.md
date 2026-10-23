@@ -80,7 +80,7 @@ larmorx ants Atropos -d 3 -a t1w_n4.nii.gz -x brain_mask.nii.gz -i KMeans[3] -k 
 | `-l [λ,p]` / `-l label[λ,p]` | `label_propagation=(λ, p)` / `{label: (λ, p)}` | |
 | `-u 0/1` | `minimize_memory` | ANTS-97, ANTS-105 |
 | `-w BoxPlot[l,u,w]` / `-w GrubbsRosner[s,w]` | `outliers=lx.ants.BoxPlot(...)` / `lx.ants.GrubbsRosner(...)` | ANTS-94, ANTS-107, ITK-51 |
-| `-s 1x2` (repeatable), `--use-partial-volume-likelihoods` | `partial_volume=[(1, 2)]`, `partial_volume_likelihoods` | partial-volume classes with an MRF never win a voxel (ANTS-106): use `mrf_smoothing=0` with them |
+| `-s 1x2` (repeatable), `--use-partial-volume-likelihoods` | `partial_volume=[(1, 2)]`, `partial_volume_likelihoods` | partial-volume classes (labels after the tissues, in the order given); with the MRF, ANTs' partial-volume labels hardly win a voxel and Atropos often stops (ANTS-106, corrected below) |
 | `-b [levels,mesh,order]` | `bspline=(6, 1, 3)` | the adaptive smoothing's B-spline fit |
 | `-o [seg,post%02d,lik%02d,dist%02d,bsp%02d]` | `AtroposResult.labels`, `.posteriors`; `likelihood_images`, `distance_images`, `smoothed_images` → `.likelihoods`, `.distances`, `.smoothed` | the classified image as `uint32`, the others `float32`, 0 outside the mask |
 | `-v 1` | `AtroposResult.iterations`, `.log` | the progress lines and the filter's settings and models |
@@ -119,11 +119,20 @@ line a line on standard error) names the entry wherever it changed the result
 | ANTS-103 | the joint shape and orientation model evaluated at the raw components and an unset coordinate (0 here) | at the tensor's eigenvalues and principal direction |
 | ANTS-104 | manifold Parzen covariances double their running sums | the documented local covariance |
 | ANTS-105 | `-u 1` with priors and a mask crashes | runs |
+| ANTS-106 | in the MRF a partial-volume label is +1 against every neighbour, its own tissues included: with partial-volume likelihoods and an MRF the partial-volume classes hardly win a voxel, and Atropos stops when one wins none | a partial-volume label counts as a member of its own set: −1 with its tissues, −2 with itself, +1 with any other label (decided 2026-10-22) |
 | ANTS-107 | Grubbs-Rosner's grown sample weighed with uninitialized memory (ANTs' result depends on the heap) | not met (the sample does not grow); reproduced, the extra weights are 0 |
 | ANTS-03, ANTS-06, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, out-of-range conversions, the direction of a file with more dimensions than `-d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
-ANTS-106 (partial-volume classes with an MRF never win a voxel, so Atropos stops) has no
-switch: no correction is defined; both modes behave as ANTs.
+**ANTS-106, measured** on a phantom whose partial-volume fractions are known (nested spheres of
+three tissues box-averaged from a five-times finer grid; the record's `partial-volume-phantom-*`
+cases; classes 1x2 and 2x3, five iterations): with the MRF at 0.1, ANTs labels 0.295 and 0.405
+(Dice) of the two partial-volume classes and 94.0 % of the voxels as the truth; corrected, 0.862,
+0.805 and 97.7 %. With the MRF at 0.3 (Atropos' default) ANTs stops ("2 non-zero label sets but
+5 is requested"); corrected, 0.835, 0.801 and 97.8 %. Without the MRF ANTs gives 0.728 and 0.578
+(93.7 %), larmorx's default 0.711 and 0.594 (93.4 %: ITK-50's and ANTS-96's corrections alone).
+On sMRIPrep's call with partial-volume classes on fMRIPrep's T1w the correction is what lets
+Atropos finish (the record's `real/*/smriprep-partial-volume`: ANTs stops; corrected, 31 % of
+ds000005's brain voxels fall in the two partial-volume classes).
 
 On sMRIPrep's call ITK-50 is met (its K-means): on the five oracle runs the correction
 changes 1 to 25 of 0.8 to 2.5 million brain voxels' labels (Dice at least 0.99999 for every

@@ -4,7 +4,8 @@ extraction found for a real T1w (fMRIPrep 25.2.6's ``init_aff``, antsAI), by fMR
 2.6.5 (1 and 8 threads, correctly rounded maths) and by larmorx (both modes); niworkflows'
 antsAffineInitializer call on the same images; each transform as its parameters, as the
 moving image it places on the template (resampled by ANTs as built), and as the distance in
-mm between where two transforms send the template's brain; the records' cases.
+mm between where two transforms send the template's brain; antsAI's blob alignment on a T1w
+and two copies with known transforms (``ants_ai_blobs``); the records' cases.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import ants_ai_blobs, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -674,6 +675,12 @@ def _example(ctx: core.Context, reg: dict) -> dict:
 
 # ------------------------------------------------------------------------------------ cases
 
+#: The record's cases that a blob example shows.
+BLOB_EXAMPLES = {
+    "real/ds000005-sub-01/blobs-t1w-shift": "blobs-shift",
+    "real/ds000005-sub-01/blobs-t1w-rotated": "blobs-rotated",
+}
+
 IMPLS = {
     "ai": ("antsAI", "ants-ai", "ants_ai"),
     "init": ("antsAffineInitializer", "ants-affine-initializer", "ants_affine_initializer"),
@@ -716,6 +723,13 @@ def _cases(ctx: core.Context) -> list[dict]:
                     )
                 if band is not None:
                     v = (v[0], v[1] + f"; larmorx − ANTs at 1 thread: {band} in a parameter")
+                if "alignment error" in rep:
+                    v = (
+                        v[0],
+                        v[1]
+                        + f"; from the known transform: ANTs {rep.get('alignment error: ANTs')}, "
+                        f"larmorx's default {rep['alignment error']}",
+                    )
             out.append(
                 {
                     "id": f"{program}/{r['case']}",
@@ -731,8 +745,9 @@ def _cases(ctx: core.Context) -> list[dict]:
                         }
                     },
                     **(
-                        {"example": "init-aff"}
+                        {"example": BLOB_EXAMPLES.get(r["case"], "init-aff")}
                         if r["case"] == "real/ds000005-sub-01/brain-extraction"
+                        or r["case"] in BLOB_EXAMPLES
                         else {}
                     ),
                 }
@@ -766,14 +781,18 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": sources,
             "benchmarks": [],
-            "cache": [fcache.provenance(entry(ctx)), fcache.provenance(placed_entry(ctx))],
+            "cache": [
+                fcache.provenance(entry(ctx)),
+                fcache.provenance(placed_entry(ctx)),
+                ants_ai_blobs.provenance(ctx),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": impls,
         "cases_per_impl": True,
         "cases": cases,
         "cases_total": len(cases),
-        "examples": [_example(ctx, reg)],
+        "examples": [_example(ctx, reg), *ants_ai_blobs.examples(ctx)],
     }
 
 

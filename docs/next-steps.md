@@ -24,9 +24,10 @@ starts no other agent.
 | A5.1 | `7f2a61e` (10-20) | `antsRegistration`'s SyN stages; displacement fields as initial transforms; parity `--jobs` | the other deformable stages (A5.2, A5.3) |
 | A5.2 | `a5-part2-bspline` (10-21) | `antsRegistration`'s BSplineSyN, BSpline, GaussianDisplacementField and BSplineDisplacementField stages; the Python API's `mesh_size`, `total_mesh_size`, `spline_order` | `antsApplyTransforms` with `BSplineTransform` files; ANTS-78 and ITK-35 (below); A5.3 |
 | Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
+| A4.5 | `worktree-agent-aa903a90387159f4f` (10-23) | `antsAI -b` (blob alignment) to full completeness: ANTs' blob detector, patch correlations, pairing, landmark fits (LINPACK's QR, Eigen's `SelfAdjointEigenSolver`), `lx.ants.blob_alignment`; ANTS-110 to ANTS-116 and ITK-60; ANTS-106 corrected in Atropos; ANTS-72 shown to cause the ITK-35 references' run-to-run variation (the record now gives their spread); both evidence pages | ANTS-116 (decide); a benchmark of `-b` |
 | AFNI masks | `worktree-agent-af5a27ad72e66b922` (10-23) | 3dAutomask and 3dUnifize: GPL replicas (both depend on MCW routines), bit-identical to AFNI in every compared case; specs for the clean-room originals; two evidence pages; AFNI-40 to AFNI-49 | the clean-room originals; AFNI-41, -42, -44, -48 (below) |
 | A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
-| A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | ANTS-106 (below) |
+| A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | – |
 
 ## The order from here
 
@@ -45,9 +46,8 @@ starts no other agent.
 3. **A6, Atropos: done** (merged 2026-10-22, run in parallel with A5 part 3 at the user's
    request). With A4 to A6, sMRIPrep's brain extraction and MNI normalisation run in larmorx
    (A5 part 3 merged).
-4. **`antsAI -b`** (blob alignment), its own task (user, 2026-10-17): ANTs' blob detector, patch
-   correlations in float, LINPACK's QR and Eigen's vectorised `SelfAdjointEigenSolver`
-   (`docs/findings/ants-ai.md`, "Blobs").
+4. **`antsAI -b`: done** (2026-10-23): the blob alignment to full completeness; ANTS-110 to
+   ANTS-116, ITK-60; ANTS-106 corrected in Atropos; the ANTs run-to-run variation explained (ANTS-72).
 5. **AFNI 3dAutomask and 3dUnifize: the replicas done** (2026-10-23, in parallel with `antsAI
    -b`). Both depend on MCW library routines (`docs/licensing.md`), so each has a GPL replica in
    `larmorx-gpl`, bit-identical to AFNI 25.2.09 in every compared case (fMRIPrep's calls on
@@ -114,15 +114,6 @@ starts no other agent.
   fMRIPrep's N4s and on NaN/infinite inputs, then rule A or C); rule B for AFNI-41 and AFNI-48
   in the replica (and in the specs for the clean-room originals). An ANTs part and an AFNI
   replica part, each small.
-- **A run-to-run variation of ANTs** (found by the orchestrator re-running A5 part 3's
-  `ants-registration-corrections` record, 2026-10-23): the reference "ANTs with the B-spline
-  transform as a displacement field" before a linear stage gave different results in two runs
-  at one thread with a fixed seed (3.75 mm, then 4.70 mm); larmorx's side identical. Assigned to
-  the `antsAI -b` part; the site's antsRegistration page says the reference varies.
-- **ANTS-106 in Atropos** (decided 2026-10-22): partial-volume classes with an MRF, a
-  partial-volume label counting as a member of its own set; `reproduce` keeps ANTs' stop; parity
-  in `reproduce` plus a fix pass, phantoms with known mixtures, golden case, the site's Atropos
-  page. A small part after A5 part 3.
 - **In-place writing in 3dTshift** (decided 2026-10-21): an existing writable output in a
   directory that cannot be written is replaced in place, as AFNI does. The replica directly;
   the clean-room original from a spec amendment written from black-box runs (the implementer

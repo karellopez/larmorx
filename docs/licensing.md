@@ -112,6 +112,14 @@ command-line binary. Code from different families is never linked into one binar
   way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
   port the code and ship the atlases. To decide when the FreeSurfer track starts. `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
+- **Eigen (MPL-2.0), one file in `larmorx-core`** (decided by the user, 2026-10-23: kept).
+  `crates/larmorx-core/src/eigen_sym.rs` translates Eigen 3.4.90's self-adjoint eigensolver (as
+  ITK v5.4.5 bundles it) to Rust, so ITK's `VersorRigid3DTransform` landmark fit (antsAI `-b`) is
+  reproduced bit for bit. MPL-2.0 is file-level copyleft: the file stays under MPL-2.0 (SPDX
+  `Apache-2.0 AND MPL-2.0`, Eigen's notice in the file and in NOTICE, its source public here),
+  which MPL-2.0 allows inside an Apache-2.0 package (a "Larger Work"); Eigen does not use the
+  "Incompatible With Secondary Licenses" notice, so the GPL wheel may contain it too. The
+  project's licence is unchanged.
 - **AFNI: one implementation or two is decided per routine.** AFNI's `LICENSE.txt`: code
   written at NIH is public domain; the "major portions" written at the Medical College of
   Wisconsin are GPL-2, marked at the top of each file. A program needs a GPL replica and a

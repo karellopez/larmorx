@@ -118,8 +118,8 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 | ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call) | `larmorx ants ImageMath`, `lx.ants.image_math` | port | [327 cases](docs/validation/ants-image-math.md): values bit-identical in 296 of 301, headers in 301 of 301 |
 | ThresholdImage, MultiplyImages, SmoothImage, ResampleImage, ResampleImageBySpacing | `larmorx ants ...` | port | bit-identical in every compared case ([threshold](docs/validation/ants-threshold-image.md), [multiply](docs/validation/ants-multiply-images.md), [smooth](docs/validation/ants-smooth-image.md), [resample](docs/validation/ants-resample-image.md), [by spacing](docs/validation/ants-resample-image-by-spacing.md)) |
 | antsRegistration (every stage: linear, SyN, B-spline SyN, B-spline, displacement-field, exponential and time-varying velocity-field; image and point-set metrics) | `larmorx ants antsRegistration`, `lx.ants.registration` | port | [505 cases](docs/validation/ants-registration.md): 347 of 391 compared identical to ANTs (outputs and messages), 44 more with correctly rounded maths; [the corrections' effects](docs/validation/ants-registration-corrections.md) |
-| antsAI, antsAffineInitializer | `larmorx ants antsAI`, `larmorx ants antsAffineInitializer` | port | [antsAI](docs/validation/ants-ai.md): 51 of 52 compared identical; [antsAffineInitializer](docs/validation/ants-affine-initializer.md): 26 of 26 |
-| Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [93 cases](docs/validation/ants-atropos.md): 25 of 56 compared bit-identical to ANTs, 56 of 56 with correctly rounded maths, sMRIPrep's call on the five oracle runs included |
+| antsAI, antsAffineInitializer | `larmorx ants antsAI`, `larmorx ants antsAffineInitializer` | port | [antsAI](docs/validation/ants-ai.md): 75 of 75 compared identical (74 as built, 1 with correctly rounded maths), the blob alignment (`-b`) included; [antsAffineInitializer](docs/validation/ants-affine-initializer.md): 26 of 26 |
+| Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [97 cases](docs/validation/ants-atropos.md): 27 of 58 compared bit-identical to ANTs, 58 of 58 with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106) |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original; exact replica in `larmorx-gpl` | original: [279 of 279](docs/validation/afni-tshift.md) compared agree, 176 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [279 of 279](docs/validation/afni-tshift-replica.md) bit-identical |
 | 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | exact replica in `larmorx-gpl`; clean-room original planned ([spec](specs/3dAutomask.md)) | [105 cases](docs/validation/afni-automask.md): 81 of 81 compared cases that write outputs bit-identical to AFNI, fMRIPrep's call on every oracle run's BOLD reference included |
@@ -130,17 +130,16 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 
 The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 
-1. **ANTs:** antsAI's blob alignment (`-b`).
-2. **AFNI:** 3dUnifize and 3dAutomask (fMRIPrep's BOLD reference), then 3dQwarp, 3dSkullStrip,
+1. **AFNI:** the clean-room originals of 3dAutomask and 3dUnifize (their replicas are done), then 3dQwarp, 3dSkullStrip,
    3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit,
    3dFWHMx/3dClustSim, ...).
-3. **FSL-compatible tools:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup.
-4. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
+2. **FSL-compatible tools:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup.
+3. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
    Workbench- and MSM-compatible surface tools, the confounds.
-5. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
+4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
    fMRIPrep-compatible derivatives and reports out), written in plain Python on the library,
    then compared with fMRIPrep end to end.
-6. **Releases on PyPI** for all six platforms.
+5. **Releases on PyPI** for all six platforms.
 
 | Document | Contents |
 |---|---|

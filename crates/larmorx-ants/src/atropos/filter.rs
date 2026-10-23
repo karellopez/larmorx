@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use larmorx_core::defects::{self, Notices};
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
 use larmorx_core::math::{expf, powf};
 use larmorx_image::itk_math::almost_equal_f32;
 use larmorx_image::kdtree::{KdTree, Kmeans};
@@ -470,6 +470,13 @@ impl<'a> Atropos<'a> {
         self.inverse_distances = inv;
         let total = self.total_classes();
         let has_pv = total > self.classes();
+        // ANTS-106: ANTs tests whether two labels share a partial-volume set by the set's
+        // tissue labels only, so a partial-volume label is +1 against every neighbour (even
+        // its own tissues) and can hardly win a voxel; corrected (decided 2026-10-22), each
+        // partial-volume label is a member of its own set: −1 with its tissues, −2 with
+        // itself, +1 with any other label.
+        let own_set = self.options.upstream_defects == UpstreamDefects::Fix;
+        let classes = self.classes() as u32;
         let mut delta = vec![vec![0.0f32; total]; total];
         for (l, row) in delta.iter_mut().enumerate() {
             for (k, slot) in row.iter_mut().enumerate() {
@@ -477,16 +484,32 @@ impl<'a> Atropos<'a> {
                 *slot = if label == neighbour {
                     if has_pv { -2.0 } else { -1.0 }
                 } else if has_pv {
-                    let common = self
-                        .options
-                        .partial_volume_sets
-                        .iter()
-                        .any(|s| s.contains(&label) && s.contains(&neighbour));
+                    let common =
+                        self.options
+                            .partial_volume_sets
+                            .iter()
+                            .enumerate()
+                            .any(|(j, s)| {
+                                let pv_label = classes + j as u32 + 1;
+                                let member = |x: u32| s.contains(&x) || (own_set && x == pv_label);
+                                member(label) && member(neighbour)
+                            });
                     if common { -1.0 } else { 1.0 }
                 } else {
                     0.0
                 };
             }
+        }
+        let mrf = self.options.mrf_smoothing > 0.0 || self.options.mrf_coefficients.is_some();
+        if has_pv && mrf {
+            self.notices.add(
+                &defects::ANTS_106,
+                if own_set {
+                    "each partial-volume label is a member of its own set in the MRF (-1 with its tissues; ANTs gives it +1 against every neighbour, so it hardly wins a voxel)"
+                } else {
+                    "the partial-volume labels are +1 against every neighbour in the MRF, as in ANTs (they hardly win a voxel, and Atropos stops when one wins none)"
+                },
+            );
         }
         self.delta = delta;
     }

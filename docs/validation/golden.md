@@ -64,6 +64,16 @@ What the coverage test enumerates:
   has its own case. 3dUnifize's half-size path (more than a million voxels) and AFNI-47 are
   beyond the 32³ budget: the parity records cover them (real T1w images; a 720 × 720 × 2 slab).
 
+- **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
+an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane
+rigid and affine at 4 threads, the shifted plane from files with 16 pairs at most),
+`py.ants.blob_alignment.reproduce` (ANTs' blob alignment: the rotated plane with ANTS-111's
+extra pair and ANTS-110's test, the shifted plane, 3D on `anat`/`anat2` with every pair blob 0
+and the versor fit of coincident landmarks, a 2D fit without landmarks hashed as where it is
+NaN); `py.ants.atropos` gains `pv_mrf` (partial-volume classes with the MRF, ANTS-106
+corrected). Inputs: three 180 × 180 blob planes (32,400 pixels, under 32³), each blob
+`a·(1 − r²/R²)²` with rational rotations (2·atan(0.04)); no transcendental function.
+
 No list is written by hand. A case names what it runs in `covers`; a name that does not exist
 fails the coverage test, and so does a case in `golden.json` that the registry no longer has.
 

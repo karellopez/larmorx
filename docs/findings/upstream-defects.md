@@ -106,7 +106,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-57 | antsAffineInitializer | two or three arguments abort (`std::string` of a null pointer) instead of printing the usage | a | none | prints ANTs' message, exit 1 | – |
 | ANTS-58 | antsAI | `Random` sampling (always) and `--random-seed 0` draw from the clock: no two runs agree | b | none (fMRIPrep uses `Regular` with a seed) | seeded from the seed: repeatable | – |
 | ANTS-59 | antsAI | `--convergence`'s window defaults to 5; the help says 10 | f | none | follows the code; documented | – |
-| ANTS-60 | antsAI `-b` (ANTs' blob detector) | with more than one thread, per-thread heaps sized by the thread count are indexed by work units, four times as many | a | none | `-b` not implemented (refused) | – |
+| ANTS-60 | antsAI `-b` (ANTs' blob detector) | with more than one thread, per-thread heaps sized by the thread count are indexed by work units, four times as many: `antsAI -b` crashes (signal 11) at 2, 4 and 6 threads, every run | a | none | the one-work-unit result at any thread count (2026-10-23) | – |
 | ANTS-61 | antsRegistration IGDM | a stage that combines IGDM with ICP, PSE or JHCT, or lists it after an image metric, hands only one kind of point set to ITK: "Mismatch between number of image pairs and the number of metrics" (the stage dropped, ANTS-49) or a crash | c | none (fMRIPrep uses no point-set metric) | corrected by default: every metric gets its inputs, a notice; `reproduce` throws ITK's exception, or stops where ANTs crashes (A4 part 4) | – |
 | ANTS-62 | antsRegistration point-set text reader | a file that ends with a newline gets one more record, from variables the failed read leaves (in the oracle's build a copy of the last point) | a | none | corrected by default: no extra record, a notice; `reproduce` adds the copy of the last record, as the oracle's build, with a notice (A4 part 4) | – |
 | ANTS-63 | antsRegistration VTK reader | a binary file's labels are read only as far as one point's components: the other labels are uninitialised memory | a | none | corrected by default: every label read; `reproduce` reads ANTs' bytes and takes the unread labels as 0, with a notice (A4 part 4) | – |
@@ -145,8 +145,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-103 | Atropos | `JointShapeAndOrientationProbability` evaluates its histograms at the raw components and an unset coordinate | a | none | corrected by default: at the tensor's eigenvalues and direction; `reproduce` takes the unset coordinate as 0, with a notice (A6) | – |
 | ANTS-104 | Atropos | `ManifoldParzenWindows`' local covariances double their running sums | c | none | corrected by default (A6) | – |
 | ANTS-105 | Atropos | `-u 1` with prior probability images and a mask crashes | a | none | runs; `reproduce` stops where ANTs crashes (A6) | – |
-| ANTS-106 | Atropos | partial-volume classes with their likelihoods and an MRF never win a voxel: Atropos stops | c? | none | as ANTs in both modes today; decided 2026-10-22: a partial-volume label counts as a member of its own set in the MRF, `reproduce` keeps ANTs' stop | yes (to implement) |
+| ANTS-106 | Atropos | partial-volume classes with their likelihoods and an MRF hardly win a voxel (a partial-volume label is +1 against every neighbour): Atropos stops when one wins none | c (c? until 2026-10-22) | none | corrected by default: a partial-volume label is a member of its own set (2026-10-23) | – |
 | ANTS-107 | Atropos | with Grubbs-Rosner (ANTS-94) the grown sample is weighed with uninitialized memory: the result depends on the heap | a | none | not met by default (ANTS-94 corrected); `reproduce` weighs those samples 0, with a notice (A6) | – |
+| ANTS-110 | antsAI `-b` | the blob alignment keeps the pairs whose displacements have about the same length as three others', not those whose distances to three others are preserved (as its comment and ImageMath's `MatchBlobs` say): any rotation leaves no landmark | c | none (fMRIPrep does not align blobs) | corrected by default (2026-10-23) | – |
+| ANTS-111 | antsAI `-b` | once no positive patch correlation is left, the pairing takes the first fixed and moving blob again at every step | c | none | corrected by default: the pairing stops (2026-10-23) | – |
+| ANTS-112 | antsAI `-b` (the blob detector) | not the N strongest maxima: the threshold of later scales is set while fewer than N are kept, and a heap that has just filled lets a weaker maximum push out its weakest | c | none | corrected by default (2026-10-23) | – |
+| ANTS-114 | antsAI `-b` | a rigid or similarity alignment with no landmark writes a transform of NaNs (exit 0) | c | none | corrected by default: an error (2026-10-23) | – |
+| ANTS-115 | antsAI `-b` | an empty blob list (a constant image) prints its message, then dereferences a null transform (crash) | a | none | refuses with ANTs' message (exit 1) | – |
+| ANTS-116 | antsAI `-b` | the patch rotation `V·Uᵀ` is not checked for a reflection, and the gradients' axes have arbitrary signs: identical patches can be compared reflected or turned (4 of 11 identical pairs of a T1w and its shifted copy correlate at 1) | c? | none | as ANTs in both modes | yes (decided 2026-10-23, rule A: patches compared in the orientation that matches best; to implement) |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -191,6 +197,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-42 | ITK scales estimator and optimizer | scales all below epsilon (a B-spline-smoothed update whose control points all touch its pinned boundary: the probe vanishes, the scales equal but for rounding) are refused ("m_Scales values must be > epsilon"), although equal scales cancel in the estimated learning rate | c | none | corrected by default: ones, a notice; `reproduce` throws as ITK (A5 part 3) | – |
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` | the point a k-d tree node is split at is left out of the new centres when the node is divided between candidates | c | every run: sMRIPrep's Atropos call (corrected: 1 to 25 of 0.8 to 2.5 million voxels change label on the five oracle runs) | corrected by default (A6) | – |
 | ITK-51 | ITK `TDistribution` | density and `InverseCDF` NaN above about 340 degrees of freedom (Gamma overflows): Grubbs-Rosner never finds an outlier in an image | c | none | corrected by default (A6) | – |
+| ITK-60 | ITK `LandmarkBasedTransformInitializer` (antsAI `-b`, 2D) | the 2D rigid fit takes −90° whenever the landmarks' summed dot product is within 5e-5 of 0, whatever the sign of the cross product | c | none | corrected by default: `atan2` there too (2026-10-23) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -281,14 +288,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | later (decided 2026-10-23: when the mcflirt replica is built) |
 
-**Counts** (233 entries, recounted from the table on 2026-10-23; an entry with two classes
+**Counts** (240 entries, recounted from the table on 2026-10-23 after the antsAI merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 38 | |
+| (a) crash, undefined behaviour, out of bounds | 39 | |
 | (b) race, nondeterminism | 11 | |
-| (c) deterministic bug that changes results | 114 | 19 |
+| (c) deterministic bug that changes results | 120 | 19 |
 | (d) imprecision | 20 | |
 | (e) command-line or parsing quirk | 38 | |
 | (f) documentation or message only | 11 | |
@@ -333,7 +340,7 @@ switch); A5 part 3 (the velocity-field stages, `antsApplyTransforms` with B-spli
 2026-10-22) corrected them, each with its measured effect ([ants-velocity.md](ants-velocity.md)),
 and added ANTS-79 to ANTS-82 and ITK-36 to ITK-42: every class (c) and (e) one corrected by
 default with a switch, ITK-41 (class (a)) completed by default and refused where ANTs crashes,
-ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). On 2026-10-23 the user decided all of them as proposed (decision log): the gap column has no **decide** left. Before that, the gap column had 22 **decide** (recounted 2026-10-23 from the table, after A5 part 3, A6 and the AFNI masks part were merged; an earlier count of 14 that day had missed the † rows; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
+ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). On 2026-10-23 the user decided all of them by four standing rules (decision log): the gap column has no **decide** left; after the antsAI merge the same day it has 10 **yes** (decided, to implement: ANTS-17, -22, -23, -32, -40, -44, -116, ITK-06, AFNI-41, -48). Before that, the gap column had 22 **decide** (recounted 2026-10-23 from the table, after A5 part 3, A6 and the AFNI masks part were merged; an earlier count of 14 that day had missed the † rows; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
 The AFNI part of 2026-10-23 (3dAutomask and 3dUnifize, a GPL replica each; in parallel with
 `antsAI -b`) added AFNI-40 to AFNI-49 and extended AFNI-01 (3dAutomask's average of a series
 and 3dUnifize's `-EPI` median drop a negative scale factor, as 3dTshift's extraction does):
@@ -343,6 +350,11 @@ AFNI-40 and AFNI-46 (crashes) refused in both modes; AFNI-49 a help text; AFNI-4
 -48 to decide. The dataset defects 3dTshift found (AFNI-01, -02, -07, -08, -11, -12, -16, -18,
 -20, -22, -23, -26) apply to both programs and are handled by the same replica code; their
 tool in `larmorx_core::defects` is now "AFNI".
+antsAI's blob alignment (2026-10-23, in parallel with AFNI's 3dAutomask and 3dUnifize) added
+ANTS-110 to ANTS-116 (ANTS-113 unused) and ITK-60: ANTS-110, -111, -112, -114 and ITK-60
+corrected by default with a switch, ANTS-115 (class (a)) refused, ANTS-116 decided by the user the same day (rule A, to implement); ANTS-60
+measured (a crash at every thread count above one) and now met with the one-thread result; and
+corrected ANTS-106 as the user decided on 2026-10-22.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -1275,12 +1287,12 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   which ITK 5's pool threader makes four times the thread count when there is more than one
   thread: work units past the thread count index the vector past its end.
 - **Evidence:** read: `Utilities/itkMultiScaleLaplacianBlobDetectorImageFilter.hxx:79-81, 199`,
-  ITK v5.4.5 `Modules/Core/Common/src/itkPoolMultiThreader.cxx:88-95`.
+  ITK v5.4.5 `Modules/Core/Common/src/itkPoolMultiThreader.cxx:88-95`; verified 2026-10-23:
+  `antsAI -b` crashes (signal 11) at 2, 4 and 6 threads in every run, on fMRIPrep's T1w of
+  ds000005 and on phantoms (the record's thread band); at one thread its runs are identical.
 - **fMRIPrep:** none (it does not align blobs).
-- **larmorx:** `-b` is not implemented (refused with a message); a port would compute the
-  one-work-unit result.
+- **larmorx:** computes the one-work-unit result at any thread count (2026-10-23).
 - **D13 / gap:** class (a), not reproduced. No gap.
-
 ### ANTS-61 IGDM with another kind of metric gets no input — (c)
 - **What:** `DoRegistration` instantiates the registration method for one kind of point set,
   chosen by the stage's **first** metric (`if (stageMetricList[0].m_MetricType != IGDM)`, the
@@ -1472,6 +1484,14 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   of ANTs differ from the first iteration of that stage, `--random-seed` or not.
 - **Evidence:** read: `itkRegistrationParameterScalesEstimator.hxx` (`SampleVirtualDomainRandomly`);
   verified (two ANTs runs of `syn/then-linear` differ).
+  Also met by the corrections record's ITK-35 references (2026-10-23): ANTs with a B-spline
+  transform sampled as a displacement field, then a linear stage, at one thread with
+  ANTS_RANDOM_SEED fixed, gives five different transforms in five runs (up to 8.5 mm apart,
+  record `ants-registration-corrections`, table "ITK-35's references"); with `time()` and
+  `clock()` fixed by a preloaded
+  library the runs are identical, and the first metric value of the linear stage is the same in
+  every run (its scales differ from the second iteration on). The record runs that reference
+  five times and gives the median, the range and ANTs' own spread.
 - **fMRIPrep:** none: its linear stages come before SyN.
 - **larmorx:** draws the voxels with the stage's seed, so the result is repeatable; the parity
   cases are expected divergences.
@@ -1799,7 +1819,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** runs; `reproduce` stops where ANTs crashes, with a message (A6).
 - **D13 / gap:** none.
 
-### ANTS-106 Partial-volume classes with an MRF never win a voxel — (c?)
+### ANTS-106 Partial-volume classes with an MRF hardly win a voxel — (c)
 - **What:** with `--use-partial-volume-likelihoods 1`, `ComputeMRFDeltaMatrix`
   (`Atropos.hxx:546-606`) gives two labels of one partial-volume set −1, the same label −2 and
   any other pair +1; it compares the *tissue* labels of each set, never the partial-volume
@@ -1808,15 +1828,18 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   stops: "Updating the class labeling resulted in 3 non-zero label sets but 5 is requested".
   Without the MRF (`-m [0,...]`) partial-volume classes work.
 - **Evidence:** read; validated (`partial-volume-with-mrf`: both stop identically;
-  `partial-volume-likelihoods` without the MRF: identical with CORE-MATH).
+  `partial-volume-likelihoods` without the MRF: identical with CORE-MATH); measured on a phantom
+  of known fractions (the record's `partial-volume-phantom-mrf-*`): with the MRF at 0.1, ANTs
+  labels Dice 0.295 and 0.405 of the two partial-volume classes and 94.0 % of the voxels as the
+  truth, corrected 0.862, 0.805 and 97.7 %; at 0.3 ANTs stops, corrected 0.835, 0.801, 97.8 %
+  (record); sMRIPrep's call with partial-volume classes stops in ANTs on fMRIPrep's T1w of
+  ds000005 and ds005040, and runs corrected.
 - **fMRIPrep:** none.
-- **larmorx:** as ANTs in both modes, documented ([api/ants-atropos.md](../api/ants-atropos.md)).
-- **D13 / gap:** decided by the user on 2026-10-22 (decision log): corrected by default, a
-  partial-volume label counting as a member of its own set (−1 with its tissues, −2 with
-  itself, +1 with any other label); `reproduce` keeps ANTs' stop; validated on phantoms with
-  known mixtures. To implement (follow-up). Was: the intended energy of a partial-volume label
-  is not stated.
-
+- **larmorx:** corrected by default (2026-10-23, the user's decision of 2026-10-22): a
+  partial-volume label is a member of its own set, −1 with its two tissues, −2 with itself, +1
+  with any other label; a notice wherever partial-volume classes meet the MRF; `reproduce` keeps
+  ANTs' energies (and its stop).
+- **D13 / gap:** done. No gap.
 ### ANTS-107 Grubbs-Rosner's grown sample is weighed with uninitialized memory — (a)
 - **What:** with Grubbs-Rosner the samples grow by the masked voxels at every update
   (ANTS-94). `UpdateClassLabeling` allocates the weights for the grown sample
@@ -1833,6 +1856,94 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   weighs the extra samples 0, what a fresh allocation holds, with a notice (A6). The parity
   cases report ANTs' values without requiring them.
 - **D13 / gap:** none.
+
+### ANTS-110 antsAI's blob landmarks test displacement lengths, not distances — (c)
+- **What:** `GetTransformFromFeatureMatching` keeps a matched blob pair as a landmark when at
+  least 3 other pairs have a "distance ratio" within 0.1 of 1. Its comment, and ImageMath's
+  `MatchBlobs` (`ImageMath_Templates.hxx:14320-14366`), mean the ratio of the distances between
+  two pairs' blobs in the moving and in the fixed image (a rigid motion preserves them), but the
+  code divides the squared lengths of the two pairs' displacements:
+  `|f_j − m_j|² / |f_i − m_i|²` (`antsAI.cxx:551-552`, assigned symmetrically inside the double
+  loop, so `r(i, j)` ends as the smaller over the larger by index). For a pure translation every
+  true pair has the same displacement and the test happens to be strict; for any rotation the
+  displacements differ and ANTs keeps no pair, or the wrong ones.
+- **Evidence:** read; validated (record `ants-ai`, category `blobs`, and
+  `real/ds000005-sub-01/blobs-t1w-*`): a phantom rotated by 7° and 4°, ANTs' rigid fit 34 mm
+  and its affine fit 653 mm off; a T1w rotated by 8°, no landmark (ANTS-114: NaN); corrected,
+  the phantom keeps no landmark (an error) and the T1w (rotated by 8° in millimetres) a rotation
+  of 8.5°, 1.0 mm from the truth on average (record, "Blob alignment against the known
+  transforms"; evidence page).
+- **fMRIPrep:** none (fMRIPrep does not run `antsAI -b`).
+- **larmorx:** corrected by default (2026-10-23): the ratio of the distances,
+  `|m_i − m_j|² / |f_i − f_j|²`, a notice where ANTs' test keeps other pairs; `reproduce` keeps
+  ANTs' test. For a translation the corrected test admits a pair matched to a neighbouring blob
+  (the T1w's shifted copy: 11 landmarks instead of 10, 1.2 mm off on average where ANTs is
+  exact).
+- **D13 / gap:** done. No gap.
+
+### ANTS-111 antsAI pairs the first blobs again once the correlations run out — (c)
+- **What:** the pairing loop takes `arg_max` of the correspondence matrix and zeroes the chosen
+  row and column; once every entry is 0, `arg_max` returns entry (0, 0), and while the moving
+  blob 0 passes the radius and brightness tests the loop pairs fixed blob 0 with moving blob 0
+  again, at every step, until it has `m` pairs or has tried every fixed blob
+  (`antsAI.cxx:499-525`).
+- **Evidence:** read; validated (the phantoms of the record, the noise case: ANTs' pairs end in
+  repeated (0, 0)).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (2026-10-23): the pairing stops when no positive
+  correlation is left, a notice with the number of pairs ANTs adds; `reproduce` keeps them.
+- **D13 / gap:** done. No gap.
+
+### ANTS-112 antsAI's blob detector does not keep the strongest maxima — (c)
+- **What:** `MultiScaleLaplacianBlobDetectorImageFilter` keeps per work unit a min-heap of at
+  most N blobs and merges the heaps after each scale. (1) After each scale the weakest blob
+  kept becomes the threshold every later scale's candidates must exceed
+  (`itkMultiScaleLaplacianBlobDetectorImageFilter.hxx:161-163`), even while fewer than N blobs
+  are kept, so weaker maxima of later scales are dropped although there is room. (2) While a
+  heap fills, its threshold is not updated (`:296-307`); the first candidate after it is full
+  is compared with the stale threshold instead of the heap's weakest value, and a weaker
+  maximum can push out the heap's weakest one.
+- **Evidence:** read; the corrected and ANTs' lists are computed from the same candidates
+  (`larmorx_image::blobs`), unit tests on constructed scale stacks; on the record's phantoms and
+  real images the largest scales already fill the list and the two agree (no notice).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (2026-10-23): the N strongest maxima, a notice where the
+  lists differ; `reproduce` keeps ANTs' list.
+- **D13 / gap:** done. No gap.
+
+### ANTS-114 antsAI's rigid blob alignment without landmarks writes NaNs — (c)
+- **What:** with no landmark, ITK's rigid landmark fits (`VersorRigid3DTransform`,
+  `Rigid2DTransform`) divide the landmarks' sums by their count, 0, and the transform is NaN;
+  antsAI starts its search from it and writes a transform of NaNs, exit 0. (The affine fit
+  throws instead: "insufficient number of landmarks", which antsAI does not catch: it aborts.)
+- **Evidence:** read (`itkLandmarkBasedTransformInitializer.hxx`); validated (the T1w rotated by
+  8°, the noise and constant cases).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (2026-10-23): an error ("no blob pair kept its distances to 3
+  others: there is no landmark for the rigid fit"), exit 1; `reproduce` writes ANTs' NaNs.
+- **D13 / gap:** done. No gap.
+
+### ANTS-115 antsAI dereferences a null transform when a blob list is empty — (a)
+- **What:** when either image has no blob, `GetTransformFromFeatureMatching` prints "The moving
+  image or fixed image blobs list is empty." and returns a null pointer
+  (`antsAI.cxx:471-475`), which the caller dereferences (`:918`, `:928`): a crash.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** prints ANTs' message and refuses (exit 1), in both modes (class (a)).
+- **D13 / gap:** class (a), not reproduced. No gap.
+
+### ANTS-116 antsAI compares blob patches possibly reflected — (c?)
+- **What:** `PatchCorrelation` turns the moving patch onto the fixed one with Wahba's
+  `A = V·Uᵀ` of the patches' principal axes (`antsAI.cxx:228-262`), without the determinant
+  check that antsAI's own principal-axes alignment makes (`:1001-1023`); and the axes come from
+  `vnl_symmetric_eigensystem`, whose eigenvectors' signs are arbitrary. Identical patches can
+  then be compared reflected or turned by 180°: on fMRIPrep's T1w of ds000005 against its own
+  shifted copy, only 4 of 11 identical blob pairs correlate at 1.
+- **Evidence:** read; verified (the blob probe and `lx.ants.blob_alignment` on the shifted copy).
+- **fMRIPrep:** none.
+- **larmorx:** as ANTs in both modes.
+- **D13 / gap:** decided 2026-10-23 (decision log), rule A: the patches compared in the orientation that matches best (the rotation's determinant checked, the eigenvectors' sign combinations tried), `reproduce` keeps ANTs' method; to implement. Was: decide: a remedy (the determinant check, or trying the sign combinations and
+  keeping the best correlation) changes the method, not a slip; for the user.
 
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
@@ -2431,6 +2542,19 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   taken through `dlngam` (smaller arguments as ITK computes them, bit for bit), with a notice
   where Grubbs-Rosner's result changes; `reproduce` as ITK, its SLATEC messages included (A6).
 - **D13 / gap:** none.
+
+### ITK-60 The 2D rigid landmark fit takes −90° near a quarter turn — (c)
+- **What:** `LandmarkBasedTransformInitializer`'s `Rigid2DTransform` fit computes the angle as
+  `atan2(s_cross, s_dot)` of the summed cross and dot products of the centred landmarks, but
+  when `|s_dot| ≤ 5e-5` it takes `−π/2` whatever the sign of `s_cross`
+  (`itkLandmarkBasedTransformInitializer.hxx:724-731`): a quarter turn one way gives the
+  rotation the other way. With fewer than 2 landmarks it warns ("Less than 2 landmarks
+  available. Rotation is not computed", `:735`).
+- **Evidence:** read; unit tests of `larmorx_registration::landmark` against ITK's build.
+- **fMRIPrep:** none (antsAI `-b` in 2D only).
+- **larmorx:** corrected by default (2026-10-23): `atan2` there too, a notice where the angle
+  differs; `reproduce` keeps −π/2.
+- **D13 / gap:** done. No gap.
 
 ## fMRIPrep and its libraries
 

@@ -1,14 +1,14 @@
 # Parity: Atropos
 
-**All cases agree.** 97 cases on the `full` tier: 64 pass, 25 rejected by both, 8 expected divergences, 0 failures.
+**All cases agree.** 102 cases on the `full` tier: 66 pass, 28 rejected by both, 8 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants Atropos` / `lx.ants.atropos` (crates larmorx-ants, larmorx-image)
 - **Reference:** Atropos from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
 - **Test data:** larmorx-testdata `00b862132e9c`, tier `full`
-- **Generated:** 2026-10-22 on Linux x86_64, with `python -m larmorx_validation parity ants-atropos --tier full`
+- **Generated:** 2026-10-23 on Linux x86_64, with `python -m larmorx_validation parity ants-atropos --tier full`
 
-**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 25 of 60 compared cases; the classified image identical in 60 of 60.** The others' posteriors differ in the last bits where glibc's `expf`/`logf`/`exp`/`log`/`pow` are not correctly rounded for a value the run meets (their largest differences and NCC are in the table).
-**The cause, confirmed: with those functions correctly rounded (CORE-MATH preloaded into the same ANTs program), 60 of 60 are bit-identical.**
+**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 27 of 62 compared cases; the classified image identical in 62 of 62.** The others' posteriors differ in the last bits where glibc's `expf`/`logf`/`exp`/`log`/`pow` are not correctly rounded for a value the run meets (their largest differences and NCC are in the table).
+**The cause, confirmed: with those functions correctly rounded (CORE-MATH preloaded into the same ANTs program), 62 of 62 are bit-identical.**
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-100: 1 case(s) named it, 1 with changed values (largest difference 2): `priors-vector`
   - ANTS-101: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; outputs not written): `unknown-formulation`
@@ -16,13 +16,14 @@
   - ANTS-103: 1 case(s) named it, 1 with changed values (largest difference 2): `joint-shape-orientation`
   - ANTS-104: 1 case(s) named it, 1 with changed values (largest difference 0.996): `manifold-parzen-covariance`
   - ANTS-105: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; outputs written): `priors-minimize-memory`
+  - ANTS-106: 5 case(s) named it, 1 with changed values (largest difference 3), 4 with other changes (exit N -> N; outputs written): `partial-volume-with-mrf`, `partial-volume-phantom-mrf-0.1`, `partial-volume-phantom-mrf-0.3`, `real/ds000005-sub-01/smriprep-partial-volume`, `real/ds005040-sub-002/smriprep-partial-volume`
   - ANTS-90: 4 case(s) named it, 3 with changed values (largest difference 2), 1 with other changes (exit N -> N; outputs written): `kmeans-multivariate`, `log-euclidean`, `joint-shape-orientation`, `grubbs-rosner-multivariate`
   - ANTS-92: 3 case(s) named it, 3 with changed values (largest difference 2): `random`, `clock-seed-random-labels`, `real/ds000005/random`
   - ANTS-94: 5 case(s) named it, 4 with changed values (largest difference 2), 1 with other changes (exit N -> N; outputs written): `box-plot`, `grubbs-rosner`, `grubbs-rosner-outliers`, `grubbs-rosner-multivariate`, `verbose-box-plot`
   - ANTS-95: 2 case(s) named it, 2 with changed values (largest difference 2): `manifold-parzen`, `manifold-parzen-covariance`
-  - ANTS-96: 2 case(s) named it, 1 with changed values (largest difference 3): `partial-volume-likelihoods`, `partial-volume-with-mrf`
+  - ANTS-96: 7 case(s) named it, 3 with changed values (largest difference 3), 4 with other changes (exit N -> N; outputs written): `partial-volume-likelihoods`, `partial-volume-with-mrf`, `partial-volume-phantom-mrf-0`, `partial-volume-phantom-mrf-0.1`, `partial-volume-phantom-mrf-0.3`, `real/ds000005-sub-01/smriprep-partial-volume`, `real/ds005040-sub-002/smriprep-partial-volume`
   - ANTS-98: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; outputs written): `mask-255`
-  - ITK-50: 43 case(s) named it, 34 with changed values (largest difference 3), 3 with other changes (exit N -> N; outputs written): `kmeans-3`, `kmeans-4`, `kmeans-centres`, `kmeans-multivariate`, `histogram-parzen`, `manifold-parzen`, `manifold-parzen-covariance`, `log-euclidean` …
+  - ITK-50: 48 case(s) named it, 36 with changed values (largest difference 3), 7 with other changes (exit N -> N; outputs written): `kmeans-3`, `kmeans-4`, `kmeans-centres`, `kmeans-multivariate`, `histogram-parzen`, `manifold-parzen`, `manifold-parzen-covariance`, `log-euclidean` …
   - ITK-51: 1 case(s) named it, 1 with changed values (largest difference 2): `grubbs-rosner-outliers`
 
 | Case | Output | Difference from ANTs as built |
@@ -138,17 +139,32 @@
 | `real/ds000005/random` | post02 | 30 of 5898240 differ; max \|diff\| 5.96e-08, 1 - NCC 0 |
 | `real/ds000005/random` | post03 | 23 of 5898240 differ; max \|diff\| 5.96e-08, 1 - NCC 0 |
 - `clock-seed` seg: ANTs run 1 vs run 2: identical; larmorx vs ANTs: identical / identical
-- `clock-seed` post01: ANTs run 1 vs run 2: identical; larmorx vs ANTs: 14184 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 6.5e-14 / 14184 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 6.5e-14
-- `clock-seed` post02: ANTs run 1 vs run 2: identical; larmorx vs ANTs: 27756 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 1.4e-13 / 27756 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 1.4e-13
-- `clock-seed` post03: ANTs run 1 vs run 2: identical; larmorx vs ANTs: 30641 of 63360 differ; max |diff| 3.64e-06, 1 - NCC 7.4e-14 / 30641 of 63360 differ; max |diff| 3.64e-06, 1 - NCC 7.4e-14
-- `clock-seed-random-labels` seg: ANTs run 1 vs run 2: 23774 of 63360 differ; smallest Dice 0.268738; larmorx vs ANTs: 25409 of 63360 differ; smallest Dice 0.267100 / 23353 of 63360 differ; smallest Dice 0.256217
-- `clock-seed-random-labels` post01: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.984, 1 - NCC 0.78; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 1, 1 - NCC 0.88 / 35551 of 63360 differ; max |diff| 0.999, 1 - NCC 0.73
-- `clock-seed-random-labels` post02: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.989, 1 - NCC 0.69; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 0.991, 1 - NCC 0.86 / 35551 of 63360 differ; max |diff| 0.999, 1 - NCC 0.91
-- `clock-seed-random-labels` post03: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.99, 1 - NCC 0.82; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 0.99, 1 - NCC 0.83 / 35551 of 63360 differ; max |diff| 0.982, 1 - NCC 0.6
-- `real/ds000005/smriprep-clock-seed` seg: ANTs run 1 vs run 2: 331 of 5898240 differ; smallest Dice 0.999367; larmorx vs ANTs: 270 of 5898240 differ; smallest Dice 0.999540 / 379 of 5898240 differ; smallest Dice 0.999345
-- `real/ds000005/smriprep-clock-seed` post01: ANTs run 1 vs run 2: 754592 of 5898240 differ; max |diff| 0.143, 1 - NCC 8.5e-06; larmorx vs ANTs: 751838 of 5898240 differ; max |diff| 0.143, 1 - NCC 5.9e-06 / 739896 of 5898240 differ; max |diff| 0.129, 1 - NCC 8.6e-06
-- `real/ds000005/smriprep-clock-seed` post02: ANTs run 1 vs run 2: 794886 of 5898240 differ; max |diff| 0.152, 1 - NCC 7.2e-06; larmorx vs ANTs: 795877 of 5898240 differ; max |diff| 0.143, 1 - NCC 5.1e-06 / 794582 of 5898240 differ; max |diff| 0.129, 1 - NCC 7.7e-06
-- `real/ds000005/smriprep-clock-seed` post03: ANTs run 1 vs run 2: 700965 of 5898240 differ; max |diff| 0.152, 1 - NCC 2e-06; larmorx vs ANTs: 757230 of 5898240 differ; max |diff| 0.0763, 1 - NCC 1.6e-06 / 730984 of 5898240 differ; max |diff| 0.116, 1 - NCC 2.4e-06
+- `clock-seed` post01: ANTs run 1 vs run 2: 14184 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 6.5e-14; larmorx vs ANTs: identical / 14184 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 6.5e-14
+- `clock-seed` post02: ANTs run 1 vs run 2: 27756 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 1.4e-13; larmorx vs ANTs: 1 of 63360 differ; max |diff| 9.09e-13, 1 - NCC 2.2e-16 / 27756 of 63360 differ; max |diff| 4.17e-06, 1 - NCC 1.4e-13
+- `clock-seed` post03: ANTs run 1 vs run 2: 30641 of 63360 differ; max |diff| 3.64e-06, 1 - NCC 7.4e-14; larmorx vs ANTs: identical / 30641 of 63360 differ; max |diff| 3.64e-06, 1 - NCC 7.4e-14
+- `clock-seed-random-labels` seg: ANTs run 1 vs run 2: 24062 of 63360 differ; smallest Dice 0.285677; larmorx vs ANTs: 23020 of 63360 differ; smallest Dice 0.271868 / 23787 of 63360 differ; smallest Dice 0.313139
+- `clock-seed-random-labels` post01: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.992, 1 - NCC 0.73; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 0.988, 1 - NCC 0.63 / 35551 of 63360 differ; max |diff| 0.999, 1 - NCC 0.81
+- `clock-seed-random-labels` post02: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.989, 1 - NCC 0.82; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 0.983, 1 - NCC 0.67 / 35551 of 63360 differ; max |diff| 0.989, 1 - NCC 0.79
+- `clock-seed-random-labels` post03: ANTs run 1 vs run 2: 35551 of 63360 differ; max |diff| 0.983, 1 - NCC 0.83; larmorx vs ANTs: 35551 of 63360 differ; max |diff| 0.987, 1 - NCC 0.85 / 35551 of 63360 differ; max |diff| 0.99, 1 - NCC 0.76
+- `real/ds000005/smriprep-clock-seed` seg: ANTs run 1 vs run 2: 300 of 5898240 differ; smallest Dice 0.999452; larmorx vs ANTs: 225 of 5898240 differ; smallest Dice 0.999652 / 279 of 5898240 differ; smallest Dice 0.999487
+- `real/ds000005/smriprep-clock-seed` post01: ANTs run 1 vs run 2: 758096 of 5898240 differ; max |diff| 0.154, 1 - NCC 7.5e-06; larmorx vs ANTs: 721653 of 5898240 differ; max |diff| 0.104, 1 - NCC 4.2e-06 / 757470 of 5898240 differ; max |diff| 0.113, 1 - NCC 6.4e-06
+- `real/ds000005/smriprep-clock-seed` post02: ANTs run 1 vs run 2: 795219 of 5898240 differ; max |diff| 0.154, 1 - NCC 6.3e-06; larmorx vs ANTs: 783857 of 5898240 differ; max |diff| 0.104, 1 - NCC 4.2e-06 / 795303 of 5898240 differ; max |diff| 0.139, 1 - NCC 5.8e-06
+- `real/ds000005/smriprep-clock-seed` post03: ANTs run 1 vs run 2: 702527 of 5898240 differ; max |diff| 0.139, 1 - NCC 1.7e-06; larmorx vs ANTs: 672334 of 5898240 differ; max |diff| 0.0995, 1 - NCC 1.6e-06 / 658124 of 5898240 differ; max |diff| 0.139, 1 - NCC 1.9e-06
+
+**ANTS-106 on the partial-volume phantom** (known fractions; Dice per class, 4 = 1x2 and 5 = 2x3, and the share of voxels labelled as the truth). larmorx's default corrects ANTS-106 and, as everywhere, ITK-50 and ANTS-96; without the MRF only those two apply:
+
+| Case | ANTs | larmorx's default |
+|---|---|---|
+| `partial-volume-phantom-mrf-0` | Dice 0.975 0.944 0.975 0.728 0.578 (classes 1-5), 0.937 of the voxels as the truth | Dice 0.971 0.948 0.971 0.711 0.594 (classes 1-5), 0.934 of the voxels as the truth |
+| `partial-volume-phantom-mrf-0.1` | Dice 0.980 0.951 0.964 0.295 0.405 (classes 1-5), 0.940 of the voxels as the truth | Dice 0.991 0.983 0.985 0.862 0.805 (classes 1-5), 0.977 of the voxels as the truth |
+| `partial-volume-phantom-mrf-0.3` | no labels (ANTs stopped) | Dice 0.991 0.983 0.986 0.835 0.801 (classes 1-5), 0.978 of the voxels as the truth |
+
+**sMRIPrep's call with partial-volume classes on fMRIPrep's T1w** (ANTS-106): ANTs stops; larmorx's default labels
+
+| Case | ANTs | larmorx's default: voxels per class |
+|---|---|---|
+| `real/ds000005-sub-01/smriprep-partial-volume` | stops (exit 1) | classes 1-3 (CSF, GM, WM) and 4 = 1x2, 5 = 2x3: 1: 110433, 2: 224560, 3: 214642, 4: 109362, 5: 137019 |
+| `real/ds005040-sub-002/smriprep-partial-volume` | stops (exit 1) | classes 1-3 (CSF, GM, WM) and 4 = 1x2, 5 = 2x3: 1: 277931, 2: 822401, 3: 769812, 4: 262474, 5: 395475 |
 
 ## Thresholds
 
@@ -160,7 +176,7 @@
 | Data type, shape, affine | identical (affine within 1e-06 mm) |
 | larmorx's threads | 4 threads and 1 thread give the same bits |
 | Values | bit-identical to ANTs with correctly rounded math (CORE-MATH preloaded); with ANTs as built, bit-identity reported and NCC > 0.995 where posteriors differ |
-| Reported | ANTs' thread band (2, 4, 8 threads vs 1), ANTs' seed band (two clock-seeded runs), the distance to fMRIPrep's own files |
+| Reported | ANTs' thread band (2, 4, 6 threads vs 1), ANTs' seed band (two clock-seeded runs), the distance to fMRIPrep's own files |
 
 ## Results by category
 
@@ -173,10 +189,11 @@
 | messages | 31 | 5 | 22 | 4 | 0 |
 | mrf | 5 | 5 | 0 | 0 | 0 |
 | outliers | 5 | 4 | 1 | 0 | 0 |
-| partial volume | 3 | 2 | 1 | 0 | 0 |
+| partial volume | 6 | 4 | 2 | 0 | 0 |
 | posteriors | 16 | 15 | 0 | 1 | 0 |
 | random seeds | 2 | 0 | 0 | 2 | 0 |
 | real (other) | 3 | 2 | 0 | 1 | 0 |
+| real (partial volume) | 2 | 0 | 2 | 0 | 0 |
 | real (priors) | 6 | 6 | 0 | 0 | 0 |
 | real (sMRIPrep) | 5 | 5 | 0 | 0 | 0 |
 | verbose | 5 | 5 | 0 | 0 | 0 |
@@ -200,7 +217,8 @@
 |---|---|---|
 | `grubbs-rosner-multivariate` | Grubbs-Rosner on two images: the class covariance becomes singular in both | ANTs exit 1: '\nSLATEC/DGAMMA: X SO BIG GAMMA OVERFLOWS\nSLATEC/DGAMMA: X SO BIG GAMMA OVERFLOWS\nSLATEC/DGAMMA: X SO BIG GAMMA OVERFLOWS\nSLATEC/DGAMMA: X SO … |
 | `partial-volume-with-mrf` | partial-volume classes with the MRF (ANTS-106: they can never win a voxel; both stop) | ANTs exit 1: ''; larmorx exit 1: 'rrects it]\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMO… |
-| `mask-255` | a mask of 255s (one LabelMap label, ITK's error) | ANTs exit 1: 'nListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x5c40f396ff10): The input list sample has <= 1 element. Function evaluations will… |
+| `partial-volume-phantom-mrf-0.3` | the partial-volume phantom, classes 1x2 and 2x3 with their likelihoods, MRF 0.3 (ANTS-106), scored against the known fractions | ANTs exit 1: ''; larmorx exit 1: 'rrects it]\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMO… |
+| `mask-255` | a mask of 255s (one LabelMap label, ITK's error) | ANTs exit 1: 'nListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x57ccfd938f10): The input list sample has <= 1 element. Function evaluations will… |
 | `no-arguments` | no arguments: the short help | ANTs exit 1: ' ). \n\n -v, --verbose (0)/1\n Verbose output. \n\n -h \n Print the help menu (short version). \n\n --help \n Print the help menu.'; larmorx exit… |
 | `no-initialization` | no -i | ANTs exit 1: 'No initialization option specified.'; larmorx exit 1: 'No initialization option specified.' |
 | `initialization-without-classes` | -i KMeans (no classes) | ANTs exit 1: 'usage option (see -m). With that option one can specify a prior probability threshold in which only those pixels exceeding that threshold are sto… |
@@ -223,12 +241,14 @@
 | `tensor-image-count` | a tensor model with one image | ANTs exit 1: 'Expect images in upper triangular order \n xx xy xz yy yz zz \nIncorrect number of intensity images specified.'; larmorx exit 1: 'Expect images i… |
 | `partial-volume-labels` | -s 1x2x3 (three labels) | ANTs exit 1: 'Error: Currently Atropos only supports partial volume label sets of size equal to 2.'; larmorx exit 1: 'Error: Currently Atropos only supports pa… |
 | `unknown-outliers` | -w Foo | ANTs exit 1: 'Unrecognized outlier handling strategy request.'; larmorx exit 1: 'Unrecognized outlier handling strategy request.' |
+| `real/ds000005-sub-01/smriprep-partial-volume` | sMRIPrep's options on ds000005-sub-01's N4-corrected T1w and brain mask with partial-volume classes 1x2 and 2x3 (ANTS-106: ANTs stops) | ANTs exit 1: ''; larmorx exit 1: 'rrects it]\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMO… |
+| `real/ds005040-sub-002/smriprep-partial-volume` | sMRIPrep's options on ds005040-sub-002's N4-corrected T1w and brain mask with partial-volume classes 1x2 and 2x3 (ANTS-106: ANTs stops) | ANTs exit 1: ''; larmorx exit 1: 'rrects it]\nlarmorx: upstream defect ANTS-96 (Atropos) reproduced: the partial-volume classes keep their initial means [LARMO… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (8b747322f536-dirty) |
+| larmorx | 0.0.1 (708bb99389fe) |
 | larmorx-testdata | 00b862132e9c |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -284,6 +304,9 @@ ANTs runs as its own binary, larmorx in-process (`larmorx._core.cli_main`), with
 | `partial-volume-mrf-only` | pass | 24/24 | a partial-volume label set used by the MRF only |
 | `partial-volume-likelihoods` | pass | 24/24 | partial-volume classes 1x2 and 2x3 with their likelihoods, no MRF |
 | `partial-volume-with-mrf` | both-error | 4/4 | partial-volume classes with the MRF (ANTS-106: they can never win a voxel; both stop) |
+| `partial-volume-phantom-mrf-0` | pass | 26/26 | the partial-volume phantom, classes 1x2 and 2x3 with their likelihoods, MRF 0 (ANTS-106), scored against the known frac… |
+| `partial-volume-phantom-mrf-0.1` | pass | 26/26 | the partial-volume phantom, classes 1x2 and 2x3 with their likelihoods, MRF 0.1 (ANTS-106), scored against the known fr… |
+| `partial-volume-phantom-mrf-0.3` | both-error | 6/6 | the partial-volume phantom, classes 1x2 and 2x3 with their likelihoods, MRF 0.3 (ANTS-106), scored against the known fr… |
 | `2d` | pass | 24/24 | a 2D slice |
 | `4d` | pass | 24/24 | a 4D series (two volumes) |
 | `mask-255` | both-error | 4/4 | a mask of 255s (one LabelMap label, ITK's error) |
@@ -338,6 +361,8 @@ ANTs runs as its own binary, larmorx in-process (`larmorx._core.cli_main`), with
 | `real/ds005454-sub-16/priors-3` | pass | 27/27 | antsCorticalThickness-style segmentation in ds005454-sub-16: the OASIS30ANTs priors (CSF, CGM, WM) in T1w space, weight… |
 | `real/ds005752-sub-ON01016/priors-3` | pass | 27/27 | antsCorticalThickness-style segmentation in ds005752-sub-ON01016: the OASIS30ANTs priors (CSF, CGM, WM) in T1w space, w… |
 | `real/ds000005-sub-01/priors-6` | pass | 45/45 | antsCorticalThickness-style segmentation in ds000005-sub-01: the OASIS30ANTs priors (CSF, CGM, WM, SCGM, BS, CBM) in T1… |
+| `real/ds000005-sub-01/smriprep-partial-volume` | both-error | 5/5 | sMRIPrep's options on ds000005-sub-01's N4-corrected T1w and brain mask with partial-volume classes 1x2 and 2x3 (ANTS-1… |
+| `real/ds005040-sub-002/smriprep-partial-volume` | both-error | 5/5 | sMRIPrep's options on ds005040-sub-002's N4-corrected T1w and brain mask with partial-volume classes 1x2 and 2x3 (ANTS-… |
 | `real/ds000005/otsu` | pass | 27/27 | Otsu[3] on ds000005's N4-corrected T1w |
 | `real/ds000005/random` | pass | 27/27 | Random[3] on ds000005's T1w (fixed seed) |
 | `real/ds000005/smriprep-clock-seed` | expected-divergence | 7/7 | sMRIPrep's call with --use-random-seed 1: ANTs seeds from the clock (two ANTs runs, ANTs' seed band) |

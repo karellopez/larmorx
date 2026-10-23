@@ -197,10 +197,19 @@ phantoms; the parity suite's fix pass reports the same corrections case by case.
   - `-r bspline.txt` then `Rigid`: a lower mean squared difference than either ANTs construction.
   ANTs' runs with the B-spline transform as a displacement field stop early on linear stages
   (ITK's Jacobian of a field is its nearest voxel's, so the derivative is approximate); larmorx
-  given the same field stops with them, identically. Without a mask a linear stage after a
-  B-spline transform can stall: the transform is the identity outside its valid region, so
-  where its coefficients are not 0 at that border the composite jumps there, and points crossing
-  it make the metric discontinuous. Use a mask (fMRIPrep's registrations have one).
+  given the same field stops with them, identically. Those runs are also **not repeatable**
+  (ANTS-72, found 2026-10-23 when a re-run of the record gave 4.70 mm where the first had given
+  3.75 mm): a linear stage after a displacement field estimates its scales and learning rate from
+  1000 voxels ITK draws with a generator seeded from the clock. Run five times at one thread with
+  `ANTS_RANDOM_SEED` fixed, ANTs' own results are up to 8.5 mm apart (`chain/bspline-then-rigid`,
+  where their median is 2.6 mm from larmorx's corrected stage); with `time()` and `clock()` fixed
+  by a preloaded library the five runs are identical, and the first metric value of the linear
+  stage is the same in every run (the scales act from its second iteration). The two `BSpline`
+  stages' reference has no linear stage and is repeatable (0 mm). The record runs each field
+  reference five times and gives the median, the range and ANTs' own spread (its table "ITK-35's
+  references"). Without a mask a linear stage after a B-spline transform can stall: the
+  transform is the identity outside its valid region, so where its coefficients are not 0 at
+  that border the composite jumps there, and points crossing it make the metric discontinuous. Use a mask (fMRIPrep's registrations have one).
 - **ANTS-67, ANTS-68** (IGDM's `kNeighborhood`, `gradientSigma` and true gradient). On the
   point-set phantoms (the moving blocks shifted by (−2, 2, 2.5) mm), Rigid, 40 iterations,
   given sigmas (50, 5): ANTs' IGDM does not move (its derivative, the two terms weighed by

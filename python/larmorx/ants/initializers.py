@@ -23,7 +23,7 @@ from typing import Any, Literal
 import numpy as np
 
 from larmorx import _core
-from larmorx._defects import UpstreamDefectsName, check, parse_line
+from larmorx._defects import UpstreamDefectsName, check, parse_line, warn
 from larmorx.ants._filters import memory_image
 from larmorx.ants.registration import _Args, _num
 from larmorx.transforms.itk import ItkTransform, read
@@ -32,8 +32,11 @@ __all__ = [
     "AIError",
     "AIResult",
     "AffineInitializerError",
+    "Blob",
+    "BlobAlignment",
     "affine_initializer",
     "ai",
+    "blob_alignment",
 ]
 
 AIMetric = Literal["Mattes", "GC", "MI"]
@@ -83,6 +86,21 @@ def _dimension(image: Any) -> int:
     return min(max(ndim, 2), 4)
 
 
+def _blobs_arg(blobs: int | tuple[int, int]) -> str:
+    """``-b``'s value: ``n`` or ``[n,m]``."""
+    if isinstance(blobs, tuple):
+        if len(blobs) != 2:
+            raise ValueError("blobs is n or (n, m)")
+        n, m = (int(v) for v in blobs)
+        if n < 0 or m < 0:
+            raise ValueError("the numbers of blobs cannot be negative")
+        return f"[{n},{m}]"
+    n = int(blobs)
+    if n < 0:
+        raise ValueError("the number of blobs cannot be negative")
+    return str(n)
+
+
 def _messages(err: str) -> list[str]:
     """The lines of standard error that are not upstream-defect notices (which become
     :class:`~larmorx.UpstreamDefectWarning` warnings)."""
@@ -112,6 +130,7 @@ def ai(
     sampling: Sampling = "None",
     sampling_percentage: float = 1.0,
     align_principal_axes: bool = False,
+    blobs: int | tuple[int, int] | None = None,
     search_factor: float = 20.0,
     arc_fraction: float = 1.0,
     translation_search_grid: tuple[float, Sequence[float]] | None = None,
@@ -137,6 +156,10 @@ def ai(
       points.
     - ``align_principal_axes``: start from the rotation between the images' principal axes
       (otherwise from their centres of mass only).
+    - ``blobs``: start instead from the transform fitted to matched blobs (``-b``): ``n`` blobs
+      extracted from each image and up to ``n`` pairs matched, or ``(n, m)`` to match up to
+      ``m`` (at least 3 extracted); the start points then rotate about the image axes.
+      :func:`blob_alignment` returns the blobs, pairs and landmarks themselves.
     - ``search_factor`` (degrees) and ``arc_fraction``: the start points' rotations, from
       ``-180°·arc_fraction`` to ``180°·arc_fraction`` in steps of ``search_factor``, about each
       axis (the principal axes with ``align_principal_axes``).
@@ -174,6 +197,8 @@ def ai(
         else:
             argv += ["-t", f"{transform}[{_num(gradient_step)}]"]
         argv += ["-p", str(int(align_principal_axes))]
+        if blobs is not None:
+            argv += ["-b", _blobs_arg(blobs)]
         argv += ["-s", f"[{_num(search_factor)},{_num(arc_fraction)}]"]
         if translation_search_grid is not None:
             step, extents = translation_search_grid
@@ -280,3 +305,129 @@ def affine_initializer(
                 "\n".join(messages).strip() or f"antsAffineInitializer exited {code}"
             )
         return read(out_name, upstream_defects=upstream_defects)[0]
+
+
+@dataclass(frozen=True)
+class Blob:
+    """A blob of ANTs' multi-scale Laplacian-of-Gaussian detector: ``index`` the voxel of the
+    maximum, ``sigma`` the Laplacian's scale (mm), ``radius`` the blob's radius
+    (``√D · sigma``, ITK's ``GetObjectRadius``), ``value`` the normalised Laplacian there."""
+
+    index: tuple[int, ...]
+    sigma: float
+    radius: float
+    value: float
+
+
+@dataclass(frozen=True)
+class BlobAlignment:
+    """What :func:`blob_alignment` returns: the steps of ``antsAI -b``.
+
+    - ``fixed_blobs``, ``moving_blobs``: the blobs of each image, strongest first;
+    - ``correspondence``: the ``(fixed, moving)`` matrix of patch correlations (float32; 0 for
+      negative correlations, dim blob centres and patches that leave an image);
+    - ``pairs``: the matched ``(fixed blob, moving blob)`` pairs, in matching order;
+    - ``landmarks``: the pairs kept as landmarks (indices into ``pairs``), and
+      ``fixed_landmarks``, ``moving_landmarks`` their centres in ITK's physical space (LPS mm);
+    - ``transform``: the transform fitted to the landmarks (``AffineTransform``, centre 0),
+      mapping fixed-space points to the moving image: ``antsAI``'s initial transform.
+    """
+
+    fixed_blobs: list[Blob]
+    moving_blobs: list[Blob]
+    correspondence: np.ndarray
+    pairs: list[tuple[int, int]]
+    landmarks: list[int]
+    fixed_landmarks: np.ndarray
+    moving_landmarks: np.ndarray
+    transform: ItkTransform
+
+
+def blob_alignment(
+    fixed: Any,
+    moving: Any,
+    *,
+    blobs: int | tuple[int, int] = 30,
+    transform: Literal["Rigid", "Affine", "Similarity"] = "Rigid",
+    dimension: int | None = None,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> BlobAlignment:
+    """The blob alignment ``antsAI -b`` starts from, with everything it computed.
+
+    ANTs' ``MultiScaleLaplacianBlobDetectorImageFilter`` finds up to ``n`` blobs in each image
+    (``blobs=n`` or ``(n, m)``; at least 3); every fixed and moving blob is compared by the
+    correlation of their spherical patches (radius 20 voxels, oriented by the gradients'
+    principal axes); the best-correlated pairs with radii within 0.25 are matched (up to
+    ``m``); the pairs whose distances to at least 3 others are preserved become landmarks; the
+    landmarks are fitted with an affine (``transform="Affine"``) or rigid transform (otherwise;
+    ``Similarity`` too, as in ANTs). Images are read as ANTs reads them (float).
+
+    ANTs' defects are corrected by default (ANTS-110, ANTS-111, ANTS-112, ANTS-114, ITK-60;
+    ``docs/api/ants-ai.md``); ``upstream_defects="reproduce"`` gives ANTs' result, with an
+    :class:`~larmorx.UpstreamDefectWarning` for each defect that changed it. The result does
+    not depend on ``n_threads``.
+
+    Raises :class:`AIError` where ``antsAI`` stops (a blob list that is empty, too few
+    landmarks for the affine fit, an image too thin for the detector; corrected, a rigid fit
+    without a landmark).
+    """
+    check(upstream_defects)
+    if transform not in ("Rigid", "Affine", "Similarity"):
+        raise ValueError("transform is 'Rigid', 'Affine' or 'Similarity'")
+    if isinstance(blobs, tuple):
+        if len(blobs) != 2:
+            raise ValueError("blobs is n or (n, m)")
+        n, m = (int(v) for v in blobs)
+    else:
+        n = m = int(blobs)
+    if n < 3:
+        raise ValueError("Please specify a greater number of blobs (>=3).")
+    if m < 0:
+        raise ValueError("the number of blobs to match cannot be negative")
+    if dimension is None:
+        dimension = _dimension(fixed)
+    if dimension not in (2, 3):
+        raise ValueError(f"the blob alignment is 2D or 3D, not {dimension}D")
+
+    def arg(image: Any) -> Any:
+        if isinstance(image, (str, os.PathLike)):
+            return os.fspath(image)
+        return memory_image(image)
+
+    value, error, notices = _core.ants_blob_alignment(
+        arg(fixed),
+        arg(moving),
+        int(dimension),
+        n,
+        m,
+        transform == "Affine",
+        int(n_threads),
+        upstream_defects,
+    )
+    warn(notices, stacklevel=3)
+    if value is None:
+        raise AIError(str(error).strip())
+    for line in value["messages"]:
+        warnings.warn(line.strip(), RuntimeWarning, stacklevel=2)
+    d = int(dimension)
+    nf, nm = len(value["fixed_blobs"]), len(value["moving_blobs"])
+
+    def blob_list(items: list) -> list[Blob]:
+        return [
+            Blob(tuple(int(i) for i in c), float(s), float(r), float(v)) for c, s, r, v in items
+        ]
+
+    matrix = np.asarray(value["matrix"], dtype=np.float64).reshape(d, d)
+    offset = np.asarray(value["offset"], dtype=np.float64).reshape(d)
+    params = np.concatenate([matrix.ravel(), offset])
+    return BlobAlignment(
+        fixed_blobs=blob_list(value["fixed_blobs"]),
+        moving_blobs=blob_list(value["moving_blobs"]),
+        correspondence=np.asarray(value["correspondence"], dtype=np.float32).reshape(nf, nm),
+        pairs=[(int(i), int(j)) for i, j in value["pairs"]],
+        landmarks=[int(i) for i in value["landmarks"]],
+        fixed_landmarks=np.asarray(value["fixed_landmarks"], dtype=np.float64).reshape(-1, d),
+        moving_landmarks=np.asarray(value["moving_landmarks"], dtype=np.float64).reshape(-1, d),
+        transform=ItkTransform(f"AffineTransform_double_{d}_{d}", params, np.zeros(d)),
+    )

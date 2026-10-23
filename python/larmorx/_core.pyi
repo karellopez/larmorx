@@ -331,6 +331,22 @@ def ants_program(
 def ants_image_math_operations() -> list[tuple[str, str]]:
     """The ImageMath operations larmorx implements: ``(name, usage)``."""
 
+def ants_blob_alignment(
+    fixed: ImageTuple | str,
+    moving: ImageTuple | str,
+    dim: int,
+    blobs_to_extract: int,
+    blobs_to_match: int,
+    affine: bool,
+    n_threads: int,
+    upstream_defects: str,
+) -> tuple[dict[str, Any] | None, str | None, list[Notice]]:
+    """``antsAI``'s blob alignment with everything it computed: ``(result, error, notices)``;
+    ``result`` holds ``fixed_blobs`` and ``moving_blobs`` (``(index, sigma, radius, value)``),
+    ``correspondence`` (row-major), ``pairs``, ``landmarks``, ``fixed_landmarks``,
+    ``moving_landmarks`` (LPS), ``matrix``, ``offset`` and ``messages``; ``error`` what the
+    command line would print where it stops."""
+
 def ants_read_float(
     path: str, dim: int = 3, n_threads: int = 1
 ) -> tuple[np.ndarray, np.ndarray, bytes]:

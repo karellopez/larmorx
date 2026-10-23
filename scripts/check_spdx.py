@@ -28,8 +28,9 @@ APACHE_DIRS = ("crates", "python", "tests", "validation", "scripts")
 SKIP_PARTS = {"target", ".venv", "__pycache__", "build", "dist", ".git"}
 SPDX = re.compile(r"SPDX-License-Identifier:\s*(.+?)\s*$")
 
-# Apache-2.0 files that are translations of code under another permissive licence. The
-# original notice is reproduced in each file and in NOTICE.
+# Apache-2.0 files that are translations of code under another permissive licence (or, for
+# Eigen's file, MPL-2.0's file-level terms). The original notice is reproduced in each file
+# and in NOTICE.
 MIXED = {
     "crates/larmorx-core/src/math/acos.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/asin.rs": "Apache-2.0 AND MIT",
@@ -43,8 +44,10 @@ MIXED = {
     "crates/larmorx-core/src/math/expf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/logf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/sinf.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/eigen_sym.rs": "Apache-2.0 AND MPL-2.0",
     "crates/larmorx-core/src/vnl_eigen.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_fixed.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-core/src/vnl_qr.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd_f32.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/btree.rs": "Apache-2.0 AND BSD-3-Clause",

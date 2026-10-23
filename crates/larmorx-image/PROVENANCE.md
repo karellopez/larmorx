@@ -44,17 +44,20 @@ upstream files below as it is ported.
 | `adaptive_denoising` (`adaptive_non_local_means`: which centres and neighbours take part, the noise estimate, the patch weights, the accumulation into the output and its count, the Rician bias image, its smoothing and correction factor) | AdaptiveDenoising at `24825c8d`: `include/itkAdaptiveNonLocalMeansDenoisingImageFilter.h/.hxx`, `include/itkNonLocalPatchBasedImageFilter.h/.hxx`; ITK v5.4.5: `Modules/Core/Common/include/itkGaussianOperator.hxx` (`ModifiedBesselI0`, `ModifiedBesselI1`), `itkConstNeighborhoodIterator.hxx` (`IndexInBounds`), `itkMath.h` (`AlmostEquals`, `FloatAlmostEqual`), `Modules/Filtering/ImageStatistics/include/itkStatisticsImageFilter.hxx` (the maximum), `Modules/Filtering/Smoothing/include/itkDiscreteGaussianImageFilter.hxx`. ITK's threads add to shared output voxels without locks, so its result depends on the thread count; larmorx gives the one-thread result on any number of threads (the centres in parallel, each output voxel summed in ITK's raster order afterwards). The padded images and the groups of 8 centres computed side by side are larmorx's |
 | `volume` (`Volume`, `VolumeRef`) | original larmorx code |
 | `kdtree` (`KdTree`: `WeightedCentroidKdTreeGenerator`'s tree with `NthElement`, `MedianOfThree`, `InsertSort` and `UnguardedPartition`, the weighted centroids and bounds; `Search` for the k nearest neighbours; `Kmeans`: `KdTreeBasedKmeansEstimator`'s filtering algorithm, `IsFarther`, `GetClosestCandidate`, the iterations and the split points ITK-50 leaves out) | ITK v5.4.5: `Modules/Numerics/Statistics/include/itkKdTree.h/.hxx`, `itkWeightedCentroidKdTreeGenerator.h/.hxx`, `itkKdTreeGenerator.hxx`, `itkStatisticsAlgorithm.hxx`, `itkKdTreeBasedKmeansEstimator.h/.hxx` | Apache-2.0 |
+| `blobs` (`detect`: the scales, `LaplacianRecursiveGaussianImageFilter` normalised across scale at each, the maxima over `3^D` neighbourhoods in three scales with `ImageBoundaryFacesCalculator`'s faces and `ZeroFluxNeumann` values, the per-work-unit heaps with libstdc++'s `push_heap`, `pop_heap`, `sort_heap` and `std::merge`, the threshold between scales; ANTS-112's corrected list and ANTS-60's per-thread heaps) | ANTs v2.6.5: `Utilities/itkMultiScaleLaplacianBlobDetectorImageFilter.h/.hxx` (Bradley Lowekamp, a **public-domain** work of the U.S. National Library of Medicine); ITK v5.4.5: `Modules/Filtering/ImageFeature/include/itkLaplacianRecursiveGaussianImageFilter.hxx`, `Modules/Core/Common/include/itkNeighborhoodAlgorithm.hxx` (`ImageBoundaryFacesCalculator`), `itkZeroFluxNeumannBoundaryCondition.hxx`, `Modules/Core/SpatialObjects/include/itkGaussianSpatialObject.h` (`GetObjectRadius`'s use); libstdc++'s `std::push_heap`, `pop_heap`, `sort_heap`, `merge` (GCC 14.3's `bits/stl_heap.h`, `bits/stl_algo.h`, reimplemented from their code paths as the oracle's GCC builds them) |
 
 Parity records: [ants-image-math](../../docs/validation/ants-image-math.md),
 [ants-threshold-image](../../docs/validation/ants-threshold-image.md),
 [ants-smooth-image](../../docs/validation/ants-smooth-image.md),
 [ants-resample-image-by-spacing](../../docs/validation/ants-resample-image-by-spacing.md),
 [ants-n4](../../docs/validation/ants-n4.md),
-[ants-denoise](../../docs/validation/ants-denoise.md).
+[ants-denoise](../../docs/validation/ants-denoise.md),
+[ants-ai](../../docs/validation/ants-ai.md) (the blob detector).
 Behaviour found while porting: [ants-image-programs.md](../../docs/findings/ants-image-programs.md),
 [ants-gaussian-filters.md](../../docs/findings/ants-gaussian-filters.md),
 [ants-morphology.md](../../docs/findings/ants-morphology.md),
 [ants-n4.md](../../docs/findings/ants-n4.md),
-[ants-denoise.md](../../docs/findings/ants-denoise.md).
+[ants-denoise.md](../../docs/findings/ants-denoise.md),
+[ants-ai.md](../../docs/findings/ants-ai.md#blobs).
 
 `gaussian::gradient_recursive_gaussian` stores each component as ITK's `GradientRecursiveGaussianImageFilter` does through `NthElementImageAdaptor<TOutputImage, float>` (ITK v5.4.5, `Modules/Filtering/ImageGradient/include/itkGradientRecursiveGaussianImageFilter.h/.hxx`): the quotient by the spacing rounded to float.

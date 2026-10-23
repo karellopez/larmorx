@@ -21,8 +21,8 @@ Version 2.0
 Advanced Normalization Tools (ANTs) v2.6.5 - Apache License, Version 2.0
   Copyright 2009-2023 ConsortiumOfANTS
 
-VXL, as bundled with ITK v5.4.5 (vnl's double and float SVD, error function, gamma function and
-1-D FFT with C. Temperton's GPFA routines) - BSD-3-Clause
+VXL, as bundled with ITK v5.4.5 (vnl's double and float SVD, QR decomposition, error function,
+gamma function and 1-D FFT with C. Temperton's GPFA routines) - BSD-3-Clause
   Copyright 2000-2013 VXL Contributors
   All rights reserved.
 
@@ -53,6 +53,18 @@ VXL, as bundled with ITK v5.4.5 (vnl's double and float SVD, error function, gam
   STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
   OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Eigen 3.4.90, as bundled with ITK v5.4.5 (SelfAdjointEigenSolver, Tridiagonalization,
+HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public License 2.0
+  Copyright (C) 2008-2010 Gael Guennebaud <gael.guennebaud@inria.fr>
+  Copyright (C) 2010 Jitse Niesen <jitse@maths.leeds.ac.uk>
+  Copyright (C) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
+
+  The Rust translation (crates/larmorx-core/src/eigen_sym.rs) is a Modification of those files
+  and is distributed under the Mozilla Public License 2.0 together with Apache-2.0; its source
+  is that file of the larmorx repository (https://github.com/karellopez/larmorx). This Source
+  Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
+  was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, powf, expf, logf, sinf, cosf) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.

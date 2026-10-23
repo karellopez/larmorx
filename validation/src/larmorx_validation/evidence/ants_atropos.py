@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import ants_atropos_pv, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -38,12 +38,20 @@ OASIS = {
     "dataset": "OASIS30ANTs (Avants et al., MICCAI 2016), from TemplateFlow",
     "licence": "CC-BY 4.0",
 }
-OUTPUTS = [
+OUTPUTS = (
     {"id": "labels", "label": "Classes (1 CSF, 2 GM, 3 WM)", "unit": ""},
     {"id": "post1", "label": "Posterior: CSF", "unit": ""},
     {"id": "post2", "label": "Posterior: grey matter", "unit": ""},
     {"id": "post3", "label": "Posterior: white matter", "unit": ""},
-]
+)
+
+
+def _outputs(ids=None) -> list[dict]:
+    """A worked example's own copy of the outputs (``finish`` writes each output's default
+    windows into it, so two examples must not share them)."""
+    return [dict(o) for o in OUTPUTS if ids is None or o["id"] in ids]
+
+
 FILES = {"labels": "{}.nii.gz", "post1": "{}-post01.nii.gz", "post2": "{}-post02.nii.gz",
          "post3": "{}-post03.nii.gz"}  # fmt: skip
 
@@ -397,7 +405,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     for label in ("ants-seed-2", "ants-seed-3", "larmorx-seed"):
         full[label] = _load_run(e.dir, label)
     diffs = _diffs()
-    common.compare_all(ex, diffs, OUTPUTS, full=full)
+    outputs = _outputs()
+    common.compare_all(ex, diffs, outputs, full=full)
     same = common.identical(diffs)
     by = {x["id"]: x for x in diffs}
     for x in diffs:
@@ -462,7 +471,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         ctx,
         ex,
         diffs,
-        OUTPUTS,
+        outputs,
         default=default,
         window_panel="larmorx",
         scale="log",
@@ -533,7 +542,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
 
 #: the priors example shows the classified image and the grey matter's posterior (its other
 #: posteriors are in the record: bit-identical with correctly rounded maths)
-OUTPUTS_PRIORS = [OUTPUTS[0], OUTPUTS[2]]
+OUTPUTS_PRIORS = ("labels", "post2")
 PRIOR_RUNS = [
     ("larmorx", "larmorx-1-reproduce", "larmorx", "larmorx (port), 1 thread", "reproduce mode"),
     ("larmorx-6", "larmorx-6-reproduce", "larmorx", "larmorx (port), 6 threads", "reproduce"),
@@ -567,7 +576,8 @@ def _priors_example(ctx: core.Context) -> dict:
         ex.add(exm.Panel(f"prior{c}", "input", f"OASIS30ANTs prior: {names[c]}",
                          "in the T1w's space (fMRIPrep's transform, Gaussian interpolation)",
                          {"all": common.load(str(e.dir / f"prior{c:02d}.nii.gz"))}))  # fmt: skip
-    shown = {o["id"] for o in OUTPUTS_PRIORS}
+    outputs = _outputs(OUTPUTS_PRIORS)
+    shown = {o["id"] for o in outputs}
     for pid, label, role, text, sub in PRIOR_RUNS:
         arr = {k: v for k, v in _load_run(e.dir, label).items() if k in shown}
         ex.add(exm.Panel(pid, role, text, sub, arr))
@@ -582,7 +592,7 @@ def _priors_example(ctx: core.Context) -> dict:
         d("lx6-lx1", "larmorx-6", "larmorx", "check", "larmorx, 6 threads − 1 thread",
           common.ROLE_SELF),
     ]  # fmt: skip
-    common.compare_all(ex, diffs, OUTPUTS_PRIORS)
+    common.compare_all(ex, diffs, outputs)
     same = common.identical(diffs)
     for x in diffs:
         i = x["id"]
@@ -622,7 +632,7 @@ def _priors_example(ctx: core.Context) -> dict:
         ctx,
         ex,
         diffs,
-        OUTPUTS_PRIORS,
+        outputs,
         default=default,
         window_panel="larmorx",
         input_windows={"prior2": "zero"},
@@ -750,7 +760,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": [],
-            "cache": [fcache.provenance(e), fcache.provenance(p)],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(p),
+                ants_atropos_pv.provenance(ctx),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -760,7 +774,8 @@ def export(ctx: core.Context) -> dict:
         ],
         "cases": cases,
         "cases_total": len(cases),
-        "examples": [_example(ctx, reg), _priors_example(ctx)],
+        "examples": [_example(ctx, reg), _priors_example(ctx), ants_atropos_pv.example(ctx)],
+        "tables": [ants_atropos_pv.table(ctx)],
     }
 
 

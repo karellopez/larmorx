@@ -867,7 +867,8 @@ CORRECTION_TABLES = [
         "corrections-chain",
         "Stages after a B-spline transform (ITK-35), which ANTs cannot run: the corrected stage "
         "against ANTs' closest runs, how far their results map the fixed points apart (largest "
-        "and mean, mm, in the mask)",
+        "and mean, mm, in the mask); with the field, the median of five ANTs runs, and how far "
+        "ANTs' own runs are apart (ANTS-72)",
         [
             ("chain/bspline-then-affine", "BSpline, then Affine"),
             ("chain/bspline-then-rigid", "BSpline, then Rigid"),
@@ -894,6 +895,11 @@ CORRECTION_TABLES = [
             (
                 "ANTs with the B-spline transform as a displacement field (half its spacing): mean distance (mm)",
                 "mean",
+                "num",
+            ),
+            (
+                "ANTs with the B-spline transform as a displacement field (half its spacing): ANTs' own runs",
+                "ANTs' own runs apart: largest",
                 "num",
             ),
         ],

@@ -1106,7 +1106,6 @@ def _phantom_cases() -> list[AtroposCase]:
                 "0",
                 "-o",
                 "[{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
-                outputs=("seg.nii.gz", *(f"post{k:02d}.nii.gz" for k in range(1, 6))),
                 expect=expect,
                 silent_ok=("ITK-50", "ANTS-96"),
                 tier="standard",
@@ -1832,7 +1831,6 @@ def _real_cases() -> list[AtroposCase]:
                 "0",
                 "-o",
                 "[{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
-                outputs=("seg.nii.gz", *(f"post{k:02d}.nii.gz" for k in range(1, 6))),
                 expect="error",
                 silent_ok=("ITK-50", "ANTS-96"),
                 tier=tier,
@@ -2461,6 +2459,37 @@ def highlights(results: list[CaseResult]) -> list[str]:
         for ch in r.checks:
             if ch.name.endswith("larmorx vs ANTs' two runs"):
                 lines.append(f"- `{r.case}` {ch.name.split(':')[0]}: {ch.detail}")
+    pv = []
+    for r in results:
+        for ch in r.checks:
+            m = re.match(r"ANTs: (.*); larmorx's default: (.*)", ch.detail)
+            if ch.name == "partial-volume scores" and m:
+                pv.append((f"`{r.case}`", m.group(1), m.group(2)))
+    if pv:
+        lines += [
+            "",
+            "**ANTS-106 on the partial-volume phantom** (known fractions; Dice per class, 4 = 1x2 "
+            "and 5 = 2x3, and the share of voxels labelled as the truth). larmorx's default "
+            "corrects ANTS-106 and, as everywhere, ITK-50 and ANTS-96; without the MRF only "
+            "those two apply:",
+            "",
+            table(("Case", "ANTs", "larmorx's default"), pv),
+        ]
+    real = []
+    for r in results:
+        for ch in r.checks:
+            if ch.name == "partial-volume voxels":
+                code = re.match(r"ANTs exit (-?\d+)", r.reason)
+                ants_text = f"stops (exit {code.group(1)})" if code else r.status
+                real.append((f"`{r.case}`", ants_text, ch.detail))
+    if real:
+        lines += [
+            "",
+            "**sMRIPrep's call with partial-volume classes on fMRIPrep's T1w** (ANTS-106): ANTs "
+            "stops; larmorx's default labels",
+            "",
+            table(("Case", "ANTs", "larmorx's default: voxels per class"), real),
+        ]
     return lines
 
 

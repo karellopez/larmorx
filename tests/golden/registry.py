@@ -261,6 +261,46 @@ def bold() -> lx.Image:
     return _frozen(lx.Image(np.asfortranarray(data), aff, hdr))
 
 
+# --- antsAI's blob alignment ------------------------------------------------------------------
+
+#: The blob planes (32,400 pixels): ``antsAI -b`` compares blobs by patches of radius 20 pixels,
+#: so the blobs lie at least 23 pixels inside every edge, rotated or not.
+BLOB_SHAPE = (180, 180)
+
+
+def _blob_params(seed: int, n: int = 20) -> list[tuple[float, float, int, int]]:
+    """``n`` blobs: centre (fractions of a pixel), radius 5-9 and amplitude 80-200."""
+    v = splitmix64(seed, 5 * n)
+    out = []
+    for k in range(n):
+        x = 44 + int(v[5 * k] % _U64(92)) + int(v[5 * k + 1] % _U64(8)) / 8
+        y = 44 + int(v[5 * k + 2] % _U64(92)) + int(v[5 * k + 1] % _U64(5)) / 5
+        out.append((x, y, 5 + int(v[5 * k + 3] % _U64(5)), 80 + int(v[5 * k + 4] % _U64(121))))
+    return out
+
+
+@functools.cache
+def blob_plane(move: str = "fixed") -> lx.Image:
+    """2D float32 (180 × 180, ITK's identity direction): 20 blobs, each ``a·(1 − r²/R²)²``
+    inside radius ``R``, over a background of 10 with integer noise (quarters, 0-1.75).
+    ``move``: ``"shift"`` moves the blobs (3, −2) pixels; ``"rotated"`` turns them by
+    2·atan(0.04) (4.6°: cosine and sine rational) about the centre and moves them (2, 1)."""
+    c, s = (1 - 0.04 * 0.04) / (1 + 0.04 * 0.04), 2 * 0.04 / (1 + 0.04 * 0.04)
+    mid = (BLOB_SHAPE[0] - 1) / 2
+    i, j = np.indices(BLOB_SHAPE, dtype=np.float64)
+    v = 10.0 + ints(41, BLOB_SHAPE, 0, 8) / 4
+    for x, y, r, amp in _blob_params(40):
+        if move == "shift":
+            x, y = x + 3, y - 2
+        elif move == "rotated":
+            dx, dy = x - mid, y - mid
+            x, y = mid + c * dx - s * dy + 2, mid + s * dx + c * dy + 1
+        q = np.maximum(1.0 - ((i - x) * (i - x) + (j - y) * (j - y)) / (r * r), 0.0)
+        v = v + amp * (q * q)
+    aff = np.diag([-1.0, -1.0, 1.0, 1.0])
+    return _frozen(lx.Image(np.asfortranarray(v.astype(np.float32)), aff))
+
+
 # --- Atropos' inputs ---------------------------------------------------------------------------
 
 
@@ -503,6 +543,9 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
         plane().with_data(ellipsoid(SHAPE2, 3, 5).astype(np.uint8)), p
     ),
     "bold.nii": lambda p: lx.save(bold(), p),
+    "blobs.nii": lambda p: lx.save(blob_plane(), p),
+    "blobs_shift.nii": lambda p: lx.save(blob_plane("shift"), p),
+    "blobs_rotated.nii": lambda p: lx.save(blob_plane("rotated"), p),
     "tissues.nii": lambda p: lx.save(tissues(), p),
     "tissues2.nii": lambda p: lx.save(tissues2(), p),
     "tissue_mask.nii": lambda p: lx.save(tissue_mask(), p),
@@ -1826,6 +1869,94 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("cli.ants.antsAI.blobs", covers=("cli:ants antsAI",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``antsAI -b`` (the blob alignment) in 2D: a rigid search from the blobs of a rotated
+    plane, an affine one from 12 matched pairs of a shifted plane (ANTS-110 and ANTS-111
+    corrected)."""
+    a = ctx.file("blobs.nii")
+    files = {"rigid": ctx.out("blobs_rigid.mat"), "affine": ctx.out("blobs_affine.mat")}
+    cli(
+        "ants", "antsAI", "-d", "2", "-m", f"Mattes[{a},{ctx.file('blobs_rotated.nii')},32]",
+        "-t", "Rigid[0.1]", "-b", "20", "-s", "[90,0.25]", "-c", "[2,1e-6,3]",
+        "-o", files["rigid"],
+    )  # fmt: skip
+    cli(
+        "ants", "antsAI", "-d", "2", "-m", f"Mattes[{a},{ctx.file('blobs_shift.nii')},32]",
+        "-t", "Affine[0.1]", "-b", "[20,12]", "-s", "[90,0.25]", "-o", files["affine"],
+    )  # fmt: skip
+    return {name: File(path) for name, path in files.items()}
+
+
+def _blob_outputs(name: str, r: Any) -> dict[str, Any]:
+    """Every step of a blob alignment. A NaN transform (ANTs' rigid fit without landmarks) is
+    hashed as where it is NaN: NaN's sign bit differs between processors."""
+
+    def blobs(items: list) -> np.ndarray:
+        return np.array([[*b.index, b.sigma, b.radius, b.value] for b in items], np.float64)
+
+    params = np.asarray(r.transform.parameters, np.float64)
+    return {
+        f"{name}.fixed_blobs": blobs(r.fixed_blobs),
+        f"{name}.moving_blobs": blobs(r.moving_blobs),
+        f"{name}.correspondence": r.correspondence,
+        f"{name}.pairs": np.array(r.pairs, np.int64).reshape(-1, 2),
+        f"{name}.landmarks": np.array(r.landmarks, np.int64),
+        f"{name}.fixed_landmarks": r.fixed_landmarks,
+        f"{name}.moving_landmarks": r.moving_landmarks,
+        f"{name}.parameters": np.where(np.isnan(params), 0.0, params),
+        f"{name}.nan": np.isnan(params),
+    }
+
+
+@case("py.ants.blob_alignment", covers=("lx.ants.blob_alignment",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.ants.blob_alignment`` (larmorx's default): the rotated plane fitted rigidly and
+    affinely, from 4 threads (ANTS-110 corrected: 10 landmarks, where ANTs keeps 4); the
+    shifted plane from files, rigidly, with at most 16 pairs (ANTS-111 corrected)."""
+    fixed = blob_plane()
+    rotated = blob_plane("rotated")
+    calls = {
+        "rigid": lambda: lx.ants.blob_alignment(fixed, rotated, blobs=20, n_threads=4),
+        "affine": lambda: lx.ants.blob_alignment(fixed, rotated, blobs=20, transform="Affine"),
+        "shift": lambda: lx.ants.blob_alignment(
+            ctx.file("blobs.nii"), ctx.file("blobs_shift.nii"), blobs=(20, 16)
+        ),
+    }
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, call in calls.items():
+            out |= _blob_outputs(name, call())
+    return out
+
+
+@case("py.ants.blob_alignment.reproduce", covers=("lx.ants.blob_alignment",))
+def _(ctx: Context) -> dict[str, Any]:
+    """ANTs' blob alignment reproduced: the rotated plane (ANTS-111's extra pair, ANTS-110's
+    test of displacement lengths) fitted rigidly and affinely; the shifted plane, rigidly
+    (ANTs' landmarks give the shift exactly); 3D, ``anat`` against ``anat2`` (no patch fits in
+    a 24 × 20 × 16 grid: every pair is blob 0 with blob 0, ANTS-111, and the versor fit of
+    coincident landmarks); a 2D rigid fit without landmarks (NaN, ANTS-114)."""
+    fixed = blob_plane()
+    kw = {"upstream_defects": REPRODUCE}
+    calls = {
+        "rigid": lambda: lx.ants.blob_alignment(fixed, blob_plane("rotated"), blobs=20, **kw),
+        "affine": lambda: lx.ants.blob_alignment(
+            fixed, blob_plane("rotated"), blobs=20, transform="Affine", **kw
+        ),
+        "shift": lambda: lx.ants.blob_alignment(fixed, blob_plane("shift"), blobs=20, **kw),
+        "3d": lambda: lx.ants.blob_alignment(anat(), anat2(), blobs=8, **kw),
+        "none": lambda: lx.ants.blob_alignment(fixed, blob_plane("rotated"), blobs=8, **kw),
+    }
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, call in calls.items():
+            out |= _blob_outputs(name, call())
+    return out
+
+
 @case("py.ants.affine_initializer", covers=("lx.ants.affine_initializer",))
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.ants.affine_initializer``: in-memory images, from the principal axes."""
@@ -2246,8 +2377,9 @@ def _(ctx: Context) -> dict[str, Any]:
     ITK-51 corrected); prior probabilities with adaptive B-spline smoothing and the sigmoid
     formulation; a prior label image with the Plato formulation, annealing and the ICM codes;
     random labels; manifold Parzen windows with local covariances; the log-Euclidean and the
-    joint shape and orientation models on tensors; partial-volume classes; minimized memory; a
-    4D series."""
+    joint shape and orientation models on tensors; partial-volume classes, without and with the
+    MRF (ANTS-106 corrected: a partial-volume label is a member of its own set); minimized
+    memory; a 4D series."""
     a = lx.ants
     t, m, lab = tissues(), tissue_mask(), tissue_labels()
     priors = [tissue_prior(c) for c in (1, 2, 3)]
@@ -2277,6 +2409,9 @@ def _(ctx: Context) -> dict[str, Any]:
         "pv": lambda: a.atropos(t, m, partial_volume=[(1, 2), (2, 3)],
                                 partial_volume_likelihoods=True, mrf_smoothing=0.0, iterations=2,
                                 use_random_seed=False),
+        "pv_mrf": lambda: a.atropos(t, m, partial_volume=[(1, 2), (2, 3)],
+                                    partial_volume_likelihoods=True, mrf_smoothing=0.1,
+                                    iterations=2, use_random_seed=False),
         "minmem": lambda: a.atropos(t, m, minimize_memory=True, use_random_seed=False),
         "bold": lambda: a.atropos(b, bmask, mrf_radius=(1, 1, 1, 0), iterations=2,
                                   use_random_seed=False),

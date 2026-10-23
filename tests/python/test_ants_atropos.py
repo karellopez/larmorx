@@ -245,6 +245,61 @@ def test_fix_and_reproduce_warn_about_the_defects_they_meet():
         lx.ants.atropos(t1, mask, upstream_defects="sometimes")
 
 
+def pv_phantom(n=20, up=4, seed=5):
+    """Nested spheres (60, 130, 200 over 0) box-averaged from a grid ``up`` times finer, so
+    the boundary voxels are mixtures of two tissues; noise sd 6; the mask: voxels less than
+    half background."""
+    c = (n - 1) / 2.0
+    g = (np.indices((n * up,) * 3) + 0.5) / up - 0.5
+    r = np.sqrt(((g - c) ** 2).sum(0))
+    tissue = np.where(r < 4.2, 3, np.where(r < 6.9, 2, np.where(r < 9.0, 1, 0)))
+    frac = np.stack([(tissue == k).reshape(n, up, n, up, n, up).mean((1, 3, 5)) for k in range(4)])
+    t1 = np.tensordot(np.array([0.0, 60.0, 130.0, 200.0]), frac, 1)
+    t1 = t1 + np.random.default_rng(seed).normal(scale=6.0, size=t1.shape)
+    return image(t1, np.eye(4)), image(frac[0] < 0.5, np.eye(4))
+
+
+def test_partial_volume_classes_with_the_mrf():
+    """ANTS-106: in ANTs' MRF a partial-volume label is +1 against every neighbour, its own
+    tissues included, so with an MRF the partial-volume classes hardly win a voxel and Atropos
+    stops when one wins none. Corrected (the user's decision of 2026-10-22), a partial-volume
+    label is a member of its own set: -1 with its tissues, -2 with itself, +1 with others."""
+    t1, mask = pv_phantom()
+    kw = {
+        "images": t1,
+        "mask": mask,
+        "classes": 3,
+        "partial_volume": [(1, 2), (2, 3)],
+        "partial_volume_likelihoods": True,
+        "convergence_threshold": 0.0,
+        "use_random_seed": False,
+    }
+    for beta in (0.1, 0.3):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            res = lx.ants.atropos(**kw, mrf_smoothing=beta)
+        assert any(str(w.message).startswith("ANTS-106") for w in caught)
+        labels = np.asarray(res.labels.data)
+        # Every class wins voxels, the two partial-volume classes (4 = 1x2, 5 = 2x3) included,
+        # at the boundaries between their tissues.
+        assert all((labels == k).any() for k in range(1, 6))
+        assert len(res.posteriors) == 3  # one posterior per tissue class, as in Atropos
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(lx.ants.AtroposError, match="non-zero label sets"):
+                lx.ants.atropos(**kw, mrf_smoothing=beta, upstream_defects="reproduce")
+        assert any(
+            str(w.message).startswith("ANTS-106") and "reproduced" in str(w.message)
+            for w in caught
+        )
+    # Without the MRF the correction does not apply.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        res = lx.ants.atropos(**kw, mrf_smoothing=0.0)
+    assert not any(str(w.message).startswith("ANTS-106") for w in caught)
+    assert (np.asarray(res.labels.data) == 5).any()
+
+
 def test_seeds():
     t1, _, mask, _ = phantom()
     a = quiet(images=t1, mask=mask, initialization="random", use_random_seed=True)

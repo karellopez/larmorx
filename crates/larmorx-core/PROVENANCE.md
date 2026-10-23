@@ -99,3 +99,45 @@ the eigenvalues as `std::complex<double>` (a scratch harness linking the oracle'
 **Ported** from the same VXL: `core/vnl/vnl_det.hxx`, `core/vnl/algo/vnl_determinant.hxx`
 (1 to 4 rows), `core/vnl/vnl_inverse.h` (2×2 to 4×4). Bit-identical to the oracle's VNL in the
 same comparison (`vnl_svd` of a sum of outer products, `V·Uᵀ`, its inverse and determinant).
+
+## vnl's QR decomposition (`src/vnl_qr.rs`)
+
+**Ported** from VXL as bundled with ITK v5.4.5 (BSD-3-Clause; LINPACK and reference BLAS from
+netlib; the file's SPDX header is `Apache-2.0 AND BSD-3-Clause`), as ITK's
+`LandmarkBasedTransformInitializer` solves its affine normal equations
+(`vnl_qr<double>(Q).solve(C)`, `antsAI -b` with `Affine`):
+- `core/vnl/algo/vnl_qr.hxx` (the constructor's transpose into column-major storage, `solve`
+  of a vector and its rank-deficiency message on `std::cerr`, `solve` of a matrix column by
+  column);
+- `v3p/netlib/linpack/dqrdc.c` (Householder QR without pivoting, `job = 0`) and `dqrsl.c`
+  (job 100: `Qᵀb` and the back substitution);
+- `v3p/netlib/blas/{dnrm2,ddot,daxpy,dscal}.c` (shared with `vnl_svd.rs`).
+
+Bit-identical to the oracle's VNL (ITK 5.4.5 as built for `oracles/ants-2.6.5`, GCC 14.3) on
+the affine landmark fits of random landmark sets, 2D and 3D (part of the 50,000 fits of
+`larmorx_registration::landmark`); a scratch harness linking the oracle's libraries.
+
+## Eigen's self-adjoint eigensolver (`src/eigen_sym.rs`)
+
+**Ported** from Eigen 3.4.90 as bundled with ITK v5.4.5
+(`Modules/ThirdParty/Eigen3/src/itkeigen/Eigen/src/`), **MPL-2.0**: the file is a Modification
+of Eigen's files and carries `Apache-2.0 AND MPL-2.0` and Eigen's notice (NOTICE lists it).
+For `SymmetricEigenAnalysisFixedDimension<4, Matrix<double, 4, 4>, ...>` (ITK v5.4.5,
+`Modules/Core/Common/include/itkSymmetricEigenAnalysis.h`), as `LandmarkBasedTransformInitializer`
+computes Horn's versor (`VersorRigid3DTransform`, `antsAI -b` in 3D):
+- `Eigenvalues/SelfAdjointEigenSolver.h` (`compute`, `computeFromTridiagonal_impl`,
+  `tridiagonal_qr_step`, the final selection sort);
+- `Eigenvalues/Tridiagonalization.h` (`tridiagonalization_inplace`,
+  `tridiagonalization_inplace_selector`'s generic path);
+- `Householder/Householder.h` (`makeHouseholderInPlace`, `applyHouseholderOnTheLeft`),
+  `Householder/HouseholderSequence.h` (`evalTo`);
+- `Jacobi/Jacobi.h` (`makeGivens`, `applyOnTheRight`);
+- `Core/products/SelfadjointMatrixVector.h` (the column-major lower-triangle kernel: the
+  solver's `EigenvectorsType` is column-major whatever the input's storage order) and
+  `Core/products/SelfadjointRank2Update.h` (`Lower`).
+
+Bit-identical to the solver compiled with the oracle's flags (GCC 14.3, `-O3 -march=corei7`,
+SSE4.2: for a 4 × 4 matrix every vectorised kernel keeps the scalar order of operations) on
+650,003 matrices: random of every scale, Horn matrices of random landmark sets, repeated
+eigenvalues, tiny subdiagonals, singular ones; a scratch harness.
+

@@ -15,8 +15,18 @@ when it is installed (`pip install "larmorx[exact]"`), else the original; `"repl
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status** against AFNI 25.2.09 itself (records: [original](../validation/afni-unifize.md),
-[replica](../validation/afni-unifize-replica.md)): RESULTS-PLACEHOLDER
+**Status: `validated`**, both, against AFNI 25.2.09 itself:
+- the original ([record](../validation/afni-unifize.md), 97 cases, none failing): AFNI's exit
+  status and messages in every case; in 32 of the 72 compared cases that write outputs every
+  output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's
+  and some squashed values differ in their last bit (at most 1,633 values of a T1w, at most
+  8.7e-8 of the largest value; the threshold is 1e-5), because AFNI's `tanhf` is glibc's and the
+  original's is correctly rounded: AFNI run with CORE-MATH's correctly rounded functions preloaded
+  gives the original's bytes in all 40. fMRIPrep's own outputs of the 7 oracle BOLD references:
+  1 bit for bit, the other 6 AFNI's oracle output with the same last-bit differences. Its result
+  does not depend on the thread count (nor does AFNI's: 1 and 6 threads, and fMRIPrep's build,
+  give the oracle's bytes);
+- the replica ([record](../validation/afni-unifize-replica.md)): every compared case, bit for bit.
 
 ## Quick start
 

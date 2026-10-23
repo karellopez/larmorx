@@ -1,0 +1,1718 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "9ec45aeb7d28",
+  "larmorx_testdata_commit": "b0999a9e0c31",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "reference": "3dUnifize from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
+ "results": [
+  {
+   "case": "options/default",
+   "category": "options",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 168.318,
+   "status": "pass"
+  },
+  {
+   "case": "options/fmriprep-call",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 86.102,
+   "status": "pass"
+  },
+  {
+   "case": "options/Urad-5",
+   "category": "options",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.142360377450515e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 3,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 3.498,
+   "status": "pass"
+  },
+  {
+   "case": "options/Urad-12",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 23.35,
+   "status": "pass"
+  },
+  {
+   "case": "options/Urad-30",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 332.04,
+   "status": "pass"
+  },
+  {
+   "case": "options/rbt",
+   "category": "options",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.138030105177528e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 326,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 27.502,
+   "status": "pass"
+  },
+  {
+   "case": "options/param",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.140173792710475e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 71.129,
+   "status": "pass"
+  },
+  {
+   "case": "options/clfrac-0.1",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 161.16,
+   "status": "pass"
+  },
+  {
+   "case": "options/clfrac-0.5",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 56.299,
+   "status": "pass"
+  },
+  {
+   "case": "options/clfrac-0.9",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.141391215585424e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 4,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 50.433,
+   "status": "pass"
+  },
+  {
+   "case": "options/mfrac",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 178.473,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 96.243,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2-T2",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 91.294,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2-T2-T2",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 76.494,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2up-95",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 80.939,
+   "status": "pass"
+  },
+  {
+   "case": "options/GM",
+   "category": "options",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 7.962948718132478e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 172.899,
+   "status": "pass"
+  },
+  {
+   "case": "options/GM-T2",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 80.691,
+   "status": "pass"
+  },
+  {
+   "case": "options/nosquash",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 89.684,
+   "status": "pass"
+  },
+  {
+   "case": "options/oink",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 83.835,
+   "status": "pass"
+  },
+  {
+   "case": "options/ssave-amsave",
+   "category": "options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "am.nii: data": 0,
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 166.359,
+   "status": "pass"
+  },
+  {
+   "case": "options/quiet",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 167.451,
+   "status": "pass"
+  },
+  {
+   "case": "options/verb",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 168.088,
+   "status": "pass"
+  },
+  {
+   "case": "options/verb-verb",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 166.409,
+   "status": "pass"
+  },
+  {
+   "case": "options/useall",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 166.193,
+   "status": "pass"
+  },
+  {
+   "case": "options/inset",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 164.398,
+   "status": "pass"
+  },
+  {
+   "case": "options/case-insensitive",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 75.42,
+   "status": "pass"
+  },
+  {
+   "case": "options/duplo",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.140576688221285e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 5,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 19.585,
+   "status": "pass"
+  },
+  {
+   "case": "options/noduplo",
+   "category": "options",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.14072380803522e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 10,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 1483.232,
+   "status": "pass"
+  },
+  {
+   "case": "options/duplo-T2",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii.gz: data": 0,
+    "uni.nii.gz: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 14.208,
+   "status": "pass"
+  },
+  {
+   "case": "options/EPI",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.817,
+   "status": "pass"
+  },
+  {
+   "case": "options/EPI-GM",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.996,
+   "status": "pass"
+  },
+  {
+   "case": "options/EPI-3D",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.697,
+   "status": "pass"
+  },
+  {
+   "case": "options/4D-without-EPI",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.13813275915009e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 9,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 148.525,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-i16",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139050137037187e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 150.268,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-u8",
+   "category": "datatypes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 65.327,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-i16-slope2",
+   "category": "datatypes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 72.358,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-i16-slope1",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139050137037187e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 145.22,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-f64",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 158.181,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-i8",
+   "category": "datatypes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 61.369,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-nan",
+   "category": "datatypes",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 80.782,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-oblique",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 157.315,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-qform-only",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 159.076,
+   "status": "pass"
+  },
+  {
+   "case": "datatypes/head-las",
+   "category": "datatypes",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii: data": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 184.243,
+   "status": "pass"
+  },
+  {
+   "case": "defects/head-f32-slope-inter",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 55249
+   },
+   "seconds": 91.314,
+   "status": "pass"
+  },
+  {
+   "case": "defects/head-metre",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 227.929,
+   "status": "pass"
+  },
+  {
+   "case": "defects/head-nearly-plumb",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 226.413,
+   "status": "pass"
+  },
+  {
+   "case": "defects/nifti-scale-no",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 58184
+   },
+   "seconds": 99.529,
+   "status": "pass"
+  },
+  {
+   "case": "defects/T2up-100",
+   "category": "defects",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 53571
+   },
+   "seconds": 32.693,
+   "status": "pass"
+  },
+  {
+   "case": "defects/T2up-99.99",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2569
+   },
+   "seconds": 0.938,
+   "status": "pass"
+  },
+  {
+   "case": "defects/EPI-negative-slope",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 337232
+   },
+   "seconds": 1.748,
+   "status": "pass"
+  },
+  {
+   "case": "defects/slab",
+   "category": "defects",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "AFNI reads memory it never wrote (AFNI-47): this run crashed (Fatal Signal 11) after the same messages; larmorx fills the read with 0 in reproduce mode and corrects it by default",
+   "reported": {
+    "D13 fix pass": 211604
+   },
+   "seconds": 5.641,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "dimensions/slice",
+   "category": "dimensions",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.245,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/two-slices",
+   "category": "dimensions",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.337,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/tiny",
+   "category": "dimensions",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/zeros",
+   "category": "dimensions",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 26.26,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/constant",
+   "category": "dimensions",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 79.138,
+   "status": "pass"
+  },
+  {
+   "case": "dimensions/series-one",
+   "category": "dimensions",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.13813275915009e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 7,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 215.691,
+   "status": "pass"
+  },
+  {
+   "case": "errors/slice-small",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-(; larmorx exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-( (the same messages)",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/slice-small-T2",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: the automask of a 2D image smaller than 16 x 16 is empty (NULL): AFNI crashes inverting the contrast with it (AFNI-46)), after the same messages",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/Urad-low",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad (the same messages)",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/Urad-high",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad (the same messages)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/rbt-bottom",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/rbt-order",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/rbt-top",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/rbt-missing",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt' (the same messages)",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/clfrac-low",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal!; larmorx exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal! (the same messages)",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/clfrac-missing",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-clfrac'; larmorx exit 1: ** FATAL ERROR: Need argument after '-clfrac' (the same messages)",
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/T2up-low",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
+   "seconds": 0.012,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/T2up-high",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/T2up-missing",
+   "category": "errors",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -T2up needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/prefix-missing",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-prefix'; larmorx exit 1: ** FATAL ERROR: Need argument after '-prefix' (the same messages)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/ssave-missing",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-ssave'; larmorx exit 1: ** FATAL ERROR: Need argument after '-ssave' (the same messages)",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/input-twice",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Can't use '-input' twice; larmorx exit 1: ** FATAL ERROR: Can't use '-input' twice (the same messages)",
+   "seconds": 0.029,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/unknown-option",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -bogus; larmorx exit 1: ** FATAL ERROR: Unknown option: -bogus (the same messages)",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/no-dataset",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: No dataset name on command line?; larmorx exit 1: ** FATAL ERROR: No dataset name on command line? (the same messages)",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/missing-input",
+   "category": "errors",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "AFNI exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii'; larmorx exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii' (the same messages)",
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "divergences/default-prefix",
+   "category": "divergences",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "AFNI's default prefix 'Unifized' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only).",
+   "seconds": 107.419,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "global/exists",
+   "category": "global",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 108.42,
+   "status": "pass"
+  },
+  {
+   "case": "global/overwrite",
+   "category": "global",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 205.825,
+   "status": "pass"
+  },
+  {
+   "case": "global/deconflict-yes",
+   "category": "global",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni_AA1.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni_AA1.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 205.81,
+   "status": "pass"
+  },
+  {
+   "case": "global/ssave-exists",
+   "category": "global",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 211.22,
+   "status": "pass"
+  },
+  {
+   "case": "global/D-write-type-2",
+   "category": "global",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 214.501,
+   "status": "pass"
+  },
+  {
+   "case": "environment/quiet-startup",
+   "category": "environment",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 215.44,
+   "status": "pass"
+  },
+  {
+   "case": "environment/message-prefix",
+   "category": "environment",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 217.492,
+   "status": "pass"
+  },
+  {
+   "case": "environment/echo-commandline",
+   "category": "environment",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 214.02,
+   "status": "pass"
+  },
+  {
+   "case": "global/prefix-with-blank",
+   "category": "global",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.47,
+   "status": "pass"
+  },
+  {
+   "case": "global/input-dir-with-blank",
+   "category": "global",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.37,
+   "status": "pass"
+  },
+  {
+   "case": "global/missing-directory",
+   "category": "global",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 111.064,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_01",
+   "category": "fmriprep",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 0,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0
+   },
+   "seconds": 266.083,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_02",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.143365579703801e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 2
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 2,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 344.995,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_03",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.139061398556082e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 2
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 2,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 346.444,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005040-task_clip_run_1",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.140911360373153e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 7
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 7,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 459.241,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005454-task_rest",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.677723996137025e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 14
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 14,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 93.195,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005752-ses_01_task_rest_dir_forward",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.14766170256798e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 1
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 419.579,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005752-ses_01_task_rest_dir_reverse",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 8.13856459647898e-08,
+    "uni.nii.gz: fMRIPrep's own output (as it ran)": 2
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 1 thread(s)": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: fMRIPrep's own output against AFNI's": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 2,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 411.542,
+   "status": "pass"
+  },
+  {
+   "case": "real/T1w-ds000005",
+   "category": "real",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "scale.nii.gz: data": 0,
+    "uni.nii.gz: data": 8.138020833333333e-08
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0,
+    "uni.nii.gz: values bit-identical to AFNI's": 1633,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 215.778,
+   "status": "pass"
+  },
+  {
+   "case": "real/EPI-ds000005",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii.gz: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "band: AFNI at 6 thread(s)": 0,
+    "band: fMRIPrep 25.2.6's AFNI": 0
+   },
+   "seconds": 52.001,
+   "status": "pass"
+  }
+ ],
+ "suite": "afni-unifize",
+ "summary": {
+  "both-error": 19,
+  "expected-divergence": 2,
+  "fail": 0,
+  "pass": 76,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

@@ -919,12 +919,24 @@ def case_verdict(r: dict, desc: str = "", who: str = "replica") -> tuple[str, st
         if parts:
             notes.append(" and ".join(parts) + " give the oracle's bytes")
         notes += other
-    for k, v in rep.items():
-        if k.endswith("fMRIPrep's own output (as it ran)"):
-            notes.append(
-                f"{k.split(':')[0]}: fMRIPrep's own output, "
-                + ("the same bytes" if not v else f"{v:,} values differ")
+    own = {k: v for k, v in {**measured, **rep}.items() if k.endswith(ar.FMRIPREP_OWN)}
+    for k, v in own.items():
+        name = k.split(":")[0]
+        oracle = rep.get(f"{name}: {ar.FMRIPREP_AFNI}")
+        notes.append(
+            f"{name}: fMRIPrep's own output, "
+            + (
+                "the same bytes"
+                if not v
+                else f"{v:,} values differ"
+                + (
+                    " (fMRIPrep's output is AFNI's oracle output bit for bit: the same last-bit "
+                    "differences)"
+                    if oracle == 0
+                    else ""
+                )
             )
+        )
     fix = rep.get("D13 fix pass")
     named = [d for d in re.findall(r"\b(AFNI-\d+)\b", desc) if d in CORRECTED]
     if fix or named:

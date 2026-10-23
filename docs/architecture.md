@@ -32,7 +32,8 @@ How the code is organised and the conventions every tool follows. The plan behin
                      N4BiasFieldCorrection, DenoiseImage), images as ANTs
                      programs read and write them, ITK's identity resampling in 2-4D (double
                      or float coordinates), the original command lines
-   larmorx-afni      AFNI-compatible tools, clean-room (3dTshift), AFNI's NIfTI rules, an FFT
+   larmorx-afni      AFNI-compatible tools, clean-room (3dTshift, 3dAutomask, 3dUnifize), AFNI's
+                     NIfTI rules, an FFT, connected clusters, a sliding window of ranked values
    larmorx-cli       the multicall `larmorx`/`lx` command line (original tool syntax), and
                      `replica`: running a tool's replica from another package as a separate
                      program

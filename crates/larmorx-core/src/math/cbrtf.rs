@@ -5,7 +5,7 @@
 //! (3dUnifize's `-EPI` radius, `specs/3dUnifize.md` §7).
 //!
 //! Port of CORE-MATH's `src/binary32/cbrt/cbrtf.c` at commit 040ee482a8ca
-//! (<https://core-math.gitlabpages.inria.fr/>), MIT licence, Copyright (c) 2022-2025 Alexei
+//! (<https://core-math.gitlabpages.inria.fr/>), MIT licence, Copyright (c) 2023 Alexei
 //! Sibidanov (the copyright and permission notice are reproduced below). The operations,
 //! their order and the integer manipulations of the bit patterns are kept exactly (C's
 //! unsigned wrap-around as wrapping arithmetic); hex-float constants are written as their exact
@@ -13,7 +13,7 @@
 //! modelled. Checked against the C function (compiled without fused multiply-adds) on every
 //! one of the 2^32 floats.
 
-// Copyright (c) 2022-2025 Alexei Sibidanov.
+// Copyright (c) 2023 Alexei Sibidanov.
 //
 // This file is part of the CORE-MATH project
 // (https://core-math.gitlabpages.inria.fr/).

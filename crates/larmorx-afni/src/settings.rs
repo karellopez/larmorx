@@ -91,6 +91,25 @@ pub fn is_consulted(name: &str) -> bool {
     EFFECT_VARIABLES.contains(&name) || NO_EFFECT_VARIABLES.contains(&name)
 }
 
+/// Whether 3dAutomask and 3dUnifize consult the variable `name`: 3dTshift's variables but
+/// `AFNI_1D_ZERO_TEXT` (they read no slice-time file; `specs/3dAutomask.md` §8.4).
+pub fn is_consulted_by_masks(name: &str) -> bool {
+    name != "AFNI_1D_ZERO_TEXT" && is_consulted(name)
+}
+
+/// An AFNI program, for the warnings about `-D` options: its name and the variables it reads.
+#[derive(Clone, Copy, Debug)]
+pub struct Program {
+    pub name: &'static str,
+    pub consults: fn(&str) -> bool,
+}
+
+/// 3dTshift.
+pub const TSHIFT: Program = Program {
+    name: "3dTshift",
+    consults: is_consulted,
+};
+
 /// AFNI's *yes*: a value that starts with `Y` or `y`.
 pub fn is_yes(value: Option<&str>) -> bool {
     value.is_some_and(|v| v.starts_with(['Y', 'y']))
@@ -371,13 +390,24 @@ pub fn take_global_options(
     settings: &mut AfniSettings,
     mode: UpstreamDefects,
 ) -> GlobalOptions {
+    take_global_options_of(args, settings, mode, &TSHIFT)
+}
+
+/// [`take_global_options`] for `program` (its name and variables in the warnings about `-D`
+/// options of variables it does not read).
+pub fn take_global_options_of(
+    args: &[String],
+    settings: &mut AfniSettings,
+    mode: UpstreamDefects,
+    program: &Program,
+) -> GlobalOptions {
     let mut g = GlobalOptions::default();
     for arg in args {
         match arg.as_str() {
             "-overwrite" => settings.set_overwrite_option(),
             "-ok_1D_text" => settings.set("AFNI_1D_ZERO_TEXT", "YES"),
             "-skip_afnirc" => {}
-            a if is_define(a) => define(a, settings, mode, &mut g),
+            a if is_define(a) => define(a, settings, mode, &mut g, program),
             _ => g.rest.push(arg.clone()),
         }
     }
@@ -385,7 +415,13 @@ pub fn take_global_options(
 }
 
 /// Applies one `-Dname=value`.
-fn define(arg: &str, settings: &mut AfniSettings, mode: UpstreamDefects, g: &mut GlobalOptions) {
+fn define(
+    arg: &str,
+    settings: &mut AfniSettings,
+    mode: UpstreamDefects,
+    g: &mut GlobalOptions,
+    program: &Program,
+) {
     let text = &arg[2..];
     let afni = afni_reading(text);
     let ours = as_written(text);
@@ -423,9 +459,10 @@ fn define(arg: &str, settings: &mut AfniSettings, mode: UpstreamDefects, g: &mut
     }
     match chosen {
         Some((name, value)) => {
-            if !is_consulted(name) {
+            if !(program.consults)(name) {
                 g.warnings.push(format!(
-                    "{arg} has no effect: 3dTshift does not read {name} (larmorx)"
+                    "{arg} has no effect: {} does not read {name} (larmorx)",
+                    program.name
                 ));
             }
             settings.set(name, value);

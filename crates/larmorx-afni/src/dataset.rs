@@ -275,6 +275,21 @@ pub fn read(
     defects: UpstreamDefects,
     settings: &AfniSettings,
 ) -> Result<AfniImage, ReadError> {
+    read_as(path, shown, n_threads, defects, settings, false)
+}
+
+/// [`read`], and with `unit_factor` a `scl_slope` of exactly 1 with `scl_inter` 0 kept as a
+/// brick factor of 1, as 3dAutomask and 3dUnifize read their input (they read the dataset
+/// itself, 3dTshift a copy; `specs/3dAutomask.md` §2, observed for uint8, int16 and float32).
+/// A factor of 1 scales nothing; it is written back as `scl_slope` 1.
+pub fn read_as(
+    path: impl AsRef<Path>,
+    shown: &str,
+    n_threads: usize,
+    defects: UpstreamDefects,
+    settings: &AfniSettings,
+    unit_factor: bool,
+) -> Result<AfniImage, ReadError> {
     let path = path.as_ref();
     let header = nifti::read_header(path)?;
     let image = nifti::read(
@@ -299,7 +314,8 @@ pub fn read(
     let slope = finite_or_zero(header.scl_slope) as f32;
     let inter = finite_or_zero(header.scl_inter) as f32;
     let both = slope != 0.0 && inter != 0.0;
-    let factor = if slope != 0.0 && slope != 1.0 {
+    let unit = unit_factor && slope == 1.0 && inter == 0.0;
+    let factor = if slope != 0.0 && (slope != 1.0 || unit) {
         slope
     } else {
         0.0

@@ -70,13 +70,11 @@ pub const REPLICAS: &[Replica] = &[
         package: &LARMORX_GPL,
         original: true,
     },
-    // The clean-room originals are to be written from specs/3dAutomask.md and
-    // specs/3dUnifize.md.
     Replica {
         family: "afni",
         tool: "3dAutomask",
         package: &LARMORX_GPL,
-        original: false,
+        original: true,
     },
     Replica {
         family: "afni",

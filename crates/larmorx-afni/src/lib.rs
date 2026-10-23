@@ -12,6 +12,7 @@
 //! - The original command lines are in [`cli`].
 #![forbid(unsafe_code)]
 
+pub mod automask;
 pub mod cfmt;
 pub mod cli;
 pub mod dataset;

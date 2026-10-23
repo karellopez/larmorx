@@ -348,12 +348,16 @@ defects! {
         "with AFNI_NIFTI_SCALE=NO, uint8 and int16 data with both a slope and an intercept stay integers with the slope as their scale factor and lose the intercept, so the values written are off by it";
     AFNI_26 = "AFNI-26", "AFNI", true,
         "an output that cannot be written (its directory is missing or cannot be written) is not written, and the program exits with status 0";
+    AFNI_41 = "AFNI-41", "3dAutomask", true,
+        "-nbhrs outside 6..26 silently becomes 17 (the range check never runs); 19..26 act as 18";
     AFNI_43 = "AFNI-43", "3dAutomask", true,
         "-peels 0 peels once: the help says that 0 turns the peeling off, but the peel count is set to 1 for any value below 1";
     AFNI_45 = "AFNI-45", "3dUnifize", true,
         "with -T2up at or near 100, the contrast is inverted about the value one past the sorted mask values (whatever the memory there holds; usually 0, which zeroes the output)";
     AFNI_47 = "AFNI-47", "3dUnifize", true,
         "a volume of more than a million voxels with an axis of 2 or 3 voxels: its half-size scale image expands back to a grid of another size, which AFNI reads as if it were the input's, past its end";
+    AFNI_48 = "AFNI-48", "3dUnifize", true,
+        "-T2 three or more times: the output is neither inverted back nor edge-clipped, so it stays inverted (the help documents -T2 once and twice)";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

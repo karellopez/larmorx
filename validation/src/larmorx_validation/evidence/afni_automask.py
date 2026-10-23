@@ -995,6 +995,78 @@ def implementations(cs: list[dict], tool: str, status: dict[str, str]) -> list[d
     ]
 
 
+#: The informal timings of both tools (validation/investigations/afni-masks-original/timing.py).
+TIMINGS = "validation/investigations/afni-masks-original/timings-2026-10-24.json"
+
+#: The series of the speed chart: the timing's column, its label and the site's mark.
+SPEED_SERIES = [
+    ("AFNI 1", "AFNI 25.2.09, 1 thread", "original"),
+    ("AFNI 6", "AFNI 25.2.09, 6 threads", "original-open"),
+    ("replica 1", "replica, 1 thread", "replica"),
+    ("replica 6", "replica, 6 threads", "replica-open"),
+    ("original 1", "clean-room original, 1 thread", "larmorx"),
+    ("original 6", "clean-room original, 6 threads", "larmorx-open"),
+]
+
+
+def timings_source(repo: Path) -> list[dict]:
+    """How the provenance names the informal timings (as a benchmark report's source)."""
+    import hashlib
+
+    path = repo / TIMINGS
+    if not path.is_file():
+        return []
+    return [{"path": TIMINGS, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}]
+
+
+def informal_speed(repo: Path, program: str) -> dict | None:
+    """The speed chart's data from the informal timings of the clean-room originals' part
+    (not a benchmark report): rows (inputs) × series of wall seconds, the speed-up AFNI ÷ the
+    original at one thread each."""
+    import json
+
+    path = repo / TIMINGS
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    series = [{"id": i, "label": label, "mark": mark} for i, label, mark in SPEED_SERIES]
+    rows = []
+    for name, seconds in data["runs"].items():
+        if not name.startswith(program + ", "):
+            continue
+        s = {i: float(seconds[i]) for i, _, _ in SPEED_SERIES if i in seconds}
+        a, b = s.get("AFNI 1"), s.get("original 1")
+        rows.append(
+            {
+                "label": name.removeprefix(program + ", "),
+                "input": name,
+                "seconds": s,
+                "speedup": a / b if a and b else None,
+            }
+        )
+    if not rows:
+        return None
+    present = {i for r in rows for i in r["seconds"]}
+    axis, ticks = common.ticks_log([v for r in rows for v in r["seconds"].values()], " s")
+    load = data.get("machine", {}).get("load", [])
+    return {
+        "title": f"{program}: wall time of the whole program (informal timings, 2026-10-24)",
+        "axis": axis,
+        "ticks": ticks,
+        "series": [x for x in series if x["id"] in present],
+        "rows": rows,
+        "note": (
+            "Each program run once (larmorx after one warm-up run), reading and writing "
+            f"compressed NIfTI included, on a {data.get('machine', {}).get('nproc', '?')}-CPU "
+            "machine shared with another job throughout (load "
+            + (f"{min(load):.0f} to {max(load):.0f}" if load else "?")
+            + "): indications, not a benchmark report. The ratio is AFNI's time over the "
+            "clean-room original's, at one thread each. Tool: "
+            "validation/investigations/afni-masks-original/timing.py."
+        ),
+    }
+
+
 def status_of(rec) -> str:
     """``validated`` when no case of the record fails, else ``experimental``."""
     return "experimental" if rec.data.get("summary", {}).get("fail") else "validated"
@@ -1018,7 +1090,7 @@ def export(ctx: core.Context) -> dict:
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": [x for rec in recs.values() for x in rec.source()],
-            "benchmarks": [],
+            "benchmarks": timings_source(ctx.repo),
             "cache": [fcache.provenance(e), fcache.provenance(o)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -1027,6 +1099,7 @@ def export(ctx: core.Context) -> dict:
         ),
         "cases": cs,
         "cases_total": len(cs),
+        "speed": informal_speed(ctx.repo, PROGRAM),
         "examples": [
             _example_ref(ctx, e, o),
             _example_bold(ctx, e, o),

@@ -685,7 +685,7 @@ def export(ctx: core.Context) -> dict:
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": [x for rec in recs.values() for x in rec.source()],
-            "benchmarks": [],
+            "benchmarks": am.timings_source(ctx.repo),
             "cache": [fcache.provenance(x) for x in (e, t, o, ot)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -694,6 +694,7 @@ def export(ctx: core.Context) -> dict:
         ),
         "cases": cs,
         "cases_total": len(cs),
+        "speed": am.informal_speed(ctx.repo, PROGRAM),
         "examples": [
             _example_ref(ctx, e, o),
             _example_t1w(ctx, t, ot),

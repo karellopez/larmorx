@@ -694,3 +694,164 @@ fn rigid_fit<const D: usize>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_registration::Space;
+
+    /// The 3D patch as ANTs builds it (from the instrumented copy of `antsAI`: 33,401 offsets,
+    /// the float sum of the weights `0x1.f6b81ep+14`, the first weight `0x1.f00548p-16`).
+    #[test]
+    fn patch_as_ants_builds_it() {
+        let (offsets, weights) = patch::<3>();
+        assert_eq!(offsets.len(), 33_401);
+        assert_eq!(offsets[0], [0, 0, -20]);
+        assert_eq!(weights[0].to_bits(), 0x37f8_02a4);
+        let (o2, w2) = patch::<2>();
+        assert_eq!(o2.len(), w2.len());
+        assert_eq!(o2.len(), 1_257);
+    }
+
+    fn blob(r: f64) -> Blob {
+        // object_radius = √(D/2)·σ·√2 = √3·σ in 3D.
+        Blob {
+            center: vec![30, 30, 30],
+            sigma: r / 3f64.sqrt(),
+            value: 1.0,
+        }
+    }
+
+    /// ANTS-111: once the positive correlations are used up, ANTs pairs blob 0 with blob 0
+    /// again at every step; corrected, the pairing stops.
+    #[test]
+    fn pairing_after_the_correlations_run_out() {
+        let fixed = vec![blob(3.0), blob(3.0), blob(3.0)];
+        let moving = vec![blob(3.0), blob(3.0), blob(3.0)];
+        let bright = [true, true, true];
+        // Only one positive correlation, at (1, 2).
+        let m = [0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0f32];
+        let ants = pair_blobs(&m, 3, 3, &fixed, &moving, &bright, &bright, 3, false);
+        assert_eq!(ants, vec![(1, 2), (0, 0), (0, 0)]);
+        let fixed_pairs = pair_blobs(&m, 3, 3, &fixed, &moving, &bright, &bright, 3, true);
+        assert_eq!(fixed_pairs, vec![(1, 2)]);
+        // Radii further apart than 0.25 are not paired.
+        let far = vec![blob(3.0), blob(3.3), blob(3.0)];
+        let p = pair_blobs(&m, 3, 3, &far, &moving, &bright, &bright, 3, true);
+        assert_eq!(p, vec![]);
+    }
+
+    /// ANTS-110: ANTs keeps pairs whose displacements have similar lengths; corrected, the
+    /// pairs whose distances to the others are preserved.
+    #[test]
+    fn landmark_tests() {
+        // Five pairs related by a rotation of 90° about z: every distance is preserved, but
+        // the displacements have different lengths.
+        let fixed: Vec<[f64; 3]> = vec![
+            [10.0, 0.0, 0.0],
+            [0.0, 20.0, 0.0],
+            [-30.0, 0.0, 5.0],
+            [0.0, -40.0, 0.0],
+            [15.0, 15.0, 15.0],
+        ];
+        let moving: Vec<[f64; 3]> = fixed.iter().map(|p| [-p[1], p[0], p[2]]).collect();
+        assert_eq!(landmark_pairs(&fixed, &moving, true), vec![0, 1, 2, 3, 4]);
+        assert_eq!(landmark_pairs(&fixed, &moving, false), Vec::<usize>::new());
+        // A pure translation: both keep every pair.
+        let shifted: Vec<[f64; 3]> = fixed
+            .iter()
+            .map(|p| [p[0] + 3.0, p[1] - 1.0, p[2]])
+            .collect();
+        assert_eq!(landmark_pairs(&fixed, &shifted, true), vec![0, 1, 2, 3, 4]);
+        assert_eq!(landmark_pairs(&fixed, &shifted, false), vec![0, 1, 2, 3, 4]);
+    }
+
+    fn phantom_2d(shift: (f64, f64)) -> Image<f32, 2> {
+        let (nx, ny) = (128usize, 124usize);
+        // Twelve blobs of distinct sizes and brightnesses, 25 voxels or more from the borders.
+        let centres = [
+            (30.0, 32.0, 2.0, 120.0),
+            (52.0, 30.0, 3.0, 160.0),
+            (78.0, 34.0, 2.5, 140.0),
+            (98.0, 30.0, 3.5, 180.0),
+            (34.0, 58.0, 3.0, 130.0),
+            (60.0, 56.0, 2.0, 170.0),
+            (84.0, 60.0, 3.5, 150.0),
+            (100.0, 62.0, 2.5, 110.0),
+            (30.0, 86.0, 3.5, 175.0),
+            (56.0, 90.0, 2.5, 125.0),
+            (80.0, 88.0, 2.0, 145.0),
+            (98.0, 92.0, 3.0, 165.0),
+        ];
+        let mut data = vec![0.0f32; nx * ny];
+        for y in 0..ny {
+            for x in 0..nx {
+                let mut v = 5.0f64;
+                for &(cx, cy, s, a) in &centres {
+                    let (dx, dy) = (x as f64 - cx - shift.0, y as f64 - cy - shift.1);
+                    let r2 = (dx * dx + dy * dy) / (2.0 * s * s);
+                    v += a / (1.0 + r2 + r2 * r2 / 2.0 + r2 * r2 * r2 / 6.0);
+                }
+                data[x + nx * y] = v as f32;
+            }
+        }
+        let space = Space::new(
+            [nx, ny],
+            [0, 0],
+            [1.0, 1.0],
+            [0.0, 0.0],
+            [[1.0, 0.0], [0.0, 1.0]],
+        )
+        .unwrap();
+        Image::new(space, data)
+    }
+
+    /// A 2D phantom against its copy shifted by whole voxels: the pairs and landmarks recover
+    /// the shift; the result does not depend on the thread count.
+    #[test]
+    fn aligns_a_shifted_phantom() {
+        let fixed = phantom_2d((0.0, 0.0));
+        let moving = phantom_2d((3.0, -2.0));
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let mut n1 = Notices::new(mode);
+            let a = align(&fixed, &moving, 12, 12, LandmarkKind::Rigid, &mut n1, 1).unwrap();
+            let mut n4 = Notices::new(mode);
+            let b = align(&fixed, &moving, 12, 12, LandmarkKind::Rigid, &mut n4, 4).unwrap();
+            assert_eq!(format!("{a:?}"), format!("{b:?}"));
+            assert!(
+                a.landmarks.len() >= 4,
+                "{mode:?}: {:?} {:?}",
+                a.pairs,
+                a.fixed_blobs
+            );
+            assert!(
+                (a.offset[0] - 3.0).abs() < 1e-9 && (a.offset[1] + 2.0).abs() < 1e-9,
+                "{:?}",
+                a.offset
+            );
+            assert!((a.matrix[0][0] - 1.0).abs() < 1e-12);
+        }
+    }
+
+    /// An image whose axis is shorter than 4 voxels: ITK's recursive Gaussian refuses it.
+    #[test]
+    fn thin_images_are_refused() {
+        let space = Space::new(
+            [50, 3],
+            [0, 0],
+            [1.0, 1.0],
+            [0.0, 0.0],
+            [[1.0, 0.0], [0.0, 1.0]],
+        )
+        .unwrap();
+        let img = Image::new(space, vec![1.0f32; 150]);
+        let mut n = Notices::new(UpstreamDefects::Fix);
+        match align(&img, &img, 5, 5, LandmarkKind::Rigid, &mut n, 1) {
+            Err(BlobFailure::Uncaught(e)) => {
+                assert!(e.description.contains("less than 4"), "{e:?}")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+}

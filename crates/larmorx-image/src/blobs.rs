@@ -575,6 +575,45 @@ mod tests {
         assert_eq!(v, vec![9.0, 4.0, 3.0, 2.0, 1.5]);
     }
 
+    fn values(k: &Keeper) -> Vec<f32> {
+        k.blobs.iter().map(|b| b.value).collect()
+    }
+
+    /// ANTS-112 (1): ANTs' threshold after a scale is the weakest kept blob even while the
+    /// list has room, so a weaker maximum of a later scale is dropped.
+    #[test]
+    fn ants_threshold_before_the_list_is_full() {
+        let idx = |o: usize| vec![o as i64];
+        let mut ants = Keeper::new(Thresholds::Ants, 3);
+        let mut strongest = Keeper::new(Thresholds::Strongest, 3);
+        for k in [&mut ants, &mut strongest] {
+            k.scale(&[(0, 10.0)], idx, 4.0);
+            k.scale(&[(1, 5.0), (2, 7.0)], idx, 2.0);
+        }
+        assert_eq!(values(&ants), vec![10.0]);
+        assert_eq!(values(&strongest), vec![10.0, 7.0, 5.0]);
+    }
+
+    /// ANTS-112 (2): when a heap has just filled, ANTs compares the next candidate with the
+    /// scale's starting threshold instead of the heap's weakest blob.
+    #[test]
+    fn ants_heap_replacement_after_filling() {
+        let idx = |o: usize| vec![o as i64];
+        let mut ants = Keeper::new(Thresholds::Ants, 2);
+        let mut strongest = Keeper::new(Thresholds::Strongest, 2);
+        for k in [&mut ants, &mut strongest] {
+            k.scale(&[(0, 8.0), (1, 9.0), (2, 1.0)], idx, 4.0);
+        }
+        assert_eq!(values(&ants), vec![9.0, 1.0]);
+        assert_eq!(values(&strongest), vec![9.0, 8.0]);
+        // Merging keeps the earlier scale's blob first among equal values.
+        let mut k = Keeper::new(Thresholds::Strongest, 3);
+        k.scale(&[(0, 5.0)], idx, 4.0);
+        k.scale(&[(1, 5.0), (2, 6.0)], idx, 2.0);
+        let order: Vec<(f32, f64)> = k.blobs.iter().map(|b| (b.value, b.sigma)).collect();
+        assert_eq!(order, vec![(6.0, 2.0), (5.0, 4.0), (5.0, 2.0)]);
+    }
+
     #[test]
     fn finds_a_bright_spot_at_its_scale() {
         // A Gaussian-like spot of variance about 4 (σ 2) in a 24³ image.

@@ -450,4 +450,84 @@ mod tests {
             fixed_fit.matrix
         );
     }
+    /// The fits of ITK v5.4.5's build (GCC 14.3, ANTs' flags; glibc's maths replaced by
+    /// CORE-MATH's, which the 2D rigid fit's `atan2`, `sin` and `cos` need): matrix and offset
+    /// as bit patterns.
+    #[test]
+    fn matches_itks_build() {
+        let bits3 = |m: &Matrix<f64, 3>, o: &[f64; 3]| -> Vec<u64> {
+            m.iter()
+                .flatten()
+                .chain(o.iter())
+                .map(|v| v.to_bits())
+                .collect()
+        };
+        let bits2 = |m: &Matrix<f64, 2>, o: &[f64; 2]| -> Vec<u64> {
+            m.iter()
+                .flatten()
+                .chain(o.iter())
+                .map(|v| v.to_bits())
+                .collect()
+        };
+        #[rustfmt::skip]
+        let (f, m): (Vec<[f64; 3]>, Vec<[f64; 3]>) = (
+            vec![[36.6, 36.95, 1.84], [-25.7, -53.53, -14.0], [-10.98, -54.57, -54.15], [59.9, 18.28, -31.86], [-7.81, 56.9, 47.72], [41.31, -12.91, -0.84], [21.2, -52.7, 6.67]],
+            vec![[42.43, 31.24, -2.69], [-21.81, -66.7, -7.78], [-3.9, -60.63, -47.51], [69.13, 17.51, -34.57], [-7.26, 43.49, 41.58], [47.88, -22.13, -0.55], [26.46, -67.28, 11.25]],
+        );
+        let fit = affine(&f, &m).unwrap();
+        #[rustfmt::skip]
+        assert_eq!(
+            bits3(&fit.matrix, &fit.offset),
+            vec![0x3ff0e296e1fd4c67, 0xbf79b8d683625792, 0xbfae3088e41ca321, 0x3fa4f29c0a40de53, 0x3ff1542fea9d06ac, 0xbfc50827621b2510, 0xbf9a3eadf27430d2, 0xbfb91eb3c2b0fdde, 0x3fef725e472e17bc, 0x40109aa3b5a44e70, 0xc023f30542b5b53f, 0x3fb13b209bf3ed48]
+        );
+        #[rustfmt::skip]
+        let (f, m): (Vec<[f64; 3]>, Vec<[f64; 3]>) = (
+            vec![[-7.6, -35.61, -21.01], [36.75, -22.03, -42.12], [23.82, -6.17, 35.87], [-31.74, -21.63, 35.99], [0.85, 0.77, -31.66], [-58.26, 51.99, -49.7]],
+            vec![[-3.34, -36.13, -37.01], [39.1, -28.22, -53.65], [20.29, -1.97, 32.46], [-29.86, -14.27, 25.67], [7.97, -4.63, -39.02], [-38.39, 41.63, -49.12]],
+        );
+        let fit = versor_rigid_3d(&f, &m).unwrap();
+        #[rustfmt::skip]
+        assert_eq!(
+            bits3(&fit.matrix, &fit.offset),
+            vec![0x3fefdda2200d38c5, 0x3fb5146b341f2562, 0xbfa46e5ca0e95045, 0xbfb4cd9fb0c5633a, 0x3fefe1b06bc0184f, 0x3f9ca67c4a9cc7ab, 0x3fa588faf4968761, 0xbf9935a6a3663d85, 0x3feff643f54b3dd6, 0x40150f84519a9af8, 0xbfffd64902302bec, 0xc01f9b26bd912c92]
+        );
+        let f = [
+            [16.91, -47.15],
+            [23.07, 16.25],
+            [-14.82, 35.82],
+            [-36.72, -13.14],
+            [35.75, -14.34],
+        ];
+        let m = [
+            [15.7, -37.51],
+            [27.0, 17.48],
+            [-5.86, 39.62],
+            [-30.25, -0.62],
+            [35.85, -11.08],
+        ];
+        let fit = affine(&f, &m).unwrap();
+        #[rustfmt::skip]
+        assert_eq!(
+            bits2(&fit.matrix, &fit.offset),
+            vec![0x3fed3bda0c02ced1, 0x3fb6e96014a1c0eb, 0xbfc09cddfd3cea72, 0x3fec28a6d8e0f1a0, 0x4011e35c92e518f9, 0x4018b4882d0188b8]
+        );
+        let f = [
+            [-41.66, 25.55],
+            [41.71, -11.85],
+            [6.39, -2.46],
+            [55.02, -21.93],
+        ];
+        let m = [
+            [-31.63, 35.74],
+            [49.07, -5.17],
+            [14.88, 5.74],
+            [61.96, -15.79],
+        ];
+        let fit = rigid_2d(&f, &m, &mut Notices::new(UpstreamDefects::Reproduce));
+        #[rustfmt::skip]
+        assert_eq!(
+            bits2(&fit.matrix, &fit.offset),
+            vec![0x3feff6f505cab10f, 0x3fa80ceb573a71cd, 0xbfa80ceb573a71cd, 0x3feff6f505cab10f, 0x4020b1eb3a81971e, 0x40210ae7abe5d6b2]
+        );
+    }
 }

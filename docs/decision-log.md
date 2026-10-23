@@ -1101,6 +1101,42 @@ strong evidence"):
    missed options and behaviours, and checks that a clean-room original was not derived from
    its replica.
 
+## 2026-10-23: Four rules for the originals' questionable behaviours; the 24 open questions; speed without losing quality
+
+**Decided by the user** ("yes, lets do it"; earlier the same day "Yes, we should apply this except for the
+point 3, I want to use the model I want in this case the one we are using now"). The user asked for "the
+best of the best approach"; these four rules refine D13 for the cases where it is unclear whether an
+original's behaviour is a bug, and from now on decide them without asking the user (only a case the
+rules cannot settle goes to the user). Every case keeps the `reproduce` switch.
+- **Rule A, correct it:** the input makes sense and the original computes a wrong result: larmorx
+  computes the correct result by default, with a warning where it differs from the original's.
+- **Rule B, stop with an error:** the input itself makes no sense (a value out of range, an option
+  repeated) and the original silently does something arbitrary: a clear error by default.
+- **Rule C, keep and document:** the behaviour looks odd but may be a deliberate design, and existing
+  pipelines depend on it, or correcting it was measured to bring no gain: the original's behaviour,
+  documented.
+- **Rule D, measure first:** when it is not known whether correcting improves results: the original's
+  behaviour until measured, then rule A or C.
+
+**The 24 open questions, decided by these rules:** rule A: ANTS-17, -22, -23, -32, -44 and ANTS-116
+(antsAI's blob patches compared reflected: try the orientations, keep the best); rule B: AFNI-41,
+AFNI-48; rule C: AFNI-42, AFNI-44 (fMRIPrep's BOLD masks), FSL-02 (its correction measured to bring no
+gain; the corrected count stays opt-in); larmorx's current behaviour kept: NIB-01, -02, -03, FSL-11;
+rule D: ANTS-40 (N4 with values ≤ 0; fMRIPrep's unmasked N4s), ITK-06 (NaN and infinities read as 0);
+decided with the part that builds them, by the same rules: PIPE-01, -05, -07, -08 (larmorprepx),
+FSL-15, FSL-18 (the mcflirt replica). **Eigen:** the one MPL-2.0 file in `larmorx-core`
+(`eigen_sym.rs`, a translation of Eigen's self-adjoint eigensolver as ITK bundles it, needed for
+ITK's landmark fits bit for bit) is kept under MPL-2.0 with its notice; the project's licence is
+unchanged.
+
+**Speed at the same quality:** (1) every output of an original program is kept in a
+content-addressed cache (keyed by the oracle build, the inputs, the arguments and the settings) and
+never computed twice; verification re-runs only larmorx against it (cases where the original varies,
+by threads or the clock, are still run when that variation is measured); (2) no duplicate runs: the
+golden recording reuses the parity smoke result, agents run the long tier once, at the end; (3)
+declined: a smaller model for routine steps; agents run on the model the user chooses (now the
+session's); (4) small questions are collected and decided in batches.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

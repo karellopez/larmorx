@@ -64,7 +64,11 @@ starts no other agent.
    3dAllineate, 3dcalc, 3dTstat, 3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority).
    Check each program's call graph routine by routine (2026-10-23: the programs' own files can
    be NIH while the library routines they rely on are MCW).
-6. **The evidence infrastructure** (decision log 2026-10-23), after the two parts now running:
+6. **The evidence infrastructure** (decision log 2026-10-23), after the two parts now running.
+   **First, the oracle-output cache** (decision log 2026-10-23, "speed at the same quality"): every
+   output of an original program kept under a key of the oracle build, inputs, arguments and
+   settings, reused by every parity run, so verification re-runs only larmorx; the golden
+   recording reusing the parity smoke result. Then:
    **the data panel** (one agreed set of shareable datasets used by every tool: 3T and 7T,
    multiband and single-band, children and older adults, a lesion, low quality and motion; in
    `larmorx-testdata` with its licences and hash-verified downloads); **differential random
@@ -105,6 +109,11 @@ starts no other agent.
   ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
 - **The clean-room originals of 3dAutomask and 3dUnifize** (from `specs/3dAutomask.md`,
   `specs/3dUnifize.md`); a benchmark report for each once the original exists.
+- **The decisions of 2026-10-23 to implement:** rule A for ANTS-17, -22, -23, -32, -44 (and
+  ANTS-116, with the antsAI merge); rule D for ANTS-40 and ITK-06 (measured first on
+  fMRIPrep's N4s and on NaN/infinite inputs, then rule A or C); rule B for AFNI-41 and AFNI-48
+  in the replica (and in the specs for the clean-room originals). An ANTs part and an AFNI
+  replica part, each small.
 - **A run-to-run variation of ANTs** (found by the orchestrator re-running A5 part 3's
   `ants-registration-corrections` record, 2026-10-23): the reference "ANTs with the B-spline
   transform as a displacement field" before a linear stage gave different results in two runs
@@ -162,28 +171,7 @@ Still to do:
 
 ## Waiting for the user
 
-- **Four new questionable behaviours of AFNI** (2026-10-23; register entries marked
-  **decide**), each kept as AFNI's until decided: AFNI-41 (3dAutomask's `-nbhrs` outside 6..26
-  silently 17: proposed, refuse it as the dead check meant), AFNI-42 (`-NN1/2/3` change the
-  peeling threshold: proposed, keep AFNI's, document), AFNI-44 (the large-hole filling depends
-  on the number of slices: proposed, keep, since it shapes fMRIPrep's BOLD masks), AFNI-48
-  (3dUnifize's third `-T2`: proposed, refuse).
-- **18 older questionable behaviours** in the defect register (marked **decide** since the
-  register began, 2026-10-11; never put to the user until 2026-10-23). Proposed, by group:
-  - **ANTs and ITK tools already ported** (ANTS-17, -22, -23, -32, -40, -44, ITK-06): the usual
-    rule (corrected by default, `reproduce` gives the original); ANTS-40 (N4 with zero and
-    negative voxels; fMRIPrep's unmasked N4s) and ITK-06 (NaN and infinities read as 0)
-    measured first.
-  - **fMRIPrep's pipeline** (PIPE-01, -05, -07, -08): decided when larmorprepx is built, by the
-    same rule (the intended behaviour by default, fMRIPrep's on request).
-  - **nibabel** (NIB-01, -02, -03): larmorx already does the safer thing (compression from the
-    content, a zero header offset refused, complex data refused); keep it and mark them decided.
-  - **mcflirt** (FSL-02 †, -11 †, -15 †, -18 †; the head-motion correction): FSL-02 (the
-    normalised correlation effectively uncentred; the corrected count is opt-in and measured,
-    no gain against the ground truth) and FSL-15, FSL-18 (`-init` affecting only the final
-    resampling; the Woods cost's squared bin counts) decided when the mcflirt replica is built;
-    FSL-11 (`FSLOUTPUTTYPE` unset fails after writing the matrices; larmorx writes `.nii.gz`)
-    keep larmorx's behaviour.
+Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A correct, B error, C keep and document, D measure first), applied without asking from now on; the 24 open questions by those rules.
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).

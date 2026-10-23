@@ -63,13 +63,13 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-14 | ImageMath `G` (ITK) | variance above ≈709 voxels² gives NaN | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-15 | ImageMath `G`, SmoothImage | wrong number of sigmas: unchanged image or 1 mm, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-16 | ImageMath `Laplacian` | normalize flag read from the sigma argument | e | none (same result) | corrected by default (`upstream_defects`, 2026-10-12) | – |
-| ANTS-17 | ImageMath `MO`, `ME` | `MO r 0` is a dilation of zeros; `ME` keeps other labels as 1 | c? | none | reproduces | decide |
+| ANTS-17 | ImageMath `MO`, `ME` | `MO r 0` is a dilation of zeros; `ME` keeps other labels as 1 | c? | none | reproduces | yes (decided 2026-10-23, rule A: corrected by default with a switch; to implement) |
 | ANTS-18 | ImageMath `GD`, `GC` (ITK) | sign of a zero extreme depends on threads | b | none | defined signs | – |
 | ANTS-19 | ImageMath `FillHoles` | `holeparam ≤ 1` reads outside the image | a | none | outside neighbours not counted by default; `reproduce` reads inside the buffer as ANTs, background beyond (2026-10-12) | – |
 | ANTS-20 | ImageMath `GetLargestComponent` | nothing kept: every voxel becomes 1 | c | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-21 | ImageMath `ClusterThresholdVariate` | reads outside the image | a | none | not ported | – |
-| ANTS-22 | ImageMath `PadImage` | fractional pad grows by ⌊2p⌋, shifts by ⌊p⌋ | c? | none | reproduces | decide |
-| ANTS-23 | ImageMath `ExtractContours` | labels are truncated values | c? | none | reproduces | decide |
+| ANTS-22 | ImageMath `PadImage` | fractional pad grows by ⌊2p⌋, shifts by ⌊p⌋ | c? | none | reproduces | yes (decided 2026-10-23, rule A: corrected by default with a switch; to implement) |
+| ANTS-23 | ImageMath `ExtractContours` | labels are truncated values | c? | none | reproduces | yes (decided 2026-10-23, rule A: corrected by default with a switch; to implement) |
 | ANTS-24 | ThresholdImage | unknown mode names become thresholds at 0; sixth argument read as a file | e, f | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-25 | ThresholdImage Otsu with a mask | range from the smallest positive float, `else if` | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-26 | ThresholdImage `Otsu 0` | never returns | a | none | refuses | – |
@@ -78,7 +78,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-29 | ResampleImage | size 1: infinite spacing, a zero image, exit 0 | c | none | refuses; `reproduce` writes ANTs' image byte for byte (2026-10-12) | – |
 | ANTS-30 | ResampleImage | seventh argument read twice | e | none | corrected by default (`upstream_defects`, 2026-10-12); the command-line design approved by the user (2026-10-22) | – |
 | ANTS-31 | ResampleImageBySpacing | `nn` read from the wrong argument; dimension 5 does nothing | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
-| ANTS-32 | ResampleImageBySpacing | sigma `out/in − 1` taken in mm; outside points get the value at index 1 | c? | none | reproduces | decide |
+| ANTS-32 | ResampleImageBySpacing | sigma `out/in − 1` taken in mm; outside points get the value at index 1 | c? | none | reproduces | yes (decided 2026-10-23, rule A: corrected by default with a switch; to implement) |
 | ANTS-33 | antsApplyTransforms | unknown `-u` ignored; interpolator parameters ignored | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-34 | antsApplyTransforms `GenericLabel` (ITK) | never finishes on intensity images | a | none | neighbour labels only, same result | – |
 | ANTS-35 | N4BiasFieldCorrection | `-c`, `-b`, `-t` without brackets set nothing | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -86,11 +86,11 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-37 | N4 (ITK) | result depends on the thread count | b | anatomical N4s | single-thread result | – |
 | ANTS-38 | N4 (ITK) | histogram range `else if`: a first-voxel minimum is dropped | c | possible, every N4 | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-39 | N4 (ITK) | 256 bins give a 1024-point FFT | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
-| ANTS-40 | N4 (ITK) | zero and negative values stay in the log image | c? | unmasked N4s | reproduces | decide |
+| ANTS-40 | N4 (ITK) | zero and negative values stay in the log image | c? | unmasked N4s | reproduces | yes (decided 2026-10-23, rule D: measured first, then rule A or C) |
 | ANTS-41 | ANTs built by GCC 11.4 / 12.3 (compiler bug, not ANTs) | two float roundings of N4's fit dropped (GCC bug 110182) | d | none (fMRIPrep's build follows the source) | follows the source | – (rule 8) |
 | ANTS-42 | DenoiseImage (ITK) | large thread dependence, races | b | every run | single-thread result | – |
 | ANTS-43 | DenoiseImage (ITK) | Rician correction NaN at high SNR becomes a bias of 0 | c | sMRIPrep's T1w (7-8 % of voxels) | corrected by default (`upstream_defects`, 2026-10-12) | – |
-| ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | decide |
+| ANTS-44 | DenoiseImage (ITK) | bias outside the mask keeps an unsmoothed value | c? | none | reproduces | yes (decided 2026-10-23, rule A: corrected by default with a switch; to implement) |
 | ANTS-45 | N4, DenoiseImage, antsRegistration | errors explained only with `-v` | f | none | always explained | – |
 | ANTS-46 | antsRegistration | BOLD reference's affine stops at 25 of 200 iterations | – | every run | explained (A4 part 2): ITK's window convergence test passes when the metric stops improving; not a defect | – |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
@@ -152,7 +152,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-04 | ITK Danielsson map | approximate, order-dependent distances | d | none | reproduces | – (D11) |
 | ITK-05 | ITK `vnl_erf` | relative error 3e-7 in Gaussian weights | d | Gaussian interpolation | reproduces | – (D11) |
-| ITK-06 | nifti_clib | NaN and ±inf read as 0 | c? | none seen | reproduces | decide |
+| ITK-06 | nifti_clib | NaN and ±inf read as 0 | c? | none seen | reproduces | yes (decided 2026-10-23, rule D: measured first, then rule A or C) |
 | ITK-07 | ITK NIfTI reader | integer data scaled in float32 | d | scaled inputs | reproduces | – |
 | ITK-08 | nifti_clib | asked for `x.nii.gz`, opens `x.nii` | e | none | opens the named file; `reproduce` reads nifti_clib's (2026-10-12) | – |
 | ITK-09 | ITK HDF5 writer | the same transform gives different bytes | b | none | byte-identical (object time 0) | – |
@@ -192,14 +192,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` | the point a k-d tree node is split at is left out of the new centres when the node is divided between candidates | c | every run: sMRIPrep's Atropos call (corrected: 1 to 25 of 0.8 to 2.5 million voxels change label on the five oracle runs) | corrected by default (A6) | – |
 | ITK-51 | ITK `TDistribution` | density and `InverseCDF` NaN above about 340 degrees of freedom (Gamma overflows): Grubbs-Rosner never finds an outlier in an image | c | none | corrected by default (A6) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
-| PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | decide |
+| PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
 | PIPE-03 | fMRIPrep `ResampleSeries` | Jacobian along the wrong target axis | c | PEPOLAR, non-native spaces | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | PIPE-04 | nitransforms | `.h5` composites read in name order | c | latent | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| PIPE-05 | nitransforms | no displacement beyond a field's last nodes | c? | 2.9 % of MNI points | reproduces | decide |
+| PIPE-05 | nitransforms | no displacement beyond a field's last nodes | c? | 2.9 % of MNI points | reproduces | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-06 | nitransforms, fMRIPrep | float32 roundings at every step | d | every run | reproduces | – (D11) |
-| PIPE-07 | nitransforms | a one-transform head-motion file applied in world space | c? | one-volume runs | reproduces | decide |
-| PIPE-08 | fMRIPrep confounds | motion parameters about another centre than mcflirt's | c? | every run | not ported | decide |
+| PIPE-07 | nitransforms | a one-transform head-motion file applied in world space | c? | one-volume runs | reproduces | later (decided 2026-10-23: when larmorprepx is built) |
+| PIPE-08 | fMRIPrep confounds | motion parameters about another centre than mcflirt's | c? | every run | not ported | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-09 | fMRIPrep, niworkflows | wrong dtype log lines; a deprecated argument; float64 masks | f | every run | – | – |
 | PIPE-10 | fMRIPrep, nipype | options that do nothing | e | their users | – | – |
 | PIPE-11 | sMRIPrep | a registration fallback leaves the composite undefined | a | after a failed attempt | – | – |
@@ -215,9 +215,9 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
-| NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | decide |
-| NIB-02 | nibabel | `vox_offset` 0: header read as data | c | none | refuses | decide |
-| NIB-03 | nibabel | complex data: imaginary part dropped | c | none | raises | decide |
+| NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
+| NIB-02 | nibabel | `vox_offset` 0: header read as data | c | none | refuses | – (decided 2026-10-23: larmorx's behaviour kept) |
+| NIB-03 | nibabel | complex data: imaginary part dropped | c | none | raises | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-04 | nibabel | qform precision depends on the platform | d | none | f64 everywhere | – |
 | GLIBC-01 | glibc 2.35 | `exp`, `log`, `sin`, `cos` not correctly rounded | d | every ANTs run | correctly rounded | – |
 | GLIBC-02 | glibc 2.35 | `expf`, `logf`, `powf` not correctly rounded | d | N4, DenoiseImage | correctly rounded | – |
@@ -253,17 +253,17 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | AFNI-25 † | 3dTshift | `-ignore` as the last argument: a crash (exit 1 from AFNI's signal handler, with a crash banner) | a | none | "-ignore needs an argument!", exit 1, in both implementations and both modes | – |
 | AFNI-26 † | 3dTshift, 3dAutomask, 3dUnifize | an output that cannot be opened for writing (a missing or read-only directory, a read-only file, a directory of that name): an error message, nothing written, exit 0 | e | none | an error, exit 1, in both implementations by default; `reproduce` writes nothing and exits 0 with AFNI's message in both (the replica and then the original, 2026-10-12; spec §7.1) | – |
 | AFNI-40 † | 3dAutomask, 3dUnifize | an option's value missing as the last argument (`-peels`, `-nbhrs`, `-clfrac`, `-SI`, `-dilate`, `-erode`; `-T2up`): a crash | a | none | an error (exit 1) in both modes, after AFNI's messages | – |
-| AFNI-41 † | 3dAutomask | `-nbhrs` outside 6..26 silently becomes 17 (the range check never runs); 19..26 act as 18 | c? | none | AFNI's behaviour in both modes | decide |
-| AFNI-42 † | 3dAutomask | `-NN1`, `-NN2`, `-NN3` also set the peeling threshold to 6, 18, 26, overriding `-nbhrs` (an explicit `-NN2` peels with 18, the default with 17) | c? | none | AFNI's behaviour in both modes | decide |
+| AFNI-41 † | 3dAutomask | `-nbhrs` outside 6..26 silently becomes 17 (the range check never runs); 19..26 act as 18 | c? | none | AFNI's behaviour in both modes | yes (decided 2026-10-23, rule B: refused by default, `reproduce` keeps AFNI's; to implement) |
+| AFNI-42 † | 3dAutomask | `-NN1`, `-NN2`, `-NN3` also set the peeling threshold to 6, 18, 26, overriding `-nbhrs` (an explicit `-NN2` peels with 18, the default with 17) | c? | none | AFNI's behaviour in both modes | – (decided 2026-10-23, rule C: AFNI's behaviour kept, documented) |
 | AFNI-43 † | 3dAutomask | `-peels 0` peels once; the help says 0 turns the peeling off | c | none | corrected by default (no peel), named when the mask changes; `reproduce` peels once | – |
-| AFNI-44 † | 3dAutomask | the large-hole filling runs or not depending on the number of slices only (32 to 93 slices: yes; fewer: no) | c? | every BOLD reference (fMRIPrep's) | AFNI's behaviour in both modes | decide |
+| AFNI-44 † | 3dAutomask | the large-hole filling runs or not depending on the number of slices only (32 to 93 slices: yes; fewer: no) | c? | every BOLD reference (fMRIPrep's) | AFNI's behaviour in both modes | – (decided 2026-10-23, rule C: AFNI's behaviour kept, documented) |
 | AFNI-45 † | 3dUnifize | `-T2up` at or near 100: the percentile read one past the sorted values (memory never written; in AFNI's runs 0, which zeroes the output) | a | none | inverts about the largest value by default, named; `reproduce` fills the read with 0 | – |
 | AFNI-46 † | 3dUnifize | `-T2` on a 2D image smaller than 16 × 16: an empty automask dereferenced, a crash | a | none | an error (exit 1) in both modes, after AFNI's messages | – |
 | AFNI-47 † | 3dUnifize | more than a million voxels with an axis of 2 or 3: the half-size scale image comes back smaller than the input and is read past its end (a crash in AFNI's runs, or values from that memory) | a | none | the scale brought back to the input's grid by default, named; `reproduce` reads AFNI's smaller image, 0 past its end | – |
-| AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | c? | none | AFNI's behaviour in both modes | decide |
+| AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | c? | none | AFNI's behaviour in both modes | yes (decided 2026-10-23, rule B: refused by default, `reproduce` keeps AFNI's; to implement) |
 | AFNI-49 † | 3dUnifize | the help gives `-clfrac`'s default as 0.1, then says it was raised to 0.2 in 2016; the code uses 0.2 | f | none | 0.2; larmorx's docs say so | – |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
-| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | decide |
+| FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | – (decided 2026-10-23, rule C: mcflirt's behaviour kept; the corrected count stays opt-in) |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-04 † | mcflirt `-gdt` | reference gradient unused; absolute `-out` aborts | c, a | none | not supported | – |
 | FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | ignored with a warning; `-edge` explained (2026-10-11) | – |
@@ -272,14 +272,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-08 † | mcflirt `-stats` | end slices left 0; names with the extension inside | c, e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-09 † | mcflirt | output types: int8 → uint8, truncation, no clamping | c, a | none | corrected by default (`upstream_defects`, 2026-10-11): int8 kept, rounded and clamped; `reproduce` truncates and wraps as x86-64 does | – |
 | FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-11 † | mcflirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz` | decide |
+| FSL-11 † | mcflirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz` | – (decided 2026-10-23: larmorx's behaviour kept) |
 | FSL-12 † | mcflirt | impossible inputs abort after the whole estimation | a | none | refuses first | – |
 | FSL-13 † | mcflirt | `.mat` directory quirks without `-mats` | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-14 † | mcflirt | one NaN voxel makes the volume's matrix NaN | c | rare | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-15 † | mcflirt `-init` | affects the final resampling only | c? | none | reproduces | decide |
+| FSL-15 † | mcflirt `-init` | affects the final resampling only | c? | none | reproduces | later (decided 2026-10-23: when the mcflirt replica is built) |
 | FSL-16 † | mcflirt | rotations orthogonal only to about 1e-8 | d | every run | reproduces | – (D11) |
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
-| FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | decide |
+| FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | later (decided 2026-10-23: when the mcflirt replica is built) |
 
 **Counts** (233 entries, recounted from the table on 2026-10-23; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -333,7 +333,7 @@ switch); A5 part 3 (the velocity-field stages, `antsApplyTransforms` with B-spli
 2026-10-22) corrected them, each with its measured effect ([ants-velocity.md](ants-velocity.md)),
 and added ANTS-79 to ANTS-82 and ITK-36 to ITK-42: every class (c) and (e) one corrected by
 default with a switch, ITK-41 (class (a)) completed by default and refused where ANTs crashes,
-ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). The gap column has 22 **decide** (recounted 2026-10-23 from the table, after A5 part 3, A6 and the AFNI masks part were merged; an earlier count of 14 that day had missed the † rows; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
+ANTS-82 (class (b)) not reproduced. A6 (Atropos, 2026-10-22, in parallel with A5 part 3) added ANTS-90 to ANTS-107, ITK-50 and ITK-51: every class (c) and (e) one corrected by default with a switch, ANTS-105 and ANTS-107 (class (a)) run or are filled deterministically by default, ANTS-106 (c?) left as ANTs; the user decided ANTS-106 on 2026-10-22 (corrected by default with a switch, to implement). On 2026-10-23 the user decided all of them as proposed (decision log): the gap column has no **decide** left. Before that, the gap column had 22 **decide** (recounted 2026-10-23 from the table, after A5 part 3, A6 and the AFNI masks part were merged; an earlier count of 14 that day had missed the † rows; listed under "Waiting for the user" in [next-steps.md](../next-steps.md)), 1 **yes** (ANTS-106, to implement) and 1 rule 8.
 The AFNI part of 2026-10-23 (3dAutomask and 3dUnifize, a GPL replica each; in parallel with
 `antsAI -b`) added AFNI-40 to AFNI-49 and extended AFNI-01 (3dAutomask's average of a series
 and 3dUnifize's `-EPI` median drop a negative scale factor, as 3dTshift's extraction does):
@@ -748,7 +748,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `antsUtilities.h:230-247`; validated (`MO-value-0`, `ME-labels`).
 - **fMRIPrep:** none (binary masks with value 1).
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide** whether these are bugs.
+- **D13 / gap:** decided 2026-10-23 (decision log): rule A: corrected by default, `reproduce` keeps the original; to implement. Was: **decide** whether these are bugs.
 
 ### ANTS-18 Signed zeros in grayscale morphology — (b)
 - **What:** ITK's moving-histogram dilation and erosion keep `-0.0` and `+0.0` in one map
@@ -803,7 +803,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `ImageMath_Templates.hxx:1955-2053`; validated (`pad-image`).
 - **fMRIPrep:** none (integer pads).
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): rule A: corrected by default, `reproduce` keeps the original; to implement. Was: **decide.**
 
 ### ANTS-23 `ExtractContours` labels by truncated value — (c?)
 - **What:** each run's label is `static_cast<SizeValueType>(value)`: 1.2 and 1.7 are both
@@ -811,7 +811,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `itkLabelContourImageFilter.hxx:144`; validated (`extract-contours`).
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): rule A: corrected by default, `reproduce` keeps the original; to implement. Was: **decide.**
 
 ### ANTS-24 ThresholdImage's arguments — (e), (f)
 - **What:** (e) a mode other than exactly `Otsu` or `Kmeans` is a range threshold whose lower
@@ -914,7 +914,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `ResampleImageBySpacing.cxx:144,190,277,406`; validated.
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): rule A: corrected by default, `reproduce` keeps the original; to implement. Was: **decide.**
 
 ### ANTS-33 antsApplyTransforms ignores what it does not understand — (e)
 - **What:** an unknown `-u` name silently keeps the default output type; `MultiLabel[sigma,alpha]`
@@ -1004,7 +1004,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **fMRIPrep:** the N4s without a mask: sMRIPrep before the template, the brain extraction's
   first pass, the BOLD reference (a weight image only).
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide**; a fix would change every unmasked run.
+- **D13 / gap:** decided 2026-10-23 (decision log): rule D: its effect measured first (fMRIPrep's runs), then corrected by default (rule A) or kept and documented (rule C). Was: **decide**; a fix would change every unmasked run.
 
 ### ANTS-41 ANTs built by GCC 11.4 drops two float roundings (a compiler bug) — (d)
 - **What:** not a source defect: a GCC defect. ANTs 2.6.5 built by GCC 11.4 at `-O3` (the
@@ -1089,7 +1089,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx:397-494`; validated.
 - **fMRIPrep:** none (no mask).
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): rule A: corrected by default, `reproduce` keeps the original; to implement. Was: **decide.**
 
 ### ANTS-45 Errors explained only with `-v` — (f)
 - **What:** N4 exits 1 on a weight image on another grid, and on a mesh of the wrong length,
@@ -2139,7 +2139,7 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **Evidence:** read: `nifti1_io.c:5013-5049`; verified (`head-outliers`).
 - **fMRIPrep:** none seen.
 - **larmorx:** reproduces in the ANTs programs (`nifti::itk::read_itk_image`).
-- **D13 / gap:** **decide** (it is what every ANTs user gets).
+- **D13 / gap:** decided 2026-10-23 (decision log): rule D: its effect measured first (fMRIPrep's runs), then corrected by default (rule A) or kept and documented (rule C). Was: **decide** (it is what every ANTs user gets).
 
 ### ITK-07 Integer data scaled in float32 — (d)
 - **What:** ITK casts integer values to float and scales in double, then rounds to float; a
@@ -2449,7 +2449,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** every run's BOLD reference.
 - **larmorx:** not a tool defect: the tools do what they are asked, and the stage comparison
   passes fMRIPrep's command as it ran.
-- **D13 / gap:** **decide** for larmorprepx: the intended 2 or the factor 4 fMRIPrep uses.
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when larmorprepx is built, by the usual rule (the intended behaviour by default, fMRIPrep's on request). Was: **decide** for larmorprepx: the intended 2 or the factor 4 fMRIPrep uses.
 
 ### PIPE-02 The one-shot resampler races with OpenBLAS — (b)
 - **What:** `ResampleSeries` resamples volumes concurrently (asyncio tasks in a thread pool);
@@ -2545,7 +2545,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   res-2 points (2.9 %) with a res-1 warp.
 - **fMRIPrep:** every MNI resampling, at the edge of the warp's field of view.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when larmorprepx is built, by the usual rule (the intended behaviour by default, fMRIPrep's on request). Was: **decide.**
 
 ### PIPE-06 Float32 roundings at every step — (d)
 - **What:** nitransforms parses ITK text parameters as float32 (`io/itk.py:200-203`; ANTs reads
@@ -2564,7 +2564,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read: `nitransforms/linear.py:451-452`.
 - **fMRIPrep:** one-volume series.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when larmorprepx is built, by the usual rule (the intended behaviour by default, fMRIPrep's on request). Was: **decide.**
 
 ### PIPE-08 Motion parameters about another centre — (c?)
 - **What:** fMRIPrep recomputes the motion parameters from the ITK transforms about
@@ -2575,7 +2575,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `specs/mcflirt.md` §2, §10.3.
 - **fMRIPrep:** every run's motion confounds.
 - **larmorx:** the confounds are not ported yet.
-- **D13 / gap:** **decide** for larmorprepx.
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when larmorprepx is built, by the usual rule (the intended behaviour by default, fMRIPrep's on request). Was: **decide** for larmorprepx.
 
 ### PIPE-09 Misleading log lines and wasted space — (f)
 - **What:** the DataSink logs "Changing ... dtype from float64 to float64" for a mask it writes
@@ -2752,7 +2752,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** validated (expected divergences in [nifti-io](../validation/nifti-io.md)).
 - **fMRIPrep:** none.
 - **larmorx:** decides from the content.
-- **D13 / gap:** **decide** (Decisions, item 5: no switch proposed).
+- **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (Decisions, item 5: no switch proposed).
 
 ### NIB-02 `vox_offset` 0 reads the header as data — (c)
 - **What:** a single-file image with `vox_offset = 0` is read with the header bytes as voxel
@@ -2760,14 +2760,14 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** validated (`malformed/vox-offset-zero.nii`).
 - **fMRIPrep:** none.
 - **larmorx:** refuses.
-- **D13 / gap:** **decide** (item 5).
+- **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (item 5).
 
 ### NIB-03 Complex data lose their imaginary part — (c)
 - **What:** `get_fdata` on complex data silently drops the imaginary part.
 - **Evidence:** validated.
 - **fMRIPrep:** none.
 - **larmorx:** raises.
-- **D13 / gap:** **decide** (item 5).
+- **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (item 5).
 
 ### NIB-04 qform precision depends on the platform — (d)
 - **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64, 64-bit
@@ -3384,7 +3384,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; verified (2026-10-23; parity cases `options/nbhrs-*`).
 - **fMRIPrep:** none (it never passes `-nbhrs`).
 - **larmorx:** AFNI's behaviour in both modes.
-- **D13 / gap:** decide: refuse values outside 6..26 (what the dead check meant), or keep.
+- **D13 / gap:** decided 2026-10-23 (decision log): rule B: refused by default (an error naming the entry), `reproduce` keeps AFNI's behaviour; to implement in the replica, and in the spec for the clean-room original. Was: decide: refuse values outside 6..26 (what the dead check meant), or keep.
 
 ### AFNI-42 † `-NN1/2/3` change the peeling threshold — (c?)
 - **What:** `-NN1`, `-NN2`, `-NN3` also set `nbhrs` to 6, 18 and 26 (`3dAutomask.c:262-273`,
@@ -3396,7 +3396,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `options/nbhrs-then-NN2`).
 - **fMRIPrep:** none.
 - **larmorx:** AFNI's behaviour in both modes.
-- **D13 / gap:** decide.
+- **D13 / gap:** decided 2026-10-23 (decision log): rule C: AFNI's behaviour kept in both modes and documented (AFNI-44 shapes fMRIPrep's BOLD masks). Was: decide.
 
 ### AFNI-43 † `-peels 0` peels once — (c)
 - **What:** `THD_automask_set_peelcounts`: `peelcount = (p > 0) ? p : 1`
@@ -3419,7 +3419,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** its BOLD references (most have 32 to 93 slices): AFNI's behaviour is what
   fMRIPrep gets.
 - **larmorx:** AFNI's behaviour in both modes.
-- **D13 / gap:** decide (probably keep: changing it changes fMRIPrep's masks).
+- **D13 / gap:** decided 2026-10-23 (decision log): rule C: AFNI's behaviour kept in both modes and documented (AFNI-44 shapes fMRIPrep's BOLD masks). Was: decide (probably keep: changing it changes fMRIPrep's masks).
 
 ### AFNI-45 † `-T2up` near 100 reads past the sorted values — (a)
 - **What:** `mri_invertcontrast_inplace` (`mri_invert.c:44`): `ii = (int)rintf(nhist * uperc *
@@ -3467,7 +3467,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; verified (parity case `options/T2-T2-T2`).
 - **fMRIPrep:** none.
 - **larmorx:** AFNI's behaviour in both modes.
-- **D13 / gap:** decide (refuse a third `-T2`, or treat it as two).
+- **D13 / gap:** decided 2026-10-23 (decision log): rule B: refused by default (an error naming the entry), `reproduce` keeps AFNI's behaviour; to implement in the replica, and in the spec for the clean-room original. Was: decide (refuse a third `-T2`, or treat it as two).
 
 ### AFNI-49 † `-clfrac`'s default in 3dUnifize's help — (f)
 - **What:** the help gives the default as 0.1 and then says it was raised to 0.2 in 2016
@@ -3518,7 +3518,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** every run (normcorr with smoothing is the default). The same function serves
   FLIRT's `-cost normcorr`.
 - **larmorx:** reproduces (`larmorx_mri::hmc::cost`).
-- **D13 / gap:** **decide** (Decisions, item 4): the fix changes the cost of every run.
+- **D13 / gap:** decided 2026-10-23 (decision log): rule C: mcflirt's behaviour kept by default, since correcting it was measured to bring no gain against the ground truth; the corrected count stays available (`normcorr_count="weights"`). Was: **decide** (Decisions, item 4): the fix changes the cost of every run.
 
 ### FSL-03 † In-plane mode pads the first stage twice — (c), (f)
 - **What:** `main` applies `fix2D` to the 8 mm grid (`mcflirt.cc:693`) and `correct` applies it
@@ -3607,7 +3607,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; verified.
 - **fMRIPrep:** none (nipype sets it).
 - **larmorx:** writes `.nii.gz` (expected divergence `no-fsloutputtype`).
-- **D13 / gap:** **decide** (item 5: no switch proposed).
+- **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (item 5: no switch proposed).
 
 ### FSL-12 † Impossible inputs abort late — (a)
 - **What:** a reference with another voxel count aborts in the final resampling ("Attempted to
@@ -3647,7 +3647,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; verified.
 - **fMRIPrep:** none.
 - **larmorx:** reproduces.
-- **D13 / gap:** **decide** whether an "initial transform" should start the search.
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when the mcflirt replica is built. Was: **decide** whether an "initial transform" should start the search.
 
 ### FSL-16 † Rotations are not quite orthogonal — (d)
 - **What:** `make_rot` stores `theta = norm2(angl)` in a float while `axis = angl/theta` is
@@ -3676,4 +3676,4 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read.
 - **fMRIPrep:** none (Woods registers no BOLD run, for mcflirt or larmorx).
 - **larmorx:** reproduces (spec appendix A).
-- **D13 / gap:** **decide.**
+- **D13 / gap:** decided 2026-10-23 (decision log): decided when the mcflirt replica is built. Was: **decide.**

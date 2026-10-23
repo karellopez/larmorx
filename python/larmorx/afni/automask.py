@@ -22,7 +22,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from larmorx import _defects, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.afni import _common
@@ -131,8 +131,32 @@ def automask(
     settings = _common.check_settings(afni_settings, "lx.afni.automask", "3dAutomask")
     n_threads = _common.check_threads(n_threads)
     selected = _replica.select("afni", "3dAutomask", implementation)
-    if selected is None:  # pragma: no cover - every tool without an original raises above
-        raise NotImplementedError("lx.afni.automask has no clean-room original yet")
+    if selected is None:
+        with _common.temporary_directory("larmorx-automask-") as tmp:
+            source = _common.write_input(image, tmp, n_threads)
+            mask, masked, depth_out, messages, notices = _core.afni_automask_file(
+                source,
+                clfrac=float(clfrac),
+                gradual=bool(gradual),
+                peels=int(peels),
+                neighbours=int(neighbours),
+                nn=nn,
+                exterior_clip=bool(exterior_clip),
+                dilate=int(dilate),
+                erode=int(erode),
+                si=None if si is None else float(si),
+                apply=bool(apply),
+                depth=bool(depth),
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                afni_settings=sorted(settings.items()) or None,
+            )
+        _common.warn_all(messages, notices)
+        return AutomaskResult(
+            mask=_common.image_of(mask),
+            masked=None if masked is None else _common.image_of(masked),
+            depth=None if depth_out is None else _common.image_of(depth_out),
+        )
     impl = selected.implementation()
     with _common.temporary_directory("larmorx-automask-") as tmp:
         source = _common.write_input(image, tmp, n_threads)

@@ -65,7 +65,7 @@ BENCH_SUITES = tuple(BENCH_MODULES)
 
 
 #: Suites that can also validate a replica binary (docs/licensing.md).
-REPLICA_SUITES = ("afni-tshift",)
+REPLICA_SUITES = ("afni-tshift", "afni-automask", "afni-unifize")
 
 
 def _parity_suite(name: str, implementation: str = "original"):

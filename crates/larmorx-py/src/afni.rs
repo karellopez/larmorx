@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 
+use larmorx_afni::automask::{self, AutomaskOptions};
 use larmorx_afni::cfmt::g32;
 use larmorx_afni::dataset::{
     self, AfniImage, BrickData, Bricks, InterceptPlan, KeptIntercept, OutputTiming, ReadError,
@@ -413,8 +414,190 @@ fn afni_tshift_array<'py>(
     )
 }
 
+/// An output dataset as Python receives it: the voxels in their written shape (a plane of one
+/// slice is 2D, one volume 3D, a series 4D) and the header.
+fn output_to_py<'py>(
+    py: Python<'py>,
+    header: &larmorx_io::nifti::NiftiHeader,
+    bricks: Bricks,
+) -> PyResult<Bound<'py, PyAny>> {
+    let shape = dataset::written_shape(bricks.shape);
+    fn array<'py, T: numpy::Element>(
+        py: Python<'py>,
+        shape: &[usize],
+        v: Vec<T>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let a = ArrayD::from_shape_vec(IxDyn(shape).f(), v).map_err(value_err)?;
+        Ok(PyArray::from_owned_array(py, a).into_any())
+    }
+    let data = match bricks.data {
+        BrickData::Byte(v) => array(py, &shape, v)?,
+        BrickData::Short(v) => array(py, &shape, v)?,
+        BrickData::Float(v) => array(py, &shape, v)?,
+    };
+    Ok(PyTuple::new(py, [data, header_to_dict(py, header)?.into_any()])?.into_any())
+}
+
+/// Reads the input of a Python call of 3dAutomask or 3dUnifize: the file found as AFNI finds
+/// it, read with AFNI's rules (a slope of 1 kept as a factor), and AFNI's messages and the
+/// notices of reading.
+fn read_for_masks(
+    py: Python<'_>,
+    path: &std::path::Path,
+    settings: &AfniSettings,
+    mode: UpstreamDefects,
+    n_threads: usize,
+) -> PyResult<(AfniImage, Vec<Message>, Vec<Notice>)> {
+    let name = path.to_string_lossy().into_owned();
+    let (mut messages, mut notices) = (Vec::new(), Vec::new());
+    let (file, shown) = match input::resolve(&name, settings, mode, &mut messages, &mut notices) {
+        Ok(found) => (found.path, found.shown),
+        Err(_) => (path.to_path_buf(), name.clone()),
+    };
+    let mut image = py
+        .detach(|| dataset::read_as(&file, &shown, n_threads, mode, settings, true))
+        .map_err(read_err)?;
+    messages.extend(std::mem::take(&mut image.messages));
+    notices.extend(std::mem::take(&mut image.notices));
+    Ok((image, messages, notices))
+}
+
+/// 3dAutomask's options from Python's arguments, checked as the command line checks them
+/// (`-nbhrs` outside 6..26: AFNI-41; `-NN1/2/3` set the peel threshold: AFNI-42).
+#[allow(clippy::too_many_arguments)]
+fn automask_options(
+    clfrac: f64,
+    gradual: bool,
+    peels: i64,
+    neighbours: i64,
+    nn: Option<u8>,
+    exterior_clip: bool,
+    dilate: usize,
+    erode: usize,
+    si: Option<f64>,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> PyResult<AutomaskOptions> {
+    use larmorx_afni::automask::morph::Neighbourhood;
+    let clfrac = clfrac as f32;
+    if !(0.1..=0.9).contains(&clfrac) {
+        return Err(PyValueError::new_err(format!(
+            "clfrac must be between 0.1 and 0.9, not {clfrac}"
+        )));
+    }
+    let mut o = AutomaskOptions::default();
+    o.mask.clfrac = clfrac;
+    o.mask.gradual = gradual;
+    o.mask.exterior_clip = exterior_clip;
+    o.requested_peels = peels;
+    o.dilate = dilate;
+    o.erode = erode;
+    o.si = si.map(|h| h as f32);
+    let mut threshold = 17u32;
+    if (6..=26).contains(&neighbours) {
+        threshold = neighbours as u32;
+    } else {
+        let detail = match mode {
+            UpstreamDefects::Fix => format!(
+                "-nbhrs {neighbours} is outside 6..26: an error (exit status 1); AFNI silently uses 17"
+            ),
+            UpstreamDefects::Reproduce => {
+                format!("-nbhrs {neighbours} is outside 6..26: 17 is used, as AFNI does")
+            }
+        };
+        if mode.fix() {
+            return Err(PyValueError::new_err(format!(
+                "neighbours={neighbours} is illegal: the number of neighbours must be 6 to 26 \
+                 (AFNI silently uses 17, AFNI-41; upstream_defects=\"reproduce\" does too)"
+            )));
+        }
+        notices.push(Notice::new(&larmorx_core::defects::AFNI_41, mode, detail));
+    }
+    if let Some(level) = nn {
+        o.nn = Neighbourhood::from_level(level)
+            .ok_or_else(|| PyValueError::new_err(format!("nn must be 1, 2 or 3, not {level}")))?;
+        threshold = [6, 18, 26][usize::from(level - 1)];
+    }
+    o.mask.threshold = threshold;
+    Ok(o)
+}
+
+/// 3dAutomask on a NIfTI file (the clean-room original): returns `(mask, masked, depth,
+/// warnings, notices)`, each output `(data, header)` or `None`, the data in AFNI's storage
+/// type before the brick factor (the header's `scl_slope`).
+#[pyfunction]
+#[pyo3(signature = (path, clfrac = 0.5, gradual = true, peels = 1, neighbours = 17, nn = None, exterior_clip = false, dilate = 0, erode = 0, si = None, apply = false, depth = false, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
+#[allow(clippy::too_many_arguments)]
+fn afni_automask_file<'py>(
+    py: Python<'py>,
+    path: PathBuf,
+    clfrac: f64,
+    gradual: bool,
+    peels: i64,
+    neighbours: i64,
+    nn: Option<u8>,
+    exterior_clip: bool,
+    dilate: usize,
+    erode: usize,
+    si: Option<f64>,
+    apply: bool,
+    depth: bool,
+    n_threads: usize,
+    upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mode = defects_mode(upstream_defects)?;
+    let settings = settings_of(afni_settings);
+    let mut notices = Vec::new();
+    let mut options = automask_options(
+        clfrac,
+        gradual,
+        peels,
+        neighbours,
+        nn,
+        exterior_clip,
+        dilate,
+        erode,
+        si,
+        mode,
+        &mut notices,
+    )?;
+    options.apply = apply;
+    options.depth = depth;
+    let (mut image, messages, read_notices) =
+        read_for_masks(py, &path, &settings, mode, n_threads)?;
+    notices.extend(read_notices);
+    let run = py
+        .detach(|| automask::run(&mut image, &options, mode, &settings, n_threads))
+        .map_err(value_err)?;
+    let mut warnings: Vec<String> = warning_texts(messages).collect();
+    warnings.extend(warning_texts(run.messages));
+    notices.extend(run.notices);
+    if let Some(why) = run.failure {
+        return Err(PyValueError::new_err(format!("3dAutomask: {why}")));
+    }
+    let to_py = |o: Option<automask::Output>| -> PyResult<Bound<'py, PyAny>> {
+        match o {
+            Some((h, b)) => output_to_py(py, &h, b),
+            None => Ok(py.None().into_bound(py)),
+        }
+    };
+    let notices: Vec<PyNotice> = notices_to_py(notices);
+    PyTuple::new(
+        py,
+        [
+            to_py(run.mask)?,
+            to_py(run.masked)?,
+            to_py(run.depth)?,
+            warnings.into_pyobject(py)?.into_any(),
+            notices.into_pyobject(py)?.into_any(),
+        ],
+    )
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(afni_tshift_file, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_array, m)?)?;
+    m.add_function(wrap_pyfunction!(afni_automask_file, m)?)?;
     Ok(())
 }

@@ -212,12 +212,21 @@ def run_fmriprep_afni(
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
 
-def run_larmorx(program: str, args: list[str], mode: str, env: dict[str, str], cwd: Path) -> Run:
-    """``larmorx afni <program>`` in process, with the replica forced (it runs the
-    ``larmorx-gpl`` program as a separate process); ``mode`` is D13's choice."""
+def run_larmorx(
+    program: str,
+    args: list[str],
+    mode: str,
+    env: dict[str, str],
+    cwd: Path,
+    implementation: str = "replica",
+) -> Run:
+    """``larmorx afni <program>`` in process, with ``implementation`` forced: the replica (it
+    runs the ``larmorx-gpl`` program as a separate process) or the clean-room original (in
+    process); ``mode`` is D13's choice."""
     from larmorx.cli import run
 
-    env = dict(env, LARMORX_GPL_BIN=str(replica_binary()))
+    if implementation == "replica":
+        env = dict(env, LARMORX_GPL_BIN=str(replica_binary()))
     out, err = io.StringIO(), io.StringIO()
     with (
         process_environment(env, cwd),
@@ -225,7 +234,7 @@ def run_larmorx(program: str, args: list[str], mode: str, env: dict[str, str], c
         contextlib.redirect_stderr(err),
         contextlib.redirect_stdout(out),
     ):
-        code = run(["larmorx", "afni", program, *args], implementation="replica")
+        code = run(["larmorx", "afni", program, *args], implementation=implementation)
     return Run(code, out.getvalue(), err.getvalue(), cwd)
 
 
@@ -373,11 +382,22 @@ def compare_files(a: Path, b: Path) -> Comparison:
     return Comparison(identical, ha == hb, n, total, max_abs, detail)
 
 
+#: The tolerance of the clean-room originals' float32 outputs where the bits are not the spec's
+#: to decide (PLAN.md §11.3, deterministic arithmetic: max |diff| ≤ 1e-5 × max |AFNI output|).
+FLOAT_RTOL = 1e-5
+
+
 def check_outputs(
-    checks: CheckList, afni_dir: Path, ours_dir: Path, outputs: tuple[str, ...]
+    checks: CheckList,
+    afni_dir: Path,
+    ours_dir: Path,
+    outputs: tuple[str, ...],
+    tolerance: float | None = None,
 ) -> bool:
-    """Every output of the case: present in both, data and header identical. Returns whether
-    every output was found in both."""
+    """Every output of the case: present in both, data and header identical. With
+    ``tolerance`` (a clean-room original's float32 outputs), the data may differ by at most
+    ``tolerance`` × max |AFNI output|, and bit-identity is reported. Returns whether every
+    output was found in both."""
     ok = True
     for name in outputs:
         a, b = afni_dir / name, ours_dir / name
@@ -390,16 +410,42 @@ def check_outputs(
             ok = False
             continue
         c = compare_files(a, b)
-        checks.add(
-            Check(
-                f"{name}: data",
-                c.identical,
-                metric="values that differ",
-                value=c.differing,
-                threshold=0,
-                detail=c.detail,
+        if tolerance is None or c.identical:
+            checks.add(
+                Check(
+                    f"{name}: data",
+                    c.identical,
+                    metric="values that differ",
+                    value=c.differing,
+                    threshold=0,
+                    detail=c.detail,
+                )
             )
-        )
+        else:
+            va = stored(a)
+            scale = float(np.max(np.abs(va.astype(np.float64)))) if va.size else 0.0
+            limit = tolerance * scale
+            within = va.dtype.kind == "f" and np.isfinite(c.max_abs) and c.max_abs <= limit
+            checks.add(
+                Check(
+                    f"{name}: data",
+                    bool(within),
+                    metric="max |diff| / max |AFNI|",
+                    value=c.max_abs / scale if scale else c.max_abs,
+                    threshold=tolerance,
+                    detail=c.detail,
+                )
+            )
+            checks.add(
+                Check(
+                    f"{name}: values bit-identical to AFNI's",
+                    True,
+                    metric="values that differ",
+                    value=c.differing,
+                    threshold="reported",
+                    detail=c.detail,
+                )
+            )
         checks(f"{name}: header bytes", c.header, detail="identical" if c.header else "differ")
     return ok
 
@@ -455,6 +501,11 @@ class ToolSpec:
     function: str
     scenarios: Callable[[], list[tuple[str, str, str, Scenario]]]
     inputs: Callable[[str], Path]
+    #: ``replica`` (the larmorx-gpl program) or ``original`` (the clean-room original).
+    implementation: str = "replica"
+    #: For float32 outputs that need not be bit-identical: the largest |diff| allowed, as a
+    #: fraction of the largest |AFNI output| (``None``: bit-identity required).
+    tolerance: float | None = None
 
 
 def cases_of(spec: ToolSpec, tier: str) -> list[Case]:
@@ -490,9 +541,10 @@ def _produced(d: Path, s: Scenario) -> list[str]:
 def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     program = spec.program
+    impl = spec.implementation
     if afni_binary(program) is None:
         raise Outcome("skipped", f"the AFNI {program} oracle was not found (LARMORX_AFNI_BIN)")
-    if replica_binary() is None:
+    if impl == "replica" and replica_binary() is None:
         raise Outcome(
             "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
         )
@@ -508,11 +560,11 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         _setup(a_dir, s)
         _setup(l_dir, s)
         afni = run_afni(program, args, env, a_dir)
-        ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir)
+        ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
 
         if s.undefined is not None:
-            _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir)
+            _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir, impl)
             return
         if s.expect == "crash" or crashed(afni):
             check_crash(checks, afni, ours)
@@ -554,9 +606,9 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             if afni.code == 0:
                 checks("both reject the arguments", False, detail="AFNI succeeded")
             return
-        check_outputs(checks, a_dir, l_dir, tuple(a_out))
+        check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance)
         if s.expect == "pass" and afni.code != 0 and s.fix_writes is not None:
-            _fix_writes(checks, program, s, args, env, tmp)
+            _fix_writes(checks, program, s, args, env, tmp, impl)
             return
         if s.expect != "pass" or afni.code != 0:
             return
@@ -581,7 +633,7 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             _band(checks, spec, s, args, env, tmp, a_dir, paths)
         if s.python is not None:
             _python(checks, spec, s, paths[0], l_dir)
-        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
 
 
 def _band(
@@ -656,10 +708,14 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
 
     fn = getattr(lx.afni, spec.function)
     kwargs = dict(s.python or {})
-    env = dict(os.environ, LARMORX_GPL_BIN=str(replica_binary()))
+    env = dict(os.environ)
+    if spec.implementation == "replica":
+        env["LARMORX_GPL_BIN"] = str(replica_binary())
     with process_environment(env), warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result = fn(image, implementation="replica", upstream_defects="reproduce", **kwargs)
+        result = fn(
+            image, implementation=spec.implementation, upstream_defects="reproduce", **kwargs
+        )
     bad = []
     for attr, name in s.python_outputs.items():
         img = getattr(result, attr)
@@ -693,6 +749,7 @@ def _undefined(
     ours: Run,
     a_dir: Path,
     l_dir: Path,
+    impl: str = "replica",
 ) -> None:
     """A case where AFNI reads memory it never wrote (``Scenario.undefined``): AFNI crashes or
     writes values from that memory, depending on the memory; larmorx's ``reproduce`` mode
@@ -711,7 +768,7 @@ def _undefined(
             if ok
             else first_difference(before, mine[: len(before)]),
         )
-        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
         if all(c.passed for c in checks.checks):
             raise Outcome(
                 EXPECTED,
@@ -755,7 +812,7 @@ def _undefined(
                 detail=f"{n} of {va.size} differ",
             )
         )
-    _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+    _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
     if beyond and all(c.passed for c in checks.checks):
         raise Outcome(
             EXPECTED,
@@ -771,12 +828,13 @@ def _fix_writes(
     args: list[str],
     env: dict[str, str],
     tmp: Path,
+    impl: str = "replica",
 ) -> None:
     """The fix pass of a case AFNI refuses and larmorx's default corrects (``fix_writes``): the
     default exits 0, names the defect and writes every output."""
     d = tmp / "fix"
     _setup(d, s)
-    r = run_larmorx(program, args, defects.FIX, env, d)
+    r = run_larmorx(program, args, defects.FIX, env, d, impl)
     named = defects.notices_in(r.err)
     written = _produced(d, s)
     ok = r.code == 0 and s.fix_writes in named and written == list(s.outputs)
@@ -802,10 +860,11 @@ def _fix_pass(
     tmp: Path,
     reproduced_dir: Path,
     reproduced: Run,
+    impl: str = "replica",
 ) -> None:
     d = tmp / "fix"
     _setup(d, s)
-    r = run_larmorx(program, args, defects.FIX, env, d)
+    r = run_larmorx(program, args, defects.FIX, env, d, impl)
     if s.fix_refuses is not None:
         named = defects.notices_in(r.err)
         checks.add(
@@ -864,7 +923,11 @@ def _fix_pass(
 
 
 def highlights(
-    results: list[CaseResult], program: str, function: str, crash_causes: str
+    results: list[CaseResult],
+    program: str,
+    function: str,
+    crash_causes: str,
+    implementation: str = "replica",
 ) -> list[str]:
     """The record's summary lines; ``crash_causes`` names what makes AFNI crash in its cases
     (e.g. "a missing option value, AFNI-40")."""
@@ -873,8 +936,12 @@ def highlights(
     def data_checks(r: CaseResult) -> list[Check]:
         return [c for c in r.checks if c.name.endswith((": data", ": header bytes"))]
 
+    def identical(r: CaseResult) -> bool:
+        reported = [c for c in r.checks if c.name.endswith(": values bit-identical to AFNI's")]
+        return all(c.passed for c in data_checks(r)) and all(c.value == 0 for c in reported)
+
     with_outputs = [r for r in compared if data_checks(r)]
-    bit = [r for r in with_outputs if all(c.passed for c in data_checks(r))]
+    bit = [r for r in with_outputs if identical(r)]
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     lines = [
         f"**Bit-identical to AFNI: {len(bit)} of {len(with_outputs)} compared cases that write "
@@ -903,7 +970,7 @@ def highlights(
         lines.append(
             f"- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran "
             f"them in its image): {sum(c.value == 0 for c in fmri)} of {len(fmri)} bit-identical "
-            "to the replica's."
+            f"to the {implementation}'s."
         )
     band = [c for r in results for c in r.checks if c.name.startswith("band: ")]
     if band:
@@ -918,7 +985,7 @@ def highlights(
     py = [c for r in results for c in r.checks if c.name.startswith("Python API")]
     if py:
         lines.append(
-            f'- Python API (`lx.afni.{function}(..., implementation="replica")`): '
+            f'- Python API (`lx.afni.{function}(..., implementation="{implementation}")`): '
             f"{sum(c.passed for c in py)} of {len(py)} cases give the command line's outputs bit "
             "for bit."
         )

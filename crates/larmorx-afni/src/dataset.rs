@@ -580,12 +580,8 @@ pub fn output_header(
     defects: UpstreamDefects,
     settings: &AfniSettings,
 ) -> Result<(NiftiHeader, Vec<Notice>, Vec<Message>), String> {
-    let [nx, ny, nz, nt] = bricks.shape;
-    let shape: Vec<usize> = if nt > 1 {
-        vec![nx, ny, nz, nt]
-    } else {
-        vec![nx, ny, nz]
-    };
+    let shape = written_shape(bricks.shape);
+    let [_, _, nz, nt] = bricks.shape;
     let mut messages = Vec::new();
     let large = shape.iter().any(|&d| d > 32767);
     let version = match write_type(settings.get("AFNI_NIFTI_WRITE_TYPE")) {
@@ -649,6 +645,20 @@ pub fn output_header(
     Ok((hdr, notices, messages))
 }
 
+/// The dimensions AFNI writes for a dataset of `shape`: a time series is 4D, one volume 3D,
+/// and one volume of one slice 2D (observed with 3dAutomask's outputs of a 64 × 64 × 1
+/// input: `dim[0]` 2).
+pub fn written_shape(shape: [usize; 4]) -> Vec<usize> {
+    let [nx, ny, nz, nt] = shape;
+    if nt > 1 {
+        vec![nx, ny, nz, nt]
+    } else if nz == 1 {
+        vec![nx, ny]
+    } else {
+        vec![nx, ny, nz]
+    }
+}
+
 /// Writes `bricks` to `path` (`.nii` or `.nii.gz`) with `header` (see [`output_header`]).
 pub fn write(
     path: impl AsRef<Path>,
@@ -656,12 +666,7 @@ pub fn write(
     bricks: &Bricks,
     n_threads: usize,
 ) -> Result<(), nifti::Error> {
-    let [nx, ny, nz, nt] = bricks.shape;
-    let shape: Vec<usize> = if nt > 1 {
-        vec![nx, ny, nz, nt]
-    } else {
-        vec![nx, ny, nz]
-    };
+    let shape = written_shape(bricks.shape);
     let options = WriteOptions {
         n_threads,
         ..Default::default()

@@ -387,17 +387,59 @@ def compare_files(a: Path, b: Path) -> Comparison:
 FLOAT_RTOL = 1e-5
 
 
+#: The value of a header check whose difference AFNI-10 explains (``check_outputs``).
+AFNI_10 = "AFNI-10"
+
+
+def has_afni_extension(path: Path) -> bool:
+    """Whether a NIfTI-1 file carries AFNI's own header extension (code 4), whose attributes
+    AFNI reads in place of the NIfTI header's geometry (AFNI-10)."""
+    try:
+        raw = path.read_bytes()
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+    except OSError:
+        return False
+    if raw[:4] != b"\x5c\x01\x00\x00" or len(raw) < 360 or raw[348] == 0:
+        return False
+    offset = int(np.frombuffer(raw[108:112], "<f4")[0])
+    pos = 352
+    while pos + 8 <= offset:
+        size, code = np.frombuffer(raw[pos : pos + 8], "<i4")
+        if code == 4:
+            return True
+        if size <= 0:
+            break
+        pos += int(size)
+    return False
+
+
+def without_extensions(src: Path, dst: Path) -> Path:
+    """A copy of the NIfTI-1 file ``src`` without its header extensions (the header's bytes
+    unchanged but ``vox_offset``), uncompressed."""
+    raw = src.read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    offset = int(np.frombuffer(raw[108:112], "<f4")[0])
+    header = bytearray(raw[:348])
+    header[108:112] = np.float32(352.0).tobytes()
+    dst.write_bytes(bytes(header) + b"\x00\x00\x00\x00" + raw[offset:])
+    return dst
+
+
 def check_outputs(
     checks: CheckList,
     afni_dir: Path,
     ours_dir: Path,
     outputs: tuple[str, ...],
     tolerance: float | None = None,
+    explain_header: Callable[[str], str | None] | None = None,
 ) -> bool:
     """Every output of the case: present in both, data and header identical. With
     ``tolerance`` (a clean-room original's float32 outputs), the data may differ by at most
-    ``tolerance`` × max |AFNI output|, and bit-identity is reported. Returns whether every
-    output was found in both."""
+    ``tolerance`` × max |AFNI output|, and bit-identity is reported. ``explain_header(name)``
+    gives the reason a header that differs is expected (AFNI-10), or ``None``. Returns whether
+    every output was found in both."""
     ok = True
     for name in outputs:
         a, b = afni_dir / name, ours_dir / name
@@ -446,8 +488,71 @@ def check_outputs(
                     detail=c.detail,
                 )
             )
-        checks(f"{name}: header bytes", c.header, detail="identical" if c.header else "differ")
+        reason = None if c.header or explain_header is None else explain_header(name)
+        if reason is not None:
+            checks.add(
+                Check(
+                    f"{name}: header bytes",
+                    True,
+                    metric="header bytes",
+                    value=AFNI_10,
+                    threshold="AFNI's header without its extension (AFNI-10)",
+                    detail=reason,
+                )
+            )
+        else:
+            checks(
+                f"{name}: header bytes", c.header, detail="identical" if c.header else "differ"
+            )
     return ok
+
+
+def afni_10_explainer(
+    program: str,
+    s: "Scenario",
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    paths: list[Path],
+    ours_dir: Path,
+) -> Callable[[str], str | None]:
+    """For a clean-room original, which ignores AFNI's own header extension (AFNI-10, as the
+    3dTshift original does): when an input carries one, AFNI runs again on copies of the
+    inputs without their extensions, and a header that differs is explained when that run
+    writes the original's header byte for byte."""
+    state: dict[str, Path | None] = {}
+
+    def run_once() -> Path | None:
+        if "dir" in state:
+            return state["dir"]
+        state["dir"] = None
+        with_ext = [p for p in paths if has_afni_extension(p)]
+        if not with_ext:
+            return None
+        d = tmp / "afni-without-extension"
+        _setup(d, s)
+        copies = {p: without_extensions(p, d / f"input{i}.nii") for i, p in enumerate(with_ext)}
+        new_args = list(args)
+        for p, q in copies.items():
+            new_args = [a.replace(str(p), str(q)) for a in new_args]
+        r = run_afni(program, new_args, env, d)
+        state["dir"] = d if r.code == 0 else None
+        return state["dir"]
+
+    def explain(name: str) -> str | None:
+        d = run_once()
+        if d is None or not (d / name).is_file() or not (ours_dir / name).is_file():
+            return None
+        if nifti_parts(d / name)[0] != nifti_parts(ours_dir / name)[0]:
+            return None
+        return (
+            "the input carries AFNI's own header extension, whose attributes AFNI reads in "
+            "place of the NIfTI header's geometry (7 significant digits; AFNI-10, which the "
+            "clean-room original ignores, as 3dTshift's does): AFNI run on the input without "
+            "its extension writes the original's header byte for byte"
+        )
+
+    return explain
 
 
 # ------------------------------------------------------------------------------------------------
@@ -606,7 +711,12 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             if afni.code == 0:
                 checks("both reject the arguments", False, detail="AFNI succeeded")
             return
-        check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance)
+        explain = (
+            afni_10_explainer(program, s, args, env, tmp, paths, l_dir)
+            if impl == "original"
+            else None
+        )
+        check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance, explain)
         if s.expect == "pass" and afni.code != 0 and s.fix_writes is not None:
             _fix_writes(checks, program, s, args, env, tmp, impl)
             return
@@ -938,10 +1048,14 @@ def highlights(
 
     def identical(r: CaseResult) -> bool:
         reported = [c for c in r.checks if c.name.endswith(": values bit-identical to AFNI's")]
-        return all(c.passed for c in data_checks(r)) and all(c.value == 0 for c in reported)
+        return (
+            all(c.passed and c.value != AFNI_10 for c in data_checks(r))
+            and all(c.value == 0 for c in reported)
+        )
 
     with_outputs = [r for r in compared if data_checks(r)]
     bit = [r for r in with_outputs if identical(r)]
+    afni_10 = [r for r in with_outputs if any(c.value == AFNI_10 for c in data_checks(r))]
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     lines = [
         f"**Bit-identical to AFNI: {len(bit)} of {len(with_outputs)} compared cases that write "
@@ -959,6 +1073,15 @@ def highlights(
         f"date, and larmorx's own lines, set aside): {sum(c.passed for c in messages)} of "
         f"{len(messages)} identical, in every case that ran both programs.",
     ]
+    if afni_10:
+        names = ", ".join(f"`{r.case}`" for r in afni_10)
+        lines.append(
+            f"- {len(afni_10)} case(s) whose input carries AFNI's own header extension, whose "
+            "attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room "
+            "original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run "
+            f"on the input without its extension writes the original's header byte for byte: "
+            f"{names}."
+        )
     crashes = [r for r in results if any(c.name == CRASH for c in r.checks)]
     if crashes:
         lines.append(

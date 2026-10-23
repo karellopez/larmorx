@@ -80,7 +80,7 @@ pub const REPLICAS: &[Replica] = &[
         family: "afni",
         tool: "3dUnifize",
         package: &LARMORX_GPL,
-        original: false,
+        original: true,
     },
 ];
 

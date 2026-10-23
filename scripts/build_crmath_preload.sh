@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 # Build libcrmath.so: glibc's expf, logf, exp, log, sin, cos, sincos, sinf, cosf, sincosf, asin,
-# acos, atan2, cbrt, pow and powf replaced by CORE-MATH's correctly rounded functions, for
-# LD_PRELOAD into an oracle program. (sinf, cosf and sincosf since 2026-10-11:
+# acos, atan2, cbrt, pow, powf, tanhf and cbrtf replaced by CORE-MATH's correctly rounded
+# functions, for LD_PRELOAD into an oracle program. (sinf, cosf and sincosf since 2026-10-11:
 # Euler3DTransform<float> calls them under antsApplyTransforms --float 1. asin, acos, atan2 and
 # cbrt since 2026-10-17: the rigid and similarity transforms' SetMatrix in antsAI computes their
 # parameters with them. pow and powf since 2026-10-18: antsRegistration's JHCT point-set metric
-# and the Gaussian membership function call std::pow; ImageMath's ^ calls powf.)
+# and the Gaussian membership function call std::pow; ImageMath's ^ calls powf. tanhf and cbrtf
+# since 2026-10-23: AFNI's 3dUnifize squashes with tanhf and sizes -EPI's ball with cbrtf.)
 #
 # larmorx's transcendental functions are correctly rounded (CLAUDE.md rule 5); glibc's are not
 # always, and ITK calls glibc's. Running an ANTs oracle with this library preloaded gives ANTs'
@@ -58,6 +59,8 @@ mkdir -p "$OUT/obj"
 "$CC" -O2 -fPIC -c "$CM/src/binary64/cbrt/cbrt.c" -o "$OUT/obj/cbrt.o"
 "$CC" -O2 -fPIC -I"$CM/src/binary64/pow" -c "$CM/src/binary64/pow/pow.c" -o "$OUT/obj/pow.o"
 "$CC" -O2 -fPIC -c "$CM/src/binary32/pow/powf.c" -o "$OUT/obj/powf.o"
+"$CC" -O2 -fPIC -c "$CM/src/binary32/tanh/tanhf.c" -o "$OUT/obj/tanhf.o"
+"$CC" -O2 -fPIC -c "$CM/src/binary32/cbrt/cbrtf.c" -o "$OUT/obj/cbrtf.o"
 
 cat > "$OUT/obj/preload.c" <<'EOF'
 /* glibc's names for CORE-MATH's correctly rounded functions (LD_PRELOAD). */
@@ -75,6 +78,8 @@ double cr_atan2(double, double);
 double cr_cbrt(double);
 double cr_pow(double, double);
 float cr_powf(float, float);
+float cr_tanhf(float);
+float cr_cbrtf(float);
 float expf(float x) { return cr_expf(x); }
 float logf(float x) { return cr_logf(x); }
 double exp(double x) { return cr_exp(x); }
@@ -91,6 +96,8 @@ double atan2(double y, double x) { return cr_atan2(y, x); }
 double cbrt(double x) { return cr_cbrt(x); }
 double pow(double x, double y) { return cr_pow(x, y); }
 float powf(float x, float y) { return cr_powf(x, y); }
+float tanhf(float x) { return cr_tanhf(x); }
+float cbrtf(float x) { return cr_cbrtf(x); }
 EOF
 "$CC" -O2 -fPIC -fno-builtin -c "$OUT/obj/preload.c" -o "$OUT/obj/preload.o"
 "$CC" -shared -o "$OUT/libcrmath.so" "$OUT"/obj/*.o -lm
@@ -98,7 +105,7 @@ EOF
 {
   echo "CORE-MATH: $CM ($(git -C "$CM" rev-parse HEAD 2>/dev/null || echo 'no git metadata'))"
   echo "compiler: $($CC --version | head -1)"
-  echo "functions: expf logf exp log sin cos sincos sinf cosf sincosf asin acos atan2 cbrt pow powf"
+  echo "functions: expf logf exp log sin cos sincos sinf cosf sincosf asin acos atan2 cbrt pow powf tanhf cbrtf"
   echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$OUT/BUILD_INFO.txt"
 echo "built $OUT/libcrmath.so"

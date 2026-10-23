@@ -597,12 +597,12 @@ pub fn form_mask(
         }
     }
     invert(&mut mask);
+    // The count comes before the exterior clip's last peel and cluster (observed).
+    log.push(format!("Mask now has {} voxels", count(&mask)));
     if clipped > 0 {
         morph::peel_and_restore(&mut mask, &stencil, 1, threshold);
         largest(&mut mask, dims, log);
     }
-    log.push(format!("Mask now has {} voxels", count(&mask)));
-    let _ = nz;
     Ok(mask)
 }
 

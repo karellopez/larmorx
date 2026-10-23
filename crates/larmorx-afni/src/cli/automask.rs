@@ -282,10 +282,6 @@ pub fn main_with_settings(
             log.fatal(&message);
             1
         }
-        Err(Failure::Error(message)) => {
-            log.error(&message);
-            1
-        }
     }
 }
 
@@ -442,7 +438,7 @@ mod tests {
         let settings = AfniSettings::new();
         let mut log = Log::new(&mut out, &mut err, &settings, mode);
         parse(&args, &mut log, &settings, mode).map_err(|f| match f {
-            Failure::Fatal(m) | Failure::Error(m) => m,
+            Failure::Fatal(m) => m,
         })
     }
 

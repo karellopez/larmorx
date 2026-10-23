@@ -63,8 +63,10 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
                                                     tier="smoke" if p == "2" else "standard",
                                                     **_python_options(peels=int(p))))
     for n in ("6", "15", "18", "26", "40"):
+        # AFNI-41 (decided 2026-10-23, rule B): outside 6..26 the default refuses.
         add(f"nbhrs-{n}", "options", f"-nbhrs {n} (AFNI uses 17 outside 6..26, AFNI-41)",
-            S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="smoke" if n == "15" else "standard"))
+            S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="smoke" if n == "15" else "standard",
+              fix_refuses="AFNI-41" if n == "40" else None))
     for nn in ("1", "2", "3"):
         add(f"NN{nn}-dilate-erode-depth", "options",
             f"-NN{nn} with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42)",

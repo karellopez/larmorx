@@ -13,6 +13,7 @@ mod acos;
 mod asin;
 mod atan2;
 mod cbrt;
+mod cbrtf;
 mod cos;
 pub(crate) mod dint;
 mod exp;
@@ -24,8 +25,18 @@ mod powf;
 mod powi;
 mod sin;
 mod sinf;
+mod tanhf;
 
 pub use powi::powi;
+
+/// `tanh(x)` for `f32`, correctly rounded (CORE-MATH's `cr_tanhf`; its only fused
+/// multiply-adds are explicit `mul_add` calls on tiny arguments, so it has no FMA-compiled
+/// copy). AFNI's 3dUnifize squash calls glibc's `tanhf`, which is not correctly rounded.
+pub use tanhf::tanhf;
+
+/// The cube root for `f32`, correctly rounded (CORE-MATH's `cr_cbrtf`; no fused
+/// multiply-adds). AFNI's 3dUnifize `-EPI` calls glibc's `cbrtf`.
+pub use cbrtf::cbrtf;
 
 // Speed: without hardware FMA in the generated code (baseline x86-64), every `mul_add` in the
 // kernels is a call into the platform's `fma`. On x86-64 CPUs with FMA, a copy of each kernel

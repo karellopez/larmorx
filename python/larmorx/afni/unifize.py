@@ -21,7 +21,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from larmorx import _defects, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.afni import _common
@@ -116,8 +116,34 @@ def unifize(
     settings = _common.check_settings(afni_settings, "lx.afni.unifize", "3dUnifize")
     n_threads = _common.check_threads(n_threads)
     selected = _replica.select("afni", "3dUnifize", implementation)
-    if selected is None:  # pragma: no cover - every tool without an original raises above
-        raise NotImplementedError("lx.afni.unifize has no clean-room original yet")
+    if selected is None:
+        bottom, top = (float(p) for p in percentiles)
+        with _common.temporary_directory("larmorx-unifize-") as tmp:
+            source = _common.write_input(image, tmp, n_threads)
+            out, scale, automasked, messages, notices = _core.afni_unifize_file(
+                source,
+                t2=int(t2),
+                t2_percentile=float(t2_percentile),
+                gm=bool(gm),
+                radius=float(radius),
+                bottom=bottom,
+                top=top,
+                clfrac=float(clfrac),
+                duplo=bool(duplo),
+                epi=bool(epi),
+                squash=bool(squash),
+                save_scale=bool(save_scale),
+                save_automask=bool(save_automask),
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                afni_settings=sorted(settings.items()) or None,
+            )
+        _common.warn_all(messages, notices)
+        return UnifizeResult(
+            image=_common.image_of(out),
+            scale=None if scale is None else _common.image_of(scale),
+            automasked=None if automasked is None else _common.image_of(automasked),
+        )
     impl = selected.implementation()
     with _common.temporary_directory("larmorx-unifize-") as tmp:
         source = _common.write_input(image, tmp, n_threads)

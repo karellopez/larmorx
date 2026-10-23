@@ -13,11 +13,10 @@ use crate::msg::Log;
 use crate::output::{self, afni_name, file_name, refused, refused_when_written};
 use crate::settings::{AfniSettings, Deconflict};
 
-/// How a run fails: a fatal error, or an error (AFNI's `** ERROR:`), both with exit status 1.
+/// How a run fails: a fatal error (exit status 1).
 #[derive(Debug)]
 pub(crate) enum Failure {
     Fatal(String),
-    Error(String),
 }
 
 /// AFNI's echoed command line (`AFNI_ECHO_COMMANDLINE`): the arguments after the global
@@ -194,14 +193,15 @@ pub(crate) fn write_dataset(
                 path = new;
             }
             Deconflict::Stop | Deconflict::Unset => {
-                notices.push(afni_11(mode));
                 let conflict = format!(
                     "output dataset name '{}' conflicts with existing file",
                     file_name(prefix)
                 );
                 if mode.fix() {
+                    log.notice(&afni_11(mode));
                     return Err(Failure::Fatal(conflict));
                 }
+                notices.push(afni_11(mode));
                 log.error(&conflict);
                 log.error("dataset NOT written to disk!");
                 return Ok(None);
@@ -231,12 +231,14 @@ pub(crate) fn write_dataset(
         ));
     }
     if let Some(e) = output::cannot_open(Path::new(&path)) {
-        notices.push(afni_26(&name, &e.to_string(), mode));
+        let notice = afni_26(&name, &e.to_string(), mode);
         if mode.fix() {
+            log.notice(&notice);
             return Err(Failure::Fatal(format!(
                 "cannot open output file '{name}' ({e}): nothing was written"
             )));
         }
+        notices.push(notice);
         if !one_row_text {
             log.raw(&format!(
                 "** ERROR (nifti_image_write_engine): cannot open output file '{name}'"

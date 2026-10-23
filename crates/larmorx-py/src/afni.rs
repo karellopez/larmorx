@@ -595,9 +595,96 @@ fn afni_automask_file<'py>(
     )
 }
 
+/// 3dUnifize on a NIfTI file (the clean-room original): returns `(image, scale, automasked,
+/// warnings, notices)`, each output `(data, header)` or `None`. The arguments are 3dUnifize's
+/// options, checked by the Python wrapper (`t2` is 0, 1 or 2).
+#[pyfunction]
+#[pyo3(signature = (path, t2 = 0, t2_percentile = 98.5, gm = false, radius = 18.3, bottom = 70.0, top = 80.0, clfrac = 0.2, duplo = true, epi = false, squash = true, save_scale = false, save_automask = false, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
+#[allow(clippy::too_many_arguments)]
+fn afni_unifize_file<'py>(
+    py: Python<'py>,
+    path: PathBuf,
+    t2: u32,
+    t2_percentile: f64,
+    gm: bool,
+    radius: f64,
+    bottom: f64,
+    top: f64,
+    clfrac: f64,
+    duplo: bool,
+    epi: bool,
+    squash: bool,
+    save_scale: bool,
+    save_automask: bool,
+    n_threads: usize,
+    upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    use larmorx_afni::unifize::{self, Event, UnifizeOptions};
+    let mode = defects_mode(upstream_defects)?;
+    if t2 > 2 {
+        return Err(PyValueError::new_err(format!(
+            "t2 must be 0, 1 or 2, not {t2} (AFNI-48)"
+        )));
+    }
+    let settings = settings_of(afni_settings);
+    let options = UnifizeOptions {
+        radius: radius as f32,
+        bottom: bottom as f32,
+        top: top as f32,
+        clfrac: clfrac as f32,
+        t2,
+        t2up: t2_percentile as f32,
+        gm,
+        duplo,
+        epi,
+        squash,
+        verb: false,
+        scale: save_scale,
+        automasked: save_automask,
+    };
+    let (mut image, messages, mut notices) =
+        read_for_masks(py, &path, &settings, mode, n_threads)?;
+    let run = py
+        .detach(|| unifize::run(&mut image, &options, mode, &settings, n_threads))
+        .map_err(value_err)?;
+    let mut warnings: Vec<String> = warning_texts(messages).collect();
+    let run_messages: Vec<Message> = run
+        .events
+        .into_iter()
+        .filter_map(|e| match e {
+            Event::Progress(m) | Event::Always(m) => Some(m),
+            Event::Write(_) => None,
+        })
+        .collect();
+    warnings.extend(warning_texts(run_messages));
+    notices.extend(run.notices);
+    if let Some(why) = run.failure {
+        return Err(PyValueError::new_err(format!("3dUnifize: {why}")));
+    }
+    let to_py = |o: Option<automask::Output>| -> PyResult<Bound<'py, PyAny>> {
+        match o {
+            Some((h, b)) => output_to_py(py, &h, b),
+            None => Ok(py.None().into_bound(py)),
+        }
+    };
+    let notices: Vec<PyNotice> = notices_to_py(notices);
+    PyTuple::new(
+        py,
+        [
+            to_py(run.output)?,
+            to_py(run.scale)?,
+            to_py(run.automasked)?,
+            warnings.into_pyobject(py)?.into_any(),
+            notices.into_pyobject(py)?.into_any(),
+        ],
+    )
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(afni_tshift_file, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_array, m)?)?;
     m.add_function(wrap_pyfunction!(afni_automask_file, m)?)?;
+    m.add_function(wrap_pyfunction!(afni_unifize_file, m)?)?;
     Ok(())
 }

@@ -4,11 +4,12 @@
 pub mod automask;
 pub(crate) mod common;
 pub mod tshift;
+pub mod unifize;
 
 use std::io::Write;
 
 /// The AFNI programs on the command line.
-pub const TOOLS: &[&str] = &["3dTshift", "3dAutomask"];
+pub const TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize"];
 
 /// Runs AFNI program `tool` with `args` (the arguments after the program name). `None` if
 /// there is no such program.
@@ -16,6 +17,7 @@ pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write
     match tool {
         "3dTshift" => Some(tshift::main(args, out, err)),
         "3dAutomask" => Some(automask::main(args, out, err)),
+        "3dUnifize" => Some(unifize::main(args, out, err)),
         _ => None,
     }
 }

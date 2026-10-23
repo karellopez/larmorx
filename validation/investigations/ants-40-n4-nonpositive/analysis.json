@@ -1,0 +1,1355 @@
+[
+ {
+  "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-01_T1w_noise_corrected.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' -r --shrink-factor 4 --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 5898240,
+   "zero": 517933,
+   "negative": 27059
+  },
+  "shrunk": {
+   "shrunk_voxels": 281250,
+   "included": 10657,
+   "zero": 8,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.19900258595799003,
+   "p99": 0.0529122234202899,
+   "median": 0.010952062728127487
+  },
+  "change_brain": {
+   "max": 0.11364248005166644,
+   "p99": 0.06058314546774983,
+   "median": 0.04538149986712081
+  },
+  "larmorx_seconds": 2.8,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 2.5029520436592456e-05,
+   "p99": 9.291643445552565e-06,
+   "median": 1.2276966978586046e-06
+  },
+  "band_brain": {
+   "max": 1.944941458686955e-05,
+   "p99": 1.1089947766169672e-05,
+   "median": 6.801740998430006e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 2.0931767090837106e-05,
+   "p99": 7.609314141239221e-06,
+   "median": 9.982101656924591e-07
+  },
+  "analysis": {
+   "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "region": "brain",
+   "scale": 0.9546227149952069,
+   "shape_max": 0.16657865202511757,
+   "shape_p99": 0.03043119748117512,
+   "shape_median": 0.0024952135873199666,
+   "wm_cv_ants": 0.035258418456296084,
+   "wm_cv_excluded": 0.03506534109433163,
+   "wm_cv_input": 0.12032977705404065,
+   "weight_cv_ants": 0.04119456569836839,
+   "weight_cv_excluded": 0.04113045351398362,
+   "weight_cv_input": 0.08787097416326595
+  }
+ },
+ {
+  "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-01_T1w_noise_corrected_maths.nii.gz --convergence '[' 50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 5898240,
+   "zero": 0,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 281250,
+   "included": 92160,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 6.4,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 2.964669256289021e-05,
+   "p99": 1.726931109360175e-05,
+   "median": 4.766731363847754e-06
+  },
+  "band_brain": {
+   "max": 2.7528597005499478e-05,
+   "p99": 1.9885916366382257e-05,
+   "median": 9.275721948087678e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 2.2166506471243963e-05,
+   "p99": 9.139423185684515e-06,
+   "median": 1.9000701189098024e-06
+  },
+  "analysis": {
+   "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0,
+   "wm_cv_ants": 0.06869662535422845,
+   "wm_cv_excluded": 0.06869662535422845,
+   "wm_cv_input": 0.12032977705404065
+  }
+ },
+ {
+  "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 139264,
+   "zero": 62557,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 3072,
+   "included": 688,
+   "zero": 61,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.35952761882482964,
+   "p99": 0.19175349986842793,
+   "median": 0.03305982155853904
+  },
+  "change_brain": {
+   "max": 0.23633220073108663,
+   "p99": 0.10589114476801939,
+   "median": 0.03699893396453757
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 7.264478694368748e-06,
+   "p99": 4.621449653692267e-06,
+   "median": 1.4855633525545642e-06
+  },
+  "band_brain": {
+   "max": 5.629841189680462e-06,
+   "p99": 2.994672428524579e-06,
+   "median": 1.6468333041697036e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 1.748699613512983e-05,
+   "p99": 5.950860843420003e-06,
+   "median": 1.1267452015850665e-06
+  },
+  "analysis": {
+   "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_01_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 0.963305063012364,
+   "shape_max": 0.20724199571749602,
+   "shape_p99": 0.10828485204199394,
+   "shape_median": 0.006201138793389016
+  }
+ },
+ {
+  "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/out/sub-01/func/sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 139264,
+   "zero": 1196,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 3072,
+   "included": 693,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.0010127884051940317,
+   "p99": 0.0005702886843475491,
+   "median": 0.00013983920320898013
+  },
+  "band_brain": {
+   "max": 0.0007896804739706553,
+   "p99": 0.00030758569136313696,
+   "median": 0.00012139661727705864
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 0.0007584024327911276,
+   "p99": 0.0004009668878949743,
+   "median": 7.121106245588926e-05
+  },
+  "analysis": {
+   "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_02_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0
+  }
+ },
+ {
+  "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/out/sub-01/func/sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/work/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 139264,
+   "zero": 1184,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 3072,
+   "included": 704,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.006152680225493867,
+   "p99": 0.002323373179000442,
+   "median": 0.00055007426549325
+  },
+  "band_brain": {
+   "max": 0.00588762181898117,
+   "p99": 0.003103109819301369,
+   "median": 0.0009688338301110377
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 0.0032858611072317245,
+   "p99": 0.001257442163245565,
+   "median": 0.00030616260652083227
+  },
+  "analysis": {
+   "node": "ds000005-sub-01-noreconall/fmriprep_25_2_wf/sub_01_wf/bold_task_mixedgamblestask_run_03_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-1_T1w_noise_corrected.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' -r --shrink-factor 4 --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 11534336,
+   "zero": 5941922,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 500000,
+   "included": 19028,
+   "zero": 1,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.03747288982322983,
+   "p99": 0.031160545405768063,
+   "median": 0.013250311117097402
+  },
+  "change_brain": {
+   "max": 0.03717405872459223,
+   "p99": 0.03140984697961813,
+   "median": 0.029998231437696588
+  },
+  "larmorx_seconds": 4.5,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 4.109212078828861e-06,
+   "p99": 3.1682510119379616e-06,
+   "median": 1.7313163608312365e-06
+  },
+  "band_brain": {
+   "max": 4.109212078828861e-06,
+   "p99": 3.344620492877759e-06,
+   "median": 2.635593993161045e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 2.0545320751352847e-06,
+   "p99": 1.0054448580887333e-06,
+   "median": 1.4220555699662185e-07
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "region": "brain",
+   "scale": 0.9700017685623035,
+   "shape_max": 0.025094166309434396,
+   "shape_p99": 0.005986672855719737,
+   "shape_median": 0.0007604753394302444,
+   "wm_cv_ants": 0.035339519041146,
+   "wm_cv_excluded": 0.035101979666023034,
+   "wm_cv_input": 0.08646223991196894,
+   "weight_cv_ants": 0.03583867346242373,
+   "weight_cv_excluded": 0.03571407191177008,
+   "weight_cv_input": 0.06961929193282292
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-1_T1w_noise_corrected_maths.nii.gz --convergence '[' 50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 11534336,
+   "zero": 0,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 500000,
+   "included": 180224,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 19.0,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 3.420904797879487e-06,
+   "p99": 2.6100228019687592e-06,
+   "median": 1.5492634801717031e-06
+  },
+  "band_brain": {
+   "max": 3.1868835717041577e-06,
+   "p99": 2.4320764801288864e-06,
+   "median": 1.9133338547971945e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 3.0761017104641297e-06,
+   "p99": 2.689614821915765e-06,
+   "median": 5.981819336531302e-07
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0,
+   "wm_cv_ants": 0.0515334516838662,
+   "wm_cv_excluded": 0.0515334516838662,
+   "wm_cv_input": 0.08646223991196894
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00000/magnitude_wf/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00000/magnitude_wf/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 180224,
+   "zero": 82705,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 2816,
+   "included": 2816,
+   "zero": 1302,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.5635660242187039,
+   "p99": 0.3083714324402153,
+   "median": 0.04103271641516837
+  },
+  "change_brain": null,
+  "larmorx_seconds": 0.5,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 2.2104789281107706e-05,
+   "p99": 7.976425491615902e-06,
+   "median": 5.338653954467532e-07
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 1.7191174510822194e-05,
+   "p99": 6.0424265127334445e-06,
+   "median": 7.83411551408264e-07
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00000/magnitude_wf/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 0.9619805360615762,
+   "shape_max": 0.6253613930902031,
+   "shape_p99": 0.35891494375547217,
+   "shape_median": 0.01372624134845779
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00001/magnitude_wf/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00001/magnitude_wf/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 180224,
+   "zero": 83679,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 2816,
+   "included": 2816,
+   "zero": 1352,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.4139732741802289,
+   "p99": 0.09896042163175514,
+   "median": 0.013559904841671244
+  },
+  "change_brain": null,
+  "larmorx_seconds": 0.5,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.0001388802130870559,
+   "p99": 1.4923723325681587e-05,
+   "median": 7.351977387992648e-07
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00001/magnitude_wf/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 0.9870007858021723,
+   "shape_max": 0.4325958950792932,
+   "shape_p99": 0.09728781426158253,
+   "shape_median": 0.004271169403772479
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00002/magnitude_wf/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00002/magnitude_wf/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 180224,
+   "zero": 86407,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 2816,
+   "included": 2816,
+   "zero": 1368,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.5117839055224334,
+   "p99": 0.1930560762841011,
+   "median": 0.02394728546318592
+  },
+  "change_brain": null,
+  "larmorx_seconds": 0.7,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 2.1253283035038706e-05,
+   "p99": 4.434032237972118e-06,
+   "median": 5.197916383981038e-07
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00002/magnitude_wf/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 0.9991342936177601,
+   "shape_max": 0.5130938004824386,
+   "shape_p99": 0.19340727975293667,
+   "shape_median": 0.024160465964491284
+  }
+ },
+ {
+  "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00003/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds001600-sub-1-noreconall/work/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00003/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 384000,
+   "zero": 189540,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 6000,
+   "included": 6000,
+   "zero": 2950,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.47352066674548343,
+   "p99": 0.21110665714451846,
+   "median": 0.06991172842750981
+  },
+  "change_brain": null,
+  "larmorx_seconds": 0.8,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 3.6623160863724635e-05,
+   "p99": 3.6164803536220553e-06,
+   "median": 2.723115828939804e-07
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds001600-sub-1-noreconall/fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00003/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 1.0692411858680857,
+   "shape_max": 0.37809942809972763,
+   "shape_p99": 0.17338130069744367,
+   "shape_median": 0.014861202253153072
+  }
+ },
+ {
+  "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-002_T1w_noise_corrected.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' -r --shrink-factor 4 --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 15842304,
+   "zero": 9438153,
+   "negative": 86009
+  },
+  "shrunk": {
+   "shrunk_voxels": 849600,
+   "included": 35692,
+   "zero": 9,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.2447883714554916,
+   "p99": 0.23982756084182322,
+   "median": 0.177084535982028
+  },
+  "change_brain": {
+   "max": 0.2447883714554916,
+   "p99": 0.24078360030020823,
+   "median": 0.23265163768836272
+  },
+  "larmorx_seconds": 6.8,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 5.684586410481529e-06,
+   "p99": 4.934014373203509e-06,
+   "median": 3.886518156970276e-06
+  },
+  "band_brain": {
+   "max": 5.667528739428107e-06,
+   "p99": 4.8992597907338015e-06,
+   "median": 4.38457389972946e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 2.6543048154969995e-06,
+   "p99": 2.2783670218684546e-06,
+   "median": 1.0216782529992585e-06
+  },
+  "analysis": {
+   "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "region": "brain",
+   "scale": 0.7673483623116373,
+   "shape_max": 0.11029953679300686,
+   "shape_p99": 0.054203299702722155,
+   "shape_median": 0.005736962450086591,
+   "wm_cv_ants": 0.035711154492986834,
+   "wm_cv_excluded": 0.03439631905676773,
+   "wm_cv_input": 0.1226619254919603,
+   "weight_cv_ants": 0.03197552624668357,
+   "weight_cv_excluded": 0.031325417071470636,
+   "weight_cv_input": 0.09321995278973012
+  }
+ },
+ {
+  "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/work/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-002_T1w_noise_corrected_maths.nii.gz --convergence '[' 50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 15842304,
+   "zero": 0,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 849600,
+   "included": 248832,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 18.7,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 9.825931693407952e-06,
+   "p99": 6.326528831063217e-06,
+   "median": 5.2421421163906246e-06
+  },
+  "band_brain": {
+   "max": 9.825931693407952e-06,
+   "p99": 8.06501805056259e-06,
+   "median": 5.568085320484251e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 5.65622945691846e-06,
+   "p99": 4.872864252417619e-06,
+   "median": 3.8444520712443975e-06
+  },
+  "analysis": {
+   "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0,
+   "wm_cv_ants": 0.06506825764978359,
+   "wm_cv_excluded": 0.06506825764978359,
+   "wm_cv_input": 0.12266046374626957
+  }
+ },
+ {
+  "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/out/sub-002/func/sub-002_task-clip_run-1_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 163840,
+   "zero": 12166,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 4335,
+   "included": 1042,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.0011385816949519567,
+   "p99": 0.0006065691264084141,
+   "median": 0.00010040731996480146
+  },
+  "band_brain": {
+   "max": 0.000792637960520981,
+   "p99": 0.0003714165446962671,
+   "median": 8.7855339058307e-05
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0
+  }
+ },
+ {
+  "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall/work/fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 163840,
+   "zero": 65295,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 2560,
+   "included": 2560,
+   "zero": 981,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 1.122978157244023,
+   "p99": 0.3119832628148314,
+   "median": 0.05085576159561467
+  },
+  "change_brain": null,
+  "larmorx_seconds": 0.5,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 4.078348710856439e-05,
+   "p99": 5.528753413770455e-06,
+   "median": 2.112563733391859e-06
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds005040-sub-002-noreconall/fmriprep_25_2_wf/sub_002_wf/fmap_preproc_wf/wf_auto_00000/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 1.0481369432750274,
+   "shape_max": 1.0254778451091777,
+   "shape_p99": 0.26454445214906425,
+   "shape_median": 0.018310672187378474
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/n4_correct/mapflow/_n4_correct0",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-16_acq-denoised_T1w_noise_corrected.nii.gz",
+  "weight": false,
+  "full_grid": {
+   "voxels": 17547264,
+   "zero": 6611363,
+   "negative": 848045
+  },
+  "shrunk": {
+   "shrunk_voxels": 274176,
+   "included": 274176,
+   "zero": 103113,
+   "negative": 13533
+  },
+  "change_head": {
+   "max": 0.37611859383854973,
+   "p99": 0.3404269287905701,
+   "median": 0.20806233019151305
+  },
+  "change_brain": {
+   "max": 0.25948961929651737,
+   "p99": 0.22866627123543226,
+   "median": 0.16810447177818072
+  },
+  "larmorx_seconds": 16.8,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.811501940063298e-05,
+   "p99": 1.735331477722979e-05,
+   "median": 1.6247906581612348e-05
+  },
+  "band_brain": {
+   "max": 1.8040244675443518e-05,
+   "p99": 1.6766312306165655e-05,
+   "median": 1.493201555408108e-05
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 3.129134491075547e-06,
+   "p99": 2.407195432074793e-06,
+   "median": 7.333897309447224e-07
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/n4_correct/mapflow/_n4_correct0",
+   "region": "brain",
+   "scale": 0.8318955282218192,
+   "shape_max": 0.10985171144467243,
+   "shape_p99": 0.07279976559881574,
+   "shape_median": 0.013623274216441938,
+   "wm_cv_ants": 0.11124667689034486,
+   "wm_cv_excluded": 0.10511808166331645,
+   "wm_cv_input": 0.11852761224108126
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/n4_correct/mapflow/_n4_correct1",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise1/sub-16_acq-mp2rage_T1w_noise_corrected.nii.gz",
+  "weight": false,
+  "full_grid": {
+   "voxels": 17547264,
+   "zero": 5166998,
+   "negative": 62168
+  },
+  "shrunk": {
+   "shrunk_voxels": 274176,
+   "included": 274176,
+   "zero": 80512,
+   "negative": 994
+  },
+  "change_head": {
+   "max": 0.9819610855470375,
+   "p99": 0.7635619269344466,
+   "median": 0.45080448053802236
+  },
+  "change_brain": {
+   "max": 0.6528885622341514,
+   "p99": 0.6321597464756857,
+   "median": 0.46260105109430805
+  },
+  "larmorx_seconds": 16.1,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.797056885943782e-05,
+   "p99": 1.6951767494928214e-05,
+   "median": 1.5076820822024217e-05
+  },
+  "band_brain": {
+   "max": 1.797056885943782e-05,
+   "p99": 1.740118213795494e-05,
+   "median": 1.568943349838925e-05
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 8.559274932706806e-06,
+   "p99": 7.641792965751293e-06,
+   "median": 5.626551706272576e-06
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/n4_correct/mapflow/_n4_correct1",
+   "region": "brain",
+   "scale": 1.4626010510943082,
+   "shape_max": 0.13010212935200016,
+   "shape_p99": 0.11592955936584001,
+   "shape_median": 0.03048013741294614,
+   "wm_cv_ants": 0.10762401340206379,
+   "wm_cv_excluded": 0.11013104257190645,
+   "wm_cv_input": 0.10667869167379512
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/anat_template_wf/anat_merge/sub-16_acq-denoised_T1w_noise_corrected_template.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' -r --shrink-factor 4 --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 17547264,
+   "zero": 153131,
+   "negative": 2638293
+  },
+  "shrunk": {
+   "shrunk_voxels": 968750,
+   "included": 33471,
+   "zero": 0,
+   "negative": 43
+  },
+  "change_head": {
+   "max": 0.5146561465910251,
+   "p99": 0.42214879819314544,
+   "median": 0.1955837564906613
+  },
+  "change_brain": {
+   "max": 0.47463035565786393,
+   "p99": 0.3891794816056026,
+   "median": 0.13081311757919967
+  },
+  "larmorx_seconds": 9.0,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.740169769059996e-05,
+   "p99": 8.224305660053943e-06,
+   "median": 7.151641743252668e-07
+  },
+  "band_brain": {
+   "max": 1.7163946320231105e-05,
+   "p99": 1.1084964104401962e-05,
+   "median": 3.933357012986249e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 1.4541186241334714e-05,
+   "p99": 7.8666090099766e-06,
+   "median": 4.767794122839675e-07
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "region": "brain",
+   "scale": 0.8695276363807739,
+   "shape_max": 0.3957987965409854,
+   "shape_p99": 0.30089840529691425,
+   "shape_median": 0.09925218889590892,
+   "wm_cv_ants": 0.07555324508292129,
+   "wm_cv_excluded": 0.08661564136537961,
+   "wm_cv_input": 0.0755514944317841,
+   "weight_cv_ants": 0.07624975190992529,
+   "weight_cv_excluded": 0.06889232711230028,
+   "weight_cv_input": 0.07624779492328711
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-16_acq-denoised_T1w_noise_corrected_template_maths.nii.gz --convergence '[' 50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 17547264,
+   "zero": 0,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 968750,
+   "included": 274176,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 22.6,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.7711296624312034e-05,
+   "p99": 1.5957189459178126e-05,
+   "median": 6.633735407546304e-06
+  },
+  "band_brain": {
+   "max": 1.7711296624312034e-05,
+   "p99": 1.6699601791780874e-05,
+   "median": 1.4065484390701766e-05
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 2.6430330566373783e-06,
+   "p99": 2.434637441601774e-06,
+   "median": 1.9533728088383384e-06
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0,
+   "wm_cv_ants": 0.07868195453111376,
+   "wm_cv_excluded": 0.07868195453111376,
+   "wm_cv_input": 0.0755514075752369
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/bold_task_rest_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/out/sub-16/func/sub-16_task-rest_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/bold_task_rest_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 2457600,
+   "zero": 24693,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 181476,
+   "included": 9775,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 1.9,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 2.895321934648365e-06,
+   "p99": 2.0883137464533516e-06,
+   "median": 2.415202102756808e-07
+  },
+  "band_brain": {
+   "max": 2.675223577330854e-06,
+   "p99": 2.136255026410349e-06,
+   "median": 1.361410210454217e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 6.499029261419764e-07,
+   "p99": 4.715137008393099e-07,
+   "median": 1.681788468488321e-07
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/bold_task_rest_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0
+  }
+ },
+ {
+  "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/fmap_preproc_wf/wf_gre16/magnitude_wf/brainextraction_wf/n4",
+  "arguments": "-d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall/work/fmriprep_25_2_wf/sub_16_wf/fmap_preproc_wf/wf_gre16/magnitude_wf/brainextraction_wf/clipper_pre/clipped.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 878080,
+   "zero": 416161,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 13328,
+   "included": 13328,
+   "zero": 6190,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.4125530118590728,
+   "p99": 0.18309236533547166,
+   "median": 0.024118159239056913
+  },
+  "change_brain": null,
+  "larmorx_seconds": 1.1,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.00010697702791917507,
+   "p99": 1.0360100700528305e-05,
+   "median": 3.7985728826850362e-06
+  },
+  "band_brain": null,
+  "larmorx_vs_ants1_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "analysis": {
+   "node": "ds005454-sub-16-noreconall/fmriprep_25_2_wf/sub_16_wf/fmap_preproc_wf/wf_gre16/magnitude_wf/brainextraction_wf/n4",
+   "region": "head",
+   "scale": 0.9783234236109334,
+   "shape_max": 0.39953703043039135,
+   "shape_p99": 0.18044189750821368,
+   "shape_median": 0.010788676923428775
+  }
+ },
+ {
+  "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/work/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/anat_template_wf/denoise/mapflow/_denoise0/sub-ON01016_ses-01_acq-FSPGR_rec-SCIC_T1w_noise_corrected.nii.gz --convergence '[' 50x50x50x50x50, 1e-07 ']' -r --shrink-factor 4 --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/work/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/apply_wm_prior/prodmap.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 12845056,
+   "zero": 8123013,
+   "negative": 88849
+  },
+  "shrunk": {
+   "shrunk_voxels": 749075,
+   "included": 15275,
+   "zero": 4,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.11041468614422356,
+   "p99": 0.071137558203463,
+   "median": 0.029524111908675543
+  },
+  "change_brain": {
+   "max": 0.09954382201639456,
+   "p99": 0.07418001718945419,
+   "median": 0.06704038877791263
+  },
+  "larmorx_seconds": 5.0,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.538345501939098e-05,
+   "p99": 6.918786437175596e-06,
+   "median": 3.620854677421903e-06
+  },
+  "band_brain": {
+   "max": 1.538345501939098e-05,
+   "p99": 6.873306194368213e-06,
+   "median": 2.4920514406501226e-06
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 3.4837369139117946e-05,
+   "p99": 2.7995326840090114e-05,
+   "median": 9.223450185835702e-07
+  },
+  "analysis": {
+   "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0",
+   "region": "brain",
+   "scale": 0.9329596112220874,
+   "shape_max": 0.03760060556754352,
+   "shape_p99": 0.016416789418259952,
+   "shape_median": 0.0024410594462051516,
+   "wm_cv_ants": 0.035135197350215745,
+   "wm_cv_excluded": 0.03479125053227763,
+   "wm_cv_input": 0.08699720134639156,
+   "weight_cv_ants": 0.049758957327789795,
+   "weight_cv_excluded": 0.04971452730305368,
+   "weight_cv_input": 0.08030471209536724
+  }
+ },
+ {
+  "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/work/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/truncate_images/mapflow/_truncate_images0/sub-ON01016_ses-01_acq-FSPGR_rec-SCIC_T1w_noise_corrected_maths.nii.gz --convergence '[' 50x50x50x50, 1e-07 ']' --shrink-factor 4",
+  "weight": false,
+  "full_grid": {
+   "voxels": 12845056,
+   "zero": 0,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 749075,
+   "included": 200704,
+   "zero": 0,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "change_brain": {
+   "max": 0.0,
+   "p99": 0.0,
+   "median": 0.0
+  },
+  "larmorx_seconds": 17.4,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 1.1840634026483166e-05,
+   "p99": 1.1583404257992091e-05,
+   "median": 1.1438551413389675e-05
+  },
+  "band_brain": {
+   "max": 1.1455101507240606e-05,
+   "p99": 1.1119331465246907e-05,
+   "median": 1.0699107414691156e-05
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 6.0457278703296424e-06,
+   "p99": 5.80502670554095e-06,
+   "median": 5.606389761103614e-06
+  },
+  "analysis": {
+   "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/anat_fit_wf/brain_extraction_wf/inu_n4/mapflow/_inu_n40",
+   "region": "brain",
+   "scale": 1.0,
+   "shape_max": 0.0,
+   "shape_p99": 0.0,
+   "shape_median": 0.0,
+   "wm_cv_ants": 0.05933201661739742,
+   "wm_cv_excluded": 0.05933201661739742,
+   "wm_cv_input": 0.08699720134639156
+  }
+ },
+ {
+  "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_forward_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/out/sub-ON01016/ses-01/func/sub-ON01016_ses-01_task-rest_dir-forward_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/work/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_forward_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 196608,
+   "zero": 3462,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 12615,
+   "included": 778,
+   "zero": 1,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.12857684910805212,
+   "p99": 0.04594412979533439,
+   "median": 0.005139553094770544
+  },
+  "change_brain": {
+   "max": 0.03875202841156655,
+   "p99": 0.017607649004901027,
+   "median": 0.009059348956077962
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.0017377472391357784,
+   "p99": 0.0010448336456616745,
+   "median": 0.0002044282048218049
+  },
+  "band_brain": {
+   "max": 0.0010010916259930447,
+   "p99": 0.000613637228872994,
+   "median": 0.00017945903534510865
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 0.0017705609527809418,
+   "p99": 0.0009890477706451682,
+   "median": 0.0003145180634340772
+  },
+  "analysis": {
+   "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_forward_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 1.009056208168101,
+   "shape_max": 0.029429302355096,
+   "shape_p99": 0.011843422319524151,
+   "shape_median": 0.0010247982588982296
+  }
+ },
+ {
+  "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_reverse_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+  "arguments": "--bspline-fitting '[' 200 ']' -d 3 --input-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/out/sub-ON01016/ses-01/func/sub-ON01016_ses-01_task-rest_dir-reverse_desc-hmc_boldref.nii.gz -r --weight-image /home/karelo/VScode_projects/super_fmriprep/oracles/fmriprep-25.2.6/ds005752-sub-ON01016-noreconall/work/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_reverse_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/fix_header/tpl-MNI152NLin2009cAsym_res-01_label-brain_probseg_trans_fixhdr.nii.gz",
+  "weight": true,
+  "full_grid": {
+   "voxels": 196608,
+   "zero": 3630,
+   "negative": 0
+  },
+  "shrunk": {
+   "shrunk_voxels": 12615,
+   "included": 771,
+   "zero": 3,
+   "negative": 0
+  },
+  "change_head": {
+   "max": 0.06559947135688193,
+   "p99": 0.03213126359631294,
+   "median": 0.0037633722526143054
+  },
+  "change_brain": {
+   "max": 0.05688671618263319,
+   "p99": 0.023688798969505348,
+   "median": 0.002344864368936106
+  },
+  "larmorx_seconds": 0.3,
+  "ants_threads": [
+   1,
+   6
+  ],
+  "band_head": {
+   "max": 0.004449467159538756,
+   "p99": 0.002897062958776319,
+   "median": 0.0013167714788514528
+  },
+  "band_brain": {
+   "max": 0.0040168124351709356,
+   "p99": 0.0029912078167326013,
+   "median": 0.002408007859373118
+  },
+  "larmorx_vs_ants1_head": {
+   "max": 0.0007876101057426865,
+   "p99": 0.0005683514566786108,
+   "median": 0.00036319434360654324
+  },
+  "analysis": {
+   "node": "ds005752-sub-ON01016-noreconall/fmriprep_25_2_wf/sub_ON01016_ses_01_wf/bold_ses_01_task_rest_dir_reverse_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+   "region": "brain",
+   "scale": 0.9983835238868477,
+   "shape_max": 0.05859791442473372,
+   "shape_p99": 0.025346246684981966,
+   "shape_median": 0.001484746490257427
+  }
+ }
+]

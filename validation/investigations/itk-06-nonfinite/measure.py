@@ -115,9 +115,8 @@ def run_inputs() -> list[dict]:
                     path = cmd.parent / token
                 if not path.is_file():
                     continue
-                rec = seen.setdefault(
-                    path, {"file": str(path.relative_to(WS)), "programs": set(), "runs": set()}
-                )
+                shown = str(path.relative_to(WS)) if path.is_relative_to(WS) else str(path)
+                rec = seen.setdefault(path, {"file": shown, "programs": set(), "runs": set()})
                 rec["programs"].add(program)
                 rec["runs"].add(run.name)
     out = []
@@ -184,7 +183,7 @@ def downstream(threads: int) -> list[dict]:
         ).denoised,
         "Atropos (K-means, 3 classes, head mask)": lambda im: lx.ants.atropos(
             im, mask, classes=3, n_threads=threads
-        ).segmentation,
+        ).labels,
     }
     out = []
     for name, f in tools.items():

@@ -123,13 +123,25 @@ pub struct N4Result {
     pub notices: Vec<Notice>,
 }
 
-/// The voxels N4 uses: mask not 0 and confidence above 0.
+/// The voxels N4 uses: mask not 0 and confidence above 0 (ITK's test).
 fn included(mask: Option<&[f32]>, confidence: Option<&[f32]>, len: usize) -> Vec<usize> {
     (0..len)
         .filter(|&i| {
             mask.is_none_or(|m| m[i] != 0.0) && confidence.is_none_or(|c| f64::from(c[i]) > 0.0)
         })
         .collect()
+}
+
+/// ANTS-40: of the voxels ITK uses, those whose value has no logarithm (0, negative, NaN):
+/// their count and how many are 0.
+fn nonpositive(input: &[f32], voxels: &[usize]) -> (usize, usize) {
+    let bad: Vec<f32> = voxels
+        .iter()
+        .map(|&i| input[i])
+        .filter(|&v| v.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater))
+        .collect();
+    let zeros = bad.iter().filter(|&&v| v == 0.0).count();
+    (bad.len(), zeros)
 }
 
 /// The exponent of the histogram's padded size: ITK's `ceil(logf(bins) / log(2.0)) + 1`
@@ -441,7 +453,35 @@ pub fn n4_bias_field(
     if p.bins == 0 {
         return Err(FilterError::invalid("N4 needs at least one histogram bin"));
     }
-    let voxels = included(mask, confidence, len);
+    let mut notices = Notices::new(p.upstream_defects);
+    let mut voxels = included(mask, confidence, len);
+    // ANTS-40: ITK log-transforms only the values above 0 and keeps 0 and negative values as
+    // they are, inside its log image (0 is the log of an intensity of 1). Corrected: they take
+    // no part in the histogram, the fit or the convergence measure, as a mask would leave
+    // them out.
+    let (bad, zeros) = nonpositive(input, &voxels);
+    if bad > 0 {
+        let what = format!(
+            "{bad} of the {} voxels N4 uses have no logarithm ({zeros} are 0, {} negative or \
+             NaN)",
+            voxels.len(),
+            bad - zeros
+        );
+        notices.add(
+            &defects::ANTS_40,
+            if p.upstream_defects.fix() {
+                format!(
+                    "{what}: they are left out of the histogram and the fit; ITK keeps them in \
+                     its log image as they are (0 is the log of 1)"
+                )
+            } else {
+                format!("{what}: they stay in the log image as they are, as in ITK")
+            },
+        );
+        if p.upstream_defects.fix() {
+            voxels.retain(|&i| input[i] > 0.0);
+        }
+    }
     let weights: Vec<f32> = match confidence {
         Some(c) => voxels.iter().map(|&i| c[i]).collect(),
         None => vec![1.0; voxels.len()],
@@ -475,7 +515,6 @@ pub fn n4_bias_field(
         .map(|a| grid.origin[a] + grid.spacing[a] * grid.start[a] as f64)
         .collect();
 
-    let mut notices = Notices::new(p.upstream_defects);
     let mut log_uncorrected = log_input.clone();
     let mut log_bias = vec![0.0f32; len];
     let mut lattice: Option<Lattice> = None;
@@ -607,6 +646,44 @@ mod tests {
         assert_eq!(a.iterations.len(), 9);
         assert_eq!(a.lattice.size, [5, 5, 5]);
         assert!(a.lattice.data.iter().all(|v| v.is_finite()));
+    }
+
+    /// ANTS-40: zero and negative voxels are left out of the fit by default, which is the
+    /// same as a mask of the positive voxels; ITK keeps them in its log image.
+    #[test]
+    fn nonpositive_voxels_are_left_out() {
+        let (mut data, grid) = phantom();
+        for (i, v) in data.iter_mut().enumerate() {
+            if i % 9 == 0 {
+                *v = 0.0;
+            } else if i % 23 == 0 {
+                *v = -5.0;
+            }
+        }
+        let mut p = N4Parameters::itk_defaults(3);
+        p.iterations = vec![5, 4];
+        p.convergence_threshold = 0.0;
+        let fixed = n4_bias_field(&data, &grid, None, None, &p, 2, None).unwrap();
+        assert_eq!(fixed.notices[0].defect.id, "ANTS-40");
+        let positive: Vec<f32> = data.iter().map(|&v| f32::from(u8::from(v > 0.0))).collect();
+        let masked = n4_bias_field(&data, &grid, Some(&positive), None, &p, 2, None).unwrap();
+        assert_eq!(fixed.lattice, masked.lattice);
+        assert!(masked.notices.is_empty());
+        p.upstream_defects = UpstreamDefects::Reproduce;
+        let ants = n4_bias_field(&data, &grid, None, None, &p, 2, None).unwrap();
+        assert_ne!(ants.lattice, fixed.lattice);
+        assert!(
+            ants.notices[0].detail.contains("as in ITK"),
+            "{:?}",
+            ants.notices
+        );
+        // Without such voxels the two modes agree and nothing is named.
+        let (clean, _) = phantom();
+        let a = n4_bias_field(&clean, &grid, None, None, &p, 1, None).unwrap();
+        p.upstream_defects = UpstreamDefects::Fix;
+        let b = n4_bias_field(&clean, &grid, None, None, &p, 1, None).unwrap();
+        assert_eq!(a, b);
+        assert!(a.notices.is_empty());
     }
 
     #[test]

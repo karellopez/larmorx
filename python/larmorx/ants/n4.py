@@ -105,8 +105,11 @@ def n4_bias_field_correction(
     (``docs/findings/ants-n4.md``).
 
     ITK's filter defects are corrected: the histogram's range (ANTS-38: ITK can leave out a
-    first voxel that is the unique minimum) and its FFT size (ANTS-39: 256 bins give 1024
-    points instead of 512). ``upstream_defects="reproduce"`` gives ANTs' result.
+    first voxel that is the unique minimum), its FFT size (ANTS-39: 256 bins give 1024 points
+    instead of 512), and the voxels whose value is 0 or negative (ANTS-40: ITK keeps them in its
+    log image, a zero as the log of 1, so a zero background without a mask pulls the field;
+    larmorx leaves them out of the fit, as a mask of the positive voxels would).
+    ``upstream_defects="reproduce"`` gives ANTs' result.
     """
     check(upstream_defects)
     source, header, ndim = _source(image)

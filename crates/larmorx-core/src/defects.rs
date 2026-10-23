@@ -196,6 +196,8 @@ defects! {
         "the histogram's range is found with else-if, so a first included voxel that is the unique minimum is left out of the histogram";
     ANTS_39 = "ANTS-39", "N4BiasFieldCorrection", true,
         "256 histogram bins give a 1024-point FFT instead of 512 (a float logarithm divided by a double one)";
+    ANTS_40 = "ANTS-40", "N4BiasFieldCorrection", true,
+        "the voxels N4 uses whose value is 0 or negative stay in its log image as they are (0, the log of an intensity of 1), inside the histogram it sharpens and the bias field's fit: without a mask, a zero background or zero-filled voxels pull the field";
     ANTS_43 = "ANTS-43", "DenoiseImage", true,
         "the Rician correction factor overflows at high signal-to-noise ratios and the bias becomes 0";
     ANTS_44 = "ANTS-44", "DenoiseImage", true,

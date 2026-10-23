@@ -146,6 +146,25 @@ inside a log image. Without a mask, a raw image's zero background is therefore p
 histogram at log value 0 (the same as an intensity of 1). *Read; validated*
 (`inputs/outliers`).
 
+**Corrected by default (ANTS-40, decided 2026-10-23: measured first, then rule A).** Measured on
+fMRIPrep 25.2.6's 25 N4 calls of the five oracle runs
+([investigation](../../validation/investigations/ants-40-n4-nonpositive/README.md)): 16 include
+non-positive voxels (every final anatomical N4: 1 to 9 zeros, or ds005454's 43 negative values;
+3 of 6 BOLD references; every field-map magnitude, about half its voxels; ds005454's T1w-template
+N4s, 116,646 and 81,506 of 274,176). Leaving them out (what a mask of the positive voxels does)
+changes the field far beyond ANTs' thread band (2e-6 to 3e-3 of the field): a global factor of
+0.77 to 1.46 and its shape by 0.6 % to 36 % (99th percentile). It is the better correction
+wherever that can be measured: on phantoms with a known field the shape error falls from 0.026
+to 0.0097; on fMRIPrep's final N4s the white matter's coefficient of variation (over the N4's own
+weight region) falls in all five runs; and on ds005454 sub-16 ANTs' final N4 corrects nothing at
+all (its field is 1.0000 to 1.0002: 43 negative values, whose logs stretch the histogram until the
+tissue sits in one or two bins and the sharpening does nothing) where the correction fits a field
+of 0.49 to 1.16 and lowers the CV from 0.0762 to 0.0689. A non-positive value has no logarithm and
+N4 models the log intensities of tissue, so larmorx's default leaves such voxels out of the
+histogram, the fit and the convergence measure, names ANTS-40 with their count, and `reproduce`
+keeps ITK's log image (bit for bit: record `ants-n4`). *Validated* (unit test: the default equals
+the run with a mask of the positive voxels, bit for bit; the record's fix pass).
+
 **Levels and iterations** (`N4.hxx:182-244`). At each level the loop runs while
 `iterations < max[level]` and `convergence > threshold`. One iteration sharpens the current
 log image, fits a B-spline to the residual `log image - sharpened`, adds the fitted lattice to

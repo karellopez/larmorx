@@ -22,8 +22,9 @@
 //! larmorx computes ITK's single-thread result with any number of threads
 //! (`docs/findings/ants-n4.md`).
 //!
-//! ITK's defects in the filter (ANTS-38, ANTS-39, [`larmorx_image::n4`]) are corrected unless
-//! [`N4Options::upstream_defects`] is [`UpstreamDefects::Reproduce`].
+//! ITK's defects in the filter (ANTS-38, ANTS-39, ANTS-40: the zero and negative voxels left out
+//! of the fit, [`larmorx_image::n4`]) are corrected unless [`N4Options::upstream_defects`] is
+//! [`UpstreamDefects::Reproduce`].
 
 use larmorx_core::defects::{Notice, UpstreamDefects};
 use larmorx_image::bspline::evaluate;
@@ -68,7 +69,7 @@ pub struct N4Options {
     /// `-r`: rescale to the input's intensity range in the mask. ANTs does this only when a
     /// mask is given (and does it by default then); without a mask this has no effect.
     pub rescale_intensities: bool,
-    /// Correct the filter's defects (ANTS-38, ANTS-39; the default) or reproduce them.
+    /// Correct the filter's defects (ANTS-38, ANTS-39, ANTS-40; the default) or reproduce them.
     pub upstream_defects: UpstreamDefects,
 }
 

@@ -73,14 +73,25 @@ def main() -> int:
                 c = data[wm] / b[wm]
                 rec[f"wm_cv_{label}"] = float(c.std() / c.mean())
             rec["wm_cv_input"] = float(data[wm].std() / data[wm].mean())
+        # fMRIPrep's final WM map is FAST's on the image ANTs' N4 corrected, so it favours
+        # ANTs' field; the final N4's own weight (the brain extraction's WM posterior, computed
+        # before it) is a region neither field shaped.
+        if a["weight"] is not None and "inu_n4_final" in r["node"]:
+            w = np.asanyarray(nib.load(a["weight"]).dataobj) > 0.9
+            if w.sum() > 100:
+                for label, b in (("ants", b_ants), ("excluded", b_exc)):
+                    c = data[w] / b[w]
+                    rec[f"weight_cv_{label}"] = float(c.std() / c.mean())
+                rec["weight_cv_input"] = float(data[w].std() / data[w].mean())
         rows.append({**r, "analysis": rec})
         print(json.dumps(rec), flush=True)
     (args.out / "analysis.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
     print(
-        "| Node | zero voxels used (of included) | global scale | shape change: median, p99, max "
-        "| ANTs' thread band: p99, max | WM CV: input, ANTs, excluded |"
+        "| Node | zero / negative voxels used (of included) | global scale | shape change: median, p99, max "
+        "| ANTs' thread band: p99, max | WM CV: input, ANTs, excluded | weight > 0.9 CV: input, "
+        "ANTs, excluded |"
     )
-    print("|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|")
     for row in rows:
         x, s = row["analysis"], row["shrunk"]
         bb = row.get("band_brain") or row.get("band_head") or {}
@@ -90,13 +101,20 @@ def main() -> int:
             else "–"
         )
 
+        wcv = (
+            f"{x['weight_cv_input']:.4f}, {x['weight_cv_ants']:.4f}, {x['weight_cv_excluded']:.4f}"
+            if "weight_cv_ants" in x
+            else "–"
+        )
+
         def g(v):
             return "–" if v is None else f"{v:.2g}"
 
         print(
-            f"| `{row['node']}` | {s['zero']} of {s['included']} | {x['scale']:.4f} | "
+            f"| `{row['node']}` | {s['zero']} / {s['negative']} of {s['included']} | "
+            f"{x['scale']:.4f} | "
             f"{g(x['shape_median'])}, {g(x['shape_p99'])}, {g(x['shape_max'])} | "
-            f"{g(bb.get('p99'))}, {g(bb.get('max'))} | {cv} |"
+            f"{g(bb.get('p99'))}, {g(bb.get('max'))} | {cv} | {wcv} |"
         )
     return 0
 

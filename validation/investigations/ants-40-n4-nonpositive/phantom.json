@@ -1,0 +1,47 @@
+[
+ {
+  "phantom": "zero-background",
+  "voxels": 1032192,
+  "zero_voxels": 768640,
+  "ants": {
+   "field_shape_error": 0.025972309827985696,
+   "wm_cv": 0.02706295167315657,
+   "uncorrected_wm_cv": 0.06596437841653824
+  },
+  "excluded": {
+   "field_shape_error": 0.009668425048439311,
+   "wm_cv": 0.025471699645419316,
+   "uncorrected_wm_cv": 0.06596437841653824
+  }
+ },
+ {
+  "phantom": "zero-dropout",
+  "voxels": 1032192,
+  "zero_voxels": 773901,
+  "ants": {
+   "field_shape_error": 0.026432148586294786,
+   "wm_cv": 0.14478700127492136,
+   "uncorrected_wm_cv": 0.1570405662059784
+  },
+  "excluded": {
+   "field_shape_error": 0.009612543902717393,
+   "wm_cv": 0.14451557477685467,
+   "uncorrected_wm_cv": 0.1570405662059784
+  }
+ },
+ {
+  "phantom": "noisy-background",
+  "voxels": 1032192,
+  "zero_voxels": 0,
+  "ants": {
+   "field_shape_error": 0.1112025119380903,
+   "wm_cv": 0.02571310080067887,
+   "uncorrected_wm_cv": 0.06596437841653824
+  },
+  "excluded": {
+   "field_shape_error": 0.1112025119380903,
+   "wm_cv": 0.02571310080067887,
+   "uncorrected_wm_cv": 0.06596437841653824
+  }
+ }
+]

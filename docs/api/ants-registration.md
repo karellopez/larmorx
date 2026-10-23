@@ -32,11 +32,11 @@ line, standard error, every file), most against the unmodified binary, the rest 
 
 | Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
 |---|---|---|---|---|---|---|
-| standard | 505 | 346 | 44 | 93 | 22 | 0 |
+| standard | 505 | 347 | 44 | 93 | 21 | 0 |
 | full (A5 part 2's run) | 441 | 278 | 68 | 77 | 18 | 0 |
 | full, the velocity-field cases ([record](../validation/ants-registration-velocity-full.md)) | see the record | | | | | |
 
-The standard record was re-run by A5 part 3 (2026-10-22, from `393b190`) with the
+The standard record was re-run by A5 part 3 (2026-10-23, from `a9401a6`) with the
 velocity-field cases (the `exponential`, `bspline-exponential`, `time-varying` and
 `time-varying-bspline` categories: every metric, masks, sampling, 2D and float, the outputs and
 the collapse, initial transforms, every message and failure; `corrections`: the paths of the
@@ -47,9 +47,11 @@ stage in place of its SyN stage, on every third voxel): every one of the 102 new
 (81 compared: 73 identical to the unmodified ANTs, 8 with CORE-MATH, the four real ones among
 them, through glibc's `log` in their Mattes stages; 16 rejected by both; 5 expected divergences:
 three samplings ANTs seeds from the clock, ANTS-82; an affine stage after a velocity field,
-ANTS-72; a mesh size of 0, ANTS-77). Its fix pass shows each correction of this part. The full
-tier's new cases (4D, the other four oracle runs on every third voxel, the exponential stages
-at full size) ran separately, from the same commit ([record](../validation/ants-registration-velocity-full.md));
+ANTS-72; a mesh size of 0, ANTS-77); and `syn/exponential`, an expected divergence while
+larmorx refused the stage, is now compared (identical to the unmodified ANTs). Its fix pass shows
+each correction of this part. The full tier's new cases (4D, the other four oracle runs on every
+third voxel, the exponential stages at full size) ran separately, beside it
+([record](../validation/ants-registration-velocity-full.md));
 the full record above is A5 part 2's. What the corrections change is measured in
 [ants-registration-corrections](../validation/ants-registration-corrections.md) (19 cases).
 The standard record was re-run by A5 part 2 (2026-10-20, from `9a4d65a`) with the B-spline and
@@ -94,10 +96,10 @@ time-varying B-spline mesh of 0 (ANTS-77). The velocity-field stages, an expecte
 while larmorx refused them (`syn/exponential`), are compared since A5 part 3.
 
 **ANTs' own thread band** (the standard record's 36 cases, 2, 4 and 8 threads against one; A5
-part 3 added the four velocity-field stages: 0 to 1.9e-6 on the phantoms, 0.18 mm with the
-exponential stage and 0.40 mm with the time-varying field on sMRIPrep's registration, where
-larmorx lies within 0.11 and 0.27 mm of ANTs at one thread as built, and is identical with
-CORE-MATH; earlier parts' 24 cases:
+part 3 added the four velocity-field stages: 0 to 1.9e-6 on the phantoms; on sMRIPrep's
+registration 0.28 mm with the exponential stage and 0.96 mm with the time-varying field (0.18 and
+0.40 mm in the run before: the band changes from run to run), where larmorx lies within 0.11 and
+0.27 mm of ANTs at one thread as built, and is identical with CORE-MATH; earlier parts' 24 cases:
 about 1e-13 to 1e-12 in a transform parameter in double, 3.9e-10 on fMRIPrep's BOLD-reference
 affine (3.5e-9 in A4 part 2's run: the band itself changes from run to run), 4.9e-3 on a float
 affine and up to 1.1e-16 with the point-set metrics; the B-spline stages (A5 part 2): 8.9e-16 for

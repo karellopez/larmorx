@@ -392,6 +392,10 @@ defects! {
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,
         "one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN";
+    FSL_40 = "FSL-40", "bet2", true,
+        "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
+    FSL_42 = "FSL-42", "bet2", true,
+        "numeric options without meaning are used as given: a NaN threshold (-f, -g), a negative, NaN or infinite radius (-r), a smoothness of 0 or less (-w), a centre (-c) or search depth (--parameter_d1/d2) that is not finite";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

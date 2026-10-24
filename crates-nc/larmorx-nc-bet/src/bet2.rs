@@ -1,0 +1,1251 @@
+// SPDX-License-Identifier: LicenseRef-FSL
+// Copyright 2026 Karel Lopez Vilaret (the translation).
+//! `bet2`: FSL's brain extraction (fsl-bet2 2111.8, `bet2.cpp`; S. M. Smith, "Fast robust
+//! automated brain extraction", Human Brain Mapping 17(3), 2002), translated line by line.
+//!
+//! A tessellated sphere (an icosahedron subdivided 4 times: 2562 vertices) is placed at the
+//! image's centre of gravity with half the estimated head radius, then deformed for 1000
+//! iterations: each vertex moves along its neighbours' tangential mean, along its normal by a
+//! smoothness term (`tanh` of the local curvature), and along its normal by an intensity term
+//! that compares the minimum and maximum intensities found inward along the normal with a
+//! threshold between the robust minimum and the local maximum (`-f`, `-g`). A mesh whose
+//! vertices crossed is deformed again from the start with a stronger smoothness, up to 10 times.
+//! The brain is the inside of the final mesh (a flood fill from the mesh's centroid).
+
+use std::io::Write;
+
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
+
+use crate::fsl::cstr::g6;
+use crate::fsl::fdlibm;
+use crate::fsl::options::{ArgFlag, Opt, OptionParser, Value};
+use crate::fsl::volume::{self, FslSettings, ImageError, Volume};
+use crate::fsl::{arma, glibc_pow};
+use crate::mesh::{Mesh, V3};
+
+const NORMAL_MAX_UPDATE_FRACTION: f64 = 0.5;
+const LAMBDA_FIT: f64 = 0.1;
+const TITLE: &str = "BET (Brain Extraction Tool) v2.1 - FMRIB Analysis Group, Oxford";
+const EXAMPLES: &str = "bet2 <input_fileroot> <output_fileroot> [options]";
+
+/// `bet_parameters`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BetParameters {
+    pub min: f64,
+    pub max: f64,
+    pub t98: f64,
+    pub t2: f64,
+    pub t: f64,
+    pub tm: f64,
+    pub radius: f64,
+    pub cog: V3,
+}
+
+/// MISCMATHS' `Min` (the second operand unless the first is smaller) and `Max`.
+#[inline]
+fn fmin(a: f64, b: f64) -> f64 {
+    if a < b { a } else { b }
+}
+
+#[inline]
+fn fmax(a: f64, b: f64) -> f64 {
+    if a > b { a } else { b }
+}
+
+/// C's `(int) x` for a double (x86-64: `INT_MIN` out of range).
+#[inline]
+fn trunc_i(x: f64) -> i64 {
+    i64::from(volume::c_to_i32(x))
+}
+
+/// The options of `bet2`, in the order FSL adds them (the order of `-h`).
+pub fn parser() -> OptionParser {
+    let b = |key, help| Opt {
+        key,
+        default: Value::Bool(false),
+        help,
+        compulsory: false,
+        flag: ArgFlag::NoArgument,
+        visible: true,
+    };
+    let f = |key, default: f32, help, n, visible| Opt {
+        key,
+        default: Value::Float(default),
+        help,
+        compulsory: false,
+        flag: ArgFlag::Requires(n),
+        visible,
+    };
+    OptionParser::new(
+        TITLE,
+        EXAMPLES,
+        vec![
+            b("-o,--outline", "generate brain surface outline overlaid onto original image"),
+            b("-m,--mask", "generate binary brain mask"),
+            b("-s,--skull", "generate approximate skull image"),
+            b("-n,--nooutput", "don't generate segmented brain image output"),
+            f(
+                "-f",
+                0.5,
+                "~<f>\t\tfractional intensity threshold (0->1); default=0.5; smaller values give larger brain outline estimates",
+                1,
+                true,
+            ),
+            f(
+                "-g",
+                0.0,
+                "~<g>\t\tvertical gradient in fractional intensity threshold (-1->1); default=0; positive values give larger brain outline at bottom, smaller at top",
+                1,
+                true,
+            ),
+            f(
+                "-r,--radius",
+                0.0,
+                "~<r>\thead radius (mm not voxels); initial surface sphere is set to half of this",
+                1,
+                true,
+            ),
+            f(
+                "-w,--smooth",
+                1.0,
+                "~<r>\tsmoothness factor; default=1; values smaller than 1 produce more detailed brain surface, values larger than one produce smoother, less detailed surface",
+                1,
+                true,
+            ),
+            f(
+                "-c",
+                0.0,
+                "~<x y z>\tcentre-of-gravity (voxels not mm) of initial mesh surface.",
+                3,
+                true,
+            ),
+            b("-t,--threshold", "-apply thresholding to segmented brain image and mask"),
+            b("--ct", "-treat input as CT image (default is MRI)"),
+            b("-e,--mesh", "generates brain surface as mesh in vtk format"),
+            b("-v,--verbose", "switch on diagnostic messages"),
+            b("-h,--help", "displays this help, then exits"),
+            f("--parameter_d1", 7.0, "~<d1>\tintensity search depth d1 ( default 7 ).", 1, false),
+            f("--parameter_d2", 3.0, "~<d2>\tintensity search depth d2 ( default 3 ).", 1, false),
+        ],
+    )
+}
+
+/// What `bet2` was asked to do.
+#[derive(Clone, Debug)]
+pub struct Bet2Args {
+    pub outline: bool,
+    pub mask: bool,
+    pub skull: bool,
+    pub no_output: bool,
+    pub frac: f32,
+    pub grad: f32,
+    pub radius: f32,
+    pub smooth: f32,
+    pub centre: Option<[f32; 3]>,
+    pub threshold: bool,
+    pub ct: bool,
+    pub mesh: bool,
+    pub verbose: bool,
+    pub d1: f32,
+    pub d2: f32,
+}
+
+impl Default for Bet2Args {
+    fn default() -> Self {
+        Bet2Args {
+            outline: false,
+            mask: false,
+            skull: false,
+            no_output: false,
+            frac: 0.5,
+            grad: 0.0,
+            radius: 0.0,
+            smooth: 1.0,
+            centre: None,
+            threshold: false,
+            ct: false,
+            mesh: false,
+            verbose: false,
+            d1: 7.0,
+            d2: 3.0,
+        }
+    }
+}
+
+/// The surface and masks bet2 computes.
+pub struct Bet2Result {
+    pub params: BetParameters,
+    pub mesh: Mesh,
+    /// 0 inside the brain (and on the surface), 1 outside: bet2's `brainmask`.
+    pub outside: Volume<i16>,
+    pub passes: i32,
+}
+
+/// `adjust_initial_mesh`: the thresholds, the radius, the centre of gravity, the median
+/// intensity inside the initial sphere; the mesh moved and scaled there. `Err` when no voxel
+/// lies strictly between the robust limits inside the sphere (FSL-41).
+pub fn adjust_initial_mesh(
+    image: &Volume<f32>,
+    m: &mut Mesh,
+    rad: f64,
+    xpara: f64,
+    ypara: f64,
+    zpara: f64,
+    warn: &mut String,
+) -> Result<BetParameters, usize> {
+    let mut bp = BetParameters::default();
+    let (mx, mn) = image.extrema();
+    bp.min = f64::from(mn);
+    bp.max = f64::from(mx);
+    let (t2f, t98f) = image.robust_limits();
+    let (t2, t98) = (f64::from(t2f), f64::from(t98f));
+    let t = t2 + 0.1 * (t98 - t2);
+    bp.t98 = t98;
+    bp.t2 = t2;
+    bp.t = t;
+    let (nx, ny, nz) = (image.xsize(), image.ysize(), image.zsize());
+    let (xd, yd, zd) = (
+        f64::from(image.xdim),
+        f64::from(image.ydim),
+        f64::from(image.zdim),
+    );
+    if rad == 0.0 {
+        let mut counter: i64 = 0;
+        for k in 0..nz {
+            for j in 0..ny {
+                for i in 0..nx {
+                    let c = f64::from(image.value(i, j, k));
+                    if c > t {
+                        counter += 1;
+                    }
+                }
+            }
+        }
+        let mut radius = glibc_pow::pow(
+            0.75 * counter as f64 * xd * yd * zd / std::f64::consts::PI,
+            1.0 / 3.0,
+        );
+        let mut dimensionality: i16 = 3;
+        // image.xsize() * image.xdim(): int64 * float, in float
+        // counter * dim * dim: int64 * float * float, in float; then / M_PI / size in double
+        let flat = |a: f32, b: f32, size: i64| {
+            f64::from(counter as f32 * a * b) / std::f64::consts::PI / size as f64
+        };
+        if f64::from(nx as f32 * image.xdim) < radius {
+            radius = glibc_pow::pow(flat(image.ydim, image.zdim, nx), 1.0 / 2.0);
+            dimensionality -= 1;
+        }
+        if f64::from(ny as f32 * image.ydim) < radius {
+            radius = glibc_pow::pow(flat(image.xdim, image.zdim, ny), 1.0 / 2.0);
+            dimensionality -= 1;
+        }
+        if f64::from(nz as f32 * image.zdim) < radius {
+            radius = glibc_pow::pow(flat(image.xdim, image.ydim, nz), 1.0 / 2.0);
+            dimensionality -= 1;
+        }
+        if dimensionality < 2 {
+            warn.push_str("Warning: Image appears to be 1D\n");
+        }
+        bp.radius = radius;
+    } else {
+        bp.radius = rad;
+    }
+    let center = if xpara == 0.0 && ypara == 0.0 && zpara == 0.0 {
+        // `double counter` (kept double "to preserve old results")
+        let mut counter = 0.0f64;
+        let tmp = t - t2;
+        let mut c3 = V3::default();
+        for k in 0..nz {
+            for j in 0..ny {
+                for i in 0..nx {
+                    let mut c = f64::from(image.value(i, j, k)) - t2;
+                    if c > tmp {
+                        c = fmin(c, t98 - t2);
+                        counter += c;
+                        let p = V3::new(c * i as f64 * xd, c * j as f64 * yd, c * k as f64 * zd);
+                        c3 = V3::new(c3.x + p.x, c3.y + p.y, c3.z + p.z);
+                    }
+                }
+            }
+        }
+        V3::new(c3.x / counter, c3.y / counter, c3.z / counter)
+    } else {
+        V3::new(xpara * xd, ypara * yd, zpara * zd)
+    };
+    bp.cog = center;
+    m.translation(center.x, center.y, center.z);
+    m.rescale(bp.radius / 2.0, center);
+
+    // tm: the median of the intensities strictly between t2 and t98 inside the sphere
+    let mut vm: Vec<f64> = Vec::new();
+    let r2 = bp.radius * bp.radius;
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let d = f64::from(image.value(i, j, k));
+                // i * xdim: int * float, in float
+                let p = V3::new(
+                    f64::from(i as f32 * image.xdim),
+                    f64::from(j as f32 * image.ydim),
+                    f64::from(k as f32 * image.zdim),
+                );
+                let dp = p.sub(center);
+                if d > t2 && d < t98 && dp.dot(dp) < r2 {
+                    vm.push(d);
+                }
+            }
+        }
+    }
+    let med = vm.len() / 2;
+    if vm.is_empty() {
+        return Err(0);
+    }
+    // nth_element(med - 1) then the largest of the first med values: the (med-1)-th smallest
+    // value; with one value (med 0), libstdc++ returns it.
+    let tm = if med == 0 {
+        vm[0]
+    } else {
+        let (_, nth, _) = vm.select_nth_unstable_by(med - 1, |a, b| a.total_cmp(b));
+        *nth
+    };
+    bp.tm = tm;
+    Ok(bp)
+}
+
+/// `step_of_computation`.
+#[allow(clippy::too_many_arguments)]
+pub fn step_of_computation(
+    image: &Volume<f32>,
+    m: &mut Mesh,
+    bet_main_parameter: f64,
+    pass: i32,
+    increase_smoothing: f64,
+    iteration_number: i32,
+    l: &mut f64,
+    t2: f64,
+    tm: f64,
+    t: f64,
+    e: f64,
+    f: f64,
+    zcog: f64,
+    radius: f64,
+    local_th: f64,
+    d1: i32,
+    d2: i32,
+) {
+    let (nx, ny, nz) = (image.xsize(), image.ysize(), image.zsize());
+    let xdim = if f64::from(nx as f32 * image.xdim) > radius {
+        f64::from(image.xdim)
+    } else {
+        2.0 * radius
+    };
+    let ydim = if f64::from(ny as f32 * image.ydim) > radius {
+        f64::from(image.ydim)
+    } else {
+        2.0 * radius
+    };
+    let zdim = if f64::from(nz as f32 * image.zdim) > radius {
+        f64::from(image.zdim)
+    } else {
+        2.0 * radius
+    };
+    let dscale = fmin(fmin(fmin(xdim, ydim), zdim), 1.0);
+
+    if iteration_number == 50 || iteration_number % 100 == 0 {
+        *l = 0.0;
+        let mut counter = 0i32;
+        for p in 0..m.points.len() {
+            counter += 1;
+            *l += m.medium_distance_of_neighbours(p);
+        }
+        *l /= f64::from(counter);
+    }
+    let lv = *l;
+    let fit = NORMAL_MAX_UPDATE_FRACTION * LAMBDA_FIT * lv;
+    let d1f = f64::from(d1);
+    let d2f = f64::from(d2);
+    for p in 0..m.points.len() {
+        let n = m.local_normal(p);
+        let dv = m.difference_vector(p);
+        let tmp = dv.dot(n);
+        let sn = V3::new(n.x * tmp, n.y * tmp, n.z * tmp);
+        let st = dv.sub(sn);
+        let u1 = V3::new(st.x * 0.5, st.y * 0.5, st.z * 0.5);
+        let rinv = (2.0 * sn.dot(n).abs()) / (lv * lv);
+        let mut f2 = (1.0 + fdlibm::tanh(f * (rinv - e))) * 0.5;
+        if pass > 0 && tmp > 0.0 {
+            f2 *= increase_smoothing;
+            f2 = fmin(f2, 1.0);
+        }
+        let u2 = sn.scale(f2);
+
+        let coord = m.points[p].coord;
+        let mut f3 = 0.0;
+        let mut local_t = bet_main_parameter;
+        if local_th != 0.0 {
+            local_t = fmin(
+                1.0,
+                fmax(0.0, bet_main_parameter + local_th * (coord.z - zcog) / radius),
+            );
+        }
+        let mut imin = tm;
+        let mut imax = t;
+        let pp = coord.add(n.scale(-1.0));
+        let mut iv = pp.x / xdim + 0.5;
+        let mut jv = pp.y / ydim + 0.5;
+        let mut kv = pp.z / zdim + 0.5;
+        if image.in_bounds(trunc_i(iv), trunc_i(jv), trunc_i(kv)) {
+            let mut im = f64::from(image.value(trunc_i(iv), trunc_i(jv), trunc_i(kv)));
+            imin = fmin(imin, im);
+            imax = fmax(imax, im);
+            let mut nxv = n.x / xdim;
+            let mut nyv = n.y / ydim;
+            let mut nzv = n.z / zdim;
+            let i2 = trunc_i(iv - f64::from(d1.wrapping_sub(1)) * nxv);
+            let j2 = trunc_i(jv - f64::from(d1.wrapping_sub(1)) * nyv);
+            let k2 = trunc_i(kv - f64::from(d1.wrapping_sub(1)) * nzv);
+            nxv *= dscale;
+            nyv *= dscale;
+            nzv *= dscale;
+            if image.in_bounds(i2, j2, k2) {
+                im = f64::from(image.value(i2, j2, k2));
+                imin = fmin(imin, im);
+                let mut gi = 2.0;
+                while gi < d1f {
+                    iv -= nxv;
+                    jv -= nyv;
+                    kv -= nzv;
+                    im = f64::from(image.value(trunc_i(iv), trunc_i(jv), trunc_i(kv)));
+                    imin = fmin(imin, im);
+                    if gi < d2f {
+                        imax = fmax(imax, im);
+                    }
+                    gi += dscale;
+                }
+                imin = fmax(t2, imin);
+                imax = fmin(tm, imax);
+                let tl = (imax - t2) * local_t + t2;
+                f3 = if imax - t2 > 0.0 {
+                    2.0 * (imin - tl) / (imax - t2)
+                } else {
+                    (imin - tl) * 2.0
+                };
+            }
+        }
+        f3 *= fit;
+        let u3 = n.scale(f3);
+        let u = u1.add(u2).add(u3);
+        m.points[p].update_coord = coord.add(u);
+    }
+    m.update();
+}
+
+/// `draw_segment` (on a short image, writing 0).
+fn draw_segment(image: &mut Volume<i16>, p1: V3, p2: V3, mininc: f64, dims: (f64, f64, f64)) {
+    let mut n = p1.sub(p2);
+    let d = n.norm();
+    n.normalize();
+    let mut i = 0.0;
+    while i <= d {
+        let p = p2.add(n.scale(i));
+        let x = trunc_i((p.x / dims.0 + 0.5).floor());
+        let y = trunc_i((p.y / dims.1 + 0.5).floor());
+        let z = trunc_i((p.z / dims.2 + 0.5).floor());
+        if image.in_bounds(x, y, z) {
+            image.set(x, y, z, 0);
+        }
+        i += mininc;
+    }
+}
+
+/// `draw_mesh` (bet2's: the surface drawn as 0 in a short image).
+pub fn draw_mesh(image: &Volume<i16>, m: &Mesh) -> Volume<i16> {
+    let dims = (
+        f64::from(image.xdim),
+        f64::from(image.ydim),
+        f64::from(image.zdim),
+    );
+    let mininc = fmin(dims.0, fmin(dims.1, dims.2)) * 0.5;
+    let mut res = image.clone();
+    for &t in &m.tri_list {
+        let [a, b, c] = m.tris[t].v;
+        let (pa, pb, pc) = (m.points[a].coord, m.points[b].coord, m.points[c].coord);
+        let mut n = pa.sub(pb);
+        let d = n.norm();
+        n.normalize();
+        let mut j = 0.0;
+        while j <= d {
+            let p = pb.add(n.scale(j));
+            draw_segment(&mut res, p, pc, mininc, dims);
+            j += mininc;
+        }
+    }
+    res
+}
+
+/// `draw_mesh_bis`: the outline drawn at the image's maximum, rounding coordinates by
+/// truncation of `x + 0.5`.
+pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
+    let dims = (
+        f64::from(image.xdim),
+        f64::from(image.ydim),
+        f64::from(image.zdim),
+    );
+    let mininc = fmin(dims.0, fmin(dims.1, dims.2)) * 0.5;
+    let mut res = image.clone();
+    let max = f64::from(image.max()) as f32;
+    for &t in &m.tri_list {
+        let [a, b, c] = m.tris[t].v;
+        let (pa, pb, pc) = (m.points[a].coord, m.points[b].coord, m.points[c].coord);
+        let mut n = pa.sub(pb);
+        let d = n.norm();
+        n.normalize();
+        let mut j = 0.0;
+        while j <= d {
+            let p1 = pb.add(n.scale(j));
+            let mut n2 = p1.sub(pc);
+            let d2 = n2.norm();
+            n2.normalize();
+            let mut i = 0.0;
+            while i <= d2 {
+                let p = pc.add(n2.scale(i));
+                let x = trunc_i(p.x / dims.0 + 0.5);
+                let y = trunc_i(p.y / dims.1 + 0.5);
+                let z = trunc_i(p.z / dims.2 + 0.5);
+                if res.in_bounds(x, y, z) {
+                    res.set(x, y, z, max);
+                }
+                i += mininc;
+            }
+            j += mininc;
+        }
+    }
+    res
+}
+
+/// `make_mask_from_mesh`: 1 everywhere, the surface drawn as 0, then 0 filled from the mesh's
+/// centroid. `Err` with the start voxel when it lies outside the image (FSL-43).
+pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh) -> Result<Volume<i16>, [i64; 3]> {
+    let mut mask: Volume<i16> = Volume::copyconvert(image);
+    for v in mask.data.iter_mut() {
+        *v = 1;
+    }
+    let mut mask = draw_mesh(&mask, m);
+    let (xd, yd, zd) = (
+        f64::from(image.xdim),
+        f64::from(image.ydim),
+        f64::from(image.zdim),
+    );
+    let mut c = V3::default();
+    for p in &m.points {
+        c = V3::new(c.x + p.coord.x, c.y + p.coord.y, c.z + p.coord.z);
+    }
+    let f = 1.0 / m.points.len() as f64;
+    c = V3::new(c.x * f, c.y * f, c.z * f);
+    c = V3::new(c.x / xd, c.y / yd, c.z / zd);
+    let start = [trunc_i(c.x), trunc_i(c.y), trunc_i(c.z)];
+    if !mask.in_bounds(start[0], start[1], start[2]) {
+        return Err(start);
+    }
+    let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
+    let mut current: Vec<[i64; 3]> = vec![start];
+    while let Some([x, y, z]) = current.pop() {
+        mask.set(x, y, z, 0);
+        if x - 1 >= 0 && mask.value(x - 1, y, z) == 1 {
+            current.push([x - 1, y, z]);
+        }
+        if y - 1 >= 0 && mask.value(x, y - 1, z) == 1 {
+            current.push([x, y - 1, z]);
+        }
+        if z - 1 >= 0 && mask.value(x, y, z - 1) == 1 {
+            current.push([x, y, z - 1]);
+        }
+        if nx > x + 1 && mask.value(x + 1, y, z) == 1 {
+            current.push([x + 1, y, z]);
+        }
+        if ny > y + 1 && mask.value(x, y + 1, z) == 1 {
+            current.push([x, y + 1, z]);
+        }
+        if nz > z + 1 && mask.value(x, y, z + 1) == 1 {
+            current.push([x, y, z + 1]);
+        }
+    }
+    Ok(mask)
+}
+
+/// `h2c`: Hounsfield units to Cormack units (`--ct`).
+pub fn h2c(image: &Volume<f32>) -> Volume<f32> {
+    let mut result = image.clone();
+    let mx = image.max();
+    let mn = image.min();
+    if mn < -1024.0 {
+        for v in result.data.iter_mut() {
+            if *v < -1024.0 {
+                *v = -1024.0;
+            }
+        }
+    }
+    let mn: f32 = -1024.0;
+    let _range = mx - mn;
+    let scale: f32 = 10.0;
+    let uninteresting_dark: f32 = 900.0;
+    let interesting_mid: f32 = 200.0;
+    for v in result.data.iter_mut() {
+        *v -= mn;
+    }
+    let mut extra1 = result.clone();
+    for v in extra1.data.iter_mut() {
+        *v -= uninteresting_dark;
+        if *v < 0.0 {
+            *v = 0.0;
+        }
+    }
+    let mut extra9 = extra1.clone();
+    for v in extra9.data.iter_mut() {
+        if *v > interesting_mid {
+            *v = interesting_mid;
+        }
+        *v *= scale - 1.0;
+    }
+    for ((r, e9), e1) in result.data.iter_mut().zip(&extra9.data).zip(&extra1.data) {
+        // result = extra9 + extra1 + result
+        let s = *e9 + *e1 + *r;
+        *r = if s > 3000.0 { 100.0 } else { s };
+    }
+    result
+}
+
+/// `find_skull`: an approximate skull image (100 where the skull's outer edge is found along
+/// each vertex's normal).
+pub fn find_skull(image: &Volume<f32>, m: &Mesh, t2: f64, t: f64, t98: f64) -> Volume<f32> {
+    const SKULL_SEARCH: f64 = 30.0;
+    const SKULL_START: f64 = -3.0;
+    let mut result = image.clone();
+    for v in result.data.iter_mut() {
+        *v = 0.0;
+    }
+    let mut volmesh: Volume<i16> = Volume::copyconvert(image);
+    for v in volmesh.data.iter_mut() {
+        *v = 1;
+    }
+    let volmesh = draw_mesh(&volmesh, m);
+    let (xsize, ysize, zsize) = (
+        volmesh.xsize() as f64,
+        volmesh.ysize() as f64,
+        volmesh.zsize() as f64,
+    );
+    let (xdim, ydim, zdim) = (
+        f64::from(volmesh.xdim),
+        f64::from(volmesh.ydim),
+        f64::from(volmesh.zdim),
+    );
+    let scale = fmin(xdim, fmin(ydim, zdim));
+    let interp = |p: V3| f64::from(image.interpolate(p.x as f32, p.y as f32, p.z as f32));
+    let inside = |p: V3| p.x >= 0.0 && p.y >= 0.0 && p.z >= 0.0 && p.x < xsize && p.y < ysize && p.z < zsize;
+    for i in 0..m.points.len() {
+        let mut max_neighbour = 0.0;
+        let normal = m.local_normal(i);
+        let n = V3::new(normal.x / xdim, normal.y / ydim, normal.z / zdim);
+        let me = m.points[i].coord;
+        for &nei in &m.points[i].neighbours {
+            max_neighbour = fmax(me.sub(m.points[nei].coord).norm(), max_neighbour);
+        }
+        max_neighbour = (max_neighbour / 2.0).ceil();
+        let mp = V3::new(me.x / xdim, me.y / ydim, me.z / zdim);
+        let kz0 = trunc_i((mp.z - max_neighbour / zdim).floor());
+        let kz1 = trunc_i((mp.z + max_neighbour / zdim).floor());
+        let jy0 = trunc_i((mp.y - max_neighbour / ydim).floor());
+        let jy1 = trunc_i((mp.y + max_neighbour / ydim).floor());
+        let ix0 = trunc_i((mp.x - max_neighbour / xdim).floor());
+        let ix1 = trunc_i((mp.x + max_neighbour / xdim).floor());
+        for ck in kz0..=kz1 {
+            for cj in jy0..=jy1 {
+                for ci in ix0..=ix1 {
+                    let point = V3::new(ci as f64, cj as f64, ck as f64);
+                    let realpoint = V3::new(ci as f64 * xdim, cj as f64 * ydim, ck as f64 * zdim);
+                    let mut compute = false;
+                    if volmesh.get(ci, cj, ck) == 0 {
+                        let mut mindist = 10000.0;
+                        for &nei in &m.points[i].neighbours {
+                            mindist = fmin(realpoint.sub(m.points[nei].coord).norm(), mindist);
+                        }
+                        if mindist >= realpoint.sub(me).norm() {
+                            compute = true;
+                        }
+                    }
+                    if !compute {
+                        continue;
+                    }
+                    let mut maxval = t;
+                    let mut minval = interp(point);
+                    let mut d_max = 0.0;
+                    let mut d = 0.0;
+                    while d < SKULL_SEARCH {
+                        let current = point.add(n.scale(d));
+                        let val = interp(current);
+                        if val > maxval {
+                            maxval = val;
+                            d_max = d;
+                        }
+                        if val < minval {
+                            minval = val;
+                        }
+                        d += scale * 0.5;
+                    }
+                    let _ = minval;
+                    if maxval > t {
+                        let mut d_min = SKULL_START;
+                        let mut max_j = -1_000_000.0;
+                        let mut d = SKULL_START;
+                        while d < d_max {
+                            let current = point.add(n.scale(d));
+                            if inside(current) {
+                                let tmpf = d / 30.0 - interp(current) / (t98 - t2);
+                                if tmpf > max_j {
+                                    max_j = tmpf;
+                                    d_min = d;
+                                }
+                            }
+                            d += scale * 0.5;
+                        }
+                        let mut maxgrad = 0.0;
+                        let mut d_skull = 0.0;
+                        let current2 = point.add(n.scale(d_min));
+                        if inside(current2) {
+                            let mut val2 = interp(current2);
+                            let mut d = d_min + scale;
+                            while d < d_max {
+                                let current = point.add(n.scale(d));
+                                if inside(current) {
+                                    let val = interp(current);
+                                    let grad = val - val2;
+                                    val2 = val;
+                                    if grad > 0.0 {
+                                        if grad > maxgrad {
+                                            maxgrad = grad;
+                                            d_skull = d;
+                                        } else {
+                                            d = d_max;
+                                        }
+                                    }
+                                }
+                                d += 0.5 * scale;
+                            }
+                        }
+                        if maxgrad > 0.0 {
+                            let c3 = point.add(n.scale(d_skull));
+                            if inside(c3) {
+                                result.set(trunc_i(c3.x), trunc_i(c3.y), trunc_i(c3.z), 100.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
+/// The settings of a run besides its options.
+pub struct Run<'a> {
+    pub fsl: &'a FslSettings,
+    pub mode: UpstreamDefects,
+}
+
+/// Prints an uncaught exception of the image layer: what FSL printed before aborting, then
+/// larmorx's own line (FSL's program aborts: no defined result in either mode).
+fn report_abort(e: &ImageError, prog: &str, err: &mut dyn Write) -> u8 {
+    let _ = err.write_all(e.printed.as_bytes());
+    if let Some(code) = e.exit {
+        return code;
+    }
+    let what = e.what.replace('\n', " / ");
+    let _ = writeln!(
+        err,
+        "{prog}: stopped: FSL's {prog} aborts here with an uncaught {} ({what}) (larmorx)",
+        e.type_name
+    );
+    1
+}
+
+/// `bet2`'s `main`: `args[0]` is the program name. Returns the exit status.
+pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let mut notices = Notices::new(run.mode);
+    let code = main_inner(args, run, out, err, &mut notices);
+    notices.print(err);
+    code
+}
+
+fn main_inner(
+    args: &[String],
+    run: &Run,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    notices: &mut Notices,
+) -> u8 {
+    let parser = parser();
+    let argc = args.len();
+    if argc < 3 {
+        if argc == 1 {
+            let _ = err.write_all(parser.usage().as_bytes());
+            return 1;
+        }
+        let s = &args[1];
+        if s.contains("-h") || s.contains("--help") {
+            let _ = err.write_all(parser.usage().as_bytes());
+            return 0;
+        }
+        let _ = writeln!(err, "error: not enough arguments, use bet -h for help");
+        return 255;
+    }
+    let inputname = args[1].clone();
+    let outputname = args[2].clone();
+    if inputname.starts_with('-') || outputname.starts_with('-') {
+        let _ = writeln!(
+            err,
+            "error : two first arguments should be input and output names, see bet -h for help"
+        );
+        return 255;
+    }
+    let parsed = match parser.parse(args, 2) {
+        Ok(p) => p,
+        Err((_, what)) => {
+            let _ = err.write_all(parser.usage().as_bytes());
+            let _ = writeln!(err, "\n{what}");
+            return 1;
+        }
+    };
+    let get = |k: &str| parsed.get(&parser, k);
+    let c = get("-c");
+    let a = Bet2Args {
+        outline: get("-o,--outline").bool(),
+        mask: get("-m,--mask").bool(),
+        skull: get("-s,--skull").bool(),
+        no_output: get("-n,--nooutput").bool(),
+        frac: get("-f").float(),
+        grad: get("-g").float(),
+        radius: get("-r,--radius").float(),
+        smooth: get("-w,--smooth").float(),
+        centre: c.set.then(|| [c.float_at(0), c.float_at(1), c.float_at(2)]),
+        threshold: get("-t,--threshold").bool(),
+        ct: get("--ct").bool(),
+        mesh: get("-e,--mesh").bool(),
+        verbose: get("-v,--verbose").bool(),
+        d1: get("--parameter_d1").float(),
+        d2: get("--parameter_d2").float(),
+    };
+    if a.frac < 0.0 || a.frac > 1.0 {
+        let _ = writeln!(err, "\nFractional intensity threshold must be between 0 and 1!");
+        return 1;
+    }
+    if a.grad < -1.0 || a.grad > 1.0 {
+        let _ = writeln!(err, "\nVertical gradient must be between -1 and 1!");
+        return 1;
+    }
+    if get("-h,--help").bool() {
+        let _ = err.write_all(parser.usage().as_bytes());
+        return 0;
+    }
+    // FSL-42 (rule B): values without meaning, which bet2 uses as given.
+    if let Some(what) = meaningless_values(&a) {
+        if notices.fix() {
+            notices.add(
+                &defects::FSL_42,
+                format!("{what}: refused (bet2 computes with it)"),
+            );
+            let _ = writeln!(err, "\nbet2: {what} (larmorx)");
+            return 1;
+        }
+        notices.add(&defects::FSL_42, format!("{what}: used as given, as bet2 does"));
+    }
+    // FSL-40: bet2 removes ".hdr" (and, meaning ".img", ".hdr" again) wherever it appears.
+    let (in_name, out_name) = match strip_names(&inputname, &outputname, notices) {
+        Ok(v) => v,
+        Err(code) => {
+            let _ = writeln!(
+                err,
+                "bet2: stopped: FSL's bet2 aborts here with an uncaught std::out_of_range \
+                 (basic_string::erase: a name with .img but no .hdr, FSL-40) (larmorx)"
+            );
+            return code;
+        }
+    };
+    let out_name = if out_name == "default__default" {
+        format!("{in_name}_brain")
+    } else {
+        out_name
+    };
+    let mut warn = String::new();
+    let testvol: Volume<f32> = match volume::read_volume(&in_name, run.fsl, &mut warn) {
+        Ok(v) => {
+            let _ = err.write_all(warn.as_bytes());
+            v
+        }
+        Err(e) => return report_abort(&e, "bet2", err),
+    };
+    let ctvol = testvol.clone();
+    let testvol = if a.ct { h2c(&testvol) } else { testvol };
+    match compute(&testvol, &a, out, err, notices) {
+        Ok(res) => write_outputs(&testvol, &ctvol, &a, &res, &out_name, run, err),
+        Err(code) => code,
+    }
+}
+
+/// The values bet2 accepts but cannot compute with (FSL-42).
+fn meaningless_values(a: &Bet2Args) -> Option<String> {
+    if a.frac.is_nan() {
+        return Some("the fractional intensity threshold (-f) is not a number".into());
+    }
+    if a.grad.is_nan() {
+        return Some("the vertical gradient (-g) is not a number".into());
+    }
+    if !a.radius.is_finite() || a.radius < 0.0 {
+        return Some(format!(
+            "the head radius (-r) must be a finite number of millimetres, 0 or more (0 estimates it), not {}",
+            g6(f64::from(a.radius))
+        ));
+    }
+    if !a.smooth.is_finite() || a.smooth <= 0.0 {
+        return Some(format!(
+            "the smoothness factor (-w) must be a finite number above 0, not {}",
+            g6(f64::from(a.smooth))
+        ));
+    }
+    if let Some(c) = a.centre
+        && c.iter().any(|v| !v.is_finite())
+    {
+        return Some("the centre (-c) must be three finite numbers of voxels".into());
+    }
+    for (name, v) in [("--parameter_d1", a.d1), ("--parameter_d2", a.d2)] {
+        if !v.is_finite() || !(-2_147_483_648.0..2_147_483_648.0).contains(&v) {
+            return Some(format!(
+                "{name} must be a finite number within the range of an integer, not {}",
+                g6(f64::from(v))
+            ));
+        }
+    }
+    None
+}
+
+/// bet2's handling of `.hdr` and `.img` in the input and output names (FSL-40): it erases
+/// `.hdr` at its first occurrence, and for a name containing `.img` it erases at the position
+/// of `.hdr` (out of range when there is none: std::out_of_range, an abort). The correction
+/// removes the image extension `.hdr` or `.img` only at the end of a name.
+fn strip_names(
+    input: &str,
+    output: &str,
+    notices: &mut Notices,
+) -> Result<(String, String), u8> {
+    let fsl = |s: &str| -> Option<String> {
+        let mut s = s.to_owned();
+        if let Some(p) = s.find(".hdr") {
+            s.replace_range(p..p + 4, "");
+        }
+        if s.contains(".img") {
+            let p = s.find(".hdr")?;
+            s.replace_range(p..(p + 4).min(s.len()), "");
+        }
+        Some(s)
+    };
+    let fixed = |s: &str| -> String {
+        for ext in [".hdr", ".img"] {
+            if let Some(b) = s.strip_suffix(ext) {
+                return b.to_owned();
+            }
+        }
+        s.to_owned()
+    };
+    let mut pair = Vec::new();
+    for name in [output, input] {
+        let original = fsl(name);
+        let corrected = fixed(name);
+        if original.as_deref() != Some(corrected.as_str()) {
+            if notices.fix() {
+                notices.add(
+                    &defects::FSL_40,
+                    format!(
+                        "'{name}' read as '{corrected}' (bet2 {})",
+                        match &original {
+                            Some(o) => format!("reads '{o}'"),
+                            None => "aborts".into(),
+                        }
+                    ),
+                );
+            } else {
+                notices.add(
+                    &defects::FSL_40,
+                    match &original {
+                        Some(o) => format!("'{name}' read as '{o}', as bet2 does"),
+                        None => format!("'{name}': bet2 aborts (std::out_of_range)"),
+                    },
+                );
+            }
+        }
+        if notices.fix() {
+            pair.push(corrected);
+        } else {
+            match original {
+                Some(o) => pair.push(o),
+                None => return Err(1),
+            }
+        }
+    }
+    let input = pair.pop().unwrap_or_default();
+    let output = pair.pop().unwrap_or_default();
+    Ok((input, output))
+}
+
+/// The surface and the brain mask, with bet2's verbose messages.
+pub fn compute(
+    testvol: &Volume<f32>,
+    a: &Bet2Args,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    _notices: &mut Notices,
+) -> Result<Bet2Result, u8> {
+    let (mut xarg, mut yarg, mut zarg) = (0.0f64, 0.0, 0.0);
+    if let Some(c) = a.centre {
+        let v = [f64::from(c[0]), f64::from(c[1]), f64::from(c[2]), 1.0];
+        let v = arma::mul_vec(&testvol.niftivox2newimagevox_mat(), &v);
+        xarg = v[0];
+        yarg = v[1];
+        zarg = v[2];
+    }
+    let bet_main_parameter = glibc_pow::pow(f64::from(a.frac), 0.275);
+    let mut m = Mesh::icosa(5);
+    let mut warn = String::new();
+    let bp = match adjust_initial_mesh(testvol, &mut m, f64::from(a.radius), xarg, yarg, zarg, &mut warn) {
+        Ok(bp) => {
+            let _ = err.write_all(warn.as_bytes());
+            bp
+        }
+        Err(_) => {
+            let _ = err.write_all(warn.as_bytes());
+            let _ = writeln!(
+                err,
+                "bet2: stopped: no voxel inside the initial sphere has an intensity strictly \
+                 between the 2nd and 98th percentiles, so the median brain intensity is \
+                 undefined; FSL's bet2 reads an empty list here and crashes (FSL-41) (larmorx)"
+            );
+            return Err(1);
+        }
+    };
+    if a.verbose {
+        let _ = writeln!(
+            out,
+            "min {} thresh2 {} thresh {} thresh98 {} max {}",
+            g6(bp.min),
+            g6(bp.t2),
+            g6(bp.t),
+            g6(bp.t98),
+            g6(bp.max)
+        );
+        let _ = writeln!(out, "c-of-g {} {} {} mm", g6(bp.cog.x), g6(bp.cog.y), g6(bp.cog.z));
+        let _ = writeln!(out, "radius {} mm", g6(bp.radius));
+        let _ = writeln!(out, "median within-brain intensity {}", g6(bp.tm));
+    }
+    let moriginal = m.copy();
+    let rmin = 3.33 * f64::from(a.smooth);
+    let rmax = f64::from(10.0f32 * a.smooth);
+    let e = (1.0 / rmin + 1.0 / rmax) / 2.0;
+    let f = 6.0 / (1.0 / rmin - 1.0 / rmax);
+    const NB_ITER: i32 = 1000;
+    const SELF_INTERSECTION_THRESHOLD: f64 = 4000.0;
+    let d1 = volume::c_to_i32(f64::from(a.d1));
+    let d2 = volume::c_to_i32(f64::from(a.d2));
+    let grad = f64::from(a.grad);
+    let mut l = 0.0;
+    for i in 0..NB_ITER {
+        step_of_computation(
+            testvol,
+            &mut m,
+            bet_main_parameter,
+            0,
+            0.0,
+            i,
+            &mut l,
+            bp.t2,
+            bp.tm,
+            bp.t,
+            e,
+            f,
+            bp.cog.z,
+            bp.radius,
+            grad,
+            d1,
+            d2,
+        );
+    }
+    let mut msgs = String::new();
+    let tmp = m.self_intersection(&moriginal, &mut msgs);
+    let _ = err.write_all(msgs.as_bytes());
+    if a.verbose && !a.mesh {
+        let _ = writeln!(out, "self-intersection total {} (threshold=4000.0) ", g6(tmp));
+    }
+    let mut self_intersection = if !a.mesh {
+        tmp > SELF_INTERSECTION_THRESHOLD
+    } else {
+        m.real_self_intersection()
+    };
+    let mut pass = 0;
+    if a.verbose && a.mesh && self_intersection {
+        let _ = writeln!(out, "the mesh is self-intersecting ");
+    }
+    while self_intersection {
+        if self_intersection && a.verbose {
+            let _ = writeln!(out, "thus will rerun with higher smoothness constraint");
+        }
+        m.assign(&moriginal);
+        l = 0.0;
+        pass += 1;
+        for i in 0..NB_ITER {
+            let mut incfactor = pow10(pass + 1);
+            if f64::from(i) > 0.75 * f64::from(NB_ITER) {
+                incfactor =
+                    4.0 * (1.0 - f64::from(i) / f64::from(NB_ITER)) * (incfactor - 1.0) + 1.0;
+            }
+            step_of_computation(
+                testvol,
+                &mut m,
+                bet_main_parameter,
+                pass,
+                incfactor,
+                i,
+                &mut l,
+                bp.t2,
+                bp.tm,
+                bp.t,
+                e,
+                f,
+                bp.cog.z,
+                bp.radius,
+                grad,
+                d1,
+                d2,
+            );
+        }
+        let mut msgs = String::new();
+        let tmp = m.self_intersection(&moriginal, &mut msgs);
+        let _ = err.write_all(msgs.as_bytes());
+        self_intersection = if !a.mesh {
+            tmp > SELF_INTERSECTION_THRESHOLD
+        } else {
+            m.real_self_intersection()
+        };
+        if a.verbose && !a.mesh {
+            let _ = writeln!(out, "self-intersection total {} (threshold=4000.0) ", g6(tmp));
+        }
+        if a.verbose && a.mesh && self_intersection {
+            let _ = writeln!(out, "the mesh is self-intersecting");
+        }
+        if pass == 10 {
+            self_intersection = false;
+        }
+    }
+    let outside = match make_mask_from_mesh(testvol, &m) {
+        Ok(v) => v,
+        Err(s) => {
+            let _ = writeln!(
+                err,
+                "bet2: stopped: the surface's centre lies outside the image (voxel {} {} {}), \
+                 where FSL's bet2 starts its fill of the brain mask, writing outside the image \
+                 (FSL-43) (larmorx)",
+                s[0], s[1], s[2]
+            );
+            return Err(1);
+        }
+    };
+    Ok(Bet2Result {
+        params: bp,
+        mesh: m,
+        outside,
+        passes: pass,
+    })
+}
+
+/// `pow(10.0, (double) k)`: exact for these small powers.
+fn pow10(k: i32) -> f64 {
+    let mut v = 1.0;
+    for _ in 0..k {
+        v *= 10.0;
+    }
+    v
+}
+
+/// Writes bet2's outputs: the brain (unless `-n`), `_mask`, `_overlay`, `_mesh.vtk`, `_skull`.
+fn write_outputs(
+    testvol: &Volume<f32>,
+    ctvol: &Volume<f32>,
+    a: &Bet2Args,
+    res: &Bet2Result,
+    out_name: &str,
+    run: &Run,
+    err: &mut dyn Write,
+) -> u8 {
+    let reproduce_offset = run.mode.reproduce();
+    let mut brainmask = res.outside.clone();
+    if a.threshold {
+        let t = res.params.t;
+        for (b, &v) in brainmask.data.iter_mut().zip(&testvol.data) {
+            if f64::from(v) < t {
+                *b = 1;
+            }
+        }
+    }
+    let saved = |r: volume::SaveResult, err: &mut dyn Write| -> Option<u8> {
+        match r {
+            Ok(None) => None,
+            Ok(Some(_)) => Some(255),
+            Err(e) => Some(report_abort(&e, "bet2", err)),
+        }
+    };
+    if !a.no_output {
+        let mut output = if a.ct { ctvol.clone() } else { testvol.clone() };
+        let n = output.nvoxels();
+        for (o, &b) in output.data[..n].iter_mut().zip(&brainmask.data) {
+            *o *= f32::from(1 - b);
+        }
+        if let Some(code) = saved(volume::save_volume(&output, out_name, run.fsl, reproduce_offset), err) {
+            return code;
+        }
+    }
+    if a.mask {
+        let mut m = brainmask.clone();
+        m.display_max = 1.0;
+        m.display_min = 0.0;
+        for v in m.data.iter_mut() {
+            *v = 1 - *v;
+        }
+        if let Some(code) = saved(
+            volume::save_volume(&m, &format!("{out_name}_mask"), run.fsl, reproduce_offset),
+            err,
+        ) {
+            return code;
+        }
+    }
+    if a.outline {
+        let outline = draw_mesh_bis(testvol, &res.mesh);
+        if let Some(code) = saved(
+            volume::save_volume(&outline, &format!("{out_name}_overlay"), run.fsl, reproduce_offset),
+            err,
+        ) {
+            return code;
+        }
+    }
+    if a.mesh {
+        let mut msgs = String::new();
+        res.mesh.save_vtk(&format!("{out_name}_mesh.vtk"), &mut msgs);
+        let _ = err.write_all(msgs.as_bytes());
+    }
+    if a.skull {
+        let skull = find_skull(testvol, &res.mesh, res.params.t2, res.params.t, res.params.t98);
+        let bskull: Volume<i16> = Volume::copyconvert(&skull);
+        if let Some(code) = saved(
+            volume::save_volume(&bskull, &format!("{out_name}_skull"), run.fsl, reproduce_offset),
+            err,
+        ) {
+            return code;
+        }
+    }
+    0
+}

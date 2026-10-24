@@ -49,7 +49,7 @@ starts no other agent.
    (A5 part 3 merged).
 4. **`antsAI -b`: done** (2026-10-23): the blob alignment to full completeness; ANTS-110 to
    ANTS-116, ITK-60; ANTS-106 corrected in Atropos; the ANTs run-to-run variation explained (ANTS-72).
-5. **AFNI 3dAutomask and 3dUnifize: the replicas done** (2026-10-23, in parallel with `antsAI
+5. **AFNI 3dAutomask and 3dUnifize: done, replicas and clean-room originals** (2026-10-23 and 24; the replicas in parallel with `antsAI
    -b`). Both depend on MCW library routines (`docs/licensing.md`), so each has a GPL replica in
    `larmorx-gpl`, bit-identical to AFNI 25.2.09 in every compared case (fMRIPrep's calls on
    every oracle run's BOLD reference, T1w images, BOLD series, at 1, 2 and 6 threads, and
@@ -64,7 +64,7 @@ starts no other agent.
    3dAllineate, 3dcalc, 3dTstat, 3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority).
    Check each program's call graph routine by routine (2026-10-23: the programs' own files can
    be NIH while the library routines they rely on are MCW).
-6. **The evidence infrastructure** (decision log 2026-10-23), after the two parts now running.
+6. **The evidence infrastructure** (decision log 2026-10-23): next.
    **First, the oracle-output cache** (decision log 2026-10-23, "speed at the same quality"): every
    output of an original program kept under a key of the oracle build, inputs, arguments and
    settings, reused by every parity run, so verification re-runs only larmorx; the golden

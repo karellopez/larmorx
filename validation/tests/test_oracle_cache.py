@@ -218,6 +218,31 @@ def test_variables_outside_the_family_do_not_count(cache, fake, workdir):
     assert prepared(fake, src, dst, env=env_for(NSLOTS="3")).key != base.key
 
 
+def test_home_is_named_like_a_place_and_its_logs_do_not_count(cache, tmp_path, workdir):
+    """AFNI prints its HOME (where it appends its crash log): replayed with this run's; the
+    files it writes there and never reads are not in the key."""
+    prog = make_program(
+        tmp_path / "bin",
+        "import os, sys\n"
+        "log = os.path.join(os.environ['HOME'], '.afni.crashlog')\n"
+        "open(log, 'a').write('crash\\n')\n"
+        "print('** Crash log is appended to file', log, file=sys.stderr)\n",
+    )
+    policy = oc.Policy(threads=1, family="afni")
+    homes = []
+    for i in range(2):
+        home = tmp_path / f"lx-gen-{i}" / "home"
+        home.mkdir(parents=True)
+        homes.append(home)
+        oc.begin_case(f"case {i}")
+        r = oc.run([prog], env=env_for(HOME=str(home)), policy=policy)
+        assert r.cached == (i == 1)
+        assert r.stderr == f"** Crash log is appended to file {home}/.afni.crashlog\n"
+    assert len(entries(cache)) == 1
+    # the first run's crash log is in its HOME; the digest of the second's (empty) is the same
+    assert (homes[0] / ".afni.crashlog").is_file()
+
+
 def test_afni_family_reads_home_by_its_contents(cache, fake, workdir, tmp_path):
     _d, src, dst = workdir()
     home1, home2 = tmp_path / "h1", tmp_path / "h2"
@@ -685,6 +710,19 @@ def test_volatile_text_is_masked():
     b = b"ITK ERROR: Filter(0x7f00bb)\nElapsed time (stage 0): 9.87\nElapsed = 1.25 sec\n"
     assert compare.mask(a) == compare.mask(b)
     assert compare.mask(b"value 1.0") != compare.mask(b"value 2.0")
+
+
+def test_hdf5_strings_compare_by_their_contents(tmp_path):
+    """Variable-length strings: their array's bytes are object pointers, never compared."""
+    h5py = pytest.importorskip("h5py")
+    paths = []
+    for name in ("a.h5", "b.h5"):
+        path = tmp_path / name
+        with h5py.File(path, "w") as f:
+            f.create_dataset("TransformGroup/0/TransformType", data=["AffineTransform_double_3_3"])
+            f.attrs["note"] = ["x", "y"]
+        paths.append(path)
+    assert compare.same_file(*paths)[0]
 
 
 def test_hdf5_outputs_compare_by_their_datasets(tmp_path):

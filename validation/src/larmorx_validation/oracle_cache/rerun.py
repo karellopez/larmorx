@@ -12,6 +12,7 @@ else the entry is skipped: a changed oracle has a new key, so its old entries ar
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import tempfile
@@ -84,7 +85,7 @@ def _layout(store: Store, entry: dict, root: Path) -> tuple[Prepared, dict[str, 
         path = Path(_fill(where, values))
         if path.is_dir() and (path == root or path.is_relative_to(root)):
             watched[f"w{i}"] = (path, recursive)
-    prep = Prepared(entry["parts"], places, inputs, [], watched, files, {})
+    prep = Prepared(entry["parts"], places, inputs, [], watched, files, {}, home)
     return prep, values
 
 
@@ -98,6 +99,9 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
     key = entry["key"]
     launcher = entry.get("launcher", {})
     oracle = entry["parts"]["oracle"]
+    home = entry["parts"].get("env", {}).get("HOME")
+    if home is not None and home != f"<directory {hashlib.sha256(b'').hexdigest()}>":
+        return Outcome(key, "skipped", "its HOME held files (only an empty one is made again)")
     with tempfile.TemporaryDirectory(prefix="lx-oracle-rerun-") as t:
         root = Path(t)
         prep, values = _layout(store, entry, root)

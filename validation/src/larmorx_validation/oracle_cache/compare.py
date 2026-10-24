@@ -53,26 +53,31 @@ def first_line_difference(a: bytes, b: bytes) -> str:
     return "the same lines"
 
 
+def _value(v) -> object:
+    """An HDF5 value in a comparable form: numbers by their bytes, strings (and arrays of
+    variable-length strings, whose bytes are object pointers) by their contents."""
+    if isinstance(v, (bytes, str)):
+        return v
+    a = np.asarray(v)
+    if a.dtype.kind == "O":
+        return (a.shape, [x if isinstance(x, (bytes, str)) else repr(x) for x in a.ravel()])
+    return (str(a.dtype), a.shape, a.tobytes())
+
+
 def _h5_content(path: Path) -> list:
     import h5py
 
     items: list = []
 
     def attrs(obj) -> list:
-        out = []
-        for k in sorted(obj.attrs):
-            v = obj.attrs[k]
-            out.append((k, np.asarray(v).tobytes() if not isinstance(v, (str, bytes)) else v))
-        return out
+        return [(k, _value(obj.attrs[k])) for k in sorted(obj.attrs)]
 
     with h5py.File(path, "r") as f:
         items.append(("/", attrs(f)))
 
         def visit(name, obj):
             if isinstance(obj, h5py.Dataset):
-                value = obj[()]
-                data = value if isinstance(value, (bytes, str)) else np.asarray(value).tobytes()
-                items.append((name, str(obj.dtype), obj.shape, data, attrs(obj)))
+                items.append((name, str(obj.dtype), obj.shape, _value(obj[()]), attrs(obj)))
             else:
                 items.append((name, "group", attrs(obj)))
 

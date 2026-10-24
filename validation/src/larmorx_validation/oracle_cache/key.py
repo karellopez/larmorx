@@ -69,6 +69,11 @@ ENV_FAMILIES = {
 }
 
 
+#: Files programs write into ``HOME`` and never read (left out of its digest): AFNI's crash log
+#: and log file.
+WRITTEN_IN_HOME = (".afni.crashlog", ".afni.log")
+
+
 def env_names(family: str | None) -> tuple[str, ...]:
     """The variables in the key of a program of ``family`` (``None``: of any family)."""
     if family is None:
@@ -293,6 +298,9 @@ class Prepared:
     #: the environment's variables that matter, as ``verify`` sets them again: paths as
     #: placeholders, ``LD_PRELOAD`` as written, ``HOME`` as ``{home}``
     rerun_env: dict[str, str] = field(default_factory=dict)
+    #: ``HOME`` when it is in the key (a small directory of the run's, AFNI's): its path in the
+    #: messages is replaced like a place's
+    home: Path | None = None
 
     def watch_roles(self) -> list[tuple[str, bool]]:
         """The watched directories as ``verify`` finds them again: inside a place by its role,
@@ -330,6 +338,7 @@ class _Mapper:
         self.watched: dict[str, tuple[Path, bool]] = {}
         self.files: set[str] = set()
         self.dirs: set[str] = set()
+        self.home: Path | None = None
         self.cwd = cwd
         self.tmp = temp_root()
         if cwd is not None:
@@ -510,11 +519,12 @@ def _env_part(
             home = Path(value)
             if os.path.abspath(value) == os.path.abspath(_real_home()) or not home.is_dir():
                 continue  # the user's home: not part of the key (AFNI's runs set an empty one)
-            digest = directory_digest(home)
+            digest = directory_digest(home, ignore=WRITTEN_IN_HOME)
             if digest is None:
                 raise Uncacheable(f"HOME ({value}) is a large directory, not hashed")
             out[name] = f"<directory {digest}>"
             rerun[name] = "{home}"
+            mapper.home = Path(os.path.abspath(value))
         else:
             out[name], rerun[name] = mapper.env_value(value)
     return out, rerun
@@ -565,7 +575,14 @@ def prepare(
     if extra:
         parts["extra"] = extra
     return Prepared(
-        parts, mapper.places, mapper.inputs, template, mapper.watched, mapper.files, rerun_env
+        parts,
+        mapper.places,
+        mapper.inputs,
+        template,
+        mapper.watched,
+        mapper.files,
+        rerun_env,
+        mapper.home,
     )
 
 

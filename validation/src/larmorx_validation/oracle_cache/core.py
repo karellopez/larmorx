@@ -253,6 +253,8 @@ def _pairs(prep: Prepared, *, storing: bool) -> list[tuple[bytes, bytes]]:
     (and the files beside them) and, when ``storing``, the inputs' file names long enough not
     to be met by chance (replaying knows every input's name)."""
     pairs: list[tuple[str, str]] = [(str(p), n) for n, p in prep.places]
+    if prep.home is not None:
+        pairs.append((str(prep.home), "home"))
     for i, item in enumerate(prep.inputs):
         pairs.append((str(item.path), f"in{i}"))
         for j, (_s, _h, c) in enumerate(item.companions):
@@ -297,7 +299,8 @@ def _fragments(prep: Prepared) -> list[bytes]:
     not hold them."""
     root = temp_root()
     found = set()
-    for path in [p for _, p in prep.places] + [i.path for i in prep.inputs]:
+    homes = [prep.home] if prep.home is not None else []
+    for path in [p for _, p in prep.places] + [i.path for i in prep.inputs] + homes:
         try:
             rel = Path(os.path.abspath(path)).resolve().relative_to(root)
         except ValueError:

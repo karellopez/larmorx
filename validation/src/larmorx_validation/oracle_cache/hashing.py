@@ -103,14 +103,23 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def directory_digest(path: Path, *, max_files: int = 64, max_bytes: int = 1 << 20) -> str | None:
-    """A digest of a small directory's tree (names and contents); ``None`` when it holds more
-    than ``max_files`` files or ``max_bytes`` bytes (a real home directory)."""
+def directory_digest(
+    path: Path,
+    *,
+    max_files: int = 64,
+    max_bytes: int = 1 << 20,
+    ignore: tuple[str, ...] = (),
+) -> str | None:
+    """A digest of a small directory's tree (names and contents), without the files named in
+    ``ignore``; ``None`` when it holds more than ``max_files`` files or ``max_bytes`` bytes (a
+    real home directory)."""
     items = []
     total = 0
     for root, dirs, files in os.walk(path):
         dirs.sort()
         for name in sorted(files):
+            if name in ignore:
+                continue
             p = Path(root) / name
             rel = p.relative_to(path).as_posix()
             try:

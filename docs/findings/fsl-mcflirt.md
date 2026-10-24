@@ -338,7 +338,7 @@ sum stay sequential. Outputs are byte-identical at 1 and 3 threads (golden and p
 image has fsl-mcflirt 2111.0 with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap
 0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the seven mcflirt calls of the
 five fMRIPrep oracle runs, its `.mat` files are identical as text to FSL 6.0.7.17's and to the
-replica's: 1,033 of 1,033 matrices (the replica's record, `docs/validation/fsl-mcflirt-replica.md`,
+replica's: 1,273 of 1,273 matrices (the replica's record, `docs/validation/fsl-mcflirt-replica.md`,
 the `fmriprep/` cases). *Verified* (2026-10-24).
 
 **What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and

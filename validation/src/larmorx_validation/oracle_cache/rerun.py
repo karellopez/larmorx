@@ -77,11 +77,13 @@ def _layout(store: Store, entry: dict, root: Path) -> tuple[Prepared, dict[str, 
     home = root / "home"
     home.mkdir()
     values["home"] = str(home)
+    for d in entry["parts"].get("directories", []):  # the directories inside the places
+        Path(_fill(d, values)).mkdir(parents=True, exist_ok=True)
     watched = {}
-    for name, path in places:
-        if name in files:
-            continue
-        watched[name] = (path, name == "cwd" or re.fullmatch(r"out\d+", name) is not None)
+    for i, (where, recursive) in enumerate(entry.get("watch", [])):
+        path = Path(_fill(where, values))
+        if path.is_dir() and (path == root or path.is_relative_to(root)):
+            watched[f"w{i}"] = (path, recursive)
     prep = Prepared(entry["parts"], places, inputs, [], watched, files, {})
     return prep, values
 

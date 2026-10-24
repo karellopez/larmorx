@@ -294,6 +294,26 @@ class Prepared:
     #: placeholders, ``LD_PRELOAD`` as written, ``HOME`` as ``{home}``
     rerun_env: dict[str, str] = field(default_factory=dict)
 
+    def watch_roles(self) -> list[tuple[str, bool]]:
+        """The watched directories as ``verify`` finds them again: inside a place by its role,
+        elsewhere as written."""
+        out = []
+        for path, recursive in self.watched.values():
+            best = None
+            for name, p in self.places:
+                if name in self.files:
+                    continue
+                if (path == p or under(path, p)) and (
+                    best is None or len(str(p)) > len(str(best[1]))
+                ):
+                    best = (name, p)
+            if best is None:
+                out.append((str(path), recursive))
+            else:
+                rest = path.relative_to(best[1]).as_posix()
+                out.append(("{" + best[0] + "}" + ("" if rest == "." else "/" + rest), recursive))
+        return out
+
     @functools.cached_property
     def key(self) -> str:
         blob = json.dumps(self.parts, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -309,6 +329,7 @@ class _Mapper:
         self._input_index: dict[Path, int] = {}
         self.watched: dict[str, tuple[Path, bool]] = {}
         self.files: set[str] = set()
+        self.dirs: set[str] = set()
         self.cwd = cwd
         self.tmp = temp_root()
         if cwd is not None:
@@ -343,6 +364,10 @@ class _Mapper:
     def _input(self, path: Path) -> str:
         path = Path(os.path.abspath(path))
         if path not in self._input_index:
+            if under(path, self.tmp) and path.parent != self.tmp:
+                # the run may write it (or beside it): its directory is a place, watched
+                self._place(f"d{sum(n.startswith('d') for n, _ in self.places)}", path.parent,
+                            recursive=False)  # fmt: skip
             comps = tuple((suffix(c.name), sha256_file(c), c) for c in companions(path))
             self._input_index[path] = len(self.inputs)
             self.inputs.append(
@@ -390,38 +415,63 @@ class _Mapper:
         rest = path.relative_to(best[1]).as_posix()
         return "{" + best[0] + "}" + ("" if rest == "." else "/" + rest)
 
+    def _watch(self, directory: Path) -> None:
+        """Watch ``directory`` for the files the run writes (unless a watch covers it)."""
+        for w, recursive in self.watched.values():
+            if w == directory or (recursive and under(directory, w)):
+                return
+        self.watched[f"w{len(self.watched)}"] = (directory, False)
+
+    def _note_directories(self, target: Path, anchor: Path) -> None:
+        """The directories that exist between ``target``'s place and ``target`` (``verify``
+        makes them again; they are in the key: a run writing into a missing directory is not
+        one writing into a directory that exists)."""
+        best = None
+        for name, p in self.places:
+            if (anchor == p or under(anchor, p)) and (
+                best is None or len(str(p)) > len(str(best[1]))
+            ):
+                best = (name, p)
+        if best is None:
+            return
+        d = anchor
+        while d != best[1] and under(d, best[1]):
+            self.dirs.add("{" + best[0] + "}/" + d.relative_to(best[1]).as_posix())
+            d = d.parent
+
     def token(self, text: str) -> str:
         """One path-like piece of an argument, with its path replaced."""
         if not text:
             return text
-        if text.startswith("/"):
+        relative = not text.startswith("/")
+        if not relative:
             path = Path(text)
         elif self.cwd is not None or os.sep in text or Path(text).suffix:
             path = (self.cwd or Path.cwd()) / text
-            if not path.is_file():
-                return text  # a relative name: kept as written (its place is the cwd)
+            if not path.is_file() and self.cwd is None:
+                return text  # a relative name, no working directory: kept as written
         else:
             return text
         if path.is_file():
             return "{" + self._input(path) + "}"
-        role = self._role(Path(os.path.abspath(path)))
-        if role is not None:
-            return role
-        if text.startswith("/"):
-            # A directory the run may write in, or a path to be created: a temporary place.
-            target = Path(os.path.abspath(path))
-            anchor = target if target.is_dir() else _existing_ancestor(target)
-            if anchor is not None and under(anchor, self.tmp) and anchor != self.tmp:
-                self._place(
-                    f"d{sum(n.startswith('d') for n, _ in self.places)}", anchor, recursive=False
-                )
-                role = self._role(target)
-                if role is not None:
-                    return role
-            elif anchor is not None and len(anchor.parts) > 3:
-                # Elsewhere: kept as written, but watched: a file the run writes there makes it
-                # impossible to store (the cache could not put it back).
-                self.watched.setdefault(f"w{len(self.watched)}", (anchor, False))
+        # A directory the run may write in, or a path it may create.
+        target = Path(os.path.abspath(path))
+        anchor = target if target.is_dir() else _existing_ancestor(target)
+        role = self._role(target)
+        temporary = anchor is not None and under(anchor, self.tmp) and anchor != self.tmp
+        if role is None and not relative and temporary:
+            # a temporary directory: a place of its own
+            n = sum(name.startswith("d") for name, _ in self.places)
+            self._place(f"d{n}", anchor, recursive=False)
+            role = self._role(target)
+        if role is not None and anchor is not None:
+            self._watch(anchor)
+            self._note_directories(target, anchor)
+            return text if relative else role
+        if not relative and anchor is not None and len(anchor.parts) > 3:
+            # Elsewhere: kept as written, but watched: a file the run writes there makes it
+            # impossible to store (the cache could not put it back).
+            self._watch(anchor)
         return text
 
     def argument(self, arg: str) -> str:
@@ -509,6 +559,7 @@ def prepare(
         ],
         "env": env_part,
         "cwd": "{cwd}" if cwd is not None else None,
+        "directories": sorted(mapper.dirs),
         "machine": machine() | ({} if threads_known else {"cpus": _cpus()}),
     }
     if extra:

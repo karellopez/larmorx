@@ -445,6 +445,7 @@ def _new_entry(
         ],
         "rerun_env": prep.rerun_env,
         "template": prep.template,
+        "watch": [[w, r] for w, r in prep.watch_roles()],
         "launcher": launcher,
         "command": provenance.display(display),
         "runner": runner,
@@ -496,7 +497,6 @@ def _settle(
         return f"ended by a signal, {name} (never stored)"
     try:
         result, files = _capture(store, prep, done, before, policy)
-        _store_inputs(store, prep)
     except Uncacheable as e:
         return f"not storable: {e}"
     fresh_files = {(o["place"], o["path"]): p for o, p in files}
@@ -697,6 +697,10 @@ def _run(
     except Uncacheable as e:
         _fresh(f"not keyable: {e}")
         return execute()
+    except Exception as e:  # the cache never breaks a parity run: it runs, uncached
+        _warn(f"cannot key a run of {program} ({type(e).__name__}: {e}); it runs uncached")
+        _fresh("not keyable: an error in the cache")
+        return execute()
     store.ensure()
     repeated = prep.key in _case.keys
     _case.keys.add(prep.key)
@@ -725,22 +729,38 @@ def _run(
         reason = f"above one thread: not yet {entry['required']} identical runs"
     else:
         reason = "its entry's files are missing"
-    before = _snapshot(prep)
+    try:
+        _store_inputs(store, prep)  # as they are before the run (it may write them)
+        before = _snapshot(prep)
+    except Exception as e:
+        _warn(f"cannot store the inputs of {program} ({type(e).__name__}: {e})")
+        _fresh("not storable: an error in the cache")
+        return execute()
     done = execute()
-    why = _settle(
-        store,
-        prep,
-        done,
-        before,
-        decision,
-        policy,
-        runner,
-        argv,
-        launcher,
-        refreshing=current == "refresh",
-    )
+    try:
+        why = _settle(
+            store,
+            prep,
+            done,
+            before,
+            decision,
+            policy,
+            runner,
+            argv,
+            launcher,
+            refreshing=current == "refresh",
+        )
+    except Exception as e:  # the result stands; only the cache missed it
+        _warn(f"cannot store a run of {program} ({type(e).__name__}: {e})")
+        why = "not storable: an error in the cache"
     _fresh(why or reason)
     return done
+
+
+def _warn(text: str) -> None:
+    import sys
+
+    print(f"oracle cache: {text}", file=sys.stderr, flush=True)
 
 
 __all__ = [

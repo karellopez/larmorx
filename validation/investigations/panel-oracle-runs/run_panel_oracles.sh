@@ -7,12 +7,17 @@
 # not stop the others; every run's status is in the log.
 #
 # Usage: run_panel_oracles.sh <larmorx checkout> [run name ...]   (default: all nine)
-# Log: <workspace>/oracles/logs/panel-oracles.log, last line "PANEL ORACLES FINISHED".
+# Log: <workspace>/oracles/logs/panel-oracles.log, last line "PANEL ORACLES FINISHED". After each
+# run, its RUN_INFO.txt gets the BIDS view it read and the commit of this script; ds004884 also
+# the derived lesion mask (bids_view.py, mask_on_grid).
 set -uo pipefail
 REPO=$(cd "$1" && pwd); shift
 WS=$(cd "$REPO/.." && pwd)
 VIEWS=$WS/oracles/bids-views
 LOG=$WS/oracles/logs/panel-oracles.log
+# The commit of this script and of bids_view.py beside it, recorded in every run's RUN_INFO.txt.
+COMMIT=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse HEAD 2>/dev/null || echo unknown)
+git -C "$(dirname "${BASH_SOURCE[0]}")" diff --quiet HEAD -- . 2>/dev/null || COMMIT="$COMMIT-dirty"
 RUNS=(
   "ds000228 pixar008 ds000228-sub-pixar008-noreconall"
   "ds005003 RS001 ds005003-sub-RS001-noreconall"
@@ -35,5 +40,21 @@ for spec in "${RUNS[@]}"; do
     --fs-no-reconall ${extra:-} > "$WS/oracles/logs/panel-oracle-$name.log" 2>&1
   status=$?
   echo "RUN $name: exit $status after $(( ($(date +%s) - start) / 60 )) min" >> "$LOG"
+  info=$WS/oracles/fmriprep-25.2.6/$name/RUN_INFO.txt
+  if [[ -f $info ]] && ! grep -q '^BIDS view:' "$info"; then
+    {
+      echo "BIDS view: $VIEWS/$ds, the panel's files of $ds hard-linked from the test-data cache"
+      echo "  (larmorx validation/investigations/panel-oracle-runs/bids_view.py, commit $COMMIT)"
+      if [[ $ds == ds004884 ]]; then
+        echo "derived input: sub-M2079/ses-217/anat/sub-M2079_ses-217_label-lesion_roi.nii.gz, sha256"
+        echo "  $(sha256sum "$VIEWS/$ds/sub-M2079/ses-217/anat/sub-M2079_ses-217_label-lesion_roi.nii.gz" | cut -d' ' -f1),"
+        echo "  the dataset's manual lesion mask (derivatives/lesion_masks/sub-M2079/ses-217/anat/"
+        echo "  sub-M2079_ses-217_acq-spc3_run-4_T2w_desc-lesion_mask.nii.gz, drawn on the T2w's grid)"
+        echo "  resampled onto the T1w's grid (sub-M2079_ses-217_acq-tfl3p2_run-3_T1w) by nearest"
+        echo "  neighbour through both files' scanner coordinates, no registration, by bids_view.py's"
+        echo "  mask_on_grid; the test-data catalog keeps the original mask unchanged"
+      fi
+    } >> "$info"
+  fi
 done
 echo "PANEL ORACLES FINISHED $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$LOG"

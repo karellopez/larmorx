@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The GPL replica of 3dUnifize (``larmorx-gpl``, run as a separate process) against AFNI
+"""The clean-room original of 3dUnifize (``larmorx afni 3dUnifize``, in process) against AFNI
 itself, through the AFNI 25.2.09 binary (see validation/)."""
 
 import os
@@ -13,11 +13,9 @@ from larmorx_validation.parity import afni_unifize  # noqa: E402
 
 if ar.afni_binary("3dUnifize") is None:
     pytest.skip("the AFNI 3dUnifize oracle is not available", allow_module_level=True)
-if ar.replica_binary() is None:
-    pytest.skip("the larmorx-gpl binary is not built (crates-gpl)", allow_module_level=True)
 
 TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
-SUITE = afni_unifize.suite()
+SUITE = afni_unifize.suite("original")
 CASES = SUITE.cases(TIER)
 
 

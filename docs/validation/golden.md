@@ -41,6 +41,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | I/O (`lx`, `lx.io`) | 4 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel` |
 | `larmorx-gpl afni 3dTshift` | 25 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms; AFNI's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced: a negative scale factor (AFNI-01), float32 with a slope and an intercept in an oblique sform in metres with header slice code 2 (AFNI-02, -03, -07), a copy keeping slice times within 3 ms of 0 (AFNI-08), `-no_detrend` (AFNI-05), an sform 0.006° from plumb (AFNI-16; the reproduced header is the plumb input's, byte for byte), `-TR` in ms with `AFNI_ALLOW_MILLISECONDS` (AFNI-19, in both modes), int16 with a slope and an intercept under `-DAFNI_NIFTI_SCALE=NO` (AFNI-23, in both modes, and the default's `-rlt -ignore` path, read as without the variable); AFNI's global options and variables: `-overwrite` onto an existing output (written through a temporary file and a rename on every platform), NIfTI-2 output by `-DAFNI_NIFTI_WRITE_TYPE=2` and by the environment; each case also checks the defects named on standard error |
 | `larmorx-gpl afni 3dAutomask`, `3dUnifize` | 16 | 3dAutomask: fMRIPrep's call on an int16 head phantom with `-apply_prefix` and `-depth`; `-eclip -nograd -NN1 -erode`; a 4D series with `-SI`; a 2D slice; `-peels 0` (AFNI-43) in both modes. 3dUnifize: the default on int16 with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-GM -nosquash`; `-T2 -T2`; `-EPI` on a series, and on one with a negative scale factor in both modes (AFNI-01); `-T2up 100` in both modes (AFNI-45); a 2D slice |
+| `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 
 What the coverage test enumerates:
 
@@ -55,14 +56,12 @@ What the coverage test enumerates:
   constants are not functions and are not enforced; the I/O cases read the computed ones
   (`NiftiHeader.affine`, `qform`, `sform`, `itk_geometry`).
 
-- **Tools with only a replica** (3dAutomask and 3dUnifize, until their clean-room originals
-  exist): the main package's command line has no implementation of its own to check, so the
-  coverage test (`test_tools_with_only_a_replica_have_golden_cases_in_crates_gpl`) requires
-  their golden cases in `crates-gpl/larmorx-gpl-cli/tests/golden.tsv` instead, and the Python
-  registry lists `lx.afni.automask` and `lx.afni.unifize` as replica-only
-  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`); `lx.afni.fmriprep_unifize_options`
-  has its own case. 3dUnifize's half-size path (more than a million voxels) and AFNI-47 are
-  beyond the 32³ budget: the parity records cover them (real T1w images; a 720 × 720 × 2 slab).
+- **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize): the cases in
+  `tests/golden/registry.py` run the clean-room original (`implementation="original"`); the
+  replica has its own in `crates-gpl/larmorx-gpl-cli/tests/golden.rs`. No tool has only a
+  replica now (`REPLICA_ONLY_FUNCTIONS` is empty). 3dUnifize's half-size path (more than a
+  million voxels) and AFNI-47 are beyond the golden tests' 32³ limit: the parity suites and
+  the Rust unit tests (`unifize::duplo`, `unifize::wmi` against the spec's method) cover them.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

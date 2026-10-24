@@ -132,13 +132,19 @@ PAGES = [
         "/tools/afni-automask/",
         "3dAutomask",
         "afni",
-        [("larmorx-gpl replica", "afni-automask", "validated", None, None)],
+        [
+            ("clean-room original", "afni-automask", "validated", None, None),
+            ("larmorx-gpl replica", "afni-automask-replica", "validated", None, None),
+        ],
     ),
     (
         "/tools/afni-unifize/",
         "3dUnifize",
         "afni",
-        [("larmorx-gpl replica", "afni-unifize", "validated", None, None)],
+        [
+            ("clean-room original", "afni-unifize", "validated", None, None),
+            ("larmorx-gpl replica", "afni-unifize-replica", "validated", None, None),
+        ],
     ),
     (
         "/tools/mri-hmc/",

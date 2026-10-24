@@ -97,8 +97,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | AFNI-23 | 3dTshift, 3dAutomask, 3dUnifize | both, with `AFNI_NIFTI_SCALE=NO` (command line, or `lx.afni.tshift(afni_settings=...)`) | uint8 and int16 data with a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the values are off by it | AFNI's integers and `scl_slope` kept, the intercept written as `scl_inter`; with `-rlt -ignore`, the data read as without the variable (decided 2026-10-12) |
 | AFNI-26 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error, exit 1 (`reproduce` prints AFNI's message, writes nothing and exits 0: both implementations, since 2026-10-12) |
 | AFNI-43 | 3dAutomask | `lx.afni.automask(peels=0)`, `larmorx afni 3dAutomask -peels 0` | peels once | no peeling, as the help says |
-| AFNI-41 | 3dAutomask | `lx.afni.automask(...)`, `larmorx afni 3dAutomask -nbhrs n` | a value outside 6..26 (the range the help gives) is silently replaced and the peeling acts as with 17 | refused: an error naming AFNI-41 (`reproduce`: AFNI's behaviour) |
-| AFNI-48 | 3dUnifize | `larmorx afni 3dUnifize -T2 -T2 -T2` | three or more `-T2` leave the output inverted, without the clipping (the help documents one and two) | refused: an error naming AFNI-48; with `-EPI` (which implies `-T2` itself) it runs as in AFNI (`reproduce`: AFNI's behaviour) |
+| AFNI-41 | 3dAutomask | `larmorx afni 3dAutomask -nbhrs n`, `lx.afni.automask(neighbours=n)` with n outside 6..26 | 17 used silently | an error (exit 1, `ValueError`); `reproduce` uses 17 (decided 2026-10-23) |
+| AFNI-48 | 3dUnifize | `larmorx afni 3dUnifize -T2 -T2 -T2` | neither the inversion back nor the edge clipping: the output stays inverted | an error (exit 1); `reproduce` gives AFNI's output (decided 2026-10-23); `lx.afni.unifize` accepts `t2` 0 to 2 only |
 | AFNI-45 | 3dUnifize | `lx.afni.unifize(t2=True, t2_percentile=100)`, `-T2up` near 100 | the percentile is read one past the sorted values (memory never written; AFNI read 0 and wrote zeros) | the largest value (the 100th percentile); `reproduce` uses 0 |
 | AFNI-47 | 3dUnifize | inputs of more than a million voxels with an axis of 2 or 3 | the half-size scale image is read past its end | brought back to the input's grid; `reproduce` reads AFNI's image, 0 past its end |
 | AFNI-01 | 3dAutomask, 3dUnifize `-EPI` | a series with a negative `scl_slope` | the factor dropped when the series is averaged (3dAutomask) or its median taken (3dUnifize `-EPI`: all zeros) | the factor applied |
@@ -263,6 +263,8 @@ AFNI entry that applies to them; they have no clean-room original yet. AFNI-40 a
 - **ITK-06** (nifti_clib reads NaN and ±inf as 0) is kept in both modes, by measurement
   (2026-10-23, rule C): no fMRIPrep input has such a value, and keeping them would spread one NaN
   through every smoothing step ([investigation](../../validation/investigations/itk-06-nonfinite/README.md)).
+Their clean-room originals (2026-10-23) have the same switch and the same defaults; their parity
+records' fix passes show each correction where it applies.
 
 ## How the switch is validated
 
@@ -272,7 +274,7 @@ AFNI entry that applies to them; they have no clean-room original yet. AFNI-40 a
   fMRIPrep too, since it compares with fMRIPrep as it ran). A second pass runs the default and
   reports, case by case, which defects were named and what the corrections changed. It also
   checks the rule above: a defect is named exactly when the two passes differ (`D13 fix pass`
-  in the records: [afni-tshift.md](../validation/afni-tshift.md), [afni-automask.md](../validation/afni-automask.md), [afni-unifize.md](../validation/afni-unifize.md),
+  in the records: [afni-tshift.md](../validation/afni-tshift.md), [afni-automask.md](../validation/afni-automask.md) and [afni-automask-replica.md](../validation/afni-automask-replica.md), [afni-unifize.md](../validation/afni-unifize.md) and [afni-unifize-replica.md](../validation/afni-unifize-replica.md),
   [mri-hmc.md](../validation/mri-hmc.md), [resample-series.md](../validation/resample-series.md),
   and every ANTs record, such as [ants-image-math.md](../validation/ants-image-math.md)).
   Where the original's output depends on memory it never wrote, the comparison covers

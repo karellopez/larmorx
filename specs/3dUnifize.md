@@ -234,6 +234,30 @@ automask runs. Then `++ Output dataset ./<name>` (also with `-quiet`; not with
 `AFNI_QUIET_STARTUP`), and unless `-quiet`, `++ ===== Elapsed = %.1f sec` (the elapsed time of
 the run; AFNI 25.2.09 on Linux prints only this, its CPU clock reading 0).
 
+**(observed** by the clean-room implementer, with the AFNI 25.2.09 binary:
+- `-verb` once already prints the automask's messages (the ` + ` lines of
+  `specs/3dAutomask.md` §8.3 step 4, without `++ Forming automask`). `I` and `A` are printed
+  before their automask's lines (` + Pre-processing: A + Fixed clip level = ...`), the final
+  `m` after them;
+- `U` is printed also without the half-size path (`AV.UW[s84]m`); with it, `D` comes after the
+  automask (`ADV..UW[s5027]m`);
+- `-ssave` and `-amsave` print no `Output dataset` line;
+- `-EPI`: `++ -EPI turns off -GM` (with `-GM`), then `++ -EPI changes -Urad to %.1f voxels`, are
+  printed before ` + Pre-processing: `, with `-quiet` too; with `-quiet`, the volumes' dots are
+  printed without the newline after them. `-EPI` sets the `-T2` count to 1 whatever `-T2` gave
+  (`-T2 -T2 -EPI` on one volume inverts back and does not clip edges). `-EPI` on one volume
+  prints the elapsed time, as without `-EPI`;
+- the automask of 3dUnifize works on the signed values (a T1 with negative values gives the
+  output of the spec's rules on them; an all-negative image has an empty automask: `AVUWm`, no
+  dot);
+- the warning of a 4D input without `-EPI` ends with a newline, and the letters continue on the
+  next line (` + Pre-processing: *+ WARNING: Only processing sub-brick #0 (out of 5)` then
+  `AV.UW[s1144]m`);
+- with CORE-MATH's correctly rounded `tanhf` and `cbrtf` preloaded into AFNI, its output is the
+  output of this spec's arithmetic with correctly rounded functions, bit for bit, on the cases
+  where glibc's `tanhf` made them differ (a 4D phantom: 8 values; `-rbt 10 30 60`: 25 values,
+  both within 1.2e-4).**)**
+
 ### 8.3 Failures
 
 - No automask for the WM scaling (§4.1): unless `-quiet` a newline, then "Can't compute

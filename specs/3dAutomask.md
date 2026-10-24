@@ -49,7 +49,9 @@ uni_xform_mask.nii.gz uni_xform.nii.gz` (niworkflows, `init_enhance_and_skullstr
   3dAutomask reads the dataset itself, not a copy, so **a `scl_slope` of exactly 1 with
   `scl_inter` 0 on uint8 or int16 data is kept as a brick factor of 1** (3dTshift's copy has
   none). A factor of 1 scales nothing, but it is copied to `-apply_prefix`'s output, whose
-  `scl_slope` is then 1 (observed; 0 for the copy of 3dTshift).
+  `scl_slope` is then 1 (observed; 0 for the copy of 3dTshift). **(observed** by the clean-room
+  implementer: float32 data with `scl_slope` 1 and `scl_inter` 0, as nibabel writes them, keep
+  the factor of 1 too: `-apply_prefix`'s output has `scl_slope` 1.**)**
 - **Outputs**, each optional:
   - the mask (`-prefix`): uint8, 0 and 1, one volume, no time axis, `scl_slope` 0, the input's
     geometry. With neither `-prefix` nor `-apply_prefix`, AFNI writes it with the prefix
@@ -195,6 +197,12 @@ nothing.
 4. Invert again: the mask is the brain.
 5. With `-eclip`, if step 3 added any voxel: one more peel and restore, then 5.2.
 
+**(observed** by the clean-room implementer: ` + Mask now has %d voxels` counts the mask of
+step 4, before step 5's peel; step 5's ` + Clustering voxels ...` and ` + Largest cluster has
+%d voxels` follow it, so the count of §6.2 can be smaller than that line's (3dAutomask -eclip
+-clfrac 0.2 on a T2-like phantom: `Mask now has 7261`, then `Largest cluster has 7252`,
+`7252 voxels in the mask`).**)**
+
 ## 6. The program's own steps
 
 ### 6.1 `-dilate` and `-erode`
@@ -209,7 +217,11 @@ or `e` is not 0: `w = max(1, rint(0.032 nx), rint(0.032 ny), rint(0.032 nz))`;
 3. fill every hole: invert, keep the largest 6-connected cluster, invert.
 
 With both options, AFNI warns "Combining dilate,erode options is like peels option" (at the
-option scan).
+option scan). **(observed** by the clean-room implementer: the warning comes after the whole
+option scan, when it succeeds (an illegal option or value after or before it stops the program
+without it), before the dataset is opened; whenever both options were given, whatever their
+values (`-dilate 0 -erode 1` too). `++ Dilating automask` is printed only for at least one
+dilation; ` + Eroded   %d voxels` only for an erosion that cleared something.**)**
 
 ### 6.2 Counts, empty planes and `-SI`
 
@@ -254,6 +266,10 @@ Settings of §4 and §5 other than `-clfrac` play no part.
    largest cluster's size; when that is 0 or more than `big`, `big`).
 6. Invert; keep the clusters with at least `trunc(0.9f * (float)big)` pixels (the outside, and
    any hole nearly as large); invert.
+
+**(observed** by the clean-room implementer: a plane's mask prints no ` + ` lines after `++
+Forming automask`; its outputs (the mask, the masked input) are written as 2D NIfTI, `dim[0]`
+2, for a 64 × 64 × 1 input.**)**
 
 ## 8. The command line (`larmorx afni 3dAutomask [options] dataset`)
 
@@ -316,6 +332,13 @@ In order (observed on every parity case, byte for byte):
    mask to original data`, `++ Writing masked data`, `++ Output dataset ./<name>`; with `-depth`:
    `++ Writing depth dataset`, `++ Output dataset ./<name>`;
 9. `++ CPU time = 0.000000 sec` (AFNI 25.2.09's CPU clock reads 0 on Linux).
+
+**(observed** by the clean-room implementer: `++ Output dataset` follows an attempted write when
+a regular file of that name exists afterwards: not after AFNI-11's two errors (nothing
+attempted), not after a failed write into a missing directory or onto a directory of the
+output's name, but after a failed write over a read-only file that `-overwrite` asked to
+replace (the old file is there). With `AFNI_DECONFLICT` starting with upper-case `N`, an
+existing output is AFNI-11's case, as unset.**)**
 
 `%f` is C's six decimals; `%d` and `%5d` integers.
 

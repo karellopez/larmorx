@@ -58,7 +58,9 @@ AFNI is public domain; newer NIH programs call MCW library routines
 
 The clean-room implementer must not open the upstream source, the replica crates, or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
-[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), and the sections of the
+[findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
+[findings/afni-licence-routines.md](findings/afni-licence-routines.md),
+[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
 [defect register](findings/upstream-defects.md) marked **restricted**. What the implementer
 learns from black-box runs goes back into the spec, marked (observed). The models are
 [specs/3dTshift.md](../specs/3dTshift.md) and [specs/mcflirt.md](../specs/mcflirt.md); the

@@ -131,26 +131,15 @@ command-line binary. Code from different families is never linked into one binar
   `thd_dsetto3D.c`, `mri_get_cmass.c`: NIH, public domain), but their results depend on MCW
   routines:
 
-  | MCW routine (GPL-2) | File | What it decides | Program |
-  |---|---|---|---|
-  | `THD_extract_array` | `thd_dsetto1D.c` | a voxel's series and its scaling (positive factors only: AFNI-01) | both (the average of a series; `-EPI`'s median) |
-  | `mri_to_float`, `mri_scale_to_float` | `mri_to_float.c` | one sub-brick as float, its scaling | both |
-  | `mri_max` | `mri_max.c` | the clip level histogram's top | both |
-  | `mri_cut_3D` | `mri_cut.c` | the octants' boxes of the gradual clip level | both |
-  | `THD_countmask` | `thd_makemask.c` | the voxel counts printed, "No voxels?" | 3dAutomask |
-  | `thd_floatscan` | `thd_floatscan.c` | non-finite values set to 0 | both |
-  | `THD_need_brick_factor` | `thd_initdblk.c` | whether factors are applied | both |
-  | `mri_new_vol`, `mri_new_conforming` | `mri_new.c` | zero-filled images | both |
-  | `MCW_spheremask`, `MCW_build_mask` | `edt_buildmask.c` | the ball of the local white-matter level | 3dUnifize |
-  | `qsort_float` (with `cs_qsort_small.h`) | `mri_percents.c` | the sorted ball values; `-T2`'s percentile | 3dUnifize |
-  | `qmed_float` | `cs_qmed.c` | `-GM`'s medians, `-EPI`'s median | 3dUnifize |
-  | `AFNI_prefilter_args`, `THD_filename_ok`, `THD_write_3dim_dataset`, ... | `afni_environ.c`, `thd_filestuff.c`, `thd_writedset.c` | global options, output names, existing outputs | both |
+  The routine-by-routine table (each MCW routine, its file and what it decides) is source-derived
+  and kept in a restricted findings file, [findings/afni-licence-routines.md](findings/afni-licence-routines.md):
+  **clean-room implementers must not read it** (CLAUDE.md rule 1).
 
   3dUnifize's squash also calls the C library's `tanhf` (and `-EPI` `cbrtf`): the replica
   carries a port of glibc 2.35's (LGPL-2.1-or-later, fdlibm's notice; `crates-gpl/NOTICE`),
   checked against glibc on all 2^32 float inputs. So the replicas are in `larmorx-gpl`
   (`crates-gpl/larmorx-gpl-afni`), and `specs/3dAutomask.md` and `specs/3dUnifize.md` are
-  written for the clean-room originals (still to do). The routine-by-routine tables, with
+  written for the clean-room originals. The routine-by-routine tables, with
   file:line, are in the restricted findings `docs/findings/afni-automask.md` and
   `afni-unifize.md`.
 
@@ -187,6 +176,10 @@ the two exchange NIfTI files. Loading a GPL extension module into the Python pro
 one combined work of the two, under the GPL, so it is not done. larmorx knows the replica's
 program name and arguments, nothing more.
 
+The clean-room originals exist since 2026-10-23 (`crates/larmorx-afni`, Apache-2.0: `automask`,
+`unifize`; provenance in `crates/larmorx-afni/PROVENANCE.md`); the main package uses
+CORE-MATH's correctly rounded `tanhf` and `cbrtf` (MIT, `larmorx_core::math`) where AFNI calls the C
+library's.
 - **Python:** `lx.<family>.<tool>(..., implementation="auto")` (built for `lx.afni.tshift`).
   - `"auto"` (the default) runs the replica when its program is found, and the original
     otherwise; `"replica"` and `"original"` force one.

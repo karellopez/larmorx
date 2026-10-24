@@ -347,13 +347,13 @@ mod tests {
             .chain(replica::replica_only("afni"))
             .collect();
         assert_eq!(listed, AFNI_TOOLS);
-        // Without an original, asking for it is an error naming the replica's package.
-        let (code, _, err) = run_capture(&["lx", "afni", "3dAutomask", "-q", "in.nii"]);
-        assert_eq!(code, replica::EXIT_NOT_FOUND);
-        assert!(
-            err.contains("no clean-room original of afni 3dAutomask"),
-            "{err}"
-        );
+        // Every AFNI tool has its clean-room original.
+        assert_eq!(replica::replica_only("afni").count(), 0);
+        for tool in ["3dAutomask", "3dUnifize"] {
+            let (code, out, _) = run_capture(&["lx", "afni", tool]);
+            assert_eq!(code, 0);
+            assert!(out.starts_with(&format!("Usage: {tool}")), "{out}");
+        }
     }
 
     #[test]

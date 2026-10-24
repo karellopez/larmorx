@@ -63,6 +63,7 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
                                                     tier="smoke" if p == "2" else "standard",
                                                     **_python_options(peels=int(p))))
     for n in ("6", "15", "18", "26", "40"):
+        # AFNI-41 (decided 2026-10-23, rule B): outside 6..26 the default refuses.
         add(f"nbhrs-{n}", "options", f"-nbhrs {n} (AFNI uses 17 outside 6..26, AFNI-41)",
             S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="smoke" if n in ("15", "40") else "standard",
               fix_refuses="AFNI-41" if n == "40" else None))
@@ -259,27 +260,45 @@ def _input(name: str):
     return ph.input_path(name)
 
 
-SPEC = ar.ToolSpec(PROGRAM, "automask", _scenario_list, _input)
+#: The implementations this suite validates.
+IMPLEMENTATIONS = ("original", "replica")
+
+
+def spec(implementation: str = "original") -> ar.ToolSpec:
+    if implementation not in IMPLEMENTATIONS:
+        raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
+    return ar.ToolSpec(PROGRAM, "automask", _scenario_list, _input, implementation)
 
 
 def cases(tier: str) -> list[Case]:
-    return ar.cases_of(SPEC, tier)
+    return ar.cases_of(spec(), tier)
 
 
-def run_case(case: Case, checks: CheckList) -> None:
-    ar.run_case(SPEC, case, checks)
+def suite(implementation: str = "original") -> Suite:
+    """The 3dAutomask suite for the clean-room original (``larmorx afni 3dAutomask``, in
+    process) or the GPL replica (``larmorx-gpl afni 3dAutomask``, which larmorx runs as a
+    separate process); both through larmorx's command line and its Python API."""
+    tool_spec = spec(implementation)
+    replica = implementation == "replica"
+    who = "replica" if replica else "original"
 
+    def run_case(case: Case, checks: CheckList) -> None:
+        ar.run_case(tool_spec, case, checks)
 
-def suite() -> Suite:
+    tool = (
+        f"`larmorx-gpl afni 3dAutomask` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
+        "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
+        "separate process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and "
+        '`lx.afni.automask(..., implementation="replica")`'
+        if replica
+        else "`larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 "
+        "clean-room original written from `specs/3dAutomask.md`), with "
+        '`implementation="original"`'
+    )
     return Suite(
-        name="afni-automask",
-        title="3dAutomask (replica)",
-        tool=(
-            f"`larmorx-gpl afni 3dAutomask` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
-            "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
-            "separate process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and "
-            '`lx.afni.automask(..., implementation="replica")`'
-        ),
+        name="afni-automask-replica" if replica else "afni-automask",
+        title="3dAutomask (replica)" if replica else "3dAutomask",
+        tool=tool,
         reference=f"3dAutomask from AFNI ({ar.afni_build(PROGRAM)}), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
             (
@@ -299,16 +318,16 @@ def suite() -> Suite:
         run_case=run_case,
         packages=("nibabel",),
         highlights=lambda results: ar.highlights(
-            results, PROGRAM, "automask", "a missing option value, AFNI-40"
+            results, PROGRAM, "automask", "a missing option value, AFNI-40", who
         ),
         notes=(
             "Both programs run in directories of their own on the same input files, in the same "
             "environment (no AFNI variables of this process, `HOME` an empty directory, "
             "`AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); "
-            "outputs are compared as stored (data bytes, header bytes decompressed). The replica "
+            f"outputs are compared as stored (data bytes, header bytes decompressed). The {who} "
             "is compared in `reproduce` mode; the fix pass runs its default. The real cases also "
             "run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and "
             "report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases "
-            "compare the replica with fMRIPrep's own output of the node as well."
+            f"compare the {who} with fMRIPrep's own output of the node as well."
         ),
     )

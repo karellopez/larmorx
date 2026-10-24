@@ -212,12 +212,21 @@ def run_fmriprep_afni(
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
 
-def run_larmorx(program: str, args: list[str], mode: str, env: dict[str, str], cwd: Path) -> Run:
-    """``larmorx afni <program>`` in process, with the replica forced (it runs the
-    ``larmorx-gpl`` program as a separate process); ``mode`` is D13's choice."""
+def run_larmorx(
+    program: str,
+    args: list[str],
+    mode: str,
+    env: dict[str, str],
+    cwd: Path,
+    implementation: str = "replica",
+) -> Run:
+    """``larmorx afni <program>`` in process, with ``implementation`` forced: the replica (it
+    runs the ``larmorx-gpl`` program as a separate process) or the clean-room original (in
+    process); ``mode`` is D13's choice."""
     from larmorx.cli import run
 
-    env = dict(env, LARMORX_GPL_BIN=str(replica_binary()))
+    if implementation == "replica":
+        env = dict(env, LARMORX_GPL_BIN=str(replica_binary()))
     out, err = io.StringIO(), io.StringIO()
     with (
         process_environment(env, cwd),
@@ -225,7 +234,7 @@ def run_larmorx(program: str, args: list[str], mode: str, env: dict[str, str], c
         contextlib.redirect_stderr(err),
         contextlib.redirect_stdout(out),
     ):
-        code = run(["larmorx", "afni", program, *args], implementation="replica")
+        code = run(["larmorx", "afni", program, *args], implementation=implementation)
     return Run(code, out.getvalue(), err.getvalue(), cwd)
 
 
@@ -373,10 +382,67 @@ def compare_files(a: Path, b: Path) -> Comparison:
     return Comparison(identical, ha == hb, n, total, max_abs, detail)
 
 
+#: The tolerance of the clean-room originals' float32 outputs where the bits are not the spec's
+#: to decide (PLAN.md §11.3, deterministic arithmetic: max |diff| ≤ 1e-5 × max |AFNI output|).
+FLOAT_RTOL = 1e-5
+
+
+#: The value of a header check whose difference AFNI-10 explains (``check_outputs``).
+AFNI_10 = "AFNI-10"
+
+#: The names' ends of the checks against fMRIPrep's own outputs (the oracle runs' node outputs).
+FMRIPREP_OWN = "fMRIPrep's own output (as it ran)"
+FMRIPREP_AFNI = "fMRIPrep's own output against AFNI's"
+
+
+def has_afni_extension(path: Path) -> bool:
+    """Whether a NIfTI-1 file carries AFNI's own header extension (code 4), whose attributes
+    AFNI reads in place of the NIfTI header's geometry (AFNI-10)."""
+    try:
+        raw = path.read_bytes()
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+    except OSError:
+        return False
+    if raw[:4] != b"\x5c\x01\x00\x00" or len(raw) < 360 or raw[348] == 0:
+        return False
+    offset = int(np.frombuffer(raw[108:112], "<f4")[0])
+    pos = 352
+    while pos + 8 <= offset:
+        size, code = np.frombuffer(raw[pos : pos + 8], "<i4")
+        if code == 4:
+            return True
+        if size <= 0:
+            break
+        pos += int(size)
+    return False
+
+
+def without_extensions(src: Path, dst: Path) -> Path:
+    """A copy of the NIfTI-1 file ``src`` without its header extensions (the header's bytes
+    unchanged but ``vox_offset``), uncompressed."""
+    raw = src.read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    offset = int(np.frombuffer(raw[108:112], "<f4")[0])
+    header = bytearray(raw[:348])
+    header[108:112] = np.float32(352.0).tobytes()
+    dst.write_bytes(bytes(header) + b"\x00\x00\x00\x00" + raw[offset:])
+    return dst
+
+
 def check_outputs(
-    checks: CheckList, afni_dir: Path, ours_dir: Path, outputs: tuple[str, ...]
+    checks: CheckList,
+    afni_dir: Path,
+    ours_dir: Path,
+    outputs: tuple[str, ...],
+    tolerance: float | None = None,
+    explain_header: Callable[[str], str | None] | None = None,
 ) -> bool:
-    """Every output of the case: present in both, data and header identical. Returns whether
+    """Every output of the case: present in both, data and header identical. With
+    ``tolerance`` (a clean-room original's float32 outputs), the data may differ by at most
+    ``tolerance`` × max |AFNI output|, and bit-identity is reported. ``explain_header(name)``
+    gives the reason a header that differs is expected (AFNI-10), or ``None``. Returns whether
     every output was found in both."""
     ok = True
     for name in outputs:
@@ -390,18 +456,188 @@ def check_outputs(
             ok = False
             continue
         c = compare_files(a, b)
+        if tolerance is None or c.identical:
+            checks.add(
+                Check(
+                    f"{name}: data",
+                    c.identical,
+                    metric="values that differ",
+                    value=c.differing,
+                    threshold=0,
+                    detail=c.detail,
+                )
+            )
+        else:
+            va = stored(a)
+            scale = float(np.max(np.abs(va.astype(np.float64)))) if va.size else 0.0
+            limit = tolerance * scale
+            within = va.dtype.kind == "f" and np.isfinite(c.max_abs) and c.max_abs <= limit
+            checks.add(
+                Check(
+                    f"{name}: data",
+                    bool(within),
+                    metric="max |diff| / max |AFNI|",
+                    value=c.max_abs / scale if scale else c.max_abs,
+                    threshold=tolerance,
+                    detail=c.detail,
+                )
+            )
+            checks.add(
+                Check(
+                    f"{name}: values bit-identical to AFNI's",
+                    True,
+                    metric="values that differ",
+                    value=c.differing,
+                    threshold="reported",
+                    detail=c.detail,
+                )
+            )
+        reason = None if c.header or explain_header is None else explain_header(name)
+        if reason is not None:
+            checks.add(
+                Check(
+                    f"{name}: header bytes",
+                    True,
+                    metric="header bytes",
+                    value=AFNI_10,
+                    threshold="AFNI's header without its extension (AFNI-10)",
+                    detail=reason,
+                )
+            )
+        else:
+            checks(f"{name}: header bytes", c.header, detail="identical" if c.header else "differ")
+    return ok
+
+
+#: The check of a clean-room original's outputs against AFNI with correctly rounded maths.
+CORRECTLY_ROUNDED = "values bit-identical to AFNI's with correctly rounded maths"
+
+
+def crmath_preload() -> Path | None:
+    """CORE-MATH's correctly rounded functions for ``LD_PRELOAD`` into AFNI
+    (``scripts/build_crmath_preload.sh``), when the build has ``tanhf`` and ``cbrtf`` (3dUnifize's
+    squash and ``-EPI``): ``LARMORX_CRMATH_PRELOAD``, else the workspace's
+    ``oracles/core-math-preload``."""
+    if env := os.environ.get("LARMORX_CRMATH_PRELOAD"):
+        lib = Path(env)
+    else:
+        ws = workspace()
+        if ws is None:
+            return None
+        lib = ws / "oracles/core-math-preload/libcrmath.so"
+    info = lib.parent / "BUILD_INFO.txt"
+    if not lib.is_file() or not info.is_file():
+        return None
+    functions = re.search(r"functions: (.+)", info.read_text(encoding="utf-8"))
+    names = set(functions.group(1).split()) if functions else set()
+    return lib if {"tanhf", "cbrtf"} <= names else None
+
+
+def _correctly_rounded(
+    checks: CheckList,
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    a_dir: Path,
+    l_dir: Path,
+    outputs: tuple[str, ...],
+) -> None:
+    """For a clean-room original whose float32 outputs differ from AFNI's in their last bits:
+    AFNI again with CORE-MATH's correctly rounded functions preloaded (the original uses
+    correctly rounded ``tanhf``; AFNI calls glibc's). Reported: how many values still differ."""
+    differ = [
+        n
+        for n in outputs
+        if (a_dir / n).is_file()
+        and (l_dir / n).is_file()
+        and nifti_parts(a_dir / n)[1] != nifti_parts(l_dir / n)[1]
+    ]
+    if not differ:
+        return
+    lib = crmath_preload()
+    if lib is None:
         checks.add(
             Check(
-                f"{name}: data",
-                c.identical,
+                CORRECTLY_ROUNDED,
+                True,
                 metric="values that differ",
-                value=c.differing,
-                threshold=0,
-                detail=c.detail,
+                value="not run",
+                threshold="reported",
+                detail="no CORE-MATH preload with tanhf and cbrtf (scripts/build_crmath_preload.sh)",
             )
         )
-        checks(f"{name}: header bytes", c.header, detail="identical" if c.header else "differ")
-    return ok
+        return
+    d = tmp / "afni-correctly-rounded"
+    _setup(d, s)
+    r = run_afni(program, args, dict(env, LD_PRELOAD=str(lib)), d)
+    worst, details = 0, []
+    for name in differ:
+        if r.code != 0 or not (d / name).is_file():
+            worst, details = -1, [f"AFNI with the preload: exit {r.code}"]
+            break
+        c = compare_files(d / name, l_dir / name)
+        worst = max(worst, c.differing)
+        details.append(f"{name}: {c.detail}")
+    checks.add(
+        Check(
+            CORRECTLY_ROUNDED,
+            True,
+            metric="values that differ",
+            value=worst,
+            threshold="reported",
+            detail="; ".join(details),
+        )
+    )
+
+
+def afni_10_explainer(
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    paths: list[Path],
+    ours_dir: Path,
+) -> Callable[[str], str | None]:
+    """For a clean-room original, which ignores AFNI's own header extension (AFNI-10, as the
+    3dTshift original does): when an input carries one, AFNI runs again on copies of the
+    inputs without their extensions, and a header that differs is explained when that run
+    writes the original's header byte for byte."""
+    state: dict[str, Path | None] = {}
+
+    def run_once() -> Path | None:
+        if "dir" in state:
+            return state["dir"]
+        state["dir"] = None
+        with_ext = [p for p in paths if has_afni_extension(p)]
+        if not with_ext:
+            return None
+        d = tmp / "afni-without-extension"
+        _setup(d, s)
+        copies = {p: without_extensions(p, d / f"input{i}.nii") for i, p in enumerate(with_ext)}
+        new_args = list(args)
+        for p, q in copies.items():
+            new_args = [a.replace(str(p), str(q)) for a in new_args]
+        r = run_afni(program, new_args, env, d)
+        state["dir"] = d if r.code == 0 else None
+        return state["dir"]
+
+    def explain(name: str) -> str | None:
+        d = run_once()
+        if d is None or not (d / name).is_file() or not (ours_dir / name).is_file():
+            return None
+        if nifti_parts(d / name)[0] != nifti_parts(ours_dir / name)[0]:
+            return None
+        return (
+            "the input carries AFNI's own header extension, whose attributes AFNI reads in "
+            "place of the NIfTI header's geometry (7 significant digits; AFNI-10, which the "
+            "clean-room original ignores, as 3dTshift's does): AFNI run on the input without "
+            "its extension writes the original's header byte for byte"
+        )
+
+    return explain
 
 
 # ------------------------------------------------------------------------------------------------
@@ -455,6 +691,11 @@ class ToolSpec:
     function: str
     scenarios: Callable[[], list[tuple[str, str, str, Scenario]]]
     inputs: Callable[[str], Path]
+    #: ``replica`` (the larmorx-gpl program) or ``original`` (the clean-room original).
+    implementation: str = "replica"
+    #: For float32 outputs that need not be bit-identical: the largest |diff| allowed, as a
+    #: fraction of the largest |AFNI output| (``None``: bit-identity required).
+    tolerance: float | None = None
 
 
 def cases_of(spec: ToolSpec, tier: str) -> list[Case]:
@@ -490,9 +731,10 @@ def _produced(d: Path, s: Scenario) -> list[str]:
 def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     program = spec.program
+    impl = spec.implementation
     if afni_binary(program) is None:
         raise Outcome("skipped", f"the AFNI {program} oracle was not found (LARMORX_AFNI_BIN)")
-    if replica_binary() is None:
+    if impl == "replica" and replica_binary() is None:
         raise Outcome(
             "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
         )
@@ -508,11 +750,11 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         _setup(a_dir, s)
         _setup(l_dir, s)
         afni = run_afni(program, args, env, a_dir)
-        ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir)
+        ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
 
         if s.undefined is not None:
-            _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir)
+            _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir, impl)
             return
         if s.expect == "crash" or crashed(afni):
             check_crash(checks, afni, ours)
@@ -554,9 +796,16 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             if afni.code == 0:
                 checks("both reject the arguments", False, detail="AFNI succeeded")
             return
-        check_outputs(checks, a_dir, l_dir, tuple(a_out))
+        explain = (
+            afni_10_explainer(program, s, args, env, tmp, paths, l_dir)
+            if impl == "original"
+            else None
+        )
+        check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance, explain)
+        if spec.tolerance is not None and afni.code == 0:
+            _correctly_rounded(checks, program, s, args, env, tmp, a_dir, l_dir, tuple(a_out))
         if s.expect == "pass" and afni.code != 0 and s.fix_writes is not None:
-            _fix_writes(checks, program, s, args, env, tmp)
+            _fix_writes(checks, program, s, args, env, tmp, impl)
             return
         if s.expect != "pass" or afni.code != 0:
             return
@@ -567,13 +816,38 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
                 continue
             if path.is_file() and (l_dir / name).is_file():
                 c = compare_files(path, l_dir / name)
+                passed = c.identical
+                if spec.tolerance is not None and not c.identical:
+                    # A clean-room original's float32 values: the record's threshold, as
+                    # against AFNI's oracle, and whether fMRIPrep's output is that oracle's.
+                    vf = stored(path)
+                    scale = float(np.max(np.abs(vf.astype(np.float64)))) if vf.size else 0.0
+                    passed = bool(
+                        vf.dtype.kind == "f"
+                        and np.isfinite(c.max_abs)
+                        and c.max_abs <= spec.tolerance * scale
+                    )
+                    if (a_dir / name).is_file():
+                        oracle = compare_files(path, a_dir / name)
+                        checks.add(
+                            Check(
+                                f"{name}: {FMRIPREP_AFNI}",
+                                True,
+                                metric="values that differ",
+                                value=oracle.differing,
+                                threshold="reported",
+                                detail=oracle.detail,
+                            )
+                        )
                 checks.add(
                     Check(
-                        f"{name}: fMRIPrep's own output (as it ran)",
-                        c.identical,
+                        f"{name}: {FMRIPREP_OWN}",
+                        passed,
                         metric="values that differ",
                         value=c.differing,
-                        threshold="reported",
+                        threshold="reported"
+                        if spec.tolerance is None
+                        else f"max |diff| ≤ {spec.tolerance:g} × max |fMRIPrep output|",
                         detail=c.detail,
                     )
                 )
@@ -581,7 +855,7 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             _band(checks, spec, s, args, env, tmp, a_dir, paths)
         if s.python is not None:
             _python(checks, spec, s, paths[0], l_dir)
-        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
 
 
 def _band(
@@ -656,10 +930,14 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
 
     fn = getattr(lx.afni, spec.function)
     kwargs = dict(s.python or {})
-    env = dict(os.environ, LARMORX_GPL_BIN=str(replica_binary()))
+    env = dict(os.environ)
+    if spec.implementation == "replica":
+        env["LARMORX_GPL_BIN"] = str(replica_binary())
     with process_environment(env), warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result = fn(image, implementation="replica", upstream_defects="reproduce", **kwargs)
+        result = fn(
+            image, implementation=spec.implementation, upstream_defects="reproduce", **kwargs
+        )
     bad = []
     for attr, name in s.python_outputs.items():
         img = getattr(result, attr)
@@ -693,6 +971,7 @@ def _undefined(
     ours: Run,
     a_dir: Path,
     l_dir: Path,
+    impl: str = "replica",
 ) -> None:
     """A case where AFNI reads memory it never wrote (``Scenario.undefined``): AFNI crashes or
     writes values from that memory, depending on the memory; larmorx's ``reproduce`` mode
@@ -711,7 +990,7 @@ def _undefined(
             if ok
             else first_difference(before, mine[: len(before)]),
         )
-        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
         if all(c.passed for c in checks.checks):
             raise Outcome(
                 EXPECTED,
@@ -755,7 +1034,7 @@ def _undefined(
                 detail=f"{n} of {va.size} differ",
             )
         )
-    _fix_pass(checks, program, s, args, env, tmp, l_dir, ours)
+    _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
     if beyond and all(c.passed for c in checks.checks):
         raise Outcome(
             EXPECTED,
@@ -771,12 +1050,13 @@ def _fix_writes(
     args: list[str],
     env: dict[str, str],
     tmp: Path,
+    impl: str = "replica",
 ) -> None:
     """The fix pass of a case AFNI refuses and larmorx's default corrects (``fix_writes``): the
     default exits 0, names the defect and writes every output."""
     d = tmp / "fix"
     _setup(d, s)
-    r = run_larmorx(program, args, defects.FIX, env, d)
+    r = run_larmorx(program, args, defects.FIX, env, d, impl)
     named = defects.notices_in(r.err)
     written = _produced(d, s)
     ok = r.code == 0 and s.fix_writes in named and written == list(s.outputs)
@@ -802,10 +1082,11 @@ def _fix_pass(
     tmp: Path,
     reproduced_dir: Path,
     reproduced: Run,
+    impl: str = "replica",
 ) -> None:
     d = tmp / "fix"
     _setup(d, s)
-    r = run_larmorx(program, args, defects.FIX, env, d)
+    r = run_larmorx(program, args, defects.FIX, env, d, impl)
     if s.fix_refuses is not None:
         named = defects.notices_in(r.err)
         checks.add(
@@ -864,7 +1145,11 @@ def _fix_pass(
 
 
 def highlights(
-    results: list[CaseResult], program: str, function: str, crash_causes: str
+    results: list[CaseResult],
+    program: str,
+    function: str,
+    crash_causes: str,
+    implementation: str = "replica",
 ) -> list[str]:
     """The record's summary lines; ``crash_causes`` names what makes AFNI crash in its cases
     (e.g. "a missing option value, AFNI-40")."""
@@ -873,8 +1158,15 @@ def highlights(
     def data_checks(r: CaseResult) -> list[Check]:
         return [c for c in r.checks if c.name.endswith((": data", ": header bytes"))]
 
+    def identical(r: CaseResult) -> bool:
+        reported = [c for c in r.checks if c.name.endswith(": values bit-identical to AFNI's")]
+        return all(c.passed and c.value != AFNI_10 for c in data_checks(r)) and all(
+            c.value == 0 for c in reported
+        )
+
     with_outputs = [r for r in compared if data_checks(r)]
-    bit = [r for r in with_outputs if all(c.passed for c in data_checks(r))]
+    bit = [r for r in with_outputs if identical(r)]
+    afni_10 = [r for r in with_outputs if any(c.value == AFNI_10 for c in data_checks(r))]
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
     lines = [
         f"**Bit-identical to AFNI: {len(bit)} of {len(with_outputs)} compared cases that write "
@@ -892,19 +1184,55 @@ def highlights(
         f"date, and larmorx's own lines, set aside): {sum(c.passed for c in messages)} of "
         f"{len(messages)} identical, in every case that ran both programs.",
     ]
+    rounded = [c for r in with_outputs for c in r.checks if c.name == CORRECTLY_ROUNDED]
+    if rounded:
+        same = [c for c in rounded if c.value == 0]
+        lines.append(
+            f"- The other {len(rounded)} compared case(s) write float32 values within the threshold "
+            "(AFNI's squash calls glibc's `tanhf`, which is not correctly rounded on some "
+            "arguments; the original's is): with CORE-MATH's correctly rounded functions "
+            f"preloaded into AFNI, {len(same)} of them are bit-identical to the original."
+        )
+    if afni_10:
+        names = ", ".join(f"`{r.case}`" for r in afni_10)
+        lines.append(
+            f"- {len(afni_10)} case(s) whose input carries AFNI's own header extension, whose "
+            "attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room "
+            "original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run "
+            f"on the input without its extension writes the original's header byte for byte: "
+            f"{names}."
+        )
     crashes = [r for r in results if any(c.name == CRASH for c in r.checks)]
     if crashes:
         lines.append(
             f"- {len(crashes)} case(s) where AFNI crashes ({crash_causes}): larmorx prints "
             "AFNI's messages up to the crash, then refuses with one line and exit status 1."
         )
-    fmri = [c for r in results for c in r.checks if "fMRIPrep's own output" in c.name]
+    fmri = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if fmri:
-        lines.append(
+        line = (
             f"- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran "
             f"them in its image): {sum(c.value == 0 for c in fmri)} of {len(fmri)} bit-identical "
-            "to the replica's."
+            f"to the {implementation}'s"
         )
+        rest = [r for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN) and c.value]
+        if rest:
+            # The clean-room original's float differences: fMRIPrep's output is AFNI's oracle
+            # output, which AFNI with correctly rounded maths turns into the original's.
+            explained = [
+                r
+                for r in rest
+                if all(c.value == 0 for c in r.checks if c.name.endswith(FMRIPREP_AFNI))
+                and any(c.name.endswith(FMRIPREP_AFNI) for c in r.checks)
+                and all(c.value == 0 for c in r.checks if c.name == CORRECTLY_ROUNDED)
+                and any(c.name == CORRECTLY_ROUNDED for c in r.checks)
+            ]
+            line += (
+                f"; the other {len(rest)} within the threshold, and in {len(explained)} of them "
+                "fMRIPrep's output is AFNI's oracle output bit for bit, which AFNI with correctly "
+                "rounded maths turns into the original's (glibc's `tanhf`)"
+            )
+        lines.append(line + ".")
     band = [c for r in results for c in r.checks if c.name.startswith("band: ")]
     if band:
         kinds = sorted({c.name.removeprefix("band: ") for c in band})
@@ -918,7 +1246,7 @@ def highlights(
     py = [c for r in results for c in r.checks if c.name.startswith("Python API")]
     if py:
         lines.append(
-            f'- Python API (`lx.afni.{function}(..., implementation="replica")`): '
+            f'- Python API (`lx.afni.{function}(..., implementation="{implementation}")`): '
             f"{sum(c.passed for c in py)} of {len(py)} cases give the command line's outputs bit "
             "for bit."
         )

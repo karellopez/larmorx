@@ -11,8 +11,10 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [oracles](oracles.md) | how the original programs were built (BUILD_INFO, every program's SHA-256) | — | reference |
 | [oracle-runs](oracle-runs.md) | how the fMRIPrep oracle runs were made (image digest, arguments, seeds, threads) | — | reference |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
-| [afni-automask](afni-automask.md) | `larmorx-gpl afni 3dAutomask` (GPL replica, `crates-gpl/`), run by `larmorx afni 3dAutomask` and `lx.afni.automask` | 3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build) | `validated` |
-| [afni-unifize](afni-unifize.md) | `larmorx-gpl afni 3dUnifize` (GPL replica), run by `larmorx afni 3dUnifize` and `lx.afni.unifize` | 3dUnifize (AFNI 25.2.09 binary, 1, 2 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI) | `validated` |
+| [afni-automask](afni-automask.md) | `lx.afni.automask`, `larmorx afni 3dAutomask` (clean-room original, `crates/larmorx-afni`) | 3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build) | `validated` |
+| [afni-automask-replica](afni-automask-replica.md) | `larmorx-gpl afni 3dAutomask` (GPL replica, `crates-gpl/`), run by `larmorx afni 3dAutomask` and `lx.afni.automask` | 3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build) | `validated` |
+| [afni-unifize](afni-unifize.md) | `lx.afni.unifize`, `larmorx afni 3dUnifize` (clean-room original) | 3dUnifize (AFNI 25.2.09 binary, as built and with CORE-MATH's correctly rounded functions preloaded; 1 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI) | `validated` |
+| [afni-unifize-replica](afni-unifize-replica.md) | `larmorx-gpl afni 3dUnifize` (GPL replica), run by `larmorx afni 3dUnifize` and `lx.afni.unifize` | 3dUnifize (AFNI 25.2.09 binary, 1, 2 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI) | `validated` |
 | [resample-series](resample-series.md) | `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` | fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process) | `validated` |
 | [numpy-linalg](numpy-linalg.md) | `larmorx_transform::openblas` through `lx.transforms`: 4×4 products and inverses, point mapping, `ensure_positive_cosines`, loaded transforms | numpy 2.3.5 on OpenBLAS 0.3.30's Haswell kernels, nitransforms, sdcflows, fMRIPrep (in-process); other kernels in [numpy-linalg-kernels.json](numpy-linalg-kernels.json) | `validated` (1 expected divergence: exactly 45° grids) |
 | [ants-image-math](ants-image-math.md) | `lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`, `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`) | ImageMath (ANTs 2.6.5 binary) | `validated` |
@@ -82,8 +84,10 @@ python -m larmorx_validation parity ants-apply-transforms --tier standard --out 
 python -m larmorx_validation parity afni-tshift --tier standard --out docs/validation   # needs the AFNI oracle (scripts/build_afni_oracle.sh)
 (cd crates-gpl && cargo build --release)   # the GPL replica, run as a separate program
 python -m larmorx_validation parity afni-tshift --tier standard --implementation replica --out docs/validation
-python -m larmorx_validation parity afni-automask --tier standard --out docs/validation   # the AFNI oracle and the larmorx-gpl build
-python -m larmorx_validation parity afni-unifize --tier standard --out docs/validation
+python -m larmorx_validation parity afni-automask --tier standard --out docs/validation   # the clean-room original; the AFNI oracle
+python -m larmorx_validation parity afni-automask --tier standard --implementation replica --out docs/validation   # the larmorx-gpl build
+LARMORX_CRMATH_PRELOAD=oracles/core-math-preload/libcrmath.so python -m larmorx_validation parity afni-unifize --tier standard --out docs/validation   # a preload with tanhf, cbrtf
+python -m larmorx_validation parity afni-unifize --tier standard --implementation replica --out docs/validation
 python -m larmorx_validation parity resample-series --tier standard --out docs/validation   # needs fmriprep, nitransforms, scipy in the environment
 python -m larmorx_validation parity numpy-linalg --tier standard --out docs/validation   # needs numpy on the Haswell kernels, threadpoolctl, sdcflows
 python -m larmorx_validation.parity.numpy_linalg kernels --n 200000 --kernels Haswell SandyBridge Nehalem Prescott --out docs/validation/numpy-linalg-kernels.json

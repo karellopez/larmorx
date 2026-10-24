@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dUnifize``: white-matter intensity uniformization of a T1- or T2-weighted volume (or, with
-``epi=True``, an EPI series), by the bit-exact replica of AFNI 25.2.09's program in
-``larmorx-gpl``, run as a separate program.
+``epi=True``, an EPI series): the clean-room original of AFNI 25.2.09's program, or its
+bit-exact replica from ``larmorx-gpl``, run as a separate program.
 
-larmorx has no clean-room original of 3dUnifize yet (it is to be written from
-``specs/3dUnifize.md``): ``implementation="auto"`` needs the ``larmorx-gpl`` package
-(``pip install "larmorx[exact]"``), and ``"original"`` raises ``NotImplementedError``.
+``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed
+(``pip install "larmorx[exact]"``), else the clean-room original; ``"replica"`` and
+``"original"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
+calls glibc's, so squashed values (above 1300) can differ in their last bit
+(``docs/validation/afni-unifize.md``).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
 ``-T2up`` at or near 100 (AFNI-45), the half-size grid of a volume with an axis of 2 or 3 voxels
@@ -21,7 +23,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from larmorx import _defects, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.afni import _common
@@ -106,7 +108,8 @@ def unifize(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation, upstream_defects, afni_settings
-        As for :func:`larmorx.afni.automask`.
+        As for :func:`larmorx.afni.automask`. ``t2=3`` (``-T2`` three times, AFNI-48) is not
+        accepted.
 
     Returns
     -------
@@ -117,8 +120,34 @@ def unifize(
     settings = _common.check_settings(afni_settings, "lx.afni.unifize", "3dUnifize")
     n_threads = _common.check_threads(n_threads)
     selected = _replica.select("afni", "3dUnifize", implementation)
-    if selected is None:  # pragma: no cover - every tool without an original raises above
-        raise NotImplementedError("lx.afni.unifize has no clean-room original yet")
+    if selected is None:
+        bottom, top = (float(p) for p in percentiles)
+        with _common.temporary_directory("larmorx-unifize-") as tmp:
+            source = _common.write_input(image, tmp, n_threads)
+            out, scale, automasked, messages, notices = _core.afni_unifize_file(
+                source,
+                t2=int(t2),
+                t2_percentile=float(t2_percentile),
+                gm=bool(gm),
+                radius=float(radius),
+                bottom=bottom,
+                top=top,
+                clfrac=float(clfrac),
+                duplo=bool(duplo),
+                epi=bool(epi),
+                squash=bool(squash),
+                save_scale=bool(save_scale),
+                save_automask=bool(save_automask),
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                afni_settings=sorted(settings.items()) or None,
+            )
+        _common.warn_all(messages, notices)
+        return UnifizeResult(
+            image=_common.image_of(out),
+            scale=None if scale is None else _common.image_of(scale),
+            automasked=None if automasked is None else _common.image_of(automasked),
+        )
     impl = selected.implementation()
     with _common.temporary_directory("larmorx-unifize-") as tmp:
         source = _common.write_input(image, tmp, n_threads)

@@ -28,6 +28,8 @@ pub enum Message {
     Error(String),
     /// Text as it is (it ends with a newline unless one is added).
     Raw(String),
+    /// Text as it is, without a newline added (3dUnifize's progress letters).
+    Text(String),
 }
 
 /// Writes 3dTshift's messages as AFNI does.
@@ -141,6 +143,9 @@ impl<'a> Log<'a> {
             Message::Warning(t) => self.warning(t),
             Message::Error(t) => self.error(t),
             Message::Raw(t) => self.raw(t),
+            Message::Text(t) => {
+                let _ = self.err.write_all(t.as_bytes());
+            }
         }
     }
 

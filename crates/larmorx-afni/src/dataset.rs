@@ -275,6 +275,21 @@ pub fn read(
     defects: UpstreamDefects,
     settings: &AfniSettings,
 ) -> Result<AfniImage, ReadError> {
+    read_as(path, shown, n_threads, defects, settings, false)
+}
+
+/// [`read`], and with `unit_factor` a `scl_slope` of exactly 1 with `scl_inter` 0 kept as a
+/// brick factor of 1, as 3dAutomask and 3dUnifize read their input (they read the dataset
+/// itself, 3dTshift a copy; `specs/3dAutomask.md` §2, observed for uint8, int16 and float32).
+/// A factor of 1 scales nothing; it is written back as `scl_slope` 1.
+pub fn read_as(
+    path: impl AsRef<Path>,
+    shown: &str,
+    n_threads: usize,
+    defects: UpstreamDefects,
+    settings: &AfniSettings,
+    unit_factor: bool,
+) -> Result<AfniImage, ReadError> {
     let path = path.as_ref();
     let header = nifti::read_header(path)?;
     let image = nifti::read(
@@ -299,7 +314,8 @@ pub fn read(
     let slope = finite_or_zero(header.scl_slope) as f32;
     let inter = finite_or_zero(header.scl_inter) as f32;
     let both = slope != 0.0 && inter != 0.0;
-    let factor = if slope != 0.0 && slope != 1.0 {
+    let unit = unit_factor && slope == 1.0 && inter == 0.0;
+    let factor = if slope != 0.0 && (slope != 1.0 || unit) {
         slope
     } else {
         0.0
@@ -564,12 +580,8 @@ pub fn output_header(
     defects: UpstreamDefects,
     settings: &AfniSettings,
 ) -> Result<(NiftiHeader, Vec<Notice>, Vec<Message>), String> {
-    let [nx, ny, nz, nt] = bricks.shape;
-    let shape: Vec<usize> = if nt > 1 {
-        vec![nx, ny, nz, nt]
-    } else {
-        vec![nx, ny, nz]
-    };
+    let shape = written_shape(bricks.shape);
+    let [_, _, nz, nt] = bricks.shape;
     let mut messages = Vec::new();
     let large = shape.iter().any(|&d| d > 32767);
     let version = match write_type(settings.get("AFNI_NIFTI_WRITE_TYPE")) {
@@ -633,6 +645,20 @@ pub fn output_header(
     Ok((hdr, notices, messages))
 }
 
+/// The dimensions AFNI writes for a dataset of `shape`: a time series is 4D, one volume 3D,
+/// and one volume of one slice 2D (observed with 3dAutomask's outputs of a 64 × 64 × 1
+/// input: `dim[0]` 2).
+pub fn written_shape(shape: [usize; 4]) -> Vec<usize> {
+    let [nx, ny, nz, nt] = shape;
+    if nt > 1 {
+        vec![nx, ny, nz, nt]
+    } else if nz == 1 {
+        vec![nx, ny]
+    } else {
+        vec![nx, ny, nz]
+    }
+}
+
 /// Writes `bricks` to `path` (`.nii` or `.nii.gz`) with `header` (see [`output_header`]).
 pub fn write(
     path: impl AsRef<Path>,
@@ -640,12 +666,7 @@ pub fn write(
     bricks: &Bricks,
     n_threads: usize,
 ) -> Result<(), nifti::Error> {
-    let [nx, ny, nz, nt] = bricks.shape;
-    let shape: Vec<usize> = if nt > 1 {
-        vec![nx, ny, nz, nt]
-    } else {
-        vec![nx, ny, nz]
-    };
+    let shape = written_shape(bricks.shape);
     let options = WriteOptions {
         n_threads,
         ..Default::default()

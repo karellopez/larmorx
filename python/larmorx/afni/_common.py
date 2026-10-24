@@ -129,3 +129,19 @@ def run_replica(
 
 def temporary_directory(prefix: str) -> tempfile.TemporaryDirectory[str]:
     return tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True)
+
+
+def image_of(output: tuple[np.ndarray, dict[str, Any]]) -> Image:
+    """An output of a clean-room original (``(data, header fields)`` from ``larmorx._core``),
+    its values scaled as :func:`larmorx.load` would read the file the command line writes."""
+    data, fields = output
+    header = NiftiHeader.from_dict(fields)
+    return Image(_scaled(data, header), header.affine, header, implementation=_replica.ORIGINAL)
+
+
+def warn_all(messages: Sequence[str], notices: Sequence[tuple[str, str, str, str]]) -> None:
+    """AFNI's warnings and larmorx's upstream-defect notices of a clean-room original's run, as
+    Python warnings (in the caller's caller)."""
+    for text in messages:
+        warnings.warn(text, stacklevel=3)
+    _defects.warn(notices, stacklevel=2)

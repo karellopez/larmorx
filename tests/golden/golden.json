@@ -1,7 +1,27 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "bbe77cc93d10eeafb81ae03f462f91e00a3216f8", "date": "2026-10-24", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "bbe77cc93d10eeafb81ae03f462f91e00a3216f8 and 12cad72517da257bbb1e76d78ed3ea3d5c03e4aa, merged (re-record from the merge)", "date": "2026-10-24", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
+  "cli.afni.3dAutomask": {
+   "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
+   "depth:header": {"bytes": 352, "sha256": "31b4ff336126f32c67b2bba7138bd809f2af8479701ca5ea43e1e1efb7e4b380"},
+   "mask:data": {"dtype": "|u1", "sample": "0000010000010000", "sha256": "4d2e54b49369986f7dc2dbd7cb493ef21008d394f8ce7bf5b7711d4dfba81bdf", "shape": [24, 20, 16], "sum": "2214.0"},
+   "mask:header": {"bytes": 352, "sha256": "7476ce8d33209d33e0ff62db824b31cfae36185ce1e48fd57d19ee755eb41b42"},
+   "masked:data": {"dtype": "<f4", "sample": "0000000000000000dbb6d4430000000000000000b7edd3430000000000000000", "sha256": "751b4c7d465ecd9fa1fea9778764a3a543225d6988de371f4e8fe20514e7c9c1", "shape": [24, 20, 16], "sum": "666274.285893023"},
+   "masked:header": {"bytes": 352, "sha256": "740a1929f698b5ff90fd5ddd3d570f51a9fa652d8ec702274b4f9dfa7e3aad40"}
+  },
+  "cli.afni.3dAutomask.options": {
+   "mask:data": {"dtype": "|u1", "sample": "0000000000000000", "sha256": "45d1b87aee49b06acaab9c6be208dbf7f12392e9f8bd1f7c58dce26aa5524f98", "shape": [16, 14, 12], "sum": "524.0"},
+   "mask:header": {"bytes": 352, "sha256": "7e1492da7e04d5824df8a113ed1c1fa2a04f7dd04d6dc92d6f2d89a4bc31126e"},
+   "plane:data": {"dtype": "<f4", "sample": "0000000000000000ab2a8343ab2af943ab6a0444000000000000000000000000", "sha256": "893796cd5675f8cdbbcf246b52b470ec891bc1b906a72fa63054914fd791dbb5", "shape": [32, 24], "sum": "150190.99981689453"},
+   "plane:header": {"bytes": 352, "sha256": "cd3dc7e0ee38ef7684ff48b05322b3e2758dc33c7403f00c940e7f3c03d29b3c"}
+  },
+  "cli.afni.3dAutomask.reproduce": {
+   "fix:data": {"dtype": "<i2", "sample": "210371049805fb034c05ae03d5043406", "sha256": "40c4d509080cc4b8918233abb6d0f85df63c626c43f58f4db260db0de56b263e", "shape": [8, 6, 5, 10], "sum": "2869363.0"},
+   "fix:header": {"bytes": 352, "sha256": "06f7d1c3809cae2aa3ad00e728176cf0a3fb736b2b0870bf0cbf6c330b22a177"},
+   "reproduce:data": {"dtype": "<i2", "sample": "210371049805fb034c05ae03d5043406", "sha256": "40c4d509080cc4b8918233abb6d0f85df63c626c43f58f4db260db0de56b263e", "shape": [8, 6, 5, 10], "sum": "2869363.0"},
+   "reproduce:header": {"bytes": 352, "sha256": "06f7d1c3809cae2aa3ad00e728176cf0a3fb736b2b0870bf0cbf6c330b22a177"}
+  },
   "cli.afni.3dTshift": {
    "out:data": {"dtype": "<i2", "sample": "21037904980509044105ae03d5042506", "sha256": "fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f", "shape": [8, 6, 5, 10], "sum": "2869310.0"},
    "out:header": {"bytes": 352, "sha256": "e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c"},
@@ -37,6 +57,28 @@
    "reproduce:header": {"bytes": 352, "sha256": "e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c"},
    "rlt_ignore:data": {"dtype": "<f4", "sample": "00c054430060944380557dc0f40aa6c0882b5140981150c016c093c000009a40", "sha256": "48d9341243f7fa965a62684461682001416324c0c171403e53a2a0a01731853e", "shape": [8, 6, 5, 10], "sum": "148524.52715187566"},
    "rlt_ignore:header": {"bytes": 352, "sha256": "d0dbbb595c05bd2882d30181c155ab1c9d17b74cc1e91713c6c3ea21bfa62b7e"}
+  },
+  "cli.afni.3dUnifize": {
+   "am:data": {"dtype": "<f4", "sample": "0000000000000000dbb6d4430000000000000000b7edd3430000000000000000", "sha256": "bde9f4ebb3ae7f482fa35852cb3b0d35826b3a00b90b50e020af9772de2a9e0d", "shape": [24, 20, 16], "sum": "761317.5715942383"},
+   "am:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"},
+   "scale:data": {"dtype": "<f4", "sample": "326316407da315407da31540785a1540005115407da315407da3154088381440", "sha256": "14fbbd3c7d0c202c2042d94823a0af3f4d993759940873955cbe0b579994fc3c", "shape": [24, 20, 16], "sum": "17939.7175385952"},
+   "scale:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"},
+   "uni:data": {"dtype": "<f4", "sample": "00000000000000008cac7844000000000000000067c177440000000000000000", "sha256": "8206016b24a440dc86128a798769455ca6ac824cd81e7668656922ba054cd636", "shape": [24, 20, 16], "sum": "1780003.364654541"},
+   "uni:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"}
+  },
+  "cli.afni.3dUnifize.options": {
+   "epi:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "ccc1a10b7aac17225febe0b37d40d5b4575aebdad5bb1c291429f04d1a5892b4", "shape": [16, 14, 12, 4], "sum": "0.0"},
+   "epi:header": {"bytes": 352, "sha256": "7436512462b402ce45c01a8b4e414d593032a446664180c466cecfa70b3fb956"},
+   "fmriprep:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "fmriprep:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"},
+   "t2t2_gm:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "t2t2_gm:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"}
+  },
+  "cli.afni.3dUnifize.reproduce": {
+   "fix:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "fix:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"},
+   "reproduce:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "reproduce:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"}
   },
   "cli.ants.Atropos": {
    "otsu:data": {"dtype": "<u4", "sample": "0000000000000000020000000000000000000000020000000000000000000000", "sha256": "4f9f298c469760e148f32ad9c4da2d084b1c098ea0e8252d8868c5c080b20f60", "shape": [24, 20, 16], "sum": "3320.0"},
@@ -614,6 +656,12 @@
    "file:header": {"bytes": 544, "sha256": "375dca77493ce772525db506f60ac6e583c636ba8055c9be6e8881dec807b576"},
    "load": {"dtype": "<i2", "sample": "00000000030000000000020000000000", "sha256": "b3d162e68dd6253f7e676ce414b97462e6c0188ff8fe85976cf9f90cedbfe6df", "shape": [24, 20, 16], "sum": "3000.0"}
   },
+  "py.afni.automask": {
+   "depth": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "6e202d8147818f18c4e6e6c87ddee15508aac53dc9bc362b3933997d43ba82ae", "shape": [24, 20, 16], "sum": "4055.0"},
+   "mask": {"dtype": "|u1", "sample": "0000010000010000", "sha256": "46de8922e96afbff19ad0587f0b8bcc9ab8fea344aac64a4225a0215e67deaee", "shape": [24, 20, 16], "sum": "1108.0"},
+   "mask.header": {"bytes": 348, "sha256": "2cb3205cff740c062c77c2bd11ae86a5f4a45d7f624113e369cbc209a8c0c5d8"},
+   "masked": {"dtype": "<f4", "sample": "00000000000000005df44e430000000000000000ba6850430000000000000000", "sha256": "f087c383c441ded50bf425fab79f6ec6e77ebfce4844d5da02f8c2a064289a93", "shape": [24, 20, 16], "sum": "206459.90939331055"}
+  },
   "py.afni.fmriprep_slice_timing": {
    "times": {"dtype": "<f8", "sample": "9a9999999999e83f666666666666d03f666666666666f03f666666666666e03f0000000000000000fca9f1d24d62e03f", "sha256": "fecd5cc65b28849a481157199862f50ff68f056202fcce594236c541ee7711b9", "shape": [6], "sum": "3.0745"}
   },
@@ -642,6 +690,12 @@
   "py.afni.tshift.settings": {
    "out": {"dtype": "<f8", "sample": "0000000000086b4000000000006c724000000000002877400000000000b0704000000000002c76400000000000886e4000000000003074400000000000987940", "sha256": "1aa1d4ba0376e3812cb86029916ca05d0d37bae8ee7e45c8074317c840c322f1", "shape": [8, 6, 5, 10], "sum": "747347.25"},
    "out.header": {"bytes": 540, "sha256": "64da537bebb17a34d1517c69761b3cdf580668d1def89288f71c2ef6a6154739"}
+  },
+  "py.afni.unifize": {
+   "automasked": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "scale": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "uni": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac", "shape": [24, 20, 16], "sum": "0.0"},
+   "uni.header": {"bytes": 348, "sha256": "0fbe940d529ead24fc2ae9353c0bc44d7679e83e7baf9553f1b57e9f14be2ec5"}
   },
   "py.ants.affine_initializer": {
    "fixed": {"dtype": "<f8", "sample": "2b71ca6e7af2f9bf41a2e77b94a10040b06b5effb206e83f", "sha256": "b3613a67ac5c116fd371d2db83b77bc43698e51e7ae22c48c6c6ca13b0b5249a", "shape": [3], "sum": "1.2080154743167204"},

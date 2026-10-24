@@ -216,27 +216,57 @@ def _scenario_list() -> list[tuple[str, str, str, ar.Scenario]]:
     return _scenarios()
 
 
-SPEC = ar.ToolSpec(PROGRAM, "unifize", _scenario_list, _input)
+#: The implementations this suite validates.
+IMPLEMENTATIONS = ("original", "replica")
+
+
+def spec(implementation: str = "original") -> ar.ToolSpec:
+    """The suite's runner for ``implementation``. The clean-room original's float32 outputs
+    may differ from AFNI's in the last bits where AFNI's squash calls glibc's ``tanhf``, which
+    is not correctly rounded (the original's is): within PLAN.md §11.3's deterministic
+    arithmetic threshold, bit-identity reported."""
+    if implementation not in IMPLEMENTATIONS:
+        raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
+    tolerance = ar.FLOAT_RTOL if implementation == "original" else None
+    return ar.ToolSpec(PROGRAM, "unifize", _scenario_list, _input, implementation, tolerance)
 
 
 def cases(tier: str) -> list[Case]:
-    return ar.cases_of(SPEC, tier)
+    return ar.cases_of(spec(), tier)
 
 
-def run_case(case: Case, checks: CheckList) -> None:
-    ar.run_case(SPEC, case, checks)
+def suite(implementation: str = "original") -> Suite:
+    """The 3dUnifize suite for the clean-room original (``larmorx afni 3dUnifize``, in
+    process) or the GPL replica (``larmorx-gpl afni 3dUnifize``, which larmorx runs as a
+    separate process); both through larmorx's command line and its Python API."""
+    tool_spec = spec(implementation)
+    replica = implementation == "replica"
+    who = "replica" if replica else "original"
 
+    def run_case(case: Case, checks: CheckList) -> None:
+        ar.run_case(tool_spec, case, checks)
 
-def suite() -> Suite:
+    tool = (
+        f"`larmorx-gpl afni 3dUnifize` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
+        "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
+        "separate process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and "
+        '`lx.afni.unifize(..., implementation="replica")`'
+        if replica
+        else "`larmorx afni 3dUnifize` / `lx.afni.unifize` (crate larmorx-afni, the Apache-2.0 "
+        "clean-room original written from `specs/3dUnifize.md`), with "
+        '`implementation="original"`'
+    )
+    outputs = (
+        "the same values, bit for bit, and the same NIfTI header bytes"
+        if replica
+        else "the same NIfTI header bytes; the values bit for bit, or float32 values within "
+        "max |diff| ≤ 1e-5 × max |AFNI output| (PLAN.md §11.3) with bit-identity reported (AFNI's "
+        "squash calls glibc's tanhf, which is not correctly rounded on some arguments)"
+    )
     return Suite(
-        name="afni-unifize",
-        title="3dUnifize (replica)",
-        tool=(
-            f"`larmorx-gpl afni 3dUnifize` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
-            "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
-            "separate process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and "
-            '`lx.afni.unifize(..., implementation="replica")`'
-        ),
+        name="afni-unifize-replica" if replica else "afni-unifize",
+        title="3dUnifize (replica)" if replica else "3dUnifize",
+        tool=tool,
         reference=f"3dUnifize from AFNI ({ar.afni_build(PROGRAM)}, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
             (
@@ -247,10 +277,7 @@ def suite() -> Suite:
                 "Messages",
                 "standard output and error byte for byte (AFNI's banner and compile date, larmorx's own lines and the elapsed time set aside)",
             ),
-            (
-                "Every output (the unifized image, -ssave, -amsave)",
-                "the same values, bit for bit, and the same NIfTI header bytes",
-            ),
+            ("Every output (the unifized image, -ssave, -amsave)", outputs),
         ],
         cases=cases,
         run_case=run_case,
@@ -260,6 +287,7 @@ def suite() -> Suite:
             PROGRAM,
             "unifize",
             "a missing option value, AFNI-40; an empty automask dereferenced, AFNI-46",
+            who,
         ),
         notes=(
             "Both programs run in directories of their own on the same input files, in the same "
@@ -268,9 +296,9 @@ def suite() -> Suite:
             "outputs are compared as stored (data bytes, header bytes decompressed). AFNI runs "
             "with OpenMP at this machine's default thread count unless a case sets "
             "`OMP_NUM_THREADS`; the replica with its own threads (results do not depend on "
-            "them). The replica is compared in `reproduce` mode; the fix pass runs its default. "
+            f"them). The {who} is compared in `reproduce` mode; the fix pass runs its default. "
             "The real cases also run AFNI at other OpenMP thread counts and fMRIPrep 25.2.6's own "
             "AFNI (in its image) and report how far they are from the oracle; the fMRIPrep cases "
-            "compare the replica with fMRIPrep's own output of the node as well."
+            f"compare the {who} with fMRIPrep's own output of the node as well."
         ),
     )

@@ -1,20 +1,21 @@
-# Parity: 3dAutomask (replica)
+# Parity: 3dAutomask
 
-**All cases agree.** 109 cases on the `standard` tier: 89 pass, 19 rejected by both, 1 expected divergences, 0 failures.
+**All cases agree.** 105 cases on the `standard` tier: 85 pass, 19 rejected by both, 1 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-gpl afni 3dAutomask` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.automask(..., implementation="replica")`
+- **Validated:** `larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dAutomask.md`), with `implementation="original"`
 - **Reference:** 3dAutomask from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
 - **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
 
-**Bit-identical to AFNI: 85 of 85 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 102 of 102 identical, in every case that ran both programs.
+**Bit-identical to AFNI: 80 of 81 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 98 of 98 identical, in every case that ran both programs.
+- 1 case(s) whose input carries AFNI's own header extension, whose attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run on the input without its extension writes the original's header byte for byte: `fmriprep/ds005454-task_rest`.
 - 6 case(s) where AFNI crashes (a missing option value, AFNI-40): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
-- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 7 of 7 bit-identical to the replica's.
+- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 7 of 7 bit-identical to the original's.
 - AFNI's own variability, AFNI at 1 thread(s): 10 of 10 runs give the oracle's output bit for bit.
 - AFNI's own variability, AFNI at 6 thread(s): 7 of 7 runs give the oracle's output bit for bit.
-- AFNI's own variability, fMRIPrep 25.2.6's AFNI: 3 of 10 runs give the oracle's output bit for bit.
-- Python API (`lx.afni.automask(..., implementation="replica")`): 20 of 20 cases give the command line's outputs bit for bit.
+- AFNI's own variability, fMRIPrep 25.2.6's AFNI: 10 of 10 runs give the oracle's output bit for bit.
+- Python API (`lx.afni.automask(..., implementation="original")`): 20 of 20 cases give the command line's outputs bit for bit.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `defects/negative-slope-4d`
   - AFNI-02: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (masked.nii header, messages): `defects/head-f32-slope-inter`
@@ -25,7 +26,7 @@
   - AFNI-18: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the outputs written where AFNI refuses (mask.nii, exit N)): `global/input-dir-with-blank`
   - AFNI-23: 1 case(s) named it, 1 with changed values (largest difference 2.02e+03), 1 with other changes (masked.nii header, messages): `defects/nifti-scale-no`
   - AFNI-26: 1 case(s) named it, 0 with changed values (largest difference 0): `global/missing-directory`
-  - AFNI-41: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)): `options/nbhrs-40`, `options/nbhrs-5`, `options/nbhrs-27`, `options/nbhrs-0`, `options/nbhrs-40-then-NN1`
+  - AFNI-41: 1 case(s) named it, 0 with changed values (largest difference 0): `options/nbhrs-40`
   - AFNI-43: 1 case(s) named it, 1 with changed values (largest difference 1e+03), 1 with other changes (messages): `defects/peels-0-fmriprep`
 
 ## Thresholds
@@ -48,7 +49,7 @@
 | errors | 19 | 0 | 19 | 0 | 0 |
 | fmriprep | 7 | 7 | 0 | 0 | 0 |
 | global | 8 | 8 | 0 | 0 | 0 |
-| options | 37 | 37 | 0 | 0 | 0 |
+| options | 33 | 33 | 0 | 0 | 0 |
 | real | 3 | 3 | 0 | 0 | 0 |
 
 ## Expected divergences
@@ -85,7 +86,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6bf2860fb745) |
+| larmorx | 0.0.1 (2a009d1ba7d6) |
 | larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -95,7 +96,7 @@
 
 ## Notes
 
-Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). The replica is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases compare the replica with fMRIPrep's own output of the node as well.
+Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). The original is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases compare the original with fMRIPrep's own output of the node as well.
 
 ## All cases
 
@@ -116,10 +117,6 @@ Both programs run in directories of their own on the same input files, in the sa
 | `options/nbhrs-18` | pass | 6/6 | -nbhrs 18 (AFNI uses 17 outside 6..26, AFNI-41) |
 | `options/nbhrs-26` | pass | 6/6 | -nbhrs 26 (AFNI uses 17 outside 6..26, AFNI-41) |
 | `options/nbhrs-40` | pass | 6/6 | -nbhrs 40 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-5` | pass | 6/6 | -nbhrs 5: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-27` | pass | 6/6 | -nbhrs 27: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-0` | pass | 6/6 | -nbhrs 0: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-40-then-NN1` | pass | 6/6 | -nbhrs 40 then -NN1: AFNI peels as -NN1 says; refused by default (AFNI-41) |
 | `options/NN1-dilate-erode-depth` | pass | 8/8 | -NN1 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
 | `options/NN2-dilate-erode-depth` | pass | 8/8 | -NN2 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
 | `options/NN3-dilate-erode-depth` | pass | 8/8 | -NN3 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |

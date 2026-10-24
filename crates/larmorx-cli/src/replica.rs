@@ -70,19 +70,17 @@ pub const REPLICAS: &[Replica] = &[
         package: &LARMORX_GPL,
         original: true,
     },
-    // The clean-room originals are to be written from specs/3dAutomask.md and
-    // specs/3dUnifize.md.
     Replica {
         family: "afni",
         tool: "3dAutomask",
         package: &LARMORX_GPL,
-        original: false,
+        original: true,
     },
     Replica {
         family: "afni",
         tool: "3dUnifize",
         package: &LARMORX_GPL,
-        original: false,
+        original: true,
     },
 ];
 
@@ -426,31 +424,41 @@ mod tests {
 
     #[test]
     fn tools_without_an_original() {
-        let automask = lookup("afni", "3dAutomask").unwrap();
-        assert!(!automask.original && TSHIFT.original);
+        // A replica without an original: `auto` runs it or fails like `replica`; `original`
+        // is an error. No tool is in that state now; the rule is checked on a stand-in.
+        const ONLY: Replica = Replica {
+            family: "afni",
+            tool: "3dSomething",
+            package: &LARMORX_GPL,
+            original: false,
+        };
         let found = || Ok(Some(PathBuf::from("bin/larmorx-gpl")));
         let missing = || Ok(None);
         assert!(matches!(
-            choose_with(Implementation::Auto, automask, found),
+            choose_with(Implementation::Auto, &ONLY, found),
             Ok(Choice::Replica(_))
         ));
-        let e = choose_with(Implementation::Auto, automask, missing).unwrap_err();
+        let e = choose_with(Implementation::Auto, &ONLY, missing).unwrap_err();
         assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
         assert!(
             e.to_string()
-                .contains("no clean-room original of afni 3dAutomask"),
+                .contains("no clean-room original of afni 3dSomething"),
             "{e}"
         );
-        let e = choose_with(Implementation::Original, automask, found).unwrap_err();
+        let e = choose_with(Implementation::Original, &ONLY, found).unwrap_err();
         assert!(
             e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
             "{e}"
         );
-        assert_eq!(
-            replica_only("afni").collect::<Vec<_>>(),
-            ["3dAutomask", "3dUnifize"]
-        );
+        // Every registered tool has its original: `auto` without the replica runs it.
+        assert!(REPLICAS.iter().all(|r| r.original));
+        assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
+        let automask = lookup("afni", "3dAutomask").unwrap();
+        assert!(matches!(
+            choose_with(Implementation::Auto, automask, missing),
+            Ok(Choice::Original)
+        ));
     }
 
     #[test]

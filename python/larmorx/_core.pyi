@@ -216,6 +216,56 @@ def afni_tshift_array(
     """Shift a 4D ``uint8``/``int16``/``float32`` array placed by ``header`` (``3dTshift``):
     the shifted voxels, the output header fields, warnings and upstream-defect notices."""
 
+# --- AFNI 3dAutomask and 3dUnifize, the clean-room originals (larmorx/afni) ------------------
+
+#: An output: the voxels in AFNI's storage type (before the brick factor, the header's
+#: ``scl_slope``), in the shape the command line writes, and the header fields.
+AfniOutput = tuple[np.ndarray, dict[str, Any]]
+
+def afni_automask_file(
+    path: str,
+    clfrac: float = 0.5,
+    gradual: bool = True,
+    peels: int = 1,
+    neighbours: int = 17,
+    nn: int | None = None,
+    exterior_clip: bool = False,
+    dilate: int = 0,
+    erode: int = 0,
+    si: float | None = None,
+    apply: bool = False,
+    depth: bool = False,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    afni_settings: list[tuple[str, str]] | None = None,
+) -> tuple[AfniOutput, AfniOutput | None, AfniOutput | None, list[str], list[Notice]]:
+    """3dAutomask on a NIfTI file read with AFNI's rules: the mask, the masked input (with
+    ``apply``), the depth (with ``depth``), AFNI's warnings and upstream-defect notices.
+    ``ValueError`` for AFNI's fatal errors (no mask, an empty mask) and for ``neighbours``
+    outside 6..26 by default (AFNI-41)."""
+
+def afni_unifize_file(
+    path: str,
+    t2: int = 0,
+    t2_percentile: float = 98.5,
+    gm: bool = False,
+    radius: float = 18.3,
+    bottom: float = 70.0,
+    top: float = 80.0,
+    clfrac: float = 0.2,
+    duplo: bool = True,
+    epi: bool = False,
+    squash: bool = True,
+    save_scale: bool = False,
+    save_automask: bool = False,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    afni_settings: list[tuple[str, str]] | None = None,
+) -> tuple[AfniOutput, AfniOutput | None, AfniOutput | None, list[str], list[Notice]]:
+    """3dUnifize on a NIfTI file read with AFNI's rules: the result, the scale factors (with
+    ``save_scale``), the automasked input (with ``save_automask``), AFNI's warnings and
+    upstream-defect notices. ``ValueError`` for AFNI's fatal errors and for ``t2`` above 2."""
+
 # --- SciPy-compatible interpolation (larmorx/ndimage.py) --------------------------------------
 
 def ndimage_map_coordinates(

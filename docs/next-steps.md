@@ -26,6 +26,7 @@ starts no other agent.
 | Figures 1 | `worktree-agent-a23fe03519502c885` (10-21) | the figure framework (`larmorx_validation.figures`, `docs/figures.md`), 37 figures for every tool ported so far, a page per tool on the site, the landing page's phone layout and Greek glyphs | benchmarks for the pages that say pending; smaller figure files |
 | A4.5 | `worktree-agent-aa903a90387159f4f` (10-23) | `antsAI -b` (blob alignment) to full completeness: ANTs' blob detector, patch correlations, pairing, landmark fits (LINPACK's QR, Eigen's `SelfAdjointEigenSolver`), `lx.ants.blob_alignment`; ANTS-110 to ANTS-116 and ITK-60; ANTS-106 corrected in Atropos; ANTS-72 shown to cause the ITK-35 references' run-to-run variation (the record now gives their spread); both evidence pages | ANTS-116 (decide); a benchmark of `-b` |
 | AFNI masks | `worktree-agent-af5a27ad72e66b922` (10-23) | 3dAutomask and 3dUnifize: GPL replicas (both depend on MCW routines), bit-identical to AFNI in every compared case; specs for the clean-room originals; two evidence pages; AFNI-40 to AFNI-49 | the clean-room originals; AFNI-41, -42, -44, -48 (below) |
+| AFNI masks original | `worktree-agent-a4282c736dbd9fe7c` (10-23) | the clean-room originals of 3dAutomask and 3dUnifize (from the specs; built for speed: a sliding window of ranked values for 3dUnifize's ball, union-find clusters, breadth-first exterior clip and depth, parallel passes), `implementation=` for both, AFNI-41 and AFNI-48 refused by default; CORE-MATH's `tanhf` and `cbrtf`; 8 golden cases; both evidence pages with the original | a benchmark report (on a quiet machine); the replica records to regenerate under `-replica`; the shared CORE-MATH preload to rebuild |
 | A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
 | A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | – |
 
@@ -53,10 +54,9 @@ starts no other agent.
    `larmorx-gpl`, bit-identical to AFNI 25.2.09 in every compared case (fMRIPrep's calls on
    every oracle run's BOLD reference, T1w images, BOLD series, at 1, 2 and 6 threads, and
    fMRIPrep's own build of AFNI), and a spec for a clean-room original (`specs/3dAutomask.md`,
-   `specs/3dUnifize.md`). **Next for them: the clean-room originals**, by an agent that has
-   never read AFNI's source, from the specs only (the porting guide's speed rules: the ball's
-   percentile mean is the hot loop); `larmorx afni 3dAutomask` / `3dUnifize` then get
-   `implementation="auto"|"replica"|"original"` as 3dTshift. Optional later AFNI paths of
+   `specs/3dUnifize.md`). **The clean-room originals: done** (2026-10-23): `larmorx afni 3dAutomask` / `3dUnifize` and
+   `lx.afni.automask` / `unifize` have `implementation="auto"|"replica"|"original"` as 3dTshift
+   (records `afni-automask.md`, `afni-unifize.md`; the replica's moved to `*-replica.md`). Optional later AFNI paths of
    fMRIPrep's libraries: 3dQwarp (sdcflows' alternative PEPOLAR estimator), 3dSkullStrip with
    3dcalc (niworkflows' legacy AFNI skull-stripping): **planned for later** (user,
    2026-10-19). **A later AFNI analysis track (decided by the user, 2026-10-19; not fMRIPrep):**
@@ -108,9 +108,8 @@ starts no other agent.
 - **Records made with the older CORE-MATH preload:** `ants-image-math`, `ants-n4`, `ants-denoise`,
   `ants-resample-image-by-spacing`, `ants-ai` (and its full tier) were regenerated on 2026-10-24 with the current
   preload; any other record older than 2026-10-18 still to re-run.
-- **The clean-room originals of 3dAutomask and 3dUnifize** (running since 2026-10-23; the specs carry the
-  rule-B refusals of AFNI-41 and AFNI-48 since 2026-10-24) (from `specs/3dAutomask.md`,
-  `specs/3dUnifize.md`); a benchmark report for each once the original exists.
+- **Benchmark reports of 3dAutomask and 3dUnifize** (AFNI, the replica, the original; a quiet
+  machine). Informal timings of 2026-10-23 are in the originals' part report.
 - **The decisions of 2026-10-23, implemented** (small-fixes part, 2026-10-24): ANTS-17, -22,
   -23, -32, -44, -116 corrected by default (rule A), ANTS-40 measured and corrected (D, then A),
   ITK-06 measured and kept (D, then C), AFNI-41 and AFNI-48 refused by default in the GPL replicas

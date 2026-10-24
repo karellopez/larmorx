@@ -913,10 +913,7 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs``, run on every
 #: platform by the GPL job). ``replica_only`` checks that each tool has one there.
-REPLICA_ONLY_FUNCTIONS = {
-    "lx.afni.automask": "afni 3dAutomask",
-    "lx.afni.unifize": "afni 3dUnifize",
-}
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replica's golden cases.
 GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
@@ -2956,6 +2953,94 @@ def _(ctx: Context) -> dict[str, Any]:
             implementation=ORIGINAL,
         )
     return image_outputs("out", img, header=True)
+
+
+@case("cli.afni.3dAutomask", covers=("cli:afni 3dAutomask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's call (-apply_prefix, -dilate 1) with -depth on the oblique float32 volume:
+    the gradual clip level, clusters, peeling, holes, the masked input."""
+    mask, masked, depth = ctx.out("mask.nii"), ctx.out("masked.nii"), ctx.out("depth.nii")
+    cli("afni", "3dAutomask", "-q", "-apply_prefix", masked, "-dilate", "1", "-depth", depth, "-prefix", mask, ctx.file("anat.nii"))  # fmt: skip
+    return {"mask": Nifti(mask), "masked": Nifti(masked), "depth": Nifti(depth)}
+
+
+@case("cli.afni.3dAutomask.options", covers=("cli:afni 3dAutomask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A 4D series averaged; one clip level, the exterior clip, two peels, NN3 dilations and
+    erosions, -SI; and the 2D method on a plane."""
+    out, plane_out = ctx.out("mask.nii"), ctx.out("plane.nii")
+    cli("afni", "3dAutomask", "-q", "-nograd", "-eclip", "-clfrac", "0.3", "-peels", "2", "-NN3", "-dilate", "2", "-erode", "1", "-SI", "20", "-prefix", out, ctx.file("bold.nii"))  # fmt: skip
+    cli("afni", "3dAutomask", "-q", "-apply_prefix", plane_out, ctx.file("plane.nii"))
+    return {"mask": Nifti(out), "plane": Nifti(plane_out)}
+
+
+@case("cli.afni.3dAutomask.reproduce", covers=("cli:afni 3dAutomask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """-peels 0 and a negative scl_slope in a series: no peeling and the factor applied by
+    default; one peel and the factor dropped reproduced (AFNI-43, AFNI-01)."""
+    fixed, afni = ctx.out("fix.nii"), ctx.out("reproduce.nii")
+    args = ("afni", "3dAutomask", "-q", "-peels", "0", "-nbhrs", "12")
+    cli(*args, "-apply_prefix", fixed, ctx.file("series_negative.nii"))
+    cli(*args, "-apply_prefix", afni, ctx.file("series_negative.nii"), upstream_defects=REPRODUCE)
+    return {"fix": Nifti(fixed), "reproduce": Nifti(afni)}
+
+
+@case("py.afni.automask", covers=("lx.afni.automask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The clean-room original on an image in memory: the mask, the masked input, the depth."""
+    r = lx.afni.automask(
+        anat2(), exterior_clip=True, erode=1, nn=1, apply=True, depth=True, implementation=ORIGINAL
+    )
+    return {
+        **image_outputs("mask", r.mask, header=True),
+        "masked": r.masked.data,
+        "depth": r.depth.data,
+    }
+
+
+@case("cli.afni.3dUnifize", covers=("cli:afni 3dUnifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The defaults on the oblique float32 volume (the ball's local intensity, the squash, the
+    final mask), with -ssave and -amsave."""
+    out, scale, am = ctx.out("uni.nii"), ctx.out("scale.nii"), ctx.out("am.nii")
+    cli("afni", "3dUnifize", "-quiet", "-ssave", scale, "-amsave", am, "-prefix", out, ctx.file("anat.nii"))  # fmt: skip
+    return {"uni": Nifti(out), "scale": Nifti(scale), "am": Nifti(am)}
+
+
+@case("cli.afni.3dUnifize.options", covers=("cli:afni 3dUnifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's call (-clfrac 0.2 -rbt 18.3 65 90 -T2), -T2 -T2 with -GM (no inversion back,
+    the edges clipped), and -EPI on a series."""
+    out = {name: ctx.out(f"{name}.nii") for name in ("fmriprep", "t2t2_gm", "epi")}
+    cli("afni", "3dUnifize", "-quiet", "-clfrac", "0.2", "-rbt", "18.3", "65.0", "90.0", "-T2", "-prefix", out["fmriprep"], "-input", ctx.file("anat2.nii"))  # fmt: skip
+    cli("afni", "3dUnifize", "-quiet", "-T2", "-T2", "-GM", "-rbt", "6", "70", "80", "-prefix", out["t2t2_gm"], ctx.file("anat2.nii"))  # fmt: skip
+    cli("afni", "3dUnifize", "-quiet", "-EPI", "-prefix", out["epi"], ctx.file("bold.nii"))
+    return {name: Nifti(path) for name, path in out.items()}
+
+
+@case("cli.afni.3dUnifize.reproduce", covers=("cli:afni 3dUnifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """-T2up 100: the percentile one past the sorted values, the largest value by default and
+    AFNI's 0 reproduced (AFNI-45)."""
+    fixed, afni = ctx.out("fix.nii"), ctx.out("reproduce.nii")
+    args = ("afni", "3dUnifize", "-quiet", "-T2", "-T2up", "100", "-Urad", "6")
+    cli(*args, "-prefix", fixed, ctx.file("anat2.nii"))
+    cli(*args, "-prefix", afni, ctx.file("anat2.nii"), upstream_defects=REPRODUCE)
+    return {"fix": Nifti(fixed), "reproduce": Nifti(afni)}
+
+
+@case("py.afni.unifize", covers=("lx.afni.unifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The clean-room original on an image in memory, with the scale factors and the
+    automasked input."""
+    r = lx.afni.unifize(
+        anat(), t2=True, radius=8.0, save_scale=True, save_automask=True, implementation=ORIGINAL
+    )
+    return {
+        **image_outputs("uni", r.image, header=True),
+        "scale": r.scale.data,
+        "automasked": r.automasked.data,
+    }
 
 
 @case("py.afni.fmriprep_unifize_options", covers=("lx.afni.fmriprep_unifize_options",))

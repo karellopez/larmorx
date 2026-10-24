@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-afni"
-description = "AFNI-compatible tools for larmorx (3dTshift), re-implemented clean-room from behaviour specs"
+description = "AFNI-compatible tools for larmorx (3dTshift, 3dAutomask, 3dUnifize), re-implemented clean-room from behaviour specs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

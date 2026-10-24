@@ -32,6 +32,21 @@ both files' scanner coordinates, without a registration (`mask_on_grid`). For th
 0.38 degrees and 0.4 mm of residual motion between the two scans (at most 1.1 mm at the corners
 of a brain-sized box; `arc_align.sh`, `arc_motion.py`; the best of the six sessions measured): the
 headers alone align them to about one voxel. The resampled mask holds 176,205 voxels (176.2 mL,
-the original's volume) and lies on the infarct in the T1w. This resampling is a decision reported
-to the orchestrator (the brief allows renames and links only); the alternative is to run without
-the mask.
+the original's volume; SHA-256 `02440da7ebdb5625ce344e4997bd52545a656dc81b544c78c14514574cf962d0`)
+and lies on the infarct in the T1w. The orchestrator accepted this derived input on 2026-10-24
+(the alternative was a run without the mask); the test-data catalog keeps the original mask
+unchanged.
+
+## The runs
+
+```bash
+nohup bash validation/investigations/panel-oracle-runs/run_panel_oracles.sh <larmorx main checkout> &
+```
+
+runs the nine one after the other (`NPROCS=6 OMP=6`), logs to
+`<workspace>/oracles/logs/panel-oracles.log` (one line per run with its exit status; the last line
+`PANEL ORACLES FINISHED`) and each run's console to `panel-oracle-<run>.log` beside it. After each
+run it appends to the run's `RUN_INFO.txt` the BIDS view it read and the commit of this directory,
+and for ds004884 the derived lesion mask: its SHA-256, the upstream mask it was made from and how.
+The checkout given supplies `scripts/run_fmriprep_oracle.sh` (the five earlier runs' script); its
+parent is the workspace.

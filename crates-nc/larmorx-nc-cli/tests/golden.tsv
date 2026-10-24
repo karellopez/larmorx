@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from bb7959ad3633b51b321428794f36e5d2a2a2622f+dirty on 2026-10-24 (Linux x86_64)
+# Recorded from 53481ee26e1ca2f98b200c9138f7e96c6c019b42 on 2026-10-24 (Linux x86_64)
 # case	output	sha256	type	sample
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0000	633321b8478677454c33d3e82c9de5c297714b8f258fde08d8db42db06ec802f	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0001	8795c62cc2ad469560c04bb9ab443d63c187836bf092a312f22b39c9e8e429ae	-	-

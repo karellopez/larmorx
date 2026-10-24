@@ -190,7 +190,7 @@ options).
 preprocessed T1w of ds000005 with its brain mask, `-n Rician`): the correction changes 70,886
 voxels outside the mask (60,026 of them at one voxel from it). They are then denoised as the
 mask's own edge is: they move from the input by 8.5 on average (ANTs' 7.0; the mask's two-voxel
-inner edge 16.7 in both modes), and 812 of them become 0 (ANTs' 3), as the Rician correction
+inner edge 16.8; ANTs' 16.7), and 812 of them become 0 (ANTs' 3), as the Rician correction
 makes the darkest voxels 0 inside the mask too (1,299 of the inner edge's, in both modes): with
 the bias of the method, the method's behaviour at low signal.
 

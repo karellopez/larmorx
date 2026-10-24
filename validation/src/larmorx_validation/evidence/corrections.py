@@ -141,10 +141,13 @@ RUNS = (
 
 
 def _crosshair(ex, spec: Spec, first: str) -> list[int]:
-    """The default view's voxel: where the correction changes the first output most, within
-    ``spec.focus`` (or the shown region away from its edge); among equal changes (a mask's 0
-    and 1), the one nearest their centre, so the view is not at the region's first corner."""
+    """The default view's voxel: in the axial slice with the most of the shown region, where
+    the correction changes the first output most, within ``spec.focus`` (or the shown region
+    away from its edge); among equal changes (a mask's 0 and 1), the one nearest their centre,
+    so the view is not at the region's first corner."""
     from scipy import ndimage
+
+    from larmorx_validation.evidence.example import PLANE_AXES
 
     va = ex.values(ex.key("larmorx", first))
     vb = ex.values(ex.key("larmorx-reproduce", first))
@@ -153,6 +156,14 @@ def _crosshair(ex, spec: Spec, first: str) -> list[int]:
     else:
         inner = ndimage.binary_erosion(ex.m, iterations=2)
         region = inner if inner.any() else ex.m
+    axis = PLANE_AXES["axial"][0]
+    others = tuple(i for i in range(3) if i != axis)
+    k = int(np.argmax(region.sum(axis=others)))
+    keep = np.zeros_like(region)
+    index = [slice(None)] * 3
+    index[axis] = k
+    keep[tuple(index)] = True
+    region = region & keep
     dv = np.where(region, np.abs(va.astype(np.float64) - vb), -1.0)
     top = np.argwhere(dv == dv.max())
     centre = top.mean(axis=0)

@@ -707,14 +707,25 @@ def _a44_spec(ctx: core.Context):
         return ndimage.binary_dilation(common.load(str(run / MASK)) > 0, iterations=4)
 
     def effect(e) -> str:
+        from scipy import ndimage
+
         mask = common.load(str(run / MASK)) > 0
-        a = common.load(str(e.dir / "larmorx-reproduce-denoised.nii.gz"))
-        b = common.load(str(e.dir / "larmorx-denoised.nii.gz"))
+        x = common.load(str(run / PREPROC)).astype(np.float64)
+        a = common.load(str(e.dir / "larmorx-reproduce-denoised.nii.gz")).astype(np.float64)
+        b = common.load(str(e.dir / "larmorx-denoised.nii.gz")).astype(np.float64)
         changed = a != b
+        out = changed & ~mask
+        edge = mask & ~ndimage.binary_erosion(mask, iterations=2)
         return (
-            f"{int((changed & ~mask).sum()):,} voxels outside the mask change (the voxels next "
-            f"to it that a centre inside reached), {int((changed & mask).sum()):,} inside it "
-            "(ANTS-43, corrected since 2026-10-12)"
+            f"{int(out.sum()):,} voxels outside the mask change (the voxels next to it that a "
+            f"centre inside reached), {int((changed & mask).sum()):,} inside it (ANTS-43, "
+            "corrected since 2026-10-12). Outside, the corrected voxels are denoised as the "
+            "mask's own edge is: they move from the input by "
+            f"{np.abs(b[out] - x[out]).mean():.1f} on average (ANTs' {np.abs(a[out] - x[out]).mean():.1f}; "
+            f"the mask's two-voxel inner edge {np.abs(b[edge] - x[edge]).mean():.1f}), and "
+            f"{int((b[out] == 0).sum()):,} of them become 0 (ANTs' {int((a[out] == 0).sum()):,}), "
+            "as the Rician correction makes the darkest voxels inside the mask 0 too "
+            f"({int((b[edge] == 0).sum()):,} of the edge's)"
         )
 
     return corrections.Spec(

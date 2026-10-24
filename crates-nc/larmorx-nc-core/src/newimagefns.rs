@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Translated to Rust from FSL 6.0.7.17: fsl-newimage 2203.12 (newimagefns.{h,cc}:
-// isotropic_resample, affine_transform, raw_affine_transform, affine_transform_mask). Copyright
+// isotropic_resample, affine_transform, raw_affine_transform, affine_transform_mask,
+// make_grad_masks, gradient). Copyright
 // (C) 1999-2018 University of Oxford (Mark Jenkinson et al.). Rust translation Copyright 2026
 // Karel Lopez Vilaret; modified from the originals. Distributed under the FSL Licence (see
 // LICENSE).
@@ -217,4 +218,63 @@ pub fn affine_transform_mask(
         }
     }
     Ok(())
+}
+
+/// `make_grad_masks(maskx, masky, maskz)`: the 3x3x3 gradient masks,
+/// `(x-1)*pow(3, 1-|y-1|-|z-1|)` and its permutations (the exponent is 1, 0 or -1, so `pow` is
+/// exact or correctly rounded on every libm), stored in single precision; index `x + 3*(y + 3*z)`.
+pub fn grad_masks() -> [[f32; 27]; 3] {
+    let mut m = [[0.0f32; 27]; 3];
+    let p3 = |e: f64| -> f64 {
+        if e == 1.0 {
+            3.0
+        } else if e == 0.0 {
+            1.0
+        } else {
+            1.0 / 3.0
+        }
+    };
+    for z in 0..3 {
+        for y in 0..3 {
+            for x in 0..3 {
+                let (xf, yf, zf) = (f64::from(x), f64::from(y), f64::from(z));
+                let i = (x + 3 * (y + 3 * z)) as usize;
+                m[0][i] = ((xf - 1.0) * p3(1.0 - (yf - 1.0).abs() - (zf - 1.0).abs())) as f32;
+                m[1][i] = ((yf - 1.0) * p3(1.0 - (xf - 1.0).abs() - (zf - 1.0).abs())) as f32;
+                m[2][i] = ((zf - 1.0) * p3(1.0 - (xf - 1.0).abs() - (yf - 1.0).abs())) as f32;
+            }
+        }
+    }
+    m
+}
+
+/// `gradient(source)` (voxel coordinates): the magnitude of the 3x3x3 gradient, the neighbours
+/// outside the volume taken by its extrapolation, accumulated in single precision in FSL's
+/// order; the result keeps `source`'s properties.
+pub fn gradient(source: &Volume) -> Volume {
+    let m = grad_masks();
+    let mut grad = source.clone();
+    for z in 0..source.zsize() {
+        for y in 0..source.ysize() {
+            for x in 0..source.xsize() {
+                let (mut vx, mut vy, mut vz) = (0.0f32, 0.0f32, 0.0f32);
+                for mz in -1i64..=1 {
+                    for my in -1i64..=1 {
+                        for mx in -1i64..=1 {
+                            let v = source.get(x + mx, y + my, z + mz);
+                            let i = ((mx + 1) + 3 * ((my + 1) + 3 * (mz + 1))) as usize;
+                            vx += v * m[0][i];
+                            vy += v * m[1][i];
+                            vz += v * m[2][i];
+                        }
+                    }
+                }
+                let k = grad.idx(x, y, z);
+                // sqrt(float) and sqrt(double) rounded to float agree (no double rounding for
+                // the square root).
+                grad.data[k] = (vx * vx + vy * vy + vz * vz).sqrt();
+            }
+        }
+    }
+    grad
 }

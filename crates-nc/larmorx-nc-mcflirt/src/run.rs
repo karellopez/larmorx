@@ -13,7 +13,7 @@ use larmorx_nc_core::cnum;
 use larmorx_nc_core::costfns::{CostType, Costfn};
 use larmorx_nc_core::kernel;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
-use larmorx_nc_core::newimagefns::{affine_transform, isotropic_resample};
+use larmorx_nc_core::newimagefns::{self, affine_transform, isotropic_resample};
 use larmorx_nc_core::nifti;
 use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
@@ -95,7 +95,6 @@ struct State {
     no_volumes: i32,
     twodcorrect: bool,
     smoothsize: f32,
-    no_params: i32,
     maincostfn: CostType,
 }
 
@@ -103,7 +102,6 @@ struct State {
 struct Search<'a> {
     o: &'a Options,
     st: &'a State,
-    mode: UpstreamDefects,
 }
 
 /// The result of registering one volume: its matrix and what it printed.
@@ -151,9 +149,11 @@ fn param_tols(rot_param: f32, new_tolerance: f32) -> Mat {
 
 impl Search<'_> {
     /// `costfn(params)`: the cost of the parameters, printing the matrix with `-verbose 20`.
-    fn cost(&self, cf: &mut Costfn, params: &Mat, cerr: &mut Cerr) -> f32 {
+    /// `no_params` is `Globaloptions::no_params`, which `optimise_strategy1` sets to the
+    /// corrected dof before every search (`-dof` sets it too, but no cost is evaluated before).
+    fn cost(&self, cf: &mut Costfn, params: &Mat, no_params: i32, cerr: &mut Cerr) -> f32 {
         let centre = Mat::col(&cf.test_cog);
-        let aff = vector2affine(params, self.st.no_params, &centre, self.st.twodcorrect);
+        let aff = vector2affine(params, no_params, &centre, self.st.twodcorrect);
         // affmat = uninitaffmat * initmat (the identity): a 4x4 product.
         let affmat = arma::mul_tinysq(&aff, &Mat::eye(4));
         if self.o.verbose >= 20 {
@@ -167,7 +167,8 @@ impl Search<'_> {
 
     /// `usroptimise(matresult, dof, 1, new_tolerance)` → `optimise_strategy1`.
     fn usroptimise(&self, cf: &mut Costfn, matresult: &Mat, new_tolerance: f32, cerr: &mut Cerr) -> Mat {
-        let mut dof = self.o.dof.min(self.o.dof);
+        // usroptimise(matresult, globalopts.dof, ...): Min(globalopts.dof, usrdof), the same.
+        let mut dof = self.o.dof;
         if dof < 6 {
             cerr.s(&format!("Erroneous dof {dof} : using 6 instead\n"));
             dof = 6;
@@ -200,7 +201,7 @@ impl Search<'_> {
             }
         }
         {
-            let mut f = |p: &Mat| -> f32 { self.cost(cf, p, cerr) };
+            let mut f = |p: &Mat| -> f32 { self.cost(cf, p, dof.max(6), cerr) };
             let _ = optimise::optimise(
                 &mut pvec,
                 no_params,
@@ -424,6 +425,11 @@ impl Run<'_> {
     }
 }
 
+/// A default-constructed `volume<float>`: no voxels, voxel sizes 1.
+fn empty_volume() -> Volume {
+    Volume::new(0, 0, 0, 1)
+}
+
 /// Runs `f` in a pool of `n` threads (0: all logical CPUs).
 fn with_pool<R: Send>(n: usize, f: impl FnOnce() -> R + Send) -> R {
     match rayon::ThreadPoolBuilder::new().num_threads(n).build() {
@@ -467,6 +473,14 @@ fn register_volume_mut(
 ) -> Result<VolumeResult, FslError> {
     let mut cerr = Cerr::new(fixed);
     let mut testvol = timeseries.sub_volume(i64::from(i))?;
+    if o.gdtflag {
+        // -gdt (reached only when reproducing, FSL-04): the test volume becomes its gradient
+        // image; the reference's gradient is computed and discarded.
+        if !o.no_reporting {
+            cerr.s(&format!("Calculating gradient image for volume [{i}]\n"));
+        }
+        testvol = newimagefns::gradient(&testvol);
+    }
     fix2d(&mut testvol, st, o.fov);
     let offsettrans = start.clone();
     // usrsetscale(refvol, testvol, (int) scaling)
@@ -479,7 +493,7 @@ fn register_volume_mut(
     cf.set_no_bins(o.no_bins / scaling as i32);
     cf.smoothsize = st.smoothsize;
     cf.skip_nonfinite = mode.fix();
-    let search = Search { o, st, mode };
+    let search = Search { o, st };
     let res = search.usroptimise(&mut cf, &offsettrans, new_tolerance, &mut cerr);
     // finalmat = offsettrans * initmat (the identity).
     let finalmat = arma::mul_tinysq(&res, &Mat::eye(4));
@@ -517,7 +531,6 @@ pub fn mcflirt(
         no_volumes: 0,
         twodcorrect: o.twodcorrect,
         smoothsize: o.smoothsize,
-        no_params: o.no_params,
         maincostfn: o.maincostfn,
     };
     let mut run = Run {
@@ -757,7 +770,6 @@ impl Run<'_> {
             let mut m0 = std::mem::take(&mut mat0);
             self.correct(1, &rv, &timeseries, current_scale, 0.1, &mut m1, &mut m0, mean_cond)?;
             self.correct(-1, &rv, &timeseries, current_scale, 0.1, &mut m1, &mut m0, mean_cond)?;
-            mat1 = m1;
             mat0 = m0;
         } else {
             mat0.clone_from(&mat1);
@@ -806,9 +818,13 @@ impl Run<'_> {
             let mut msgs = Vec::new();
             timeseries.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel("blackman", 7, 1201, &mut msgs)));
         }
-        let template = match &extrefvol {
-            Some(r) => Some(r.clone()),
-            None => None,
+        // With a reference file the output grid is the reference's; mcflirt reads it in the
+        // first stage only, so with `-stages 0` it is still the empty volume (`volume<float>
+        // extrefvol;`) and the resampling throws (the corrected run refused this earlier).
+        let template = if self.o.reffileflag {
+            Some(extrefvol.clone().unwrap_or_else(empty_volume))
+        } else {
+            None
         };
         let mats: Vec<Mat> = mat0.iter().map(|m| arma::mul_tinysq(m, &init_trans)).collect();
         let resampled: Vec<Result<Volume, FslError>> = with_pool(self.n_threads, || {
@@ -830,10 +846,12 @@ impl Run<'_> {
             self.stats(&timeseries)?;
         }
         if self.o.tmpmatflag {
-            let rv = if let Some(r) = &extrefvol {
-                r.clone()
-            } else if let Some(m) = &meanvol {
-                m.clone()
+            // decompose_mats takes only the reference's grid (its centre); the volumes are
+            // empty when no stage ran (`-stages 0`).
+            let rv = if self.o.reffileflag {
+                extrefvol.clone().unwrap_or_else(empty_volume)
+            } else if self.o.meanvol {
+                meanvol.clone().unwrap_or_else(empty_volume)
             } else {
                 if !self.o.no_reporting {
                     let _ = write!(

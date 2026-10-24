@@ -1096,8 +1096,8 @@ fn q_kernelval(x: f32, w: i32) -> f32 {
         return 0.0;
     }
     let t = sinc_table();
-    (f64::from(t[n as usize]) * (1.0 - f64::from(dn)) + f64::from(t[n as usize + 1]) * f64::from(dn))
-        as f32
+    // kernel[n]*(1.0-dn) is double (the literal); kernel[n+1]*dn is a float product.
+    (f64::from(t[n as usize]) * (1.0 - f64::from(dn)) + f64::from(t[n as usize + 1] * dn)) as f32
 }
 
 /// `q_sinc_interpolation(v, x, y, z)`: the windowed sinc over the voxels inside the volume,

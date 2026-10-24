@@ -547,9 +547,90 @@ pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
     res
 }
 
+/// The fill of FSL's `make_mask_from_mesh` (bet2's and betsurf's): from `start`, every voxel of
+/// value `from` 6-connected to it becomes `to`, the start itself whatever its value. (FSL pushes a
+/// voxel each time it is seen with `from` and sets it when popped; marking it when pushed fills the
+/// same voxels with far less memory.)
+///
+/// A start outside the image is FSL-43: FSL writes `to` there, outside the volume, and reads its
+/// neighbours outside it too. Corrected (`fix`), the fill starts at the nearest voxel inside the
+/// image; reproduced, only what FSL defines is done: no write outside, and of the start's
+/// neighbours FSL's bounds allow, those inside the image are examined (those outside count as not
+/// `from`). Returns the start when it lay outside.
+pub fn fill_mask(
+    mask: &mut Volume<i16>,
+    start: [i64; 3],
+    from: i16,
+    to: i16,
+    fix: bool,
+) -> Option<[i64; 3]> {
+    let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
+    if nx <= 0 || ny <= 0 || nz <= 0 {
+        return Some(start);
+    }
+    let inside = mask.in_bounds(start[0], start[1], start[2]);
+    let mut current: Vec<[i64; 3]> = Vec::new();
+    let neighbours = |[x, y, z]: [i64; 3]| {
+        [
+            (x > 0).then_some([x - 1, y, z]),
+            (y > 0).then_some([x, y - 1, z]),
+            (z > 0).then_some([x, y, z - 1]),
+            (nx > x + 1).then_some([x + 1, y, z]),
+            (ny > y + 1).then_some([x, y + 1, z]),
+            (nz > z + 1).then_some([x, y, z + 1]),
+        ]
+    };
+    if inside || fix {
+        let s = [
+            start[0].clamp(0, nx - 1),
+            start[1].clamp(0, ny - 1),
+            start[2].clamp(0, nz - 1),
+        ];
+        mask.set(s[0], s[1], s[2], to);
+        current.push(s);
+    } else {
+        for [x, y, z] in neighbours(start).into_iter().flatten() {
+            if mask.in_bounds(x, y, z) && mask.value(x, y, z) == from {
+                mask.set(x, y, z, to);
+                current.push([x, y, z]);
+            }
+        }
+    }
+    while let Some(p) = current.pop() {
+        for [x, y, z] in neighbours(p).into_iter().flatten() {
+            if mask.value(x, y, z) == from {
+                mask.set(x, y, z, to);
+                current.push([x, y, z]);
+            }
+        }
+    }
+    (!inside).then_some(start)
+}
+
+/// The FSL-43 notice of a fill that started outside the image.
+pub(crate) fn outside_notice(notices: &mut Notices, start: [i64; 3], what: &str) {
+    let detail = if notices.fix() {
+        format!(
+            "{what} starts at voxel {} {} {}, outside the image: filled from the nearest voxel inside it",
+            start[0], start[1], start[2]
+        )
+    } else {
+        format!(
+            "{what} starts at voxel {} {} {}, outside the image, where FSL writes and reads outside \
+             the volume: filled from the start's neighbours inside it",
+            start[0], start[1], start[2]
+        )
+    };
+    notices.add(&defects::FSL_43, detail);
+}
+
 /// `make_mask_from_mesh`: 1 everywhere, the surface drawn as 0, then 0 filled from the mesh's
-/// centroid. `Err` with the start voxel when it lies outside the image (FSL-43).
-pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh) -> Result<Volume<i16>, [i64; 3]> {
+/// centroid ([`fill_mask`]; the start, when outside the image: FSL-43).
+pub fn make_mask_from_mesh(
+    image: &Volume<f32>,
+    m: &Mesh,
+    fix: bool,
+) -> (Volume<i16>, Option<[i64; 3]>) {
     let mut mask: Volume<i16> = Volume::copyconvert(image);
     for v in mask.data.iter_mut() {
         *v = 1;
@@ -568,33 +649,8 @@ pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh) -> Result<Volume<i16>,
     c = V3::new(c.x * f, c.y * f, c.z * f);
     c = V3::new(c.x / xd, c.y / yd, c.z / zd);
     let start = [trunc_i(c.x), trunc_i(c.y), trunc_i(c.z)];
-    if !mask.in_bounds(start[0], start[1], start[2]) {
-        return Err(start);
-    }
-    let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
-    let mut current: Vec<[i64; 3]> = vec![start];
-    while let Some([x, y, z]) = current.pop() {
-        mask.set(x, y, z, 0);
-        if x > 0 && mask.value(x - 1, y, z) == 1 {
-            current.push([x - 1, y, z]);
-        }
-        if y > 0 && mask.value(x, y - 1, z) == 1 {
-            current.push([x, y - 1, z]);
-        }
-        if z > 0 && mask.value(x, y, z - 1) == 1 {
-            current.push([x, y, z - 1]);
-        }
-        if nx > x + 1 && mask.value(x + 1, y, z) == 1 {
-            current.push([x + 1, y, z]);
-        }
-        if ny > y + 1 && mask.value(x, y + 1, z) == 1 {
-            current.push([x, y + 1, z]);
-        }
-        if nz > z + 1 && mask.value(x, y, z + 1) == 1 {
-            current.push([x, y, z + 1]);
-        }
-    }
-    Ok(mask)
+    let outside = fill_mask(&mut mask, start, 1, 0, fix);
+    (mask, outside)
 }
 
 /// `h2c`: Hounsfield units to Cormack units (`--ct`).
@@ -1052,7 +1108,7 @@ pub fn compute(
     a: &Bet2Args,
     out: &mut dyn Write,
     err: &mut dyn Write,
-    _notices: &mut Notices,
+    notices: &mut Notices,
 ) -> Result<Bet2Result, u8> {
     let (mut xarg, mut yarg, mut zarg) = (0.0f64, 0.0, 0.0);
     if let Some(c) = a.centre {
@@ -1215,19 +1271,10 @@ pub fn compute(
             self_intersection = false;
         }
     }
-    let outside = match make_mask_from_mesh(testvol, &m) {
-        Ok(v) => v,
-        Err(s) => {
-            let _ = writeln!(
-                err,
-                "bet2: stopped: the surface's centre lies outside the image (voxel {} {} {}), \
-                 where FSL's bet2 starts its fill of the brain mask, writing outside the image \
-                 (FSL-43) (larmorx)",
-                s[0], s[1], s[2]
-            );
-            return Err(1);
-        }
-    };
+    let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix());
+    if let Some(s) = start {
+        outside_notice(notices, s, "the fill of the brain mask");
+    }
     Ok(Bet2Result {
         params: bp,
         mesh: m,

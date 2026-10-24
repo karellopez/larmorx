@@ -17,7 +17,7 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices};
 
-use crate::bet2::{Run, report_abort};
+use crate::bet2::{Run, fill_mask, outside_notice, report_abort};
 use crate::fsl::cstr::g6;
 use crate::fsl::fdlibm;
 use crate::fsl::istream::{Got, IStream};
@@ -329,9 +329,12 @@ fn fill_start(image: &Volume<i16>, m: &Mesh) -> [i64; 3] {
 }
 
 /// `make_mask_from_mesh` (betsurf's): the image with 1 filled in from the mesh's centroid
-/// through the 6-connected voxels that are 0. FSL writes the start voxel without a check: one
-/// outside the image is a write outside the volume (a crash), refused.
-fn make_mask_from_mesh(image: &Volume<i16>, m: &Mesh) -> Result<Volume<i16>, Fail> {
+/// through the 6-connected voxels that are 0 (a start outside the image: FSL-43).
+fn make_mask_from_mesh(
+    image: &Volume<i16>,
+    m: &Mesh,
+    notices: &mut Notices,
+) -> Result<Volume<i16>, Fail> {
     if m.points.is_empty() {
         return Err(Fail::Refused(
             "the mesh has no vertices: FSL's betsurf divides by 0 for its centre and writes \
@@ -340,50 +343,22 @@ fn make_mask_from_mesh(image: &Volume<i16>, m: &Mesh) -> Result<Volume<i16>, Fai
         ));
     }
     let start = fill_start(image, m);
-    fill_from(image, start)
+    Ok(fill_from(image, start, notices))
 }
 
-fn fill_from(image: &Volume<i16>, start: [i64; 3]) -> Result<Volume<i16>, Fail> {
+fn fill_from(image: &Volume<i16>, start: [i64; 3], notices: &mut Notices) -> Volume<i16> {
     let mut mask = image.clone();
-    if !mask.in_bounds(start[0], start[1], start[2]) {
-        return Err(Fail::Refused(format!(
-            "the centre of a surface lies outside the image (voxel {} {} {}), where FSL's \
-             betsurf writes outside the image (FSL-43)",
-            start[0], start[1], start[2]
-        )));
+    if let Some(s) = fill_mask(&mut mask, start, 0, 1, notices.fix()) {
+        outside_notice(notices, s, "the fill of a surface's mask");
     }
-    let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
-    // FSL pushes a voxel each time it is seen at 0 and sets it when popped; marking it when
-    // pushed fills the same voxels
-    mask.set(start[0], start[1], start[2], 1);
-    let mut current = vec![start];
-    while let Some([x, y, z]) = current.pop() {
-        let mut visit = |mask: &mut Volume<i16>, x: i64, y: i64, z: i64| {
-            if mask.value(x, y, z) == 0 {
-                mask.set(x, y, z, 1);
-                current.push([x, y, z]);
-            }
-        };
-        if x > 0 {
-            visit(&mut mask, x - 1, y, z);
-        }
-        if y > 0 {
-            visit(&mut mask, x, y - 1, z);
-        }
-        if z > 0 {
-            visit(&mut mask, x, y, z - 1);
-        }
-        if x + 1 < nx {
-            visit(&mut mask, x + 1, y, z);
-        }
-        if y + 1 < ny {
-            visit(&mut mask, x, y + 1, z);
-        }
-        if z + 1 < nz {
-            visit(&mut mask, x, y, z + 1);
-        }
-    }
-    Ok(mask)
+    mask
+}
+
+/// [`fill_from`] without a notice (the comparison of FSL-47's two starts).
+fn fill_quiet(image: &Volume<i16>, start: [i64; 3], fix: bool) -> Volume<i16> {
+    let mut mask = image.clone();
+    let _ = fill_mask(&mut mask, start, 0, 1, fix);
+    mask
 }
 
 /// A volume of `image`'s grid and properties, as `short`, every voxel 0 (`copyconvert(image,
@@ -1092,7 +1067,7 @@ fn surfaces(
     let thr = {
         let mut brain_mask = zeros_like(&t1);
         draw_mesh(&mut brain_mask, &m);
-        let brain_mask = make_mask_from_mesh(&brain_mask, &m)?;
+        let brain_mask = make_mask_from_mesh(&brain_mask, &m, notices)?;
         let mut hist: Vec<f64> = Vec::new();
         for (k, &b) in brain_mask.data.iter().enumerate() {
             if b == 1 {
@@ -1237,7 +1212,7 @@ fn surfaces(
     let maskinskull = {
         let mut base: Volume<i16> = Volume::copyconvert(&write0);
         draw_mesh(&mut base, &m);
-        let maskinskull = make_mask_from_mesh(&base, &m)?;
+        let maskinskull = make_mask_from_mesh(&base, &m, notices)?;
         let mut output1 = zeros_like(&t1);
         if a.outline || a.mask || a.skullmask {
             draw_mesh(&mut output1, &realmesh);
@@ -1256,7 +1231,7 @@ fn surfaces(
             )?;
         }
         if a.mask || a.skullmask {
-            let smask = make_mask_from_mesh(&output1, &realmesh)?;
+            let smask = make_mask_from_mesh(&output1, &realmesh, notices)?;
             if a.mask {
                 say(out, "  mask");
                 save(
@@ -1311,7 +1286,7 @@ fn surfaces(
     let maskoutskull = {
         let mut base: Volume<i16> = Volume::copyconvert(&write0);
         draw_mesh(&mut base, &m);
-        let maskoutskull = make_mask_from_mesh(&base, &m)?;
+        let maskoutskull = make_mask_from_mesh(&base, &m, notices)?;
         let mut output1 = zeros_like(&t1);
         if a.mask || a.outline || a.skullmask {
             draw_mesh(&mut output1, &realmesh2);
@@ -1330,7 +1305,7 @@ fn surfaces(
             )?;
         }
         if a.mask || a.skullmask {
-            let smask = make_mask_from_mesh(&output1, &realmesh2)?;
+            let smask = make_mask_from_mesh(&output1, &realmesh2, notices)?;
             if a.mask {
                 say(out, "  mask");
                 save(
@@ -1431,32 +1406,27 @@ fn surfaces(
                 // FSL-47: FSL fills from the outer skull surface's centre, in the padded grid
                 let wrong = fill_start(&output1, &m);
                 let right = fill_start(&output1, &m2);
-                let theirs = fill_from(&output1, wrong);
-                if notices.fix() {
-                    let ours = fill_from(&output1, right)?;
-                    if theirs.as_ref().map(|t| t.data != ours.data).unwrap_or(true) {
-                        notices.add(
-                            &defects::FSL_47,
-                            "the scalp mask is filled from the scalp surface's centre",
-                        );
-                    }
-                    ours
-                } else {
-                    let theirs = theirs?;
-                    if fill_from(&output1, right)
-                        .map(|o| o.data != theirs.data)
-                        .unwrap_or(true)
-                    {
-                        notices.add(
-                            &defects::FSL_47,
+                let fix = notices.fix();
+                let theirs = fill_quiet(&output1, wrong, fix);
+                let ours = fill_quiet(&output1, right, fix);
+                if theirs.data != ours.data {
+                    notices.add(
+                        &defects::FSL_47,
+                        if fix {
+                            "the scalp mask is filled from the scalp surface's centre"
+                        } else {
                             "the scalp mask is filled from the outer skull surface's centre in \
-                             the padded grid, as FSL does",
-                        );
-                    }
-                    theirs
+                             the padded grid, as FSL does"
+                        },
+                    );
                 }
+                let (start, chosen) = if fix { (right, ours) } else { (wrong, theirs) };
+                if !output1.in_bounds(start[0], start[1], start[2]) {
+                    outside_notice(notices, start, "the fill of a surface's mask");
+                }
+                chosen
             } else {
-                make_mask_from_mesh(&output1, &m2)?
+                make_mask_from_mesh(&output1, &m2, notices)?
             };
             save(
                 &mask,

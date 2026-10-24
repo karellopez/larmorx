@@ -46,6 +46,7 @@ PARITY_MODULES = {
     "ants-ai": "ants_ai",
     "ants-affine-initializer": "ants_affine_initializer",
     "ants-atropos": "ants_atropos",
+    "fsl-bet": "fsl_bet",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).
@@ -65,7 +66,7 @@ BENCH_SUITES = tuple(BENCH_MODULES)
 
 
 #: Suites that can also validate a replica binary (docs/licensing.md).
-REPLICA_SUITES = ("afni-tshift", "afni-automask", "afni-unifize")
+REPLICA_SUITES = ("afni-tshift", "afni-automask", "afni-unifize", "fsl-bet")
 
 
 def _parity_suite(name: str, implementation: str = "original"):

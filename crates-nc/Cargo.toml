@@ -12,6 +12,7 @@
 resolver = "3"
 members = [
     "larmorx-nc-bet",
+    "larmorx-nc-bet/tools/libm-verify",
 ]
 
 [workspace.package]

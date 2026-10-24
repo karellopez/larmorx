@@ -106,6 +106,15 @@ def replica_binary() -> Path | None:
     return Path(found) if found else None
 
 
+def replica_version() -> str:
+    """What the replica's program reports (``larmorx-nc <version>``)."""
+    exe = replica_binary()
+    if exe is None:
+        return "not found"
+    p = subprocess.run([str(exe), "--version"], capture_output=True, text=True, check=False)
+    return p.stdout.strip() or "unknown version"
+
+
 @dataclass(frozen=True)
 class Completed:
     """A run: its exit status (negative: killed by that signal), standard output and error."""

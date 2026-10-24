@@ -17,7 +17,7 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices};
 
-use crate::bet2::{Run, fill_mask, outside_notice, report_abort};
+use crate::bet2::{Fill, Run, crash_message, fill_mask, outside_notice, report_abort};
 use crate::fsl::cstr::g6;
 use crate::fsl::fdlibm;
 use crate::fsl::istream::{Got, IStream};
@@ -343,15 +343,28 @@ fn make_mask_from_mesh(
         ));
     }
     let start = fill_start(image, m);
-    Ok(fill_from(image, start, notices))
+    fill_from(image, start, notices)
 }
 
-fn fill_from(image: &Volume<i16>, start: [i64; 3], notices: &mut Notices) -> Volume<i16> {
+fn fill_from(
+    image: &Volume<i16>,
+    start: [i64; 3],
+    notices: &mut Notices,
+) -> Result<Volume<i16>, Fail> {
     let mut mask = image.clone();
-    if let Some(s) = fill_mask(&mut mask, start, 0, 1, notices.fix()) {
-        outside_notice(notices, s, "the fill of a surface's mask");
+    match fill_mask(&mut mask, start, 0, 1, notices.fix()) {
+        Fill::Inside => {}
+        Fill::Outside(s) => outside_notice(notices, s, "the fill of a surface's mask"),
+        Fill::Crash(s) => {
+            let msg = crash_message("betsurf", s);
+            let why = msg
+                .trim_start_matches("betsurf: stopped: ")
+                .trim_end_matches(" (larmorx)")
+                .to_owned();
+            return Err(Fail::Refused(why));
+        }
     }
-    mask
+    Ok(mask)
 }
 
 /// [`fill_from`] without a notice (the comparison of FSL-47's two starts).
@@ -1420,10 +1433,10 @@ fn surfaces(
                         },
                     );
                 }
-                let (start, chosen) = if fix { (right, ours) } else { (wrong, theirs) };
-                if !output1.in_bounds(start[0], start[1], start[2]) {
-                    outside_notice(notices, start, "the fill of a surface's mask");
-                }
+                let start = if fix { right } else { wrong };
+                // the fill again, with its notice or refusal (FSL-43)
+                let chosen = fill_from(&output1, start, notices)?;
+                let _ = (ours, theirs);
                 chosen
             } else {
                 make_mask_from_mesh(&output1, &m2, notices)?

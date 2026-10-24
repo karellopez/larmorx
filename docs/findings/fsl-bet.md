@@ -71,7 +71,10 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   the nearest voxel inside the image; `reproduce` does what FSL defines (no write outside; the
   start's neighbours inside the image are examined, those outside count as not to be filled) and
   warns that FSL writes and reads outside the volume there. On `defects/2d` both give FSL's
-  outputs, bit for bit.
+  outputs, bit for bit. Further than one voxel outside, FSL's write lands far from the buffer and
+  it crashes (a NaN centroid, as FSL-42's NaN options give, truncates to `INT_MIN`: the parity
+  cases `defects/nan-f` and `defects/zero-w` segfault in FSL): both modes refuse there, except that
+  the default fills from the nearest voxel when the centroid is a real position.
 - **FSL-44** (rule A, corrected): the `bet` script expands `$1`, `$2`, `$IN`, `$OUT` unquoted
   throughout (`bet:155-160` and every command): a name with a blank becomes several words (the
   input is "not valid"; an output name writes other files), and `while [ _$1 != _ ]`

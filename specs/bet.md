@@ -293,7 +293,8 @@ image), then a flood fill of 0 through 6-connected voxels of value 1 from the vo
 centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - that`. A centroid
 outside the image (a single slice: the surface's centroid falls below it) makes FSL write and
 read outside the volume (FSL-43): the default starts the fill at the nearest voxel inside the
-image, which on a single slice gives FSL's mask **(observed)**.
+image, which on a single slice gives FSL's mask **(observed)**; a centroid that is not a number
+(the surface diverged) is an error.
 
 ### 4.7 Outputs
 

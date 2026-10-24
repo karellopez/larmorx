@@ -553,22 +553,29 @@ pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
 /// same voxels with far less memory.)
 ///
 /// A start outside the image is FSL-43: FSL writes `to` there, outside the volume, and reads its
-/// neighbours outside it too. Corrected (`fix`), the fill starts at the nearest voxel inside the
-/// image; reproduced, only what FSL defines is done: no write outside, and of the start's
-/// neighbours FSL's bounds allow, those inside the image are examined (those outside count as not
-/// `from`). Returns the start when it lay outside.
-pub fn fill_mask(
-    mask: &mut Volume<i16>,
-    start: [i64; 3],
-    from: i16,
-    to: i16,
-    fix: bool,
-) -> Option<[i64; 3]> {
+/// neighbours outside it too. One voxel outside (a single slice: the centroid falls just below
+/// it), FSL's write lands beside the volume's buffer and the run goes on: corrected (`fix`), the
+/// fill starts at the nearest voxel inside the image; reproduced, only what FSL defines is done:
+/// no write outside, and of the start's neighbours FSL's bounds allow, those inside the image are
+/// examined (those outside count as not `from`). Further outside (a centroid that is not a number
+/// truncates to `INT_MIN`) FSL writes far from the volume and crashes: [`Fill::Crash`] in both
+/// modes, except that `fix` fills from the nearest voxel when the start is a real position.
+pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fix: bool) -> Fill {
     let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
     if nx <= 0 || ny <= 0 || nz <= 0 {
-        return Some(start);
+        return Fill::Crash(start);
     }
     let inside = mask.in_bounds(start[0], start[1], start[2]);
+    let real = start.iter().all(|&c| c != i64::from(i32::MIN));
+    let near = start[0] >= -1
+        && start[1] >= -1
+        && start[2] >= -1
+        && start[0] <= nx
+        && start[1] <= ny
+        && start[2] <= nz;
+    if !inside && !(if fix { real } else { near }) {
+        return Fill::Crash(start);
+    }
     let mut current: Vec<[i64; 3]> = Vec::new();
     let neighbours = |[x, y, z]: [i64; 3]| {
         [
@@ -604,7 +611,30 @@ pub fn fill_mask(
             }
         }
     }
-    (!inside).then_some(start)
+    if inside {
+        Fill::Inside
+    } else {
+        Fill::Outside(start)
+    }
+}
+
+/// How [`fill_mask`] started.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fill {
+    Inside,
+    /// Outside the image, handled (FSL-43's notice).
+    Outside([i64; 3]),
+    /// Where FSL writes far outside the volume and crashes: nothing filled.
+    Crash([i64; 3]),
+}
+
+/// The refusal of a fill FSL crashes on (FSL-43).
+pub(crate) fn crash_message(prog: &str, start: [i64; 3]) -> String {
+    format!(
+        "{prog}: stopped: the surface's centre lies outside the image (voxel {} {} {}), where \
+         FSL's {prog} starts its fill of a mask, writing outside the image (FSL-43) (larmorx)",
+        start[0], start[1], start[2]
+    )
 }
 
 /// The FSL-43 notice of a fill that started outside the image.
@@ -626,11 +656,7 @@ pub(crate) fn outside_notice(notices: &mut Notices, start: [i64; 3], what: &str)
 
 /// `make_mask_from_mesh`: 1 everywhere, the surface drawn as 0, then 0 filled from the mesh's
 /// centroid ([`fill_mask`]; the start, when outside the image: FSL-43).
-pub fn make_mask_from_mesh(
-    image: &Volume<f32>,
-    m: &Mesh,
-    fix: bool,
-) -> (Volume<i16>, Option<[i64; 3]>) {
+pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh, fix: bool) -> (Volume<i16>, Fill) {
     let mut mask: Volume<i16> = Volume::copyconvert(image);
     for v in mask.data.iter_mut() {
         *v = 1;
@@ -1272,8 +1298,13 @@ pub fn compute(
         }
     }
     let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix());
-    if let Some(s) = start {
-        outside_notice(notices, s, "the fill of the brain mask");
+    match start {
+        Fill::Inside => {}
+        Fill::Outside(s) => outside_notice(notices, s, "the fill of the brain mask"),
+        Fill::Crash(s) => {
+            let _ = writeln!(err, "{}", crash_message("bet2", s));
+            return Err(1);
+        }
     }
     Ok(Bet2Result {
         params: bp,

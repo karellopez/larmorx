@@ -158,12 +158,13 @@ def _crosshair(ex, spec: Spec, first: str) -> list[int]:
         region = inner if inner.any() else ex.m
     axis = PLANE_AXES["axial"][0]
     others = tuple(i for i in range(3) if i != axis)
-    k = int(np.argmax(region.sum(axis=others)))
+    k = int(np.argmax(ex.m.sum(axis=others)))
     keep = np.zeros_like(region)
     index = [slice(None)] * 3
     index[axis] = k
     keep[tuple(index)] = True
-    region = region & keep
+    if (region & keep).any():
+        region = region & keep
     dv = np.where(region, np.abs(va.astype(np.float64) - vb), -1.0)
     top = np.argwhere(dv == dv.max())
     centre = top.mean(axis=0)

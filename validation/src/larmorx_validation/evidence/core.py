@@ -326,15 +326,20 @@ def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0, inter: float = 
 
 def one_minus_ncc(x: np.ndarray, y: np.ndarray) -> float:
     """1 − Pearson's correlation, computed stably as half the squared distance between the
-    normalised, centred images."""
-    xc = x - x.mean()
-    yc = y - y.mean()
-    nx = math.sqrt(float(np.dot(xc.ravel(), xc.ravel())))
-    ny = math.sqrt(float(np.dot(yc.ravel(), yc.ravel())))
+    normalised, centred images.
+
+    The sums are numpy's own pairwise sums (`np.sum`), not `np.dot`: `np.dot` hands long vectors
+    to the BLAS, which splits them across its threads, so its last bits depend on the thread
+    count and the export would not be byte-deterministic (found 2026-10-24: 48 values differed
+    between two exports of the same outputs)."""
+    xc = (x - x.mean()).ravel()
+    yc = (y - y.mean()).ravel()
+    nx = math.sqrt(float(np.sum(xc * xc)))
+    ny = math.sqrt(float(np.sum(yc * yc)))
     if nx == 0 or ny == 0:
         return 0.0 if nx == ny else 1.0
     u = xc / nx - yc / ny
-    return 0.5 * float(np.dot(u.ravel(), u.ravel()))
+    return 0.5 * float(np.sum(u * u))
 
 
 # --------------------------------------------------------------------- links and records

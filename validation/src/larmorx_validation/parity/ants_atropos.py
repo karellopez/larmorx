@@ -2046,8 +2046,9 @@ def _ncc(a: np.ndarray, b: np.ndarray) -> float:
     x = a.astype(np.float64).ravel()
     y = b.astype(np.float64).ravel()
     x, y = x - x.mean(), y - y.mean()
-    den = np.sqrt((x @ x) * (y @ y))
-    return float((x @ y) / den) if den > 0 else (1.0 if np.array_equal(x, y) else 0.0)
+    # numpy's own pairwise sums, not `@` (the BLAS's threads change the last bits, 2026-10-24)
+    den = np.sqrt(np.sum(x * x) * np.sum(y * y))
+    return float(np.sum(x * y) / den) if den > 0 else (1.0 if np.array_equal(x, y) else 0.0)
 
 
 def _dice(a: np.ndarray, b: np.ndarray) -> dict[int, float]:

@@ -75,9 +75,16 @@ def metrics(a: np.ndarray, b: np.ndarray) -> dict[str, float]:
     af, bf = a.astype(np.float64).ravel(), b.astype(np.float64).ravel()
     d = np.abs(af - bf)
     rel = d / np.maximum(np.abs(af), 1e-30)
+    # 1 - NCC as half the squared distance of the normalised, centred images (stable for nearly
+    # identical images), with numpy's own pairwise sums: `x @ x` goes to the BLAS, whose threads
+    # change the last bits from run to run (2026-10-24).
     x, y = af - af.mean(), bf - bf.mean()
-    den = np.sqrt((x @ x) * (y @ y))
-    ncc = float((x @ y) / den) if den > 0 else (1.0 if np.array_equal(af, bf) else 0.0)
+    nx, ny = float(np.sqrt(np.sum(x * x))), float(np.sqrt(np.sum(y * y)))
+    if nx > 0 and ny > 0:
+        u = x / nx - y / ny
+        one_minus = 0.5 * float(np.sum(u * u))
+    else:
+        one_minus = 0.0 if np.array_equal(af, bf) else 1.0
     return {
         "differing": int(
             np.count_nonzero(
@@ -86,8 +93,7 @@ def metrics(a: np.ndarray, b: np.ndarray) -> dict[str, float]:
         ),
         "max_abs": float(d.max()) if d.size else 0.0,
         "max_rel": float(rel.max()) if rel.size else 0.0,
-        # Rounding can put the NCC of nearly identical images a hair above 1.
-        "one_minus_ncc": max(0.0, 1.0 - ncc),
+        "one_minus_ncc": one_minus,
     }
 
 

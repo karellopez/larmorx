@@ -5,7 +5,7 @@
 - **Validated:** `larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dAutomask.md`), with `implementation="original"`
 - **Reference:** 3dAutomask from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
-- **Generated:** 2026-10-23 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
+- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
 
 **Bit-identical to AFNI: 80 of 81 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
 - Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 98 of 98 identical, in every case that ran both programs.
@@ -86,7 +86,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (753e72eb525b) |
+| larmorx | 0.0.1 (2a009d1ba7d6) |
 | larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

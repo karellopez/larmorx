@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "9ec45aeb7d28",
+  "larmorx_commit": "2a009d1ba7d6",
   "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -31,7 +31,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 168.318,
+   "seconds": 136.294,
    "status": "pass"
   },
   {
@@ -48,7 +48,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 86.102,
+   "seconds": 72.647,
    "status": "pass"
   },
   {
@@ -67,7 +67,7 @@
     "uni.nii: values bit-identical to AFNI's": 3,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 3.498,
+   "seconds": 2.942,
    "status": "pass"
   },
   {
@@ -84,7 +84,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 23.35,
+   "seconds": 21.379,
    "status": "pass"
   },
   {
@@ -101,7 +101,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 332.04,
+   "seconds": 277.673,
    "status": "pass"
   },
   {
@@ -120,7 +120,7 @@
     "uni.nii: values bit-identical to AFNI's": 326,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 27.502,
+   "seconds": 21.792,
    "status": "pass"
   },
   {
@@ -139,7 +139,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 71.129,
+   "seconds": 65.344,
    "status": "pass"
   },
   {
@@ -158,7 +158,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 161.16,
+   "seconds": 138.372,
    "status": "pass"
   },
   {
@@ -175,7 +175,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 56.299,
+   "seconds": 45.461,
    "status": "pass"
   },
   {
@@ -194,7 +194,7 @@
     "uni.nii: values bit-identical to AFNI's": 4,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 50.433,
+   "seconds": 45.371,
    "status": "pass"
   },
   {
@@ -213,7 +213,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 178.473,
+   "seconds": 153.575,
    "status": "pass"
   },
   {
@@ -230,7 +230,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 96.243,
+   "seconds": 75.11,
    "status": "pass"
   },
   {
@@ -247,7 +247,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 91.294,
+   "seconds": 77.191,
    "status": "pass"
   },
   {
@@ -264,7 +264,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 76.494,
+   "seconds": 69.454,
    "status": "pass"
   },
   {
@@ -281,7 +281,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 80.939,
+   "seconds": 71.123,
    "status": "pass"
   },
   {
@@ -300,7 +300,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 172.899,
+   "seconds": 162.487,
    "status": "pass"
   },
   {
@@ -317,7 +317,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 80.691,
+   "seconds": 71.737,
    "status": "pass"
   },
   {
@@ -334,7 +334,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 89.684,
+   "seconds": 90.233,
    "status": "pass"
   },
   {
@@ -351,7 +351,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 83.835,
+   "seconds": 86.99,
    "status": "pass"
   },
   {
@@ -372,7 +372,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 166.359,
+   "seconds": 175.07,
    "status": "pass"
   },
   {
@@ -391,7 +391,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 167.451,
+   "seconds": 170.663,
    "status": "pass"
   },
   {
@@ -410,7 +410,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 168.088,
+   "seconds": 170.521,
    "status": "pass"
   },
   {
@@ -429,7 +429,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 166.409,
+   "seconds": 162.472,
    "status": "pass"
   },
   {
@@ -448,7 +448,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 166.193,
+   "seconds": 161.553,
    "status": "pass"
   },
   {
@@ -467,7 +467,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 164.398,
+   "seconds": 160.563,
    "status": "pass"
   },
   {
@@ -484,7 +484,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 75.42,
+   "seconds": 69.183,
    "status": "pass"
   },
   {
@@ -503,7 +503,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 5,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 19.585,
+   "seconds": 18.672,
    "status": "pass"
   },
   {
@@ -522,7 +522,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 10,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1483.232,
+   "seconds": 1210.005,
    "status": "pass"
   },
   {
@@ -540,7 +540,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 14.208,
+   "seconds": 13.427,
    "status": "pass"
   },
   {
@@ -557,7 +557,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.817,
+   "seconds": 3.268,
    "status": "pass"
   },
   {
@@ -574,7 +574,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.996,
+   "seconds": 2.776,
    "status": "pass"
   },
   {
@@ -591,7 +591,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.697,
+   "seconds": 2.594,
    "status": "pass"
   },
   {
@@ -610,7 +610,7 @@
     "uni.nii: values bit-identical to AFNI's": 9,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 148.525,
+   "seconds": 139.618,
    "status": "pass"
   },
   {
@@ -630,7 +630,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 150.268,
+   "seconds": 140.614,
    "status": "pass"
   },
   {
@@ -648,7 +648,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 65.327,
+   "seconds": 64.313,
    "status": "pass"
   },
   {
@@ -666,7 +666,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 72.358,
+   "seconds": 71.301,
    "status": "pass"
   },
   {
@@ -686,7 +686,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 145.22,
+   "seconds": 146.024,
    "status": "pass"
   },
   {
@@ -706,7 +706,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 158.181,
+   "seconds": 158.715,
    "status": "pass"
   },
   {
@@ -724,7 +724,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 61.369,
+   "seconds": 60.227,
    "status": "pass"
   },
   {
@@ -742,7 +742,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 80.782,
+   "seconds": 81.003,
    "status": "pass"
   },
   {
@@ -762,7 +762,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 157.315,
+   "seconds": 152.828,
    "status": "pass"
   },
   {
@@ -782,7 +782,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 159.076,
+   "seconds": 151.86,
    "status": "pass"
   },
   {
@@ -802,7 +802,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 184.243,
+   "seconds": 159.004,
    "status": "pass"
   },
   {
@@ -819,7 +819,7 @@
    "reported": {
     "D13 fix pass": 55249
    },
-   "seconds": 91.314,
+   "seconds": 82.19,
    "status": "pass"
   },
   {
@@ -838,7 +838,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 227.929,
+   "seconds": 159.493,
    "status": "pass"
   },
   {
@@ -857,7 +857,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 226.413,
+   "seconds": 159.877,
    "status": "pass"
   },
   {
@@ -874,7 +874,7 @@
    "reported": {
     "D13 fix pass": 58184
    },
-   "seconds": 99.529,
+   "seconds": 73.647,
    "status": "pass"
   },
   {
@@ -891,7 +891,7 @@
    "reported": {
     "D13 fix pass": 53571
    },
-   "seconds": 32.693,
+   "seconds": 20.813,
    "status": "pass"
   },
   {
@@ -908,7 +908,7 @@
    "reported": {
     "D13 fix pass": 2569
    },
-   "seconds": 0.938,
+   "seconds": 0.578,
    "status": "pass"
   },
   {
@@ -925,7 +925,7 @@
    "reported": {
     "D13 fix pass": 337232
    },
-   "seconds": 1.748,
+   "seconds": 1.144,
    "status": "pass"
   },
   {
@@ -938,7 +938,7 @@
    "reported": {
     "D13 fix pass": 211604
    },
-   "seconds": 5.641,
+   "seconds": 4.232,
    "status": "expected-divergence"
   },
   {
@@ -955,7 +955,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.245,
+   "seconds": 0.646,
    "status": "pass"
   },
   {
@@ -972,7 +972,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.337,
+   "seconds": 1.438,
    "status": "pass"
   },
   {
@@ -989,7 +989,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.096,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1006,7 +1006,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 26.26,
+   "seconds": 17.673,
    "status": "pass"
   },
   {
@@ -1023,7 +1023,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 79.138,
+   "seconds": 55.805,
    "status": "pass"
   },
   {
@@ -1042,7 +1042,7 @@
     "uni.nii: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 215.691,
+   "seconds": 131.75,
    "status": "pass"
   },
   {
@@ -1055,7 +1055,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-(; larmorx exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-( (the same messages)",
-   "seconds": 0.036,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -1068,7 +1068,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: the automask of a 2D image smaller than 16 x 16 is empty (NULL): AFNI crashes inverting the contrast with it (AFNI-46)), after the same messages",
-   "seconds": 0.031,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -1081,7 +1081,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad (the same messages)",
-   "seconds": 0.008,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1094,7 +1094,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad (the same messages)",
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1107,7 +1107,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.011,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1120,7 +1120,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.01,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1146,7 +1146,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1159,7 +1159,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal!; larmorx exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal! (the same messages)",
-   "seconds": 0.011,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1185,7 +1185,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
-   "seconds": 0.012,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1198,7 +1198,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
-   "seconds": 0.01,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1211,7 +1211,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -T2up needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.01,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1224,7 +1224,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-prefix'; larmorx exit 1: ** FATAL ERROR: Need argument after '-prefix' (the same messages)",
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1237,7 +1237,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-ssave'; larmorx exit 1: ** FATAL ERROR: Need argument after '-ssave' (the same messages)",
-   "seconds": 0.011,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1250,7 +1250,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't use '-input' twice; larmorx exit 1: ** FATAL ERROR: Can't use '-input' twice (the same messages)",
-   "seconds": 0.029,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -1263,7 +1263,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -bogus; larmorx exit 1: ** FATAL ERROR: Unknown option: -bogus (the same messages)",
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1276,7 +1276,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: No dataset name on command line?; larmorx exit 1: ** FATAL ERROR: No dataset name on command line? (the same messages)",
-   "seconds": 0.01,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1289,7 +1289,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii'; larmorx exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii' (the same messages)",
-   "seconds": 0.014,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -1299,7 +1299,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "AFNI's default prefix 'Unifized' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only).",
-   "seconds": 107.419,
+   "seconds": 62.461,
    "status": "expected-divergence"
   },
   {
@@ -1315,7 +1315,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 108.42,
+   "seconds": 63.457,
    "status": "pass"
   },
   {
@@ -1334,7 +1334,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 205.825,
+   "seconds": 126.788,
    "status": "pass"
   },
   {
@@ -1353,7 +1353,7 @@
     "uni_AA1.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 205.81,
+   "seconds": 125.371,
    "status": "pass"
   },
   {
@@ -1372,7 +1372,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 211.22,
+   "seconds": 120.91,
    "status": "pass"
   },
   {
@@ -1391,7 +1391,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 214.501,
+   "seconds": 125.416,
    "status": "pass"
   },
   {
@@ -1410,7 +1410,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 215.44,
+   "seconds": 130.254,
    "status": "pass"
   },
   {
@@ -1429,7 +1429,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 217.492,
+   "seconds": 123.279,
    "status": "pass"
   },
   {
@@ -1448,7 +1448,7 @@
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 214.02,
+   "seconds": 126.116,
    "status": "pass"
   },
   {
@@ -1464,7 +1464,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.47,
+   "seconds": 1.295,
    "status": "pass"
   },
   {
@@ -1480,7 +1480,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.37,
+   "seconds": 1.492,
    "status": "pass"
   },
   {
@@ -1496,7 +1496,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 111.064,
+   "seconds": 59.913,
    "status": "pass"
   },
   {
@@ -1517,7 +1517,7 @@
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 266.083,
+   "seconds": 167.056,
    "status": "pass"
   },
   {
@@ -1541,7 +1541,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 344.995,
+   "seconds": 208.874,
    "status": "pass"
   },
   {
@@ -1565,7 +1565,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 346.444,
+   "seconds": 213.295,
    "status": "pass"
   },
   {
@@ -1589,7 +1589,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 459.241,
+   "seconds": 300.215,
    "status": "pass"
   },
   {
@@ -1613,7 +1613,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 14,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 93.195,
+   "seconds": 63.719,
    "status": "pass"
   },
   {
@@ -1637,7 +1637,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 419.579,
+   "seconds": 270.604,
    "status": "pass"
   },
   {
@@ -1661,7 +1661,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 411.542,
+   "seconds": 264.016,
    "status": "pass"
   },
   {
@@ -1683,7 +1683,7 @@
     "uni.nii.gz: values bit-identical to AFNI's": 1633,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 215.778,
+   "seconds": 127.157,
    "status": "pass"
   },
   {
@@ -1702,7 +1702,7 @@
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 52.001,
+   "seconds": 36.518,
    "status": "pass"
   }
  ],

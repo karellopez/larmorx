@@ -1344,4 +1344,52 @@ mod tests {
         v.swap_lr_order();
         assert_eq!(v.data, orig.data);
     }
+
+    /// A series saved in each of FSL's output types and read back: the same values, sizes,
+    /// voxel sizes and sform; the type each `FSLOUTPUTTYPE` gives; `.hdr`/`.img` pairs.
+    #[test]
+    fn save_and_read_every_output_type() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut v = Volume::new(5, 4, 3, 2);
+        for (i, d) in v.data.iter_mut().enumerate() {
+            *d = (i as f32) * 0.5 - 7.0;
+        }
+        v.pixdims[0] = 2.0;
+        v.pixdims[1] = 2.5;
+        v.pixdims[2] = 3.0;
+        v.pixdims[3] = 1.5;
+        v.sform_code = 1;
+        v.sform = Mat::from4([
+            [-2.0, 0.0, 0.0, 4.0],
+            [0.0, 2.5, 0.0, -3.0],
+            [0.0, 0.0, 3.0, -2.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let cases = [
+            ("NIFTI_GZ", ".nii.gz"),
+            ("NIFTI", ".nii"),
+            ("NIFTI2_GZ", ".nii.gz"),
+            ("NIFTI_PAIR", ".hdr"),
+            ("NIFTI_PAIR_GZ", ".hdr.gz"),
+        ];
+        for (ty, ext) in cases {
+            let settings = Settings::default().with("FSLOUTPUTTYPE", ty);
+            let base = dir.path().join(format!("v-{ty}"));
+            let base = base.to_str().unwrap();
+            v.save(base, &settings, b"test").unwrap();
+            let path = format!("{base}{ext}");
+            assert!(Path::new(&path).is_file(), "{ty}: {path}");
+            let (r, dtype, _units) = read_volume4d(&path, &settings).unwrap();
+            assert_eq!(dtype, dt::FLOAT, "{ty}");
+            assert_eq!(r.dims[..4], v.dims[..4], "{ty}");
+            assert_eq!(r.pixdims[..4], v.pixdims[..4], "{ty}");
+            assert_eq!(r.data, v.data, "{ty}");
+            assert_eq!(r.sform_code, 1, "{ty}");
+            for i in 0..4 {
+                for j in 0..4 {
+                    assert_eq!(r.sform.at(i, j), v.sform.at(i, j), "{ty} sform");
+                }
+            }
+        }
+    }
 }

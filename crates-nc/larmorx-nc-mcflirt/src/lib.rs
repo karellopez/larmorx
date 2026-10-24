@@ -11,7 +11,7 @@
 //! statuses and output files (the corrected series, `.mat` directory, `.par`, `.rms`, `-stats` and
 //! `-meanvol` images), the same numbers. mcflirt's deterministic defects are corrected by
 //! default and reproduced with `LARMORX_UPSTREAM_DEFECTS=reproduce` (D13; register entries
-//! FSL-01, -03, -05 to -10, -13, -14, -20, -21), with the same defaults as larmorx's clean-room
+//! FSL-01, -03, -04, -05 to -10, -13, -14, -20, -21), with the same defaults as larmorx's clean-room
 //! original (`larmorx mri hmc`).
 #![forbid(unsafe_code)]
 // Index loops mirror mcflirt's loops, so that each step can be checked against the source.

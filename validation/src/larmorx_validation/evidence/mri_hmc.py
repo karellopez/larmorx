@@ -977,13 +977,15 @@ def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
         if kind == "recorded" and name in by_id:
             by_id[name]["results"]["replica"] = result
             continue
+        # A recorded run the original's record does not have (its full tier) keeps the
+        # original's names: its run name and category.
         category = {
             "edge": "replica: edge cases",
             "fmriprep": "replica: fMRIPrep's calls",
-        }.get(kind, r["category"])
+        }.get(kind, r["category"].removeprefix("recorded: "))
         cases.append(
             {
-                "id": r["case"],
+                "id": name if kind == "recorded" else r["case"],
                 "category": category,
                 "description": descs.get(r["case"], ""),
                 "command": "",

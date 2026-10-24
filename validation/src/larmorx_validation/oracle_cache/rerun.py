@@ -62,24 +62,29 @@ def _layout(store: Store, entry: dict, root: Path) -> tuple[Prepared, dict[str, 
             places.append((p["name"], base / p["basename"]))
             files.add(p["name"])
             values[p["name"]] = str(base / p["basename"])
+    for d in entry["parts"].get("directories", []):  # the directories inside the places
+        Path(_fill(d, values)).mkdir(parents=True, exist_ok=True)
     inputs = []
     for i, item in enumerate(entry["inputs"]):
-        d = root / f"in{i}"
-        d.mkdir(parents=True, exist_ok=True)
-        path = d / f"input{item['suffix']}"
+        # where it was: inside its place, with its name (a program may write beside it, or
+        # name it relative to its working directory); else a directory of its own
+        if item.get("at"):
+            path = Path(_fill(item["at"], values))
+        else:
+            path = root / f"in{i}" / f"input{item['suffix']}"
+        path.parent.mkdir(parents=True, exist_ok=True)
         store.copy_blob(item["sha256"], path)
+        stem = path.name[: len(path.name) - len(item["suffix"])] if item["suffix"] else path.name
         comps = []
         for suf, sha in item.get("companions", []):
-            c = d / f"input{suf}"
+            c = path.with_name(stem + suf)
             store.copy_blob(sha, c)
             comps.append((suf, sha, c))
         inputs.append(Input(path, item["sha256"], item["suffix"], tuple(comps), ""))
-        values[f"in{i}"] = str(path)
+        values[f"in{i}"] = item.get("relative") or str(path)
     home = root / "home"
     home.mkdir()
     values["home"] = str(home)
-    for d in entry["parts"].get("directories", []):  # the directories inside the places
-        Path(_fill(d, values)).mkdir(parents=True, exist_ok=True)
     watched = {}
     for i, (where, recursive) in enumerate(entry.get("watch", [])):
         path = Path(_fill(where, values))

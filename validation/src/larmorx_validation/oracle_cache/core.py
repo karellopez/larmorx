@@ -450,6 +450,8 @@ def _new_entry(
                 "sha256": i.sha256,
                 "suffix": i.suffix,
                 "companions": [[s, h] for s, h, _ in i.companions],
+                "at": prep.role_of(i.path),
+                "relative": i.relative,
             }
             for i in prep.inputs
         ],

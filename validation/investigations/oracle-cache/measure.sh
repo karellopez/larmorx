@@ -49,8 +49,8 @@ if [ $SMOKE = 1 ]; then
   step pytest-warm pytest_parity use "$OUT/pytest-warm.log"
   for d in records records-replica; do
     same "$OUT/smoke-off/$d" "$OUT/smoke-warm/$d" > "$OUT/same-smoke-off-warm-$d.txt"
-    same "$OUT/smoke-off/$d" "$OUT/smoke-warm/$d" --addresses > "$OUT/same-smoke-off-warm-$d-addresses.txt"
-    same "$OUT/smoke-off/$d" "$OUT/smoke-cold/$d" --addresses > "$OUT/same-smoke-off-cold-$d-addresses.txt"
+    same "$OUT/smoke-off/$d" "$OUT/smoke-warm/$d" --volatile > "$OUT/same-smoke-off-warm-$d-volatile.txt"
+    same "$OUT/smoke-off/$d" "$OUT/smoke-cold/$d" --volatile > "$OUT/same-smoke-off-cold-$d-volatile.txt"
   done
 fi
 
@@ -63,8 +63,8 @@ if [ $STANDARD = 1 ]; then
   step std-warm suites "$OUT/std-warm" standard use --jobs "$JOBS" "${STD[@]}"
   for d in records records-replica; do
     same "$OUT/std-off/$d" "$OUT/std-warm/$d" > "$OUT/same-std-off-warm-$d.txt"
-    same "$OUT/std-off/$d" "$OUT/std-warm/$d" --addresses > "$OUT/same-std-off-warm-$d-addresses.txt"
-    same "$OUT/std-off/$d" "$OUT/std-cold/$d" --addresses > "$OUT/same-std-off-cold-$d-addresses.txt"
+    same "$OUT/std-off/$d" "$OUT/std-warm/$d" --volatile > "$OUT/same-std-off-warm-$d-volatile.txt"
+    same "$OUT/std-off/$d" "$OUT/std-cold/$d" --volatile > "$OUT/same-std-off-cold-$d-volatile.txt"
   done
 fi
 echo "ALLDONE $(date -Is)" | tee -a "$STEPS"

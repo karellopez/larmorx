@@ -3,13 +3,13 @@
 allowed to change: the record's line on the original programs' runs, the JSON's
 ``oracle_cache`` field and the timings (``seconds``).
 
-    python -P same_records.py <records A> <records B> [<suite> ...] [--addresses]
+    python -P same_records.py <records A> <records B> [<suite> ...] [--volatile]
 
-Every other byte of every ``<suite>.md`` and ``<suite>.json`` must be equal. ``--addresses``
-also masks memory addresses (``0x...``): ANTs prints them in the messages of the runs that end
-by a signal, which are never cached and change in every run of ANTs, cached or not (so two
-runs without the cache differ there too; ``python -P same_records.py A B --addresses`` on two
-uncached runs shows it). Exit status 1 when a suite differs; each difference is printed.
+Every other byte of every ``<suite>.md`` and ``<suite>.json`` must be equal. ``--volatile``
+also masks what changes between any two runs, with the cache or without: memory addresses
+(``0x...``, which ANTs prints in the messages of the runs that end by a signal: never cached)
+and temporary paths (``/tmp/lx-...``, which larmorx's own messages name). Exit status 1 when a
+suite differs; each difference is printed.
 """
 
 from __future__ import annotations
@@ -21,11 +21,16 @@ from pathlib import Path
 
 ORACLE_LINE = re.compile(r"(?m)^- \*\*Original programs:\*\* .*\n")
 ADDRESS = re.compile(r"\b0x[0-9a-f]+\b")
+TEMPORARY = re.compile(r"/tmp/[^\s'\"`|,;)\]]*")
+
+
+def _volatile(text: str) -> str:
+    return TEMPORARY.sub("<tmp>", ADDRESS.sub("0x…", text))
 
 
 def _md(text: str, addresses: bool) -> str:
     text = ORACLE_LINE.sub("", text)
-    return ADDRESS.sub("0x…", text) if addresses else text
+    return _volatile(text) if addresses else text
 
 
 def _json(text: str, addresses: bool) -> str:
@@ -34,7 +39,7 @@ def _json(text: str, addresses: bool) -> str:
     for r in d.get("results", []):
         r.pop("seconds", None)
     out = json.dumps(d, indent=1, sort_keys=True)
-    return ADDRESS.sub("0x…", out) if addresses else out
+    return _volatile(out) if addresses else out
 
 
 def first_difference(a: str, b: str) -> str:
@@ -74,7 +79,7 @@ def compare(a_dir: Path, b_dir: Path, suites: list[str], addresses: bool) -> int
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--addresses"]
+    args = [a for a in sys.argv[1:] if a != "--volatile"]
     if len(args) < 2:
         sys.exit(__doc__)
-    sys.exit(compare(Path(args[0]), Path(args[1]), args[2:], "--addresses" in sys.argv))
+    sys.exit(compare(Path(args[0]), Path(args[1]), args[2:], "--volatile" in sys.argv))

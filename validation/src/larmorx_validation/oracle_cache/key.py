@@ -37,7 +37,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from larmorx_validation.oracle_cache.hashing import (
@@ -278,6 +278,8 @@ class Input:
     companions: tuple[tuple[str, str, Path], ...]
     content: str
     companions_content: tuple[str, ...] = ()
+    #: the argument as written when it named the file relative to the working directory
+    relative: str | None = None
 
 
 @dataclass
@@ -302,25 +304,23 @@ class Prepared:
     #: messages is replaced like a place's
     home: Path | None = None
 
+    def role_of(self, path: Path) -> str | None:
+        """``{place}/rest`` of a path inside a directory place (the longest), or ``None``."""
+        best = None
+        for name, p in self.places:
+            if name in self.files:
+                continue
+            if (path == p or under(path, p)) and (best is None or len(str(p)) > len(str(best[1]))):
+                best = (name, p)
+        if best is None:
+            return None
+        rest = path.relative_to(best[1]).as_posix()
+        return "{" + best[0] + "}" + ("" if rest == "." else "/" + rest)
+
     def watch_roles(self) -> list[tuple[str, bool]]:
         """The watched directories as ``verify`` finds them again: inside a place by its role,
         elsewhere as written."""
-        out = []
-        for path, recursive in self.watched.values():
-            best = None
-            for name, p in self.places:
-                if name in self.files:
-                    continue
-                if (path == p or under(path, p)) and (
-                    best is None or len(str(p)) > len(str(best[1]))
-                ):
-                    best = (name, p)
-            if best is None:
-                out.append((str(path), recursive))
-            else:
-                rest = path.relative_to(best[1]).as_posix()
-                out.append(("{" + best[0] + "}" + ("" if rest == "." else "/" + rest), recursive))
-        return out
+        return [(self.role_of(path) or str(path), r) for path, r in self.watched.values()]
 
     @functools.cached_property
     def key(self) -> str:
@@ -462,7 +462,11 @@ class _Mapper:
         else:
             return text
         if path.is_file():
-            return "{" + self._input(path) + "}"
+            name = self._input(path)
+            if relative:
+                i = int(name[2:])
+                self.inputs[i] = replace(self.inputs[i], relative=text)
+            return "{" + name + "}"
         # A directory the run may write in, or a path it may create.
         target = Path(os.path.abspath(path))
         anchor = target if target.is_dir() else _existing_ancestor(target)

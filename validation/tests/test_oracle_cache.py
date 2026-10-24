@@ -580,6 +580,26 @@ def test_verify_finds_drift_the_key_misses(cache, fake, workdir, tmp_path, monke
     assert cache.read(e["key"])["disputed"]
 
 
+def test_verify_puts_inputs_back_where_they_were(cache, fake, workdir):
+    """A run in its working directory, naming its files relative to it, one of them there
+    already (AFNI's ``-prefix`` over an existing file): ``verify`` makes the same layout."""
+    from larmorx_validation.oracle_cache import rerun
+
+    d, _src, _dst = workdir()
+    (d / "out.nii").write_bytes(b"there before")
+    r = oc.run([fake, "in.nii", "out.nii"], env=env_for(), cwd=d, policy=ONE)
+    assert r.returncode == 0 and r.stdout == "read in.nii wrote out.nii\n"
+    (e,) = entries(cache)
+    assert [i["relative"] for i in e["inputs"]] == ["in.nii", "out.nii"]
+    assert [i["at"] for i in e["inputs"]] == ["{cwd}/in.nii", "{cwd}/out.nii"]
+    assert rerun.rerun(cache, e).status == "same"
+    oc.begin_case("served")
+    d2, _s, _d = workdir()
+    (d2 / "out.nii").write_bytes(b"there before")
+    again = oc.run([fake, "in.nii", "out.nii"], env=env_for(), cwd=d2, policy=ONE)
+    assert again.cached and (d2 / "out.nii").read_bytes() == b"dlrow olleh"
+
+
 def test_verify_skips_an_entry_whose_program_changed(cache, fake, workdir):
     from larmorx_validation.oracle_cache import rerun
 

@@ -80,7 +80,7 @@ next section.
 Wall time in seconds of the whole program (reading and writing `.nii.gz` included), each run
 once (larmorx after one warm-up run), at 1 and 6 threads (`OMP_NUM_THREADS`; AFNI's 3dAutomask
 is single-threaded). The machine (12 logical CPUs) was shared with another agent's runs (load 17
-to 21 throughout), so these are indications, the 6-thread ones especially; a benchmark report on
+to 22 throughout), so these are indications, the 6-thread ones especially; a benchmark report on
 a quiet machine is still to come. Tool: [`validation/investigations/afni-masks-original/timing.py`](../../validation/investigations/afni-masks-original/timing.py)
 (numbers in `timings-2026-10-24.json` beside it).
 

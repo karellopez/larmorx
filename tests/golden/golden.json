@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "bd2ca21ddea81f4d2620e24516028d63244023d9", "date": "2026-10-24", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "2d1a334ef8d4264a786c94e7ff98b3723efda127", "date": "2026-10-24", "numpy": "2.3.5", "parity": "skipped", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -1059,6 +1059,10 @@
    "otsu": {"dtype": "<f4", "sample": "0000000000000000000000400000000000000000000000400000000000000000", "sha256": "a333b7d8f80c62f3a75643a031415dbeea3d8c6492bb0256549643cc0a957f7f", "shape": [24, 20, 16], "sum": "2514.0"},
    "otsu.thresholds": {"dtype": "<f8", "sample": "000000b01ea53140000000e028ce7a40", "sha256": "2f4b42e9d273c9170e43a10ba263fd90ec8f22953db4968564806470fcb83eca", "shape": [2], "sum": "446.52997875213623"},
    "threshold": {"dtype": "<f4", "sample": "000080bf000080bf00000040000080bf000080bf00000040000080bf000080bf", "sha256": "2fd43188d40d9b1819640701e4f2bae1e38e194e5aafda29037ec6fe211ede14", "shape": [24, 20, 16], "sum": "-4224.0"}
+  },
+  "py.fsl.read_vtk": {
+   "triangles": {"dtype": "<i8", "sample": "0a000000000000000700000000000000100000000000000012000000000000000400000000000000080000000000000019000000000000000c00000000000000", "sha256": "1b28fb6674ccac35900a01e1c412b5082283a87fe0d87d3f9e827bcf74a247a2", "shape": [60, 3], "sum": "3652.0"},
+   "vertices": {"dtype": "<f8", "sample": "5eba490c028b38401d5a643bdfbf4ac0c3f5285c8f024740c1caa145b6334740c976be9f1a0f3f404a0c022b87161fc0aaf1d24d628043c01f85eb51b81e3140", "sha256": "686c9a7f29fc099cc2b66690b38b1c204ffa36e335a931ea187fdc01dcced18e", "shape": [40, 3], "sum": "-377.206"}
   },
   "py.mri.hmc": {
    "MAT_0003": {"bytes": 151, "sha256": "464594b1490eade2b081da139e975ad72ffdd0410cdaddc0b566caf2dfdcee33"},

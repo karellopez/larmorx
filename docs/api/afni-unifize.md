@@ -86,8 +86,11 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   crashed in our runs); the default expands it to the input's grid; `reproduce` reads AFNI's
   image (0 past its end).
 - **AFNI-48** (decided 2026-10-23, rule B): `-T2` three or more times neither inverts back nor
-  clips edges in AFNI (the output stays inverted); the default refuses it (exit 1); `reproduce`
-  gives AFNI's result.
+  clips edges in AFNI (the output stays inverted); the default refuses it after the option scan,
+  before a dataset given last is read (`-T2 given 3 times: give it once (a T2-weighted input)
+  or twice (also clip the bright edges) (AFNI-48; ...)`, exit 1); `reproduce` gives AFNI's
+  result and names AFNI-48 after the output. With `-EPI` (which implies one `-T2`) any number
+  of `-T2` runs as in AFNI. Both implementations word it the same.
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
 - **AFNI-40**, **AFNI-46**: `-T2up` without its value as the last argument, and `-T2` on a 2D

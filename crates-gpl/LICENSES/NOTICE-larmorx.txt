@@ -66,7 +66,7 @@ HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public Lic
   Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
   was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, powf, expf, logf, sinf, cosf) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, powf, expf, logf, sinf, cosf, tanhf, cbrtf) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
@@ -77,6 +77,8 @@ CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos
   logf.c: Copyright (c) 2023-2026 Alexei Sibidanov and Paul Zimmermann.
   sinf.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   cosf.c: Copyright (c) 2022-2023 Alexei Sibidanov.
+  tanhf.c: Copyright (c) 2022-2025 Alexei Sibidanov.
+  cbrtf.c: Copyright (c) 2023 Alexei Sibidanov.
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal

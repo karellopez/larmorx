@@ -50,11 +50,11 @@ restricted findings, from these inputs only:
 
 | Input | What it gave |
 |---|---|
-| [`specs/3dAutomask.md`](../../specs/3dAutomask.md), [`specs/3dUnifize.md`](../../specs/3dUnifize.md) (commit 30c50b0) | the behaviour specs: the average, the clip level and the gradual clip level, the mask's steps, the program's steps, the local white-matter intensity, the half-size path, the T2 inversion, `-GM`, the edge clipping, `-EPI`, the command lines, the messages, the defects and the user's decisions of 2026-10-23 (AFNI-41 and AFNI-48 refused by default; AFNI-42 and AFNI-44 kept) |
+| [`specs/3dAutomask.md`](../../specs/3dAutomask.md), [`specs/3dUnifize.md`](../../specs/3dUnifize.md) (commit 30c50b0; their rule-B refusals in detail from commit 60c963d) | the behaviour specs: the average, the clip level and the gradual clip level, the mask's steps, the program's steps, the local white-matter intensity, the half-size path, the T2 inversion, `-GM`, the edge clipping, `-EPI`, the command lines, the messages, the defects and the user's decisions of 2026-10-23 (AFNI-41 and AFNI-48 refused by default; AFNI-42 and AFNI-44 kept) |
 | [`specs/3dTshift.md`](../../specs/3dTshift.md) §6 and §7.1 | AFNI's dataset reading and writing, global options and environment variables (already carried out in `dataset`, `geometry`, `input`, `output`, `settings`, `msg`) |
 | `3dAutomask -help`, `3dUnifize -help` (AFNI 25.2.09) | AFNI's documentation of the options and of the method (the progress letters' meanings, the defaults) |
 | Black-box runs of the AFNI 25.2.09 binaries (`oracles/afni-25.2.09/bin/3dAutomask`, `3dUnifize`) | the messages of every path, word for word and in order (the progress line, where each automask's lines fall, `-quiet`, `-verb`, `-EPI`'s lines and dots, the outputs' lines, the conflict, refused-name and failed-write paths), the 2D outputs' `dim[0]`, the unit brick factor of float32 inputs, the count line of `-eclip`; every rule found so is in the specs, marked observed by the clean-room implementer |
-| Black-box runs of the replica program (`larmorx-gpl afni 3dAutomask`, `3dUnifize`, built in `crates-gpl/target/release/`; its source not opened) | the wording of larmorx's own lines, so that both implementations say the same (the notices of AFNI-01, -11, -12, -18, -23, -26, -43, -45, -47; the refusals of AFNI-40 and AFNI-46) |
+| Black-box runs of the replica program (`larmorx-gpl afni 3dAutomask`, `3dUnifize`, built in `crates-gpl/target/release/`, and on 2026-10-24 its corrected build of the decisions part, `.claude/worktrees/agent-af2255d42fc4f41d1/crates-gpl/target/release/larmorx-gpl`; its source not opened) | the wording of larmorx's own lines, so that both implementations say the same (the notices of AFNI-01, -11, -12, -18, -23, -26, -43, -45, -47; the refusals of AFNI-40, -41, -46, -48, with their notices and where they are printed) |
 | The defect register's summary table (`docs/findings/upstream-defects.md`, rows AFNI-40 to AFNI-49, which describe them by observable behaviour; the restricted section not opened) | which behaviours are defects, and the corrections larmorx makes by default |
 | The parity modules of the two tools (`validation/.../parity/afni_automask.py`, `afni_unifize.py`, `afni_replica.py`, `afni_phantoms.py`), run as black boxes; edited only to select the original and record its results | the cases and phantoms of the comparison |
 | CORE-MATH (MIT), `src/binary32/tanh/tanhf.c` and `src/binary32/cbrt/cbrtf.c` at commit 040ee482a8ca | `larmorx_core::math::{tanhf, cbrtf}`, correctly rounded, for the squash and `-EPI`'s radius (checked against the C on all 2^32 floats) |
@@ -74,4 +74,12 @@ restricted findings, from these inputs only:
 | `dataset::read_as` (a unit `scl_slope` kept as a brick factor), `dataset::written_shape` (a plane written 2D) | AFNI 25.2.09's reading and writing in these programs | spec 3dAutomask §2, black-box runs |
 
 The parity records are [docs/validation/afni-automask.md](../../docs/validation/afni-automask.md)
-and [docs/validation/afni-unifize.md](../../docs/validation/afni-unifize.md).
+and [docs/validation/afni-unifize.md](../../docs/validation/afni-unifize.md). The black-box tools
+the implementer used (running and comparing AFNI, the original and the replica program, the
+phantoms, the CORE-MATH checksums, the informal timings) are in
+[validation/investigations/afni-masks-original/](../../validation/investigations/afni-masks-original/).
+
+One exposure, recorded for the audit: after both programs were complete (2026-10-23), a text
+search over `docs/licensing.md` printed a few rows of its table of
+AFNI routine names (names only, no code), a table the implementer had not opened before. No
+line of this crate was written or changed from it; the implementer did not open the table.

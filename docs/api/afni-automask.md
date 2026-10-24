@@ -80,8 +80,12 @@ defect <ID> ...`):
 
 - **AFNI-43**: `-peels 0` peels once in AFNI; its help says 0 turns the peeling off, which the
   default does (named when the mask changes).
-- **AFNI-41** (decided 2026-10-23, rule B): `-nbhrs` outside 6..26 is silently 17 in AFNI; the
-  default refuses it (exit 1, `ValueError`); `reproduce` uses 17.
+- **AFNI-41** (decided 2026-10-23, rule B): `-nbhrs` outside 6..26 (a value that is not a
+  number reads as 0) is silently 17 in AFNI, or what a `-NN1/2/3` says. The default refuses it
+  before any input is read, whether or not a `-NN` option follows (the last `-nbhrs` decides):
+  `-nbhrs 40 is illegal: choose a value between 6 and 26 (AFNI-41; ...)`, exit 1, `ValueError`
+  in Python; `reproduce` peels as AFNI does and names AFNI-41 after the outputs. Both
+  implementations word it the same.
 - **AFNI-01**: averaging the sub-bricks of a series, AFNI drops a negative `scl_slope` (and its
   magnitude); the default applies it. The mask rarely changes (the clip level scales with the
   data); the clip levels AFNI prints do.

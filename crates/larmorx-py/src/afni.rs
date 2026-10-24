@@ -497,18 +497,22 @@ fn automask_options(
     if (6..=26).contains(&neighbours) {
         threshold = neighbours as u32;
     } else {
+        // As the command line words it (AFNI peels as with 17, or as `nn` says).
+        let acts = nn.map_or(17, |level| [6, 18, 26][usize::from(level.clamp(1, 3) - 1)]);
         let detail = match mode {
             UpstreamDefects::Fix => format!(
-                "-nbhrs {neighbours} is outside 6..26: an error (exit status 1); AFNI silently uses 17"
+                "-nbhrs {neighbours} is outside 6..26 (the range the help gives): an error (exit \
+                 status 1); AFNI silently peels as with {acts}"
             ),
-            UpstreamDefects::Reproduce => {
-                format!("-nbhrs {neighbours} is outside 6..26: 17 is used, as AFNI does")
-            }
+            UpstreamDefects::Reproduce => format!(
+                "-nbhrs {neighbours} is outside 6..26 (the range the help gives): the peeling \
+                 acts as with {acts}, as in AFNI; by default it is an error"
+            ),
         };
         if mode.fix() {
             return Err(PyValueError::new_err(format!(
-                "neighbours={neighbours} is illegal: the number of neighbours must be 6 to 26 \
-                 (AFNI silently uses 17, AFNI-41; upstream_defects=\"reproduce\" does too)"
+                "neighbours={neighbours} is illegal: choose a value between 6 and 26 (AFNI-41; \
+                 upstream_defects=\"reproduce\" gives AFNI's result)"
             )));
         }
         notices.push(Notice::new(&larmorx_core::defects::AFNI_41, mode, detail));

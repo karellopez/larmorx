@@ -85,6 +85,9 @@ struct Options {
     options: AutomaskOptions,
     quiet: bool,
     dataset: String,
+    /// The notices of the option scan printed with the run's, after the outputs (AFNI-41 in
+    /// `reproduce` mode).
+    notices: Vec<Notice>,
 }
 
 /// The option values AFNI reads with C's conversions.
@@ -109,6 +112,7 @@ fn parse(
         options: AutomaskOptions::default(),
         quiet: false,
         dataset: String::new(),
+        notices: Vec::new(),
     };
     let mut nbhrs: Option<(f64, String)> = None;
     let mut nn_threshold: Option<u32> = None;
@@ -207,27 +211,34 @@ fn parse(
         }
         i += 2;
     }
-    // -nbhrs (AFNI-41) and -NN1/2/3 (AFNI-42).
+    // -nbhrs (AFNI-41, decided 2026-10-23: rule B) and -NN1/2/3 (AFNI-42). The last -nbhrs
+    // decides, whether or not a -NN1/2/3 follows it; outside 6..26 AFNI peels as with 17, or as
+    // the -NN option says.
     let mut threshold = 17u32;
     if let Some((t, text)) = &nbhrs {
         if (6.0..=26.0).contains(t) {
             threshold = *t as u32;
         } else {
+            let acts = nn_threshold.unwrap_or(17);
             let detail = match mode {
                 UpstreamDefects::Fix => format!(
-                    "-nbhrs {text} is outside 6..26: an error (exit status 1); AFNI silently uses 17"
+                    "-nbhrs {text} is outside 6..26 (the range the help gives): an error (exit \
+                     status 1); AFNI silently peels as with {acts}"
                 ),
-                UpstreamDefects::Reproduce => {
-                    format!("-nbhrs {text} is outside 6..26: 17 is used, as AFNI does")
-                }
+                UpstreamDefects::Reproduce => format!(
+                    "-nbhrs {text} is outside 6..26 (the range the help gives): the peeling acts \
+                     as with {acts}, as in AFNI; by default it is an error"
+                ),
             };
-            log.notice(&Notice::new(&defects::AFNI_41, mode, detail));
+            let notice = Notice::new(&defects::AFNI_41, mode, detail);
             if mode.fix() {
+                log.notice(&notice);
                 return Err(Failure::Fatal(format!(
-                    "-nbhrs {text} is illegal: the number of neighbours must be 6 to 26 (AFNI \
-                     silently uses 17, AFNI-41)"
+                    "-nbhrs {text} is illegal: choose a value between 6 and 26 (AFNI-41; \
+                     LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
                 )));
             }
+            o.notices.push(notice);
         }
     }
     if let Some(t) = nn_threshold {
@@ -336,7 +347,8 @@ fn execute<'a>(
     for m in std::mem::take(&mut image.messages) {
         log.message(&m);
     }
-    let mut late: Vec<Notice> = std::mem::take(&mut image.notices);
+    let mut late: Vec<Notice> = o.notices.clone();
+    late.append(&mut image.notices);
     let say = |log: &mut Log<'_>, m: Message| {
         if progress {
             log.message(&m);
@@ -463,10 +475,35 @@ mod tests {
         let o = parse_args(&["-nbhrs", "12", "-NN2", "in.nii"], FIX).unwrap();
         assert_eq!(o.options.mask.threshold, 18);
         assert_eq!(o.options.nn, Neighbourhood::Edges);
-        // AFNI-41: refused by default, 17 reproduced.
-        assert!(parse_args(&["-nbhrs", "40", "in.nii"], FIX).is_err());
+        // AFNI-41: refused by default (the replica's message), 17 reproduced, with its notice
+        // kept for the end of the run.
+        assert_eq!(
+            parse_args(&["-nbhrs", "40", "in.nii"], FIX).unwrap_err(),
+            "-nbhrs 40 is illegal: choose a value between 6 and 26 (AFNI-41; \
+             LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
+        );
         let o = parse_args(&["-nbhrs", "40", "in.nii"], REPRODUCE).unwrap();
         assert_eq!(o.options.mask.threshold, 17);
+        assert_eq!(o.notices.len(), 1);
+        assert!(o.notices[0].line().contains("acts as with 17"));
+        // A value that is not a number reads as 0; the text given is named.
+        let e = parse_args(&["-nbhrs", "abc", "in.nii"], FIX).unwrap_err();
+        assert!(e.starts_with("-nbhrs abc is illegal"), "{e}");
+        // The last -nbhrs decides, whether or not -NN1/2/3 follows it.
+        assert!(parse_args(&["-nbhrs", "12", "-nbhrs", "40", "in.nii"], FIX).is_err());
+        let o = parse_args(&["-nbhrs", "40", "-nbhrs", "12", "in.nii"], FIX).unwrap();
+        assert_eq!(o.options.mask.threshold, 12);
+        assert!(o.notices.is_empty());
+        assert!(parse_args(&["-nbhrs", "40", "-NN1", "in.nii"], FIX).is_err());
+        let o = parse_args(&["-nbhrs", "40", "-NN1", "in.nii"], REPRODUCE).unwrap();
+        assert_eq!(o.options.mask.threshold, 6);
+        assert!(o.notices[0].line().contains("acts as with 6"));
+        // Refused before the dataset is looked at (none given here).
+        assert!(
+            parse_args(&["-nbhrs", "5"], FIX)
+                .unwrap_err()
+                .contains("AFNI-41")
+        );
         // Errors.
         assert_eq!(
             parse_args(&["-clfrac", "0.05", "in.nii"], FIX).unwrap_err(),

@@ -187,15 +187,13 @@ pub fn invert(
         let p = crate::cfmt::g32(u);
         let detail = match mode {
             UpstreamDefects::Fix => format!(
-                "-T2up {p} with {n} mask values: the percentile's index is {k}, one past the \
-                 sorted values; the inversion uses the largest value ({}), where AFNI reads \
-                 memory it never wrote (0 in its runs, which zeroes the output)",
+                "-T2up {p} points one past the {n} sorted mask values: the contrast is inverted \
+                 about the largest, {}; AFNI reads past them (usually 0, which zeroes the output)",
                 crate::cfmt::g32(largest)
             ),
             UpstreamDefects::Reproduce => format!(
-                "-T2up {p} with {n} mask values: the percentile's index is {k}, one past the \
-                 sorted values; the value read there is taken as 0, as in AFNI's runs (the \
-                 output is then zero)"
+                "-T2up {p} points one past the {n} sorted mask values: inverted about 0, where \
+                 AFNI reads past them"
             ),
         };
         notice = Some(Notice::new(&defects::AFNI_45, mode, detail));
@@ -469,13 +467,13 @@ fn run_here(
         if negative {
             let detail = match mode {
                 UpstreamDefects::Fix => {
-                    "a negative scale factor is applied to the series before its median volume \
-                     is taken, where AFNI drops it (and its magnitude): AFNI's median has the \
-                     wrong sign and its output is all zeros"
+                    "a negative scale factor is applied to the series whose median -EPI scales \
+                     by; AFNI drops it there (and applies it to each volume), so its median has \
+                     the wrong sign"
                 }
                 UpstreamDefects::Reproduce => {
-                    "a negative scale factor is dropped before the median volume is taken, as \
-                     AFNI does: the median has the wrong sign and the output is all zeros"
+                    "a negative scale factor is dropped from the series whose median -EPI scales \
+                     by, as AFNI does: the median has the wrong sign"
                 }
             };
             notices.push(Notice::new(&defects::AFNI_01, mode, detail));

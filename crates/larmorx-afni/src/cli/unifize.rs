@@ -81,6 +81,9 @@ struct Options {
     /// The dataset as given, and the image when `-input` opened it during the scan.
     dataset: String,
     image: Option<AfniImage>,
+    /// The notices of the option scan printed with the run's, after the output (AFNI-48 in
+    /// `reproduce` mode).
+    notices: Vec<Notice>,
 }
 
 /// Opens the dataset `name` as AFNI does (its messages and notices to `log`).
@@ -133,6 +136,7 @@ fn parse(
         quiet: false,
         dataset: String::new(),
         image: None,
+        notices: Vec::new(),
     };
     let arbitrary = settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES");
     let mut i = 0;
@@ -274,26 +278,30 @@ fn parse(
             None => return Err(Failure::Fatal("No dataset name on command line?".into())),
         }
     }
-    // AFNI-48 (decided 2026-10-23, rule B): -T2 three or more times.
+    // AFNI-48 (decided 2026-10-23, rule B): -T2 three or more times, without -EPI (which runs
+    // any number of -T2 as AFNI does). Refused after the scan, before a dataset given last is
+    // read; in reproduce mode named with the run's notices.
     if o.options.t2 >= 3 && !o.options.epi {
         let n = o.options.t2;
         let detail = match mode {
             UpstreamDefects::Fix => format!(
-                "-T2 given {n} times: an error (exit status 1); AFNI neither inverts the result \
-                 back nor clips its edges, so the output stays inverted"
+                "-T2 given {n} times (the help documents once and twice): an error (exit status \
+                 1); AFNI leaves the output inverted"
             ),
             UpstreamDefects::Reproduce => format!(
-                "-T2 given {n} times: the result is neither inverted back nor edge-clipped, as \
-                 AFNI does (the output stays inverted)"
+                "-T2 given {n} times: the output stays inverted (neither inverted back nor \
+                 edge-clipped), as in AFNI; by default it is an error"
             ),
         };
-        log.notice(&Notice::new(&defects::AFNI_48, mode, detail));
+        let notice = Notice::new(&defects::AFNI_48, mode, detail);
         if mode.fix() {
+            log.notice(&notice);
             return Err(Failure::Fatal(format!(
-                "-T2 given {n} times: AFNI's output for more than two stays inverted (AFNI-48). \
-                 Give it once (invert back) or twice (no inversion back, the edges clipped)"
+                "-T2 given {n} times: give it once (a T2-weighted input) or twice (also clip the \
+                 bright edges) (AFNI-48; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
             )));
         }
+        o.notices.push(notice);
     }
     Ok(o)
 }
@@ -373,7 +381,8 @@ fn execute(
     let quiet = o.quiet;
     let run =
         unifize::run(&mut image, &options, mode, settings, n_threads).map_err(Failure::Fatal)?;
-    let mut notices: Vec<Notice> = run.notices.clone();
+    let mut notices: Vec<Notice> = o.notices.clone();
+    notices.extend(run.notices.iter().cloned());
     for event in &run.events {
         match event {
             Event::Progress(m) => {
@@ -525,9 +534,18 @@ mod tests {
             );
         }
         assert!(parse_args(&["-T2up"], FIX).unwrap_err().contains("AFNI-40"));
-        // AFNI-48: refused by default, AFNI's in reproduce mode.
-        assert!(parse_args(&["-T2", "-T2", "-T2", "in.nii"], FIX).is_err());
+        // AFNI-48: refused by default (the replica's message), AFNI's in reproduce mode with
+        // its notice kept for the end of the run; with -EPI any number of -T2 runs.
+        assert_eq!(
+            parse_args(&["-T2", "-T2", "-T2", "in.nii"], FIX).unwrap_err(),
+            "-T2 given 3 times: give it once (a T2-weighted input) or twice (also clip the bright \
+             edges) (AFNI-48; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
+        );
         let o = parse_args(&["-T2", "-T2", "-T2", "in.nii"], UpstreamDefects::Reproduce).unwrap();
         assert_eq!(o.options.t2, 3);
+        assert_eq!(o.notices.len(), 1);
+        assert!(o.notices[0].line().contains("AFNI-48"));
+        let o = parse_args(&["-T2", "-T2", "-T2", "-EPI", "in.nii"], FIX).unwrap();
+        assert!(o.notices.is_empty() && o.options.epi);
     }
 }

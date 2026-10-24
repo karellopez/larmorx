@@ -364,6 +364,20 @@ to disk!", goes on and exits 0).
 | AFNI-44 | the large-hole step decided by the z size | AFNI's, documented (rule C, decided 2026-10-23: it shapes fMRIPrep's BOLD masks) | AFNI's |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing (`specs/3dTshift.md` §6.5, §7.1) | as for 3dTshift; with `AFNI_NIFTI_SCALE=NO` (AFNI-23) the data are read as without the variable (float32, `slope * x + inter`) for the mask and the masked copy | AFNI's |
 
+**The rule-B refusals in detail** (added 2026-10-24 from the replicas' observable behaviour and black-box
+runs of AFNI 25.2.09; the clean-room original refuses the same way):
+
+- **AFNI-41 (rule B, refused by default).** `-nbhrs n` with `n` outside 6..26 (the range the
+  help gives; a value that is not a number reads as 0) is a fatal error by default: before any
+  input is read, the program writes a notice naming AFNI-41 and the message
+  `-nbhrs <n> is illegal: choose a value between 6 and 26 (AFNI-41; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)`
+  and exits 1, writing nothing. The test is on the last `-nbhrs` given, after the whole
+  command line is read, whether or not a `-NN1`, `-NN2` or `-NN3` follows it. With
+  `reproduce`, AFNI's behaviour: AFNI accepts any value silently; outside 6..26 its peeling
+  acts as with 17 (and after `-NN1/2/3`, as that option says), and from 19 to 26 as with 18
+  (black-box: `-nbhrs 5`, `27`, `0`, `40` give the masks of 17; `-nbhrs 40 -NN1` the mask of
+  `-NN1`); larmorx names AFNI-41 in a notice there.
+
 Every correction is named on standard error as `*+ WARNING: upstream defect <ID> (<tool>)
 corrected: ...` (the notice line of `docs/api/upstream-defects.md`).
 

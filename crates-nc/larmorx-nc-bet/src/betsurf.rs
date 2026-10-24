@@ -993,7 +993,16 @@ fn ceil_i(x: f64) -> i32 {
 }
 
 /// Saves a short image (`save_volume(v, name) < 0` returns -1 from main).
-fn save(v: &Volume<i16>, name: &str, run: &Run, err: &mut dyn Write) -> Result<(), Fail> {
+fn save(
+    v: &Volume<i16>,
+    name: &str,
+    run: &Run,
+    err: &mut dyn Write,
+    notices: &mut Notices,
+) -> Result<(), Fail> {
+    if volume::offset_defect_applies(v, run.fsl) {
+        crate::bet2::offset_notice(notices, v.extensions.len());
+    }
     match volume::save_volume(v, name, run.fsl, run.mode.reproduce()) {
         Ok(None) => Ok(()),
         Ok(Some(_)) => Err(Fail::Exit(255)),
@@ -1243,13 +1252,20 @@ fn surfaces(
                 &format!("{}_inskull_mesh", names.output),
                 run,
                 err,
+                notices,
             )?;
         }
         if a.mask || a.skullmask {
             let smask = make_mask_from_mesh(&output1, &realmesh)?;
             if a.mask {
                 say(out, "  mask");
-                save(&smask, &format!("{}_inskull_mask", names.output), run, err)?;
+                save(
+                    &smask,
+                    &format!("{}_inskull_mask", names.output),
+                    run,
+                    err,
+                    notices,
+                )?;
             }
             if a.skullmask {
                 maskinskull2 = Some(smask);
@@ -1310,13 +1326,20 @@ fn surfaces(
                 &format!("{}_outskull_mesh", names.output),
                 run,
                 err,
+                notices,
             )?;
         }
         if a.mask || a.skullmask {
             let smask = make_mask_from_mesh(&output1, &realmesh2)?;
             if a.mask {
                 say(out, "  mask");
-                save(&smask, &format!("{}_outskull_mask", names.output), run, err)?;
+                save(
+                    &smask,
+                    &format!("{}_outskull_mask", names.output),
+                    run,
+                    err,
+                    notices,
+                )?;
             }
             if a.skullmask {
                 maskoutskull2 = Some(smask);
@@ -1341,7 +1364,13 @@ fn surfaces(
             let v = i32::from(o2.data[k]) * (1 - i32::from(i2.data[k])) + i32::from(edge.data[k]);
             smask.data[k] = v.min(1) as i16;
         }
-        save(&smask, &format!("{}_skull_mask", names.output), run, err)?;
+        save(
+            &smask,
+            &format!("{}_skull_mask", names.output),
+            run,
+            err,
+            notices,
+        )?;
     }
 
     // the scalp, from a sphere inside the outer skull
@@ -1393,6 +1422,7 @@ fn surfaces(
                 &format!("{}_outskin_mesh", names.output),
                 run,
                 err,
+                notices,
             )?;
         }
         if a.mask {
@@ -1428,7 +1458,13 @@ fn surfaces(
             } else {
                 make_mask_from_mesh(&output1, &m2)?
             };
-            save(&mask, &format!("{}_outskin_mask", names.output), run, err)?;
+            save(
+                &mask,
+                &format!("{}_outskin_mask", names.output),
+                run,
+                err,
+                notices,
+            )?;
         }
     }
     Ok(())

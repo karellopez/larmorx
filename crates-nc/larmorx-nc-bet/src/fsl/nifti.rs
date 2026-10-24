@@ -977,7 +977,7 @@ pub fn save_image(
     h.vox_offset = i64::from(h.sizeof_hdr);
     let mut size_of_extensions = 4usize;
     for (i, e) in extensions.iter().enumerate() {
-        // NewNifti adds the first extension's size once per extension (FSL-46); the correction
+        // NewNifti adds the first extension's size once per extension (FSL-56); the correction
         // adds each one's.
         let _ = i;
         size_of_extensions += if reproduce_offset {

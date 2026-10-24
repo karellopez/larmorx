@@ -931,9 +931,19 @@ fn main_inner(
     let ctvol = testvol.clone();
     let testvol = if a.ct { h2c(&testvol) } else { testvol };
     match compute(&testvol, &a, out, err, notices) {
-        Ok(res) => write_outputs(&testvol, &ctvol, &a, &res, &out_name, run, err),
+        Ok(res) => write_outputs(&testvol, &ctvol, &a, &res, &out_name, run, err, notices),
         Err(code) => code,
     }
+}
+
+/// The notice of FSL-56 for outputs that carry `n` extensions of different sizes.
+pub(crate) fn offset_notice(notices: &mut Notices, n: usize) {
+    let detail = if notices.fix() {
+        format!("the outputs' vox_offset counts each of their {n} extensions' sizes")
+    } else {
+        format!("the outputs' vox_offset counts the first of their {n} extensions' size {n} times")
+    };
+    notices.add(&defects::FSL_56, detail);
 }
 
 /// The values bet2 accepts but cannot compute with (FSL-42).
@@ -1236,6 +1246,7 @@ fn pow10(k: i32) -> f64 {
 }
 
 /// Writes bet2's outputs: the brain (unless `-n`), `_mask`, `_overlay`, `_mesh.vtk`, `_skull`.
+#[allow(clippy::too_many_arguments)]
 fn write_outputs(
     testvol: &Volume<f32>,
     ctvol: &Volume<f32>,
@@ -1244,8 +1255,12 @@ fn write_outputs(
     out_name: &str,
     run: &Run,
     err: &mut dyn Write,
+    notices: &mut Notices,
 ) -> u8 {
     let reproduce_offset = run.mode.reproduce();
+    if volume::offset_defect_applies(testvol, run.fsl) {
+        offset_notice(notices, testvol.extensions.len());
+    }
     let mut brainmask = res.outside.clone();
     if a.threshold {
         let t = res.params.t;

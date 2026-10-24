@@ -1122,9 +1122,20 @@ pub fn output_extension(filetype: i32) -> &'static str {
 /// without writing (an image with no volume).
 pub type SaveResult = Result<Option<i32>, ImageError>;
 
+/// Whether NewNifti's `vox_offset` (FSL-56) would differ from the correct one when `v` is saved
+/// with `settings`: a single-file output carrying two or more extensions of different sizes.
+pub fn offset_defect_applies<T: Elem>(v: &Volume<T>, settings: &FslSettings) -> bool {
+    let single = output_type(settings).is_ok_and(|t| output_extension(t).starts_with(".nii"));
+    single
+        && v.extensions.len() > 1
+        && v.extensions
+            .iter()
+            .any(|e| e.size() != v.extensions[0].size())
+}
+
 /// `save_volume(source, filename)`: mirrored back to the file's left-right order if it was read
 /// mirrored, a fresh FSL header, the type of `FSLOUTPUTTYPE`. `reproduce_offset` keeps NewNifti's
-/// `vox_offset` of several extensions (FSL-46).
+/// `vox_offset` of several extensions (FSL-56).
 pub fn save_volume<T: Elem>(
     source: &Volume<T>,
     name: &str,

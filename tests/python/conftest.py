@@ -14,6 +14,7 @@ def no_replica(monkeypatch, tmp_path_factory):
     Python environment's scripts directory, nor on ``PATH``. So ``implementation="auto"`` and
     the command line run the clean-room original, whatever this machine has installed."""
     monkeypatch.delenv("LARMORX_GPL_BIN", raising=False)
+    monkeypatch.delenv("LARMORX_NC_BIN", raising=False)
     monkeypatch.delenv("LARMORX_IMPLEMENTATION", raising=False)
     monkeypatch.setattr(_replica, "search_dirs", list)
     monkeypatch.setenv("PATH", str(tmp_path_factory.mktemp("empty-path")))

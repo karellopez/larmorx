@@ -864,7 +864,16 @@ def image_outputs(
 
 #: The public namespaces whose functions need golden cases; classes contribute their public
 #: methods (properties and constants are not functions and are not enforced).
-NAMESPACES = ("lx.ants", "lx.afni", "lx.mri", "lx.transforms", "lx.ndimage", "lx.io", "lx")
+NAMESPACES = (
+    "lx.ants",
+    "lx.afni",
+    "lx.fsl",
+    "lx.mri",
+    "lx.transforms",
+    "lx.ndimage",
+    "lx.io",
+    "lx",
+)
 
 
 def resolve(name: str) -> Any:
@@ -911,12 +920,18 @@ def image_math_operations() -> list[str]:
 
 #: The public functions that run a tool which has only a replica (no clean-room original yet),
 #: with the tool: the replica's program is not installed where these tests run, so their golden
-#: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs``, run on every
-#: platform by the GPL job). ``replica_only`` checks that each tool has one there.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs`` and
+#: ``crates-nc/larmorx-nc-bet/tests/golden.rs``, run on every platform by the replicas' jobs).
+#: ``replica_only`` checks that each tool has one there.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
+    "lx.fsl.bet": "fsl bet2",
+    "lx.fsl.betsurf": "fsl betsurf",
+}
 
-#: The replica's golden cases.
+#: The replicas' golden cases.
 GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
+NC_GOLDEN = Path(__file__).resolve().parents[2] / "crates-nc/larmorx-nc-bet/tests/golden.rs"
+REPLICA_GOLDEN = (GPL_GOLDEN, NC_GOLDEN)
 
 
 def replica_only() -> dict[str, str]:
@@ -3545,3 +3560,23 @@ def _(ctx: Context) -> dict[str, Any]:
         "spline_filter": lx.ndimage.spline_filter(data, order=4, mode="reflect"),
         "spline_filter1d": lx.ndimage.spline_filter1d(data, order=5, axis=1, mode="grid-wrap"),
     }
+
+
+# --- FSL ----------------------------------------------------------------------------------------
+
+
+@case("py.fsl.read_vtk", covers=("lx.fsl.read_vtk",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A VTK mesh as FSL writes it (fixed notation, 6 decimals), read back. (``lx.fsl.bet`` and
+    ``lx.fsl.betsurf`` run only the replica: their cases are in ``crates-nc``.)"""
+    v = ints(71, (40, 3), -90000, 90000) / 1000
+    t = ints(72, (60, 3), 0, 40)
+    lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA"]
+    lines.append(f"POINTS {len(v)}  float")
+    lines += [" ".join(f"{c:.6f}" for c in row) for row in v]
+    lines.append(f"POLYGONS {len(t)} {4 * len(t)}")
+    lines += [f"3 {a} {b} {c} " for a, b, c in t]
+    path = ctx.out("mesh.vtk")
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    s = lx.fsl.read_vtk(path)
+    return {"vertices": s.vertices, "triangles": s.triangles}

@@ -11,7 +11,7 @@ corrects it by default and raises :class:`UpstreamDefectWarning` when it changed
 ``upstream_defects="reproduce"`` gives the original's result (``docs/api/upstream-defects.md``).
 """
 
-from larmorx import afni, ants, io, mri, ndimage, transforms
+from larmorx import afni, ants, fsl, io, mri, ndimage, transforms
 from larmorx._core import __version__
 from larmorx._defects import UpstreamDefectWarning
 from larmorx._replica import Implementation, ReplicaError, ReplicaNotFoundError
@@ -28,6 +28,7 @@ __all__ = [
     "afni",
     "ants",
     "as_image",
+    "fsl",
     "io",
     "load",
     "mri",

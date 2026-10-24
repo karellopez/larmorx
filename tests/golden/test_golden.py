@@ -124,9 +124,11 @@ def test_every_tool_operation_and_function_has_a_case(golden: dict) -> None:
 
 def test_tools_with_only_a_replica_have_golden_cases_in_crates_gpl() -> None:
     """The tools and functions that only the replica runs (:func:`registry.replica_only`) are
-    covered by the replica's golden cases, which the GPL job runs on every platform."""
-    cases = registry.GPL_GOLDEN.read_text(encoding="utf-8")
+    covered by the replicas' golden cases (``crates-gpl``, ``crates-nc``), which their jobs run
+    on every platform."""
+    cases = "".join(p.read_text(encoding="utf-8") for p in registry.REPLICA_GOLDEN)
     missing = sorted(
         {tool for tool in registry.replica_only().values() if f'tool: "{tool}"' not in cases}
     )
-    assert not missing, f"no golden case in {registry.GPL_GOLDEN} for {', '.join(missing)}"
+    where = " or ".join(str(p) for p in registry.REPLICA_GOLDEN)
+    assert not missing, f"no golden case in {where} for {', '.join(missing)}"

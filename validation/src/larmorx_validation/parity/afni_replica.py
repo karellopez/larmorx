@@ -38,7 +38,6 @@ import io
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -173,24 +172,49 @@ class Run:
     directory: Path
 
 
-def run_afni(program: str, args: list[str], env: dict[str, str], cwd: Path) -> Run:
-    p = subprocess.run(
-        [afni_binary(program), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        cwd=cwd,
+def case_never(s: Scenario) -> str:
+    """Why AFNI's runs of a case are never kept in the oracle cache: AFNI reads memory it never
+    wrote (``undefined``), or the case's texts name a defect whose result varies."""
+    from larmorx_validation.oracle_cache import never_for
+
+    if s.undefined is not None:
+        return f"AFNI reads memory it never wrote ({s.undefined})"
+    return never_for(s.reason)
+
+
+def _threads(env: dict[str, str]) -> int | None:
+    """AFNI's OpenMP thread count in ``env`` (``None``: not set, the machine's)."""
+    try:
+        return int(env["OMP_NUM_THREADS"])
+    except (KeyError, ValueError):
+        return None
+
+
+def run_afni(program: str, args: list[str], env: dict[str, str], cwd: Path, never: str = "") -> Run:
+    """AFNI's ``program`` in ``cwd``, through the oracle cache (above one OpenMP thread, served
+    once three runs agree; ``never``: why it always runs, :func:`case_never`)."""
+    from larmorx_validation import oracle_cache
+
+    policy = oracle_cache.Policy(threads=_threads(env), never=never, family="afni")
+    p = oracle_cache.run(
+        [afni_binary(program), *args], env=env, cwd=cwd, policy=policy, runner="afni"
     )
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
 
 def run_fmriprep_afni(
-    program: str, args: list[str], env: dict[str, str], cwd: Path, binds: list[Path]
+    program: str,
+    args: list[str],
+    env: dict[str, str],
+    cwd: Path,
+    binds: list[Path],
+    never: str = "",
 ) -> Run:
     """``program`` from fMRIPrep 25.2.6's image (its own AFNI 25.2.09 build), as the user, with
-    ``cwd`` and the inputs' directories bound at their own paths."""
+    ``cwd`` and the inputs' directories bound at their own paths; through the oracle cache,
+    keyed by the image's SHA-256."""
+    from larmorx_validation import oracle_cache
+
     image = fmriprep_image()
     assert image is not None
     bind = sorted({str(cwd), *(str(b) for b in binds)})
@@ -201,13 +225,15 @@ def run_fmriprep_afni(
     for k, v in inner.items():
         cmd += ["--env", f"{k}={v}"]
     cmd += ["--env", f"HOME={home()}", "--bind", f"{home()}:{home()}"]
-    p = subprocess.run(
+    p = oracle_cache.run_apptainer(
+        image,
+        program,
+        args,
+        {**inner, "HOME": str(home())},
         [*cmd, str(image), program, *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
         cwd=cwd,
+        policy=oracle_cache.Policy(threads=_threads(inner), never=never, family="afni"),
+        runner="afni-fmriprep",
     )
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
@@ -571,7 +597,7 @@ def _correctly_rounded(
         return
     d = tmp / "afni-correctly-rounded"
     _setup(d, s)
-    r = run_afni(program, args, dict(env, LD_PRELOAD=str(lib)), d)
+    r = run_afni(program, args, dict(env, LD_PRELOAD=str(lib)), d, never=case_never(s))
     worst, details = 0, []
     for name in differ:
         if r.code != 0 or not (d / name).is_file():
@@ -620,7 +646,7 @@ def afni_10_explainer(
         new_args = list(args)
         for p, q in copies.items():
             new_args = [a.replace(str(p), str(q)) for a in new_args]
-        r = run_afni(program, new_args, env, d)
+        r = run_afni(program, new_args, env, d, never=case_never(s))
         state["dir"] = d if r.code == 0 else None
         return state["dir"]
 
@@ -749,7 +775,7 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         a_dir, l_dir = tmp / "afni", tmp / "larmorx"
         _setup(a_dir, s)
         _setup(l_dir, s)
-        afni = run_afni(program, args, env, a_dir)
+        afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
 
@@ -875,7 +901,13 @@ def _band(
         variants.append(
             (
                 f"AFNI at {t} thread(s)",
-                lambda d, t=t: run_afni(spec.program, args, dict(env, OMP_NUM_THREADS=str(t)), d),
+                lambda d, t=t: run_afni(
+                    spec.program,
+                    args,
+                    dict(env, OMP_NUM_THREADS=str(t)),
+                    d,
+                    never=case_never(s),
+                ),
             )
         )
     if fmriprep_image() is not None:
@@ -883,7 +915,7 @@ def _band(
         variants.append(
             (
                 "fMRIPrep 25.2.6's AFNI",
-                lambda d: run_fmriprep_afni(spec.program, args, env, d, binds),
+                lambda d: run_fmriprep_afni(spec.program, args, env, d, binds, never=case_never(s)),
             )
         )
     for label, runner in variants:

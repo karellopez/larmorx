@@ -1066,15 +1066,21 @@ def _program(name: str) -> Path:
 
 
 def _run(name: str, args: list[str]) -> tuple[int, str, str]:
-    p = subprocess.run(
-        [str(_program(name)), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=_env(),
+    """An ANTs program, through the oracle cache (HDF5 outputs are compared by their datasets:
+    ITK stamps the objects with times, ITK-09)."""
+    from larmorx_validation import oracle_cache
+
+    env = _env()
+    argv = [str(_program(name)), *args]
+    p = oracle_cache.run(
+        argv,
+        env=env,
+        policy=oracle_cache.Policy(threads=oracle_cache.itk_threads(env), family="itk"),
         timeout=3600,
+        runner="itk-hdf5",
     )
+    if p.timed_out:
+        raise subprocess.TimeoutExpired(argv, 3600)
     return p.returncode, p.stdout, p.stderr
 
 

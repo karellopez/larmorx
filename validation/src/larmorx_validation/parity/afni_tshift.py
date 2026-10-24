@@ -1222,23 +1222,40 @@ def _process_environment(env: dict[str, str], cwd: Path | None = None) -> Iterat
         os.chdir(saved_cwd)
 
 
+#: Why AFNI's NIfTI extension is not part of 3dTshift's result for the oracle cache.
+AFNI_EXTENSION = (
+    "AFNI's NIfTI extension holds a random identifier, the date and the output's own path; the "
+    "suite compares the header's fields and the data, and whole files only without it "
+    "(AFNI_NIFTI_NOEXT)"
+)
+
+
+def case_never(case_id: str, s: Scenario, description: str = "") -> str:
+    """Why AFNI's runs of a case are never kept in the oracle cache: its texts (or its expected
+    divergence's reason) name a defect whose result varies (AFNI-20's random identifier)."""
+    from larmorx_validation.oracle_cache import never_for
+
+    reasons = [r for d in DIVERGENCES.values() if (k := d.get(case_id)) for r in [k[1]]]
+    return never_for(description, s.reason, *reasons)
+
+
 def _run_afni_streams(
-    args: list[str], env: dict[str, str], cwd: Path | None = None
+    args: list[str], env: dict[str, str], cwd: Path | None = None, never: str = ""
 ) -> tuple[int, str, str]:
-    p = subprocess.run(
-        [afni_binary(), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        cwd=cwd,
+    """3dTshift, through the oracle cache (one thread: it has no OpenMP loop)."""
+    from larmorx_validation import oracle_cache
+
+    policy = oracle_cache.Policy(
+        threads=1, never=never, nifti_extensions=AFNI_EXTENSION, family="afni"
+    )
+    p = oracle_cache.run(
+        [afni_binary(), *args], env=env, cwd=cwd, policy=policy, runner="afni-tshift"
     )
     return p.returncode, p.stdout, p.stderr
 
 
-def _run_afni(args: list[str]) -> tuple[int, str]:
-    code, out, err = _run_afni_streams(args, _environment())
+def _run_afni(args: list[str], never: str = "") -> tuple[int, str]:
+    code, out, err = _run_afni_streams(args, _environment(), never=never)
     return code, (out + err).strip()
 
 
@@ -1662,7 +1679,9 @@ def _run_separately(
         d = tmp / tool
         args = setup(d)
         if tool == "afni":
-            code, out, err = _run_afni_streams(args, env, d)
+            code, out, err = _run_afni_streams(
+                args, env, d, never=case_never(case.id, s, case.description)
+            )
         else:
             code, out, err = _run_larmorx_streams(args, implementation, defects.REPRODUCE, env, d)
         runs[tool] = (code, out, err, produced(code, d))
@@ -1991,7 +2010,8 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
         image = _image_path(s.image)
         args = _args(s, tmp)
         outputs, logs, codes, produced = {}, {}, {}, {}
-        for tool, runner in [("afni", _run_afni), ("larmorx", ours)]:
+        afni = functools.partial(_run_afni, never=case_never(case.id, s, case.description))
+        for tool, runner in [("afni", afni), ("larmorx", ours)]:
             name = f"{tool}-{s.output}" if s.output else f"{tool}{s.suffix}"
             target = tmp / ("out.nii" if occupied else name)
             codes[tool], logs[tool] = runner([*args, "-prefix", str(target), str(image)])

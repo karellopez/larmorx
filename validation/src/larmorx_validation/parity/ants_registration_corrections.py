@@ -168,20 +168,32 @@ def _larmorx(args: list[str], mode: str) -> tuple[int, str, str]:
     return _run_larmorx(args, SEED, mode)
 
 
-def _ants(args: list[str]) -> tuple[int, str, str]:
+#: Why the references with a displacement field always run (they are run FIELD_RUNS times).
+VARIES = "ANTS-72: a linear stage after a displacement field draws its voxels from the clock"
+
+
+def _ants(args: list[str], never: str = "") -> tuple[int, str, str]:
     from larmorx_validation.parity.ants_registration import _run_ants
 
-    code, out, err = _run_ants(args, SEED)
+    code, out, err = _run_ants(args, SEED, never=never)
     return code, out, err
 
 
 def _apply(args: list[str]) -> None:
+    from larmorx_validation import oracle_cache
+
     b = ants_bin()
     env = {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1"}
     env.pop("LD_PRELOAD", None)
-    subprocess.run(
-        [str(b / "antsApplyTransforms"), "-d", "3", *args], env=env, check=True, capture_output=True
+    argv = [str(b / "antsApplyTransforms"), "-d", "3", *args]
+    p = oracle_cache.run(
+        argv,
+        env=env,
+        policy=oracle_cache.Policy(threads=1, family="itk"),
+        runner="ants-registration-corrections",
     )
+    if p.returncode != 0:
+        raise subprocess.CalledProcessError(p.returncode, argv, p.stdout, p.stderr)
 
 
 def _params(path: Path) -> np.ndarray:
@@ -413,7 +425,8 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
             d = tmp / f"ants-field-{'fine' if ref == fine else 'grid'}-{r}"
             d.mkdir()
             code, _o, err = _ants(
-                ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args]
+                ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args],
+                never=VARIES,
             )
             runs.append((code, d / f"r{sc.second_file}"))
         repeated[f"ANTs with the B-spline transform as a displacement field ({tag})"] = runs

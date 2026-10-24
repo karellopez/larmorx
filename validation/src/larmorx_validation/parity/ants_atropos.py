@@ -1967,7 +1967,13 @@ def _resolve(c: AtroposCase, out: Path, tmp: Path) -> list[str]:
     return [re.sub(r"\{([^{}]+)\}", sub, a) for a in c.args]
 
 
-def _run_ants(args: list[str], threads: int = 1, *, correctly_rounded: bool = False):
+def _run_ants(
+    args: list[str], threads: int = 1, *, correctly_rounded: bool = False, never: str = ""
+):
+    """Atropos, through the oracle cache: never kept with the clock's seed
+    (``--use-random-seed 1``), or when ``never`` says why (:func:`case_never`)."""
+    from larmorx_validation import oracle_cache
+
     b = ants_bin()
     if b is None or not (b / PROGRAM).is_file():
         raise Outcome(SKIPPED, "the ANTs oracle's Atropos was not found (LARMORX_ANTS_BIN)")
@@ -1978,16 +1984,29 @@ def _run_ants(args: list[str], threads: int = 1, *, correctly_rounded: bool = Fa
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    p = subprocess.run(
-        [str(b / PROGRAM), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        timeout=3600,
+    argv = [str(b / PROGRAM), *args]
+    policy = oracle_cache.Policy(
+        threads=oracle_cache.itk_threads(env),
+        never=never or oracle_cache.ants_seed_never(PROGRAM, list(args), env),
+        family="itk",
     )
+    p = oracle_cache.run(argv, env=env, policy=policy, timeout=3600, runner="ants-atropos")
+    if p.timed_out:
+        raise subprocess.TimeoutExpired(argv, 3600)
     return p.returncode, p.stdout, p.stderr
+
+
+def case_never(c: AtroposCase) -> str:
+    """Why ANTs' runs of an Atropos case are never kept in the oracle cache: the clock's seed
+    (the case measures ANTs' own spread), values that depend on memory ANTs never wrote
+    (``undefined``), or the case's texts naming a defect whose result varies."""
+    from larmorx_validation.oracle_cache import never_for
+
+    if c.expect == "random":
+        return "ANTs seeds from the clock: the case measures its own spread"
+    if c.undefined:
+        return f"ANTs' values depend on memory it never wrote ({c.undefined[:120]})"
+    return never_for(c.description, c.reason)
 
 
 def _run_larmorx(args: list[str], threads: int = LX_THREADS, mode: str = defects.REPRODUCE):
@@ -2019,6 +2038,8 @@ class _Run:
 
 
 def _execute(c: AtroposCase, tmp: Path, name: str, runner, **kw) -> _Run:
+    if runner is _run_ants:
+        kw.setdefault("never", case_never(c))
     out = tmp / name
     out.mkdir()
     args = _resolve(c, out, tmp)

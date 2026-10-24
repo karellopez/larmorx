@@ -334,10 +334,12 @@ its start, so the replica runs them in parallel and prints their messages in mcf
 the final resampling is parallel over volumes. The first stage's chain and the mean volume's
 sum stay sequential. Outputs are byte-identical at 1 and 3 threads (golden and parity tests).
 
-**fMRIPrep's mcflirt is not FSL 6.0.7.17's.** fMRIPrep 25.2.6's image has fsl-mcflirt 2111.0
-with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap 0.7.0 (FSL 6.0.7.17: 2203.12,
-2203.2, 0.6.0), and glibc 2.35. Its matrices are compared with FSL 6.0.7.17's in the replica's
-record (`docs/validation/fsl-mcflirt-replica.md`, the `fmriprep/` cases).
+**fMRIPrep's mcflirt is not FSL 6.0.7.17's, but gives the same matrices.** fMRIPrep 25.2.6's
+image has fsl-mcflirt 2111.0 with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap
+0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the seven mcflirt calls of the
+five fMRIPrep oracle runs, its `.mat` files are identical as text to FSL 6.0.7.17's and to the
+replica's: 1,033 of 1,033 matrices (the replica's record, `docs/validation/fsl-mcflirt-replica.md`,
+the `fmriprep/` cases). *Verified* (2026-10-24).
 
 **What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and
 one line of its own, then exits with status 1), FSL's build string in `descrip`, and mcflirt's

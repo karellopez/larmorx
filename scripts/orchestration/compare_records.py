@@ -38,11 +38,16 @@ def main(argv):
         b = json.loads(Path(f"docs/validation/{s}.json").read_text())
         A = {r["case"]: r for r in a["results"]}
         B = {r["case"]: r for r in b["results"]}
-        st = [c for c in A if A[c]["status"] != B.get(c, {}).get("status")]
-        det = [c for c in A if strip(A[c]) != strip(B.get(c))]
+        new, gone = sorted(set(A) - set(B)), sorted(set(B) - set(A))
+        st = [c for c in A if c in B and A[c]["status"] != B[c]["status"]]
+        det = [c for c in A if c in B and strip(A[c]) != strip(B[c])]
         print(
             f"{s:32s} {len(A)}/{len(B)} cases; status differs: {len(st)}; details differ: {len(det)}; summary equal: {a['summary'] == b['summary']}"
         )
+        for c in new:
+            print(f"    NEW {c}: {A[c]['status']} (not in the record)")
+        for c in gone:
+            print(f"    GONE {c}: in the record ({B[c]['status']}), not in the re-run")
         for c in st:
             print(f"    STATUS {c}: {A[c]['status']} | record {B.get(c, {}).get('status')}")
         for c in det[:5]:
@@ -51,7 +56,7 @@ def main(argv):
                     print(
                         f"    {c} {k}: {str(strip(A[c][k]))[:140]} | record {str(strip(B[c].get(k)))[:140]}"
                     )
-        bad |= bool(st) or set(A) != set(B)
+        bad |= bool(st) or bool(gone) or any(A[c]["status"] == "fail" for c in new)
     return 1 if bad else 0
 
 

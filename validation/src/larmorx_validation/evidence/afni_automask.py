@@ -828,6 +828,7 @@ def command(program: str, s) -> str:
 #: refused in both modes, or, AFNI-41 and AFNI-48, refused by default: ``REFUSED``).
 CORRECTED = frozenset(
     f"AFNI-{n:02d}" for n in (1, 2, 7, 8, 11, 12, 16, 18, 20, 22, 23, 26, 43, 45, 47)
+)
 #: The inputs that make no sense, refused by default (rule B, decided 2026-10-23): the case's
 #: defect -> what AFNI does with it (observable behaviour only).
 REFUSED = {
@@ -836,7 +837,6 @@ REFUSED = {
     "AFNI-48": "the help documents -T2 once and twice; given a third time it neither inverts the "
     "output back nor clips its edges, so AFNI writes an inverted image",
 }
-)
 
 
 def case_verdict(

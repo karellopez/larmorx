@@ -1,14 +1,14 @@
 # Parity: 3dUnifize
 
-**All cases agree.** 97 cases on the `standard` tier: 76 pass, 19 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 99 cases on the `standard` tier: 78 pass, 19 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dUnifize` / `lx.afni.unifize` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dUnifize.md`), with `implementation="original"`
 - **Reference:** 3dUnifize from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
 - **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-unifize --tier standard`
 
-**Bit-identical to AFNI: 32 of 72 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 93 of 93 identical, in every case that ran both programs.
+**Bit-identical to AFNI: 34 of 74 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 95 of 95 identical, in every case that ran both programs.
 - The other 40 compared case(s) write float32 values within the threshold (AFNI's squash calls glibc's `tanhf`, which is not correctly rounded on some arguments; the original's is): with CORE-MATH's correctly rounded functions preloaded into AFNI, 40 of them are bit-identical to the original.
 - 3 case(s) where AFNI crashes (a missing option value, AFNI-40; an empty automask dereferenced, AFNI-46): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
 - **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 1 of 7 bit-identical to the original's; the other 6 within the threshold, and in 6 of them fMRIPrep's output is AFNI's oracle output bit for bit, which AFNI with correctly rounded maths turns into the original's (glibc's `tanhf`).
@@ -28,7 +28,7 @@
   - AFNI-26: 1 case(s) named it, 0 with changed values (largest difference 0): `global/missing-directory`
   - AFNI-45: 2 case(s) named it, 2 with changed values (largest difference 1.46e+03), 2 with other changes (messages): `defects/T2up-100`, `defects/T2up-99.99`
   - AFNI-47: 1 case(s) named it, 1 with changed values (largest difference 1.5e+03), 1 with other changes (messages): `defects/slab`
-  - AFNI-48: 1 case(s) named it, 0 with changed values (largest difference 0): `options/T2-T2-T2`
+  - AFNI-48: 2 case(s) named it, 0 with changed values (largest difference 0): `options/T2-T2-T2`, `options/T2-x4`
 
 ## Thresholds
 
@@ -50,7 +50,7 @@
 | errors | 19 | 0 | 19 | 0 | 0 |
 | fmriprep | 7 | 7 | 0 | 0 | 0 |
 | global | 8 | 8 | 0 | 0 | 0 |
-| options | 33 | 33 | 0 | 0 | 0 |
+| options | 35 | 35 | 0 | 0 | 0 |
 | real | 2 | 2 | 0 | 0 | 0 |
 
 ## Expected divergences
@@ -88,7 +88,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (2a009d1ba7d6) |
+| larmorx | 0.0.1 (bd2ca21ddea8) |
 | larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -117,7 +117,9 @@ Both programs run in directories of their own on the same input files, in the sa
 | `options/mfrac` | pass | 8/8 | -mfrac, the same as -clfrac |
 | `options/T2` | pass | 7/7 | -T2 on the T2-like phantom |
 | `options/T2-T2` | pass | 7/7 | -T2 -T2: no second inversion, bright edges clipped |
-| `options/T2-T2-T2` | pass | 6/6 | -T2 three times: neither (AFNI-48) |
+| `options/T2-T2-T2` | pass | 6/6 | -T2 three times: AFNI neither inverts back nor clips; refused by default (AFNI-48) |
+| `options/T2-x4` | pass | 6/6 | -T2 four times: as three (AFNI-48) |
+| `options/T2-x3-EPI` | pass | 6/6 | -T2 three times with -EPI: -EPI sets one -T2, nothing refused |
 | `options/T2up-95` | pass | 7/7 | -T2 -T2up 95 |
 | `options/GM` | pass | 9/9 | -GM |
 | `options/GM-T2` | pass | 6/6 | -GM -T2 |

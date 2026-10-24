@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "a40eaee492da",
-  "larmorx_testdata_commit": "00b862132e9c",
+  "larmorx_commit": "bd2ca21ddea8",
+  "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -21,12 +21,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.145,
+   "seconds": 0.188,
    "status": "pass"
   },
   {
@@ -35,8 +45,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -49,12 +69,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.041,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -63,12 +93,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -77,12 +117,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -91,12 +141,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.027,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -105,12 +164,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -119,8 +188,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -133,12 +211,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -147,12 +235,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -161,12 +258,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -175,12 +281,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -189,12 +305,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.027,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -203,8 +328,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -217,8 +352,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -231,12 +376,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -245,12 +400,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.029,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -259,12 +424,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -273,12 +448,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -287,12 +472,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -301,12 +496,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.036,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -315,12 +520,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -329,12 +544,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -343,12 +568,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.034,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -357,12 +592,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -371,12 +616,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.034,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -385,12 +640,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.04,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -399,12 +664,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.04,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -413,12 +688,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.048,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -427,12 +712,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.055,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -441,12 +736,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.063,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -455,12 +760,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.08,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -469,12 +784,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.126,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -483,12 +808,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.033,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -497,12 +832,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.028,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -511,12 +856,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.029,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -525,12 +880,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -539,12 +904,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -553,8 +928,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
@@ -567,12 +952,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.055,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -581,12 +976,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.032,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -595,12 +1000,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -609,12 +1024,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -623,12 +1048,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.045,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -637,12 +1072,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -651,12 +1096,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -665,12 +1120,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -679,12 +1144,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -693,8 +1168,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
@@ -707,12 +1192,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.033,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -721,12 +1216,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -735,12 +1240,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -749,12 +1264,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -763,8 +1288,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
@@ -777,12 +1312,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -791,12 +1336,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -805,12 +1360,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -819,12 +1384,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.033,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -833,12 +1408,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -847,12 +1432,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -861,12 +1456,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -875,12 +1480,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -889,12 +1504,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -903,12 +1528,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -917,12 +1551,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -931,12 +1574,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -945,12 +1597,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -959,12 +1620,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.028,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -973,8 +1643,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
@@ -987,12 +1666,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1001,12 +1690,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.042,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1015,12 +1714,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.035,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1029,12 +1738,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.033,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1043,12 +1762,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1057,12 +1786,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.039,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1071,12 +1810,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.031,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1085,12 +1833,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1099,12 +1856,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1113,12 +1879,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.03,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1127,12 +1902,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1141,12 +1925,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1155,12 +1948,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.032,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1169,12 +1972,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.031,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1183,12 +1996,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.031,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1197,12 +2020,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1211,12 +2044,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1225,12 +2068,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1239,12 +2092,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.027,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1253,12 +2115,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.027,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1267,12 +2138,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1281,12 +2161,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.029,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1295,12 +2184,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.029,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1309,12 +2207,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.027,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1323,8 +2230,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
@@ -1337,12 +2253,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1351,12 +2276,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1365,8 +2299,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
@@ -1379,12 +2322,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.025,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1393,12 +2345,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1407,12 +2368,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1421,8 +2392,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
@@ -1435,8 +2416,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
@@ -1449,12 +2440,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.033,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1463,12 +2464,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -1477,12 +2488,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.033,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1491,12 +2512,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.028,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -1505,8 +2535,17 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
@@ -1519,12 +2558,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.026,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1533,12 +2581,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1547,12 +2604,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.033,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1561,12 +2627,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.028,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1575,12 +2650,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.031,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1589,12 +2674,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.031,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1603,12 +2698,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1617,8 +2722,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
@@ -1631,12 +2746,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1645,12 +2770,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "uint8",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -1659,12 +2794,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1673,12 +2818,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1687,12 +2842,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1701,12 +2866,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -1715,12 +2890,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1729,12 +2914,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1743,8 +2938,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -1757,12 +2962,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1771,12 +2986,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1785,12 +3010,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 2637,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.036,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1799,8 +3035,19 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 2920,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -1813,12 +3060,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1827,12 +3084,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -1841,8 +3108,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -1855,12 +3130,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.023,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1869,8 +3152,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -1883,12 +3176,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1897,12 +3200,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.031,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1911,12 +3224,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.03,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1925,12 +3248,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.036,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1939,12 +3272,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1953,12 +3296,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1967,12 +3320,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1981,12 +3344,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.053,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -1995,12 +3368,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.036,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2009,12 +3392,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2023,12 +3416,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2037,12 +3440,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2051,12 +3464,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -2065,12 +3488,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2079,12 +3512,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 110,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.034,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2093,12 +3537,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 1540,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2107,12 +3562,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2121,12 +3586,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.034,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2135,12 +3610,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2149,12 +3632,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.022,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2163,12 +3654,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -2177,12 +3678,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2191,12 +3702,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.034,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2205,8 +3726,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
@@ -2219,12 +3750,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2233,12 +3774,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2247,8 +3798,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2261,8 +3822,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2275,12 +3846,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2289,8 +3870,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2303,8 +3894,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2317,8 +3918,18 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2331,12 +3942,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2345,12 +3966,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2359,12 +3990,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -2373,12 +4014,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2387,12 +4038,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2401,12 +4062,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2415,8 +4086,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2429,12 +4108,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.051,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2443,12 +4130,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2457,12 +4152,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2471,12 +4174,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2485,12 +4196,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2499,12 +4218,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.025,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -2513,8 +4240,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2527,12 +4262,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2541,12 +4284,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3581,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.029,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -2555,12 +4307,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2569,8 +4329,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
@@ -2583,12 +4351,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2597,12 +4373,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.026,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2611,12 +4395,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2625,12 +4417,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.025,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -2639,12 +4439,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.024,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -2653,12 +4461,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.029,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -2667,12 +4484,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.027,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -2681,12 +4506,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.026,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -2695,12 +4528,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2709,12 +4552,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.033,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2723,12 +4576,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.024,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -2737,12 +4599,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.037,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -2751,12 +4624,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -2765,12 +4647,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2779,12 +4671,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.042,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -2793,12 +4696,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "bit-identical",
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -2807,8 +4719,19 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2821,8 +4744,19 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -2835,12 +4769,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.037,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2849,12 +4794,23 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "D13 defaults: replica = original": "within",
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.046,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -2863,12 +4819,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.023,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2877,12 +4841,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.023,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2891,12 +4863,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.022,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2905,8 +4885,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
@@ -2919,12 +4907,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.027,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2933,12 +4929,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.025,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2947,12 +4951,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2961,8 +4973,16 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
@@ -2976,7 +4996,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Unknown option: -bogus; larmorx: ** FATAL ERROR: Unknown option: -bogus",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -2986,7 +5006,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: found -no_detrend, changing default to -heptic; larmorx: ** FATAL ERROR: found -no_detrend, changing default to -heptic",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -2996,7 +5016,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: cannot use both -rlt and -no_detrend; larmorx: ** FATAL ERROR: cannot use both -rlt and -no_detrend",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -3016,7 +5036,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: -slice value is too large (4 >= 4); larmorx: ** FATAL ERROR: -slice value is too large (4 >= 4)",
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -3026,7 +5046,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: -ignore value 96 is too large; larmorx: ** FATAL ERROR: -ignore value 96 is too large",
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -3036,7 +5056,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: illegal value '-1' after -tzero!; larmorx: ** FATAL ERROR: illegal value '-1' after -tzero!",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -3076,7 +5096,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/none.1D",
-   "seconds": 0.04,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -3086,7 +5106,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices; larmorx: ** FATAL ERROR: tpattern file <tmp>/st.1D has 3 values but have 4 slices",
-   "seconds": 0.008,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -3096,7 +5116,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value 2.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.009,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -3106,7 +5126,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Illegal value -0.5 in tpattern file <tmp>/st.1D",
-   "seconds": 0.009,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -3116,7 +5136,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D; larmorx: ** FATAL ERROR: Can't read tpattern file <tmp>/st.1D",
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -3126,7 +5146,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'; larmorx: ** FATAL ERROR: Can't open input dataset '<generated>/does-not-exist.nii'",
-   "seconds": 0.005,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -3136,7 +5156,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** ERROR: dataset NOT written to disk!; larmorx: ** ERROR: dataset NOT written to disk!",
-   "seconds": 0.01,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -3146,7 +5166,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "AFNI: ** FATAL ERROR: illegal value '<tmp>/afni-out put.nii' after -prefix; larmorx: ** FATAL ERROR: illegal value '<tmp>/larmorx-out put.nii' after -prefix",
-   "seconds": 0.005,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -3155,12 +5175,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -3169,12 +5198,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.026,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -3183,12 +5221,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.026,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -3197,12 +5244,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -3211,12 +5267,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.027,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -3225,12 +5290,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -3239,8 +5314,11 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: output dataset already exists './out.nii'; larmorx exit 1: ** FATAL ERROR: output dataset already exists './out.nii' (the same messages)",
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -3249,12 +5327,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -3263,12 +5351,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -3277,8 +5375,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3291,8 +5398,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3305,12 +5421,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3319,8 +5445,11 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
-   "seconds": 0.004,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -3329,8 +5458,11 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -3339,8 +5471,11 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix; larmorx exit 1: ** FATAL ERROR: illegal value 'out put.nii' after -prefix (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -3349,8 +5484,11 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES; larmorx exit 1: ** FATAL ERROR: Unknown option: -DAFNI_ALLOW_ARBITRARY_FILENAMES (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -3359,6 +5497,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -D; larmorx exit 1: ** FATAL ERROR: Unknown option: -D (the same messages)",
    "seconds": 0.004,
    "status": "both-error"
@@ -3369,6 +5510,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES; larmorx exit 1: ** FATAL ERROR: Unknown option: -dAFNI_ALLOW_ARBITRARY_FILENAMES=YES (the same messages)",
    "seconds": 0.004,
    "status": "both-error"
@@ -3379,12 +5523,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -3393,12 +5546,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.022,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -3407,12 +5569,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -3421,8 +5592,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3435,12 +5615,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3449,12 +5639,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3463,6 +5663,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
    "reason": "AFNI exit 0: ** ERROR: dataset NOT written to disk!; larmorx exit 0: ** ERROR: dataset NOT written to disk! (the same messages)",
    "seconds": 0.008,
    "status": "both-error"
@@ -3473,12 +5676,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.027,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3487,6 +5700,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii'; larmorx exit 1: ** FATAL ERROR: Can't open input dataset '<generated>/with blank/in.nii' (the same messages)",
    "seconds": 0.013,
    "status": "both-error"
@@ -3497,8 +5713,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3511,12 +5736,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -3525,8 +5760,18 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3539,12 +5784,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "int16",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.043,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3553,12 +5808,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.023,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -3567,8 +5831,18 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "int16",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3581,8 +5855,18 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "int16",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 3600,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3595,12 +5879,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3609,12 +5903,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.046,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3623,12 +5927,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3637,12 +5951,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.032,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3651,12 +5975,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.03,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3665,12 +5999,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3679,12 +6023,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.024,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -3693,8 +6046,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3707,6 +6069,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't read tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Can't read tpattern file st.1D (the same messages)",
    "seconds": 0.007,
    "status": "both-error"
@@ -3717,6 +6082,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D; larmorx exit 1: ** FATAL ERROR: Illegal value 9 in tpattern file st.1D (the same messages)",
    "seconds": 0.007,
    "status": "both-error"
@@ -3727,12 +6095,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -3741,12 +6118,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.035,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -3755,12 +6142,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.031,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -3769,8 +6166,18 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3783,8 +6190,17 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3797,12 +6213,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -3811,12 +6236,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.024,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -3825,12 +6259,21 @@
    "checks_passed": 15,
    "checks_total": 15,
    "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.025,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -3839,12 +6282,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -3853,8 +6306,18 @@
    "checks_passed": 17,
    "checks_total": 17,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3876,6 +6339,9 @@
      "value": null
     }
    ],
+   "measured": {
+    "exit status": 0
+   },
    "reason": "AFNI writes a dataset of one row as a 1D text file under the NIfTI name, with a random identifier (AFNI-20, unless AFNI_WRITE_1D_AS_PREFIX is YES); larmorx writes NIfTI in both modes, as AFNI does with that variable set (environment/write-1D-as-prefix)",
    "seconds": 0.011,
    "status": "expected-divergence"
@@ -3886,12 +6352,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -3900,6 +6376,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
    "reason": "AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii' (the same messages)",
    "seconds": 0.015,
    "status": "both-error"
@@ -3910,6 +6389,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
    "reason": "AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii' (the same messages)",
    "seconds": 0.014,
    "status": "both-error"
@@ -3920,6 +6402,9 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "exit status": 0
+   },
    "reason": "AFNI exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii'; larmorx exit 0: ** ERROR (nifti_image_write_engine): cannot open output file 'nodir/out.nii' (the same messages)",
    "seconds": 0.015,
    "status": "both-error"
@@ -3930,12 +6415,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.026,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -3944,12 +6439,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.026,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -3958,8 +6463,18 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "float32",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
@@ -3972,12 +6487,22 @@
    "checks_passed": 16,
    "checks_total": 16,
    "failed_checks": [],
+   "measured": {
+    "Python API with afni_settings: the command line's output": 0,
+    "data type": "int16",
+    "exit status": 0,
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.033,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3987,7 +6512,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "larmorx writes NIfTI only; it rejects a -prefix that does not end in .nii or .nii.gz, where AFNI writes its own format.",
-   "seconds": 0.046,
+   "seconds": 0.059,
    "status": "expected-divergence"
   },
   {
@@ -3997,7 +6522,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "-voxshift is not supported by larmorx (fMRIPrep does not use it).",
-   "seconds": 0.017,
+   "seconds": 0.016,
    "status": "expected-divergence"
   },
   {
@@ -4006,12 +6531,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 1.304,
+   "seconds": 1.283,
    "status": "pass"
   },
   {
@@ -4020,12 +6555,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 1.378,
+   "seconds": 1.257,
    "status": "pass"
   },
   {
@@ -4034,12 +6579,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 1.317,
+   "seconds": 1.308,
    "status": "pass"
   },
   {
@@ -4048,12 +6603,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 2.859,
+   "seconds": 2.611,
    "status": "pass"
   },
   {
@@ -4062,12 +6627,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 13.205,
+   "seconds": 12.639,
    "status": "pass"
   },
   {
@@ -4076,12 +6651,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 13.562,
+   "seconds": 12.791,
    "status": "pass"
   },
   {
@@ -4090,12 +6675,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 13.386,
+   "seconds": 13.244,
    "status": "pass"
   },
   {
@@ -4104,12 +6699,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 9.068,
+   "seconds": 8.522,
    "status": "pass"
   },
   {
@@ -4118,12 +6723,21 @@
    "checks_passed": 13,
    "checks_total": 13,
    "failed_checks": [],
+   "measured": {
+    "Python API: the command line's output": 0,
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 37.672,
+   "seconds": 35.391,
    "status": "pass"
   },
   {
@@ -4132,12 +6746,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 14.006,
+   "seconds": 11.836,
    "status": "pass"
   },
   {
@@ -4146,12 +6770,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 337.544,
+   "seconds": 318.146,
    "status": "pass"
   },
   {
@@ -4160,12 +6794,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 11.156,
+   "seconds": 10.614,
    "status": "pass"
   },
   {
@@ -4174,12 +6818,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 10.813,
+   "seconds": 10.523,
    "status": "pass"
   },
   {
@@ -4188,12 +6842,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 10.925,
+   "seconds": 10.662,
    "status": "pass"
   },
   {
@@ -4202,12 +6866,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 11.011,
+   "seconds": 10.732,
    "status": "pass"
   },
   {
@@ -4216,12 +6890,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 11.739,
+   "seconds": 11.034,
    "status": "pass"
   },
   {
@@ -4230,12 +6914,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 12.298,
+   "seconds": 11.807,
    "status": "pass"
   },
   {
@@ -4244,12 +6938,22 @@
    "checks_passed": 14,
    "checks_total": 14,
    "failed_checks": [],
+   "measured": {
+    "Python API, image in memory: the same values": 0,
+    "Python API: the command line's output": 0,
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 12.747,
+   "seconds": 11.861,
    "status": "pass"
   },
   {
@@ -4258,12 +6962,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 9.706,
+   "seconds": 9.712,
    "status": "pass"
   },
   {
@@ -4272,12 +6984,20 @@
    "checks_passed": 12,
    "checks_total": 12,
    "failed_checks": [],
+   "measured": {
+    "data type": "int16",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values (integer output)": 0,
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
    "reason": "",
    "reported": {
+    "D13 fix pass": 0,
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.064,
+   "seconds": 0.072,
    "status": "pass"
   }
  ],

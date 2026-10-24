@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "2a009d1ba7d6",
+  "larmorx_commit": "bd2ca21ddea8",
   "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -29,7 +29,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.224,
+   "seconds": 0.162,
    "status": "pass"
   },
   {
@@ -47,7 +47,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.263,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -64,7 +64,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.262,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -81,7 +81,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.099,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -98,7 +98,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.083,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -115,7 +115,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -132,7 +132,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.061,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -149,7 +149,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -166,7 +166,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -183,7 +183,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -200,7 +200,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -217,7 +217,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.062,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -234,7 +234,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -251,7 +251,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -268,7 +268,75 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.055,
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "options/nbhrs-5",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "mask.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "options/nbhrs-27",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "mask.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "options/nbhrs-0",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "mask.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "options/nbhrs-40-then-NN1",
+   "category": "options",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "mask.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -286,7 +354,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -304,7 +372,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.132,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -322,7 +390,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.138,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -339,7 +407,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -356,7 +424,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.061,
    "status": "pass"
   },
   {
@@ -373,7 +441,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -390,7 +458,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -407,7 +475,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.097,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -425,7 +493,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.105,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -442,7 +510,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -459,7 +527,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.059,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -476,7 +544,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.076,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -493,7 +561,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -510,7 +578,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -527,7 +595,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.071,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -544,7 +612,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -561,7 +629,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -579,7 +647,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.292,
+   "seconds": 0.935,
    "status": "pass"
   },
   {
@@ -598,7 +666,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.124,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -617,7 +685,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.097,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -636,7 +704,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.105,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -655,7 +723,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -674,7 +742,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.175,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -693,7 +761,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -712,7 +780,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -731,7 +799,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.125,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -750,7 +818,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.114,
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -769,7 +837,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.106,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -788,7 +856,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.119,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -807,7 +875,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.109,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -826,7 +894,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.116,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -844,7 +912,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.076,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -861,7 +929,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.062,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -878,7 +946,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.059,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -896,7 +964,7 @@
    "reported": {
     "D13 fix pass": 163840
    },
-   "seconds": 0.078,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -913,7 +981,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -931,7 +999,7 @@
    "reported": {
     "D13 fix pass": 352
    },
-   "seconds": 0.235,
+   "seconds": 0.164,
    "status": "pass"
   },
   {
@@ -949,7 +1017,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.205,
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -967,7 +1035,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.267,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -985,7 +1053,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.216,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -1003,7 +1071,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.189,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -1021,7 +1089,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.111,
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1039,7 +1107,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1057,7 +1125,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.023,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1075,7 +1143,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.023,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1093,7 +1161,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.076,
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1111,7 +1179,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.063,
    "status": "pass"
   },
   {
@@ -1124,7 +1192,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Mask creation fails for unknown reasons!; larmorx exit 1: ** FATAL ERROR: Mask creation fails for unknown reasons! (the same messages)",
-   "seconds": 0.011,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -1137,7 +1205,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Mask creation fails for unknown reasons!; larmorx exit 1: ** FATAL ERROR: Mask creation fails for unknown reasons! (the same messages)",
-   "seconds": 0.012,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -1150,7 +1218,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -peels needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1176,7 +1244,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -clfrac needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1189,7 +1257,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -SI needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.005,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1202,7 +1270,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -dilate needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.006,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1215,7 +1283,7 @@
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -erode needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1228,7 +1296,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -prefix (null) is illegal!; larmorx exit 1: ** FATAL ERROR: -prefix (null) is illegal! (the same messages)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1241,7 +1309,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -depth (null) is illegal!; larmorx exit 1: ** FATAL ERROR: -depth (null) is illegal! (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1254,7 +1322,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -apply_prefix (null) is illegal!; larmorx exit 1: ** FATAL ERROR: -apply_prefix (null) is illegal! (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1267,7 +1335,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -clfrac value 0.950000 is illegal!; larmorx exit 1: ** FATAL ERROR: -clfrac value 0.950000 is illegal! (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1280,7 +1348,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal!; larmorx exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal! (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1306,7 +1374,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -dilate -1 is illegal!; larmorx exit 1: ** FATAL ERROR: -dilate -1 is illegal! (the same messages)",
-   "seconds": 0.004,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1319,7 +1387,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -erode -2 is illegal!; larmorx exit 1: ** FATAL ERROR: -erode -2 is illegal! (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1332,7 +1400,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: ILLEGAL option: -bogus; larmorx exit 1: ** FATAL ERROR: ILLEGAL option: -bogus (the same messages)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1345,7 +1413,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't open dataset '(null)'; larmorx exit 1: ** FATAL ERROR: Can't open dataset '(null)' (the same messages)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1358,7 +1426,7 @@
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii'; larmorx exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii' (the same messages)",
-   "seconds": 0.005,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1368,7 +1436,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "AFNI's default prefix 'automask' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only).",
-   "seconds": 0.064,
+   "seconds": 0.054,
    "status": "expected-divergence"
   },
   {
@@ -1384,7 +1452,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -1401,7 +1469,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1418,7 +1486,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1435,7 +1503,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1452,7 +1520,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1469,7 +1537,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -1486,7 +1554,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -1503,7 +1571,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1520,7 +1588,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -1537,7 +1605,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.055,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -1553,7 +1621,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1569,7 +1637,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1585,7 +1653,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.058,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -1607,7 +1675,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.629,
+   "seconds": 0.532,
    "status": "pass"
   },
   {
@@ -1629,7 +1697,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.561,
+   "seconds": 0.517,
    "status": "pass"
   },
   {
@@ -1651,7 +1719,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.588,
+   "seconds": 0.534,
    "status": "pass"
   },
   {
@@ -1673,7 +1741,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.69,
+   "seconds": 0.612,
    "status": "pass"
   },
   {
@@ -1697,7 +1765,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 8.553,
+   "seconds": 7.373,
    "status": "pass"
   },
   {
@@ -1719,7 +1787,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.665,
+   "seconds": 0.578,
    "status": "pass"
   },
   {
@@ -1741,7 +1809,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni_xform_mask.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 0.732,
+   "seconds": 0.589,
    "status": "pass"
   },
   {
@@ -1760,7 +1828,7 @@
     "band: AFNI at 1 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 2.695,
+   "seconds": 2.366,
    "status": "pass"
   },
   {
@@ -1779,7 +1847,7 @@
     "band: AFNI at 1 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 0.481,
+   "seconds": 0.399,
    "status": "pass"
   },
   {
@@ -1798,7 +1866,7 @@
     "band: AFNI at 1 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 5.736,
+   "seconds": 5.477,
    "status": "pass"
   }
  ],
@@ -1807,7 +1875,7 @@
   "both-error": 19,
   "expected-divergence": 1,
   "fail": 0,
-  "pass": 85,
+  "pass": 89,
   "skipped": 0
  },
  "tier": "standard"

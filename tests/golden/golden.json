@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "bd2ca21ddea81f4d2620e24516028d63244023d9", "date": "2026-10-24", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.10"},
+ "recorded": {"commit": "d6289904851a09d1a82d9e2b27be49cc7f5c7598", "date": "2026-10-24", "numpy": "2.3.5", "parity": "skipped", "platform": "Linux x86_64", "python": "3.12.10"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -572,6 +572,16 @@
    "tvf_float.0InverseWarp:header": {"bytes": 352, "sha256": "2c30413d982496f46dc391e2152163eebf5cea0a41c0069aa17ad4bb2e1f0346"},
    "tvf_float.0Warp:data": {"dtype": "<f4", "sample": "00000000285bedb9eb96803a599ea33b173a1f3b89f10f3ceaa9053a00000000", "sha256": "72babc2f9704f74c5d2e3a80da0fbbea6ca75081ed16b6947f5b41b782f1e857", "shape": [24, 20, 16, 1, 3], "sum": "60.0049466776137"},
    "tvf_float.0Warp:header": {"bytes": 352, "sha256": "2c30413d982496f46dc391e2152163eebf5cea0a41c0069aa17ad4bb2e1f0346"}
+  },
+  "cli.fsl.mcflirt": {
+   "MAT_0000": {"bytes": 148, "sha256": "c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c"},
+   "MAT_0001": {"bytes": 151, "sha256": "21b3fea1f8049563ecb20e4a93192c6820e105c316125dc87cc1764ebd902756"},
+   "MAT_0002": {"bytes": 153, "sha256": "6131febaeafc1df9d76274e30e33cc3b53745b04822c6b27fc07b5ca1703f10d"},
+   "MAT_0003": {"bytes": 152, "sha256": "7a7df6fee99516bdabc2e3cd5f96cf94d5290500615dc68f291007fbfcf2f5e5"},
+   "abs": {"bytes": 28, "sha256": "a8d406687b461e964d4ec7ae246019aa65dd8d24d258ecde154f29e53a20b811"},
+   "out:data": {"dtype": "<f4", "sample": "000080400000c041bdd65c418465774099de3241288206419a5aa041dc758a41", "sha256": "962bd3692b745e0c6a3fc87f53dbd153bb0f7389b6bb33169ba2748bb4deab7e", "shape": [16, 14, 12, 4], "sum": "1833877.4148950577"},
+   "out:header": {"bytes": 352, "sha256": "d1c340d71621f333125293173e37e3d93cbfbfff8410dbb4de8d634a7678571d"},
+   "par": {"bytes": 251, "sha256": "37d7ad49aab9188eb6069b41b23ddac4cfa34fffebf887a9895e28127a415029"}
   },
   "cli.mri.hmc": {
    "MAT_0000": {"bytes": 153, "sha256": "4fb903a112b0acc5a6a03151a386f83b65490d8437a9868375199001c153e315"},

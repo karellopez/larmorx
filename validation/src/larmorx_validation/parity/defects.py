@@ -171,8 +171,11 @@ def summary(results: list[CaseResult]) -> list[str]:
         )
         # Differences beyond the values (headers, file names): "...; <what> changed". Their
         # kinds, with the numbers left out so that one kind is listed once.
+        # A refusal's detail quotes larmorx's message, whose own "; " is not a list of changes.
         others = [
-            rest.split("; ", 1)[1].removesuffix(" changed") for _, _, rest in cases if "; " in rest
+            rest.split("; ", 1)[1].removesuffix(" changed")
+            for _, _, rest in cases
+            if "; " in rest and "the default refuses" not in rest
         ]
         kinds = sorted(
             {

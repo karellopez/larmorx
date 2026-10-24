@@ -16,7 +16,7 @@ when it is installed (`pip install "larmorx[exact]"`), else the original; `"repl
 that ran.
 
 **Status: `validated`**, both, against AFNI 25.2.09 itself:
-- the original ([record](../validation/afni-unifize.md), 97 cases, none failing): AFNI's exit
+- the original ([record](../validation/afni-unifize.md), 99 cases, none failing): AFNI's exit
   status and messages in every case; in 32 of the 72 compared cases that write outputs every
   output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's
   and some squashed values differ in their last bit (at most 1,633 values of a T1w, at most

@@ -20,7 +20,8 @@
 
 use crate::fsl::arma::{self, Mat4};
 use crate::fsl::filename;
-use crate::fsl::nifti::{self, dt, Extension, NiftiHeader};
+use crate::fsl::glibc_pow;
+use crate::fsl::nifti::{self, Extension, NiftiHeader, dt};
 
 /// The build string newimage 2203.12 writes into `descrip` (FSL 6.0.7.17's conda build).
 pub const BUILDSTRING: &str = "2203.12-dirty 2024-02-01T16:17:47+00:00";
@@ -497,6 +498,18 @@ impl Volume<f32> {
     pub fn robust_limits(&self) -> (f32, f32) {
         find_thresholds(self)
     }
+}
+
+impl<T: Elem> Volume<T> {
+    #[inline]
+    fn value_f32(&self, x: i64, y: i64, z: i64) -> f32 {
+        self.value(x, y, z).to_f32()
+    }
+
+    #[inline]
+    fn get_f32(&self, x: i64, y: i64, z: i64) -> f32 {
+        self.get(x, y, z).to_f32()
+    }
 
     /// `interpolate(x, y, z)`, trilinear with zero padding (newimage's defaults).
     pub fn interpolate(&self, x: f32, y: f32, z: f32) -> f32 {
@@ -514,23 +527,23 @@ impl Volume<f32> {
             && iy < self.dims[1] - 1
             && iz < self.dims[2] - 1
         {
-            v000 = self.value(ix, iy, iz);
-            v100 = self.value(ix + 1, iy, iz);
-            v110 = self.value(ix + 1, iy + 1, iz);
-            v010 = self.value(ix, iy + 1, iz);
-            v011 = self.value(ix, iy + 1, iz + 1);
-            v111 = self.value(ix + 1, iy + 1, iz + 1);
-            v101 = self.value(ix + 1, iy, iz + 1);
-            v001 = self.value(ix, iy, iz + 1);
+            v000 = self.value_f32(ix, iy, iz);
+            v100 = self.value_f32(ix + 1, iy, iz);
+            v110 = self.value_f32(ix + 1, iy + 1, iz);
+            v010 = self.value_f32(ix, iy + 1, iz);
+            v011 = self.value_f32(ix, iy + 1, iz + 1);
+            v111 = self.value_f32(ix + 1, iy + 1, iz + 1);
+            v101 = self.value_f32(ix + 1, iy, iz + 1);
+            v001 = self.value_f32(ix, iy, iz + 1);
         } else {
-            v000 = self.get(ix, iy, iz);
-            v001 = self.get(ix, iy, iz + 1);
-            v010 = self.get(ix, iy + 1, iz);
-            v011 = self.get(ix, iy + 1, iz + 1);
-            v100 = self.get(ix + 1, iy, iz);
-            v101 = self.get(ix + 1, iy, iz + 1);
-            v110 = self.get(ix + 1, iy + 1, iz);
-            v111 = self.get(ix + 1, iy + 1, iz + 1);
+            v000 = self.get_f32(ix, iy, iz);
+            v001 = self.get_f32(ix, iy, iz + 1);
+            v010 = self.get_f32(ix, iy + 1, iz);
+            v011 = self.get_f32(ix, iy + 1, iz + 1);
+            v100 = self.get_f32(ix + 1, iy, iz);
+            v101 = self.get_f32(ix + 1, iy, iz + 1);
+            v110 = self.get_f32(ix + 1, iy + 1, iz);
+            v111 = self.get_f32(ix + 1, iy + 1, iz + 1);
         }
         q_tri_interpolation(v000, v001, v010, v011, v100, v101, v110, v111, dx, dy, dz)
     }
@@ -559,6 +572,107 @@ pub fn q_tri_interpolation(
     let temp5 = (temp3 - temp1) * dy + temp1;
     let temp6 = (temp4 - temp2) * dy + temp2;
     (temp6 - temp5) * dz + temp5
+}
+
+/// `gaussian_kernel1D(sigma, radius)` (newimagefns.cc): `2 radius + 1` values
+/// `exp(-j^2 / (2 sigma^2))` rounded to `float` and summed in `float`, then scaled in `double` by
+/// the inverse of the sum.
+pub fn gaussian_kernel_1d(sigma: f32, radius: i32) -> Vec<f64> {
+    let mut kern = Vec::with_capacity((2 * i64::from(radius) + 1).max(0) as usize);
+    let mut sum = 0f32;
+    for j in -radius..=radius {
+        let val: f32 = if f64::from(sigma) > 1e-6 {
+            let s = f64::from(sigma);
+            glibc_pow::exp(f64::from(-(j.wrapping_mul(j))) / (2.0 * s * s)) as f32
+        } else if j == 0 {
+            1.0
+        } else {
+            0.0
+        };
+        kern.push(f64::from(val));
+        sum += val;
+    }
+    let f = 1.0 / f64::from(sum);
+    for k in &mut kern {
+        *k *= f;
+    }
+    kern
+}
+
+/// One pass of `convolve_separable`: `convolve(source, kernel)` with a kernel along `axis`
+/// (centred on `(n - 1) / 2`), the image zero outside; each output voxel the `float` sum, in
+/// kernel order, of the `double` products (`val += source(...) * kernel(...)`). The z slices are
+/// shared between `threads` threads; the result does not depend on their number.
+fn convolve_axis(src: &Volume<f32>, ker: &[f64], axis: usize, threads: usize) -> Volume<f32> {
+    let mut result = src.clone();
+    let (nx, ny, nz) = (src.dims[0], src.dims[1], src.dims[2]);
+    let mid = (ker.len() as i64 - 1) / 2;
+    let plane = (nx * ny) as usize;
+    let n = (nx * ny * nz) as usize;
+    if n == 0 {
+        return result;
+    }
+    let data = &src.data[..n];
+    let slice = |z: i64, out: &mut [f32]| {
+        for y in 0..ny {
+            for x in 0..nx {
+                let mut val = 0f32;
+                for (m, &k) in ker.iter().enumerate() {
+                    let d = m as i64 - mid;
+                    let (cx, cy, cz) = match axis {
+                        0 => (x + d, y, z),
+                        1 => (x, y + d, z),
+                        _ => (x, y, z + d),
+                    };
+                    if cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz {
+                        continue; // + 0 * k: no change
+                    }
+                    let v = data[((cz * ny + cy) * nx + cx) as usize];
+                    val = (f64::from(val) + f64::from(v) * k) as f32;
+                }
+                out[(y * nx + x) as usize] = val;
+            }
+        }
+    };
+    let out = &mut result.data[..n];
+    let threads = threads.max(1).min(nz as usize);
+    if threads == 1 {
+        for (z, chunk) in out.chunks_mut(plane).enumerate() {
+            slice(z as i64, chunk);
+        }
+    } else {
+        let per = (nz as usize).div_ceil(threads);
+        std::thread::scope(|scope| {
+            for (t, block) in out.chunks_mut(plane * per).enumerate() {
+                let slice = &slice;
+                scope.spawn(move || {
+                    for (k, chunk) in block.chunks_mut(plane).enumerate() {
+                        slice((t * per + k) as i64, chunk);
+                    }
+                });
+            }
+        });
+    }
+    result
+}
+
+/// `smooth(source, sigma_mm)` (newimagefns.h): a separable Gaussian of `sigma_mm` millimetres,
+/// along x, then y, then z, each kernel of radius `2 (int)(sigma - 0.001) + 3` voxels.
+pub fn smooth(src: &Volume<f32>, sigma_mm: f32, threads: usize) -> Volume<f32> {
+    let sigma = [
+        sigma_mm / src.xdim,
+        sigma_mm / src.ydim,
+        sigma_mm / src.zdim,
+    ];
+    let mut result = src.clone();
+    for (axis, &s) in sigma.iter().enumerate() {
+        let radius = c_to_i32(f64::from(s) - 0.001)
+            .wrapping_mul(2)
+            .wrapping_add(3);
+        let ker = gaussian_kernel_1d(s, radius);
+        result = convolve_axis(&result, &ker, axis, threads);
+    }
+    result
 }
 
 /// `(D) x` for the element types (C's conversions).
@@ -602,7 +716,8 @@ fn find_thresholds(vol: &Volume<f32>) -> (f32, f32) {
             return (min, max);
         }
         if pass == MAX_PASSES {
-            validsize -= round_i64(hist[lowest_bin as usize]) + round_i64(hist[highest_bin as usize]);
+            validsize -=
+                round_i64(hist[lowest_bin as usize]) + round_i64(hist[highest_bin as usize]);
             lowest_bin += 1;
             highest_bin -= 1;
         }
@@ -891,8 +1006,8 @@ fn convert_and_scale<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Result<Vec<T>, Str
         dt::UINT32 => conv_int!(u32, 4),
         dt::INT64 => {
             let mut out = Vec::with_capacity(n);
-            for c in raw.chunks_exact(8).take(n) {
-                let v = i64::from_le_bytes(c.try_into().unwrap());
+            for c in raw.as_chunks::<8>().0.iter().take(n) {
+                let v = i64::from_le_bytes(*c);
                 out.push(if !scale || simple {
                     int64_to::<T>(v as i128)
                 } else {
@@ -903,8 +1018,8 @@ fn convert_and_scale<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Result<Vec<T>, Str
         }
         dt::UINT64 => {
             let mut out = Vec::with_capacity(n);
-            for c in raw.chunks_exact(8).take(n) {
-                let v = u64::from_le_bytes(c.try_into().unwrap());
+            for c in raw.as_chunks::<8>().0.iter().take(n) {
+                let v = u64::from_le_bytes(*c);
                 out.push(if !scale || simple {
                     int64_to::<T>(v as i128)
                 } else {
@@ -915,8 +1030,8 @@ fn convert_and_scale<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Result<Vec<T>, Str
         }
         dt::FLOAT => {
             let mut out = Vec::with_capacity(n);
-            for c in raw.chunks_exact(4).take(n) {
-                let v = f32::from_le_bytes(c.try_into().unwrap());
+            for c in raw.as_chunks::<4>().0.iter().take(n) {
+                let v = f32::from_le_bytes(*c);
                 out.push(if !scale || simple {
                     T::from_f32(v)
                 } else {
@@ -927,8 +1042,8 @@ fn convert_and_scale<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Result<Vec<T>, Str
         }
         dt::DOUBLE => {
             let mut out = Vec::with_capacity(n);
-            for c in raw.chunks_exact(8).take(n) {
-                let v = f64::from_le_bytes(c.try_into().unwrap());
+            for c in raw.as_chunks::<8>().0.iter().take(n) {
+                let v = f64::from_le_bytes(*c);
                 out.push(if !scale || simple {
                     T::from_f64(v)
                 } else {
@@ -997,7 +1112,7 @@ pub fn output_extension(filetype: i32) -> &'static str {
     match filetype {
         1 | 2 => ".nii",
         101 | 102 => ".nii.gz",
-        10 | 11 | 12 => ".hdr",
+        10..=12 => ".hdr",
         111 | 112 | 100 => ".hdr.gz",
         _ => "",
     }
@@ -1031,7 +1146,11 @@ pub fn save_volume<T: Elem>(
     let single = filetype % 100 < 10;
     h.set_nifti_version(version, single);
     h.bits_per_voxel = (T::SIZE * 8) as i32;
-    let path = format!("{}{}", filename::make_basename(name), output_extension(filetype));
+    let path = format!(
+        "{}{}",
+        filename::make_basename(name),
+        output_extension(filetype)
+    );
     let mut bytes = Vec::with_capacity(v.data.len() * T::SIZE);
     for &x in &v.data {
         x.put_le(&mut bytes);

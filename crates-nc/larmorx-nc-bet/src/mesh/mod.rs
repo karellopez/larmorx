@@ -11,7 +11,8 @@
 //! number is their index); triangles in an arena, with the mesh's triangle list holding their
 //! ids in list order.
 
-
+pub mod load;
+pub mod profile;
 
 use std::fmt::Write as _;
 
@@ -70,11 +71,13 @@ impl V3 {
     }
 
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, o: V3) -> V3 {
         V3::new(self.x + o.x, self.y + o.y, self.z + o.z)
     }
 
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, o: V3) -> V3 {
         V3::new(self.x - o.x, self.y - o.y, self.z - o.z)
     }
@@ -203,14 +206,25 @@ impl Mesh {
     pub fn tri_normal(&self, t: usize) -> V3 {
         let [a, b, c] = self.tris[t].v;
         let p0 = self.points[a].coord;
-        self.points[c].coord.sub(p0).cross(self.points[b].coord.sub(p0))
+        self.points[c]
+            .coord
+            .sub(p0)
+            .cross(self.points[b].coord.sub(p0))
     }
 
     /// `Triangle::centroid`.
     pub fn tri_centroid(&self, t: usize) -> V3 {
         let [a, b, c] = self.tris[t].v;
-        let (p, q, r) = (self.points[a].coord, self.points[b].coord, self.points[c].coord);
-        V3::new((p.x + q.x + r.x) / 3.0, (p.y + q.y + r.y) / 3.0, (p.z + q.z + r.z) / 3.0)
+        let (p, q, r) = (
+            self.points[a].coord,
+            self.points[b].coord,
+            self.points[c].coord,
+        );
+        V3::new(
+            (p.x + q.x + r.x) / 3.0,
+            (p.y + q.y + r.y) / 3.0,
+            (p.z + q.z + r.z) / 3.0,
+        )
     }
 
     /// `Mpoint::local_normal`: the sum of its triangles' normals, normalized.
@@ -336,10 +350,26 @@ impl Mesh {
         let mut added: Vec<usize> = Vec::new();
         for &t in &tr {
             let [v0, v1, v2] = self.tris[t].v;
-            let (c0, c1, c2) = (self.points[v0].coord, self.points[v1].coord, self.points[v2].coord);
-            let pt0 = V3::new((c1.x + c2.x) / 2.0, (c1.y + c2.y) / 2.0, (c1.z + c2.z) / 2.0);
-            let pt2 = V3::new((c0.x + c1.x) / 2.0, (c0.y + c1.y) / 2.0, (c0.z + c1.z) / 2.0);
-            let pt1 = V3::new((c0.x + c2.x) / 2.0, (c0.y + c2.y) / 2.0, (c0.z + c2.z) / 2.0);
+            let (c0, c1, c2) = (
+                self.points[v0].coord,
+                self.points[v1].coord,
+                self.points[v2].coord,
+            );
+            let pt0 = V3::new(
+                (c1.x + c2.x) / 2.0,
+                (c1.y + c2.y) / 2.0,
+                (c1.z + c2.z) / 2.0,
+            );
+            let pt2 = V3::new(
+                (c0.x + c1.x) / 2.0,
+                (c0.y + c1.y) / 2.0,
+                (c0.z + c1.z) / 2.0,
+            );
+            let pt1 = V3::new(
+                (c0.x + c2.x) / 2.0,
+                (c0.y + c2.y) / 2.0,
+                (c0.z + c2.z) / 2.0,
+            );
             let (mut p0, mut p1, mut p2) = (usize::MAX, usize::MAX, usize::MAX);
             let (mut b0, mut b1, mut b2) = (true, true, true);
             for &mi in &added {
@@ -423,7 +453,8 @@ impl Mesh {
         for (i, &(x, y, z)) in pts.iter().enumerate() {
             m.points.push(MPoint::new(V3::new(x, y, z), i as i32, 0.0));
         }
-        let (za, zb, zc, zd, ya, yb, yc, yd, xa, xb, xc, xd) = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+        let (za, zb, zc, zd, ya, yb, yc, yd, xa, xb, xc, xd) =
+            (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
         let tris = [
             (ya, xa, yd),
             (ya, yd, xb),
@@ -645,7 +676,12 @@ impl Mesh {
                 cstr::fmt_f(c.z, 6)
             );
         }
-        let _ = writeln!(s, "POLYGONS {} {}", self.tri_list.len(), self.tri_list.len() * 4);
+        let _ = writeln!(
+            s,
+            "POLYGONS {} {}",
+            self.tri_list.len(),
+            self.tri_list.len() * 4
+        );
         for &t in &self.tri_list {
             let [a, b, c] = self.tris[t].v;
             let _ = writeln!(

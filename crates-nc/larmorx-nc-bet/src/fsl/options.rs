@@ -262,7 +262,14 @@ impl OptionParser {
     }
 
     /// `Option<T>::set_value(vs, argv, valpos, argc)`.
-    fn set_value(&self, i: usize, st: &mut OptState, vs: &str, argv: &[String], valpos: usize) -> bool {
+    fn set_value(
+        &self,
+        i: usize,
+        st: &mut OptState,
+        vs: &str,
+        argv: &[String],
+        valpos: usize,
+    ) -> bool {
         let o = &self.opts[i];
         if o.kind() == Kind::Bool {
             return self.set_value_plain(i, st, vs);
@@ -301,11 +308,25 @@ impl OptionParser {
 
     /// `parse_command_line(argc, argv, skip)` (`argv[0]` is the program).
     pub fn parse(&self, argv: &[String], skip: usize) -> Result<Parsed, (Vec<OptState>, String)> {
+        self.parse_command_line(argv, skip, false)
+    }
+
+    /// `parse_command_line(argc, argv, skip, silentFail)`: with `silent_fail` a word that does
+    /// not start with `-` ends the options (the arguments that follow are the caller's).
+    pub fn parse_command_line(
+        &self,
+        argv: &[String],
+        skip: usize,
+        silent_fail: bool,
+    ) -> Result<Parsed, (Vec<OptState>, String)> {
         let mut states = self.initial();
         let mut optpos = 1 + skip;
         while optpos < argv.len() {
             let optstr = argv[optpos].as_str();
             if !optstr.starts_with('-') {
+                if silent_fail {
+                    break;
+                }
                 return Err((states, format!("{optstr}:  is an unrecognised token!")));
             }
             if optstr.as_bytes().get(1) == Some(&b'-') {
@@ -414,27 +435,45 @@ mod tests {
     #[test]
     fn short_runs_and_values() {
         let p = parser();
-        let r = p.parse(&args(&["bet2", "in", "out", "-mf", "0.2"]), 2).ok().unwrap();
+        let r = p
+            .parse(&args(&["bet2", "in", "out", "-mf", "0.2"]), 2)
+            .ok()
+            .unwrap();
         assert!(r.get(&p, "-m,--mask").bool());
         assert_eq!(r.get(&p, "-f").float(), 0.2f32);
-        let r = p.parse(&args(&["bet2", "in", "out", "-c", "1", "2"]), 2).ok().unwrap();
+        let r = p
+            .parse(&args(&["bet2", "in", "out", "-c", "1", "2"]), 2)
+            .ok()
+            .unwrap();
         let c = r.get(&p, "-c");
         assert!(c.set);
-        assert_eq!((c.float_at(0), c.float_at(1), c.float_at(2)), (1.0, 2.0, 0.0));
+        assert_eq!(
+            (c.float_at(0), c.float_at(1), c.float_at(2)),
+            (1.0, 2.0, 0.0)
+        );
     }
 
     #[test]
     fn errors() {
         let p = parser();
         let e = |a: &[&str]| p.parse(&args(a), 2).err().unwrap().1;
-        assert_eq!(e(&["bet2", "i", "o", "junk"]), "junk:  is an unrecognised token!");
+        assert_eq!(
+            e(&["bet2", "i", "o", "junk"]),
+            "junk:  is an unrecognised token!"
+        );
         assert_eq!(e(&["bet2", "i", "o", "-q"]), "-q: Option doesn't exist!");
-        assert_eq!(e(&["bet2", "i", "o", "-f"]), "-f: Missing non-optional argument!");
+        assert_eq!(
+            e(&["bet2", "i", "o", "-f"]),
+            "-f: Missing non-optional argument!"
+        );
         assert_eq!(
             e(&["bet2", "i", "o", "-f", "x", "-m"]),
             "-f: Couldn't set_value! valstr=\"x -m\"!"
         );
-        assert_eq!(e(&["bet2", "i", "o", "--mask=1", "-f"]), "-f: Missing non-optional argument!");
+        assert_eq!(
+            e(&["bet2", "i", "o", "--mask=1", "-f"]),
+            "-f: Missing non-optional argument!"
+        );
     }
 
     #[test]

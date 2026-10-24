@@ -52,6 +52,21 @@ fn cases(n: usize) -> Vec<Case> {
         if t.is_finite() {
             v.push(("tanh", t, 0.0));
         }
+        // exp: newimage's Gaussian kernels, -(j*j) / (2 sigma^2) with sigma a float, and the
+        // whole range (underflow, the subnormal results, overflow)
+        let sigma = r.log_uniform(1e-3, 300.0) as f32;
+        let j = (r.next() % 400) as i32;
+        v.push((
+            "exp",
+            f64::from(-(j * j)) / (2.0 * f64::from(sigma) * f64::from(sigma)),
+            0.0,
+        ));
+        v.push(("exp", (r.unit() - 0.5) * 1500.0, 0.0));
+        v.push(("exp", (r.unit() - 0.5) * 4.0, 0.0));
+        let e = f64::from_bits(r.next());
+        if e.is_finite() {
+            v.push(("exp", e, 0.0));
+        }
         // x87 operations on doubles of NIfTI matrices' size
         let a = (r.unit() - 0.5) * 8.0;
         let b = (r.unit() - 0.5) * 8.0 + 1e-3;
@@ -68,6 +83,7 @@ fn ours(op: &str, a: f64, b: f64) -> u64 {
     match op {
         "pow" => glibc_pow::pow(a, b).to_bits(),
         "tanh" => fdlibm::tanh(a).to_bits(),
+        "exp" => glibc_pow::exp(a).to_bits(),
         "lddiv" => x87::div_to_f64(a, b).to_bits(),
         "ldadd" => x87::add_to_f64(a, b).to_bits(),
         "ldsub" => x87::sub_to_f64(a, b).to_bits(),
@@ -79,7 +95,9 @@ fn ours(op: &str, a: f64, b: f64) -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let reference = args.get(1).expect("usage: libm-verify <glibc_reference> [count]");
+    let reference = args
+        .get(1)
+        .expect("usage: libm-verify <glibc_reference> [count]");
     let n: usize = args.get(2).map_or(2_000_000, |s| s.parse().expect("count"));
     let v = cases(n);
     let mut child = Command::new(reference)
@@ -90,7 +108,9 @@ fn main() {
     let mut stdin = child.stdin.take().unwrap();
     let input: Vec<u8> = v
         .iter()
-        .flat_map(|(op, a, b)| format!("{op} {:016x} {:016x}\n", a.to_bits(), b.to_bits()).into_bytes())
+        .flat_map(|(op, a, b)| {
+            format!("{op} {:016x} {:016x}\n", a.to_bits(), b.to_bits()).into_bytes()
+        })
         .collect();
     let writer = std::thread::spawn(move || {
         stdin.write_all(&input).unwrap();

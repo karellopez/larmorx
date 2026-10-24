@@ -37,7 +37,10 @@ pub fn remove_ext(path: &str) -> String {
 }
 
 fn get_ext(path: &str) -> &'static str {
-    FSLPY_EXTS.into_iter().find(|e| path.ends_with(e)).unwrap_or("")
+    FSLPY_EXTS
+        .into_iter()
+        .find(|e| path.ends_with(e))
+        .unwrap_or("")
 }
 
 fn is_file(p: &str) -> bool {
@@ -60,7 +63,10 @@ fn realpath(p: &str) -> String {
     let mut existing = abs.clone();
     let mut rest: Vec<std::ffi::OsString> = Vec::new();
     while !existing.exists() {
-        match (existing.file_name().map(|s| s.to_owned()), existing.parent()) {
+        match (
+            existing.file_name().map(|s| s.to_owned()),
+            existing.parent(),
+        ) {
             (Some(name), Some(parent)) => {
                 rest.push(name);
                 existing = parent.to_path_buf();
@@ -168,7 +174,9 @@ pub fn imglob(paths: &[String]) -> Vec<String> {
 pub fn shell_glob_prefix(prefix: &str) -> Vec<String> {
     let path = Path::new(prefix);
     let (dir, stem) = match (path.parent(), path.file_name()) {
-        (Some(d), Some(s)) if !d.as_os_str().is_empty() => (d.to_path_buf(), s.to_string_lossy().into_owned()),
+        (Some(d), Some(s)) if !d.as_os_str().is_empty() => {
+            (d.to_path_buf(), s.to_string_lossy().into_owned())
+        }
         (_, Some(s)) => (PathBuf::from("."), s.to_string_lossy().into_owned()),
         _ => (PathBuf::from("."), String::new()),
     };
@@ -218,10 +226,11 @@ fn failed(e: ImageError) -> ToolFailure {
 /// `dtype(filename)` then `closestTemplatedType`: the type avwutils programs read a file as.
 pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
     let mut printed = String::new();
-    let path = filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-        err: format!("{printed}{w}\n"),
-        code: 1,
-    })?;
+    let path =
+        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
+            err: format!("{printed}{w}\n"),
+            code: 1,
+        })?;
     let h = nifti::load_header(&path).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
@@ -260,10 +269,11 @@ pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
 /// (the script's `sed 's/-//g'` applied by the caller).
 pub fn fslval(name: &str, key: &str) -> Result<String, ToolFailure> {
     let mut printed = String::new();
-    let path = filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-        err: format!("{printed}{w}\n"),
-        code: 1,
-    })?;
+    let path =
+        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
+            err: format!("{printed}{w}\n"),
+            code: 1,
+        })?;
     let h = nifti::load_header(&path).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
@@ -328,7 +338,12 @@ fn save<T: Elem>(v: &Volume<T>, name: &str, fsl: &FslSettings) -> Result<(), Too
 }
 
 /// `fslroi <in> <out> <args>` with 2 (t) or 6 (x, y, z) numbers, in the input's type.
-pub fn fslroi(input: &str, output: &str, args: &[&str], fsl: &FslSettings) -> Result<(), ToolFailure> {
+pub fn fslroi(
+    input: &str,
+    output: &str,
+    args: &[&str],
+    fsl: &FslSettings,
+) -> Result<(), ToolFailure> {
     match template_type(input)? {
         dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl),
         dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl),
@@ -338,7 +353,12 @@ pub fn fslroi(input: &str, output: &str, args: &[&str], fsl: &FslSettings) -> Re
     }
 }
 
-fn fslroi_t<T: Elem>(input: &str, output: &str, args: &[&str], fsl: &FslSettings) -> Result<(), ToolFailure> {
+fn fslroi_t<T: Elem>(
+    input: &str,
+    output: &str,
+    args: &[&str],
+    fsl: &FslSettings,
+) -> Result<(), ToolFailure> {
     let v: Volume<T> = volume::read_volume4d(input, fsl).map_err(failed)?;
     let a: Vec<i64> = args.iter().map(|s| i64::from(cstr::atoi(s))).collect();
     let (mut min, mut max) = ([0i64; 4], [0i64; 4]);
@@ -347,7 +367,12 @@ fn fslroi_t<T: Elem>(input: &str, output: &str, args: &[&str], fsl: &FslSettings
         max = [v.xsize() - 1, v.ysize() - 1, v.zsize() - 1, a[1] + a[0] - 1];
     } else if a.len() == 6 {
         min = [a[0], a[2], a[4], 0];
-        max = [a[1] + a[0] - 1, a[3] + a[2] - 1, a[5] + a[4] - 1, v.tsize() - 1];
+        max = [
+            a[1] + a[0] - 1,
+            a[3] + a[2] - 1,
+            a[5] + a[4] - 1,
+            v.tsize() - 1,
+        ];
     }
     for k in 0..3 {
         if max[k] == min[k] - 2 {
@@ -375,7 +400,11 @@ fn fslroi_t<T: Elem>(input: &str, output: &str, args: &[&str], fsl: &FslSettings
             std::mem::swap(&mut mn[k], &mut mx[k]);
         }
     }
-    let r = roi(&v, [mn[0], mn[1], mn[2], min[3]], [mx[0], mx[1], mx[2], max[3]]);
+    let r = roi(
+        &v,
+        [mn[0], mn[1], mn[2], min[3]],
+        [mx[0], mx[1], mx[2], max[3]],
+    );
     save(&r, output, fsl)
 }
 
@@ -393,17 +422,22 @@ pub fn fslmerge_z(output: &str, inputs: &[String], fsl: &FslSettings) -> Result<
 
 fn header_of(name: &str) -> Result<nifti::NiftiHeader, ToolFailure> {
     let mut printed = String::new();
-    let path = filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-        err: format!("{printed}{w}\n"),
-        code: 1,
-    })?;
+    let path =
+        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
+            err: format!("{printed}{w}\n"),
+            code: 1,
+        })?;
     nifti::load_header(&path).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
     })
 }
 
-fn fslmerge_z_t<T: Elem>(output: &str, inputs: &[String], fsl: &FslSettings) -> Result<(), ToolFailure> {
+fn fslmerge_z_t<T: Elem>(
+    output: &str,
+    inputs: &[String],
+    fsl: &FslSettings,
+) -> Result<(), ToolFailure> {
     let h0 = header_of(&inputs[0])?;
     let new_tr = h0.pixdim[4] as f32;
     let x = h0.dim[1].max(1);
@@ -495,7 +529,12 @@ pub fn fslmaths_dilf(input: &str, output: &str, fsl: &FslSettings) -> Result<(),
 
 /// `fslmaths <in> -mas <mask> <out>`: the input times the mask binarised (above 0, below its
 /// maximum plus one), in float; float output, display range 0 0.
-pub fn fslmaths_mas(input: &str, mask: &str, output: &str, fsl: &FslSettings) -> Result<(), ToolFailure> {
+pub fn fslmaths_mas(
+    input: &str,
+    mask: &str,
+    output: &str,
+    fsl: &FslSettings,
+) -> Result<(), ToolFailure> {
     let mut v: Volume<f32> = volume::read_volume4d(input, fsl).map_err(failed)?;
     let mut m: Volume<f32> = volume::read_volume4d(mask, fsl).map_err(failed)?;
     let mut err = String::new();
@@ -508,7 +547,11 @@ pub fn fslmaths_mas(input: &str, mask: &str, output: &str, fsl: &FslSettings) ->
     for x in m.data.iter_mut() {
         *x = if *x > 0.0 && *x < hi { 1.0 } else { 0.0 };
     }
-    if v.dimensionality() < m.dimensionality() || v.xsize() != m.xsize() || v.ysize() != m.ysize() || v.zsize() != m.zsize() {
+    if v.dimensionality() < m.dimensionality()
+        || v.xsize() != m.xsize()
+        || v.ysize() != m.ysize()
+        || v.zsize() != m.zsize()
+    {
         err.push_str("Image Exception : #3 :: Attempted to multiply images of different sizes\n");
         err.push_str("Attempted to multiply images of different sizes\n");
         return Err(ToolFailure { err, code: 1 });
@@ -609,6 +652,9 @@ mod tests {
         assert!(!imtest(&p("y")), "incomplete pair");
         std::fs::write(p("y.img"), b"").unwrap();
         assert!(imtest(&p("y")));
-        assert_eq!(imglob(&[p("y.hdr"), p("y.img"), p("x.nii")]), vec![p("x"), p("y")]);
+        assert_eq!(
+            imglob(&[p("y.hdr"), p("y.img"), p("x.nii")]),
+            vec![p("x"), p("y")]
+        );
     }
 }

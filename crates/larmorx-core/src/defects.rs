@@ -402,6 +402,20 @@ defects! {
         "-Z crops its outputs back with imglob, called without ${FSLDIR}/bin: with FSL's programs off the PATH the outputs stay padded, and with them on every other image whose name starts with the output's is cropped too";
     FSL_46 = "FSL-46", "bet", true,
         "the cleanup removes every file whose name starts with <output>_tmp, also files the run did not create";
+    FSL_47 = "FSL-47", "betsurf", true,
+        "--t1only fills the scalp mask from the centre of the outer skull surface, taken in the padded working grid, instead of the scalp surface's";
+    FSL_48 = "FSL-48", "betsurf", true,
+        "a T2 image on another grid than the T1 (other dimensions or voxel sizes) is sampled at the T1's voxel coordinates";
+    FSL_50 = "FSL-50", "betsurf", true,
+        "one skull profile whose search range is empty ends the program with status 255 and no message, before any output is written";
+    FSL_51 = "FSL-51", "betsurf", true,
+        "a profile search can read past the profile's last sample, into memory FSL never set, and use it";
+    FSL_53 = "FSL-53", "betsurf", true,
+        "a matrix file with fewer than the 12 numbers betsurf uses leaves the missing entries at values never set (the first that does not read is 0)";
+    FSL_54 = "FSL-54", "betsurf", true,
+        "--t1only exits with status 0 also when it fails (too few arguments, a matrix file it cannot open)";
+    FSL_55 = "FSL-55", "betsurf", true,
+        "a NaN in the T1 inside the brain surface makes the 98th percentile (std::nth_element) undefined";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

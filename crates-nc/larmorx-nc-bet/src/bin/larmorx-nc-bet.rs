@@ -65,8 +65,15 @@ fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
             }
         },
         Some(arg) => {
-            let kind = if arg.starts_with('-') { "option" } else { "command" };
-            let _ = writeln!(err, "error: unknown {kind} '{arg}'\n\nRun '{prog} --help' for usage.");
+            let kind = if arg.starts_with('-') {
+                "option"
+            } else {
+                "command"
+            };
+            let _ = writeln!(
+                err,
+                "error: unknown {kind} '{arg}'\n\nRun '{prog} --help' for usage."
+            );
             EXIT_USAGE
         }
     }
@@ -77,5 +84,9 @@ fn main() -> ExitCode {
         .skip(1)
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
-    ExitCode::from(run(&args, &mut io::stdout().lock(), &mut io::stderr().lock()))
+    ExitCode::from(run(
+        &args,
+        &mut io::stdout().lock(),
+        &mut io::stderr().lock(),
+    ))
 }

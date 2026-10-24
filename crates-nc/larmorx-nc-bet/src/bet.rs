@@ -133,7 +133,10 @@ impl Script<'_, '_> {
             if self.reproduce() {
                 self.notices.add(
                     &defects::FSL_44,
-                    format!("{what} '{value}' split into {} word(s), as the script does", split.len()),
+                    format!(
+                        "{what} '{value}' split into {} word(s), as the script does",
+                        split.len()
+                    ),
                 );
                 return split;
             }
@@ -143,7 +146,11 @@ impl Script<'_, '_> {
             );
         }
         if value.is_empty() {
-            return if self.reproduce() { Vec::new() } else { vec![String::new()] };
+            return if self.reproduce() {
+                Vec::new()
+            } else {
+                vec![String::new()]
+            };
         }
         vec![value.to_owned()]
     }
@@ -159,16 +166,10 @@ impl Script<'_, '_> {
         let run = Run {
             fsl: self.run.fsl,
             mode: self.run.mode,
+            threads: self.run.threads,
         };
-        // bet2 prints its own notices; collect them into this run's
-        let mut err_buf: Vec<u8> = Vec::new();
-        let code = bet2::main(&argv, &run, self.out, &mut err_buf);
-        let text = String::from_utf8_lossy(&err_buf).into_owned();
-        let (notice_lines, rest): (Vec<&str>, Vec<&str>) = text
-            .split_inclusive('\n')
-            .partition(|l| l.starts_with("upstream defect "));
-        let _ = self.err.write_all(rest.concat().as_bytes());
-        let _ = self.err.write_all(notice_lines.concat().as_bytes());
+        // bet2's notices join this run's (one per defect, printed at the end)
+        let code = bet2::main_with(&argv, &run, self.out, self.err, &mut self.notices);
         if code != 0 {
             return Err(Stop::Failed);
         }
@@ -209,10 +210,22 @@ impl Script<'_, '_> {
             // the ERR trap stops the script
             return Err(Stop::Failed);
         }
-        let in_name = in_words.iter().map(|w| avw::remove_ext(w)).collect::<Vec<_>>().join(" ");
-        let out_name = out_words.iter().map(|w| avw::remove_ext(w)).collect::<Vec<_>>().join(" ");
+        let in_name = in_words
+            .iter()
+            .map(|w| avw::remove_ext(w))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let out_name = out_words
+            .iter()
+            .map(|w| avw::remove_ext(w))
+            .collect::<Vec<_>>()
+            .join(" ");
         // [ `imtest $IN` = 0 ]: imtest is false unless it gets exactly one word
-        let in_test = if self.reproduce() { split_words(&in_name) } else { vec![in_name.clone()] };
+        let in_test = if self.reproduce() {
+            split_words(&in_name)
+        } else {
+            vec![in_name.clone()]
+        };
         if in_test.len() != 1 || !avw::imtest(&in_test[0]) {
             let _ = writeln!(self.out, "\nError: input image {in_name} not valid\n");
             return Err(Stop::Exit(1));
@@ -310,8 +323,16 @@ impl Script<'_, '_> {
             let _ = writeln!(self.out, "variation={variation}");
         }
         let opts = split_words(&bet2opts);
-        let ins = if self.reproduce() { split_words(&in_name) } else { vec![in_name.clone()] };
-        let outs = if self.reproduce() { split_words(&out_name) } else { vec![out_name.clone()] };
+        let ins = if self.reproduce() {
+            split_words(&in_name)
+        } else {
+            vec![in_name.clone()]
+        };
+        let outs = if self.reproduce() {
+            split_words(&out_name)
+        } else {
+            vec![out_name.clone()]
+        };
         let pair = |extra: &[String]| -> Vec<String> {
             let mut v: Vec<String> = ins.clone();
             v.extend(outs.iter().cloned());
@@ -325,10 +346,22 @@ impl Script<'_, '_> {
             4 => self.fmri(&in_name, &out_name, &opts)?,
             2 | 5 | 6 | 7 => {
                 let (what, need) = match variation {
-                    2 => ("-S (eye and optic nerve cleanup)", "FLIRT (standard_space_roi and flirt)"),
-                    5 => ("-A (skull and scalp surfaces)", "FLIRT (the registration to MNI152)"),
-                    6 => ("-A2 (skull and scalp surfaces with a T2)", "FLIRT (the T2-to-T1 and MNI152 registrations)"),
-                    _ => ("-B (bias field and neck cleanup)", "FLIRT (standard_space_roi) and FAST (the bias field)"),
+                    2 => (
+                        "-S (eye and optic nerve cleanup)",
+                        "FLIRT (standard_space_roi and flirt)",
+                    ),
+                    5 => (
+                        "-A (skull and scalp surfaces)",
+                        "FLIRT (the registration to MNI152)",
+                    ),
+                    6 => (
+                        "-A2 (skull and scalp surfaces with a T2)",
+                        "FLIRT (the T2-to-T1 and MNI152 registrations)",
+                    ),
+                    _ => (
+                        "-B (bias field and neck cleanup)",
+                        "FLIRT (standard_space_roi) and FAST (the bias field)",
+                    ),
                 };
                 let _ = writeln!(
                     self.err,
@@ -370,16 +403,26 @@ impl Script<'_, '_> {
             if self.reproduce() {
                 self.notices.add(
                     &defects::FSL_46,
-                    format!("removed files this run did not create, as the script does: {}", names.join(", ")),
+                    format!(
+                        "removed files this run did not create, as the script does: {}",
+                        names.join(", ")
+                    ),
                 );
             } else {
                 self.notices.add(
                     &defects::FSL_46,
-                    format!("kept files this run did not create (the script removes them): {}", names.join(", ")),
+                    format!(
+                        "kept files this run did not create (the script removes them): {}",
+                        names.join(", ")
+                    ),
                 );
             }
         }
-        let doomed = if self.reproduce() { globbed.clone() } else { ours };
+        let doomed = if self.reproduce() {
+            globbed.clone()
+        } else {
+            ours
+        };
         for f in doomed {
             let _ = std::fs::remove_file(&f);
         }
@@ -453,7 +496,11 @@ impl Script<'_, '_> {
         self.bet2(&w)?;
         self.created(&format!("{out_name}_tmp_brain_mask"));
         self.created(&format!("{out_name}_tmp_brain"));
-        let r = avw::fslmaths_dilf(&format!("{out_name}_tmp_brain_mask"), &format!("{out_name}_mask"), self.fsl());
+        let r = avw::fslmaths_dilf(
+            &format!("{out_name}_tmp_brain_mask"),
+            &format!("{out_name}_mask"),
+            self.fsl(),
+        );
         self.tool(r)?;
         let r = avw::fslmaths_mas(in_name, &format!("{out_name}_mask"), out_name, self.fsl());
         self.tool(r)?;
@@ -461,7 +508,13 @@ impl Script<'_, '_> {
     }
 
     /// `-Z`.
-    fn small_fov(&mut self, in_name: &str, out_name: &str, opts: &[String], debug: bool) -> Result<(), Stop> {
+    fn small_fov(
+        &mut self,
+        in_name: &str,
+        out_name: &str,
+        opts: &[String],
+        debug: bool,
+    ) -> Result<(), Stop> {
         let val = |s: &mut Self, key: &str| -> Result<String, Stop> {
             let r = avw::fslval(in_name, key);
             Ok(s.tool(r)?.replace('-', ""))
@@ -484,14 +537,28 @@ impl Script<'_, '_> {
             self.bet2(&words)?;
             return Ok(());
         }
-        let (xd, yd, zd) = (xdim.trim().to_owned(), ydim.trim().to_owned(), zdim.trim().to_owned());
+        let (xd, yd, zd) = (
+            xdim.trim().to_owned(),
+            ydim.trim().to_owned(),
+            zdim.trim().to_owned(),
+        );
         let bottom = format!("{out_name}_tmp_bottom");
         let top = format!("{out_name}_tmp_top");
-        let r = avw::fslroi(in_name, &bottom, &["0", &xd, "0", &yd, "0", "1"], self.fsl());
+        let r = avw::fslroi(
+            in_name,
+            &bottom,
+            &["0", &xd, "0", &yd, "0", "1"],
+            self.fsl(),
+        );
         self.tool(r)?;
         self.created(&bottom);
         let last = dc::eval(&format!("{zdim} 1 - p"), self.err);
-        let r = avw::fslroi(in_name, &top, &["0", &xd, "0", &yd, last.trim(), "1"], self.fsl());
+        let r = avw::fslroi(
+            in_name,
+            &top,
+            &["0", &xd, "0", &yd, last.trim(), "1"],
+            self.fsl(),
+        );
         self.tool(r)?;
         self.created(&top);
         let mut inputs: Vec<String> = Vec::new();
@@ -522,13 +589,20 @@ impl Script<'_, '_> {
             if imglob_found {
                 globbed.clone()
             } else {
-                let _ = writeln!(self.err, "bet: line {IMGLOB_LINE}: imglob: command not found");
+                let _ = writeln!(
+                    self.err,
+                    "bet: line {IMGLOB_LINE}: imglob: command not found"
+                );
                 Vec::new()
             }
         } else {
             ours.clone()
         };
-        let orig_would_crop: Vec<String> = if imglob_found { globbed.clone() } else { Vec::new() };
+        let orig_would_crop: Vec<String> = if imglob_found {
+            globbed.clone()
+        } else {
+            Vec::new()
+        };
         if orig_would_crop != ours {
             let others: Vec<&str> = globbed
                 .iter()
@@ -632,7 +706,11 @@ pub mod dc {
             return None;
         }
         let digits = format!("{ip}{fp}");
-        let mant: i128 = if digits.is_empty() { 0 } else { digits.parse().ok()? };
+        let mant: i128 = if digits.is_empty() {
+            0
+        } else {
+            digits.parse().ok()?
+        };
         Some(Num {
             mant: if neg { -mant } else { mant },
             scale: fp.len() as u32,
@@ -650,7 +728,11 @@ pub mod dc {
         } else {
             format!(".{}{}", "0".repeat(s - m.len()), m)
         };
-        if neg && a.mant != 0 { format!("-{body}") } else { body }
+        if neg && a.mant != 0 {
+            format!("-{body}")
+        } else {
+            body
+        }
     }
 
     /// Evaluates `expr` and returns what `p` printed (dc's own messages to `err`).
@@ -688,7 +770,11 @@ pub mod dc {
                     if let Some((a, b)) = op(&mut stack, err) {
                         let s = a.scale.max(b.scale);
                         let (a, b) = (rescale(a, s), rescale(b, s));
-                        let mant = if tok == "+" { a.mant + b.mant } else { a.mant - b.mant };
+                        let mant = if tok == "+" {
+                            a.mant + b.mant
+                        } else {
+                            a.mant - b.mant
+                        };
                         stack.push(Num { mant, scale: s });
                     }
                 }
@@ -760,11 +846,17 @@ pub mod dc {
             assert_eq!(eval("1 1 + p", &mut e), "2\n");
             assert_eq!(eval("_10 1 + p", &mut e), "-9\n");
             assert_eq!(
-                eval("0 k 31.5 31.25 - 2 ^ 28.25 28.0 - 2 ^ + 16.0 16.0 - 2 ^ + 1 / p", &mut e),
+                eval(
+                    "0 k 31.5 31.25 - 2 ^ 28.25 28.0 - 2 ^ + 16.0 16.0 - 2 ^ + 1 / p",
+                    &mut e
+                ),
                 "0\n"
             );
             assert_eq!(
-                eval("0 k 31.517222 30.012345 - 2 ^ 1.0 0 - 2 ^ + 0 0 - 2 ^ + 1 / p", &mut e),
+                eval(
+                    "0 k 31.517222 30.012345 - 2 ^ 1.0 0 - 2 ^ + 0 0 - 2 ^ + 1 / p",
+                    &mut e
+                ),
                 "3\n"
             );
             assert!(e.is_empty());

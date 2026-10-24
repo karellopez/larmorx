@@ -481,7 +481,12 @@ mod tests {
         );
         // The AFNI tools have their originals: `auto` without the replica runs them. FSL's
         // BET has only its replica so far.
-        assert!(REPLICAS.iter().filter(|r| r.family == "afni").all(|r| r.original));
+        assert!(
+            REPLICAS
+                .iter()
+                .filter(|r| r.family == "afni")
+                .all(|r| r.original)
+        );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
         assert_eq!(

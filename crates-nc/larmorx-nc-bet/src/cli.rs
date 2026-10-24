@@ -5,7 +5,8 @@
 //!
 //! Settings come from the environment, read once: `FSLOUTPUTTYPE` and
 //! `FSL_LOAD_NIFTI_EXTENSIONS` (FSL's), `LARMORX_UPSTREAM_DEFECTS` (D13: `fix`, the default, or
-//! `reproduce`, FSL's result bit for bit). `FSLDIR` is not needed: the replica runs none of
+//! `reproduce`, FSL's result bit for bit), `OMP_NUM_THREADS` (threads; results do not depend on
+//! it). `FSLDIR` is not needed: the replica runs none of
 //! FSL's programs.
 
 use std::io::Write;
@@ -32,7 +33,21 @@ pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write
         }
     };
     let fsl = FslSettings::from_env();
-    Some(run_with(tool, args, &fsl, mode, out, err))
+    Some(run_with(tool, args, &fsl, mode, threads(), out, err))
+}
+
+/// Threads for the command line: `OMP_NUM_THREADS` if set (the variable larmorx gives its
+/// replica programs), else all logical CPUs. Results do not depend on it.
+pub fn threads() -> usize {
+    let n = std::env::var("OMP_NUM_THREADS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .unwrap_or(0);
+    if n > 0 {
+        n
+    } else {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    }
 }
 
 /// [`run`] with the settings given.
@@ -41,12 +56,17 @@ pub fn run_with(
     args: &[String],
     fsl: &FslSettings,
     mode: UpstreamDefects,
+    threads: usize,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
     let mut argv = vec![tool.to_owned()];
     argv.extend(args.iter().cloned());
-    let run = bet2::Run { fsl, mode };
+    let run = bet2::Run {
+        fsl,
+        mode,
+        threads: threads.max(1),
+    };
     let code = match tool {
         "bet2" => bet2::main(&argv, &run, out, err),
         "bet" => bet::main(&argv, &run, out, err),

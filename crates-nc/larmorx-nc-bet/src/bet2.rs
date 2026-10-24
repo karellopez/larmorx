@@ -80,10 +80,16 @@ pub fn parser() -> OptionParser {
         TITLE,
         EXAMPLES,
         vec![
-            b("-o,--outline", "generate brain surface outline overlaid onto original image"),
+            b(
+                "-o,--outline",
+                "generate brain surface outline overlaid onto original image",
+            ),
             b("-m,--mask", "generate binary brain mask"),
             b("-s,--skull", "generate approximate skull image"),
-            b("-n,--nooutput", "don't generate segmented brain image output"),
+            b(
+                "-n,--nooutput",
+                "don't generate segmented brain image output",
+            ),
             f(
                 "-f",
                 0.5,
@@ -119,13 +125,28 @@ pub fn parser() -> OptionParser {
                 3,
                 true,
             ),
-            b("-t,--threshold", "-apply thresholding to segmented brain image and mask"),
+            b(
+                "-t,--threshold",
+                "-apply thresholding to segmented brain image and mask",
+            ),
             b("--ct", "-treat input as CT image (default is MRI)"),
             b("-e,--mesh", "generates brain surface as mesh in vtk format"),
             b("-v,--verbose", "switch on diagnostic messages"),
             b("-h,--help", "displays this help, then exits"),
-            f("--parameter_d1", 7.0, "~<d1>\tintensity search depth d1 ( default 7 ).", 1, false),
-            f("--parameter_d2", 3.0, "~<d2>\tintensity search depth d2 ( default 3 ).", 1, false),
+            f(
+                "--parameter_d1",
+                7.0,
+                "~<d1>\tintensity search depth d1 ( default 7 ).",
+                1,
+                false,
+            ),
+            f(
+                "--parameter_d2",
+                3.0,
+                "~<d2>\tintensity search depth d2 ( default 3 ).",
+                1,
+                false,
+            ),
         ],
     )
 }
@@ -385,7 +406,10 @@ pub fn step_of_computation(
         if local_th != 0.0 {
             local_t = fmin(
                 1.0,
-                fmax(0.0, bet_main_parameter + local_th * (coord.z - zcog) / radius),
+                fmax(
+                    0.0,
+                    bet_main_parameter + local_th * (coord.z - zcog) / radius,
+                ),
             );
         }
         let mut imin = tm;
@@ -551,13 +575,13 @@ pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh) -> Result<Volume<i16>,
     let mut current: Vec<[i64; 3]> = vec![start];
     while let Some([x, y, z]) = current.pop() {
         mask.set(x, y, z, 0);
-        if x - 1 >= 0 && mask.value(x - 1, y, z) == 1 {
+        if x > 0 && mask.value(x - 1, y, z) == 1 {
             current.push([x - 1, y, z]);
         }
-        if y - 1 >= 0 && mask.value(x, y - 1, z) == 1 {
+        if y > 0 && mask.value(x, y - 1, z) == 1 {
             current.push([x, y - 1, z]);
         }
-        if z - 1 >= 0 && mask.value(x, y, z - 1) == 1 {
+        if z > 0 && mask.value(x, y, z - 1) == 1 {
             current.push([x, y, z - 1]);
         }
         if nx > x + 1 && mask.value(x + 1, y, z) == 1 {
@@ -641,7 +665,8 @@ pub fn find_skull(image: &Volume<f32>, m: &Mesh, t2: f64, t: f64, t98: f64) -> V
     );
     let scale = fmin(xdim, fmin(ydim, zdim));
     let interp = |p: V3| f64::from(image.interpolate(p.x as f32, p.y as f32, p.z as f32));
-    let inside = |p: V3| p.x >= 0.0 && p.y >= 0.0 && p.z >= 0.0 && p.x < xsize && p.y < ysize && p.z < zsize;
+    let inside =
+        |p: V3| p.x >= 0.0 && p.y >= 0.0 && p.z >= 0.0 && p.x < xsize && p.y < ysize && p.z < zsize;
     for i in 0..m.points.len() {
         let mut max_neighbour = 0.0;
         let normal = m.local_normal(i);
@@ -750,11 +775,14 @@ pub fn find_skull(image: &Volume<f32>, m: &Mesh, t2: f64, t: f64, t98: f64) -> V
 pub struct Run<'a> {
     pub fsl: &'a FslSettings,
     pub mode: UpstreamDefects,
+    /// Threads for the work that can be shared (betsurf's smoothing); 1 or more. The results
+    /// do not depend on it.
+    pub threads: usize,
 }
 
 /// Prints an uncaught exception of the image layer: what FSL printed before aborting, then
 /// larmorx's own line (FSL's program aborts: no defined result in either mode).
-fn report_abort(e: &ImageError, prog: &str, err: &mut dyn Write) -> u8 {
+pub(crate) fn report_abort(e: &ImageError, prog: &str, err: &mut dyn Write) -> u8 {
     let _ = err.write_all(e.printed.as_bytes());
     if let Some(code) = e.exit {
         return code;
@@ -774,6 +802,17 @@ pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
     let code = main_inner(args, run, out, err, &mut notices);
     notices.print(err);
     code
+}
+
+/// [`main`] collecting its notices into `notices` (printed by the caller): how `bet` runs it.
+pub fn main_with(
+    args: &[String],
+    run: &Run,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    notices: &mut Notices,
+) -> u8 {
+    main_inner(args, run, out, err, notices)
 }
 
 fn main_inner(
@@ -835,7 +874,10 @@ fn main_inner(
         d2: get("--parameter_d2").float(),
     };
     if a.frac < 0.0 || a.frac > 1.0 {
-        let _ = writeln!(err, "\nFractional intensity threshold must be between 0 and 1!");
+        let _ = writeln!(
+            err,
+            "\nFractional intensity threshold must be between 0 and 1!"
+        );
         return 1;
     }
     if a.grad < -1.0 || a.grad > 1.0 {
@@ -856,7 +898,10 @@ fn main_inner(
             let _ = writeln!(err, "\nbet2: {what} (larmorx)");
             return 1;
         }
-        notices.add(&defects::FSL_42, format!("{what}: used as given, as bet2 does"));
+        notices.add(
+            &defects::FSL_42,
+            format!("{what}: used as given, as bet2 does"),
+        );
     }
     // FSL-40: bet2 removes ".hdr" (and, meaning ".img", ".hdr" again) wherever it appears.
     let (in_name, out_name) = match strip_names(&inputname, &outputname, notices) {
@@ -931,11 +976,7 @@ fn meaningless_values(a: &Bet2Args) -> Option<String> {
 /// `.hdr` at its first occurrence, and for a name containing `.img` it erases at the position
 /// of `.hdr` (out of range when there is none: std::out_of_range, an abort). The correction
 /// removes the image extension `.hdr` or `.img` only at the end of a name.
-fn strip_names(
-    input: &str,
-    output: &str,
-    notices: &mut Notices,
-) -> Result<(String, String), u8> {
+fn strip_names(input: &str, output: &str, notices: &mut Notices) -> Result<(String, String), u8> {
     let fsl = |s: &str| -> Option<String> {
         let mut s = s.to_owned();
         if let Some(p) = s.find(".hdr") {
@@ -1014,7 +1055,15 @@ pub fn compute(
     let bet_main_parameter = glibc_pow::pow(f64::from(a.frac), 0.275);
     let mut m = Mesh::icosa(5);
     let mut warn = String::new();
-    let bp = match adjust_initial_mesh(testvol, &mut m, f64::from(a.radius), xarg, yarg, zarg, &mut warn) {
+    let bp = match adjust_initial_mesh(
+        testvol,
+        &mut m,
+        f64::from(a.radius),
+        xarg,
+        yarg,
+        zarg,
+        &mut warn,
+    ) {
         Ok(bp) => {
             let _ = err.write_all(warn.as_bytes());
             bp
@@ -1040,7 +1089,13 @@ pub fn compute(
             g6(bp.t98),
             g6(bp.max)
         );
-        let _ = writeln!(out, "c-of-g {} {} {} mm", g6(bp.cog.x), g6(bp.cog.y), g6(bp.cog.z));
+        let _ = writeln!(
+            out,
+            "c-of-g {} {} {} mm",
+            g6(bp.cog.x),
+            g6(bp.cog.y),
+            g6(bp.cog.z)
+        );
         let _ = writeln!(out, "radius {} mm", g6(bp.radius));
         let _ = writeln!(out, "median within-brain intensity {}", g6(bp.tm));
     }
@@ -1080,7 +1135,11 @@ pub fn compute(
     let tmp = m.self_intersection(&moriginal, &mut msgs);
     let _ = err.write_all(msgs.as_bytes());
     if a.verbose && !a.mesh {
-        let _ = writeln!(out, "self-intersection total {} (threshold=4000.0) ", g6(tmp));
+        let _ = writeln!(
+            out,
+            "self-intersection total {} (threshold=4000.0) ",
+            g6(tmp)
+        );
     }
     let mut self_intersection = if !a.mesh {
         tmp > SELF_INTERSECTION_THRESHOLD
@@ -1133,7 +1192,11 @@ pub fn compute(
             m.real_self_intersection()
         };
         if a.verbose && !a.mesh {
-            let _ = writeln!(out, "self-intersection total {} (threshold=4000.0) ", g6(tmp));
+            let _ = writeln!(
+                out,
+                "self-intersection total {} (threshold=4000.0) ",
+                g6(tmp)
+            );
         }
         if a.verbose && a.mesh && self_intersection {
             let _ = writeln!(out, "the mesh is self-intersecting");
@@ -1205,7 +1268,10 @@ fn write_outputs(
         for (o, &b) in output.data[..n].iter_mut().zip(&brainmask.data) {
             *o *= f32::from(1 - b);
         }
-        if let Some(code) = saved(volume::save_volume(&output, out_name, run.fsl, reproduce_offset), err) {
+        if let Some(code) = saved(
+            volume::save_volume(&output, out_name, run.fsl, reproduce_offset),
+            err,
+        ) {
             return code;
         }
     }
@@ -1226,7 +1292,12 @@ fn write_outputs(
     if a.outline {
         let outline = draw_mesh_bis(testvol, &res.mesh);
         if let Some(code) = saved(
-            volume::save_volume(&outline, &format!("{out_name}_overlay"), run.fsl, reproduce_offset),
+            volume::save_volume(
+                &outline,
+                &format!("{out_name}_overlay"),
+                run.fsl,
+                reproduce_offset,
+            ),
             err,
         ) {
             return code;
@@ -1234,14 +1305,26 @@ fn write_outputs(
     }
     if a.mesh {
         let mut msgs = String::new();
-        res.mesh.save_vtk(&format!("{out_name}_mesh.vtk"), &mut msgs);
+        res.mesh
+            .save_vtk(&format!("{out_name}_mesh.vtk"), &mut msgs);
         let _ = err.write_all(msgs.as_bytes());
     }
     if a.skull {
-        let skull = find_skull(testvol, &res.mesh, res.params.t2, res.params.t, res.params.t98);
+        let skull = find_skull(
+            testvol,
+            &res.mesh,
+            res.params.t2,
+            res.params.t,
+            res.params.t98,
+        );
         let bskull: Volume<i16> = Volume::copyconvert(&skull);
         if let Some(code) = saved(
-            volume::save_volume(&bskull, &format!("{out_name}_skull"), run.fsl, reproduce_offset),
+            volume::save_volume(
+                &bskull,
+                &format!("{out_name}_skull"),
+                run.fsl,
+                reproduce_offset,
+            ),
             err,
         ) {
             return code;

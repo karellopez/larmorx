@@ -366,7 +366,10 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("fsl    bet, bet2, betsurf"), "{out}");
-        assert!(out.contains("fsl bet: larmorx-nc (LicenseRef-FSL)"), "{out}");
+        assert!(
+            out.contains("fsl bet: larmorx-nc (LicenseRef-FSL)"),
+            "{out}"
+        );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(replica::replica_only("fsl").collect::<Vec<_>>(), FSL_TOOLS);
         // Without the replica (or with `original` asked for) the tool refuses, naming the

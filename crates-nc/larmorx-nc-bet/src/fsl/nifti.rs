@@ -14,6 +14,9 @@
 //! is read as is); written files are compressed with zlib's default level, whose bytes are not
 //! compared (only the decompressed bytes are, docs/validation).
 
+// index loops, as the C and LAPACK code they translate
+#![allow(clippy::needless_range_loop)]
+
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -623,7 +626,8 @@ fn to_i16(v: i64) -> i16 {
 
 fn write_nifti1(h: &NiftiHeader, analyze: bool) -> Vec<u8> {
     let mut b = vec![0u8; 348];
-    let put = |b: &mut Vec<u8>, at: usize, bytes: &[u8]| b[at..at + bytes.len()].copy_from_slice(bytes);
+    let put =
+        |b: &mut Vec<u8>, at: usize, bytes: &[u8]| b[at..at + bytes.len()].copy_from_slice(bytes);
     put(&mut b, 0, &h.sizeof_hdr.to_le_bytes());
     for k in 0..8 {
         put(&mut b, 40 + 2 * k, &to_i16(h.dim[k]).to_le_bytes());
@@ -707,7 +711,8 @@ fn write_nifti1(h: &NiftiHeader, analyze: bool) -> Vec<u8> {
 
 fn write_nifti2(h: &NiftiHeader) -> Vec<u8> {
     let mut b = vec![0u8; 540];
-    let put = |b: &mut Vec<u8>, at: usize, bytes: &[u8]| b[at..at + bytes.len()].copy_from_slice(bytes);
+    let put =
+        |b: &mut Vec<u8>, at: usize, bytes: &[u8]| b[at..at + bytes.len()].copy_from_slice(bytes);
     put(&mut b, 0, &h.sizeof_hdr.to_le_bytes());
     for k in 0..8 {
         put(&mut b, 16 + 8 * k, &h.dim[k].to_le_bytes());
@@ -840,8 +845,18 @@ fn read_extensions(content: &[u8], h: &NiftiHeader) -> Result<Vec<Extension>, Ni
             }
             return Ok(out);
         }
-        let mut a = [content[pos], content[pos + 1], content[pos + 2], content[pos + 3]];
-        let mut c = [content[pos + 4], content[pos + 5], content[pos + 6], content[pos + 7]];
+        let mut a = [
+            content[pos],
+            content[pos + 1],
+            content[pos + 2],
+            content[pos + 3],
+        ];
+        let mut c = [
+            content[pos + 4],
+            content[pos + 5],
+            content[pos + 6],
+            content[pos + 7],
+        ];
         if h.was_wrong_endian {
             a.reverse();
             c.reverse();
@@ -906,9 +921,14 @@ pub fn load_image(path: &str) -> Result<Loaded, NiftiError> {
     }
     let width = h.datum_byte_width();
     let n = h.n_elements();
-    let nbytes = n.checked_mul(width).ok_or_else(|| err("Error: short read, file may be truncated"))?;
+    let nbytes = n
+        .checked_mul(width)
+        .ok_or_else(|| err("Error: short read, file may be truncated"))?;
     let (src, offset): (std::borrow::Cow<[u8]>, usize) = if h.single_file() {
-        (std::borrow::Cow::Borrowed(&content[..]), h.nominal_vox_offset() as usize)
+        (
+            std::borrow::Cow::Borrowed(&content[..]),
+            h.nominal_vox_offset() as usize,
+        )
     } else {
         // The data file: .img for .hdr (compressed or not, read transparently).
         let img = match path.rfind(".hdr") {
@@ -922,7 +942,10 @@ pub fn load_image(path: &str) -> Result<Loaded, NiftiError> {
                 )));
             }
         };
-        (std::borrow::Cow::Owned(read_file(&img)?), h.nominal_vox_offset() as usize)
+        (
+            std::borrow::Cow::Owned(read_file(&img)?),
+            h.nominal_vox_offset() as usize,
+        )
     };
     if src.len() < offset || src.len() - offset < nbytes {
         return Err(err("Error: short read, file may be truncated"));
@@ -1088,10 +1111,9 @@ pub mod legacy {
         let (r21, r22, r23) = (g(1, 0), g(1, 1), g(1, 2));
         let (r31, r32, r33) = (g(2, 0), g(2, 1), g(2, 2));
         let (v1, v2, v3) = (g(0, 3), g(1, 3), g(2, 3));
-        let mut deti = r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33
-            + r21 * r32 * r13
-            + r31 * r12 * r23
-            - r31 * r22 * r13;
+        let mut deti =
+            r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+                - r31 * r22 * r13;
         if deti != 0.0 {
             deti = x87::div_to_f64(1.0, deti);
         }
@@ -1100,25 +1122,19 @@ pub mod legacy {
         q[0][1] = (deti * (-r12 * r33 + r32 * r13)) as f32;
         q[0][2] = (deti * (r12 * r23 - r22 * r13)) as f32;
         q[0][3] = (deti
-            * (-r12 * r23 * v3 + r12 * v2 * r33 + r22 * r13 * v3
-                - r22 * v1 * r33
-                - r32 * r13 * v2
+            * (-r12 * r23 * v3 + r12 * v2 * r33 + r22 * r13 * v3 - r22 * v1 * r33 - r32 * r13 * v2
                 + r32 * v1 * r23)) as f32;
         q[1][0] = (deti * (-r21 * r33 + r31 * r23)) as f32;
         q[1][1] = (deti * (r11 * r33 - r31 * r13)) as f32;
         q[1][2] = (deti * (-r11 * r23 + r21 * r13)) as f32;
         q[1][3] = (deti
-            * (r11 * r23 * v3 - r11 * v2 * r33 - r21 * r13 * v3
-                + r21 * v1 * r33
-                + r31 * r13 * v2
+            * (r11 * r23 * v3 - r11 * v2 * r33 - r21 * r13 * v3 + r21 * v1 * r33 + r31 * r13 * v2
                 - r31 * v1 * r23)) as f32;
         q[2][0] = (deti * (r21 * r32 - r31 * r22)) as f32;
         q[2][1] = (deti * (-r11 * r32 + r31 * r12)) as f32;
         q[2][2] = (deti * (r11 * r22 - r21 * r12)) as f32;
         q[2][3] = (deti
-            * (-r11 * r22 * v3 + r11 * r32 * v2 + r21 * r12 * v3
-                - r21 * r32 * v1
-                - r31 * r12 * v2
+            * (-r11 * r22 * v3 + r11 * r32 * v2 + r21 * r12 * v3 - r21 * r32 * v1 - r31 * r12 * v2
                 + r31 * r22 * v1)) as f32;
         q[3][3] = if deti == 0.0 { 0.0 } else { 1.0 };
         q
@@ -1312,10 +1328,9 @@ pub mod legacy {
         r31 = pg(2, 0);
         r32 = pg(2, 1);
         r33 = pg(2, 2);
-        let zdet = r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33
-            + r21 * r32 * r13
-            + r31 * r12 * r23
-            - r31 * r22 * r13;
+        let zdet =
+            r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+                - r31 * r22 * r13;
         let qfac;
         if zdet > 0.0 {
             qfac = 1.0;

@@ -114,7 +114,12 @@ fn final_insertion_sort<T: Clone>(
     }
 }
 
-fn insertion_sort<T: Clone>(v: &mut [T], first: usize, last: usize, less: &impl Fn(&T, &T) -> bool) {
+fn insertion_sort<T: Clone>(
+    v: &mut [T],
+    first: usize,
+    last: usize,
+    less: &impl Fn(&T, &T) -> bool,
+) {
     if first == last {
         return;
     }
@@ -247,9 +252,131 @@ fn sort_heap<T: Clone>(v: &mut [T], first: usize, mut last: usize, less: &impl F
     }
 }
 
+/// `std::nth_element(v.begin(), v.begin() + nth, v.end())` on doubles with `<`, as libstdc++
+/// performs it (`__introselect`: median-of-three partitions while more than 3 elements remain,
+/// heap selection past a depth of 2 log2(n), then an insertion sort). Its unguarded loops rely on
+/// a strict weak order; with NaN values they can step outside the vector, where C++ reads memory
+/// that is not the vector's: here they stop at its ends instead, and the result says whether
+/// that happened.
+pub fn nth_element_f64(v: &mut [f64], nth: usize) -> bool {
+    let n = v.len();
+    if n == 0 || nth >= n {
+        return false;
+    }
+    let less = |a: &f64, b: &f64| a < b;
+    let mut outside = false;
+    let (mut first, mut last) = (0usize, n);
+    let mut depth = (usize::BITS - 1 - n.leading_zeros()) as usize * 2;
+    while last - first > 3 {
+        if depth == 0 {
+            heap_select(v, first, nth + 1, last, &less);
+            v.swap(first, nth);
+            return outside;
+        }
+        depth -= 1;
+        let mid = first + (last - first) / 2;
+        move_median_to_first(v, first, first + 1, mid, last - 1, &less);
+        let cut = guarded_partition(v, first + 1, last, first, &mut outside);
+        if cut <= nth {
+            first = cut;
+        } else {
+            last = cut;
+        }
+    }
+    // __insertion_sort(first, last)
+    for i in first + 1..last {
+        if v[i] < v[first] {
+            let val = v[i];
+            for k in (first..i).rev() {
+                v[k + 1] = v[k];
+            }
+            v[first] = val;
+        } else {
+            // __unguarded_linear_insert
+            let val = v[i];
+            let mut hole = i;
+            while val < v[hole - 1] {
+                v[hole] = v[hole - 1];
+                hole -= 1;
+                if hole == 0 {
+                    outside = true;
+                    break;
+                }
+            }
+            v[hole] = val;
+        }
+    }
+    outside
+}
+
+/// `__unguarded_partition(first, last, pivot)` on doubles, stopped at the vector's ends.
+fn guarded_partition(
+    v: &mut [f64],
+    mut first: usize,
+    mut last: usize,
+    pivot: usize,
+    outside: &mut bool,
+) -> usize {
+    let n = v.len();
+    loop {
+        while v[first] < v[pivot] {
+            first += 1;
+            if first >= n {
+                *outside = true;
+                return n - 1;
+            }
+        }
+        if last == 0 {
+            *outside = true;
+            return first;
+        }
+        last -= 1;
+        while v[pivot] < v[last] {
+            if last == 0 {
+                *outside = true;
+                break;
+            }
+            last -= 1;
+        }
+        if first >= last {
+            return first;
+        }
+        v.swap(first, last);
+        first += 1;
+        if first >= n {
+            *outside = true;
+            return n - 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nth_element_selects() {
+        let mut s = 0x9e3779b97f4a7c15u64;
+        for n in [1usize, 2, 3, 4, 5, 17, 100, 5000] {
+            let v: Vec<f64> = (0..n)
+                .map(|_| {
+                    s ^= s << 13;
+                    s ^= s >> 7;
+                    s ^= s << 17;
+                    (s % 997) as f64
+                })
+                .collect();
+            let mut sorted = v.clone();
+            sorted.sort_by(f64::total_cmp);
+            for nth in [0, n / 3, n - 1] {
+                let mut w = v.clone();
+                assert!(!nth_element_f64(&mut w, nth));
+                assert_eq!(w[nth], sorted[nth], "{n} {nth}");
+            }
+        }
+        let mut w = vec![3.0, f64::NAN, 1.0, 2.0, f64::NAN, 0.5, 7.0, 6.0];
+        let _ = nth_element_f64(&mut w, 5);
+    }
 
     #[test]
     fn sorts_like_any_sort_on_distinct_keys() {

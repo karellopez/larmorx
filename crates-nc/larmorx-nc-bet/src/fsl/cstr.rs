@@ -186,6 +186,24 @@ fn compose(mant: u128, exp: i64, sticky: bool) -> f64 {
     (keep as f64) * 2f64.powi(lsb.clamp(-1074, 1023) as i32)
 }
 
+/// `strtof(s, &end)` for a decimal number (what C++'s `>> float` hands it): the value rounded
+/// once to `float`, and the bytes read. Other forms (hexadecimal, `inf`, `nan`) go through
+/// `strtod`'s value.
+pub fn strtof(s: &str) -> (f32, usize) {
+    let (v, used) = strtod(s);
+    if used == 0 {
+        return (0.0, 0);
+    }
+    let text = s[..used].trim_start_matches(|c: char| c.is_ascii() && is_space(c as u8));
+    let decimal = text
+        .bytes()
+        .all(|c| c.is_ascii_digit() || matches!(c, b'+' | b'-' | b'.' | b'e' | b'E'));
+    match text.parse::<f32>() {
+        Ok(f) if decimal => (f, used),
+        _ => (v as f32, used),
+    }
+}
+
 /// `atof(s)`: `strtod` without the end.
 pub fn atof(s: &str) -> f64 {
     strtod(s).0
@@ -267,7 +285,11 @@ pub fn fmt_g(v: f64, prec: usize) -> String {
     }
     let p = if prec == 0 { 1 } else { prec };
     if v == 0.0 {
-        return if v.is_sign_negative() { "-0".into() } else { "0".into() };
+        return if v.is_sign_negative() {
+            "-0".into()
+        } else {
+            "0".into()
+        };
     }
     let e_form = format!("{:.*e}", p - 1, v);
     let x: i32 = e_form
@@ -300,7 +322,11 @@ pub fn g6(v: f64) -> String {
 fn non_finite(v: f64) -> String {
     if v.is_nan() {
         // glibc prints the sign bit of a NaN
-        if v.is_sign_negative() { "-nan".into() } else { "nan".into() }
+        if v.is_sign_negative() {
+            "-nan".into()
+        } else {
+            "nan".into()
+        }
     } else if v > 0.0 {
         "inf".into()
     } else {

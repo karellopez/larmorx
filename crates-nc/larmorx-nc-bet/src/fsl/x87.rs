@@ -53,10 +53,7 @@ fn round(v: Exact, bits: i32, min_lsb: i32) -> Exact {
     if shift <= 0 {
         // Exactly representable at this precision, unless bits were cut below.
         debug_assert!(!v.sticky, "a cut value must carry guard bits");
-        return Exact {
-            sticky: false,
-            ..v
-        };
+        return Exact { sticky: false, ..v };
     }
     let (keep, rem, half) = if shift >= 128 {
         (0u128, v.mant, None)
@@ -165,8 +162,7 @@ fn add_exact(a: f64, b: f64) -> Exact {
     }
     // Order by magnitude: `big` has the larger leading bit (or the larger value at equal ones).
     let lead = |v: &Exact| v.exp + bit_len(v.mant);
-    let (big, small) = if lead(&xa) > lead(&xb) || (lead(&xa) == lead(&xb) && a.abs() >= b.abs())
-    {
+    let (big, small) = if lead(&xa) > lead(&xb) || (lead(&xa) == lead(&xb) && a.abs() >= b.abs()) {
         (xa, xb)
     } else {
         (xb, xa)
@@ -280,7 +276,13 @@ mod tests {
 
     #[test]
     fn exact_cases_are_the_double_results() {
-        for (a, b) in [(1.0, 2.0), (0.5, 0.25), (3.0, -7.0), (1e300, 1e-300), (-2.5, 4.0)] {
+        for (a, b) in [
+            (1.0, 2.0),
+            (0.5, 0.25),
+            (3.0, -7.0),
+            (1e300, 1e-300),
+            (-2.5, 4.0),
+        ] {
             assert_eq!(add_to_f64(a, b), a + b);
             assert_eq!(mul_to_f64(a, b), a * b);
             assert_eq!(div_to_f64(a, b), a / b);

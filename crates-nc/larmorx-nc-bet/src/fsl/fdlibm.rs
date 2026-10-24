@@ -20,6 +20,9 @@
 //! without FMA), so this translation gives its bits on every input (checked against glibc on
 //! random inputs by `tools/libm-verify`). BET's surface model calls it 2.5 million times per run.
 
+// fdlibm's literals, digit for digit
+#![allow(clippy::excessive_precision, clippy::approx_constant)]
+
 const ONE: f64 = 1.0;
 const TWO: f64 = 2.0;
 const TINY: f64 = 1.0e-300;
@@ -175,7 +178,11 @@ pub fn tanh(x: f64) -> f64 {
 
     // x is INF or NaN
     if ix >= 0x7ff0_0000 {
-        return if jx >= 0 { ONE / x + ONE } else { ONE / x - ONE };
+        return if jx >= 0 {
+            ONE / x + ONE
+        } else {
+            ONE / x - ONE
+        };
     }
 
     let z;
@@ -221,12 +228,17 @@ mod tests {
 
     #[test]
     fn close_to_the_true_values() {
-        for &x in &[1e-20, 0.001, 0.3, 0.5, 0.9, 1.0, 1.5, 3.0, 10.0, 21.9, -0.7, -2.2] {
-            let want = (f64::exp(2.0 * x) - 1.0) / (f64::exp(2.0 * x) + 1.0);
+        for &x in &[
+            1e-20f64, 0.001, 0.3, 0.5, 0.9, 1.0, 1.5, 3.0, 10.0, 21.9, -0.7, -2.2,
+        ] {
+            let want = x.tanh();
             let got = tanh(x);
-            assert!((got - want).abs() <= 4.0 * f64::EPSILON * want.abs().max(1e-300), "{x}");
+            assert!((got - want).abs() <= 4.0 * f64::EPSILON * want.abs(), "{x}");
             let e = expm1(x);
-            assert!((e - (f64::exp(x) - 1.0)).abs() <= 1e-12 * e.abs().max(1e-20), "{x}");
+            assert!(
+                (e - x.exp_m1()).abs() <= 4.0 * f64::EPSILON * e.abs(),
+                "{x}"
+            );
         }
     }
 }

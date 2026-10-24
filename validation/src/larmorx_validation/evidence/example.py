@@ -1,7 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """A worked example being exported: its display grid and mask, its panels (an input, or one
 program's run with its outputs), the comparisons between them, and the still posters of its
-default view (for pages read without JavaScript)."""
+default view (for pages read without JavaScript).
+
+**Views.** An example ships either its whole display grid (``view="volume"``: every slice of
+the box around the shown region, for a tool's two or three key datasets) or three orthogonal
+full-resolution slices through one voxel (``view="slices"``: the voxel where the main
+comparison differs most, or the region's centre where nothing differs; every other panel-
+dataset case). Each slice is cropped to the shown region's box in that plane plus
+:data:`SLICE_MARGIN` voxels, and the arrays are stored as the slices one after the other
+(axial, coronal, sagittal; for a series, volume by volume), each with its offset, so the viewer
+maps a voxel to its value exactly. Every metric is still computed offline over every voxel of
+the files: a view decides only what the reader can browse."""
 
 from __future__ import annotations
 
@@ -11,7 +21,23 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from larmorx_validation.evidence.core import Context, Grid, compare, dtype_code, encode, put, store
+from larmorx_validation.evidence.core import (
+    Context,
+    Grid,
+    blob,
+    compare,
+    dtype_code,
+    encode,
+    put,
+    store,
+)
+
+#: An example's views: its whole display grid, or three slices through one voxel.
+VIEWS = ("volume", "slices")
+#: The planes of a slices view, in their order in the stored arrays.
+PLANE_ORDER = ("axial", "coronal", "sagittal")
+#: The voxels kept around the shown region in each slice of a slices view.
+SLICE_MARGIN = 2
 
 
 @dataclass
@@ -37,16 +63,27 @@ class Example:
     Each panel's array is stored once: identical to an earlier panel's (``same``), the
     negation of a shown one (``neg``), its raw values (the first of each output), or the
     exclusive or of its bits with a reference (``xor``): the output's first array, or what
-    ``predict[output](panel id)`` returns, a closer reference (e.g. a quotient of two arrays)."""
+    ``predict[output](panel id)`` returns, a closer reference (e.g. a quotient of two arrays).
 
-    def __init__(self, ctx: Context, grid: Grid, show: np.ndarray):
-        self.ctx, self.grid = ctx, grid
+    With ``view="slices"`` the arrays are encoded when :meth:`cut` names the voxel the three
+    slices go through (``common.finish`` calls it with the default view's voxel)."""
+
+    def __init__(self, ctx: Context, grid: Grid, show: np.ndarray, view: str = "volume"):
+        if view not in VIEWS:
+            raise ValueError(f"unknown view {view!r}; choose from {VIEWS}")
+        self.ctx, self.grid, self.view = ctx, grid, view
         self.mask = grid.take(show).astype(np.uint8)
         self.m = self.mask.astype(bool)
         self.panels: list[Panel] = []
         self.specs: dict[str, dict] = {}
         self.shown: dict[str, np.ndarray] = {}  # "pid:out" -> display array, as stored
         self.predict: dict[str, Callable[[str], tuple[np.ndarray, object]]] = {}
+        #: slices view: plane -> {index, box [u0, v0, nu, nv], offset}, once cut
+        self.planes: dict[str, dict] | None = None
+        self.voxel: list[int] | None = None
+        self.per_volume = 0
+        #: slices view: what is encoded at the cut (key, spec to fill, reference keys, prediction)
+        self.pending: list[tuple[str, dict, list[str], tuple | None, dict]] = []
 
     def panel(self, pid: str) -> Panel:
         return next(p for p in self.panels if p.id == pid)
@@ -105,29 +142,147 @@ class Example:
                 )
             if neg:
                 spec[out] = {"neg": neg, "dtype": dtype_code(full), **meta}
+            elif self.view == "volume":
+                spec[out] = self._encode(key, a, self._candidates(key, p.id, a), None, meta)
             else:
-                # the smallest of: the values, the bits' difference from the shown array of the
-                # same type closest to it (the fewest differing bytes), the bits' difference
-                # from the predicted reference
-                cands = [encode(a)]
-                bytes_a = a.view(np.uint8)
-                refs = [
-                    (int(np.count_nonzero(b.view(np.uint8) != bytes_a)), k)
-                    for k, b in self.shown.items()
-                    if k != key
-                    and b.dtype == a.dtype
-                    and b.shape == a.shape
-                    and not k.startswith(f"{p.id}:")
-                ]
-                if refs:
-                    _, k = min(refs)
-                    cands.append(encode(a, self.shown[k], k))
-                if out in self.predict:
-                    ref, ref_spec = self.predict[out](p.id)
-                    cands.append(encode(a, ref, ref_spec))
-                spec[out] = store(self.ctx, min(cands, key=lambda c: len(c[0])), **meta)
+                spec[out] = {}
+                pred = self.predict[out](p.id) if out in self.predict else None
+                self.pending.append((key, spec[out], self._candidates(key, p.id, a), pred, meta))
         self.panels.append(p)
         self.specs[p.id] = spec
+
+    def _candidates(self, key: str, pid: str, a: np.ndarray) -> list[str]:
+        """The shown arrays an array may be stored against: the same type and shape, another
+        panel's, shown before it."""
+        return [
+            k
+            for k, b in self.shown.items()
+            if k != key
+            and b.dtype == a.dtype
+            and b.shape == a.shape
+            and not k.startswith(f"{pid}:")
+        ]
+
+    def _encode(self, key: str, a: np.ndarray, cands: list[str], pred, meta: dict) -> dict:
+        """The smallest of: the values, the bits' difference from the candidate closest to it
+        (the fewest differing bytes), the bits' difference from the predicted reference."""
+        view = self.slices if self.view == "slices" else (lambda x: x)
+        a = view(a)
+        choices = [encode(a)]
+        bytes_a = a.view(np.uint8)
+        refs = [
+            (int(np.count_nonzero(view(self.shown[k]).view(np.uint8) != bytes_a)), k) for k in cands
+        ]
+        if refs:
+            _, k = min(refs)
+            choices.append(encode(a, view(self.shown[k]), k))
+        if pred is None and self.view == "volume":
+            pid, out = key.split(":")
+            if out in self.predict:
+                pred = self.predict[out](pid)
+        if pred is not None:
+            ref, ref_spec = pred
+            choices.append(encode(a, view(ref), ref_spec))
+        return store(self.ctx, min(choices, key=lambda c: len(c[0])), **meta)
+
+    # ------------------------------------------------------------------ slices
+    def cut(self, voxel) -> None:
+        """A slices view: the three planes through ``voxel`` (display voxel), each cropped to
+        the shown region in it, and every array encoded on them."""
+        if self.view != "slices":
+            raise ValueError("cut() is for a slices view")
+        voxel = [int(v) for v in voxel[:3]]
+        if self.planes is not None:
+            if voxel != self.voxel:
+                raise ValueError(f"already cut at {self.voxel}, not {voxel}")
+            return
+        self.voxel, self.planes, off = voxel, {}, 0
+        for name in PLANE_ORDER:
+            s = PLANE_AXES[name][0]
+            m2 = np.take(self.mask, voxel[s], axis=s)
+            idx = np.argwhere(m2)
+            if idx.size:
+                lo = np.maximum(idx.min(0) - SLICE_MARGIN, 0)
+                hi = np.minimum(idx.max(0) + 1 + SLICE_MARGIN, m2.shape)
+            else:  # nothing shown in this plane: one voxel, outside the mask
+                lo, hi = np.zeros(2, int), np.ones(2, int)
+            box = [int(lo[0]), int(lo[1]), int(hi[0] - lo[0]), int(hi[1] - lo[1])]
+            self.planes[name] = {"index": voxel[s], "box": box, "offset": off}
+            off += box[2] * box[3]
+        self.per_volume = off
+        for key, spec, cands, pred, meta in self.pending:
+            spec.update(self._encode(key, self.shown[key], cands, pred, meta))
+        self.pending = []
+
+    def slices(self, a: np.ndarray) -> np.ndarray:
+        """A display array (x, y, z[, t]) as a slices view stores it: for each volume, the
+        axial, coronal and sagittal slices, each cropped to its box, u fastest."""
+        if self.planes is None:
+            raise ValueError("the slices view is not cut yet")
+        cuts = []
+        for name in PLANE_ORDER:
+            p = self.planes[name]
+            u0, v0, nu, nv = p["box"]
+            cuts.append(
+                np.take(a, p["index"], axis=PLANE_AXES[name][0])[u0 : u0 + nu, v0 : v0 + nv]
+            )
+        nt = a.shape[3] if a.ndim == 4 else 1
+        parts = [
+            (c if a.ndim == 3 else c[..., t]).ravel(order="F") for t in range(nt) for c in cuts
+        ]
+        return np.ascontiguousarray(np.concatenate(parts))
+
+    def unslice(self, i: int, ndim: int = 3) -> tuple[str, list[int]]:
+        """The plane and display voxel (x, y, z, and t for a series) of position ``i`` in a
+        slices array."""
+        t, r = divmod(int(i), self.per_volume)
+        for name in PLANE_ORDER:
+            p = self.planes[name]
+            u0, v0, nu, nv = p["box"]
+            if r < p["offset"] + nu * nv:
+                dv, du = divmod(r - p["offset"], nu)
+                s, uu, vv, _ = PLANE_AXES[name]
+                at = [0, 0, 0]
+                at[s], at[uu], at[vv] = p["index"], u0 + du, v0 + dv
+                return name, at + ([t] if ndim == 4 else [])
+        raise AssertionError(i)
+
+    def mask_blob(self) -> dict:
+        return blob(self.ctx, self.slices(self.mask) if self.view == "slices" else self.mask)
+
+    def describe_view(self) -> dict:
+        if self.view == "volume":
+            return {"kind": "volume"}
+        return {
+            "kind": "slices",
+            "voxel": self.voxel,
+            "planes": self.planes,
+            "per_volume": self.per_volume,
+        }
+
+    def display_diff(self, ka: str, kb: str) -> dict:
+        """Where the shown values of A and B differ most: over the whole display grid, or, in
+        a cut slices view, over its three slices (with the plane)."""
+        va, vb = self.values(ka), self.values(kb)
+        ndim = va.ndim
+        if self.planes is not None:
+            va, vb = self.slices(va), self.slices(vb)
+        d = np.abs(va - vb)
+        k = int(np.argmax(d))
+        if self.planes is not None:
+            plane, at = self.unslice(k, ndim)
+        else:
+            plane, at = None, [int(i) for i in np.unravel_index(k, d.shape)]
+        out = {
+            "max_abs": float(d.flat[k]),
+            "at": at,
+            "a": float(va.flat[k]),
+            "b": float(vb.flat[k]),
+            "differ": int(np.count_nonzero(d)),
+        }
+        if plane:
+            out["plane"] = plane
+        return out
 
     def compare(self, a: str, b: str, out: str) -> dict:
         """A − B: the metrics over the whole image (every voxel of the files), and where the
@@ -145,18 +300,7 @@ class Example:
         else:
             m = compare(fa, fb)
         m["at_display"] = self.grid.display_index(tuple(m["at"]))
-        va, vb = self.values(self.key(a, out)), self.values(self.key(b, out))
-        d = np.abs(va - vb)
-        k = int(np.argmax(d))
-        at = [int(i) for i in np.unravel_index(k, d.shape)]
-        shown = {
-            "max_abs": float(d.flat[k]),
-            "at": at,
-            "a": float(va.flat[k]),
-            "b": float(vb.flat[k]),
-            "differ": int(np.count_nonzero(d)),
-        }
-        return {"metrics": m, "display": shown}
+        return {"metrics": m, "display": self.display_diff(self.key(a, out), self.key(b, out))}
 
     def describe_panels(self) -> list[dict]:
         out = []

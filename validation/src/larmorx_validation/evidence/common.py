@@ -77,6 +77,17 @@ def load_raw(path: Path | str) -> tuple[np.ndarray, float, float]:
     )
 
 
+def stored(path: Path | str) -> tuple[np.ndarray, float | None, float]:
+    """A file's values as a panel ships them, exactly and at their own size: an integer file
+    with a scale factor or intercept gives its stored integers with both (``Panel(...,
+    scale=, inter=)``: the viewer shows stored × scale + intercept, as nibabel does); any
+    other file its values as stored (scale None)."""
+    arr, slope, inter = load_raw(path)
+    if arr.dtype.kind in "iu" and (slope != 1.0 or inter != 0.0):
+        return arr, slope, inter
+    return arr, None, 0.0
+
+
 def itk_parts(path: Path | str) -> list:
     """The transforms of an ITK file as larmorx reads them (``reproduce``: as ITK reads them)."""
     import larmorx as lx
@@ -191,6 +202,50 @@ def largest_in_slice(
     return at, k
 
 
+def slice_voxel(ex, a: str, b: str, output: str, t: int | None = None) -> list[int]:
+    """Where a slices view cuts: the display voxel where A and B differ most over the whole
+    shown region (inside it proper, its edge eroded by two voxels where that leaves anything;
+    for a series, in volume ``t`` or the volume that differs most), or the region's centre
+    (its voxel nearest the centroid) where they agree everywhere."""
+    from scipy import ndimage
+
+    va, vb = ex.values(ex.key(a, output)), ex.values(ex.key(b, output))
+    if va.ndim == 4:
+        if t is None:
+            t = int(np.argmax(np.abs(va - vb).reshape(-1, va.shape[3]).max(axis=0)))
+        va, vb = va[..., t], vb[..., t]
+    inner = ndimage.binary_erosion(ex.m, iterations=2)
+    region = inner if inner.any() else ex.m
+    d = np.where(region, np.abs(va - vb), -1.0)
+    if d.max() > 0:
+        return [int(i) for i in np.unravel_index(int(np.argmax(d)), d.shape)]
+    idx = np.argwhere(region)
+    c = idx.mean(0)
+    return [int(i) for i in idx[int(np.argmin(((idx - c) ** 2).sum(axis=1)))]]
+
+
+def head_mask(data: np.ndarray, fraction: float = 0.08, margin: int = 2) -> np.ndarray:
+    """The head in an anatomical image, for an example that shows the whole head (only for
+    images whose defacing was checked: larmorx-testdata's ``panel.toml``, ``show = "head"``):
+    the voxels above ``fraction`` of the smoothed image's 99th percentile, the largest connected
+    part, its holes filled slice by slice and in 3D, dilated by ``margin`` voxels."""
+    from scipy import ndimage
+
+    a = np.asarray(data, dtype=np.float64)
+    if a.ndim == 4:
+        a = a.mean(axis=3)
+    s = ndimage.gaussian_filter(a, 1.0)
+    m = s > fraction * float(np.percentile(s, 99))
+    lab, n = ndimage.label(m)
+    if n:
+        sizes = ndimage.sum(m, lab, range(1, n + 1))
+        m = lab == 1 + int(np.argmax(sizes))
+    m = ndimage.binary_fill_holes(m)
+    for z in range(m.shape[2]):
+        m[..., z] = ndimage.binary_fill_holes(m[..., z])
+    return ndimage.binary_dilation(m, iterations=margin) if margin else m
+
+
 def centre_view(ex, plane: str = "axial") -> tuple[list[int], int]:
     """The default view where the images agree: the slice of ``plane`` with the most brain, the
     crosshair at the brain's centre in it."""
@@ -219,9 +274,16 @@ def finish(
     caption: str = "",
 ) -> dict:
     """Windows, the default view's posters and the example's JSON parts (grid, mask, outputs,
-    panels, diffs, default, poster). The comparisons must have their metrics and verdicts."""
+    panels, diffs, default, poster; ``view`` for a slices view). The comparisons must have
+    their metrics and verdicts. A slices view is cut through the default view's voxel here, and
+    each comparison's largest shown difference is then sought in its three slices."""
     from larmorx_validation.evidence import example as exm
 
+    if ex.view == "slices":
+        ex.cut(default["voxel"])
+        for x in diffs:
+            for oid in list(x.get("display") or {}):
+                x["display"][oid] = ex.display_diff(ex.key(x["a"], oid), ex.key(x["b"], oid))
     m4 = None
     for o in outputs:
         v = ex.values(ex.key(window_panel, o["id"]))
@@ -288,7 +350,8 @@ def finish(
     del m4
     return {
         "grid": ex.grid.describe(n_volumes=n_vol),
-        "mask": core.blob(ctx, ex.mask),
+        **({"view": ex.describe_view()} if ex.view != "volume" else {}),
+        "mask": ex.mask_blob(),
         "outputs": outputs,
         "panels": panels,
         "diffs": diffs,

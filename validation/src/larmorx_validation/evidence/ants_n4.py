@@ -668,7 +668,7 @@ A40_NODE = f"{A40_WF}/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n
 A40_DATA = {
     "dataset": "OpenNeuro ds005454 (fMRIPrep boot camp, 7T training dataset), v1.0.0",
     "subject": "sub-16",
-    "licence": "CC0-1.0",
+    "licence": "CC-BY-4.0",
 }
 A40_INVESTIGATION = "validation/investigations/ants-40-n4-nonpositive"
 
@@ -768,6 +768,9 @@ def _a40_spec(ctx: core.Context):
             "reproduce mode gives ANTs' result."
         ),
         effect=effect,
+        # a 0.8 mm 7T image (172 x 214 x 172 voxels shown): three slices through the largest
+        # change instead of the whole grid (40 MB of this page's 50 MB until 2026-10-24)
+        view="slices",
         node="fMRIPrep 25.2.6, `anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final`",
         fmriprep=fmriprep,
         settings="fMRIPrep 25.2.6's final N4 of ds005454 sub-16 (inu_n4_final), its arguments "

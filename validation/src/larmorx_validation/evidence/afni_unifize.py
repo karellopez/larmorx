@@ -490,7 +490,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "afni-1", "original-1", "replica-1"],
-        "diffs": ["original-afni", "original-afnicr", "afni6-afni1"],
+        "diffs": ["original-afni", "replica-afni", "afni6-afni1"],
         "compare": {"a": "afni-1", "b": "original-1"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS_T1W), default=default, window_panel="afni-1",

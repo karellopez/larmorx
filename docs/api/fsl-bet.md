@@ -16,7 +16,8 @@ under the FSL Licence's terms; translated from FSL's source:
 replica that ran.
 
 **Status: `validated`** (the replica), against FSL 6.0.7.17 itself
-([record](../validation/fsl-bet-replica.md)): every compared case gives FSL's exit status,
+([record](../validation/fsl-bet-replica.md), standard tier: 129 cases;
+[full tier](../validation/fsl-bet-replica-full.md): 143): every compared case gives FSL's exit status,
 messages and files byte for byte (images: header and data; meshes as text), fMRIPrep's nine BET
 calls on its oracle runs included, whose outputs also have the values of fMRIPrep's own (and of
 fMRIPrep's build of FSL in its image).
@@ -160,8 +161,12 @@ computes them (`pow`, `exp`, `tanh`, and the x87 `long double` arithmetic of FSL
 
 ## Speed
 
-Informal timings on a shared machine (not a benchmark report): fMRIPrep's call on ds000005's BOLD
-reference took about 1.6 s in FSL and 0.9 s in the replica. There is no benchmark report yet.
+Informal timings, one run each on a shared machine (not a benchmark report;
+[validation/investigations/fsl-bet](../../validation/investigations/fsl-bet/README.md)):
+fMRIPrep's call on ds000005's BOLD reference took 1.14 s in FSL and 0.62 s in the replica;
+`bet2 -m` on a T1w 2.27 s and 1.06 s; `betsurf --t1only -m` 31.4 s and 15.1 s (13.6 s at 3
+threads: the replica smooths in parallel, with the same result). There is no benchmark report
+yet.
 
 ## Rust
 

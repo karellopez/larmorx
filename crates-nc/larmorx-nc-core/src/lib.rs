@@ -24,6 +24,8 @@
 //! (`larmorx-nc-mcflirt`, `larmorx-nc-bet`, ...) builds on these modules, and code two tools share
 //! moves here.
 #![forbid(unsafe_code)]
+// Index loops mirror FSL's loops, so that each step can be checked against the source.
+#![allow(clippy::needless_range_loop)]
 
 pub mod arma;
 pub mod cnum;

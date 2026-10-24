@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(fmt_g(0.0001, 6), "0.0001");
         assert_eq!(fmt_g(0.00001234, 6), "1.234e-05");
         assert_eq!(fmt_g(999999.5, 6), "1e+06");
-        assert_eq!(fmt_g(-3.14159265, 6), "-3.14159");
+        assert_eq!(fmt_g(-2.25346789, 6), "-2.25347");
         assert_eq!(fmt_g(1e-300, 6), "1e-300");
         assert_eq!(fmt_g(f64::NAN, 6), "nan");
         assert_eq!(fmt_g(-f64::NAN, 6), "-nan");

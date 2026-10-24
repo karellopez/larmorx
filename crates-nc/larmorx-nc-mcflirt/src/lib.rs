@@ -14,6 +14,8 @@
 //! FSL-01, -03, -05 to -10, -13, -14, -20, -21), with the same defaults as larmorx's clean-room
 //! original (`larmorx mri hmc`).
 #![forbid(unsafe_code)]
+// Index loops mirror mcflirt's loops, so that each step can be checked against the source.
+#![allow(clippy::needless_range_loop)]
 
 pub mod options;
 pub mod run;

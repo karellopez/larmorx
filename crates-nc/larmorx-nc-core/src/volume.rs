@@ -1115,6 +1115,7 @@ impl Volume {
     /// `save_volume_dtype(source, filename, datatype)` with the conversion `conv` (FSL's is
     /// [`Conversion::X86Cast`]); `datatype_code` overrides the header's datatype and `units` is
     /// the header's `xyzt_units` (FSL always writes [`nifti::UNITS_MM_SEC`]).
+    #[allow(clippy::too_many_arguments)]
     pub fn save_typed(
         &self,
         filename: &str,
@@ -1293,7 +1294,9 @@ mod tests {
         assert_eq!(make_basename("x.nii.gz_meanvol"), "x.nii.gz_meanvol");
         assert_eq!(make_basename("plain"), "plain");
         assert_eq!(find_pathname("/a/b/c.nii"), "/a/b/");
-        assert_eq!(find_pathname("c.nii"), "c.nii");
+        // No '/': everything after the first character is erased (FSL's loop stops at 0).
+        assert_eq!(find_pathname("c.nii"), "c");
+        assert_eq!(find_pathname(""), "");
     }
 
     #[test]

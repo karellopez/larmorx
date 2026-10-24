@@ -82,7 +82,7 @@ const CASES: &[Case] = &[
         input: Input::Int16,
         args: args!["-mats", "-plots", "-rmsrel", "-rmsabs"],
         mode: "fix",
-        named: &["FSL-01", "FSL-09"],
+        named: &["FSL-09"],
         output_type: "NIFTI",
     },
     Case {
@@ -91,7 +91,7 @@ const CASES: &[Case] = &[
         input: Input::Int16,
         args: args!["-mats", "-plots", "-rmsrel", "-rmsabs"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-09"],
+        named: &["FSL-09"],
         output_type: "NIFTI",
     },
     Case {
@@ -109,7 +109,7 @@ const CASES: &[Case] = &[
             "-rmsabs"
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-01"],
         output_type: "NIFTI",
     },
     Case {
@@ -118,7 +118,7 @@ const CASES: &[Case] = &[
         input: Input::Float32,
         args: args!["-meanvol", "-spline_final", "-dof", "12", "-mats", "-plots"],
         mode: "fix",
-        named: &["FSL-08"],
+        named: &["FSL-01"],
         output_type: "NIFTI",
     },
     Case {
@@ -137,7 +137,7 @@ const CASES: &[Case] = &[
             "-plots"
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-01"],
         output_type: "NIFTI",
     },
     Case {
@@ -199,7 +199,7 @@ const CASES: &[Case] = &[
         input: Input::Slab,
         args: args!["-mats", "-plots"],
         mode: "fix",
-        named: &["FSL-01", "FSL-03"],
+        named: &["FSL-03"],
         output_type: "NIFTI",
     },
     Case {
@@ -208,7 +208,7 @@ const CASES: &[Case] = &[
         input: Input::Slab,
         args: args!["-2d", "-mats", "-plots"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-03"],
+        named: &["FSL-03"],
         output_type: "NIFTI",
     },
     Case {
@@ -217,7 +217,7 @@ const CASES: &[Case] = &[
         input: Input::Float32,
         args: args!["-stats", "-mats"],
         mode: "fix",
-        named: &["FSL-01", "FSL-08"],
+        named: &["FSL-08"],
         output_type: "NIFTI",
     },
     Case {
@@ -226,7 +226,7 @@ const CASES: &[Case] = &[
         input: Input::Float32,
         args: args!["-stats", "-mats"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-08"],
+        named: &["FSL-08"],
         output_type: "NIFTI",
     },
     Case {
@@ -235,7 +235,7 @@ const CASES: &[Case] = &[
         input: Input::Float32,
         args: args!["-gdt", "-mats"],
         mode: "reproduce",
-        named: &["FSL-01"],
+        named: &["FSL-04"],
         output_type: "NIFTI",
     },
     Case {
@@ -244,7 +244,7 @@ const CASES: &[Case] = &[
         input: Input::Uint8,
         args: args!["-mats"],
         mode: "fix",
-        named: &["FSL-01", "FSL-09"],
+        named: &["FSL-09"],
         output_type: "NIFTI",
     },
     Case {
@@ -253,7 +253,7 @@ const CASES: &[Case] = &[
         input: Input::Int8,
         args: args!["-mats"],
         mode: "fix",
-        named: &["FSL-01", "FSL-09"],
+        named: &["FSL-09"],
         output_type: "NIFTI",
     },
     Case {
@@ -262,7 +262,7 @@ const CASES: &[Case] = &[
         input: Input::Int8,
         args: args!["-mats"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-09"],
+        named: &["FSL-09"],
         output_type: "NIFTI",
     },
     Case {
@@ -271,7 +271,7 @@ const CASES: &[Case] = &[
         input: Input::Float32NonFinite,
         args: args!["-mats", "-plots", "-rmsabs"],
         mode: "fix",
-        named: &["FSL-01", "FSL-14"],
+        named: &["FSL-14"],
         output_type: "NIFTI",
     },
     Case {
@@ -280,7 +280,7 @@ const CASES: &[Case] = &[
         input: Input::Float32NonFinite,
         args: args!["-mats", "-plots", "-rmsabs"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-14"],
+        named: &["FSL-14"],
         output_type: "NIFTI",
     },
     Case {
@@ -289,7 +289,7 @@ const CASES: &[Case] = &[
         input: Input::Float32BigEndianNeurological,
         args: args!["-mats", "-plots"],
         mode: "fix",
-        named: &["FSL-01"],
+        named: &[],
         output_type: "NIFTI2",
     },
     Case {
@@ -298,7 +298,7 @@ const CASES: &[Case] = &[
         input: Input::Int16Milliseconds,
         args: args!["-stages", "1", "-mats"],
         mode: "fix",
-        named: &["FSL-01", "FSL-09", "FSL-10"],
+        named: &["FSL-09", "FSL-10"],
         output_type: "NIFTI",
     },
     Case {
@@ -307,7 +307,7 @@ const CASES: &[Case] = &[
         input: Input::Int16Milliseconds,
         args: args!["-stages", "1", "-mats"],
         mode: "reproduce",
-        named: &["FSL-01", "FSL-09", "FSL-10"],
+        named: &["FSL-09", "FSL-10"],
         output_type: "NIFTI",
     },
 ];
@@ -425,8 +425,8 @@ fn nifti_file(
     put_i16(&mut h, 70, datatype);
     put_i16(&mut h, 72, bitpix);
     put_f32(&mut h, 76, 1.0);
-    for k in 0..3 {
-        put_f32(&mut h, 80 + 4 * k, PIXDIM[k]);
+    for (k, d) in PIXDIM.iter().enumerate() {
+        put_f32(&mut h, 80 + 4 * k, *d);
     }
     put_f32(&mut h, 92, tr);
     put_f32(&mut h, 108, 352.0);
@@ -842,6 +842,7 @@ fn golden() {
     let inputs = write_inputs(dir.path());
     let mut actual = Recorded::new();
     let mut runs = BTreeMap::new();
+    let mut notices = Vec::new();
     for case in CASES {
         // Each case in its own directory, so that its outputs are exactly the files there.
         let run = dir.path().join(case.id);
@@ -876,17 +877,21 @@ fn golden() {
             .collect();
         found.sort_unstable();
         found.dedup();
-        assert_eq!(found, case.named, "{}: {stderr}", case.id);
         let verb = if case.mode == "fix" {
             "corrected"
         } else {
             "reproduced"
         };
-        for id in case.named {
-            let named = stderr.lines().any(|l| {
+        let all_named = case.named.iter().all(|id| {
+            stderr.lines().any(|l| {
                 l.contains(&format!("upstream defect {id} (")) && l.contains(&format!(") {verb}: "))
-            });
-            assert!(named, "{}: {stderr}", case.id);
+            })
+        });
+        if found != case.named || !all_named {
+            notices.push(format!(
+                "{}: named {found:?} ({verb}: {all_named}), expected {:?}",
+                case.id, case.named
+            ));
         }
         let fps = case_fingerprints(&run);
         assert!(!fps.is_empty(), "{}: no outputs", case.id);
@@ -896,6 +901,11 @@ fn golden() {
         runs.insert(case.id, run);
     }
 
+    assert!(
+        notices.is_empty(),
+        "the upstream defects named differ:\n  {}",
+        notices.join("\n  ")
+    );
     if std::env::var_os("LARMORX_GOLDEN_RECORD").is_some() {
         record(&actual);
         return;

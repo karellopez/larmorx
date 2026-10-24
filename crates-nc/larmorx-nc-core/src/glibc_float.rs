@@ -39,29 +39,29 @@ struct SinCos {
 const TABLE: [SinCos; 2] = [
     SinCos {
         sign: [1.0, -1.0, -1.0, 1.0],
-        hpi_inv: hexf(0x1_45F3_06DC_9C883, 23),
-        hpi: hexf(0x1_921F_B544_42D18, 0),
+        hpi_inv: hexf(0x145F306DC9C883, 23),
+        hpi: hexf(0x1921FB54442D18, 0),
         c0: 1.0,
-        c1: -hexf(0x1_ffff_ffd0_c621c, -2),
-        c2: hexf(0x1_5555_3e10_68f19, -5),
-        c3: -hexf(0x1_6c08_7e89_a359d, -10),
-        c4: hexf(0x1_9934_3027_bf8c3, -16),
-        s1: -hexf(0x1_5555_4599_5a603, -3),
-        s2: hexf(0x1_1107_6052_30bc4, -7),
-        s3: -hexf(0x1_994e_b377_4cf24, -13),
+        c1: -hexf(0x1ffffffd0c621c, -2),
+        c2: hexf(0x155553e1068f19, -5),
+        c3: -hexf(0x16c087e89a359d, -10),
+        c4: hexf(0x199343027bf8c3, -16),
+        s1: -hexf(0x1555545995a603, -3),
+        s2: hexf(0x11107605230bc4, -7),
+        s3: -hexf(0x1994eb3774cf24, -13),
     },
     SinCos {
         sign: [1.0, -1.0, -1.0, 1.0],
-        hpi_inv: hexf(0x1_45F3_06DC_9C883, 23),
-        hpi: hexf(0x1_921F_B544_42D18, 0),
+        hpi_inv: hexf(0x145F306DC9C883, 23),
+        hpi: hexf(0x1921FB54442D18, 0),
         c0: -1.0,
-        c1: hexf(0x1_ffff_ffd0_c621c, -2),
-        c2: -hexf(0x1_5555_3e10_68f19, -5),
-        c3: hexf(0x1_6c08_7e89_a359d, -10),
-        c4: -hexf(0x1_9934_3027_bf8c3, -16),
-        s1: -hexf(0x1_5555_4599_5a603, -3),
-        s2: hexf(0x1_1107_6052_30bc4, -7),
-        s3: -hexf(0x1_994e_b377_4cf24, -13),
+        c1: hexf(0x1ffffffd0c621c, -2),
+        c2: -hexf(0x155553e1068f19, -5),
+        c3: hexf(0x16c087e89a359d, -10),
+        c4: -hexf(0x199343027bf8c3, -16),
+        s1: -hexf(0x1555545995a603, -3),
+        s2: hexf(0x11107605230bc4, -7),
+        s3: -hexf(0x1994eb3774cf24, -13),
     },
 ];
 
@@ -80,7 +80,7 @@ const fn hexf(m: u64, exp: i32) -> f64 {
 }
 
 /// 2pi * 2^-64.
-const PI63: f64 = hexf(0x1_921F_B544_42D18, -62);
+const PI63: f64 = hexf(0x1921FB54442D18, -62);
 
 /// The top 12 bits of the float's representation, sign cleared.
 #[inline]
@@ -137,7 +137,7 @@ fn sinf_poly(x: f64, x2: f64, p: &SinCos, n: i32) -> f32 {
 fn reduce_fast(x: f64, p: &SinCos) -> (f64, i32) {
     let r = x * p.hpi_inv;
     // (int32_t)r: truncation; |r| < 2^31 here.
-    let n = ((r as i32).wrapping_add(0x80_0000)) >> 24;
+    let n = ((r as i32).wrapping_add(0x0080_0000)) >> 24;
     ((-f64::from(n)).mul_add(p.hpi, x), n)
 }
 
@@ -147,7 +147,7 @@ fn reduce_large(xi: u32) -> (f64, i32) {
     let k = ((xi >> 26) & 15) as usize;
     let arr = &INV_PIO4[k..];
     let shift = (xi >> 23) & 7;
-    let xi = ((xi & 0xff_ffff) | 0x80_0000) << shift;
+    let xi = ((xi & 0x00ff_ffff) | 0x0080_0000) << shift;
     // res0 = xi * arr[0]: a 32-bit product, then widened.
     let mut res0 = u64::from(xi.wrapping_mul(arr[0]));
     let res1 = u64::from(xi) * u64::from(arr[4]);
@@ -162,6 +162,7 @@ fn reduce_large(xi: u32) -> (f64, i32) {
 
 /// glibc's `sinf` (x86-64, FMA build).
 #[must_use]
+#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn sinf(y: f32) -> f32 {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -195,6 +196,7 @@ pub fn sinf(y: f32) -> f32 {
 
 /// glibc's `cosf` (x86-64, FMA build).
 #[must_use]
+#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn cosf(y: f32) -> f32 {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -227,6 +229,7 @@ pub fn cosf(y: f32) -> f32 {
 
 /// glibc's `sincosf` (x86-64, FMA build): `(sin y, cos y)`.
 #[must_use]
+#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn sincosf(y: f32) -> (f32, f32) {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -262,32 +265,33 @@ pub fn sincosf(y: f32) -> (f32, f32) {
 
 /// `__logf_data`: 16 table entries (1/c, log c), ln 2, and the polynomial.
 const LOGF_TAB: [(f64, f64); 16] = [
-    (hexf(0x1_661e_c79f_8f3be, 0), -hexf(0x1_57bf_7808_caade, -2)),
-    (hexf(0x1_571e_d4aa_f883d, 0), -hexf(0x1_2bef_0a7c_06ddb, -2)),
-    (hexf(0x1_4953_9f0f_010b0, 0), -hexf(0x1_01ea_e7f5_13a67, -2)),
-    (hexf(0x1_3c99_5b0b_80385, 0), -hexf(0x1_b31d_8a68_224e9, -3)),
-    (hexf(0x1_30d1_90c8_864a5, 0), -hexf(0x1_6574_f0ac_07758, -3)),
-    (hexf(0x1_25e2_27b0_b8ea0, 0), -hexf(0x1_1aa2_bc79_c8100, -3)),
-    (hexf(0x1_1bb4_a4a1_a343f, 0), -hexf(0x1_a4e7_6ce8_c0e5e, -4)),
-    (hexf(0x1_1235_8f08_ae5ba, 0), -hexf(0x1_1973_c5a6_11ccc, -4)),
-    (hexf(0x1_0953_f419_900a7, 0), -hexf(0x1_252f_438e_10c1e, -5)),
+    (hexf(0x1661ec79f8f3be, 0), -hexf(0x157bf7808caade, -2)),
+    (hexf(0x1571ed4aaf883d, 0), -hexf(0x12bef0a7c06ddb, -2)),
+    (hexf(0x149539f0f010b0, 0), -hexf(0x101eae7f513a67, -2)),
+    (hexf(0x13c995b0b80385, 0), -hexf(0x1b31d8a68224e9, -3)),
+    (hexf(0x130d190c8864a5, 0), -hexf(0x16574f0ac07758, -3)),
+    (hexf(0x125e227b0b8ea0, 0), -hexf(0x11aa2bc79c8100, -3)),
+    (hexf(0x11bb4a4a1a343f, 0), -hexf(0x1a4e76ce8c0e5e, -4)),
+    (hexf(0x112358f08ae5ba, 0), -hexf(0x11973c5a611ccc, -4)),
+    (hexf(0x10953f419900a7, 0), -hexf(0x1252f438e10c1e, -5)),
     (1.0, 0.0),
-    (hexf(0x1_e608_cfd9_a47ac, -1), hexf(0x1_aa5a_a5df_25984, -5)),
-    (hexf(0x1_ca4b_31f0_26aa0, -1), hexf(0x1_c5e5_3aa3_62eb4, -4)),
-    (hexf(0x1_b203_6576_afce6, -1), hexf(0x1_526e_5772_0db08, -3)),
-    (hexf(0x1_9c2d_163a_1aa2d, -1), hexf(0x1_bc28_60d2_24770, -3)),
-    (hexf(0x1_886e_6037_841ed, -1), hexf(0x1_1058_bc8a_07ee1, -2)),
-    (hexf(0x1_767d_cf55_34862, -1), hexf(0x1_4043_057b_6ee09, -2)),
+    (hexf(0x1e608cfd9a47ac, -1), hexf(0x1aa5aa5df25984, -5)),
+    (hexf(0x1ca4b31f026aa0, -1), hexf(0x1c5e53aa362eb4, -4)),
+    (hexf(0x1b2036576afce6, -1), hexf(0x1526e57720db08, -3)),
+    (hexf(0x19c2d163a1aa2d, -1), hexf(0x1bc2860d224770, -3)),
+    (hexf(0x1886e6037841ed, -1), hexf(0x11058bc8a07ee1, -2)),
+    (hexf(0x1767dcf5534862, -1), hexf(0x14043057b6ee09, -2)),
 ];
-const LOGF_LN2: f64 = hexf(0x1_62e4_2fef_a39ef, -1);
+const LOGF_LN2: f64 = hexf(0x162e42fefa39ef, -1);
 const LOGF_POLY: [f64; 3] = [
-    -hexf(0x1_00ea_348b_88334, -2),
-    hexf(0x1_5575_b0be_00b6a, -2),
-    -hexf(0x1_ffff_ef20_a4123, -2),
+    -hexf(0x100ea348b88334, -2),
+    hexf(0x15575b0be00b6a, -2),
+    -hexf(0x1ffffef20a4123, -2),
 ];
 
 /// glibc's `logf` (x86-64, FMA build).
 #[must_use]
+#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn logf(x: f32) -> f32 {
     const OFF: u32 = 0x3f33_0000;
     let mut ix = x.to_bits();
@@ -332,8 +336,8 @@ mod tests {
 
     #[test]
     fn constants_are_the_c_literals() {
-        assert_eq!(hexf(0x1_921F_B544_42D18, 0), std::f64::consts::FRAC_PI_2);
-        assert_eq!(hexf(0x1_62e4_2fef_a39ef, -1), std::f64::consts::LN_2);
+        assert_eq!(hexf(0x1921FB54442D18, 0), std::f64::consts::FRAC_PI_2);
+        assert_eq!(hexf(0x162e42fefa39ef, -1), std::f64::consts::LN_2);
         assert_eq!(PIO4_TOP12, abstop12(std::f32::consts::FRAC_PI_4));
         assert_eq!(TOP12_120, abstop12(120.0));
         assert_eq!(TOP12_2M12, abstop12(f32::from_bits(0x3980_0000)));

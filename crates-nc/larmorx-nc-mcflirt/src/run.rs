@@ -503,7 +503,7 @@ fn register_volume_mut(
     let mut cerr = Cerr::new(fixed);
     let mut testvol = timeseries.sub_volume(i64::from(i))?;
     if o.gdtflag {
-        // -gdt (reached only when reproducing, FSL-04): the test volume becomes its gradient
+        // -gdt (reached only when reproducing, FSL-04; named in `main`): the test volume becomes its gradient
         // image; the reference's gradient is computed and discarded.
         if !o.no_reporting {
             cerr.s(&format!("Calculating gradient image for volume [{i}]\n"));
@@ -611,6 +611,13 @@ impl Run<'_> {
     /// `main()` after the command line.
     fn main(&mut self) -> Result<(), End> {
         self.report("\nMcFLIRT v 2.0 - FMRI motion correction\n\n");
+        if self.mode.reproduce() && self.o.gdtflag {
+            self.notice(
+                &defects::FSL_04,
+                "-gdt registers each volume's gradient image to the reference's plain image, as in \
+                 mcflirt",
+            );
+        }
         if self.mode.fix() && self.o.gdtflag {
             return Err(End::Refuse(
                 "-gdt (registration of gradient images) is not supported: mcflirt computes the \
@@ -1153,10 +1160,21 @@ impl Run<'_> {
                 (ty, Conversion::X86Cast, None)
             }
         } else {
+            let integer = matches!(ty, SaveType::Char | SaveType::Short | SaveType::Int);
             if datatype == nifti::dt::INT8 {
                 self.notice(
                     &defects::FSL_09,
                     "int8 data are written as uint8, as in mcflirt",
+                );
+            } else if integer
+                && ts
+                    .data
+                    .iter()
+                    .any(|v| v.round_ties_even() != v.trunc() || !v.is_finite())
+            {
+                self.notice(
+                    &defects::FSL_09,
+                    "integer outputs are truncated toward zero, as in mcflirt",
                 );
             }
             (ty, Conversion::X86Cast, None)
@@ -1340,6 +1358,13 @@ impl Run<'_> {
                              with status 0)"
                         )));
                     }
+                    self.notice(
+                        &defects::FSL_20,
+                        format!(
+                            "the directory {d} cannot be created: mcflirt's message and exit \
+                             status 0, nothing more written"
+                        ),
+                    );
                     return Err(End::Exit(
                         0,
                         vec!["Error!: Unknown Log directory return value".into()],

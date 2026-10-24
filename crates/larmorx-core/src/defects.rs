@@ -376,6 +376,8 @@ defects! {
         "the normalised correlation's count N is a running sum of running sums of the weights, so the correlation is effectively uncentred";
     FSL_03 = "FSL-03", "mcflirt", true,
         "the in-plane mode pads the first stage's reference grid twice";
+    FSL_04 = "FSL-04", "mcflirt", true,
+        "-gdt registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded), and aborts when -out names a directory";
     FSL_05 = "FSL-05", "mcflirt", true,
         "-scaling and -hist are accepted and ignored";
     FSL_06 = "FSL-06", "mcflirt", true,
@@ -392,6 +394,8 @@ defects! {
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,
         "one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN";
+    FSL_20 = "FSL-20", "mcflirt", true,
+        "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

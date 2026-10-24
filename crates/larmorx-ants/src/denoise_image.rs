@@ -18,8 +18,9 @@
 //! (`docs/findings/ants-denoise.md`).
 //!
 //! The filter's Rician correction factor overflows at a high signal-to-noise ratio and ITK
-//! then sets the bias to 0 (ANTS-43): corrected unless [`DenoiseOptions::upstream_defects`] is
-//! [`UpstreamDefects::Reproduce`].
+//! then sets the bias to 0 (ANTS-43), and with a mask the voxels outside it that patches reach
+//! keep an unsmoothed, uncorrected bias (ANTS-44): both corrected unless
+//! [`DenoiseOptions::upstream_defects`] is [`UpstreamDefects::Reproduce`].
 
 use larmorx_core::IndexFloor;
 use larmorx_core::defects::{Notice, Notices, UpstreamDefects};
@@ -55,7 +56,7 @@ pub struct DenoiseOptions {
     pub patch_radius: Vec<u32>,
     /// `-r`: the search radius per axis (default 2); empty means 2 on every axis.
     pub search_radius: Vec<u32>,
-    /// Correct the filter's defect (ANTS-43; the default) or reproduce it.
+    /// Correct the filter's defects (ANTS-43, ANTS-44; the default) or reproduce them.
     pub upstream_defects: UpstreamDefects,
 }
 

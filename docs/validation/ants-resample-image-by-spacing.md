@@ -1,18 +1,20 @@
 # Parity: ResampleImageBySpacing
 
-**All cases agree.** 35 cases on the `standard` tier: 30 pass, 5 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 37 cases on the `standard` tier: 32 pass, 5 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants ResampleImageBySpacing` / `lx.ants.resample_image_by_spacing` (crates larmorx-ants, larmorx-image)
 - **Reference:** ResampleImageBySpacing from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard`
+- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
+- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity ants-resample-image-by-spacing --tier standard`
 
-**Bit-identical: 28 of 28 passing cases** produce exactly the values ANTs writes; 28 of 28 also write exactly its header bytes.
+**Bit-identical: 30 of 30 passing cases** produce exactly the values ANTs writes; 30 of 30 also write exactly its header bytes.
 Values not compared, as ANTs' depend on memory it never wrote (larmorx reproduces the rest: exit code, header, type, shape, affine): `errors/thin-smoothed-axis`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-28: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; outputs not written): `errors/thin-smoothed-axis`
   - ANTS-31: 4 case(s) named it, 2 with changed values (largest difference 112), 2 with other changes (exit N -> N; outputs written): `dimensions/dim2-nn-from-addvox`, `dimensions/dim2-addvox-0`, `errors/dimension-5`, `errors/dim4-addvox-without-nn`
-  - ITK-02: 1 case(s) named it, 1 with changed values (largest difference 3.81e-06), 1 with other changes (header quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z): `dimensions/dim3-of-4d`
+  - ANTS-32: 24 case(s) named it, 22 with changed values (largest difference 1.53e+05), 18 with other changes (exit N -> N; header quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; outputs written; stdout): `spacing/down-2mm`, `spacing/down-anisotropic`, `spacing/up-1mm`, `spacing/add-voxels`, `spacing/remove-voxels`, `spacing/non-integer-size`, `spacing/int16-scaled`, `spacing/outliers` …
+  - ITK-02: 1 case(s) named it, 1 with changed values (largest difference 9.78), 1 with other changes (header quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; stdout): `dimensions/dim3-of-4d`
+- **Corrections against a result known independently** (D13 correction: the known result): 2 of 2 cases give exactly it: `spacing/sigma-in-voxels-known` (ANTs' output at 1 mm (where mm are voxels): 0 of 4480 values differ from it); `spacing/outside-zero-known` (ANTs' with its 2949 outside voxels 0: 0 of 7429 values differ from it)
 
 | Category | Cases | Pass | Both error | Expected divergence | Bit-identical | Most values differing |
 |---|---|---|---|---|---|---|
@@ -20,7 +22,7 @@ Values not compared, as ANTs' depend on memory it never wrote (larmorx reproduce
 | errors | 7 | 2 | 5 | 0 | 0 | – |
 | interpolation | 3 | 3 | 0 | 0 | 3 | 0 |
 | real | 4 | 4 | 0 | 0 | 4 | 0 |
-| spacing | 14 | 14 | 0 | 0 | 14 | 0 |
+| spacing | 16 | 16 | 0 | 0 | 16 | 0 |
 
 ## Thresholds
 
@@ -41,7 +43,7 @@ Values not compared, as ANTs' depend on memory it never wrote (larmorx reproduce
 | errors | 7 | 2 | 5 | 0 | 0 |
 | interpolation | 3 | 3 | 0 | 0 | 0 |
 | real | 4 | 4 | 0 | 0 | 0 |
-| spacing | 14 | 14 | 0 | 0 | 0 |
+| spacing | 16 | 16 | 0 | 0 | 0 |
 
 ## Rejected by both
 
@@ -57,8 +59,8 @@ Values not compared, as ANTs' depend on memory it never wrote (larmorx reproduce
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (50509e30b3e8) |
-| larmorx-testdata | 00b862132e9c |
+| larmorx | 0.0.1 (f312142c42f4) |
+| larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -87,6 +89,8 @@ Both programs get the same arguments and files; ANTs runs as its own binary and 
 | `spacing/negative-pixdim` | pass | 10/10 | a qform-only image with a negative pixdim |
 | `spacing/las-sform-only` | pass | 10/10 | an sform-only LAS image |
 | `spacing/thin-unsmoothed-axis` | pass | 10/10 | an axis of 3 voxels that is not smoothed (its sigma is 0) |
+| `spacing/sigma-in-voxels-known` | pass | 11/11 | 2 mm voxels to 4 mm: by default smoothed by one voxel (2 mm), the voxels ANTs gives for the same voxels at 1 mm to 2 mm… |
+| `spacing/outside-zero-known` | pass | 11/11 | 1 to 2 mm with addvox 3, nearest neighbour, no smoothing: by default the voxels beyond the input are 0; ANTs gives them… |
 | `interpolation/nearest` | pass | 10/10 | nearest neighbour to 1 mm |
 | `interpolation/nearest-down` | pass | 10/10 | nearest neighbour to 2 mm after smoothing |
 | `interpolation/nn-flag-2` | pass | 10/10 | an nn flag of 2 counts as true |

@@ -38,6 +38,7 @@ from larmorx_validation.parity.ants_programs import (
     crmath_preload,
     fix_pass,
     header_differences,
+    known_summary,
     raw_header,
     resolve_arg,
     run_ants,
@@ -298,6 +299,7 @@ def highlights(results: list[CaseResult], functions: str, band_threads: Sequence
                     )
                 )
     lines += defects.summary(results)
+    lines += known_summary(results)
     if rows:
         lines += [
             "",

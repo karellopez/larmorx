@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "50509e30b3e8",
-  "larmorx_testdata_commit": "00b862132e9c",
+  "larmorx_commit": "f312142c42f4",
+  "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -21,8 +21,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.14,
+   "reported": {
+    "D13 fix pass": 16128,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.364,
    "status": "pass"
   },
   {
@@ -31,8 +42,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 8960,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.386,
    "status": "pass"
   },
   {
@@ -41,8 +63,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.107,
+   "reported": {
+    "D13 fix pass": 408,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.527,
    "status": "pass"
   },
   {
@@ -51,8 +84,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.041,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -61,8 +105,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.042,
+   "reported": {
+    "D13 fix pass": 22599,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -71,8 +126,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 12584,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -81,8 +147,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.046,
+   "reported": {
+    "D13 fix pass": 25088,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -91,8 +168,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 16128,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -101,8 +189,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.045,
+   "reported": {
+    "D13 fix pass": 7942,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -111,8 +210,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.029,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.065,
    "status": "pass"
   },
   {
@@ -121,8 +231,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.028,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -131,8 +252,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.048,
+   "reported": {
+    "D13 fix pass": 9828,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -141,8 +273,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.051,
+   "reported": {
+    "D13 fix pass": 20160,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -151,8 +294,63 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 960,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/sigma-in-voxels-known",
+   "category": "spacing",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4480,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.23,
+   "status": "pass"
+  },
+  {
+   "case": "spacing/outside-zero-known",
+   "category": "spacing",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2949,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -161,8 +359,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.061,
+   "reported": {
+    "D13 fix pass": 408,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.168,
    "status": "pass"
   },
   {
@@ -171,8 +380,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.04,
+   "reported": {
+    "D13 fix pass": 16128,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -181,8 +401,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.065,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.164,
    "status": "pass"
   },
   {
@@ -191,8 +422,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.039,
+   "reported": {
+    "D13 fix pass": 1440,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -201,8 +443,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.034,
+   "reported": {
+    "D13 fix pass": 2321,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -211,8 +464,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.043,
+   "reported": {
+    "D13 fix pass": 2224,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -221,8 +485,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.049,
+   "reported": {
+    "D13 fix pass": 6048,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -231,8 +506,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.074,
+   "reported": {
+    "D13 fix pass": 56284,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -241,8 +527,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.044,
+   "reported": {
+    "D13 fix pass": 2016,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.17,
    "status": "pass"
   },
   {
@@ -251,8 +548,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.032,
+   "reported": {
+    "D13 fix pass": 2016,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -261,8 +569,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.96,
+   "reported": {
+    "D13 fix pass": 1290319,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.448,
    "status": "pass"
   },
   {
@@ -271,8 +590,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 1.325,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.553,
    "status": "pass"
   },
   {
@@ -281,8 +611,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 0.742,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.314,
    "status": "pass"
   },
   {
@@ -291,8 +632,19 @@
    "checks_passed": 10,
    "checks_total": 10,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
    "reason": "",
-   "seconds": 11.599,
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 21.815,
    "status": "pass"
   },
   {
@@ -302,7 +654,10 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -312,7 +667,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 1: addvox pads each dimension by addvox; larmorx exit 1: addvox pads each dimension by addvox",
-   "seconds": 0.015,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -322,7 +680,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs exit 0: ; larmorx exit 0: larmorx: upstream defect ANTS-31 (ResampleImageBySpacing) reproduced: dimension 5: nothing is done, exit 0, as in ANTs [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.014,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -332,7 +693,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: smoothing by : 0.666667 dir 1; larmorx exit 1: larmorx: ResampleImageBySpacing: smoothing needs all 3 spacings (ANTs calls atof on a null pointer) (ANTs crashes here)",
-   "seconds": 0.021,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -342,7 +706,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 6: what():  basic_string: construction from null is not valid; larmorx exit 1: larmorx: ResampleImageBySpacing: no nn argument after addvox (std::stoi(argv[10]) on a null pointer) (ANTs crashes here)",
-   "seconds": 0.019,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.102,
    "status": "both-error"
   },
   {
@@ -351,8 +718,18 @@
    "checks_passed": 9,
    "checks_total": 9,
    "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0
+   },
    "reason": "",
-   "seconds": 0.03,
+   "reported": {
+    "D13 fix pass": 0,
+    "header bytes identical": "True",
+    "values not compared": 576
+   },
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -362,7 +739,10 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "ANTs killed by signal 11: file <tmp>/none.nii.gz does not exist .; larmorx exit 1: larmorx: ResampleImageBySpacing: cannot read image '<tmp>/none.nii.gz' (ANTs crashes here)",
-   "seconds": 0.012,
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.033,
    "status": "both-error"
   }
  ],
@@ -371,7 +751,7 @@
   "both-error": 5,
   "expected-divergence": 0,
   "fail": 0,
-  "pass": 30,
+  "pass": 32,
   "skipped": 0
  },
  "tier": "standard"

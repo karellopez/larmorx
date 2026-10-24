@@ -81,7 +81,8 @@ def unifize(
         volume of a 4D image is processed, unless ``epi=True``.
     t2
         ``True`` or 1 is ``-T2``: invert the contrast about the ``t2_percentile`` point,
-        unifize, invert back. 2 is ``-T2 -T2``: no inversion back; bright edges clipped.
+        unifize, invert back. 2 is ``-T2 -T2``: no inversion back; bright edges clipped. (On
+        the command line ``-T2`` three or more times is an error by default, AFNI-48.)
     t2_percentile
         ``-T2up``, 90 to 100. Near 100 the percentile falls past the values, where AFNI reads
         memory (AFNI-45; the default uses the largest value).

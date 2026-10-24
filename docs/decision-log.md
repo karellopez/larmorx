@@ -1137,6 +1137,21 @@ golden recording reuses the parity smoke result, agents run the long tier once, 
 declined: a smaller model for routine steps; agents run on the model the user chooses (now the
 session's); (4) small questions are collected and decided in batches.
 
+## 2026-10-24: ANTS-40 and ITK-06 measured (rule D)
+
+- **ANTS-40 → rule A (corrected by default).** N4 keeps 0 and negative voxels in its log image.
+  Measured on fMRIPrep's 25 N4 calls of the five oracle runs (16 use such voxels), against ANTs'
+  own thread band, and on phantoms with a known bias field
+  (`validation/investigations/ants-40-n4-nonpositive`): leaving them out changes the field by far
+  more than ANTs' variability (shape 0.6 % to 36 % at the 99th percentile, band at most 3.1e-3),
+  recovers known fields better (shape error 0.026 → 0.0097), lowers the white matter's CV on every
+  final N4, and repairs ds005454 sub-16's final N4, which ANTs left flat (CV 0.0762 → 0.0689). A
+  value without a logarithm is not part of N4's model: a correction, not a D11 improvement.
+- **ITK-06 → rule C (kept, documented).** nifti_clib zeroes NaN and ±inf on reading. Measured
+  (`validation/investigations/itk-06-nonfinite`): no non-finite value in the 509 images the oracle
+  runs pass to ANTs programs; kept as values, one NaN slab would turn a smoothed image entirely to
+  NaN. nifti_clib's deliberate design, no gain for the pipelines.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

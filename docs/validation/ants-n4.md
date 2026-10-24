@@ -1,41 +1,45 @@
 # Parity: N4BiasFieldCorrection
 
-**All cases agree.** 51 cases on the `standard` tier: 46 pass, 5 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 52 cases on the `standard` tier: 47 pass, 5 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants N4BiasFieldCorrection` / `lx.ants.n4_bias_field_correction` (crates larmorx-image, larmorx-ants)
 - **Reference:** N4BiasFieldCorrection from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-12 on Linux x86_64, with `python -m larmorx_validation parity ants-n4 --tier standard`
+- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
+- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity ants-n4 --tier standard`
 
-**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 29 of 45 compared cases.** The others differ where glibc's `expf`, `logf`, `exp` or `sincos` is not correctly rounded for a value the run meets; the table compares each difference with ANTs' own difference between one thread and 2, 3, 4, 8 and 12 threads (a ratio below 1 is inside ANTs' thread band).
-**The cause, confirmed: with those glibc functions replaced by correctly rounded ones (CORE-MATH preloaded into the same ANTs program, one thread), 45 of 45 are bit-identical.**
+**Bit-identical to the unmodified ANTs program (glibc's math, one thread): 29 of 46 compared cases.** The others differ where glibc's `expf`, `logf`, `exp` or `sincos` is not correctly rounded for a value the run meets; the table compares each difference with ANTs' own difference between one thread and 2, 3, 4, 8 and 12 threads (a ratio below 1 is inside ANTs' thread band).
+**The cause, confirmed: with those glibc functions replaced by correctly rounded ones (CORE-MATH preloaded into the same ANTs program, one thread), 46 of 46 are bit-identical.**
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-35: 1 case(s) named it, 1 with changed values (largest difference 54): `options/no-brackets`
-  - ANTS-36: 5 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; outputs not written): `fmriprep/boldref-coregistration`, `fmriprep/boldref-template`, `fmriprep/brain-extraction-final`, `fmriprep/n4-only`, `options/missing-mask`
+  - ANTS-36: 5 case(s) named it, 3 with changed values (largest difference 1.3e+03), 1 with other changes (exit N -> N; outputs not written): `fmriprep/boldref-coregistration`, `fmriprep/boldref-template`, `fmriprep/brain-extraction-final`, `fmriprep/n4-only`, `options/missing-mask`
   - ANTS-38: 4 case(s) named it, 4 with changed values (largest difference 3.9e+03): `options/mask`, `options/mask-no-rescale`, `options/mask-and-weight`, `inputs/ramp`
-  - ITK-02: 2 case(s) named it, 1 with changed values (largest difference 10.9), 2 with other changes (header quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; header quatern_d, srow_x, srow_y): `inputs/dim3-of-4d`, `inputs/bold-first-volume`
+  - ANTS-40: 10 case(s) named it, 10 with changed values (largest difference 1.33e+05), 1 with other changes (header quatern_d, srow_x, srow_y): `fmriprep/boldref-coregistration`, `fmriprep/boldref-template`, `fmriprep/smriprep-pre-template`, `fmriprep/n4-only`, `fmriprep/sdcflows-magnitude-ds001600`, `fmriprep/t1w-ds000210-final`, `fmriprep/boldref-mask`, `inputs/zero-background-known` …
+  - ITK-02: 2 case(s) named it, 2 with changed values (largest difference 153), 2 with other changes (header quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; header quatern_d, srow_x, srow_y): `inputs/dim3-of-4d`, `inputs/bold-first-volume`
+- **Corrections against a result known independently** (D13 correction: the known result): 1 of 1 cases give exactly it: `inputs/zero-background-known` (ANTs' bias field with a mask of the positive voxels: 0 of 35840 values differ from it)
 
 | Case | Output | Difference from ANTs as built | max |diff| / band | (1 - NCC) / band |
 |---|---|---|---|---|
 | `fmriprep/boldref-coregistration` | corrected | 69747 of 139264 differ; max \|diff\| 0.00061, max rel 5.6e-06, 1 - NCC 5.4e-14 | 0.43 | 0.45 |
-| `fmriprep/boldref-template` | corrected | 467120 of 1082035 differ; max \|diff\| 0.00439, max rel 1.7e-06, 1 - NCC 8.8e-15 | 0.25 | 0.16 |
+| `fmriprep/boldref-template` | corrected | 467120 of 1082035 differ; max \|diff\| 0.00439, max rel 1.7e-06, 1 - NCC 0 | 0.25 | 0 |
 | `fmriprep/smriprep-pre-template` | corrected | 5413547 of 5898240 differ; max \|diff\| 0.241, max rel 0.00034, 1 - NCC 4.8e-10 | 1.3 | 0.24 |
 | `fmriprep/n4-only` | corrected | 694333 of 5898240 differ; max \|diff\| 0.0501, max rel 8.3e-05, 1 - NCC 1.3e-10 | 0.25 | 0.01 |
 | `fmriprep/n4-only` | bias field | 5898130 of 5898240 differ; max \|diff\| 7.86e-05, max rel 8.3e-05, 1 - NCC 2.1e-08 | 0.15 | 0.0053 |
 | `fmriprep/t1w-ds000210-final` | corrected | 6707886 of 11534336 differ; max \|diff\| 0.452, max rel 0.00017, 1 - NCC 6.9e-11 | 0.21 | 0.064 |
 | `fmriprep/t1w-ds000210-final` | bias field | 11508335 of 11534336 differ; max \|diff\| 0.000274, max rel 0.00017, 1 - NCC 4.8e-09 | 0.21 | 0.17 |
-| `fmriprep/t1w-preproc-mask` | corrected | 517729 of 5898240 differ; max \|diff\| 0.000244, max rel 3.4e-07, 1 - NCC 4.7e-14 | 0.023 | 0.012 |
+| `fmriprep/t1w-preproc-mask` | corrected | 517729 of 5898240 differ; max \|diff\| 0.000244, max rel 3.4e-07, 1 - NCC 5.8e-14 | 0.023 | 0.015 |
 | `options/mask-and-weight` | corrected | 10838 of 35840 differ; max \|diff\| 0.0612, max rel 0.00056, 1 - NCC 1.6e-08 | 0.87 | 0.79 |
-| `options/shrink-1` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.8e-15 | 0.36 | 0.28 |
+| `options/shrink-1` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.4e-15 | 0.36 | 0.26 |
 | `options/shrink-3` | corrected | 35840 of 35840 differ; max \|diff\| 0.133, max rel 0.0063, 1 - NCC 3.5e-09 | 1.7 | 4.2 |
-| `options/shrink-0` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.8e-15 | 0.36 | 0.28 |
+| `options/shrink-0` | corrected | 33414 of 35840 differ; max \|diff\| 0.000122, max rel 8e-07, 1 - NCC 4.4e-15 | 0.36 | 0.26 |
 | `options/distance-30` | corrected | 35824 of 35840 differ; max \|diff\| 0.0275, max rel 0.0039, 1 - NCC 3.8e-10 | 0.4 | 0.058 |
 | `options/distance-30` | bias field | 35827 of 35840 differ; max \|diff\| 0.00427, max rel 0.0039, 1 - NCC 2e-07 | 0.4 | 0.092 |
 | `options/distance-order-2` | corrected | 35838 of 35840 differ; max \|diff\| 1.49, max rel 0.072, 1 - NCC 5.4e-08 | 0.22 | 0.0028 |
 | `inputs/int16-scaled` | corrected | 35836 of 35840 differ; max \|diff\| 0.11, max rel 0.00096, 1 - NCC 5.5e-09 | 0.072 | 0.0031 |
+| `inputs/zero-background-known` | corrected | 10782 of 35840 differ; max \|diff\| 0.000389, max rel 5.4e-06, 1 - NCC 1.9e-13 | 2.2 | 5.3 |
+| `inputs/zero-background-known` | bias field | 35840 of 35840 differ; max \|diff\| 8.7e-06, max rel 6.2e-06, 1 - NCC 1.9e-09 | 2.4 | 4.7 |
 | `inputs/las-sform-only` | corrected | 35840 of 35840 differ; max \|diff\| 0.0402, max rel 0.00024, 1 - NCC 5.7e-11 | 0.46 | 0.31 |
 | `inputs/dim2-distance` | corrected | 1280 of 1280 differ; max \|diff\| 0.2, max rel 0.0014, 1 - NCC 1.6e-08 | 0.33 | 0.56 |
-| `inputs/bold-first-volume` | corrected | 53416 of 94276 differ; max \|diff\| 0.00165, max rel 2.4e-06, 1 - NCC 2.4e-13 | 0.39 | 0.74 |
+| `inputs/bold-first-volume` | corrected | 53416 of 94276 differ; max \|diff\| 0.00165, max rel 2.4e-06, 1 - NCC 2.4e-13 | 0.39 | 0.73 |
 
 ## Thresholds
 
@@ -54,14 +58,14 @@
 |---|---|---|---|---|---|
 | errors | 6 | 1 | 5 | 0 | 0 |
 | fmriprep | 11 | 11 | 0 | 0 | 0 |
-| inputs | 12 | 12 | 0 | 0 | 0 |
+| inputs | 13 | 13 | 0 | 0 | 0 |
 | options | 22 | 22 | 0 | 0 | 0 |
 
 ## Rejected by both
 
 | Case | What it tests | Errors |
 |---|---|---|
-| `errors/shrink-not-integer` | -s 2.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x5924ed7c9da0): ERROR: Parse error occured during command line argument processing… |
+| `errors/shrink-not-integer` | -s 2.5: the parser's Convert<int> throws (ANTs aborts) | ANTs exit -6: "s/antsCommandLineParser.h:133:\nITK ERROR: CommandLineParser(0x5bcba1094da0): ERROR: Parse error occured during command line argument processing… |
 | `errors/dimension-5` | -d 5: 'Unsupported dimension' | ANTs exit 1: 'Unsupported dimension'; larmorx exit 1: 'Unsupported dimension' |
 | `errors/missing-input` | an input that does not exist (ANTs crashes) | ANTs exit -11: 'file <tmp>/none.nii.gz does not exist .'; larmorx exit 1: 'file <tmp>/none.nii.gz does not exist . \nlarmorx: N4BiasFieldCorrection: cannot rea… |
 | `errors/mesh-wrong-length` | -b [2x2] in 3D: 'Incorrect mesh resolution', exit 1 | ANTs exit 1: ''; larmorx exit 1: '' |
@@ -71,8 +75,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (50509e30b3e8) |
-| larmorx-testdata | 00b862132e9c |
+| larmorx | 0.0.1 (6bf2860fb745) |
+| larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -122,7 +126,8 @@ ANTs runs as its own binary, larmorx in-process through its Python console entry
 | `options/missing-mask` | pass | 9/9 | a mask that does not exist: ones are used, but the mask counts as given (restoration and rescaling run) |
 | `options/verbose` | pass | 9/9 | -v 1 (stdout is not compared: it holds timings and ITK's object dump) |
 | `inputs/int16-scaled` | pass | 12/12 | scaled int16 input |
-| `inputs/outliers` | pass | 9/9 | hot, negative and zero voxels (NaN and -inf read as 0): non-positive values keep their value in the log image |
+| `inputs/zero-background-known` | pass | 21/21 | a brain on an exact 0 background with 1 % dropout (0 and -20), no mask: by default the non-positive voxels are left out… |
+| `inputs/outliers` | pass | 9/9 | hot, negative and zero voxels (NaN and -inf read as 0): ANTs keeps non-positive values in its log image (ANTS-40, corre… |
 | `inputs/constant` | pass | 9/9 | a constant image (the histogram has no width) |
 | `inputs/ramp` | pass | 9/9 | values increasing in memory order: ITK's histogram minimum is never set |
 | `inputs/las-sform-only` | pass | 12/12 | an sform-only LAS image |

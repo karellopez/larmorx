@@ -26,7 +26,8 @@
 //! **Upstream defects (D13).** By default larmorx reads an unbracketed value as the option's
 //! first parameter (`-b 200` is `-b [200]`, `-c 50x50` is `-c [50x50]`, `-t 0.15` is
 //! `-t [0.15]`; ANTS-35), refuses a mask it cannot read, and says that `-r 1` has no effect
-//! without a mask (ANTS-36); ITK's filter defects ANTS-38 and ANTS-39 are corrected too. With
+//! without a mask (ANTS-36); ITK's filter defects ANTS-38, ANTS-39 and ANTS-40 (the zero and
+//! negative voxels N4 uses left out of its log image) are corrected too. With
 //! `LARMORX_UPSTREAM_DEFECTS=reproduce` it behaves as ANTs does.
 //!
 //! `-v` prints ANTs' progress lines; ITK's filter dump (`Print`) is not reproduced. ANTs uses

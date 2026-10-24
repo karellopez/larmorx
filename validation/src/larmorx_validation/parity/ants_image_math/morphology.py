@@ -6,6 +6,7 @@ filters with a ball), ``GD``, ``GE``, ``GO``, ``GC`` (grayscale), ``FillHoles`` 
 
 from __future__ import annotations
 
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_image_math.common import (
     BOLD_MASK,
     COMPONENTS,
@@ -129,13 +130,15 @@ add(
 )
 add(f"{B}/MD-dim4", B, "ImageMath 4: a 4D ball, across time too", "MD", HOLES_4D, "1", dim="4")
 
-# ME: BinaryErodeImageFilter (the border does not erode), then 1 where eroded > 0.5 and input > 0.5.
+# ME: BinaryErodeImageFilter (the border does not erode), then ANTs' 1 where eroded > 0.5 and input
+# > 0.5 (ANTS-17, corrected by default: 1 where the voxel is still the foreground).
 add(f"{B}/ME-components", B, "ME 1 on components (the border one stays)", "ME", COMPONENTS, "1")
 add(f"{B}/ME-holes", B, "ME 2 around holes", "ME", HOLES, "2")
 add(
     f"{B}/ME-labels",
     B,
-    "ME 1 on a 3-tissue map: labels 2 and 3 are not the foreground but above 0.5, so they stay 1",
+    "ME 1 on a 3-tissue map: labels 2 and 3 are not the foreground but above 0.5, so ANTs keeps "
+    "them as 1 (ANTS-17, corrected by default)",
     "ME",
     TISSUES,
     "1",
@@ -164,17 +167,56 @@ add(f"{B}/ME-real-mni-mask", B, "ME 5 on the MNI 2 mm brain mask", "ME", MNI_2MM
 add(f"{B}/ME-dim2", B, "ImageMath 2 on a 2D image", "ME", SLICE, "1", "0", dim="2")
 add(f"{B}/ME-dim4", B, "ImageMath 4: eroded across time too", "ME", HOLES_4D, "1", dim="4")
 
+# ANTS-17 (rule A, 2026-10-23): ME as the eroded foreground's mask, known from SciPy's erosion.
+LABEL_CUBES = "{gen:known-labels-cubes}"
+MASK_HOLES = "{gen:known-mask-holes}"
+add(
+    f"{B}/ME-labels-known",
+    B,
+    "ME 1 1 on cubes of labels 1 and 2 and of 0.3: by default the eroded label-1 cube only "
+    "(SciPy's erosion); ANTs makes the label-2 cube 1 too",
+    "ME",
+    LABEL_CUBES,
+    "1",
+    "1",
+    fix_expect=known.expect_erode(1.0),
+)
+add(
+    f"{B}/ME-value-0.3-known",
+    B,
+    "ME 1 0.3: by default the eroded 0.3 cube (SciPy's erosion); ANTs' 0.5 threshold drops it "
+    "and keeps the labels 1 and 2",
+    "ME",
+    LABEL_CUBES,
+    "1",
+    "0.3",
+    tier="standard",
+    fix_expect=known.expect_erode(0.3),
+)
+
 # MO and MC.
 add(f"{B}/MO-components", B, "MO 1: objects smaller than the ball vanish", "MO", COMPONENTS, "1")
 add(f"{B}/MO-holes", B, "MO 2 around holes", "MO", HOLES, "2")
 add(
     f"{B}/MO-value-0",
     B,
-    "MO 1 0: the opening's eroded voxels become 0, the foreground itself, so it dilates only",
+    "MO 1 0: ANTs' opening sets its eroded voxels to 0, the foreground itself, so it dilates only "
+    "(ANTS-17, corrected by default)",
     "MO",
     TISSUES,
     "1",
     "0",
+)
+add(
+    f"{B}/MO-value-0-known",
+    B,
+    "MO 1 0 on a mask with a one-voxel and a 5^3 hole: by default the opening of the zeros (the "
+    "small hole filled, the large one's corners; SciPy's opening); ANTs dilates the zeros",
+    "MO",
+    MASK_HOLES,
+    "1",
+    "0",
+    fix_expect=known.expect_open_zeros,
 )
 add(f"{B}/MO-labels-value-3", B, "MO 1 3 on a 3-tissue map", "MO", TISSUES, "1", "3")
 add(f"{B}/MO-dim4", B, "ImageMath 4 opening", "MO", HOLES_4D, "1", dim="4")
@@ -337,12 +379,34 @@ add(f"{P}/pad-value", P, "PadImage 3 7: the new voxels are 7", "PadImage", HEAD,
 add(
     f"{P}/pad-fraction",
     P,
-    "PadImage 2.5: the size grows by 5 but the image shifts by 2",
+    "PadImage 2.5: ANTs grows the size by 5 but shifts the image by 2 (ANTS-22, corrected by "
+    "default)",
     "PadImage",
     HEAD,
     "2.5",
 )
 add(f"{P}/depad-fraction", P, "PadImage -2.5", "PadImage", HEAD, "-2.5")
+# ANTS-22 (rule A, 2026-10-23): trunc(pad) voxels on each side, known from NumPy.
+add(
+    f"{P}/pad-fraction-known",
+    P,
+    "PadImage 2.5: by default 2 voxels on each side (NumPy's pad, the origin moved by 2 voxels); "
+    "ANTs adds 2 before and 3 after",
+    "PadImage",
+    HEAD,
+    "2.5",
+    fix_expect=known.expect_pad(2.5),
+)
+add(
+    f"{P}/depad-fraction-known",
+    P,
+    "PadImage -2.5: by default 2 voxels removed on each side; ANTs removes 2 before and 3 after, "
+    "moves the voxels by one more than the origin and leaves the last row 0",
+    "PadImage",
+    HEAD,
+    "-2.5",
+    fix_expect=known.expect_pad(-2.5),
+)
 add(f"{P}/pad-0", P, "PadImage 0: a copy (a new image without descrip)", "PadImage", HEAD, "0")
 add(
     f"{P}/depad-to-one",

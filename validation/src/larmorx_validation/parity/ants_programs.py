@@ -72,6 +72,8 @@ ORACLE = "oracles/ants-2.6.5/bin"
 THREADS = 4
 AFFINE_ATOL = 1e-6
 _TIERS = ("smoke", "standard", "full")
+#: The check of a correction against a result known independently (``AntsCase.fix_expect``).
+FIX_EXPECT = "D13 correction: the known result"
 
 
 @functools.cache
@@ -119,6 +121,10 @@ class AntsCase:
     may name without changing the outputs (a notice about a condition, such as an ignored
     option, whose effect the comparison cannot see). ``one_mode`` lists the defects only one
     mode meets, because another defect's correction takes a different path there.
+    ``fix_expect`` checks a correction against a result known independently (a phantom whose
+    correct output another implementation, or the original where the defect does not arise,
+    gives): called with the fix pass's resolved arguments, its outputs and the case's temporary
+    directory (ANTs' outputs in ``ants/``), it returns ``(passed, detail, value)``.
     """
 
     id: str
@@ -136,6 +142,9 @@ class AntsCase:
     undefined_values: str = ""
     silent_ok: tuple[str, ...] = ()
     one_mode: tuple[str, ...] = ()
+    fix_expect: Callable[[list[str], list[Path], Path], tuple[bool, str, object]] | None = field(
+        default=None, compare=False
+    )
 
 
 def cases_for(tier: str, all_cases: Sequence[AntsCase]) -> list[Case]:
@@ -538,6 +547,21 @@ def fix_pass(
     check = defects.add_fix_check(
         checks, entries, change, other_changes="; ".join(other), silent_ok=c.silent_ok
     )
+    if c.fix_expect is not None:
+        if ok:
+            passed, detail, value = c.fix_expect(args, outputs, tmp)
+        else:
+            passed, detail, value = False, f"the fix pass wrote nothing (exit {code})", None
+        checks.add(
+            Check(
+                FIX_EXPECT,
+                passed,
+                metric="against the known correct result",
+                value=value,
+                threshold="the known result",
+                detail=detail,
+            )
+        )
     both = ok and r_ok
     named = [e for e in entries if e not in c.one_mode]
     if both and named != [e for e in defects.notices_in(r_err) if e not in c.one_mode]:
@@ -548,6 +572,19 @@ def fix_pass(
         )
         return False
     return check.passed
+
+
+def known_summary(results: list[CaseResult]) -> list[str]:
+    """The report line of the corrections checked against a result known independently
+    (``AntsCase.fix_expect``)."""
+    known = [(r.case, ch) for r in results for ch in r.checks if ch.name == FIX_EXPECT]
+    if not known:
+        return []
+    return [
+        f"- **Corrections against a result known independently** ({FIX_EXPECT}): "
+        f"{sum(ch.passed for _, ch in known)} of {len(known)} cases give exactly it: "
+        + "; ".join(f"`{case}` ({ch.detail})" for case, ch in known)
+    ]
 
 
 def _values(path: Path) -> np.ndarray:
@@ -597,6 +634,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
             + "."
         )
     lines += defects.summary(results)
+    lines += known_summary(results)
 
     def worst(rs: list[CaseResult]) -> str:
         values = [
@@ -683,6 +721,7 @@ def make_suite(
 
 
 __all__ = [
+    "FIX_EXPECT",
     "THREADS",
     "AntsCase",
     "affine_difference",
@@ -694,6 +733,7 @@ __all__ = [
     "fix_pass",
     "header_differences",
     "highlights",
+    "known_summary",
     "make_suite",
     "raw_header",
     "resolve_arg",

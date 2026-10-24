@@ -97,6 +97,8 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | AFNI-23 | 3dTshift, 3dAutomask, 3dUnifize | both, with `AFNI_NIFTI_SCALE=NO` (command line, or `lx.afni.tshift(afni_settings=...)`) | uint8 and int16 data with a slope and an intercept stay integers with the slope as their scale factor, and the intercept is dropped: the values are off by it | AFNI's integers and `scl_slope` kept, the intercept written as `scl_inter`; with `-rlt -ignore`, the data read as without the variable (decided 2026-10-12) |
 | AFNI-26 | 3dTshift, 3dAutomask, 3dUnifize | `larmorx afni 3dTshift`, `3dAutomask`, `3dUnifize` | an output that cannot be written (its directory is missing or cannot be written, the file is read-only, or a directory has its name) is not written, and the exit status is 0 | an error, exit 1 (`reproduce` prints AFNI's message, writes nothing and exits 0: both implementations, since 2026-10-12) |
 | AFNI-43 | 3dAutomask | `lx.afni.automask(peels=0)`, `larmorx afni 3dAutomask -peels 0` | peels once | no peeling, as the help says |
+| AFNI-41 | 3dAutomask | `lx.afni.automask(...)`, `larmorx afni 3dAutomask -nbhrs n` | a value outside 6..26 (the range the help gives) is silently replaced and the peeling acts as with 17 | refused: an error naming AFNI-41 (`reproduce`: AFNI's behaviour) |
+| AFNI-48 | 3dUnifize | `larmorx afni 3dUnifize -T2 -T2 -T2` | three or more `-T2` leave the output inverted, without the clipping (the help documents one and two) | refused: an error naming AFNI-48; with `-EPI` (which implies `-T2` itself) it runs as in AFNI (`reproduce`: AFNI's behaviour) |
 | AFNI-45 | 3dUnifize | `lx.afni.unifize(t2=True, t2_percentile=100)`, `-T2up` near 100 | the percentile is read one past the sorted values (memory never written; AFNI read 0 and wrote zeros) | the largest value (the 100th percentile); `reproduce` uses 0 |
 | AFNI-47 | 3dUnifize | inputs of more than a million voxels with an axis of 2 or 3 | the half-size scale image is read past its end | brought back to the input's grid; `reproduce` reads AFNI's image, 0 past its end |
 | AFNI-01 | 3dAutomask, 3dUnifize `-EPI` | a series with a negative `scl_slope` | the factor dropped when the series is averaged (3dAutomask) or its median taken (3dUnifize `-EPI`: all zeros) | the factor applied |
@@ -137,8 +139,11 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-14 | ImageMath `G` | NaN everywhere above a variance of about 709 voxels² | a finite kernel (scaled Bessel functions) |
 | ANTS-15 | ImageMath `G`, SmoothImage | a sigma list of the wrong length is not an error | an error |
 | ANTS-16 | ImageMath `Laplacian` | the normalize flag read from the sigma's argument | from its own argument |
+| ANTS-17 | ImageMath `ME`, `MO` | `ME r v` on a label map keeps every other label as 1; `MO r 0` is a dilation of the zeros | the eroded mask of `v`; the zeros opened |
 | ANTS-19 | ImageMath `FillHoles` | `p ≤ 1` counts neighbours outside the image (memory beyond it on the end slices) | outside neighbours not counted |
 | ANTS-20 | ImageMath `GetLargestComponent` | nothing kept: every voxel 1 | every voxel 0 |
+| ANTS-22 | ImageMath `PadImage` | a fractional pad grows by ⌊2p⌋ and shifts by ⌊p⌋ (a negative one also misplaces the data by a voxel) | `trunc(p)` voxels on each side |
+| ANTS-23 | ImageMath `ExtractContours` | labels are the truncated values (1.2 and 1.7 one label, 0.6 background) | every value its own label |
 | ANTS-24 | ThresholdImage | an unknown mode is the lower bound `atof(mode)` | an error |
 | ANTS-25 | ThresholdImage Otsu with a mask | range from `FLT_MIN` with `else if` | the true range |
 | ANTS-27 | MultiplyImages | an unreadable second file multiplies by 0 | an error |
@@ -146,12 +151,15 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-29 | ResampleImage | size 1: an image of zeros, infinite spacing, NaN origin | an error (`reproduce`: ANTs' file byte for byte) |
 | ANTS-30 | ResampleImage | the seventh argument is both the pixel type and the interpolator's parameter | parameters after the interpolator, the pixel type after them ([design](ants-resample-image.md#the-seventh-argument)) |
 | ANTS-31 | ResampleImageBySpacing | `nn` read from the `addvox` argument; other dimensions do nothing | each from its own argument; other dimensions an error |
+| ANTS-32 | ResampleImageBySpacing | the smoothing sigma `out/in − 1` taken in millimetres; points beyond the input get the value at index 1 | the sigma in input voxels; those points 0 |
 | ANTS-33 | antsApplyTransforms | unknown `-u` kept as default; `MultiLabel`'s alpha and `GenericLabel`'s interpolator ignored | an error; honoured |
 | ANTS-35 | N4BiasFieldCorrection | `-c`, `-b`, `-t` without brackets set nothing | the value is the first parameter |
 | ANTS-36 | N4BiasFieldCorrection | an unreadable mask becomes ones | an error |
 | ANTS-38 | N4 (ITK) | a first-voxel minimum is left out of the histogram | the true range |
 | ANTS-39 | N4 (ITK) | 64, 128 or 256 bins padded to twice the FFT size needed | the exact size |
+| ANTS-40 | N4 (ITK) | zero and negative voxels kept in the log image, inside the histogram and the fit | left out (as a mask of the positive voxels would) |
 | ANTS-43 | DenoiseImage (ITK) | the Rician correction is NaN, and the bias 0, at a high SNR | a finite factor |
+| ANTS-44 | DenoiseImage (ITK) | outside the mask the Rician bias stays the raw noise estimate of a centre | the smoothed and corrected bias wherever a patch of the mask reaches |
 | ANTS-47 | DenoiseImage | an unreadable mask is no mask | an error |
 | ANTS-49 | antsRegistration | a linear stage that throws is dropped, exit 0 | an error |
 | ANTS-50 | antsRegistration | `--save-state` after linear stages: exit 1, nothing written | the state is written |
@@ -200,6 +208,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | ANTS-111 | antsAI `-b` | after the correlations run out, the first blobs paired again and again | the pairing stops |
 | ANTS-112 | antsAI `-b` | the blob detector does not keep the N strongest maxima | the N strongest |
 | ANTS-114 | antsAI `-b` | no landmark: a rigid transform of NaNs, exit 0 | an error |
+| ANTS-116 | antsAI `-b` | blob patches compared in the orientation the eigenvectors' signs give, reflected or not | proper rotations, every sign combination, the best correlation |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -251,6 +260,9 @@ else byte for byte.
 The 3dAutomask and 3dUnifize replicas (`larmorx-gpl`, 2026-10-23) have the switch for every
 AFNI entry that applies to them; they have no clean-room original yet. AFNI-40 and AFNI-46
 (crashes) are refused in both modes.
+- **ITK-06** (nifti_clib reads NaN and ±inf as 0) is kept in both modes, by measurement
+  (2026-10-23, rule C): no fMRIPrep input has such a value, and keeping them would spread one NaN
+  through every smoothing step ([investigation](../../validation/investigations/itk-06-nonfinite/README.md)).
 
 ## How the switch is validated
 

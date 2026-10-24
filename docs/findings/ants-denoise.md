@@ -169,6 +169,31 @@ taken. *Read; validated.*
 *larmorx:* `larmorx_image::adaptive_denoising::adaptive_non_local_means`: the same operations,
 types and order.
 
+**Corrected by default (ANTS-44, decided 2026-10-23, rule A).** The voxels just outside a mask
+are denoised like any other: the patches of the centres inside the mask reach them, so they
+get an estimate (the mean of squared values, with the Rician model), and their bias must be
+the same quantity as everywhere else, the smoothed noise estimate corrected for the Rician
+distribution (`2s / CF`). ITK's mask test sits in the bias loop, so those voxels keep the raw
+`h` of whichever centre wrote last: a noise variance neither smoothed, nor doubled, nor
+corrected, subtracted from a mean of squares. The mask's purpose is to choose the centres
+(`ThreadedGenerateData` already tests it there), not to change the bias formula of the voxels
+the centres' patches reach. larmorx's default computes the corrected bias wherever the
+smoothed value is positive and the voxel is in the mask or reached by the patch of a centre in
+it (the voxels outside the mask that no such patch reaches are not denoised: their output is 0,
+as in ITK), and names the voxels this changes; `reproduce` keeps ITK's raw `h`. Without a mask,
+or with `-n Gaussian`, nothing changes (sMRIPrep denoises without a mask). *Validated* (unit
+test: larmorx against straight loops of ITK's algorithm with the mask test moved, both modes, 1
+and 3 threads; the record's fix pass: 6 cases, `fmriprep/t1w-preproc-mask` and the `mask-*`
+options).
+
+*Measured* (the site's worked example, `ants-denoise/ds000005-preproc-masked-ants44`: fMRIPrep's
+preprocessed T1w of ds000005 with its brain mask, `-n Rician`): the correction changes 70,886
+voxels outside the mask (60,026 of them at one voxel from it). They are then denoised as the
+mask's own edge is: they move from the input by 8.5 on average (ANTs' 7.0; the mask's two-voxel
+inner edge 16.8; ANTs' 16.7), and 812 of them become 0 (ANTs' 3), as the Rician correction
+makes the darkest voxels 0 inside the mask too (1,299 of the inner edge's, in both modes): with
+the bias of the method, the method's behaviour at low signal.
+
 ## ANTs' thread band
 
 **ITK splits the centres among work units and lets them write shared voxels.** The filter

@@ -20,10 +20,13 @@
 //!   size, as ITK formats them.
 //!
 //! **Upstream defects (D13).** By default larmorx reads `nn` from its own argument in 2D and
-//! 4D and refuses other dimensions (ANTS-31), and refuses to smooth an axis of fewer than 4
-//! voxels (ANTS-28, ITK's message). With `LARMORX_UPSTREAM_DEFECTS=reproduce` it reads the
-//! arguments as ANTs does, exits 0 for other dimensions, and resamples the smoothing's
-//! never-written buffer, filled with 0, after printing "Exception catched !" as ANTs does.
+//! 4D and refuses other dimensions (ANTS-31), refuses to smooth an axis of fewer than 4
+//! voxels (ANTS-28, ITK's message), smooths by `out/in − 1` input voxels and gives the voxels
+//! beyond the input 0 (ANTS-32; the sigma printed is the one the filter receives, in
+//! millimetres). With `LARMORX_UPSTREAM_DEFECTS=reproduce` it reads the arguments as ANTs
+//! does, exits 0 for other dimensions, resamples the smoothing's never-written buffer, filled
+//! with 0, after printing "Exception catched !" as ANTs does, takes the sigma in millimetres
+//! and gives the voxels beyond the input its value at index `(1, 1, …)`.
 
 use std::io::Write;
 
@@ -256,11 +259,12 @@ fn resample(
     };
     let planned = plan(&image.geometry, &options).map_err(|e| crash(&e.to_string()))?;
     let thin = unsmoothable_axes(&image.geometry, &planned);
-    for (k, &sigma) in planned.sigmas.iter().enumerate() {
+    for k in 0..planned.sigmas.len() {
+        // The sigma the smoothing filter receives (millimetres; ANTS-32 corrected by default).
         let _ = writeln!(
             out,
             " smoothing by : {} dir {k}",
-            format_g(f64::from(sigma))
+            format_g(planned.physical_sigma(k, &image.geometry, notices.mode()))
         );
         if thin.contains(&k) && notices.reproduce() {
             // ANTs catches ITK's exception here, prints it and goes on (ANTS-28). ITK's

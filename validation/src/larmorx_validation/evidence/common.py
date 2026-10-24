@@ -462,6 +462,42 @@ def outcome_verdict(r: dict) -> tuple[str, str] | None:
     return None
 
 
+#: The register entry each category's known-result cases check (``parity.known_results``),
+#: and what the correction is checked against there.
+KNOWN_RESULT = {
+    "binary-morphology": ("ANTS-17", "SciPy's binary erosion or opening with ITK's ball"),
+    "pad-image": (
+        "ANTS-22",
+        "NumPy's pad and slicing by int(pad), the origin moved by as many voxels",
+    ),
+    "extract-contours": ("ANTS-23", "the contours NumPy computes from the values themselves"),
+    "spacing": (
+        "ANTS-32",
+        "ANTs' own output where the defect cannot arise (at 1 mm, where its millimetres are "
+        "voxels; its outside voxels set to 0)",
+    ),
+    "inputs": (
+        "ANTS-40",
+        "ANTs' own N4 with a mask of the positive voxels, where the defect cannot arise (one "
+        "thread, correctly rounded maths)",
+    ),
+}
+
+
+def known_correction(c, r: dict, program: str) -> tuple[str, str] | None:
+    """The verdict of a case that checks a correction against a result known independently
+    (``AntsCase.fix_expect``) and passed: a deliberate correction."""
+    if c is None or getattr(c, "fix_expect", None) is None or r["status"] != "pass":
+        return None
+    entry, against = KNOWN_RESULT.get(r["category"], ("a register entry", "a known result"))
+    return "d13", clip(
+        f"{entry}, corrected by default (decided 2026-10-23): larmorx's default gives the "
+        f"methodically correct result bit for bit, checked against {against}; its reproduce "
+        f"mode gives {program}'s output bit for bit (the record's comparison).",
+        400,
+    )
+
+
 def command_text(program: str, args: Iterable[str], subs: Callable[[str], str]) -> str:
     """A case's command line as a reader needs it (placeholders named by ``subs``)."""
     import shlex

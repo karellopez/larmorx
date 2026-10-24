@@ -3,7 +3,7 @@
 //! Gaussian smoothing, then resampling onto a grid with the same origin and direction and a new
 //! spacing, by linear or nearest-neighbour interpolation.
 //!
-//! What ANTs computes, and this reproduces:
+//! What ANTs computes:
 //! - **Smoothing** (on by default): for each axis `d` in order, `sigma = float(out_spacing[d] /
 //!   in_spacing[d] − 1)`, and where it is positive, a zero-order `RecursiveGaussianImageFilter`
 //!   with that sigma along `d`. ITK takes the sigma in **physical units** and divides it by the
@@ -14,6 +14,14 @@
 //!   (truncated).
 //! - **Outside the input** (the output may extend past it), voxels get the input's value at
 //!   index `(1, 1, …)`, before smoothing.
+//!
+//! **ANTS-32.** The sigma `out/in − 1` is a number of input voxels (the downsampling factor
+//! less one: no smoothing at the same spacing, one voxel for a factor of 2); taking it in
+//! millimetres makes the smoothing depend on the units of the spacing, and the source's
+//! comment on the outside value says "zero regions without source". Corrected (the default):
+//! the sigma is `out/in − 1` input voxels (`out − in` millimetres), and voxels beyond the
+//! input are 0; each named where it changes the result. [`UpstreamDefects::Reproduce`] gives
+//! ANTs' result.
 //!
 //! **ANTS-28.** ITK cannot smooth an axis of fewer than 4 voxels and throws; ANTs catches the
 //! exception ("Exception catched !") and resamples the smoothing filter's output buffer,
@@ -59,11 +67,26 @@ pub enum ResampleBySpacingError {
 /// The plan of a [`resample_image_by_spacing`] run: what ANTs prints before it resamples.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResampleBySpacingPlan {
-    /// The smoothing sigma of each axis (`float`, physical units; axes with a sigma ≤ 0 are not
-    /// smoothed). Empty without smoothing.
+    /// The smoothing sigma of each axis as ANTs computes it, `float(out/in − 1)` (axes with a
+    /// sigma ≤ 0 are not smoothed). Empty without smoothing.
     pub sigmas: Vec<f32>,
     /// The output grid.
     pub geometry: ItkGeometry,
+}
+
+impl ResampleBySpacingPlan {
+    /// The sigma of axis `k` in physical units, as the smoothing filter receives it: ANTs'
+    /// `sigmas[k]` itself ([`UpstreamDefects::Reproduce`]), or that many input voxels,
+    /// `sigmas[k] · in_spacing[k]` (ANTS-32 corrected, the default). A sigma ≤ 0 smooths
+    /// nothing in either mode and stays ANTs' value (what both modes print).
+    pub fn physical_sigma(&self, k: usize, input: &ItkGeometry, mode: UpstreamDefects) -> f64 {
+        let s = f64::from(self.sigmas[k]);
+        if mode.fix() && s > 0.0 {
+            s * input.spacing[k]
+        } else {
+            s
+        }
+    }
 }
 
 /// The sigmas and output grid ANTs computes for `input` (see the module docs).
@@ -117,7 +140,7 @@ pub fn unsmoothable_axes(input: &ItkGeometry, plan: &ResampleBySpacingPlan) -> V
 
 /// `ResampleImageBySpacing`: `input` smoothed (if `options.smooth`) and resampled onto the
 /// grid of [`plan`]. Returns the image, the plan and the notices of the defects it met
-/// (ANTS-28, see the module).
+/// (ANTS-28, ANTS-32, see the module).
 pub fn resample_image_by_spacing(
     input: &AntsImage<f32>,
     options: &ResampleBySpacingOptions,
@@ -127,14 +150,59 @@ pub fn resample_image_by_spacing(
     let mut notices = Notices::new(mode);
     let plan = plan(&input.geometry, options)?;
     let d = input.dim();
-    // `inputImage->GetPixel({1, 1, ...})`, read before smoothing.
-    if input.size().iter().any(|&n| n < 2) {
+    // ANTs' outside value: `inputImage->GetPixel({1, 1, ...})`, read before smoothing.
+    let thin = input.size().iter().any(|&n| n < 2);
+    if thin && mode.reproduce() {
         return Err(ResampleBySpacingError::Invalid(
             "the default value is the voxel at index (1, 1, ...), outside an image with an axis of one voxel (ANTs reads outside the image)".into(),
         ));
     }
-    let strides = larmorx_image::strides(input.size());
-    let default_value = input.data[strides.iter().sum::<usize>()];
+    let ants_default = if thin {
+        None
+    } else {
+        let strides = larmorx_image::strides(input.size());
+        Some(input.data[strides.iter().sum::<usize>()])
+    };
+    let default_value = if mode.fix() {
+        0.0
+    } else {
+        ants_default.expect("checked above")
+    };
+    // ANTS-32's sigmas: named where the units change the smoothing.
+    let rescaled: Vec<String> = plan
+        .sigmas
+        .iter()
+        .enumerate()
+        .filter(|&(k, &s)| {
+            s > 0.0
+                && plan.physical_sigma(k, &input.geometry, UpstreamDefects::Fix)
+                    != plan.physical_sigma(k, &input.geometry, UpstreamDefects::Reproduce)
+        })
+        .map(|(k, &s)| {
+            format!(
+                "axis {k}: {} voxel(s), {} mm; ANTs {} voxel(s)",
+                f64::from(s),
+                plan.physical_sigma(k, &input.geometry, UpstreamDefects::Fix),
+                f64::from(s) / input.geometry.spacing[k]
+            )
+        })
+        .collect();
+    // ANTS-32's details, in one notice at the end.
+    let mut ants_32: Vec<String> = Vec::new();
+    if !rescaled.is_empty() {
+        ants_32.push(if mode.fix() {
+            format!(
+                "the smoothing sigma out/in - 1 is in input voxels ({}); ANTs takes it in \
+                 millimetres",
+                rescaled.join("; ")
+            )
+        } else {
+            format!(
+                "the smoothing sigma out/in - 1 is taken in millimetres, as in ANTs ({})",
+                rescaled.join("; ")
+            )
+        });
+    }
     let mut smoothed: Option<Vec<f32>> = None;
     for (k, &sigma) in plan.sigmas.iter().enumerate() {
         if sigma > 0.0 && input.size()[k] < 4 && mode.reproduce() {
@@ -158,7 +226,7 @@ pub fn resample_image_by_spacing(
             smoothed = Some(recursive_gaussian(
                 view,
                 k,
-                f64::from(sigma),
+                plan.physical_sigma(k, &input.geometry, mode),
                 GaussianOrder::Zero,
                 false,
                 n_threads,
@@ -174,17 +242,55 @@ pub fn resample_image_by_spacing(
     // `ResampleImageFilter<float, float>`: the double result cast to float (a linear or
     // nearest value of float voxels is always within float's range).
     let floor = IndexFloor::new(mode);
-    let data = resample_identity(
-        source,
-        &input.geometry,
-        &plan.geometry,
-        &interpolation,
-        default_value,
-        |v| v as f32,
-        &floor,
-        n_threads,
-    )?;
+    let resample = |default_value: f32, floor: &IndexFloor| {
+        resample_identity(
+            source,
+            &input.geometry,
+            &plan.geometry,
+            &interpolation,
+            default_value,
+            |v| v as f32,
+            floor,
+            n_threads,
+        )
+    };
+    let data = resample(default_value, &floor)?;
     floor.notice(&mut notices, "output voxels");
+    // ANTS-32's outside value: the voxels beyond the input are those the other default
+    // changes (an axis of one voxel has no index 1: ANTs reads outside the image there).
+    let other = match ants_default {
+        _ if mode.reproduce() => 0.0,
+        Some(v) => v,
+        None => f32::MAX,
+    };
+    if other.to_bits() != default_value.to_bits() {
+        let alternative = resample(other, &IndexFloor::new(mode))?;
+        let outside = data
+            .iter()
+            .zip(&alternative)
+            .filter(|(a, b)| a.to_bits() != b.to_bits())
+            .count();
+        if outside > 0 {
+            let ants_value = match ants_default {
+                Some(v) => format!("the input's value at index (1, 1, ...), {v}"),
+                None => "a value read outside this image (it has an axis of one voxel)".into(),
+            };
+            ants_32.push(if mode.fix() {
+                format!(
+                    "{outside} output voxel(s) beyond the input are 0; ANTs gives them \
+                     {ants_value}"
+                )
+            } else {
+                format!(
+                    "{outside} output voxel(s) beyond the input get {ants_value}, as in ANTs, \
+                     not 0"
+                )
+            });
+        }
+    }
+    if !ants_32.is_empty() {
+        notices.add(&defects::ANTS_32, ants_32.join("; "));
+    }
     debug_assert_eq!(plan.geometry.ndim, d);
     let image = AntsImage {
         data,
@@ -219,6 +325,17 @@ mod tests {
         }
     }
 
+    /// The plan of an upsampling of axis 1 (1.5 to 1 mm: sigma 1/1.5 − 1 < 0, no smoothing).
+    fn plan_sigma_up(input: &AntsImage<f32>) -> ResampleBySpacingPlan {
+        let options = ResampleBySpacingOptions {
+            spacing: vec![2.0, 1.0, 3.0],
+            smooth: true,
+            add_voxels: 0,
+            nearest: false,
+        };
+        plan(&input.geometry, &options).unwrap()
+    }
+
     #[test]
     fn sizes_sigmas_and_threads() {
         let input = image(&[10, 9, 8], &[1.0, 1.5, 2.0]);
@@ -228,24 +345,65 @@ mod tests {
             add_voxels: 0,
             nearest: false,
         };
-        let fix = UpstreamDefects::Fix;
+        let (fix, rep) = (UpstreamDefects::Fix, UpstreamDefects::Reproduce);
         let (a, plan, notices) = resample_image_by_spacing(&input, &options, 1, fix).unwrap();
         assert_eq!(plan.sigmas, [1.0, 0.0, 0.5]);
         assert_eq!(a.size(), [5, 9, 5]);
-        assert!(notices.is_empty());
+        // ANTS-32: axis 2 (2 mm) is smoothed by half a voxel (1 mm); ANTs by 0.5 mm.
+        assert_eq!(plan.physical_sigma(2, &input.geometry, fix), 1.0);
+        assert_eq!(plan.physical_sigma(2, &input.geometry, rep), 0.5);
+        assert_eq!(plan.physical_sigma(0, &input.geometry, fix), 1.0);
+        // A sigma ≤ 0 smooths nothing: both modes keep (and print) ANTs' value.
+        let up = plan_sigma_up(&input);
+        assert!(up.sigmas[1] < 0.0);
+        assert_eq!(
+            up.physical_sigma(1, &input.geometry, fix),
+            up.physical_sigma(1, &input.geometry, rep)
+        );
+        assert_eq!(notices[0].defect.id, "ANTS-32");
+        assert!(notices[0].detail.contains("axis 2"), "{notices:?}");
+        assert!(!notices[0].detail.contains("axis 0"), "{notices:?}");
         let (b, _, _) = resample_image_by_spacing(&input, &options, 4, fix).unwrap();
         assert_eq!(a.data, b.data);
+        let (ants, _, notices) = resample_image_by_spacing(&input, &options, 1, rep).unwrap();
+        assert_ne!(ants.data, a.data);
+        assert_eq!(notices[0].defect.id, "ANTS-32");
         let more = ResampleBySpacingOptions {
             add_voxels: 2,
             nearest: true,
             smooth: false,
-            ..options
+            ..options.clone()
         };
-        let (c, plan, _) = resample_image_by_spacing(&input, &more, 2, fix).unwrap();
+        let (c, plan, notices) = resample_image_by_spacing(&input, &more, 2, rep).unwrap();
         assert!(plan.sigmas.is_empty());
         assert_eq!(c.size(), [7, 11, 7]);
-        // Beyond the input: the value at (1, 1, 1).
+        // Beyond the input: ANTs' value at (1, 1, 1); corrected, 0.
         assert_eq!(*c.data.last().unwrap(), input.data[1 + 10 + 90]);
+        assert!(
+            notices[0].detail.contains("beyond the input"),
+            "{notices:?}"
+        );
+        let (d, _, notices) = resample_image_by_spacing(&input, &more, 2, fix).unwrap();
+        assert_eq!(*d.data.last().unwrap(), 0.0);
+        assert!(notices[0].detail.contains("are 0"), "{notices:?}");
+        let inside = c.data.iter().zip(&d.data).filter(|(x, y)| x == y).count();
+        assert!(inside > 0 && inside < c.data.len());
+        // An axis of one voxel: ANTs reads index 1 outside the image; corrected, no read.
+        let flat = image(&[10, 9, 1], &[1.0, 1.0, 1.0]);
+        let flat_options = ResampleBySpacingOptions {
+            spacing: vec![1.0, 1.0, 1.0],
+            smooth: false,
+            add_voxels: 1,
+            nearest: false,
+        };
+        assert!(resample_image_by_spacing(&flat, &flat_options, 1, rep).is_err());
+        let (e, _, notices) = resample_image_by_spacing(&flat, &flat_options, 1, fix).unwrap();
+        assert_eq!(e.size(), [11, 10, 2]);
+        assert_eq!(*e.data.last().unwrap(), 0.0);
+        assert!(
+            notices[0].detail.contains("axis of one voxel"),
+            "{notices:?}"
+        );
     }
 
     #[test]

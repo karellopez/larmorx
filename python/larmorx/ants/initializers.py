@@ -358,12 +358,14 @@ def blob_alignment(
     ANTs' ``MultiScaleLaplacianBlobDetectorImageFilter`` finds up to ``n`` blobs in each image
     (``blobs=n`` or ``(n, m)``; at least 3); every fixed and moving blob is compared by the
     correlation of their spherical patches (radius 20 voxels, oriented by the gradients'
-    principal axes); the best-correlated pairs with radii within 0.25 are matched (up to
+    principal axes, in the proper rotation of those axes that matches best); the
+    best-correlated pairs with radii within 0.25 are matched (up to
     ``m``); the pairs whose distances to at least 3 others are preserved become landmarks; the
     landmarks are fitted with an affine (``transform="Affine"``) or rigid transform (otherwise;
     ``Similarity`` too, as in ANTs). Images are read as ANTs reads them (float).
 
-    ANTs' defects are corrected by default (ANTS-110, ANTS-111, ANTS-112, ANTS-114, ITK-60;
+    ANTs' defects are corrected by default (ANTS-110, ANTS-111, ANTS-112, ANTS-114, ANTS-116,
+    ITK-60; ANTs compares the patches as its rotation leaves them, possibly reflected or turned;
     ``docs/api/ants-ai.md``); ``upstream_defects="reproduce"`` gives ANTs' result, with an
     :class:`~larmorx.UpstreamDefectWarning` for each defect that changed it. The result does
     not depend on ``n_threads``.

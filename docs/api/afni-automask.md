@@ -57,7 +57,7 @@ the process environment is never read.
 | `-clfrac c`, `-mfrac c` | `clfrac` | 0.1 to 0.9 |
 | `-nograd` | `gradual=False` | any option starting with `-nogr` |
 | `-peels p` | `peels` | 0 turns the peeling off (AFNI-43; AFNI peels once) |
-| `-nbhrs n` | `neighbours` | outside 6..26 AFNI uses 17 (AFNI-41) |
+| `-nbhrs n` | `neighbours` | 6 to 26; another value is an error by default (AFNI uses 17, AFNI-41) |
 | `-NN1`, `-NN2`, `-NN3` | `nn=1`, `2`, `3` | also set `neighbours` to 6, 18, 26 (AFNI-42) |
 | `-eclip` | `exterior_clip=True` | |
 | `-dilate nd`, `-erode ne` | `dilate`, `erode` | dilations need 3 neighbours; each is followed by filling holes |
@@ -79,6 +79,10 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`
 - **AFNI-01**: averaging the sub-bricks of a series, AFNI drops a negative `scl_slope` (and its
   magnitude); the default applies it. The mask rarely changes (the clip level scales with the
   data); the clip levels AFNI prints do.
+- **AFNI-41** (decided 2026-10-23, rule B: the value makes no sense): `-nbhrs` outside 6..26,
+  the range the help gives, is silently replaced in AFNI (the peeling acts as with 17, or as
+  `-NN1/2/3` say); the default stops with a fatal error naming AFNI-41 (exit 1), whether or not
+  `-NN1/2/3` follow; `reproduce` runs as AFNI does.
 - **AFNI-40**: an option without its value as the last argument (`-peels`, `-nbhrs`, `-clfrac`,
   `-SI`, `-dilate`, `-erode`) crashes AFNI; larmorx refuses with an error (exit 1) in both modes.
 - The defects of AFNI's dataset reading and writing, shared with 3dTshift (AFNI-02, -07, -11,
@@ -86,9 +90,9 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`
   `AFNI_NIFTI_SCALE=NO` (AFNI-23) the default reads integer data with an intercept as AFNI does
   without the variable (float32, `slope * x + inter`).
 
-Kept as AFNI's until the user decides (register entries marked **decide**): AFNI-41 (`-nbhrs`
-outside 6..26 is silently 17), AFNI-42 (`-NN1/2/3` change the peeling threshold), AFNI-44 (the
-large-hole filling depends on the number of slices only).
+Kept as AFNI's and documented (decided 2026-10-23, rule C): AFNI-42 (`-NN1/2/3` change the
+peeling threshold), AFNI-44 (the large-hole filling depends on the number of slices only; it
+shapes fMRIPrep's BOLD masks).
 
 ## Deliberate differences
 

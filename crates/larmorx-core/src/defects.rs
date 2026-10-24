@@ -160,10 +160,16 @@ defects! {
         "a sigma list of the wrong length is not an error: G filters with variance 0 and SmoothImage with 1 mm, exit 0";
     ANTS_16 = "ANTS-16", "ImageMath", true,
         "Laplacian reads its normalize flag from the sigma's argument";
+    ANTS_17 = "ANTS-17", "ImageMath", true,
+        "MO with the foreground 0 sets the voxels its erosion removes to 0, the foreground itself, so it only dilates the zeros; ME makes 1 every voxel above 0.5 that its erosion keeps, other labels included, and 0 a remaining foreground of 0.5 or less";
     ANTS_19 = "ANTS-19", "ImageMath", true,
         "FillHoles with holeparam at most 1 reads neighbours outside the image";
     ANTS_20 = "ANTS-20", "ImageMath", true,
         "GetLargestComponent turns every voxel into 1 when no component is kept";
+    ANTS_22 = "ANTS-22", "ImageMath", true,
+        "PadImage with a fractional pad p grows each axis by the truncated 2p but shifts the image by the truncated p, so the padding (or cropping) is uneven: 2.5 adds 2 voxels before and 3 after";
+    ANTS_23 = "ANTS-23", "ImageMath", true,
+        "ExtractContours takes each voxel's value truncated to an unsigned integer as its label: 1.2 and 1.7 are one label with no contour between them, values below 1 are background, and contour voxels hold the truncated value";
     ANTS_24 = "ANTS-24", "ThresholdImage", true,
         "a mode other than Otsu or Kmeans is a range threshold whose lower bound is the mode's name read with atof";
     ANTS_25 = "ANTS-25", "ThresholdImage", true,
@@ -178,6 +184,8 @@ defects! {
         "the seventh argument is read both as the pixel type and as the interpolator's parameter";
     ANTS_31 = "ANTS-31", "ResampleImageBySpacing", true,
         "the nn flag is read from the addvox argument in 2D and whenever there are more than 9 arguments in 4D, and dimensions other than 2 to 4 do nothing";
+    ANTS_32 = "ANTS-32", "ResampleImageBySpacing", true,
+        "the smoothing sigma out/in - 1, meant in voxels, is taken in millimetres (half a voxel for 2 to 4 mm), and output voxels beyond the input get the input's value at index (1, 1, ...) instead of 0";
     ANTS_33 = "ANTS-33", "antsApplyTransforms", true,
         "an unknown -u type keeps the default type, MultiLabel ignores its alpha and GenericLabel its interpolator";
     ANTS_35 = "ANTS-35", "N4BiasFieldCorrection", true,
@@ -188,8 +196,12 @@ defects! {
         "the histogram's range is found with else-if, so a first included voxel that is the unique minimum is left out of the histogram";
     ANTS_39 = "ANTS-39", "N4BiasFieldCorrection", true,
         "256 histogram bins give a 1024-point FFT instead of 512 (a float logarithm divided by a double one)";
+    ANTS_40 = "ANTS-40", "N4BiasFieldCorrection", true,
+        "the voxels N4 uses whose value is 0 or negative stay in its log image as they are (0, the log of an intensity of 1), inside the histogram it sharpens and the bias field's fit: without a mask, a zero background or zero-filled voxels pull the field";
     ANTS_43 = "ANTS-43", "DenoiseImage", true,
         "the Rician correction factor overflows at high signal-to-noise ratios and the bias becomes 0";
+    ANTS_44 = "ANTS-44", "DenoiseImage", true,
+        "with a mask and the Rician model, voxels outside the mask that patches reach are corrected with the raw noise estimate of a centre in the mask, not with the smoothed and corrected bias every other voxel gets";
     ANTS_47 = "ANTS-47", "DenoiseImage", true,
         "a mask that cannot be read is no mask: the whole image is denoised, exit 0";
     ANTS_50 = "ANTS-50", "antsRegistration", true,
@@ -348,12 +360,16 @@ defects! {
         "with AFNI_NIFTI_SCALE=NO, uint8 and int16 data with both a slope and an intercept stay integers with the slope as their scale factor and lose the intercept, so the values written are off by it";
     AFNI_26 = "AFNI-26", "AFNI", true,
         "an output that cannot be written (its directory is missing or cannot be written) is not written, and the program exits with status 0";
+    AFNI_41 = "AFNI-41", "3dAutomask", true,
+        "-nbhrs outside 6..26 (the range its help gives) is silently replaced: the peeling acts as with 17";
     AFNI_43 = "AFNI-43", "3dAutomask", true,
         "-peels 0 peels once: the help says that 0 turns the peeling off, but the peel count is set to 1 for any value below 1";
     AFNI_45 = "AFNI-45", "3dUnifize", true,
         "with -T2up at or near 100, the contrast is inverted about the value one past the sorted mask values (whatever the memory there holds; usually 0, which zeroes the output)";
     AFNI_47 = "AFNI-47", "3dUnifize", true,
         "a volume of more than a million voxels with an axis of 2 or 3 voxels: its half-size scale image expands back to a grid of another size, which AFNI reads as if it were the input's, past its end";
+    AFNI_48 = "AFNI-48", "3dUnifize", true,
+        "-T2 given three or more times (the help documents once and twice) leaves the output inverted: neither inverted back nor edge-clipped";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,
@@ -426,6 +442,8 @@ defects! {
         "the blob detector does not keep the N strongest maxima: after each scale it drops every later maximum below the weakest one kept even while fewer than N are kept, and when a heap has just filled it lets a weaker maximum push out the heap's weakest one";
     ANTS_114 = "ANTS-114", "antsAI", true,
         "a rigid or similarity blob alignment that keeps no landmark writes a transform of NaNs (ITK's rigid landmark fits divide the landmark sums by their count, 0)";
+    ANTS_116 = "ANTS-116", "antsAI", true,
+        "the blob alignment compares two blobs' patches after turning the moving one with a rotation built from the patches' principal axes, whose signs are arbitrary, without checking its determinant: identical patches can be compared reflected or turned by 180 degrees";
 }
 
 /// The register entry with ID `id`.

@@ -713,7 +713,8 @@ def _example(ctx: core.Context, move: str) -> dict:
             lx_fix,
             "larmorx",
             "antsAI: larmorx (port)",
-            "the copy placed by its transform; default mode (ANTS-110 corrected), 6 threads",
+            "the copy placed by its transform; default mode (ANTS-110 and ANTS-116 corrected), "
+            "6 threads",
         ),
     ]
     for pid, label, _steps, role, text, sub in runs:
@@ -794,6 +795,8 @@ def _example(ctx: core.Context, move: str) -> dict:
         "larmorx's default from lx.ants.blob_alignment. A pair is a landmark when its distances "
         "to at least 3 other pairs are preserved within 10 % (squared); ANTs tests the lengths "
         "of the pairs' displacements instead (ANTS-110), so a rotation leaves it no landmark. "
+        "larmorx compares the patches in the orientation that matches best, ANTs in the one its "
+        "eigenvectors' signs give, reflected or not (ANTS-116). "
         "'Off the true transform': how far the moving blob is from where the true transform "
         "sends the fixed blob's centre.",
     )
@@ -826,20 +829,47 @@ def _example(ctx: core.Context, move: str) -> dict:
             d_fix = _distance(mats["larmorx-fix"][0], mats["truth"][0], pts)["max"]
             d_ants = _distance(mats["ants-1"][0], mats["truth"][0], pts)["max"]
             x["verdict"] = "d13" if fix_named else "open"
-            x["reason"] = (
-                f"{', '.join(fix_named)} corrected by default: a pair is a landmark when its "
-                "distances to three other pairs are preserved (as the code's comment and "
-                "ImageMath's MatchBlobs say), where ANTs compares the lengths of the pairs' "
-                f"displacements. Here larmorx keeps {len(lx_fix['landmarks'])} of "
-                f"{len(lx_fix['pairs'])} pairs and ANTs {len(ants['landmarks'])}: for a pure "
-                "translation ANTs' test is the stricter one: larmorx's transform is "
-                f"{d_fix:.2g} mm off the truth at most, ANTs' is exact up to rounding "
-                f"({d_ants:.1g} mm; the tables below). For a rotation ANTs keeps no landmark (the "
-                "next example)."
-                if fix_named
-                else "Not accounted for by the other runs of this example."
+            why = []
+            if "ANTS-116" in fix_named:
+                why.append(
+                    "the patches are compared in the orientation that matches best (proper "
+                    "rotations, every sign combination of their principal axes), where ANTs may "
+                    "compare identical patches reflected or turned"
+                )
+            if "ANTS-110" in fix_named:
+                why.append(
+                    "a pair is a landmark when its distances to three other pairs are preserved "
+                    "(as the code's comment and ImageMath's MatchBlobs say), where ANTs compares "
+                    "the lengths of the pairs' displacements"
+                )
+            rotation = " For a rotation ANTs keeps no landmark (the next example)."
+            counts = (
+                f"larmorx keeps {len(lx_fix['landmarks'])} landmarks of {len(lx_fix['pairs'])} "
+                f"pairs and ANTs {len(ants['landmarks'])} of {len(ants['pairs'])}"
             )
-            x["links"] = [{"label": "ANTS-110", "href": "docs/findings/ants-ai.md#blobs"}]
+            if fix_named and same_img[i]:
+                # the correction changes the pairs and landmarks, not where the copy lands
+                x["verdict"] = "bit-identical"
+                x["reason"] = (
+                    "The same placed image: both transforms send the copy where the truth does "
+                    f"({d_fix:.2g} and {d_ants:.2g} mm off at most). {', '.join(fix_named)}, "
+                    f"corrected by default, changes the pairs and landmarks: {counts} (the "
+                    f"tables below); {'; '.join(why)}." + (rotation if move == "shift" else "")
+                )
+            else:
+                x["reason"] = (
+                    f"{', '.join(fix_named)} corrected by default: "
+                    f"{'; '.join(why) or 'see the register'}. Here {counts}; larmorx's transform "
+                    f"is {d_fix:.2g} mm off the truth at most, ANTs' {d_ants:.2g} mm (the tables "
+                    "below)." + (rotation if move == "shift" else "")
+                    if fix_named
+                    else "Not accounted for by the other runs of this example."
+                )
+            x["links"] = [
+                {"label": k, "href": "docs/findings/ants-ai.md#blobs"}
+                for k in ("ANTS-110", "ANTS-116")
+                if k in fix_named
+            ]
     if move == "shift":
         at, _k = common.largest_in_slice(ex, "larmorx-fix", "ants", "placed")
         default = {
@@ -1089,6 +1119,88 @@ def examples(ctx: core.Context) -> list[dict]:
     return [_blobs_example(ctx), _example(ctx, "shift"), _example(ctx, "rotated")]
 
 
+A116_INVESTIGATION = "validation/investigations/ants-116-blob-orientation"
+
+
+def a116_table(ctx: core.Context) -> tuple[dict, list[str]]:
+    """ANTS-116's measurement (the investigation's results, committed): identical blob pairs,
+    pairs, landmarks and the distance from the true transform, ANTs' method against the
+    corrected one."""
+    rel = f"{A116_INVESTIGATION}/results.json"
+    res = json.loads((ctx.repo / rel).read_text(encoding="utf-8"))
+    names = {
+        "T1w vs its origin-shifted copy": "fMRIPrep's T1w of ds000005, its origin moved",
+        "T1w vs its rotated (8°) and shifted copy": "the same T1w rotated by 8° and shifted",
+        "phantom 3d, shift (shift)": "3D blob phantom, a translation",
+        "phantom 3d, rigid (rigid)": "3D blob phantom, rotated by 7° and 4° and shifted",
+        "phantom 2d, shift (2d-shift)": "2D blob phantom, a translation",
+        "phantom 2d, rigid (2d-rigid)": "2D blob phantom, rotated by 9° and shifted",
+    }
+    rows = []
+    for c in res:
+        fitting = None
+        if "identical_correlations" in c["fix"]:
+            fitting = sum(1 for v in c["fix"]["identical_correlations"] if v > 0)
+        for mode, label in (("reproduce", "ANTs' method (reproduce)"), ("fix", "larmorx")):
+            x = c[mode]
+            err = x.get("error_mm")
+            rows.append(
+                {
+                    "head": names.get(c["case"], c["case"]) if mode == "reproduce" else "",
+                    "sub": label,
+                    "cells": [
+                        common.cell(
+                            f"{x['identical_at_1']} of {fitting}" if fitting is not None else "–"
+                        ),
+                        common.cell(f"{x['true_pairs']} / {x['pairs']}"),
+                        common.cell(f"{x['true_landmarks']} / {x['landmarks']}"),
+                        common.cell(err[0] if err else "no landmark"),
+                        common.cell(err[1] if err else "–"),
+                    ],
+                    **({"verdict": "d13"} if mode == "fix" else {}),
+                }
+            )
+    t = common.table(
+        "ants-116",
+        "ANTS-116, corrected by default: the blob patches compared in the orientation that "
+        "matches best, against ANTs' method (the eigenvectors' signs as they come, reflections "
+        "included); antsAI -b 30, rigid",
+        [
+            "Moving image",
+            {"label": "identical pairs at 1", "num": True},
+            {"label": "true / matched pairs", "num": True},
+            {"label": "true / landmarks", "num": True},
+            {"label": "mean distance (mm)", "num": True},
+            {"label": "largest distance (mm)", "num": True},
+        ],
+        rows,
+        note=f"From `{rel}` (measure.py: `lx.ants.blob_alignment` at 30 blobs in both modes; "
+        "larmorx's default also corrects ANTS-110, -111, -112, -114 and ITK-60, reproduce mode "
+        "is ANTs' result bit for bit). Identical pairs: the blobs found at the same voxel in both "
+        "images whose patches fit in both; a pair is true when the moving blob lies within two "
+        "voxels of where the known transform sends the fixed one; the distances are those of the "
+        "brain's (or the phantom's) points from where the true transform sends them.",
+    )
+    return t, [rel]
+
+
+def rerun_larmorx(ctx: core.Context) -> None:
+    """larmorx's runs of the cache entry again (after ANTS-116's correction), and the runs that
+    read their outputs; ANTs' runs and the probe are kept."""
+    e = entry(ctx)
+    have = {r["label"] for r in e.info()["runs"]}
+    labels = [
+        f"{move}-{k}"
+        for move in MOVES
+        for k in (
+            "larmorx", "larmorx-1", "larmorx-fix", "steps-reproduce", "steps-fix",
+            "place-larmorx", "place-larmorx-fix",
+        )
+        if f"{move}-{k}" in have
+    ]  # fmt: skip
+    fcache.rerun(e, labels, "ANTS-116 corrected by default (2026-10-23): the default changes")
+
+
 def provenance(ctx: core.Context) -> dict:
     return fcache.provenance(entry(ctx))
 
@@ -1096,6 +1208,10 @@ def provenance(ctx: core.Context) -> dict:
 if __name__ == "__main__":
     if len(sys.argv) == 7 and sys.argv[1] == "dump":
         dump(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], int(sys.argv[6]))
+    elif sys.argv[1:] == ["--rerun"]:
+        from larmorx_validation.figures.core import REPO, default_cache
+
+        rerun_larmorx(core.Context(repo=REPO, site=Path("."), cache=default_cache()))
     else:
         sys.exit(
             "usage: python -m larmorx_validation.evidence.ants_ai_blobs dump FIXED MOVING OUT MODE THREADS"

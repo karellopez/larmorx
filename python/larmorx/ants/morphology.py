@@ -48,21 +48,36 @@ def _radius(radius: int) -> int:
 
 
 def morphology(
-    image: Any, operation: str, radius: int = 1, *, value: float = 1.0, n_threads: int = 1
+    image: Any,
+    operation: str,
+    radius: int = 1,
+    *,
+    value: float = 1.0,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath d out <operation> in radius value``: ANTs' ``ants::Morphological``.
 
     ``operation`` is ImageMath's name: ``"MD"``, ``"ME"``, ``"MO"``, ``"MC"`` (binary, with
     ``value`` as the foreground) or ``"GD"``, ``"GE"``, ``"GO"``, ``"GC"`` (grayscale;
     ``value`` is ignored). ``radius`` is in voxels (the command line truncates a fractional
-    radius).
+    radius). ``ME``, and ``MO`` with the foreground 0, are corrected (ANTS-17, see
+    :func:`morphological_erode` and :func:`morphological_open`);
+    ``upstream_defects="reproduce"`` gives ANTs' results.
     """
     if operation not in _OPERATIONS:
         raise ValueError(f"unknown operation {operation!r}; choose from {_OPERATIONS}")
+    check(upstream_defects)
     a = float_input(image, n_threads)
-    data = _core.ants_morphology(
-        np.asfortranarray(a.data), operation, _radius(radius), float(value), n_threads
+    data, notices = _core.ants_morphology(
+        np.asfortranarray(a.data),
+        operation,
+        _radius(radius),
+        float(value),
+        n_threads,
+        upstream_defects,
     )
+    warn(notices)
     return result(data, a)
 
 
@@ -76,21 +91,40 @@ def morphological_dilate(
 
 
 def morphological_erode(
-    image: Any, radius: int = 1, *, value: float = 1.0, n_threads: int = 1
+    image: Any,
+    radius: int = 1,
+    *,
+    value: float = 1.0,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath d out ME in radius value``: ITK's ``BinaryErodeImageFilter`` (the image
-    border does not erode), then ANTs' clean-up: 1 where both the eroded value and the input
-    exceed 0.5, else 0. So the output is 0/1, and voxels that are not ``value`` but above 0.5
-    (a label 2 in a mask of 1s) stay 1."""
-    return morphology(image, "ME", radius, value=value, n_threads=n_threads)
+    border does not erode), as a 0/1 mask: 1 where the voxel is still ``value`` after the
+    erosion, 0 elsewhere. ANTs thresholds the eroded image at 0.5 instead, so voxels that are
+    not ``value`` but above 0.5 (a label 2 in a mask of 1s) stay 1 and a foreground of 0.5 or
+    less is lost (ANTS-17; ``upstream_defects="reproduce"``). On a 0/1 mask with ``value`` 1
+    both agree."""
+    return morphology(
+        image, "ME", radius, value=value, n_threads=n_threads, upstream_defects=upstream_defects
+    )
 
 
 def morphological_open(
-    image: Any, radius: int = 1, *, value: float = 1.0, n_threads: int = 1
+    image: Any,
+    radius: int = 1,
+    *,
+    value: float = 1.0,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """``ImageMath d out MO in radius value``: ITK's ``BinaryMorphologicalOpeningImageFilter``
-    (erosion, eroded voxels set to 0, then dilation)."""
-    return morphology(image, "MO", radius, value=value, n_threads=n_threads)
+    (erosion, the removed voxels set to 0, then dilation). With ``value`` 0 the removed voxels
+    become 1 (for a 0/1 mask, the opening of its zeros); ITK sets them to 0, the foreground
+    itself, so ANTs' ``MO r 0`` only dilates the zeros (ANTS-17;
+    ``upstream_defects="reproduce"``)."""
+    return morphology(
+        image, "MO", radius, value=value, n_threads=n_threads, upstream_defects=upstream_defects
+    )
 
 
 def morphological_close(
@@ -153,19 +187,29 @@ def fill_holes(
 
 
 def pad_image(
-    image: Any, pad: float, value: float = 0.0, *, dimension: int | None = None, n_threads: int = 1
+    image: Any,
+    pad: float,
+    value: float = 0.0,
+    *,
+    dimension: int | None = None,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
-    """``ImageMath d out PadImage in pad value``: ``pad`` voxels of ``value`` added on both
-    sides of every axis (removed if ``pad`` is negative), the origin moved so that the voxels
-    keep their positions in space.
+    """``ImageMath d out PadImage in pad value``: ``int(pad)`` voxels of ``value`` added on
+    both sides of every axis (removed if ``pad`` is negative), the origin moved so that the
+    voxels keep their positions in space. A 4D image is padded along time too. ``dimension``
+    defaults to the image's.
 
-    As in ANTs, every axis grows by ``int(2·pad)`` voxels but the image shifts by
-    ``int(|pad|)``, so a fractional ``pad`` adds the extra voxel at the end. A 4D image is
-    padded along time too. ``dimension`` defaults to the image's.
+    A fractional ``pad`` is truncated, the same number of voxels on each side. ANTs grows
+    every axis by ``int(2·pad)`` but shifts the image by ``int(|pad|)``: the extra voxel goes
+    at the end, and a negative fractional pad also moves the voxels by one in space (ANTS-22;
+    ``upstream_defects="reproduce"``).
     """
+    check(upstream_defects)
     source, header, shape, _spacing = _source(image)
     dim = int(dimension) if dimension is not None else len(shape)
-    data, affine, _descrip, spacing = _core.ants_pad_image(
-        source, dim, float(pad), float(value), n_threads
+    (data, affine, _descrip, spacing), notices = _core.ants_pad_image(
+        source, dim, float(pad), float(value), n_threads, upstream_defects
     )
+    warn(notices)
     return _result(data, affine, header, spacing)

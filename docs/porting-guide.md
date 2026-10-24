@@ -526,6 +526,16 @@ and renamed over it: a rename within a directory replaces a file atomically on L
 and Windows (on Windows, retry briefly while another program holds the target), so a failure
 never leaves a partial output.
 
+### Corrections checked against a result known independently (2026-10-24)
+
+`AntsCase.fix_expect`
+(`validation/src/larmorx_validation/parity/known_results.py`) computes the methodically correct
+output another way (SciPy, NumPy, or the original itself on an input where its defect cannot
+arise) and the harness compares larmorx's default with it bit for bit (`FIX_EXPECT`); the record
+lists these under "Corrections against a result known independently", and the evidence gives
+them the verdict *deliberate correction*. Checks that take parameters must be module-level
+functions bound with `functools.partial` (the harness pickles cases for `--jobs`).
+
 ## 10. Working safely
 
 Each of these cost work at least once. The rules every agent follows are collected in

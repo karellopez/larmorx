@@ -7,6 +7,7 @@ Maurer), ``ExtractContours`` (label contours), ``ThresholdAtMean`` and
 
 from __future__ import annotations
 
+from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_image_math.common import (
     BOLD_MASK,
     COMPONENTS,
@@ -235,8 +236,10 @@ add(f"{M}/real-mni-mask", M, "the MNI 2 mm brain mask", "MaurerDistance", MNI_2M
 add(f"{M}/dim2", M, "ImageMath 2, foreground 0", "MaurerDistance", SLICE, "0", dim="2")
 add(f"{M}/dim4", M, "ImageMath 4: distances across time", "MaurerDistance", HOLES_4D, dim="4")
 
-# ExtractContours: LabelContourImageFilter; labels are the values truncated to unsigned long.
+# ExtractContours: LabelContourImageFilter; ANTs' labels are the values truncated to unsigned
+# long (ANTS-23, corrected by default: the labels are the values).
 C = "extract-contours"
+KNOWN_FLOAT_LABELS = "{gen:known-float-labels}"
 add(
     f"{C}/labels", C, "the contours of a 3-tissue map (fully connected)", "ExtractContours", TISSUES
 )
@@ -271,6 +274,27 @@ add(
 add(f"{C}/real-T1w-mask", C, "fMRIPrep's T1w brain mask", "ExtractContours", T1_MASK)
 add(f"{C}/dim2", C, "ImageMath 2", "ExtractContours", SLICE, dim="2")
 add(f"{C}/dim4", C, "ImageMath 4: contours across time", "ExtractContours", HOLES_4D, "0", dim="4")
+# ANTS-23 (rule A, 2026-10-23): the correct contours of non-integer values, known from NumPy.
+add(
+    f"{C}/float-labels-known",
+    C,
+    "regions of 1.2 and 1.7 touching, 0.6, 0.6 against 2, and -1.5: by default every value is a "
+    "label (the contours computed by NumPy); ANTs truncates them (1.2 and 1.7 one label, 0.6 "
+    "background, -1.5 near 2^64)",
+    "ExtractContours",
+    KNOWN_FLOAT_LABELS,
+    fix_expect=known.expect_contours(True),
+)
+add(
+    f"{C}/float-labels-faces-known",
+    C,
+    "the same with face connectivity (flag 0)",
+    "ExtractContours",
+    KNOWN_FLOAT_LABELS,
+    "0",
+    tier="standard",
+    fix_expect=known.expect_contours(False),
+)
 
 # ThresholdAtMean and ReplaceVoxelValue.
 add(f"{T}/default", T, "fraction 1: 1 at or above the mean", "ThresholdAtMean", HEAD)

@@ -105,15 +105,17 @@ starts no other agent.
 - **Head-motion correction's open cases** (91 of the record's 134, shown as "open" on its
   evidence page): mcflirt's own variability is measured for the real-data cases only; measuring
   its band per option and synthetic case would classify them.
-- **Records made with the older CORE-MATH preload** (`ants-image-math`, `ants-n4`, `ants-denoise`,
-  ...): re-run; the preload now also replaces `pow`, `powf`, `asin`, `acos`, `atan2` and `cbrt`.
-- **The clean-room originals of 3dAutomask and 3dUnifize** (from `specs/3dAutomask.md`,
+- **Records made with the older CORE-MATH preload:** `ants-image-math`, `ants-n4`, `ants-denoise`,
+  `ants-resample-image-by-spacing`, `ants-ai` (and its full tier) were regenerated on 2026-10-24 with the current
+  preload; any other record older than 2026-10-18 still to re-run.
+- **The clean-room originals of 3dAutomask and 3dUnifize** (running since 2026-10-23; the specs carry the
+  rule-B refusals of AFNI-41 and AFNI-48 since 2026-10-24) (from `specs/3dAutomask.md`,
   `specs/3dUnifize.md`); a benchmark report for each once the original exists.
-- **The decisions of 2026-10-23 to implement:** rule A for ANTS-17, -22, -23, -32, -44 (and
-  ANTS-116, with the antsAI merge); rule D for ANTS-40 and ITK-06 (measured first on
-  fMRIPrep's N4s and on NaN/infinite inputs, then rule A or C); rule B for AFNI-41 and AFNI-48
-  in the replica (and in the specs for the clean-room originals). An ANTs part and an AFNI
-  replica part, each small.
+- **The decisions of 2026-10-23, implemented** (small-fixes part, 2026-10-24): ANTS-17, -22,
+  -23, -32, -44, -116 corrected by default (rule A), ANTS-40 measured and corrected (D, then A),
+  ITK-06 measured and kept (D, then C), AFNI-41 and AFNI-48 refused by default in the GPL replicas
+  (rule B). Each with its known-result parity case, its fix pass, re-recorded golden checksums
+  and its evidence on the site.
 - **In-place writing in 3dTshift** (decided 2026-10-21): an existing writable output in a
   directory that cannot be written is replaced in place, as AFNI does. The replica directly;
   the clean-room original from a spec amendment written from black-box runs (the implementer

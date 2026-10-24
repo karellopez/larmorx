@@ -551,10 +551,16 @@ def ants_resample_image(
 # The morphology group: ``a`` is float32 in 2 to 4 dimensions; radii are in voxels.
 
 def ants_morphology(
-    a: np.ndarray, operation: str, radius: int = 1, value: float = 1.0, n_threads: int = 1
-) -> np.ndarray:
+    a: np.ndarray,
+    operation: str,
+    radius: int = 1,
+    value: float = 1.0,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[Notice]]:
     """ImageMath ``MD``/``ME``/``MO``/``MC``/``GD``/``GE``/``GO``/``GC`` (``ants::Morphological``)
-    with ITK's ball of ``radius`` voxels; ``value`` is the binary operations' foreground."""
+    with ITK's ball of ``radius`` voxels; ``value`` is the binary operations' foreground
+    (``ME``, and ``MO`` with the foreground 0, corrected: ANTS-17): ``(data, notices)``."""
 
 def ants_fill_holes(
     a: np.ndarray, hole_param: float = 2.0, n_threads: int = 1, upstream_defects: str = "fix"
@@ -564,10 +570,16 @@ def ants_fill_holes(
     notices)``."""
 
 def ants_pad_image(
-    image: str | ImageTuple, dim: int, pad: float, value: float = 0.0, n_threads: int = 1
-) -> tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]]:
-    """ImageMath ``PadImage`` on a path (read in ``dim`` dimensions) or an in-memory image:
-    ``(data, ras_affine, descrip, spacing)``."""
+    image: str | ImageTuple,
+    dim: int,
+    pad: float,
+    value: float = 0.0,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[tuple[np.ndarray, np.ndarray, bytes, tuple[float, ...]], list[Notice]]:
+    """ImageMath ``PadImage`` on a path (read in ``dim`` dimensions) or an in-memory image,
+    ``int(pad)`` voxels on each side (ANTS-22): ``((data, ras_affine, descrip, spacing),
+    notices)``."""
 
 # Components, distance maps and label values: ``a`` is float32 in 2 to 4 dimensions.
 
@@ -590,8 +602,9 @@ def ants_maurer_distance(
 def ants_extract_contours(
     a: np.ndarray, fully_connected: bool = True, n_threads: int = 1, upstream_defects: str = "fix"
 ) -> tuple[np.ndarray, list[Notice]]:
-    """ImageMath ``ExtractContours``: the voxels of each integer label (values truncated)
-    that touch another label, keeping their label; 0 elsewhere: ``(data, notices)``."""
+    """ImageMath ``ExtractContours``: the voxels of each label (every distinct value; ANTs
+    truncates the values, ANTS-23) that touch another label, keeping their value; 0
+    elsewhere: ``(data, notices)``."""
 
 def ants_threshold_at_mean(a: np.ndarray, fraction: float = 1.0, n_threads: int = 1) -> np.ndarray:
     """ImageMath ``ThresholdAtMean``: 1 where ``mean · fraction ≤ v ≤ max``, else 0."""

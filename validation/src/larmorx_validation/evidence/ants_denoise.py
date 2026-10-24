@@ -687,8 +687,110 @@ def _band(rec) -> dict:
     }
 
 
+#: The ANTS-44 example: DenoiseImage with a mask, on fMRIPrep's preprocessed T1w of ds000005
+A44_DATA = {
+    "dataset": "OpenNeuro ds000005 (mixed-gambles task), v00001",
+    "subject": "sub-01",
+    "licence": "CC0-1.0",
+}
+PREPROC = "out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz"
+
+
+def _a44_spec(ctx: core.Context):
+    from larmorx_validation.evidence import corrections
+
+    run = common.fmriprep_run(RUN)
+
+    def show():
+        from scipy import ndimage
+
+        return ndimage.binary_dilation(common.load(str(run / MASK)) > 0, iterations=4)
+
+    def effect(e) -> str:
+        from scipy import ndimage
+
+        mask = common.load(str(run / MASK)) > 0
+        x = common.load(str(run / PREPROC)).astype(np.float64)
+        a = common.load(str(e.dir / "larmorx-reproduce-denoised.nii.gz")).astype(np.float64)
+        b = common.load(str(e.dir / "larmorx-denoised.nii.gz")).astype(np.float64)
+        changed = a != b
+        out = changed & ~mask
+        edge = mask & ~ndimage.binary_erosion(mask, iterations=2)
+        return (
+            f"{int(out.sum()):,} voxels outside the mask change (the voxels next to it that a "
+            f"centre inside reached), {int((changed & mask).sum()):,} inside it (ANTS-43, "
+            "corrected since 2026-10-12). Outside, the corrected voxels are denoised as the "
+            "mask's own edge is: they move from the input by "
+            f"{np.abs(b[out] - x[out]).mean():.1f} on average (ANTs' {np.abs(a[out] - x[out]).mean():.1f}; "
+            f"the mask's two-voxel inner edge {np.abs(b[edge] - x[edge]).mean():.1f}), and "
+            f"{int((b[out] == 0).sum()):,} of them become 0 (ANTs' {int((a[out] == 0).sum()):,}), "
+            "as the Rician correction makes the darkest voxels inside the mask 0 too "
+            f"({int((b[edge] == 0).sum()):,} of the edge's)"
+        )
+
+    return corrections.Spec(
+        tool=TOOL,
+        case="ds000005-preproc-masked-ants44",
+        entry="ANTS-44",
+        title="ANTS-44: denoising fMRIPrep's T1w within its brain mask",
+        summary=(
+            "DenoiseImage with a mask (`-x`, Rician noise), on fMRIPrep 25.2.6's preprocessed T1w "
+            "of OpenNeuro ds000005 sub-01 and its brain mask. The patches of the centres in the "
+            "mask reach the voxels just outside it, which are denoised like the others; ITK "
+            "smooths and corrects the Rician bias only inside the mask and leaves those voxels "
+            "the raw noise estimate of a centre. larmorx's default gives them the smoothed and "
+            "corrected bias, its reproduce mode ANTs' output."
+        ),
+        program="DenoiseImage",
+        args=(
+            "-d",
+            "3",
+            "-i",
+            "{in:t1w}",
+            "-x",
+            "{in:mask}",
+            "-n",
+            "Rician",
+            "-o",
+            "[{out:denoised},{out:noise}]",
+        ),
+        inputs={
+            "t1w": ("fMRIPrep's preprocessed T1w", run / PREPROC),
+            "mask": ("fMRIPrep's brain mask", run / MASK),
+        },
+        panels=(
+            ("t1w", "ds000005 sub-01 T1w", "fMRIPrep's desc-preproc_T1w"),
+            ("mask", "Brain mask (-x)", "fMRIPrep's desc-brain_mask"),
+        ),
+        outputs=(
+            {"id": "denoised", "label": "Denoised image", "unit": ""},
+            {"id": "noise", "label": "Noise image", "unit": ""},
+        ),
+        data=(A44_DATA,),
+        show=show,
+        reason=(
+            "ANTS-44, corrected by default with a warning: the voxels outside the mask that "
+            "the patches of centres in the mask reach are denoised like the others, but ITK "
+            "smooths and corrects their Rician bias only inside the mask and leaves them the raw "
+            "noise estimate of the last such centre. larmorx gives them the smoothed and "
+            "corrected bias, as inside; the voxels no centre reached are not denoised, as in ITK. "
+            "Inside the mask the default also corrects ANTS-43 (the Rician correction factor's "
+            "overflow at a high SNR, corrected since 2026-10-12). Reproduce mode gives ANTs' "
+            "output."
+        ),
+        effect=effect,
+        settings="DenoiseImage -n Rician with fMRIPrep 25.2.6's brain mask on its preprocessed "
+        "T1w of ds000005 sub-01 (no fMRIPrep node: fMRIPrep denoises without a mask)",
+        focus=lambda: common.load(str(run / MASK)) == 0,
+        focus_text="outside the mask (ANTS-44; inside it the default also corrects ANTS-43)",
+    )
+
+
 def export(ctx: core.Context) -> dict:
+    from larmorx_validation.evidence import corrections
+
     reg = core.register(ctx.repo)
+    a44 = _a44_spec(ctx)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx, rec)
     bench = records.load_bench(ctx.repo, TOOL)
@@ -718,7 +820,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e), fcache.provenance(repeats_entry(ctx))],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(repeats_entry(ctx)),
+                fcache.provenance(corrections.entry(ctx, a44)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -730,7 +836,7 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cases),
         "band": _band(rec),
         "speed": speed,
-        "examples": [_example(ctx, reg)],
+        "examples": [_example(ctx, reg), corrections.example(ctx, a44, reg)],
     }
 
 

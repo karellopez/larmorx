@@ -100,9 +100,18 @@ original.
   deterministic fill); both named. The parity case compares AFNI's messages before the crash
   (or, when AFNI does not crash, the header and the values that do not come from that memory)
   and is an expected divergence.
-- **AFNI-48 (questionable)** `3dUnifize.c:1193-1198`: `do_T2 == 1` re-inverts, `do_T2 == 2`
-  clips edges, and a third `-T2` does neither, so the output stays inverted (verified). The help
-  documents once and twice only. Kept as AFNI's until decided.
+- **AFNI-48 (questionable; decided: rule B)** `3dUnifize.c:1193-1198`: `do_T2 == 1` re-inverts,
+  `do_T2 == 2` clips edges, and a third `-T2` does neither, so the output stays inverted
+  (verified). The help documents once and twice only. **Decided 2026-10-23, rule B** (an option
+  repeated beyond its documented uses, and AFNI silently produces an inverted image): the
+  replica's default refuses `-T2` given three or more times, right after the option scan and
+  before the input is read (`-EPI`, which sets `do_T2 = 1` after the scan, is not refused):
+  the notice line `*+ WARNING: upstream defect AFNI-48 (3dUnifize) corrected: ...` and the fatal
+  error `-T2 given 3 times: give it once (a T2-weighted input) or twice (also clip the bright
+  edges) (AFNI-48; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)`, exit 1;
+  `reproduce` runs as AFNI does and names AFNI-48. *Validated* (parity cases
+  `options/T2-T2-T2`, `options/T2-x4`: `reproduce` bit-identical to AFNI, the default refuses
+  naming AFNI-48; `options/T2-x3-EPI`: nothing refused; unit tests).
 - **AFNI-49 (f)** `3dUnifize.c:818-822`: the help gives `-clfrac`'s default as 0.1 and then
   says it was raised to 0.2 in 2016; the code uses 0.2 (`:659`). Text only.
 - **AFNI-40, extended** `3dUnifize.c:1036`: `-T2up` reads `argv[++iarg]` without the check every

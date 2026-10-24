@@ -79,6 +79,18 @@ arise.
 *Read; validated* (`ME-labels`, `ME-value-2`, `ME-fractional`, `ME-components` with an
 object on the border).
 
+**Corrected by default (ANTS-17, decided 2026-10-23, rule A).** The threshold is the
+`FIXME - replace with threshold filter?` of `antsUtilities.h:230`: written for a 0/1 mask with
+the foreground 1, where "above 0.5" and "still the foreground" are the same test. For any other
+input it computes something no erosion defines: a label map's other labels become 1, and a
+foreground of 0.5 or less (`ME r 0.3`, `ME r 0`) vanishes even where the erosion keeps it. The
+methodically correct result of a binary erosion of the foreground `v` is the eroded set of
+`v`, so larmorx's default writes 1 where the voxel is still `v` after ITK's erosion and 0
+elsewhere; on a 0/1 mask with `v = 1` (sMRIPrep's `ME 10`, `ME 2`, `ME 5`) both give the same
+bits. `reproduce` keeps ANTs' threshold. *Validated* (`ME-labels-known`, `ME-value-0.3-known`:
+the default equals SciPy's `binary_erosion` with ITK's ball and the border as foreground, bit
+for bit; the fix pass of `ME-labels`, `ME-value-2`, `ME-fractional`).
+
 **larmorx computes the same sets with an exact distance transform.** A voxel is within the
 ball of a foreground voxel exactly when the squared index distance to the nearest foreground
 voxel is at most `r(r + 1)`. `larmorx_image::morphology::within_distance` computes that
@@ -95,6 +107,16 @@ erodes with the background value set to its own `BackgroundValue`, **0 by defaul
 foreground. A consequence: with `value` 0 (`MO r 0`), eroded foreground voxels become 0, the
 foreground itself, so the erosion changes nothing and **the opening is a plain dilation of
 the zeros**. *Read; validated* (`MO-value-0`).
+
+**Corrected by default (ANTS-17, decided 2026-10-23, rule A).** An opening removes the parts of
+the foreground smaller than the ball, so the voxels it removes must take a value other than the
+foreground; ITK's background value 0 cannot be that when the foreground is 0. With the
+foreground 0, larmorx's default gives the removed voxels the value 1: for a 0/1 mask that is the
+opening of its zeros, which by duality is the closing of its ones (small holes filled); with any
+other foreground ITK's 0 is kept, as in ANTs. `reproduce` keeps ANTs' dilation of the zeros.
+*Validated* (`MO-value-0-known`: a mask with a one-voxel and a 5³ hole; the default equals
+SciPy's opening of the zeros with ITK's ball, bit for bit: the small hole filled, the large
+one's 8 corners).
 
 **`BinaryMorphologicalClosingImageFilter`** (`itkBinaryMorphologicalClosingImageFilter.hxx`)
 has `SafeBorder` on (`.hxx:43`): the input is padded by the radius on every side with 0 (with
@@ -197,6 +219,22 @@ only call `FillHoles 2`.
 fMRIPrep's ±10 on real images; every header byte identical).
 *larmorx:* `larmorx_ants::image_math::pad_image`, with the same float arithmetic for the
 sizes, shifts and origin.
+
+**A negative fractional pad also misplaces the voxels** (found 2026-10-23, part of ANTS-22).
+The copy test is `0 ≤ float(i) + pad ≤ newsize − 1` in float and the target index its
+truncation: for `pad = −2.5` voxel `i` lands at `i − 3` (from `i = 3`), while the origin moved
+by 2 voxels; and `float(i) + pad` never reaches the last index, which keeps the pad value. So
+`PadImage −2.5` shifts the image by one voxel in space and leaves the last row of every axis
+`value`. *Read; validated* (`depad-fraction`, reproduced bit for bit).
+
+**Corrected by default (ANTS-22, decided 2026-10-23, rule A).** A pad is a number of voxels on
+each side, and voxels are whole: a fractional pad cannot be applied evenly, and ANTs' two
+truncations (the size from `2·pad`, the shift from `pad`) give an uneven result. larmorx's
+default truncates the pad toward zero, the same number of voxels on both sides of every axis
+(the shift ANTs itself applies to the origin), and places each voxel where the origin says.
+Integer pads (sMRIPrep's `PadImage ±10`) give the same bits in both modes. Named where ANTs'
+size differs. *Validated* (`pad-fraction-known`, `depad-fraction-known`: the default equals
+NumPy's `pad` and slicing by `int(pad)` with the origin moved by exactly that many voxels).
 
 ## Connected components and relabelling (used by `FillHoles` and `GetLargestComponent`)
 
@@ -323,6 +361,17 @@ with background 0 (`itkLabelContourImageFilter.hxx`).
 face and full connectivity, 2D, 4D, a real mask).
 *larmorx:* `larmorx_image::components::label_contour` on the truncated labels
 (`larmorx_ants::image_math::x86_f32_to_u64`), row by row in parallel.
+
+**Corrected by default (ANTS-23, decided 2026-10-23, rule A).** The filter's input is a float
+image and ITK encodes its runs by equal float values; only the label it then stores is the
+truncated value, so the contours are not those of the image's regions (two regions of 1.2 and
+1.7 have no contour between them, a probability map's values below 1 have none at all). The
+correct contours of a label image are those of its values: larmorx's default makes every
+distinct value a label (`±0` the background, every NaN one label) and keeps each contour
+voxel's value. Integer labels give the same bits in both modes. `reproduce` keeps ITK's
+truncation (and the wrapped negative labels, ANTS-06). *Validated* (`float-labels-known`,
+`float-labels-faces-known`: the default equals the contours NumPy computes from the values,
+26- and 6-connected, bit for bit; the fix pass of `fractional` and `negative-values`).
 
 ## `ThresholdAtMean` and `ReplaceVoxelValue`
 

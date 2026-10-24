@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "1dfe56c0dc60",
-  "larmorx_testdata_commit": "00b862132e9c",
+  "larmorx_commit": "f312142c42f4",
+  "larmorx_testdata_commit": "b0999a9e0c31",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -25,7 +25,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.14,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -38,7 +38,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.155,
    "status": "both-error"
   },
   {
@@ -51,7 +51,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.173,
+   "seconds": 0.245,
    "status": "both-error"
   },
   {
@@ -64,7 +64,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.146,
    "status": "both-error"
   },
   {
@@ -77,7 +77,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.015,
+   "seconds": 0.153,
    "status": "both-error"
   },
   {
@@ -90,7 +90,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -103,7 +103,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -116,7 +116,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.016,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -129,7 +129,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.069,
    "status": "both-error"
   },
   {
@@ -150,7 +150,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.065,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -171,7 +171,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.07,
+   "seconds": 0.158,
    "status": "pass"
   },
   {
@@ -192,7 +192,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.175,
    "status": "pass"
   },
   {
@@ -213,7 +213,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -234,7 +234,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -255,7 +255,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -276,7 +276,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -297,7 +297,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.063,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -318,7 +318,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -339,7 +339,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.065,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -360,7 +360,7 @@
     "bit-identical": 12,
     "header bytes identical": "True"
    },
-   "seconds": 0.066,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -381,7 +381,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.069,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -402,7 +402,7 @@
     "bit-identical": 27,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -423,7 +423,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -444,7 +444,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -465,7 +465,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -486,7 +486,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -507,7 +507,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.039,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -528,7 +528,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.043,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -549,7 +549,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -570,7 +570,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -591,7 +591,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.047,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -612,7 +612,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.049,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -633,7 +633,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -654,7 +654,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -675,7 +675,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -696,7 +696,7 @@
     "bit-identical": 35,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -717,7 +717,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -738,7 +738,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.041,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -759,7 +759,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.114,
    "status": "pass"
   },
   {
@@ -780,7 +780,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -801,7 +801,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -822,7 +822,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -843,7 +843,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -864,7 +864,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -885,7 +885,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.078,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -906,7 +906,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -927,7 +927,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -948,7 +948,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
@@ -969,7 +969,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -990,7 +990,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -1011,7 +1011,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.053,
+   "seconds": 0.124,
    "status": "pass"
   },
   {
@@ -1032,7 +1032,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.121,
    "status": "pass"
   },
   {
@@ -1053,7 +1053,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1074,7 +1074,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.07,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -1095,7 +1095,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -1116,7 +1116,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -1137,7 +1137,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.067,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -1158,7 +1158,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.067,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -1179,7 +1179,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -1200,7 +1200,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -1221,7 +1221,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1242,7 +1242,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -1263,7 +1263,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.994,
+   "seconds": 1.855,
    "status": "pass"
   },
   {
@@ -1284,7 +1284,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.774,
+   "seconds": 1.645,
    "status": "pass"
   },
   {
@@ -1305,7 +1305,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.086,
+   "seconds": 0.254,
    "status": "pass"
   },
   {
@@ -1326,7 +1326,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.096,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -1347,7 +1347,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 5.705,
+   "seconds": 11.165,
    "status": "pass"
   },
   {
@@ -1368,7 +1368,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.898,
+   "seconds": 1.66,
    "status": "pass"
   },
   {
@@ -1389,7 +1389,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.07,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -1410,7 +1410,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.158,
    "status": "pass"
   },
   {
@@ -1431,7 +1431,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.205,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -1473,7 +1473,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.047,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -1494,7 +1494,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -1515,7 +1515,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1536,7 +1536,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.066,
+   "seconds": 0.152,
    "status": "pass"
   },
   {
@@ -1557,7 +1557,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.068,
+   "seconds": 0.182,
    "status": "pass"
   },
   {
@@ -1578,7 +1578,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -1599,7 +1599,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -1620,7 +1620,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1641,7 +1641,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1654,7 +1654,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -1675,7 +1675,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -1696,7 +1696,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1717,7 +1717,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -1738,7 +1738,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.95,
+   "seconds": 4.034,
    "status": "pass"
   },
   {
@@ -1759,7 +1759,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.11,
+   "seconds": 2.604,
    "status": "pass"
   },
   {
@@ -1780,7 +1780,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.884,
+   "seconds": 6.552,
    "status": "pass"
   },
   {
@@ -1801,7 +1801,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.078,
+   "seconds": 0.202,
    "status": "pass"
   },
   {
@@ -1822,7 +1822,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -1843,7 +1843,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -1864,7 +1864,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1885,7 +1885,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1906,7 +1906,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1927,7 +1927,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1948,7 +1948,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -1969,7 +1969,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -1990,7 +1990,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.049,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -2011,7 +2011,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.094,
+   "seconds": 0.448,
    "status": "pass"
   },
   {
@@ -2032,7 +2032,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.828,
+   "seconds": 4.027,
    "status": "pass"
   },
   {
@@ -2053,7 +2053,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.075,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -2074,7 +2074,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2095,7 +2095,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.045,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -2116,7 +2116,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -2137,7 +2137,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.037,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -2158,7 +2158,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.24,
    "status": "pass"
   },
   {
@@ -2167,11 +2167,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x56fb3a42d2f0): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
+   "reason": "ANTs killed by signal 6: ITK ERROR: RescaleIntensityImageFilter(0x5a727b8c12f0): Minimum output value cannot be greater than Maximum output value.; larmorx exit 1: larmorx: RescaleImage: Minimum output value cannot be greater than Maximum output value. (ANTs aborts: ITK throws)",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.055,
    "status": "both-error"
   },
   {
@@ -2184,7 +2184,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -2205,7 +2205,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.527,
+   "seconds": 0.988,
    "status": "pass"
   },
   {
@@ -2226,7 +2226,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.198,
+   "seconds": 0.395,
    "status": "pass"
   },
   {
@@ -2247,7 +2247,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.069,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -2268,7 +2268,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.16,
    "status": "pass"
   },
   {
@@ -2289,7 +2289,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.114,
    "status": "pass"
   },
   {
@@ -2310,7 +2310,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -2331,7 +2331,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -2352,7 +2352,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -2373,7 +2373,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.104,
+   "seconds": 0.322,
    "status": "pass"
   },
   {
@@ -2394,7 +2394,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.063,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -2415,7 +2415,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -2436,7 +2436,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2457,7 +2457,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.037,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -2478,7 +2478,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -2499,7 +2499,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -2520,7 +2520,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -2541,7 +2541,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.084,
+   "seconds": 4.946,
    "status": "pass"
   },
   {
@@ -2562,7 +2562,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.602,
+   "seconds": 6.638,
    "status": "pass"
   },
   {
@@ -2583,7 +2583,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.126,
+   "seconds": 0.364,
    "status": "pass"
   },
   {
@@ -2604,7 +2604,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.595,
+   "seconds": 6.161,
    "status": "pass"
   },
   {
@@ -2625,7 +2625,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.701,
+   "seconds": 1.903,
    "status": "pass"
   },
   {
@@ -2646,7 +2646,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.067,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -2667,7 +2667,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.076,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -2688,7 +2688,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.167,
    "status": "pass"
   },
   {
@@ -2709,7 +2709,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -2730,7 +2730,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.167,
    "status": "pass"
   },
   {
@@ -2751,7 +2751,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.082,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -2764,7 +2764,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -2785,7 +2785,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -2794,11 +2794,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5add7f6b9440): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
+   "reason": "ANTs killed by signal 6: ITK ERROR: RecursiveGaussianImageFilter(0x5d5f8e9fe440): The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.; larmorx exit 1: The number of pixels along direction 2 is less than 4. This filter requires a minimum of four pixels along the dimension to be processed.",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -2819,7 +2819,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -2840,7 +2840,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -2861,7 +2861,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2882,7 +2882,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -2903,7 +2903,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -2924,7 +2924,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -2945,7 +2945,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 10.59,
+   "seconds": 25.404,
    "status": "pass"
   },
   {
@@ -2966,7 +2966,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.094,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -2987,7 +2987,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -3008,7 +3008,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -3029,7 +3029,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -3042,7 +3042,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -3063,7 +3063,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.115,
+   "seconds": 0.464,
    "status": "pass"
   },
   {
@@ -3084,7 +3084,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.535,
+   "seconds": 7.242,
    "status": "pass"
   },
   {
@@ -3105,7 +3105,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -3126,7 +3126,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.253,
    "status": "pass"
   },
   {
@@ -3147,7 +3147,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.064,
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -3168,7 +3168,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -3189,7 +3189,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.177,
    "status": "pass"
   },
   {
@@ -3198,11 +3198,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x55fda71cf280): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
+   "reason": "ANTs killed by signal 6: ITK ERROR: UnsharpMaskImageFilter(0x599ee1038280): Threshold must be non-negative!; larmorx exit 1: larmorx: UnsharpMask: Threshold must be non-negative! (ANTs aborts: ITK throws)",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.023,
+   "seconds": 0.093,
    "status": "both-error"
   },
   {
@@ -3215,7 +3215,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -3236,7 +3236,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -3257,7 +3257,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.046,
+   "seconds": 0.149,
    "status": "pass"
   },
   {
@@ -3278,7 +3278,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.108,
+   "seconds": 5.231,
    "status": "pass"
   },
   {
@@ -3299,7 +3299,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.044,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -3320,7 +3320,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -3341,7 +3341,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -3362,7 +3362,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.034,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -3383,7 +3383,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.034,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -3396,7 +3396,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.016,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -3417,7 +3417,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.039,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -3438,7 +3438,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.037,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -3459,7 +3459,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.039,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -3480,7 +3480,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.762,
+   "seconds": 1.687,
    "status": "pass"
   },
   {
@@ -3501,7 +3501,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.774,
+   "seconds": 1.714,
    "status": "pass"
   },
   {
@@ -3522,7 +3522,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.066,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -3543,7 +3543,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -3564,7 +3564,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.034,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -3585,7 +3585,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -3606,7 +3606,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -3623,11 +3623,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 9808,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -3644,11 +3644,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 7320,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -3665,11 +3665,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 6164,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -3690,7 +3690,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.039,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -3711,7 +3711,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.501,
+   "seconds": 4.082,
    "status": "pass"
   },
   {
@@ -3732,7 +3732,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.256,
+   "seconds": 3.366,
    "status": "pass"
   },
   {
@@ -3753,7 +3753,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.341,
+   "seconds": 1.166,
    "status": "pass"
   },
   {
@@ -3770,11 +3770,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 1278,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -3795,7 +3795,51 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.127,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-labels-known",
+   "category": "binary-morphology",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 729,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.446,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/ME-value-0.3-known",
+   "category": "binary-morphology",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1801,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.409,
    "status": "pass"
   },
   {
@@ -3816,7 +3860,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -3837,7 +3881,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -3854,11 +3898,33 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 3200,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.152,
+   "status": "pass"
+  },
+  {
+   "case": "binary-morphology/MO-value-0-known",
+   "category": "binary-morphology",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3413,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -3879,7 +3945,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -3900,7 +3966,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -3921,7 +3987,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.074,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -3942,7 +4008,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.065,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -3963,7 +4029,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.044,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -3984,7 +4050,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -4005,7 +4071,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.054,
+   "seconds": 0.182,
    "status": "pass"
   },
   {
@@ -4026,7 +4092,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.827,
+   "seconds": 5.351,
    "status": "pass"
   },
   {
@@ -4047,7 +4113,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -4068,7 +4134,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.072,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -4089,7 +4155,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -4110,7 +4176,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -4131,7 +4197,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -4152,7 +4218,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -4173,7 +4239,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.146,
    "status": "pass"
   },
   {
@@ -4194,7 +4260,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.95,
+   "seconds": 4.949,
    "status": "pass"
   },
   {
@@ -4215,7 +4281,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.207,
    "status": "pass"
   },
   {
@@ -4236,7 +4302,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.056,
+   "seconds": 0.31,
    "status": "pass"
   },
   {
@@ -4257,7 +4323,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.049,
+   "seconds": 0.259,
    "status": "pass"
   },
   {
@@ -4278,7 +4344,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -4299,7 +4365,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.194,
    "status": "pass"
   },
   {
@@ -4320,7 +4386,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.726,
+   "seconds": 4.243,
    "status": "pass"
   },
   {
@@ -4341,7 +4407,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.061,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -4362,7 +4428,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.233,
    "status": "pass"
   },
   {
@@ -4383,7 +4449,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.053,
+   "seconds": 0.233,
    "status": "pass"
   },
   {
@@ -4404,7 +4470,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -4425,7 +4491,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.262,
    "status": "pass"
   },
   {
@@ -4446,7 +4512,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.155,
+   "seconds": 6.146,
    "status": "pass"
   },
   {
@@ -4467,7 +4533,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.063,
+   "seconds": 0.175,
    "status": "pass"
   },
   {
@@ -4488,7 +4554,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.067,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -4509,7 +4575,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.183,
    "status": "pass"
   },
   {
@@ -4530,7 +4596,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.03,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -4551,7 +4617,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.071,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -4572,7 +4638,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 2.235,
+   "seconds": 5.799,
    "status": "pass"
   },
   {
@@ -4593,7 +4659,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.063,
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -4614,7 +4680,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.046,
+   "seconds": 0.217,
    "status": "pass"
   },
   {
@@ -4635,7 +4701,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.192,
+   "seconds": 0.741,
    "status": "pass"
   },
   {
@@ -4656,7 +4722,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -4677,7 +4743,7 @@
     "bit-identical": 832,
     "header bytes identical": "True"
    },
-   "seconds": 0.027,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -4698,7 +4764,7 @@
     "bit-identical": 763,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -4719,7 +4785,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.045,
+   "seconds": 0.193,
    "status": "pass"
   },
   {
@@ -4740,7 +4806,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.046,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -4761,7 +4827,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.046,
+   "seconds": 0.171,
    "status": "pass"
   },
   {
@@ -4782,7 +4848,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.208,
    "status": "pass"
   },
   {
@@ -4803,7 +4869,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.2,
    "status": "pass"
   },
   {
@@ -4824,7 +4890,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.156,
    "status": "pass"
   },
   {
@@ -4845,7 +4911,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -4866,7 +4932,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.062,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -4887,7 +4953,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.052,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -4908,7 +4974,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.051,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -4929,7 +4995,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -4950,7 +5016,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 3.383,
+   "seconds": 6.014,
    "status": "pass"
   },
   {
@@ -4971,7 +5037,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.672,
+   "seconds": 1.17,
    "status": "pass"
   },
   {
@@ -4992,7 +5058,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -5013,7 +5079,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -5034,7 +5100,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -5054,7 +5120,7 @@
     "header bytes identical": "True",
     "values not compared": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.07,
    "status": "pass"
   },
   {
@@ -5075,7 +5141,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.064,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -5096,7 +5162,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.04,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -5117,7 +5183,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.156,
    "status": "pass"
   },
   {
@@ -5134,11 +5200,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 54945,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -5155,11 +5221,55 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 24192,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.063,
+   "seconds": 0.116,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/pad-fraction-known",
+   "category": "pad-image",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 54945,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.185,
+   "status": "pass"
+  },
+  {
+   "case": "pad-image/depad-fraction-known",
+   "category": "pad-image",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 24192,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.121,
    "status": "pass"
   },
   {
@@ -5180,7 +5290,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.057,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -5197,11 +5307,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 168,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -5214,7 +5324,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
@@ -5227,7 +5337,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.074,
    "status": "both-error"
   },
   {
@@ -5240,7 +5350,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -5261,7 +5371,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.053,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -5282,7 +5392,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.058,
+   "seconds": 0.164,
    "status": "pass"
   },
   {
@@ -5303,7 +5413,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.044,
+   "seconds": 0.128,
    "status": "pass"
   },
   {
@@ -5324,7 +5434,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.812,
+   "seconds": 1.374,
    "status": "pass"
   },
   {
@@ -5345,7 +5455,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.419,
+   "seconds": 2.693,
    "status": "pass"
   },
   {
@@ -5366,7 +5476,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.026,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -5387,7 +5497,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -5408,7 +5518,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -5429,7 +5539,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.032,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -5450,7 +5560,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -5471,7 +5581,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -5492,7 +5602,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -5513,7 +5623,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.026,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -5526,7 +5636,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -5547,7 +5657,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.034,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -5568,7 +5678,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.037,
+   "seconds": 0.121,
    "status": "pass"
   },
   {
@@ -5589,7 +5699,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -5610,7 +5720,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -5631,7 +5741,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.609,
+   "seconds": 1.176,
    "status": "pass"
   },
   {
@@ -5652,7 +5762,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.666,
+   "seconds": 1.381,
    "status": "pass"
   },
   {
@@ -5673,7 +5783,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -5694,7 +5804,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.029,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -5715,7 +5825,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.03,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -5736,7 +5846,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.07,
+   "seconds": 0.151,
    "status": "pass"
   },
   {
@@ -5757,7 +5867,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.174,
    "status": "pass"
   },
   {
@@ -5778,7 +5888,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.059,
+   "seconds": 0.207,
    "status": "pass"
   },
   {
@@ -5799,7 +5909,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.049,
+   "seconds": 0.137,
    "status": "pass"
   },
   {
@@ -5820,7 +5930,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.053,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -5841,7 +5951,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.03,
+   "seconds": 0.064,
    "status": "pass"
   },
   {
@@ -5862,7 +5972,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -5883,7 +5993,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -5904,7 +6014,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.039,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -5925,7 +6035,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.144,
+   "seconds": 0.36,
    "status": "pass"
   },
   {
@@ -5946,7 +6056,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 5.316,
+   "seconds": 10.016,
    "status": "pass"
   },
   {
@@ -5967,7 +6077,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -5988,7 +6098,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -6009,7 +6119,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -6030,7 +6140,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.055,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -6051,7 +6161,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.042,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -6072,7 +6182,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.047,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -6093,7 +6203,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.043,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -6114,7 +6224,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.027,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -6135,7 +6245,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.03,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -6156,7 +6266,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.048,
+   "seconds": 0.129,
    "status": "pass"
   },
   {
@@ -6177,7 +6287,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -6198,7 +6308,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 1.598,
+   "seconds": 3.598,
    "status": "pass"
   },
   {
@@ -6219,7 +6329,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.404,
+   "seconds": 1.062,
    "status": "pass"
   },
   {
@@ -6240,7 +6350,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -6261,7 +6371,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -6282,7 +6392,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -6303,7 +6413,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.033,
+   "seconds": 0.128,
    "status": "pass"
   },
   {
@@ -6320,11 +6430,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 6249,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -6341,11 +6451,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 11473,
+    "D13 fix pass": 24893,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.178,
    "status": "pass"
   },
   {
@@ -6366,7 +6476,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.05,
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -6387,7 +6497,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.031,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -6400,7 +6510,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.015,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -6421,7 +6531,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.5,
+   "seconds": 1.212,
    "status": "pass"
   },
   {
@@ -6438,11 +6548,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 1280,
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.074,
    "status": "pass"
   },
   {
@@ -6463,7 +6573,51 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.03,
+   "seconds": 0.07,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/float-labels-known",
+   "category": "extract-contours",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1024,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.082,
+   "status": "pass"
+  },
+  {
+   "case": "extract-contours/float-labels-faces-known",
+   "category": "extract-contours",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "D13 correction: the known result": 0,
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1024,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -6484,7 +6638,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -6505,7 +6659,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.038,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -6526,7 +6680,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.035,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -6535,11 +6689,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
-   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x5b2275e644e0): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
+   "reason": "ANTs killed by signal 6: ITK ERROR: BinaryThresholdImageFilter(0x59b2c29014e0): Lower threshold cannot be greater than upper threshold.; larmorx exit 1: larmorx: ThresholdAtMean: Lower threshold cannot be greater than upper threshold. (ANTs aborts: ITK throws)",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -6560,7 +6714,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.62,
+   "seconds": 1.13,
    "status": "pass"
   },
   {
@@ -6581,7 +6735,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.036,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -6602,7 +6756,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.034,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -6623,7 +6777,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.06,
+   "seconds": 0.146,
    "status": "pass"
   },
   {
@@ -6644,7 +6798,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.053,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -6657,7 +6811,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.05,
    "status": "both-error"
   },
   {
@@ -6678,7 +6832,7 @@
     "bit-identical": 0,
     "header bytes identical": "True"
    },
-   "seconds": 0.028,
+   "seconds": 0.082,
    "status": "pass"
   }
  ],
@@ -6687,7 +6841,7 @@
   "both-error": 24,
   "expected-divergence": 0,
   "fail": 0,
-  "pass": 303,
+  "pass": 310,
   "skipped": 0
  },
  "tier": "standard"

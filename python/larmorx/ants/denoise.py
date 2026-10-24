@@ -91,7 +91,10 @@ def denoise_image(
     from larmorx's by a few float units (``docs/findings/ants-denoise.md``).
 
     At a high signal-to-noise ratio ITK's Rician correction factor overflows and the bias
-    becomes 0 (ANTS-43); larmorx computes it without the overflow. Mask values outside
+    becomes 0 (ANTS-43); larmorx computes it without the overflow. With a mask, the voxels
+    outside it that the centres' patches reach get the smoothed and corrected Rician bias like
+    every other voxel; ITK leaves them the raw noise estimate of a centre in the mask
+    (ANTS-44). Mask values outside
     ``unsigned char``'s range are clamped (ANTS-06; ANTs on x86-64 wraps them).
     ``upstream_defects="reproduce"`` gives ANTs' result.
     """

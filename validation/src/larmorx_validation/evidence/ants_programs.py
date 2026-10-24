@@ -508,7 +508,7 @@ def _cases(ctx: core.Context) -> list[dict]:
             nb = set(records.case_list(m.group(0)))
         for r in rec.results:
             c = defs.get(r["case"])
-            v = common.outcome_verdict(r)
+            v = common.outcome_verdict(r) or common.known_correction(c, r, program)
             rep = r.get("reported", {})
             if v is None:
                 if r["case"] in within and impl == "image-math":
@@ -603,9 +603,77 @@ def _speed(ctx: core.Context) -> dict | None:
     }
 
 
+#: The ANTS-17 example: ``ME`` with a label value, on fMRIPrep's segmentation of ds000005
+A17_DATA = {
+    "dataset": "OpenNeuro ds000005 (mixed-gambles task), v00001",
+    "subject": "sub-01",
+    "licence": "CC0-1.0",
+}
+DSEG = "out/sub-01/anat/sub-01_dseg.nii.gz"
+
+
+def _a17_spec(ctx: core.Context):
+    from larmorx_validation.evidence import corrections
+
+    run = common.fmriprep_run(RUN)
+
+    def show():
+        from scipy import ndimage
+
+        return ndimage.binary_dilation(common.load(str(run / MASK)) > 0, iterations=2)
+
+    def effect(e) -> str:
+        dseg = common.load(str(run / DSEG))
+        a = common.load(str(e.dir / "ants-1-eroded.nii.gz"))
+        b = common.load(str(e.dir / "larmorx-eroded.nii.gz"))
+        wm = dseg == 2
+        return (
+            f"of the {int(wm.sum()):,} white-matter voxels, larmorx's eroded mask keeps "
+            f"{int(b.sum()):,}; ANTs' output is 1 on {int(a.sum()):,} voxels, the eroded white "
+            f"matter and every voxel of the other labels ({int(((dseg == 1) | (dseg == 3)).sum()):,}"
+            " of CSF and grey matter)"
+        )
+
+    return corrections.Spec(
+        tool=TOOL,
+        case="ds000005-dseg-me-2-ants17",
+        entry="ANTS-17",
+        title="ANTS-17: eroding the white-matter label of fMRIPrep's segmentation",
+        summary=(
+            "`ImageMath ME` with a label value, on the segmentation fMRIPrep 25.2.6 wrote for "
+            "OpenNeuro ds000005 sub-01 (1 grey matter, 2 white matter, 3 CSF): an eroded white-"
+            "matter mask, as for a CompCor or a boundary mask. ANTs thresholds the eroded image at "
+            "0.5, so the other labels come back as 1 beside the eroded white matter; larmorx's "
+            "default gives the eroded white matter alone, its reproduce mode ANTs' output."
+        ),
+        program="ImageMath",
+        args=("3", "{out:eroded}", "ME", "{in:dseg}", "1", "2"),
+        inputs={"dseg": ("fMRIPrep's segmentation (dseg)", run / DSEG)},
+        panels=(("dseg", "ds000005 sub-01 segmentation", "fMRIPrep's dseg: 1 GM, 2 WM, 3 CSF"),),
+        outputs=({"id": "eroded", "label": "Eroded label 2 (WM)", "unit": ""},),
+        data=(A17_DATA,),
+        show=show,
+        reason=(
+            "ANTS-17, corrected by default with a warning: `ME r value` erodes the voxels "
+            "holding `value`; ANTs then keeps every voxel above 0.5, so on a label map the other "
+            "labels survive as 1 and the result is no erosion of anything. larmorx gives 1 where "
+            "the eroded label remains (SciPy's binary erosion gives the same voxels: the parity "
+            "case `binary-morphology/ME-labels-known`); reproduce mode gives ANTs' output."
+        ),
+        effect=effect,
+        settings="ImageMath ME with radius 1 and value 2 on fMRIPrep 25.2.6's dseg of ds000005 "
+        "sub-01 (no fMRIPrep node: fMRIPrep erodes binary masks only)",
+        focus=lambda: common.load(str(run / DSEG)) == 1,
+        focus_text="in the grey matter, which ANTs' output keeps as 1",
+    )
+
+
 def export(ctx: core.Context) -> dict:
+    from larmorx_validation.evidence import corrections
+
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
+    a17 = _a17_spec(ctx)
     ents = entries(ctx)
     impls, sources = [], []
     for impl, (program, name, _m) in PROGRAMS.items():
@@ -632,7 +700,10 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": sources,
             "benchmarks": bench_sources,
-            "cache": [fcache.provenance(e) for e in ents.values()],
+            "cache": [
+                *(fcache.provenance(e) for e in ents.values()),
+                fcache.provenance(corrections.entry(ctx, a17)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": impls,
@@ -643,12 +714,16 @@ def export(ctx: core.Context) -> dict:
         "examples": [
             _example(ctx, ents["t1w"], T1W_NODES, "t1w", reg),
             _example(ctx, ents["pad"], PAD_NODES, "pad", reg),
+            corrections.example(ctx, a17, reg),
         ],
     }
 
 
 if __name__ == "__main__":
+    from larmorx_validation.evidence import corrections
     from larmorx_validation.figures.core import REPO, default_cache
 
-    for k, e in entries(core.Context(repo=REPO, site=Path("."), cache=default_cache())).items():
+    c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    for k, e in entries(c).items():
         print("done", k, e.dir)
+    print("done", corrections.entry(c, _a17_spec(c)).dir)

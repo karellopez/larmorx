@@ -40,21 +40,23 @@ larmorx ants ResampleImageBySpacing 3 seg.nii.gz seg_1mm.nii.gz 1 1 1 0 0 1
 | `inputImageFile` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
 | `outputImageFile` | the returned `lx.Image` | float32; same origin and direction, the new spacing |
 | `outxspc outyspc [outzspc] [outtspc]` | `spacing` | one value per axis (`atof`); 4D: the last is the time step in seconds |
-| `dosmooth` (default 1) | `smooth=True` | per axis, a recursive Gaussian of sigma `out/in − 1` (read by ITK in mm) where positive |
+| `dosmooth` (default 1) | `smooth=True` | per axis, a recursive Gaussian of sigma `out/in − 1` input voxels where positive (ANTs: the same number in mm, ANTS-32) |
 | `addvox` (default 0) | `add_voxels=0` | added to every axis's size |
 | `nn-interp` (default 0) | `nearest=False` | nearest neighbour instead of linear |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | results do not depend on it |
 
 The output size on each axis is `int(size · old spacing / new spacing + add_voxels)`. Output
-voxels beyond the input take the input's value at index `(1, 1, …)` (before smoothing). The
-Python result keeps the input's header, with the new time step in 4D.
+voxels beyond the input are 0 (ANTs: the input's value at index `(1, 1, …)`, before smoothing,
+ANTS-32). The Python result keeps the input's header, with the new time step in 4D.
 
 ## Behaviour worth knowing
 
 From ANTs ([findings](../findings/ants-gaussian-filters.md#resampleimagebyspacing-examplesresampleimagebyspacingcxx)):
 - **the smoothing sigma is in millimetres but computed as a ratio**: 1 → 2 mm smooths with
-  one voxel, 2 → 4 mm with half a voxel;
-- it prints the input spacing, the new spacing, each axis's sigma and the output size;
+  one voxel, 2 → 4 mm with half a voxel (corrected by default: one input voxel per unit of
+  `out/in − 1`, ANTS-32);
+- it prints the input spacing, the new spacing, each axis's sigma (larmorx's default prints
+  the sigma the filter receives, in mm) and the output size;
 - with smoothing, every spacing must be given (else ANTs crashes);
 - 4D linear interpolation runs in four dimensions (time included), as ITK's
   `LinearInterpolateImageFunction` does.
@@ -72,11 +74,13 @@ changed the result ([upstream-defects.md](upstream-defects.md); each entry in th
 | ANTS-31 | the `nn` flag is read from the `addvox` argument in 2D (whenever an `nn` argument follows), and in 4D as soon as there are more than 9 arguments, so an `addvox` without `nn` aborts; a dimension other than 2, 3 or 4 does nothing and exits 0 | each value from its own argument; other dimensions are an error (exit 1) |
 | ITK-01 | ITK's floor of a continuous index just below 0 is 0, not −1 (x86-64), in 4D linear interpolation | the exact floor; the warning counts the output voxels this changed |
 | ANTS-28 | an axis of fewer than 4 voxels that needs smoothing: ITK throws, ANTs prints the exception after "Exception catched !" and resamples the smoothing filter's never-written buffer (uninitialised memory, different on every run), exit 0. `reproduce` prints the same text (ITK's two addresses and its build directory written as `0x0` and `<ITK source>`), fills the buffer with zeros, writes the same file and warns | ITK's message, exit 1 (Python `ValueError`) |
+| ANTS-32 | the smoothing sigma `out/in − 1`, a number of input voxels (the downsampling factor less one), is taken in millimetres, so the smoothing depends on the units of the spacing (1 → 2 mm: one voxel; 2 → 4 mm: half a voxel); output voxels beyond the input get the input's value at index `(1, 1, …)` (an axis of one voxel: a read outside the image), though the source says "zero regions without source" | the sigma is `out/in − 1` input voxels (`out − in` mm; printed in mm), the voxels beyond the input 0, an axis of one voxel accepted (decided 2026-10-23, rule A); each part named where it changes the result |
 | ANTS-03, ITK-02, ITK-08 | as for every ANTs program: names of fewer than 3 characters, the direction of a file with more dimensions than `d`, `x.nii` read for `x.nii.gz` ([ImageMath](ants-image-math.md#upstream-defects-d13)) | as there |
 
 ## Deliberate differences
 
 - `nearest=True` works in 2D in Python.
-- Where ANTs crashes or reads outside the image (an axis of one voxel for the `(1, 1, …)`
-  default value), larmorx exits 1 with a message.
+- Where ANTs crashes, larmorx exits 1 with a message; where it reads outside the image (an
+  axis of one voxel for the `(1, 1, …)` default value), `reproduce` exits 1 and the default,
+  which needs no such value, resamples.
 - Images are NIfTI only.

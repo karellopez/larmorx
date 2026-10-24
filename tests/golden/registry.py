@@ -2255,8 +2255,9 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("cli.ants.DenoiseImage.reproduce", covers=("cli:ants DenoiseImage",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``cli.ants.DenoiseImage``'s Rician model with ITK's defect reproduced (ANTS-43: the
-    Rician correction factor becomes NaN at a high SNR)."""
+    """``cli.ants.DenoiseImage``'s Rician model with ITK's defects reproduced (ANTS-43: the
+    Rician correction factor becomes NaN at a high SNR; ANTS-44: the voxels outside the mask
+    keep an unsmoothed bias)."""
     out, noise = ctx.out("out.nii"), ctx.out("noise.nii")
     cli(
         "ants",
@@ -2515,14 +2516,19 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.ants.n4.reproduce", covers=("lx.ants.n4_bias_field_correction",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``py.ants.n4``'s masked case with ITK's defects reproduced (ANTS-38)."""
+    """``py.ants.n4``'s masked case with ITK's defects reproduced (ANTS-38), and its unmasked
+    4D case, whose zero voxels ITK keeps in its log image (ANTS-40)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = lx.ants.n4_bias_field_correction(anat2(), mask=mask(), shrink_factor=2, convergence=([30], 0.02), rescale_intensities=True, upstream_defects=REPRODUCE)  # fmt: skip
+        b = lx.ants.n4_bias_field_correction(bold(), shrink_factor=2, convergence=([3, 2], 0.0), upstream_defects=REPRODUCE)  # fmt: skip
     return {
         "threshold.corrected": r.corrected.data,
         "threshold.bias": r.bias_field.data,
         "threshold.convergence": np.array([it.convergence for it in r.iterations], np.float32),
+        "bold.corrected": b.corrected.data,
+        "bold.bias": b.bias_field.data,
+        "bold.convergence": np.array([it.convergence for it in b.iterations], np.float32),
     }
 
 
@@ -2614,6 +2620,7 @@ def _(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {}
     calls = {
         "by_spacing": lambda: lx.ants.resample_image_by_spacing(anat(), [3.0, 2.0, 2.5], smooth=False, nearest=True, add_voxels=1),
+        "by_spacing_smooth": lambda: lx.ants.resample_image_by_spacing(anat(), [4.0, 5.0, 6.0]),
         "nearest_short": lambda: lx.ants.resample_image(anat(), size=[20, 16, 12], interpolation="nearest", pixel_type="short"),
         "gaussian": lambda: lx.ants.resample_image(anat(), [2.5, 2.5, 2.5], interpolation="gaussian"),
         "sinc": lambda: lx.ants.resample_image(anat(), [2.2, 2.8, 3.3], interpolation="sinc", window="welch"),
@@ -2623,6 +2630,27 @@ def _(ctx: Context) -> dict[str, Any]:
     for name, call in calls.items():
         out.update(image_outputs(name, call(), geometry=True))
     return out
+
+
+@case("py.ants.resample.reproduce", covers=("lx.ants.resample_image_by_spacing",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``py.ants.resample``'s ResampleImageBySpacing calls with ANTs' defect reproduced
+    (ANTS-32: the sigma in millimetres, the outside value at index (1, 1, 1))."""
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        calls = {
+            "by_spacing": lambda: lx.ants.resample_image_by_spacing(anat(), [3.0, 2.0, 2.5], smooth=False, nearest=True, add_voxels=1, upstream_defects=REPRODUCE),
+            "by_spacing_smooth": lambda: lx.ants.resample_image_by_spacing(anat(), [4.0, 5.0, 6.0], upstream_defects=REPRODUCE),
+        }  # fmt: skip
+        for name, call in calls.items():
+            out.update(image_outputs(name, call(), geometry=True))
+    return out
+
+
+def fractional_labels() -> lx.Image:
+    """``labels`` times 0.4: label values 0.4 to 2 (ANTS-23's fractional labels)."""
+    return labels().with_data((labels().data * 0.4).astype(np.float32))
 
 
 @case(
@@ -2653,8 +2681,37 @@ def _(ctx: Context) -> dict[str, Any]:
         "grayscale_open": lx.ants.grayscale_open(anat(), 2).data,
         "grayscale_close": lx.ants.grayscale_close(anat(), 2).data,
         "fill_holes": lx.ants.fill_holes(mask(), 0.5).data,
+        "erode_labels": lx.ants.morphological_erode(labels(), 1, value=1).data,
+        "open_zeros": lx.ants.morphological_open(mask(), 1, value=0).data,
     }
     out.update(image_outputs("pad", lx.ants.pad_image(anat(), -2.5), geometry=True))
+    return out
+
+
+@case(
+    "py.ants.morphology.reproduce",
+    covers=(
+        "lx.ants.morphological_erode",
+        "lx.ants.morphological_open",
+        "lx.ants.pad_image",
+        "lx.ants.extract_contours",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The corrected paths of ``py.ants.morphology`` and ``py.ants.components`` with ANTs'
+    defects reproduced: ``ME`` on labels and ``MO`` with the foreground 0 (ANTS-17), a
+    fractional pad (ANTS-22), contours of fractional labels (ANTS-23)."""
+    r = REPRODUCE
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = {
+            "erode_labels": lx.ants.morphological_erode(labels(), 1, value=1, upstream_defects=r).data,
+            "open_zeros": lx.ants.morphological_open(mask(), 1, value=0, upstream_defects=r).data,
+            "extract_contours_fractional": lx.ants.extract_contours(fractional_labels(), upstream_defects=r).data,
+        }  # fmt: skip
+        out.update(
+            image_outputs("pad", lx.ants.pad_image(anat(), -2.5, upstream_defects=r), geometry=True)
+        )
     return out
 
 
@@ -2675,6 +2732,7 @@ def _(ctx: Context) -> dict[str, Any]:
         "distance_map": lx.ants.distance_map(labels()).data,
         "maurer_distance": lx.ants.maurer_distance(labels(), 2.0).data,
         "extract_contours": lx.ants.extract_contours(labels(), fully_connected=False).data,
+        "extract_contours_fractional": lx.ants.extract_contours(fractional_labels()).data,
         "threshold_at_mean": lx.ants.threshold_at_mean(anat(), 1.2).data,
         "replace_voxel_value": lx.ants.replace_voxel_value(labels(), 1, 2, 9).data,
     }

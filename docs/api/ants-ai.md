@@ -116,6 +116,14 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`
   corrected, an error.
 - **ITK-60** (`-b`, 2D `Rigid`/`Similarity`): ITK's landmark fit takes −90° whenever the summed dot
   product is within 5e-5 of 0; corrected, `atan2` there too.
+- **ANTS-116** (`-b`, decided 2026-10-23, rule A): ANTs compares two blobs' patches after turning
+  the moving one with Wahba's `V·Uᵀ` of the patches' principal axes, whose signs the
+  eigensystem leaves arbitrary, and never checks the rotation's determinant, so identical
+  patches can be compared reflected or turned by 180° (on a T1w against its own shifted copy
+  only 4 of 11 identical blob pairs correlated at 1); corrected, every sign combination of the
+  moving axes (2 in 2D, 4 in 3D) with Kabsch's proper rotation, the largest correlation kept
+  (a reflected match is no match for a rigid transform). Named where the pairs, the landmarks
+  or the transform change; it costs up to four patch comparisons per blob pair instead of one.
 
 Never reproduced (class (a)): where ANTs crashes or never finishes, larmorx refuses with a
 message (exit 1): `-b` with a blob list that is empty (ANTs dereferences a null transform,

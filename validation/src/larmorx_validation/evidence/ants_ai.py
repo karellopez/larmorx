@@ -758,6 +758,7 @@ def _cases(ctx: core.Context) -> list[dict]:
 def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
+    a116, a116_sources = ants_ai_blobs.a116_table(ctx)
     impls, sources = [], []
     for impl, (program, name, _m) in IMPLS.items():
         rec = records.load(ctx.repo, name)
@@ -786,12 +787,14 @@ def export(ctx: core.Context) -> dict:
                 fcache.provenance(placed_entry(ctx)),
                 ants_ai_blobs.provenance(ctx),
             ],
+            "measurements": a116_sources,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": impls,
         "cases_per_impl": True,
         "cases": cases,
         "cases_total": len(cases),
+        "tables": [a116],
         "examples": [_example(ctx, reg), *ants_ai_blobs.examples(ctx)],
     }
 

@@ -79,38 +79,110 @@ impl Morphology {
 ///
 /// The binary operations use `value` (ImageMath's optional argument, default 1) as the
 /// foreground; other values are background. ITK's defaults stay: the dilation's background
-/// value is `-f32::MAX` (it never shows), the erosion's too, the opening's 0. `ME`
-/// then keeps `1` only where the eroded value and the input both exceed 0.5, `0` elsewhere:
-/// a voxel that is not the foreground but above 0.5 (a label 2 in a mask of 1s) stays 1.
-/// The grayscale operations ignore `value`.
+/// value is `-f32::MAX` (it never shows), the erosion's too. The grayscale operations ignore
+/// `value`. Two defects (ANTS-17, D13), each named where the correction changes the result:
+/// - `ME`: ANTs keeps `1` where the eroded value and the input both exceed 0.5, `0`
+///   elsewhere: a voxel that is not the foreground but above 0.5 (a label 2 in a mask of 1s)
+///   stays 1, and a remaining foreground of 0.5 or less (`ME r 0.3`, `ME r 0`) becomes 0.
+///   Corrected ([`UpstreamDefects::Fix`], the default): the eroded foreground as a mask, `1`
+///   where the voxel is still the foreground after the erosion, `0` elsewhere. On a 0/1 mask
+///   with the foreground 1 (every pipeline's call) both give the same result.
+/// - `MO`: ITK's opening writes the voxels its erosion removes as its background value, 0,
+///   which ANTs never changes; with the foreground 0 (`MO r 0`) the erosion then removes
+///   nothing and the opening is a dilation of the zeros. Corrected: with the foreground 0 the
+///   removed voxels become 1 (for a 0/1 mask, the opening of its zeros: by duality, the
+///   closing of its ones); any other foreground keeps ITK's 0.
 pub fn morphological(
     input: VolumeRef<'_, f32>,
     operation: Morphology,
     radius: usize,
     value: f32,
     n_threads: usize,
-) -> Result<Vec<f32>, FilterError> {
+    mode: UpstreamDefects,
+) -> Result<(Vec<f32>, Vec<Notice>), FilterError> {
     let lowest = -f32::MAX;
-    match operation {
-        Morphology::BinaryDilate => binary_dilate(input, radius, value, lowest, n_threads),
+    let mut notices = Notices::new(mode);
+    let out = match operation {
+        Morphology::BinaryDilate => binary_dilate(input, radius, value, lowest, n_threads)?,
         Morphology::BinaryErode => {
             let eroded = binary_erode(input, radius, value, lowest, n_threads)?;
-            Ok(parallel::with_threads(n_threads, || {
+            let (ants, fixed): (Vec<f32>, Vec<f32>) = parallel::with_threads(n_threads, || {
                 eroded
                     .par_iter()
                     .zip(input.data.par_iter())
                     .with_min_len(CHUNK)
-                    .map(|(&e, &v)| if e > 0.5 && v > 0.5 { 1.0 } else { 0.0 })
-                    .collect()
-            })?)
+                    .map(|(&e, &v)| {
+                        let ants = if e > 0.5 && v > 0.5 { 1.0 } else { 0.0 };
+                        let fixed = if e == value { 1.0 } else { 0.0 };
+                        (ants, fixed)
+                    })
+                    .unzip()
+            })?;
+            let (other, lost) = ants
+                .iter()
+                .zip(&fixed)
+                .fold((0usize, 0usize), |(o, l), (&a, &f)| {
+                    (o + usize::from(a > f), l + usize::from(a < f))
+                });
+            if other + lost > 0 {
+                let what = format!(
+                    "{other} voxel(s) that are not the foreground {value} but above 0.5, and \
+                     {lost} voxel(s) of the eroded foreground at or below 0.5"
+                );
+                notices.add(
+                    &defects::ANTS_17,
+                    if mode.fix() {
+                        format!(
+                            "ME gives the eroded foreground as a mask: {what} are 0 and 1 as the \
+                             erosion leaves them; ANTs thresholds at 0.5 and makes them 1 and 0"
+                        )
+                    } else {
+                        format!(
+                            "ME thresholds at 0.5 as ANTs does: {what} are 1 and 0, not as the \
+                             erosion leaves them"
+                        )
+                    },
+                );
+            }
+            if mode.fix() { fixed } else { ants }
         }
-        Morphology::BinaryOpen => binary_opening(input, radius, value, 0.0, n_threads),
-        Morphology::BinaryClose => binary_closing(input, radius, value, n_threads),
-        Morphology::GrayscaleErode => grayscale_erode(input, radius, n_threads),
-        Morphology::GrayscaleDilate => grayscale_dilate(input, radius, n_threads),
-        Morphology::GrayscaleOpen => grayscale_opening(input, radius, n_threads),
-        Morphology::GrayscaleClose => grayscale_closing(input, radius, n_threads),
-    }
+        Morphology::BinaryOpen if value == 0.0 => {
+            // ITK's opening background (0) is the foreground itself (ANTS-17).
+            let ants = binary_opening(input, radius, value, 0.0, n_threads)?;
+            let fixed = binary_opening(input, radius, value, 1.0, n_threads)?;
+            let changed = ants
+                .iter()
+                .zip(&fixed)
+                .filter(|(a, f)| a.to_bits() != f.to_bits())
+                .count();
+            if changed > 0 {
+                notices.add(
+                    &defects::ANTS_17,
+                    if mode.fix() {
+                        format!(
+                            "MO with the foreground 0 opens the zeros: the {changed} voxel(s) its \
+                             erosion removes and its dilation does not restore become 1; ANTs \
+                             sets them to 0, the foreground itself, so it only dilates the zeros"
+                        )
+                    } else {
+                        format!(
+                            "MO with the foreground 0 sets the voxels its erosion removes to 0, \
+                             the foreground itself, as ANTs does: it dilates the zeros ({changed} \
+                             voxel(s) differ from the opening)"
+                        )
+                    },
+                );
+            }
+            if mode.fix() { fixed } else { ants }
+        }
+        Morphology::BinaryOpen => binary_opening(input, radius, value, 0.0, n_threads)?,
+        Morphology::BinaryClose => binary_closing(input, radius, value, n_threads)?,
+        Morphology::GrayscaleErode => grayscale_erode(input, radius, n_threads)?,
+        Morphology::GrayscaleDilate => grayscale_dilate(input, radius, n_threads)?,
+        Morphology::GrayscaleOpen => grayscale_opening(input, radius, n_threads)?,
+        Morphology::GrayscaleClose => grayscale_closing(input, radius, n_threads)?,
+    };
+    Ok((out, notices.into_vec()))
 }
 
 /// The radius ANTs uses for ImageMath's float argument: `static_cast<unsigned long>(rad)`,
@@ -352,31 +424,73 @@ pub enum PadImageError {
     BadSize { pad: f32, size: u64 },
 }
 
-/// `PadImage`: `ImageMath d out PadImage image pad [value]`: every axis grows by `2·pad`
-/// voxels (shrinks for a negative `pad`), the image moves by `|pad|` voxels (truncated), and
-/// the new voxels are `value`. The origin moves so that the voxels keep their positions in
-/// space, computed as ITK's `TransformIndexToPhysicalPoint` does. The output is a new image
-/// (no `descrip`).
+/// `PadImage`: `ImageMath d out PadImage image pad [value]`: `|pad|` voxels (truncated) added
+/// on both sides of every axis (removed for a negative `pad`), the new voxels `value`. The
+/// origin moves so that the voxels keep their positions in space, computed as ITK's
+/// `TransformIndexToPhysicalPoint` does. The output is a new image (no `descrip`).
 ///
-/// ANTs computes each new size as `(unsigned int)(float(size) + pad·2)` and places voxel `i`
-/// at `(unsigned int)(float(i) + pad)` when that is inside: so a non-integer `pad` (2.5)
-/// grows an axis by 5 but shifts it by 2.
+/// ANTs computes each new size as `(unsigned int)(float(size) + pad·2)` but places voxel `i`
+/// at `(unsigned int)(float(i) + pad)`: so a non-integer `pad` (2.5) grows an axis by 5 but
+/// shifts it by 2, two voxels before and three after (ANTS-22, [`UpstreamDefects::Reproduce`]).
+/// Corrected (the default): a pad is a whole number of voxels on each side, `trunc(pad)`, the
+/// same before and after (the shift ANTs applies), so 2.5 adds 2 voxels on each side; named
+/// where ANTs' size differs. Returns the padded image and the notices.
 pub fn pad_image(
     image: &AntsImage<f32>,
     pad: f32,
     value: f32,
-) -> Result<AntsImage<f32>, PadImageError> {
+    mode: UpstreamDefects,
+) -> Result<(AntsImage<f32>, Vec<Notice>), PadImageError> {
     let g = &image.geometry;
     let d = g.ndim;
+    let mut notices = Notices::new(mode);
+    // The voxels added on each side (truncated toward zero; a removal if negative).
+    let side = x86_to_i64(f64::from(pad));
     let mut new_size = Vec::with_capacity(d);
+    let mut uneven: Option<(usize, u64, u64)> = None;
     for &n in &g.size {
         let s = n as f32 + pad * 2.0;
         // GCC converts float to `unsigned int` through a 64-bit truncation.
-        let s = u64::from(x86_to_i64(f64::from(s)) as u32);
+        let ants = u64::from(x86_to_i64(f64::from(s)) as u32);
+        let even = (n as i64)
+            .checked_add(side.saturating_mul(2))
+            .filter(|&e| e > 0)
+            .map_or(0, |e| e as u64);
+        if ants != even && uneven.is_none() {
+            uneven = Some((n, ants, even));
+        }
+        let s = if mode.fix() { even } else { ants };
         if s == 0 || s > 1 << 31 {
             return Err(PadImageError::BadSize { pad, size: s });
         }
         new_size.push(s as usize);
+    }
+    // For a positive pad the sizes alone differ (the image shifts by `side` in both); for a
+    // negative fractional pad ANTs also moves the voxels by one more than the origin.
+    if let Some((n, ants, even)) = uneven {
+        let sides = side.unsigned_abs();
+        let verb = if pad < 0.0 { "removes" } else { "adds" };
+        let shift = if pad < 0.0 {
+            "its voxels move by one more than its origin, so the image also shifts by a voxel \
+             in space, and the last row of every axis is the pad value"
+        } else {
+            "the extra voxel goes at the end"
+        };
+        notices.add(
+            &defects::ANTS_22,
+            if mode.fix() {
+                format!(
+                    "a pad of {pad} {verb} {sides} voxel(s) on each side of every axis (an axis \
+                     of {n} voxels has {even}); ANTs makes it {ants} and its padding uneven: \
+                     {shift}"
+                )
+            } else {
+                format!(
+                    "a pad of {pad} makes an axis of {n} voxels {ants}, as ANTs does: the padding \
+                     is uneven ({shift}); {sides} voxel(s) on each side would give {even}"
+                )
+            },
+        );
     }
     // `index` in the input and `index2` in the padded image share a position in space.
     let shift = x86_to_i64(f64::from(pad.abs())) as u32 as i64;
@@ -426,19 +540,32 @@ pub fn pad_image(
         }
         let mut target = 0usize;
         for a in 0..d {
-            let shifted = coord[a] as f32 + pad;
-            if shifted < 0.0 || shifted > (new_size[a] - 1) as f32 {
-                continue 'voxels;
-            }
-            target += shifted as usize * out_strides[a];
+            let index = if mode.fix() {
+                // `side` voxels on each side: the shift the origin was moved by.
+                let shifted = coord[a] as i64 + side;
+                if shifted < 0 || shifted >= new_size[a] as i64 {
+                    continue 'voxels;
+                }
+                shifted as usize
+            } else {
+                let shifted = coord[a] as f32 + pad;
+                if shifted < 0.0 || shifted > (new_size[a] - 1) as f32 {
+                    continue 'voxels;
+                }
+                shifted as usize
+            };
+            target += index * out_strides[a];
         }
         data[target] = v;
     }
-    Ok(AntsImage {
-        data,
-        geometry,
-        meta: Default::default(),
-    })
+    Ok((
+        AntsImage {
+            data,
+            geometry,
+            meta: Default::default(),
+        },
+        notices.into_vec(),
+    ))
 }
 
 /// The next index in memory order (first axis fastest).
@@ -498,22 +625,55 @@ mod tests {
 
     #[test]
     fn padding_moves_the_origin_and_keeps_positions() {
+        let (r, f) = (UpstreamDefects::Reproduce, UpstreamDefects::Fix);
         let img = image(&[3, 2], (0..6).map(|v| v as f32 + 1.0).collect());
-        let padded = pad_image(&img, 2.0, -5.0).unwrap();
-        assert_eq!(padded.size(), [7, 6]);
-        // Voxel (0, 0) moved to (2, 2); the origin moved by -2 voxels · direction · spacing.
-        assert_eq!(padded.data[2 + 7 * 2], 1.0);
-        assert_eq!(padded.data[0], -5.0);
-        assert_eq!(padded.geometry.origin, vec![14.0, 14.0]);
-        // Cropping back restores the image.
-        let back = pad_image(&padded, -2.0, 0.0).unwrap();
-        assert_eq!(back.data, img.data);
-        assert_eq!(back.geometry.origin, img.geometry.origin);
-        // A non-integer pad grows by 2·pad but shifts by the truncated pad.
-        let odd = pad_image(&img, 1.5, 0.0).unwrap();
+        for mode in [r, f] {
+            let (padded, notices) = pad_image(&img, 2.0, -5.0, mode).unwrap();
+            assert!(notices.is_empty());
+            assert_eq!(padded.size(), [7, 6]);
+            // Voxel (0, 0) moved to (2, 2); the origin moved by -2 voxels · direction · spacing.
+            assert_eq!(padded.data[2 + 7 * 2], 1.0);
+            assert_eq!(padded.data[0], -5.0);
+            assert_eq!(padded.geometry.origin, vec![14.0, 14.0]);
+            // Cropping back restores the image.
+            let (back, _) = pad_image(&padded, -2.0, 0.0, mode).unwrap();
+            assert_eq!(back.data, img.data);
+            assert_eq!(back.geometry.origin, img.geometry.origin);
+            assert!(pad_image(&img, -1.0, 0.0, mode).is_err());
+            // A fraction below one half changes nothing: 1.25 grows by 2, shifts by 1.
+            let (a, notices) = pad_image(&img, 1.25, 0.0, mode).unwrap();
+            assert_eq!(a.size(), [5, 4]);
+            assert_eq!(a.data[1 + 5], 1.0);
+            assert!(notices.is_empty());
+        }
+        // ANTS-22: ANTs grows by 2·pad but shifts by the truncated pad (the extra voxel at
+        // the end); corrected, one voxel on each side.
+        let (odd, notices) = pad_image(&img, 1.5, 0.0, r).unwrap();
         assert_eq!(odd.size(), [6, 5]);
         assert_eq!(odd.data[1 + 6], 1.0);
-        assert!(pad_image(&img, -1.0, 0.0).is_err());
+        assert_eq!(notices[0].defect.id, "ANTS-22");
+        let (even, notices) = pad_image(&img, 1.5, 0.0, f).unwrap();
+        assert_eq!(even.size(), [5, 4]);
+        assert_eq!(even.data[1 + 5], 1.0);
+        assert_eq!(even.geometry.origin, odd.geometry.origin);
+        assert_eq!(notices[0].defect.id, "ANTS-22");
+        // A negative fractional pad: on an axis of 6 ANTs keeps 3 voxels, moves the voxels by
+        // 2 while the origin moves by 1, and leaves the last row the pad value; corrected, 1
+        // voxel removed on each side and the voxels where the origin says.
+        let big = image(&[6, 5], (0..30).map(|v| v as f32).collect());
+        let (ants, _) = pad_image(&big, -1.5, 0.0, r).unwrap();
+        assert_eq!(ants.size(), [3, 2]);
+        assert_eq!(ants.data, [14.0, 15.0, 0.0, 0.0, 0.0, 0.0]);
+        let (fixed, notices) = pad_image(&big, -1.5, 0.0, f).unwrap();
+        assert_eq!(fixed.size(), [4, 3]);
+        assert_eq!(
+            fixed.data,
+            [
+                7.0, 8.0, 9.0, 10.0, 13.0, 14.0, 15.0, 16.0, 19.0, 20.0, 21.0, 22.0
+            ]
+        );
+        assert_eq!(fixed.geometry.origin, ants.geometry.origin);
+        assert!(notices[0].detail.contains("one more than its origin"));
     }
 
     #[test]
@@ -602,6 +762,57 @@ mod tests {
         let (b, nb) = fill_holes(v, 0.2, 1, UpstreamDefects::Reproduce).unwrap();
         assert_eq!(a, b);
         assert!(na.is_empty() && nb.is_empty(), "{na:?} {nb:?}");
+    }
+
+    #[test]
+    fn erosion_and_opening_with_labels_and_zero() {
+        let (r, f) = (UpstreamDefects::Reproduce, UpstreamDefects::Fix);
+        // A line: labels 1 (5 voxels), 2 (3 voxels), and a run of 0.3.
+        let data = [
+            0.0f32, 1., 1., 1., 1., 1., 0., 2., 2., 2., 0., 0.3, 0.3, 0.3, 0.,
+        ];
+        let size = [15usize];
+        let v = VolumeRef::new(&data, &size, &[1.0]);
+        // ANTS-17, ME 1 1: ANTs keeps label 2 as 1; corrected, only the eroded label 1.
+        let (ants, n) = morphological(v, Morphology::BinaryErode, 1, 1.0, 1, r).unwrap();
+        assert_eq!(&ants[..10], &[0., 0., 1., 1., 1., 0., 0., 1., 1., 1.]);
+        assert_eq!(n[0].defect.id, "ANTS-17");
+        let (fixed, n) = morphological(v, Morphology::BinaryErode, 1, 1.0, 1, f).unwrap();
+        assert_eq!(&fixed[..10], &[0., 0., 1., 1., 1., 0., 0., 0., 0., 0.]);
+        assert!(
+            n[0].detail
+                .contains("3 voxel(s) that are not the foreground"),
+            "{n:?}"
+        );
+        // ME 1 0.3: the eroded run of 0.3 is 0 in ANTs (not above 0.5), 1 corrected.
+        let (ants, _) = morphological(v, Morphology::BinaryErode, 1, 0.3, 1, r).unwrap();
+        assert_eq!(ants[12], 0.0);
+        let (fixed, _) = morphological(v, Morphology::BinaryErode, 1, 0.3, 1, f).unwrap();
+        assert_eq!(fixed[12], 1.0);
+        assert_eq!(fixed.iter().sum::<f32>(), 1.0);
+        // A 0/1 mask: both agree and nothing is named.
+        let mask = [0.0f32, 1., 1., 1., 0., 1., 0.];
+        let m = VolumeRef::new(&mask, &[7], &[1.0]);
+        let a = morphological(m, Morphology::BinaryErode, 1, 1.0, 1, r).unwrap();
+        let b = morphological(m, Morphology::BinaryErode, 1, 1.0, 1, f).unwrap();
+        assert_eq!(a, b);
+        assert!(a.1.is_empty());
+        // MO 1 0 on a mask with a one-voxel hole: ANTs dilates the zeros (the hole grows), the
+        // correction opens them (the hole, smaller than the ball, is filled with 1).
+        let holed = [1.0f32, 1., 1., 0., 1., 1., 1., 1., 0., 0., 0., 0.];
+        let h = VolumeRef::new(&holed, &[12], &[1.0]);
+        let (ants, n) = morphological(h, Morphology::BinaryOpen, 1, 0.0, 1, r).unwrap();
+        assert_eq!(ants, [1., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.]);
+        assert_eq!(n[0].defect.id, "ANTS-17");
+        let (fixed, _) = morphological(h, Morphology::BinaryOpen, 1, 0.0, 1, f).unwrap();
+        assert_eq!(fixed, [1., 1., 1., 1., 1., 1., 1., 1., 0., 0., 0., 0.]);
+        // Any other foreground: ITK's opening in both modes.
+        let a = morphological(h, Morphology::BinaryOpen, 1, 1.0, 1, r).unwrap();
+        assert_eq!(
+            a,
+            morphological(h, Morphology::BinaryOpen, 1, 1.0, 1, f).unwrap()
+        );
+        assert!(a.1.is_empty());
     }
 
     #[test]

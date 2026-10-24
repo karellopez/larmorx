@@ -66,9 +66,11 @@ def resample_image_by_spacing(
 
     The output has ``int(size · old spacing / new spacing + add_voxels)`` voxels on each axis.
     With ``smooth`` (as in ANTs, the default), each axis is first smoothed with a recursive
-    Gaussian of sigma ``new/old - 1`` where that is positive (ITK reads it in millimetres:
-    ``(new/old - 1) / old`` voxels). Interpolation is linear, or nearest-neighbour with
-    ``nearest``. Output voxels beyond the input take the input's value at index ``(1, 1, …)``.
+    Gaussian of sigma ``new/old - 1`` input voxels where that is positive. Interpolation is
+    linear, or nearest-neighbour with ``nearest``. Output voxels beyond the input are 0. ANTs
+    takes the sigma in millimetres (``(new/old - 1) / old`` voxels: half a voxel from 2 to
+    4 mm) and gives the voxels beyond the input its value at index ``(1, 1, …)`` (ANTS-32),
+    which ``upstream_defects="reproduce"`` gives.
 
     ``nearest`` works in 2D too (there ANTs' command line reads it from the ``addvox``
     argument). Smoothing an axis of fewer than 4 voxels is an error; ANTs goes on with a buffer

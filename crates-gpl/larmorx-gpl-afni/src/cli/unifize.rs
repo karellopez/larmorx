@@ -30,7 +30,8 @@
 //! **Upstream defects (D13)**, corrected unless `LARMORX_UPSTREAM_DEFECTS=reproduce`
 //! (`docs/findings/afni-unifize.md`): those of the shared dataset and output code (AFNI-02, -11,
 //! -12, -16, -18, -20, -22, -23, -26), AFNI-01 in `-EPI`'s median volume, `-T2up` at or near 100
-//! (AFNI-45), the half-size grid of a volume with an axis of 2 or 3 voxels (AFNI-47); and two
+//! (AFNI-45), the half-size grid of a volume with an axis of 2 or 3 voxels (AFNI-47); `-T2`
+//! three or more times refused (AFNI-48, rule B: AFNI leaves the output inverted); and two
 //! crashes refused in both modes: `-T2up` without its value (AFNI-40), `-T2` on a 2D image
 //! smaller than 16 x 16 (AFNI-46).
 
@@ -75,7 +76,8 @@ Options:
                format, not written by larmorx-gpl)
   -input dd    the input dataset (instead of the last argument); -inset is the same
   -T2          treat the input as T2-weighted: invert its contrast, unifize, invert back;
-               twice: do not invert back, clip bright edges instead
+               twice: do not invert back, clip bright edges instead (three or more times
+               is an error, AFNI-48)
   -T2up uu     the percentile (90 to 100, default 98.5) the contrast is inverted about
   -GM          also scale the grey matter (lower intensities) to a standard contrast
   -Urad rr     the radius in voxels of the ball for the local white-matter intensity
@@ -427,6 +429,34 @@ fn run(
     let mut notices = Notices::new(mode);
     notices.extend(pre.notices.iter().cloned());
     let (mut o, iarg) = parse(&pre.args, mode, settings, &mut notices, io)?;
+    // AFNI-48: `do_T2 == 1` inverts back and `do_T2 == 2` clips the bright edges; a third -T2
+    // does neither (the output stays inverted), and the help documents once and twice.
+    // Corrected (rule B, decided 2026-10-23): an error; `reproduce` keeps AFNI's behaviour.
+    // (-EPI sets one -T2 whatever was given.)
+    if o.do_t2 >= 3 && !o.do_epi {
+        let n = o.do_t2;
+        if mode.fix() {
+            io.notice(&Notice::new(
+                &defects::AFNI_48,
+                mode,
+                format!(
+                    "-T2 given {n} times (the help documents once and twice): an error (exit \
+                     status 1); AFNI leaves the output inverted"
+                ),
+            ));
+            return Err(Fail::Fatal(format!(
+                "-T2 given {n} times: give it once (a T2-weighted input) or twice (also clip the \
+                 bright edges) (AFNI-48; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)"
+            )));
+        }
+        notices.add(
+            &defects::AFNI_48,
+            format!(
+                "-T2 given {n} times: the output stays inverted (neither inverted back nor \
+                 edge-clipped), as in AFNI; by default it is an error"
+            ),
+        );
+    }
     let verbose = o.verb > 0;
     if o.verb > 1 {
         io.info(IMPLEMENTATION);
@@ -761,6 +791,42 @@ mod tests {
         .map_err(|e| match e {
             Fail::Fatal(m) | Fail::Error(m) => m,
         })
+    }
+
+    /// AFNI-48: `-T2` three times is refused by default, before the input is read; AFNI's
+    /// behaviour with `reproduce` (here the missing input stops it later); -EPI sets one -T2.
+    #[test]
+    fn t2_three_times() {
+        let run = |args: &[&str], mode| {
+            let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let code = main_with(&args, mode, Settings::empty(), &mut out, &mut err);
+            (code, String::from_utf8(err).unwrap())
+        };
+        let t2 = ["-T2", "-t2", "-T2", "-prefix", "o.nii", "missing.nii"];
+        let (code, err) = run(&t2, UpstreamDefects::Fix);
+        assert_eq!(code, 1);
+        assert!(err.contains("upstream defect AFNI-48 (3dUnifize)"), "{err}");
+        assert!(err.contains("-T2 given 3 times"), "{err}");
+        let (code, err) = run(&t2, UpstreamDefects::Reproduce);
+        assert_eq!(code, 1);
+        assert!(!err.contains("-T2 given"), "{err}");
+        let (_, err) = run(
+            &["-T2", "-T2", "-prefix", "o.nii", "missing.nii"],
+            UpstreamDefects::Fix,
+        );
+        assert!(!err.contains("AFNI-48"), "{err}");
+        let epi = [
+            "-T2",
+            "-T2",
+            "-T2",
+            "-EPI",
+            "-prefix",
+            "o.nii",
+            "missing.nii",
+        ];
+        let (_, err) = run(&epi, UpstreamDefects::Fix);
+        assert!(!err.contains("AFNI-48"), "{err}");
     }
 
     #[test]

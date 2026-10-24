@@ -141,6 +141,51 @@ def entry(
     return e
 
 
+def rerun(e: Entry, labels: Sequence[str], why: str, cpus: int | None = None) -> dict:
+    """Run again, with their recorded commands and settings, the runs ``labels`` of the complete
+    entry ``e`` (larmorx's runs after a change of larmorx, and the runs that read their outputs),
+    keeping every other output: the originals' are never computed twice. ``RUN_INFO.json``
+    records the new runs in place of the old, the larmorx commit of this re-run, and what was
+    run again and why (``rerun``).
+
+    ``cpus``: a run whose recorded thread count (``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS``) is
+    larger runs on that many CPUs only (``taskset``, Linux), its threads unchanged: larmorx's
+    result does not depend on them, and a machine shared with other work keeps its share. The
+    new run's command records the prefix."""
+    info = e.info()
+    old = {r["label"]: r for r in info["runs"]}
+    missing = [x for x in labels if x not in old]
+    if missing:
+        raise KeyError(f"{e.tool}/{e.case}: no runs {missing}")
+    previous = info.get("larmorx_commit")
+    e.runs = []
+    for label in labels:
+        r = old[label]
+        argv = list(r["argv"])
+        if argv[:1] == ["taskset"]:
+            argv = argv[3:]
+        threads = int(r["env"].get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "0") or 0)
+        if cpus is not None and threads > cpus:
+            # the first ``cpus`` of the CPUs this process may use (never more than those)
+            allowed = sorted(os.sched_getaffinity(0))[:cpus]
+            argv = ["taskset", "-c", ",".join(map(str, allowed)), *argv]
+        e.run(label, argv, env=r["env"], unset=("LD_PRELOAD", "NSLOTS", "OMP_NUM_THREADS"))
+    new = {r.label: r.__dict__ for r in e.runs}
+    info["runs"] = [new.get(r["label"], r) for r in info["runs"]]
+    info["larmorx_commit"] = git_commit(e.ctx.repo)
+    info.setdefault("rerun", []).append(
+        {
+            "computed": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+            "labels": list(labels),
+            "previous_larmorx_commit": previous,
+            "why": why,
+            **({"cpus": cpus} if cpus is not None else {}),
+        }
+    )
+    e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    return info
+
+
 def provenance(e: Entry) -> dict:
     """How a figure's provenance names a cache entry (paths relative to the cache)."""
     info = e.info()

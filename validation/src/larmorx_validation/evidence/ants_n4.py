@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import core
+from larmorx_validation.evidence import common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -181,22 +181,22 @@ def _load(path: str) -> np.ndarray:
 #: larmorx comes first: its bias field is stored as it is, the others as the exclusive or of
 #: their bits with it, and each corrected image as the exclusive or with input ÷ bias field.
 RUNS = [
-    ("larmorx", "larmorx-1", "larmorx", "larmorx (port), 1 thread", "default mode"),
-    ("larmorx-12", "larmorx-12", "larmorx", "larmorx (port), 12 threads", "default mode"),
+    ("larmorx", "larmorx-1-reproduce", "larmorx", "larmorx (port), 1 thread", "reproduce mode"),
     (
-        "larmorx-reproduce",
-        "larmorx-1-reproduce",
-        "larmorx",
-        "larmorx (port), 1 thread",
-        "reproduce mode",
-    ),
-    (
-        "larmorx-12-reproduce",
+        "larmorx-12",
         "larmorx-12-reproduce",
         "larmorx",
         "larmorx (port), 12 threads",
         "reproduce mode",
     ),
+    (
+        "larmorx-fix",
+        "larmorx-1",
+        "larmorx",
+        "larmorx (port), 1 thread",
+        "default mode: ANTS-40 corrected",
+    ),
+    ("larmorx-12-fix", "larmorx-12", "larmorx", "larmorx (port), 12 threads", "default mode"),
     (
         "ants-1-cr",
         "ants-1-cr",
@@ -285,11 +285,19 @@ def _diffs() -> list[dict]:
             "larmorx against itself",
         ),
         d(
-            "lx-repro",
+            "fix-lx",
+            "larmorx-fix",
             "larmorx",
-            "larmorx-reproduce",
+            "main",
+            "larmorx default mode − reproduce mode (ANTS-40)",
+            "larmorx's correction",
+        ),
+        d(
+            "fix12-fix1",
+            "larmorx-12-fix",
+            "larmorx-fix",
             "check",
-            "larmorx, default − reproduce mode",
+            "larmorx default mode, 12 threads − 1 thread",
             "larmorx against itself",
         ),
     ]
@@ -347,17 +355,26 @@ def _verdict(d: dict, same: dict[str, bool], reg: dict) -> None:
                 "lattices."
             )
             links.append({"label": "ANTS-37", "href": reg["ANTS-37"]["link"]})
+    elif i == "fix-lx":
+        d["verdict"] = "d13" if not same[i] else "bit-identical"
+        d["reason"] = (
+            "ANTS-40, corrected by default with a warning: of the voxels N4 uses (the weight is "
+            "positive there), those whose value is 0 have no logarithm; ITK keeps them in its log "
+            "image as the log of an intensity of 1, inside the histogram and the fit. larmorx "
+            "leaves them out, as a mask of the positive voxels would. Reproduce mode gives "
+            "ANTs' result."
+            if not same[i]
+            else "No voxel N4 uses is 0 or negative here: both modes give the same bytes."
+        )
+        links.append({"label": "ANTS-40", "href": _link(reg, "ANTS-40")})
     elif same[i]:
         d["verdict"] = "bit-identical"
         d["reason"] = {
-            "lx-cr": "With correctly rounded maths, ANTs computes exactly what larmorx computes.",
+            "lx-cr": "With correctly rounded maths, ANTs computes exactly what larmorx's "
+            "reproduce mode computes.",
             "lx12-lx1": "larmorx gives ANTs' single-thread result on any number of threads.",
-            "lx-repro": "No correction of the register applies to this command: both modes give "
-            "the same bytes (ANTS-36's notice, that -r without a mask rescales nothing, is "
-            "printed in both).",
+            "fix12-fix1": "larmorx's default mode too gives one result on any number of threads.",
         }.get(i, "The same bytes.")
-        if i == "lx-repro":
-            links.append({"label": "ANTS-36", "href": reg["ANTS-36"]["link"]})
     elif i == "lx-ants1" and same["lx-cr"]:
         d["verdict"] = "identical-cr"
         d["reason"] = (
@@ -469,7 +486,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "image1cr-ants1cr",
         "lx-cr",
         "lx12-lx1",
-        "lx-repro",
+        "fix12-fix1",
     ):
         if not same[i]:
             raise AssertionError(f"{TOOL}: the chain assumes {i} is bit-identical")
@@ -488,7 +505,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
                 "nodes": [
                     node("ants-1-cr"),
                     node("image-1-cr"),
-                    node("larmorx", "larmorx (port)", "1 and 12 threads, default and reproduce"),
+                    node("larmorx", "larmorx (port), reproduce mode", "1 and 12 threads"),
                 ]
             },
         ],
@@ -505,8 +522,9 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
         "note": "Each box holds runs that give the same bytes, both outputs. fMRIPrep's ANTs "
         "2.6.2 and the repository's ANTs 2.6.5 agree bit for bit at equal thread counts and "
         "maths, so the version plays no part; ANTs' thread count and glibc's maths are the only "
-        "two causes, and larmorx computes ANTs' result at one thread with correctly rounded "
-        "maths, on any number of threads.",
+        "two causes, and larmorx's reproduce mode computes ANTs' result at one thread with "
+        "correctly rounded maths, on any number of threads. Its default mode then corrects "
+        "ANTS-40 (the row larmorx default − reproduce mode).",
     }
 
     # the default view: the axial slice with the most brain, the crosshair where larmorx and
@@ -527,7 +545,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
             p["window"] = [w["lo"], w["hi"]] if p["id"] == "t1w" else [0.0, w["hi"]]
     exm.own_windows(ex, panels, outputs)
     default_panels = ["t1w", "fmriprep", "ants-1", "larmorx"]
-    default_diffs = ["lx-ants1", "ants8-ants1", "lx-cr", "lx-fmriprep"]
+    default_diffs = ["lx-ants1", "ants8-ants1", "lx-cr", "fix-lx"]
     win = {p["id"]: p.get("window") for p in panels}
     ow = outputs[0]["windows"][0]
     post_p = {}
@@ -637,6 +655,239 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
     }
 
 
+def _link(reg: dict, rid: str) -> str:
+    """A register entry's link; the register itself until the entry is in it."""
+    r = reg.get(rid)
+    return r["link"] if r else "docs/findings/upstream-defects.md"
+
+
+#: The ANTS-40 example: the final N4 of ds005454 sub-16 (a 7T T1w template with negative values)
+A40_RUN = "ds005454-sub-16-noreconall"
+A40_WF = "work/fmriprep_25_2_wf/sub_16_wf/anat_fit_wf"
+A40_NODE = f"{A40_WF}/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n4_final0"
+A40_DATA = {
+    "dataset": "OpenNeuro ds005454 (fMRIPrep boot camp, 7T training dataset), v1.0.0",
+    "subject": "sub-16",
+    "licence": "CC0-1.0",
+}
+A40_INVESTIGATION = "validation/investigations/ants-40-n4-nonpositive"
+
+
+def _a40_spec(ctx: core.Context):
+    from larmorx_validation.evidence import corrections
+
+    run = _oracles() / "fmriprep-25.2.6" / A40_RUN
+    words = shlex.split((run / A40_NODE / "command.txt").read_text(encoding="utf-8"))[1:]
+    args, paths, i = [], {}, 0
+    while i < len(words):
+        w = words[i]
+        if w in ("--input-image", "--weight-image"):
+            key = "t1w" if w == "--input-image" else "weight"
+            paths[key] = run / words[i + 1].removeprefix("/")
+            args += [w, "{in:" + key + "}"]
+            i += 2
+            continue
+        if w == "--output":
+            while "]" not in words[i]:
+                i += 1
+            args += [w, "[{out:corrected},{out:bias}]"]
+            i += 1
+            continue
+        args.append(w)
+        i += 1
+    node = run / A40_NODE
+    outs = sorted(node.glob("*.nii.gz"))
+    fmriprep = {
+        "corrected": next(p for p in outs if p.name.endswith("_corrected.nii.gz")),
+        "bias": next(p for p in outs if p.name.endswith("_bias.nii.gz")),
+    }
+
+    def show():
+        from scipy import ndimage
+
+        mask = common.load(str(run / "out/sub-16/anat/sub-16_desc-brain_mask.nii.gz")) > 0
+        return ndimage.binary_dilation(mask, iterations=2)
+
+    def effect(e) -> str:
+        import re as _re
+
+        log = (e.dir / "larmorx.log").read_text(encoding="utf-8")
+        m = _re.search(r"(\d+) of the (\d+) voxels N4 uses have no logarithm \((\d+) are 0, "
+                       r"(\d+) negative", log)  # fmt: skip
+        a = common.load(str(e.dir / "ants-1-bias.nii.gz"))
+        b = common.load(str(e.dir / "larmorx-bias.nii.gz"))
+        lead = (
+            f"{int(m.group(1)):,} of the {int(m.group(2)):,} voxels N4 uses are 0 or negative "
+            f"({m.group(3)} zero, {m.group(4)} negative; larmorx's notice)"
+            if m
+            else "larmorx's notice not found"
+        )
+        return (
+            f"{lead}; ANTs' bias field spans {float(a.min()):.4f} to {float(a.max()):.4f}, "
+            f"larmorx's {float(b.min()):.3f} to {float(b.max()):.3f}"
+        )
+
+    return corrections.Spec(
+        tool=TOOL,
+        case="fmriprep-ds005454-final-n4-ants40",
+        entry="ANTS-40",
+        title="ANTS-40: fMRIPrep's final N4 of a 7T T1w, which ANTs leaves uncorrected",
+        summary=(
+            "sMRIPrep's final N4 of its brain extraction, as fMRIPrep 25.2.6 ran it on OpenNeuro "
+            "ds005454 sub-16 (a 7T T1w template with negative values), its arguments and inputs "
+            "from the oracle run: a few of the voxels N4 uses are negative, ITK keeps them in its "
+            "log image, and ANTs' field stays flat. larmorx's default leaves them out of the fit "
+            "and corrects the image; its reproduce mode gives ANTs' result."
+        ),
+        program="N4BiasFieldCorrection",
+        args=tuple(args),
+        inputs={
+            "t1w": ("input (fMRIPrep's T1w template, denoised)", paths["t1w"]),
+            "weight": ("weight image (the WM posterior × prior)", paths["weight"]),
+        },
+        panels=(
+            (
+                "t1w",
+                "ds005454 sub-16 T1w template (7T)",
+                "as fMRIPrep passed it, after DenoiseImage",
+            ),
+            ("weight", "Weight image (-w)", "fMRIPrep's white-matter posterior × prior"),
+        ),
+        outputs=(
+            {"id": "corrected", "label": "Corrected image", "unit": ""},
+            {"id": "bias", "label": "Bias field", "unit": ""},
+        ),
+        data=(A40_DATA,),
+        show=show,
+        reason=(
+            "ANTS-40, corrected by default with a warning: ITK keeps the voxels N4 uses whose "
+            "value is 0 or negative in its log image as they are; here negative values, whose "
+            "logs lie far below every tissue's, stretch the histogram until the tissue sits in "
+            "one or two of its bins, the sharpening changes nothing and ANTs' field stays flat. "
+            "larmorx leaves them out of the fit, as a mask of the positive voxels would; "
+            "reproduce mode gives ANTs' result."
+        ),
+        effect=effect,
+        node="fMRIPrep 25.2.6, `anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final`",
+        fmriprep=fmriprep,
+        settings="fMRIPrep 25.2.6's final N4 of ds005454 sub-16 (inu_n4_final), its arguments "
+        "from command.txt and its inputs from the run's working directory",
+    )
+
+
+def _a40_tables(ctx: core.Context) -> tuple[list[dict], list[str]]:
+    """The ANTS-40 measurement (the investigation's results, committed): every N4 call of the
+    five fMRIPrep runs, and the phantoms with a known field."""
+    import json
+
+    d = ctx.repo / A40_INVESTIGATION
+    rows = json.loads((d / "analysis.json").read_text(encoding="utf-8"))
+    out = []
+    for r in rows:
+        x, s = r["analysis"], r["shrunk"]
+        band = r.get(f"band_{x['region']}") or {}
+        parts = r["node"].split("/")
+        node = parts[-3] if parts[-2] == "mapflow" else parts[-1]
+        where = next((p for p in parts if p.startswith(("bold_", "wf_"))), "")
+        where = where.removeprefix("bold_").removesuffix("_wf").replace("_", " ")
+        if parts[-2] == "mapflow" and node == "n4_correct":
+            where = f"image {int(parts[-1].removeprefix('_n4_correct')) + 1}"
+        kind = {
+            "inu_n4": "T1w, the brain extraction's first N4",
+            "inu_n4_final": "T1w, the brain extraction's final N4",
+            "n4_correct": f"BOLD reference ({where})"
+            if "bold" in r["node"]
+            else f"T1w template, before merging ({where})",
+            "n4": f"field-map magnitude ({where})",
+        }.get(node, node)
+        cv = [x.get(f"weight_cv_{k}") for k in ("input", "ants", "excluded")]
+        out.append(
+            {
+                "head": f"{parts[0].split('-noreconall')[0]}: {kind}",
+                "sub": ("weight image; " if r.get("weight") else "")
+                + f"over the {'brain' if x['region'] == 'brain' else 'head'}",
+                "cells": [
+                    common.cell(s["zero"] + s["negative"], "count"),
+                    common.cell(s["included"], "count"),
+                    common.cell(x["scale"], "sig"),
+                    common.cell(x["shape_p99"], "sig"),
+                    common.cell(x["shape_max"], "sig"),
+                    common.cell(band.get("p99"), "sig"),
+                    *(common.cell(v, "sig") for v in cv),
+                ],
+            }
+        )
+    calls = common.table(
+        "ants-40-calls",
+        "ANTS-40 on fMRIPrep's 25 N4 calls: the voxels N4 uses that are 0 or negative, and how "
+        "leaving them out changes the bias field (its global factor; its shape, the ratio over "
+        "its median, over fMRIPrep's brain mask, the head for the field maps), beside ANTs' own "
+        "variability (1 against 6 threads) and, for the final N4s, the white matter's CV over "
+        "the N4's weight region",
+        [
+            "Call",
+            {"label": "0 or negative", "num": True},
+            {"label": "voxels used", "num": True},
+            {"label": "global factor", "num": True},
+            {"label": "shape change, 99th pct", "num": True},
+            {"label": "shape change, max", "num": True},
+            {"label": "ANTs' thread band, 99th pct", "num": True},
+            {"label": "WM CV: input", "num": True},
+            {"label": "ANTs", "num": True},
+            {"label": "corrected", "num": True},
+        ],
+        out,
+        note=f"From `{A40_INVESTIGATION}/analysis.json` (measure.py and analyse.py, larmorx's N4 "
+        "as ANTs runs it with and without a mask of the positive voxels, which the unit test "
+        "and the parity case `inputs/zero-background-known` show to be the correction).",
+    )
+    ph = json.loads((d / "phantom.json").read_text(encoding="utf-8"))
+    prow = [
+        {
+            "head": r["phantom"].replace("-", " "),
+            "cells": [
+                common.cell(r["zero_voxels"], "count"),
+                common.cell(r["ants"]["field_shape_error"], "sig"),
+                common.cell(r["excluded"]["field_shape_error"], "sig"),
+                common.cell(r["ants"]["uncorrected_wm_cv"], "sig"),
+                common.cell(r["ants"]["wm_cv"], "sig"),
+                common.cell(r["excluded"]["wm_cv"], "sig"),
+            ],
+        }
+        for r in ph
+    ]
+    phantoms = common.table(
+        "ants-40-phantoms",
+        "ANTS-40 on phantoms with a known bias field (±25 %): the error of the estimated field's "
+        "shape and the white matter's CV, ANTs' way and with the zero voxels left out",
+        [
+            "Phantom",
+            {"label": "zero voxels", "num": True},
+            {"label": "field error: ANTs", "num": True},
+            {"label": "corrected", "num": True},
+            {"label": "WM CV: input", "num": True},
+            {"label": "ANTs", "num": True},
+            {"label": "corrected", "num": True},
+        ],
+        prow,
+        note=f"From `{A40_INVESTIGATION}/phantom.json` (phantom.py); the noisy background has no "
+        "zero voxel, so both runs give the same bits there.",
+    )
+    sources = [f"{A40_INVESTIGATION}/analysis.json", f"{A40_INVESTIGATION}/phantom.json"]
+    return [calls, phantoms], sources
+
+
+def rerun_larmorx(ctx: core.Context) -> None:
+    """larmorx's runs of the worked example's cache entry again (after ANTS-40's correction);
+    the originals' outputs are kept."""
+    fcache.rerun(
+        entry(ctx),
+        ["larmorx-1", "larmorx-1-reproduce", "larmorx-12", "larmorx-12-reproduce"],
+        "ANTS-40 corrected by default (2026-10-23): the default mode's outputs change",
+        cpus=6,
+    )
+
+
 def _cases(ctx: core.Context, rec, reg: dict) -> tuple[list[dict], dict]:
     """Every case of the record, with its verdict: bit-identical to ANTs as built unless the
     record's table lists it as differing (then identical with correctly rounded maths, which
@@ -653,7 +904,10 @@ def _cases(ctx: core.Context, rec, reg: dict) -> tuple[list[dict], dict]:
         c = defs.get(r["case"])
         status = r["status"]
         reason = ""
-        if status == "both-error":
+        known = common.known_correction(c, r, "ANTs")
+        if known is not None:
+            verdict, reason = known
+        elif status == "both-error":
             verdict, reason = "both-reject", _clip(r["reason"])
         elif status == "expected-divergence":
             verdict, reason = "divergence", _clip(r["reason"])
@@ -807,6 +1061,11 @@ def export(ctx: core.Context) -> dict:
         v = c["results"]["port"]["verdict"]
         totals[v] = totals.get(v, 0) + 1
     bench = records.load_bench(ctx.repo, TOOL)
+    from larmorx_validation.evidence import corrections
+
+    a40 = _a40_spec(ctx)
+    a40_example = corrections.example(ctx, a40, reg)
+    tables, table_sources = _a40_tables(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
@@ -815,7 +1074,8 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e)],
+            "cache": [fcache.provenance(e), fcache.provenance(corrections.entry(ctx, a40))],
+            "measurements": table_sources,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -833,7 +1093,8 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cases),
         "band": _band(rec),
         "speed": _speed(bench),
-        "examples": [_example(ctx, e)],
+        "tables": tables,
+        "examples": [_example(ctx, e), a40_example],
     }
 
 
@@ -846,9 +1107,15 @@ def cases_for(cases: list[dict], impl: str) -> list[dict]:
     ]
 
 
-if __name__ == "__main__":  # compute the cache entry only: python -m ...evidence.ants_n4
+if __name__ == "__main__":  # compute the cache entries: python -m ...evidence.ants_n4 [--rerun]
+    import sys
+
+    from larmorx_validation.evidence import corrections
     from larmorx_validation.figures.core import REPO, default_cache
 
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
-    e = entry(core.Context(repo=REPO, site=Path("."), cache=default_cache()))
-    print("done", e.dir)
+    c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if "--rerun" in sys.argv:
+        rerun_larmorx(c)
+    e = entry(c)
+    print("done", e.dir, corrections.entry(c, _a40_spec(c)).dir)

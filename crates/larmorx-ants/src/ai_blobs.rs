@@ -39,6 +39,11 @@
 //!   MatchBlobs` computes (ANTs compares `|f_j − m_j|² / |f_i − m_i|²`, the lengths of two
 //!   pairs' displacements);
 //! - ANTS-114: a rigid fit without a landmark is an error (ANTs writes NaNs);
+//! - ANTS-116: two blobs' patches are compared in the orientation that matches best: ANTs'
+//!   rotation `V·Uᵀ` is neither checked for a reflection nor independent of the arbitrary
+//!   signs of the patches' axes; corrected, each sign combination of the moving axes with
+//!   Kabsch's proper rotation, the largest correlation kept (named where the pairs, the
+//!   landmarks or the transform change);
 //! - ITK-60: the 2D rigid fit's angle near a quarter turn ([`larmorx_registration::landmark`]).
 
 #![allow(clippy::needless_range_loop)]
@@ -243,15 +248,26 @@ impl<const D: usize> Patches<'_, D> {
         })
     }
 
-    /// `PatchCorrelation` of the patches about `fc` (fixed) and `mc` (moving).
-    fn correlation(&self, fc: &[i64; D], mc: &[i64; D]) -> f32 {
+    /// `PatchCorrelation` of the patches about `fc` (fixed) and `mc` (moving): ANTs' value
+    /// and the corrected one (ANTS-116), each 0 where it is NaN or infinite.
+    ///
+    /// ANTs turns the moving patch with Wahba's `A = V·Uᵀ` of `B = Σ outer(moving axis, fixed
+    /// axis)`, the patches' principal axes from `vnl_symmetric_eigensystem`, whose signs are
+    /// arbitrary, and never checks `det A`: identical patches can be compared reflected, or
+    /// turned by 180° about an axis. Corrected: every sign combination of the moving axes (2 in
+    /// 2D, 4 in 3D), each with Kabsch's proper rotation (the singular vector of the smallest
+    /// singular value negated where `det A < 0`), and the largest correlation kept.
+    fn correlation(&self, fc: &[i64; D], mc: &[i64; D]) -> PatchCorrelations {
+        let zero = PatchCorrelations {
+            ants: 0.0,
+            oriented: 0.0,
+        };
         if !Self::inside(&self.fixed.space, fc) || !Self::inside(&self.moving.space, mc) {
-            return 0.0;
+            return zero;
         }
         let n = self.offsets.len();
         let weight = 1.0f32 / n as f32;
         let mut fixed_samples = vec![0.0f32; n];
-        let mut moving_samples = vec![0.0f32; n];
         let mut fixed_g = vec![[0.0f32; D]; n];
         let mut moving_g = vec![[0.0f32; D]; n];
         let mut moving_points: Vec<[f64; D]> = Vec::with_capacity(n);
@@ -264,7 +280,6 @@ impl<const D: usize> Patches<'_, D> {
             let fo = fspace.offset(&fi);
             let mo = mspace.offset(&mi);
             fixed_samples[i] = self.fixed.data[fo];
-            moving_samples[i] = self.moving.data[mo];
             for k in 0..D {
                 fixed_g[i][k] = self.fixed_gradient[fo][k] * self.weights[i];
                 moving_g[i][k] = self.moving_gradient[mo][k] * self.weights[i];
@@ -311,80 +326,163 @@ impl<const D: usize> Patches<'_, D> {
             )
         };
         let (Some(fe), Some(me)) = (eig(&fcov), eig(&mcov)) else {
-            return 0.0;
+            return zero;
         };
-        // B = Σ outer(moving axis, fixed axis): 2D the eigenvector 1, 3D 2 and 1.
-        let mut b = vec![0.0f32; D * D];
-        if D == 2 {
-            for i in 0..D {
-                for j in 0..D {
-                    b[i * D + j] = me[1][i] * fe[1][j];
+        // B = Σ outer(sign · moving axis, fixed axis): 2D the eigenvector 1, 3D 2 and 1.
+        let outer = |signs: [f32; 2]| -> Vec<f32> {
+            let mut b = vec![0.0f32; D * D];
+            if D == 2 {
+                for i in 0..D {
+                    for j in 0..D {
+                        b[i * D + j] = (signs[0] * me[1][i]) * fe[1][j];
+                    }
                 }
-            }
-        } else {
-            for i in 0..D {
-                for j in 0..D {
-                    b[i * D + j] = me[2][i] * fe[2][j] + me[1][i] * fe[1][j];
-                }
-            }
-        }
-        let Some((u, _w, v)) = vnl_svd_f32(&b, D, D) else {
-            return 0.0;
-        };
-        // A = V · Uᵀ (U and V column-major).
-        let vr: Vec<f32> = (0..D * D).map(|k| v[(k / D) + D * (k % D)]).collect();
-        let utr: Vec<f32> = (0..D * D)
-            .map(|k| {
-                let (r, c) = (k / D, k % D);
-                // Uᵀ(r, c) = U(c, r) = u[c + D·r]
-                u[c + D * r]
-            })
-            .collect();
-        let a = matmul_f32(&vr, D, D, &utr, D);
-        let interp = Linear::new(self.moving);
-        for i in 0..n {
-            let mut q = moving_points[i];
-            let mut vecf = [0.0f32; D];
-            for k in 0..D {
-                q[k] -= centroid[k];
-                vecf[k] = q[k] as f32;
-            }
-            let mut point = [0.0f64; D];
-            for r in 0..D {
-                let mut s = 0.0f32;
-                for c in 0..D {
-                    s += a[r * D + c] * vecf[c];
-                }
-                point[r] = f64::from(s) + centroid[r];
-            }
-            // The interpolator's PointType is Point<float>.
-            let pf: [f64; D] = std::array::from_fn(|k| f64::from(point[k] as f32));
-            if interp.is_inside(&pf) {
-                moving_samples[i] =
-                    interp.evaluate(&pf, &larmorx_core::IndexFloor::default()) as f32;
             } else {
-                return 0.0;
+                for i in 0..D {
+                    for j in 0..D {
+                        b[i * D + j] =
+                            (signs[0] * me[2][i]) * fe[2][j] + (signs[1] * me[1][i]) * fe[1][j];
+                    }
+                }
             }
-        }
-        let mm = mean_f32(&moving_samples);
-        for v in &mut moving_samples {
-            *v -= mm;
-        }
-        let moving_sd = sumsq_f32(&moving_samples).sqrt();
-        let mut ip = 0.0f32;
-        for i in 0..n {
-            ip += fixed_samples[i] * moving_samples[i];
-        }
-        let c = ip / (fixed_sd * moving_sd);
-        if c.is_nan() || c.is_infinite() {
-            0.0
+            b
+        };
+        // Wahba's `V·Uᵀ` of `vnl_svd<float>(B)`; `proper`: Kabsch's rotation (det +1).
+        let rotation = |b: &[f32], proper: bool| -> Option<(Vec<f32>, bool)> {
+            let (u, w, mut v) = vnl_svd_f32(b, D, D)?;
+            let product = |v: &[f32]| -> Vec<f32> {
+                // A = V · Uᵀ (U and V column-major): V(r, k) = v[r + D·k], Uᵀ(k, c) = u[c + D·k].
+                let vr: Vec<f32> = (0..D * D).map(|k| v[(k / D) + D * (k % D)]).collect();
+                let utr: Vec<f32> = (0..D * D)
+                    .map(|k| {
+                        let (r, c) = (k / D, k % D);
+                        u[c + D * r]
+                    })
+                    .collect();
+                matmul_f32(&vr, D, D, &utr, D)
+            };
+            let a = product(&v);
+            let reflected = determinant::<D>(&a) < 0.0;
+            if !(proper && reflected) {
+                return Some((a, reflected));
+            }
+            // Negate the right singular vector of the smallest singular value.
+            let k = (0..D)
+                .min_by(|&x, &y| w[x].total_cmp(&w[y]).then(y.cmp(&x)))
+                .expect("D > 0");
+            for r in 0..D {
+                v[r + D * k] = -v[r + D * k];
+            }
+            Some((product(&v), true))
+        };
+        let interp = Linear::new(self.moving);
+        // The correlation of the fixed patch with the moving patch turned by `a`.
+        let correlate = |a: &[f32]| -> f32 {
+            let mut moving_samples = vec![0.0f32; n];
+            for i in 0..n {
+                let mut q = moving_points[i];
+                let mut vecf = [0.0f32; D];
+                for k in 0..D {
+                    q[k] -= centroid[k];
+                    vecf[k] = q[k] as f32;
+                }
+                let mut point = [0.0f64; D];
+                for r in 0..D {
+                    let mut s = 0.0f32;
+                    for c in 0..D {
+                        s += a[r * D + c] * vecf[c];
+                    }
+                    point[r] = f64::from(s) + centroid[r];
+                }
+                // The interpolator's PointType is Point<float>.
+                let pf: [f64; D] = std::array::from_fn(|k| f64::from(point[k] as f32));
+                if interp.is_inside(&pf) {
+                    moving_samples[i] =
+                        interp.evaluate(&pf, &larmorx_core::IndexFloor::default()) as f32;
+                } else {
+                    return 0.0;
+                }
+            }
+            let mm = mean_f32(&moving_samples);
+            for v in &mut moving_samples {
+                *v -= mm;
+            }
+            let moving_sd = sumsq_f32(&moving_samples).sqrt();
+            let mut ip = 0.0f32;
+            for i in 0..n {
+                ip += fixed_samples[i] * moving_samples[i];
+            }
+            let c = ip / (fixed_sd * moving_sd);
+            if c.is_nan() || c.is_infinite() {
+                0.0
+            } else {
+                c
+            }
+        };
+        // ANTs: the axes as the eigensystem gives them, no determinant check.
+        let ants = rotation(&outer([1.0, 1.0]), false);
+        let ants_value = ants.as_ref().map_or(0.0, |(a, _)| correlate(a));
+        let signs: &[[f32; 2]] = if D == 2 {
+            &[[1.0, 1.0], [-1.0, 1.0]]
         } else {
-            c
+            &[[1.0, 1.0], [-1.0, 1.0], [1.0, -1.0], [-1.0, -1.0]]
+        };
+        let mut oriented = f32::NEG_INFINITY;
+        for (c, &s) in signs.iter().enumerate() {
+            let value = match (&ants, c) {
+                // ANTs' own rotation when it is proper.
+                (Some((_, false)), 0) => ants_value,
+                _ => match rotation(&outer(s), true) {
+                    Some((a, _)) => correlate(&a),
+                    None => continue,
+                },
+            };
+            oriented = oriented.max(value);
+        }
+        PatchCorrelations {
+            ants: ants_value,
+            oriented: if oriented == f32::NEG_INFINITY {
+                0.0
+            } else {
+                oriented
+            },
         }
     }
 }
 
-/// `GetBlobCorrespondenceMatrix`: the `fixed × moving` matrix (row-major, float).
+/// A patch correlation as ANTs computes it and as corrected (ANTS-116).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PatchCorrelations {
+    ants: f32,
+    oriented: f32,
+}
+
+/// The determinant of a `D × D` float matrix (row-major), in double: its sign tells a rotation
+/// from a reflection.
+fn determinant<const D: usize>(a: &[f32]) -> f64 {
+    let m = |r: usize, c: usize| f64::from(a[r * D + c]);
+    match D {
+        1 => m(0, 0),
+        2 => m(0, 0) * m(1, 1) - m(0, 1) * m(1, 0),
+        _ => {
+            m(0, 0) * (m(1, 1) * m(2, 2) - m(1, 2) * m(2, 1))
+                - m(0, 1) * (m(1, 0) * m(2, 2) - m(1, 2) * m(2, 0))
+                + m(0, 2) * (m(1, 0) * m(2, 1) - m(1, 1) * m(2, 0))
+        }
+    }
+}
+
+/// The correspondence matrices of [`correspondence`]: ANTs' and the corrected one.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Correspondence {
+    /// `GetBlobCorrespondenceMatrix` as ANTs computes it.
+    pub ants: Vec<f32>,
+    /// With the patches compared in the orientation that matches best (ANTS-116).
+    pub oriented: Vec<f32>,
+}
+
+/// `GetBlobCorrespondenceMatrix`: the `fixed × moving` matrices (row-major, float), ANTs' and
+/// the corrected one (ANTS-116).
 #[allow(clippy::too_many_arguments)]
 pub fn correspondence<const D: usize>(
     fixed: &Image<f32, D>,
@@ -392,7 +490,7 @@ pub fn correspondence<const D: usize>(
     fixed_blobs: &[Blob],
     moving_blobs: &[Blob],
     n_threads: usize,
-) -> Result<Vec<f32>, ItkException> {
+) -> Result<Correspondence, ItkException> {
     let fg = gradient_f32(fixed, n_threads)?;
     let mg = gradient_f32(moving, n_threads)?;
     let (offsets, weights) = patch::<D>();
@@ -415,15 +513,17 @@ pub fn correspondence<const D: usize>(
                 let fc = center(&fixed_blobs[i]);
                 let mc = center(&moving_blobs[j]);
                 if !bright(fixed, &fc) || !bright(moving, &mc) {
-                    return 0.0f32;
+                    return (0.0f32, 0.0f32);
                 }
                 let c = p.correlation(&fc, &mc);
-                if c < 0.0 { 0.0 } else { c }
+                let clip = |v: f32| if v < 0.0 { 0.0 } else { v };
+                (clip(c.ants), clip(c.oriented))
             })
-            .collect::<Vec<f32>>()
+            .collect::<Vec<(f32, f32)>>()
     })
     .map_err(|e| ItkException::new("", 0, "", e.to_string()))?;
-    Ok(out)
+    let (ants, oriented) = out.into_iter().unzip();
+    Ok(Correspondence { ants, oriented })
 }
 
 /// The pairing loop (`antsAI.cxx:494-527`) on the correspondence matrix `m` (row-major,
@@ -545,9 +645,103 @@ pub fn align<const D: usize>(
     if fixed_blobs.is_empty() || moving_blobs.is_empty() {
         return Err(BlobFailure::EmptyBlobList);
     }
-    let (nf, nm) = (fixed_blobs.len(), moving_blobs.len());
-    let m = correspondence(fixed, moving, &fixed_blobs, &moving_blobs, n_threads)
+    let both = correspondence(fixed, moving, &fixed_blobs, &moving_blobs, n_threads)
         .map_err(BlobFailure::Uncaught)?;
+    let (m, other) = if notices.fix() {
+        (both.oriented, both.ants)
+    } else {
+        (both.ants, both.oriented)
+    };
+    let changed = m.iter().zip(&other).filter(|(a, b)| a != b).count();
+    let total = m.len();
+    let result = match_and_fit(
+        fixed,
+        moving,
+        &fixed_blobs,
+        &moving_blobs,
+        m,
+        blobs_to_match,
+        kind,
+        notices,
+    );
+    if changed > 0 {
+        // ANTS-116: named where the other matrix changes the outcome.
+        let mut scratch = Notices::new(notices.mode());
+        let alternative = match_and_fit(
+            fixed,
+            moving,
+            &fixed_blobs,
+            &moving_blobs,
+            other,
+            blobs_to_match,
+            kind,
+            &mut scratch,
+        );
+        let outcome = |r: &Result<BlobAlignment<D>, BlobFailure>| -> String {
+            match r {
+                Ok(a) => format!(
+                    "{} landmark(s) of {} pair(s)",
+                    a.landmarks.len(),
+                    a.pairs.len()
+                ),
+                Err(BlobFailure::NoLandmark) => "no landmark".into(),
+                Err(BlobFailure::EmptyBlobList) => "no blob".into(),
+                Err(BlobFailure::Uncaught(e)) => {
+                    format!("ITK's exception ({})", e.description.trim())
+                }
+            }
+        };
+        let same = match (&result, &alternative) {
+            (Ok(a), Ok(b)) => {
+                let bits = |x: &BlobAlignment<D>| -> Vec<u64> {
+                    x.matrix
+                        .iter()
+                        .flatten()
+                        .chain(&x.offset)
+                        .map(|v| v.to_bits())
+                        .collect()
+                };
+                a.pairs == b.pairs && a.landmarks == b.landmarks && bits(a) == bits(b)
+            }
+            (Err(a), Err(b)) => a == b,
+            _ => false,
+        };
+        if !same {
+            let (ants, fixed_outcome) = if notices.fix() {
+                (outcome(&alternative), outcome(&result))
+            } else {
+                (outcome(&result), outcome(&alternative))
+            };
+            notices.add(
+                &defects::ANTS_116,
+                if notices.fix() {
+                    format!(
+                        "{changed} of {total} patch correlations change when the patches are compared in the orientation that matches best (the rotation's determinant checked, the axes' signs tried): {fixed_outcome}; ANTs compares them as its rotation leaves them: {ants}"
+                    )
+                } else {
+                    format!(
+                        "the patches are compared as ANTs' rotation leaves them (possibly reflected or turned): {ants}; in the orientation that matches best {changed} of {total} patch correlations change: {fixed_outcome}"
+                    )
+                },
+            );
+        }
+    }
+    result
+}
+
+/// The pairing, the landmarks and the fit of [`align`] on the correspondence matrix `m`.
+#[allow(clippy::too_many_arguments)]
+fn match_and_fit<const D: usize>(
+    fixed: &Image<f32, D>,
+    moving: &Image<f32, D>,
+    fixed_blobs: &[Blob],
+    moving_blobs: &[Blob],
+    m: Vec<f32>,
+    blobs_to_match: u32,
+    kind: LandmarkKind,
+    notices: &mut Notices,
+) -> Result<BlobAlignment<D>, BlobFailure> {
+    let (nf, nm) = (fixed_blobs.len(), moving_blobs.len());
     let center = |b: &Blob| -> [i64; D] { std::array::from_fn(|k| b.center[k]) };
     let fb: Vec<bool> = fixed_blobs
         .iter()
@@ -561,8 +755,8 @@ pub fn align<const D: usize>(
         &m,
         nf,
         nm,
-        &fixed_blobs,
-        &moving_blobs,
+        fixed_blobs,
+        moving_blobs,
         &fb,
         &mb,
         blobs_to_match,
@@ -572,8 +766,8 @@ pub fn align<const D: usize>(
         &m,
         nf,
         nm,
-        &fixed_blobs,
-        &moving_blobs,
+        fixed_blobs,
+        moving_blobs,
         &fb,
         &mb,
         blobs_to_match,
@@ -641,8 +835,8 @@ pub fn align<const D: usize>(
         }
     };
     Ok(BlobAlignment {
-        fixed_blobs,
-        moving_blobs,
+        fixed_blobs: fixed_blobs.to_vec(),
+        moving_blobs: moving_blobs.to_vec(),
         correspondence: m,
         pairs,
         landmarks,
@@ -833,6 +1027,32 @@ mod tests {
             );
             assert!((a.matrix[0][0] - 1.0).abs() < 1e-12);
         }
+    }
+
+    /// ANTS-116: identical patches (the phantom against its copy shifted by whole voxels)
+    /// correlate at 1 once compared in the orientation that matches best; ANTs' rotation can
+    /// reflect or turn them. (Between different patches ANTs' reflection may correlate more
+    /// than any rotation: a reflected match is no match for a rigid transform.)
+    #[test]
+    fn identical_patches_correlate_at_one() {
+        let fixed = phantom_2d((0.0, 0.0));
+        let moving = phantom_2d((3.0, -2.0));
+        let mut notices = Notices::new(UpstreamDefects::Fix);
+        let fb = detect(&fixed, 12, "fixed", &mut notices, 1).unwrap();
+        let mb = detect(&moving, 12, "moving", &mut notices, 1).unwrap();
+        let c = correspondence(&fixed, &moving, &fb, &mb, 2).unwrap();
+        let mut identical = 0;
+        for (i, f) in fb.iter().enumerate() {
+            for (j, m) in mb.iter().enumerate() {
+                let k = i * mb.len() + j;
+                if m.center[0] == f.center[0] + 3 && m.center[1] == f.center[1] - 2 {
+                    assert!(c.oriented[k] > 0.999, "{k}: {}", c.oriented[k]);
+                    assert!(c.oriented[k] >= c.ants[k]);
+                    identical += 1;
+                }
+            }
+        }
+        assert!(identical >= 4, "{identical}");
     }
 
     /// An image whose axis is shorter than 4 voxels: ITK's recursive Gaussian refuses it.

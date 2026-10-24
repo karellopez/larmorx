@@ -91,12 +91,13 @@ def automask(
         Peel (erode) the mask this many times, then unpeel (``-peels``); 0 turns it off
         (AFNI peels once: AFNI-43, ``upstream_defects="reproduce"``).
     neighbours
-        Neighbours (of 18) a voxel needs not to be peeled (``-nbhrs``); AFNI uses 17 for values
-        outside 6 to 26 (AFNI-41, to be decided).
+        Neighbours (of 18) a voxel needs not to be peeled (``-nbhrs``), 6 to 26 as AFNI's help
+        says. Another value is an error by default (AFNI uses 17 silently: AFNI-41, decided
+        2026-10-23; ``upstream_defects="reproduce"`` gives AFNI's result).
     nn
         ``-NN1``, ``-NN2`` or ``-NN3``: the neighbourhood of ``dilate``, ``erode`` and
         ``depth`` (faces, edges, corners; default edges). As in AFNI it also sets
-        ``neighbours`` to 6, 18 or 26 (AFNI-42, to be decided).
+        ``neighbours`` to 6, 18 or 26 (AFNI-42, kept and documented: decided 2026-10-23).
     exterior_clip
         ``-eclip``: remove exterior voxels below the clip level.
     dilate, erode

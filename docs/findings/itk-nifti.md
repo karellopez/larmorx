@@ -43,6 +43,19 @@ file: `ImageMath abs` turns `-inf` into 0. *Read; verified* (found by the ImageM
 suite: `head-outliers` has a NaN and a `-inf`). *larmorx:* `read_itk_image` does the same
 (it did not before 2026-10-10; no earlier test file had non-finite values).
 
+**Kept and documented (ITK-06, decided 2026-10-23: measured first, then rule C).** Measured
+(`validation/investigations/itk-06-nonfinite/`): none of the 420 float images the five fMRIPrep
+oracle runs pass to ANTs programs (of 509 images in all) holds a NaN or an infinity, and of the
+test-data catalog's 32 float files only nibabel's test image `resampled_anat_moved.nii` does (153
+NaN, a resampler's "outside the field of view"). Kept, one NaN slab in a T1w makes every value of
+SmoothImage's and ResampleImageBySpacing's outputs NaN, and N4, DenoiseImage, TruncateImageIntensity
+and antsApplyTransforms' linear interpolation spread NaN around it (DenoiseImage also changes
+1.17 million other values, by up to 16 %). nifti_clib's zeroing is its deliberate design ("check
+input float arrays for goodness, and fix bad floats"), what every ITK and ANTs user gets, and 0 is
+the background these tools treat as no signal; keeping the values brings no gain to the pipelines
+and breaks every filter. So larmorx keeps the zeroing in both modes; the ANTs API pages say that
+non-finite input values are read as 0.
+
 **When ITK scales.** Only if `|slope| > ε` and (`|slope − 1| > ε` or `|inter| > ε`), with
 `ε` = double epsilon. Analyze files (no NIfTI magic) are never scaled. A slope of 0 is
 replaced by 1. nifti_clib first replaces non-finite slope and intercept by 0

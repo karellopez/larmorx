@@ -64,7 +64,15 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
                                                     **_python_options(peels=int(p))))
     for n in ("6", "15", "18", "26", "40"):
         add(f"nbhrs-{n}", "options", f"-nbhrs {n} (AFNI uses 17 outside 6..26, AFNI-41)",
-            S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="smoke" if n == "15" else "standard"))
+            S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="smoke" if n in ("15", "40") else "standard",
+              fix_refuses="AFNI-41" if n == "40" else None))
+    # AFNI-41 (rule B, decided 2026-10-23): outside 6..26 the default refuses; AFNI peels as with 17
+    # (or as -NNx says), which `reproduce` gives.
+    for n in ("5", "27", "0"):
+        add(f"nbhrs-{n}", "options", f"-nbhrs {n}: outside 6..26, refused by default (AFNI-41)",
+            S(("-nbhrs", n, "-prefix", M, "{0}"), (h,), (M,), tier="standard", fix_refuses="AFNI-41"))
+    add("nbhrs-40-then-NN1", "options", "-nbhrs 40 then -NN1: AFNI peels as -NN1 says; refused by default (AFNI-41)",
+        S(("-nbhrs", "40", "-NN1", "-prefix", M, "{0}"), (h,), (M,), tier="standard", fix_refuses="AFNI-41"))
     for nn in ("1", "2", "3"):
         add(f"NN{nn}-dilate-erode-depth", "options",
             f"-NN{nn} with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42)",

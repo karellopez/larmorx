@@ -26,7 +26,7 @@ from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
 TOOL = "fsl-bet"
-RECORD = "fsl-bet-replica"
+RECORD = "fsl-bet-replica-full"  # the full tier: every case of the standard one and more
 CASE = "fmriprep-ds000005-run-01"
 RUN = "ds000005-sub-01-noreconall"
 NODE = (
@@ -304,15 +304,45 @@ def _diffs() -> list[dict]:
     ]  # fmt: skip
 
 
-def _verdict(x: dict, same: dict[str, bool], what: str = "this input") -> None:
+def headers(e: fcache.Entry, tag: str, files: dict[str, str]) -> dict[str, dict[str, bool]]:
+    """Whether each run's NIfTI headers (the bytes before the data, decompressed) are FSL's:
+    run label -> output id -> same. ``files``: output id -> the file's suffix."""
+    import gzip
+
+    def head(f: Path) -> bytes:
+        raw = gzip.decompress(f.read_bytes())
+        return raw[: int(np.frombuffer(raw[108:112], "<f4")[0])]
+
+    out: dict[str, dict[str, bool]] = {}
+    for pid, stem, *_ in PANELS:
+        if not (e.dir / f"{tag}{stem}{next(iter(files.values()))}").is_file():
+            continue
+        out[pid] = {
+            oid: head(e.dir / f"{tag}{stem}{suf}") == head(e.dir / f"{tag}fsl{suf}")
+            for oid, suf in files.items()
+        }
+    return out
+
+
+def header_note(h: dict[str, dict[str, bool]], pid: str) -> str:
+    if pid not in h:
+        return ""
+    if all(h[pid].values()):
+        return " The NIfTI headers too, byte for byte."
+    other = [o for o, v in h[pid].items() if not v]
+    return f" The NIfTI headers of {', '.join(other)} differ (FSL's build string, `descrip`)."
+
+
+def _verdict(x: dict, same: dict[str, bool], what: str = "this input", h=None) -> None:
     i = x["id"]
     x.setdefault("links", [])
+    h = h or {}
     if x["kind"] == "variability":
         x["verdict"] = None
         x["reason"] = (
             "Two builds of FSL (fMRIPrep's image, with newer image libraries, and the "
             f"installation in ~/fsl) give the same values on {what}: FSL's own variability is "
-            "zero here (FSL is deterministic, single-threaded)."
+            "zero here (FSL is deterministic, single-threaded)." + header_note(h, x["a"])
             if same[i]
             else f"FSL's two builds differ on {what}."
         )
@@ -322,7 +352,7 @@ def _verdict(x: dict, same: dict[str, bool], what: str = "this input") -> None:
             "replica-repro": "No correction of the register applies to this input: both modes "
             "give the same values.",
             "replica-image": "The replica gives the values of fMRIPrep's own build of FSL too.",
-        }.get(i, "The same values, every one (and the same NIfTI header bytes: the record).")
+        }.get(i, "The same values, every one." + header_note(h, x["a"]))
     else:
         x["verdict"] = "open"
         x["reason"] = "Not accounted for by the other runs of this example."
@@ -374,8 +404,9 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry) -> dict:
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
+    h = headers(e, "", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
     for x in diffs:
-        _verdict(x, same)
+        _verdict(x, same, h=h)
         if x["id"] == "replica-node" and same["replica-node"]:
             x["reason"] = (
                 "The replica gives the values fMRIPrep's node wrote, every voxel of the brain and "
@@ -466,8 +497,9 @@ def _example_t1(ctx: core.Context, e: fcache.Entry) -> dict:
     diffs = [x for x in _diffs() if "image" not in (x["a"], x["b"])]
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
+    h = headers(e, "t1-", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
     for x in diffs:
-        _verdict(x, same, "this T1w")
+        _verdict(x, same, "this T1w", h)
     at, _k = mask_view(ex)
     default = {
         "output": "mask",
@@ -537,8 +569,11 @@ def _example_surf(ctx: core.Context, e: fcache.Entry) -> dict:
     diffs = _diffs()
     common.compare_all(ex, diffs, SURF_OUTPUTS)
     same = common.identical(diffs)
+    h = headers(
+        e, "", {o: f"_{o}_mask.nii.gz" for o in ("inskull", "outskull", "outskin", "skull")}
+    )
     for x in diffs:
-        _verdict(x, same, "this head")
+        _verdict(x, same, "this head", h)
     k = img.shape[2] // 2
     default = {
         "output": "skull",
@@ -744,7 +779,7 @@ def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     examples = {
         "fmriprep/ds000005-task_mixedgamblestask_run_01-enhance_and_skullstrip_bold": "fmriprep-bet",
-        "real/adult-ds000005": "t1w-robust",
+        "real/adult-ds000005-R": "t1w-robust",
         "betsurf/t1t2": "betsurf-head",
     }
     cs = cases(rec, _scenarios(), examples)

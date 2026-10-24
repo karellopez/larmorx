@@ -113,8 +113,8 @@ All three take FSL's image names: a file name with or without its extension (§3
 
 Each output image has the input's grid and geometry and a fresh FSL header:
 - dimensions, voxel sizes (and `pixdim[0]`, the qform's sign), the sform and qform with their
-  codes, the intent code and parameters, `cal_min`/`cal_max` (FSL's display range: the mask's is
-  1 and 0, others' 0 and 0), `aux_file` copied from the input; `xyzt_units` 10 (mm and s);
+  codes, the intent code and parameters, `cal_min`/`cal_max` (the input's display range, kept; the mask's set to
+  1 and 0, **observed**), `aux_file` copied from the input; `xyzt_units` 10 (mm and s);
   `descrip` is FSL's build string, `2203.12-dirty 2024-02-01T16:17:47+00:00` for FSL 6.0.7.17's
   image library; `scl_slope` 1 and `scl_inter` 0; `slice_*` fields and `toffset` 0;
   `vox_offset` 352 for single files without extensions **(observed)**;
@@ -252,12 +252,14 @@ positions of the previous iteration). For each vertex `p`:
   - the voxel grid's spacing used for sampling is `(dx, dy, dz)`, except that an axis whose field
     of view is smaller than `r` uses `2 r` instead; `ds = min(1, the smallest of the three)`;
   - `Imin = tm`, `Imax = t`. The point `q = p - n` (1 mm inside) is converted to voxel indices by
-    `trunc(q / d + 0.5)` per axis (`d` the spacing above). If it is inside the image: its value
-    `I` gives `Imin = min(Imin, I)`, `Imax = max(Imax, I)`; then the voxel at
-    `trunc(q/d + 0.5 - (d1 - 1) n/d)` (the deepest point, `d1 = 7` by default) must be inside the
-    image too, else `f3 = 0`; its value lowers `Imin`. Then for `g` from 2 below `d1` in steps of
-    `ds`, the voxel `trunc(q/d + 0.5 - (g - 1) n ds/d)`… (the sample moves inward by `ds` along
-    `n/d` per step from `q`) lowers `Imin`, and raises `Imax` while `g < d2` (`d2 = 3`);
+    `trunc(q / d + 0.5)` per axis (`d` the spacing above, `trunc` toward zero). If that voxel is
+    inside the image: its value `I` gives `Imin = min(Imin, I)`, `Imax = max(Imax, I)`; then the
+    voxel `trunc(q/d + 0.5 - (d1 - 1) n/d)` (the deepest point, `d1 - 1` mm further in; `d1 = 7`
+    by default) must be inside the image too, else `f3 = 0`; its value lowers `Imin`. Then, for
+    `k = 1, 2, ...` while `g = 2 + (k - 1) ds` stays below `d1`, the voxel
+    `trunc(q/d + 0.5 - k ds n/d)` (the position is accumulated, one step of `ds n/d` at a time)
+    lowers `Imin`, and raises `Imax` while `g < d2` (`d2 = 3`): with 1 mm voxels, the samples at
+    2 to 6 mm inside `p`, `Imax` from the one at 2 mm;
   - `Imin = max(t2, Imin)`, `Imax = min(tm, Imax)`;
   - the local threshold `tl = (Imax - t2) b + t2`, where `b = b_t`, or with `-g G`:
     `b = clamp(b_t + G (p_z - c_z) / r, 0, 1)` (larger `G` grows the brain at the bottom);

@@ -452,9 +452,18 @@ def test_a_case_that_runs_a_command_again_runs_it_and_compares(cache, fake, work
     first = run(fake, *workdir()[1:])  # each run in a directory of its own, as the suites do
     second = run(fake, *workdir()[1:])
     assert first.cached and not second.cached
-    assert oc.end_case().fresh == {"the case runs it again (its own spread)": 1}
+    again = "the case runs it again (served once 3 runs agree)"
+    assert oc.end_case().fresh == {again: 1}
     (e,) = entries(cache)
     assert [h["event"] for h in e["history"]] == ["same"]
+    # once three runs agreed, a case that runs it again is served it too
+    oc.begin_case("a later run of the case")
+    assert run(fake, *workdir()[1:]).cached
+    assert not run(fake, *workdir()[1:]).cached
+    oc.begin_case("and the next")
+    assert run(fake, *workdir()[1:]).cached
+    assert run(fake, *workdir()[1:]).cached
+    assert core.identical_runs(cache.read(e["key"])) == 3
 
 
 def test_an_output_there_before_the_run_is_an_input(cache, fake, workdir):

@@ -18,6 +18,10 @@ is what the records measure. The rules, in the order they are applied (``decide`
    served (a finding, kept in ``disputes/``).
 4. **One thread, a fixed seed:** cached and served from its first run.
 
+A command a case runs a second time runs again and is compared with the first (a case that runs
+the same command twice may be measuring the original's own spread): it is served to such a case
+only once :data:`CONFIRMATIONS` runs of it agreed, and one difference makes it a finding.
+
 And, whatever the policy says, a run that ends by a signal (a crash: memory the source does not
 define) or by its timeout is never stored; a run whose outputs or messages name its temporary
 directories in a form the cache cannot map back is never stored either.

@@ -34,7 +34,7 @@ for s in "${SUITES[@]}"; do
   line=$(grep -m1 "^original programs:" "$OUT/$name-$impl.log")
   served=$(echo "$line" | sed -n 's/^original programs: \([0-9]*\) runs from.*/\1/p')
   ran=$(echo "$line" | sed -n 's/.*saved), \([0-9]*\) run;.*/\1/p')
-  printf "%s\t%s\t%.1f\t%s\t%s\n" "$s" "$code" "$(echo "$end - $start" | bc)" "$served" "$ran" \
+  LC_ALL=C printf "%s\t%s\t%.1f\t%s\t%s\n" "$s" "$code" "$(echo "$end - $start" | bc)" "$served" "$ran" \
     | tee -a "$OUT/timings.tsv"
 done
 echo "ALLDONE $(date -Is)" | tee -a "$OUT/timings.tsv"

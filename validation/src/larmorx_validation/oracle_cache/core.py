@@ -34,7 +34,7 @@ from larmorx_validation.oracle_cache.key import (
     temp_root,
     under,
 )
-from larmorx_validation.oracle_cache.policy import Policy, decide
+from larmorx_validation.oracle_cache.policy import CONFIRMATIONS, Policy, decide
 from larmorx_validation.oracle_cache.store import Store, now
 
 ENV_MODE = "LARMORX_ORACLE_CACHE_MODE"
@@ -322,6 +322,17 @@ def _holds(path: Path, fragments: list[bytes]) -> bytes | None:
 
 # ------------------------------------------------------------------------------------------------
 # Entries
+
+
+#: The events of an entry's history that are a run giving its stored result again.
+AGREED = ("same", "confirmed", "refreshed", "verified")
+
+
+def identical_runs(entry: dict) -> int:
+    """How many runs gave the entry's result: the one that stored it, and every one since
+    that agreed (a case that runs a command again is served it only from
+    :data:`~larmorx_validation.oracle_cache.policy.CONFIRMATIONS` on)."""
+    return 1 + sum(h.get("event") in AGREED for h in entry.get("history", []))
 
 
 def _servable(store: Store, entry: dict) -> bool:
@@ -709,7 +720,12 @@ def _run(
     _case.keys.add(prep.key)
     entry = store.read(prep.key)
     unresolved = ""
-    if current == "use" and entry is not None and not repeated and _servable(store, entry):
+    if (
+        current == "use"
+        and entry is not None
+        and (not repeated or identical_runs(entry) >= CONFIRMATIONS)
+        and _servable(store, entry)
+    ):
         try:
             done = _replay(store, entry, prep, argv)
         except _Unresolved as e:
@@ -721,7 +737,7 @@ def _run(
     if unresolved:
         reason = unresolved
     elif repeated:
-        reason = "the case runs it again (its own spread)"
+        reason = f"the case runs it again (served once {CONFIRMATIONS} runs agree)"
     elif current == "refresh":
         reason = "refresh"
     elif entry is None:

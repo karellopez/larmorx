@@ -1,0 +1,22 @@
+[package]
+name = "larmorx-nc-cli"
+description = "The larmorx-nc command line: bit-exact replicas of FSL tools with the original programs' arguments (FSL Licence: non-commercial)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+autobins = false
+
+[[bin]]
+name = "larmorx-nc"
+path = "src/main.rs"
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-nc-core.workspace = true
+larmorx-nc-mcflirt.workspace = true
+
+[dev-dependencies]
+flate2.workspace = true
+sha2.workspace = true
+tempfile.workspace = true

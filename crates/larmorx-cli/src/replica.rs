@@ -4,7 +4,7 @@
 //!
 //! Some tools have two implementations: the clean-room original in this Apache-2.0 package,
 //! and a replica translated from the upstream source, in a package of the upstream's licence
-//! family (`larmorx-gpl`; later `larmorx-nc`). This crate never links a replica. It finds the
+//! family (`larmorx-gpl`, `larmorx-nc`). This crate never links a replica. It finds the
 //! replica package's program and runs it as a child process, with the tool's original
 //! arguments; the two exchange files only. So the licences stay separate. This module knows
 //! the replica's program name and arguments, nothing more.
@@ -48,6 +48,16 @@ pub const LARMORX_GPL: Package = Package {
     install: "pip install \"larmorx[exact]\"",
 };
 
+/// The replicas of FSL's programs (`crates-nc/`), under the FSL Licence's terms (non-commercial;
+/// installed by name, so that the licence is accepted knowingly: `docs/licensing.md`).
+pub const LARMORX_NC: Package = Package {
+    name: "larmorx-nc",
+    program: "larmorx-nc",
+    env: "LARMORX_NC_BIN",
+    licence: "LicenseRef-FSL",
+    install: "pip install larmorx-nc",
+};
+
 /// A tool with a replica: `larmorx <family> <tool> ...` runs
 /// `<package.program> <family> <tool> ...`.
 #[derive(Debug)]
@@ -81,6 +91,25 @@ pub const REPLICAS: &[Replica] = &[
         tool: "3dUnifize",
         package: &LARMORX_GPL,
         original: true,
+    },
+    // FSL's BET: the clean-room original is to be written from specs/bet.md.
+    Replica {
+        family: "fsl",
+        tool: "bet",
+        package: &LARMORX_NC,
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "bet2",
+        package: &LARMORX_NC,
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "betsurf",
+        package: &LARMORX_NC,
+        original: false,
     },
 ];
 
@@ -450,10 +479,19 @@ mod tests {
             e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
             "{e}"
         );
-        // Every registered tool has its original: `auto` without the replica runs it.
-        assert!(REPLICAS.iter().all(|r| r.original));
+        // The AFNI tools have their originals: `auto` without the replica runs them. FSL's
+        // BET has only its replica so far.
+        assert!(REPLICAS.iter().filter(|r| r.family == "afni").all(|r| r.original));
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
+        assert_eq!(
+            replica_only("fsl").collect::<Vec<_>>(),
+            ["bet", "bet2", "betsurf"]
+        );
+        let bet = lookup("fsl", "bet").unwrap();
+        assert_eq!(bet.package.env, "LARMORX_NC_BIN");
+        let e = choose_with(Implementation::Auto, bet, missing).unwrap_err();
+        assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
         let automask = lookup("afni", "3dAutomask").unwrap();
         assert!(matches!(
             choose_with(Implementation::Auto, automask, missing),

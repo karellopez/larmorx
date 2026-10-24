@@ -3,9 +3,9 @@
 
 Some tools have two implementations (``docs/licensing.md``): the clean-room original in this
 Apache-2.0 package, and a replica translated from the upstream's source, in a package of the
-upstream's licence family (``larmorx-gpl``). larmorx never imports, loads or links a replica.
-It runs the replica package's program as a separate process and exchanges files with it, so
-the licences stay separate. This module knows the program's name and arguments, nothing more.
+upstream's licence family (``larmorx-gpl``, ``larmorx-nc``). larmorx never imports, loads or
+links a replica. It runs the replica package's program as a separate process and exchanges
+files with it, so the licences stay separate. This module knows the program's name and arguments, nothing more.
 
 The registry of tools with a replica and the search for the program are shared with the
 command line (``larmorx_cli::replica`` in Rust, through :mod:`larmorx._core`). The search
@@ -188,7 +188,7 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
         if not replica.original:
             raise NotImplementedError(
                 f"larmorx has no clean-room original of {family} {tool} yet (it is to be "
-                f"written from specs/{tool}.md); its bit-exact replica is in the "
+                f"written from its spec in specs/); its bit-exact replica is in the "
                 f"{replica.package} package ({replica.licence}): install it with "
                 f"{replica.install} and use implementation='auto' or 'replica'"
             )

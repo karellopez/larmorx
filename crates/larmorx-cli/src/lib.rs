@@ -5,9 +5,9 @@
 //! argument syntax of the program it replaces. Parsing lives here, once, and is shared by the
 //! standalone binaries and the Python console scripts (through `larmorx._core`).
 //!
-//! Tools with a bit-exact replica in another package (`larmorx-gpl`) run that package's
-//! program as a separate process when it is found, and the clean-room original otherwise
-//! ([`replica`], `docs/licensing.md`).
+//! Tools with a bit-exact replica in another package (`larmorx-gpl`, `larmorx-nc`) run that
+//! package's program as a separate process when it is found, and the clean-room original
+//! otherwise ([`replica`], `docs/licensing.md`).
 #![forbid(unsafe_code)]
 
 pub mod replica;
@@ -32,8 +32,13 @@ const EXIT_IO_ERROR: u8 = 1;
 pub const FAMILIES: &[(&str, &[&str])] = &[
     ("afni", AFNI_TOOLS),
     ("ants", larmorx_ants::cli::TOOLS),
+    ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
 ];
+
+/// The FSL tools, which run through their replica in `larmorx-nc` (no clean-room original yet:
+/// [`replica::replica_only`]; a test checks the list).
+const FSL_TOOLS: &[&str] = &["bet", "bet2", "betsurf"];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`) and those with a
 /// replica only, which run when the `larmorx-gpl` program is installed
@@ -357,6 +362,22 @@ mod tests {
     }
 
     #[test]
+    fn fsl_tools_have_only_their_replica() {
+        let (code, out, _) = run_capture(&["lx", "--help"]);
+        assert_eq!(code, 0);
+        assert!(out.contains("fsl    bet, bet2, betsurf"), "{out}");
+        assert!(out.contains("fsl bet: larmorx-nc (LicenseRef-FSL)"), "{out}");
+        assert!(out.contains("LARMORX_NC_BIN"), "{out}");
+        assert_eq!(replica::replica_only("fsl").collect::<Vec<_>>(), FSL_TOOLS);
+        // Without the replica (or with `original` asked for) the tool refuses, naming the
+        // package; exit 127 as for a missing program.
+        let (code, _, err) = run_capture(&["lx", "fsl", "bet", "in", "out"]);
+        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert!(err.contains("no clean-room original of fsl bet"), "{err}");
+        assert!(err.contains("pip install larmorx-nc"), "{err}");
+    }
+
+    #[test]
     fn a_replica_that_cannot_start_exits_126() {
         let tmp = tempfile::tempdir().unwrap();
         let replica = replica::lookup("afni", "3dTshift").unwrap();
@@ -419,10 +440,13 @@ mod tests {
 
     #[test]
     fn unknown_commands_and_options_are_usage_errors() {
-        let (code, out, err) = run_capture(&["lx", "fsl", "bet"]);
+        let (code, out, err) = run_capture(&["lx", "freesurfer", "mri_convert"]);
         assert_eq!(code, EXIT_USAGE);
         assert_eq!(out, "");
-        assert!(err.starts_with("error: unknown command 'fsl'"), "{err}");
+        assert!(
+            err.starts_with("error: unknown command 'freesurfer'"),
+            "{err}"
+        );
         assert!(err.contains("Run 'lx --help'"), "{err}");
 
         let (code, _, err) = run_capture(&["lx", "afni", "3dvolreg"]);

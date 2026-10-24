@@ -31,7 +31,8 @@ fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let prog = "larmorx-nc-bet";
     match args.first().map(String::as_str) {
         Some("-V" | "--version") => {
-            let _ = writeln!(out, "{prog} {}", env!("CARGO_PKG_VERSION"));
+            // The package's name, which larmorx records with a result (`_replica.Selected`).
+            let _ = writeln!(out, "larmorx-nc {}", env!("CARGO_PKG_VERSION"));
             0
         }
         Some("-h" | "--help") => {

@@ -259,6 +259,19 @@ it is unset); it changes no result.
 | AFNI-49 | the help's `-clfrac` default (0.1; the code uses 0.2) | – (text) | – |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing | as for 3dAutomask | AFNI's |
 
+**The rule-B refusals in detail** (added 2026-10-24 from the replicas' observable behaviour and black-box
+runs of AFNI 25.2.09; the clean-room original refuses the same way):
+
+- **AFNI-48 (rule B, refused by default).** `-T2` given three or more times, without `-EPI`,
+  is a fatal error by default, before the input is read: a notice naming AFNI-48 and the
+  message
+  `-T2 given <n> times: give it once (a T2-weighted input) or twice (also clip the bright edges) (AFNI-48; LARMORX_UPSTREAM_DEFECTS=reproduce gives AFNI's result)`,
+  exit 1, nothing written. With
+  `-EPI`, which already implies one `-T2`, any number of `-T2` runs as AFNI runs it. With
+  `reproduce`, AFNI's behaviour (black-box): three or more `-T2` give an output that is
+  neither inverted back nor clipped at the bright edges (the inverted image's unifized
+  result, as written), with a notice naming AFNI-48.
+
 ## 10. Validation
 
 - **Bit-identity** of every output (data and header), exit status and messages with AFNI's

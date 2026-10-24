@@ -114,6 +114,28 @@ impl Elem for f32 {
     }
 }
 
+/// FSL's `volume<char>`: C's `char` (signed on x86-64), written as unsigned bytes
+/// (`DT_UNSIGNED_CHAR`); the bytes go through unchanged.
+impl Elem for i8 {
+    const DTYPE: i16 = dt::UNSIGNED_CHAR;
+    const SIZE: usize = 1;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+    fn from_f32(x: f32) -> Self {
+        c_to_i32(f64::from(x)) as i8
+    }
+    fn from_f64(x: f64) -> Self {
+        c_to_i32(x) as i8
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.push(self as u8);
+    }
+}
+
 impl Elem for f64 {
     const DTYPE: i16 = dt::DOUBLE;
     const SIZE: usize = 8;

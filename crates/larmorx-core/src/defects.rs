@@ -396,6 +396,12 @@ defects! {
         "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
     FSL_42 = "FSL-42", "bet2", true,
         "numeric options without meaning are used as given: a NaN threshold (-f, -g), a negative, NaN or infinite radius (-r), a smoothness of 0 or less (-w), a centre (-c) or search depth (--parameter_d1/d2) that is not finite";
+    FSL_44 = "FSL-44", "bet", true,
+        "the script expands its arguments unquoted: a name with a blank is split into words (an input with a blank is reported not valid, an output with a blank writes other files), and an empty argument ends the options";
+    FSL_45 = "FSL-45", "bet", true,
+        "-Z crops its outputs back with imglob, called without ${FSLDIR}/bin: with FSL's programs off the PATH the outputs stay padded, and with them on every other image whose name starts with the output's is cropped too";
+    FSL_46 = "FSL-46", "bet", true,
+        "the cleanup removes every file whose name starts with <output>_tmp, also files the run did not create";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

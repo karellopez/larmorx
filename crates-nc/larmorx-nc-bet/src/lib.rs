@@ -16,6 +16,7 @@
 //! - [`cli`]: the command lines (`fsl bet`, `fsl bet2`, `fsl betsurf`).
 #![forbid(unsafe_code)]
 
+pub mod avw;
 pub mod bet;
 pub mod bet2;
 pub mod betsurf;

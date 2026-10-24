@@ -735,3 +735,45 @@ def test_mode_must_be_known(monkeypatch):
     monkeypatch.setenv(oc.ENV_MODE, "sometimes")
     with pytest.raises(ValueError):
         core.mode()
+
+
+# ------------------------------------------------------------------------------------------------
+# No duplicate runs: the golden recording reuses a passing smoke tier
+
+
+def _record_golden():
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location(
+        "lx_record_golden", root / "scripts" / "record_golden.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_record_golden_reuses_the_smoke_marker_of_this_commit_and_build(cache):
+    pytest.importorskip("larmorx._core")
+    import hashlib
+
+    import larmorx._core as core
+
+    rg = _record_golden()
+    commit = rg.git("rev-parse", "HEAD")
+    assert rg.smoke_marker() is None  # none written yet
+    built = hashlib.sha256(Path(core.__file__).read_bytes()).hexdigest()
+    path = cache.root / "markers" / f"parity-smoke-{commit}.json"
+    marker = {
+        "commit": commit,
+        "time": "2026-10-24T12:00:00+00:00",
+        "result": "passed",
+        "extension_sha256": built,
+    }
+    store.write_atomic(path, store.dumps(marker))
+    found = rg.smoke_marker()
+    assert found is not None and found[1] == path
+    store.write_atomic(path, store.dumps(marker | {"extension_sha256": "another build"}))
+    assert rg.smoke_marker() is None
+    store.write_atomic(path, store.dumps(marker | {"result": "failed"}))
+    assert rg.smoke_marker() is None

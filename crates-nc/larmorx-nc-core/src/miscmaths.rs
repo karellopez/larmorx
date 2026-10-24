@@ -12,7 +12,6 @@
 //! the rotations' sines and cosines are `float`s (`sincosf` of a `float` angle) and the Euler
 //! angles come from glibc's `atan2f` ([`crate::fdlibm`]).
 
-use larmorx_core::math;
 
 use crate::arma::{self, Mat};
 use crate::fdlibm::atan2f;
@@ -35,10 +34,11 @@ pub fn cross(a: &Mat, b: &Mat) -> Mat {
     Mat::col(&[a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1])
 }
 
-/// `sincosf` of a `float` angle (GCC merges `sin(theta)` and `cos(theta)`): correctly rounded
-/// (CORE-MATH), as the oracle comparisons' CORE-MATH preload makes it.
+/// `sincosf` of a `float` angle (GCC merges `sin(theta)` and `cos(theta)` into one call): the C
+/// library's, as FSL's Linux build computes it (glibc 2.35, FMA build;
+/// [`crate::glibc_float::sincosf`]).
 fn sincosf(theta: f32) -> (f32, f32) {
-    (math::sinf(theta), math::cosf(theta))
+    crate::glibc_float::sincosf(theta)
 }
 
 /// `make_rot(angl, centre, rot)`: the rotation by `|angl|` about the axis `angl` through

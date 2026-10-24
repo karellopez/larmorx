@@ -141,6 +141,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glibc-float-verify"
+version = "0.0.0"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
+ "rayon",
+]
+
+[[package]]
 name = "hybrid-array"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"

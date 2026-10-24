@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: LicenseRef-FSL
+# The larmorx-nc wheel: the `larmorx-nc` program only (maturin's "bin" bindings), no Python
+# module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
+# (docs/licensing.md). Build: `maturin build --release --locked` in this directory.
+#
+# The FSL Licence requires "all original and amended source code" in every transmitted product:
+# the wheel carries both as licence files (in its .dist-info/licenses/): FSL's original source
+# of the replicated parts (fsl-source/) and the Rust translation (the crates' sources).
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "larmorx-nc"
+description = "Bit-exact replicas of FSL tools (mcflirt), run by larmorx as a separate program; FSL Licence: non-commercial use only"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "LicenseRef-FSL"
+# The FSL Licence (LICENSE); the FSL, Armadillo, fdlibm and Arm notices (NOTICE); the texts and
+# notices of the Apache-2.0 larmorx crate and of Arm's MIT code (LICENSES/); FSL's original
+# source (fsl-source/) and the amended source, the Rust translation (the crates below).
+license-files = [
+    "LICENSE",
+    "NOTICE",
+    "LICENSES/*",
+    "fsl-source/README.md",
+    "fsl-source/MANIFEST.tsv",
+    "fsl-source/*/*",
+    "Cargo.toml",
+    "Cargo.lock",
+    "larmorx-nc-*/Cargo.toml",
+    "larmorx-nc-*/PROVENANCE.md",
+    "larmorx-nc-*/src/*.rs",
+    "larmorx-nc-*/src/**/*.rs",
+]
+keywords = ["neuroimaging", "mri", "fmri", "fsl", "motion-correction"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/karellopez/larmorx"
+Source = "https://github.com/karellopez/larmorx/tree/main/crates-nc"
+Issues = "https://github.com/karellopez/larmorx/issues"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "larmorx-nc-cli/Cargo.toml"

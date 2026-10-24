@@ -1012,13 +1012,13 @@ pub fn calc_smoothed_entropy(
     for &n in &jointhist {
         if n > 0.0 {
             let p = n / nv;
-            jointentropy += -p * math::logf(p);
+            jointentropy += -p * crate::glibc_float::logf(p);
         }
     }
     for &n in &marghist1 {
         if n > 0.0 {
             let p = n / nv;
-            margentropy1 += -p * math::logf(p);
+            margentropy1 += -p * crate::glibc_float::logf(p);
         }
     }
     let mut noverlap: f32 = 0.0;
@@ -1026,12 +1026,12 @@ pub fn calc_smoothed_entropy(
         if n > 0.0 {
             noverlap += n;
             let p = n / nv;
-            margentropy2 += -p * math::logf(p);
+            margentropy2 += -p * crate::glibc_float::logf(p);
         }
     }
     if noverlap > 0.0 {
         let nratio = nv / noverlap;
-        let l = math::logf(nratio);
+        let l = crate::glibc_float::logf(nratio);
         jointentropy = nratio * jointentropy - l;
         margentropy1 = nratio * margentropy1 - l;
         margentropy2 = nratio * margentropy2 - l;

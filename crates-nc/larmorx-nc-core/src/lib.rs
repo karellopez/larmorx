@@ -29,6 +29,7 @@ pub mod arma;
 pub mod cnum;
 pub mod costfns;
 pub mod fdlibm;
+pub mod glibc_float;
 pub mod interp;
 pub mod kernel;
 pub mod miscmaths;

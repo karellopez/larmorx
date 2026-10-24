@@ -1,0 +1,12 @@
+[package]
+name = "glibc-float-verify"
+description = "Compares larmorx-nc-core's glibc sinf/cosf/sincosf/logf with the platform's C library on every input, and the C library with correctly rounded maths at mcflirt's arguments (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-nc-core.workspace = true
+rayon.workspace = true

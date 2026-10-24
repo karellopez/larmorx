@@ -7,11 +7,15 @@
 
 use larmorx_core::math;
 
-/// The sine in single precision: C++'s `sin(float)`, i.e. `sinf`. Correctly rounded
-/// (CORE-MATH), as `sinf` is with the CORE-MATH preload of the oracle comparisons.
+use crate::glibc_float;
+
+/// The sine in single precision: C++'s `sin(float)`, i.e. the C library's `sinf`, as FSL's Linux
+/// build computes it (glibc 2.35, FMA build; [`glibc_float::sinf`]). The double `cos` of the
+/// windows is correctly rounded: glibc's agrees with it on every argument the kernels use
+/// (`tools/glibc-float-verify kernel`).
 #[inline]
 pub fn sinf(x: f32) -> f32 {
-    math::sinf(x)
+    glibc_float::sinf(x)
 }
 
 /// A kernel of half-widths `(wx, wy, wz)` sampled at `kx.len()` points over `[-w, w]`

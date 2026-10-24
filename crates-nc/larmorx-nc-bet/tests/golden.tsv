@@ -2,7 +2,7 @@
 # Golden checksums of the BET replicas (tests/golden.rs): SHA-256 of every file that
 # larmorx-nc-bet writes on Linux x86_64 (NIfTI decompressed). Every platform must
 # reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from b5ce765ab0568ab55b8c32d8196a6f5957d6b919+dirty on 2026-10-24 (Linux x86_64)
+# Recorded from 85405255ccb1ba668d6d348831bc76b4fa5a53ff on 2026-10-24 (Linux x86_64)
 # case	file	sha256
 bet.fmri	out.nii	19fd69997bf0f6b7a6a77e8173d5462a35f07f9e563b47d8bd1e94a942206a51
 bet.fmri	out_mask.nii	bc6905ed9eee43b409476fd8f6e9e4be75bd6bd73507c8b0b8c39b70c9e33b9d
